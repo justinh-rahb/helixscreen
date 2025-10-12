@@ -94,6 +94,7 @@ void ui_nav_init() {
     lv_xml_register_subject(NULL, "nav_icon_2_color", &icon_color_subjects[2]);
     lv_xml_register_subject(NULL, "nav_icon_3_color", &icon_color_subjects[3]);
     lv_xml_register_subject(NULL, "nav_icon_4_color", &icon_color_subjects[4]);
+    lv_xml_register_subject(NULL, "nav_icon_5_color", &icon_color_subjects[5]);
 
     // Add observer to active panel subject to update icon colors
     lv_subject_add_observer(&active_panel_subject, active_panel_observer_cb, NULL);
@@ -118,8 +119,8 @@ void ui_nav_wire_events(lv_obj_t* navbar) {
     lv_obj_remove_flag(navbar, LV_OBJ_FLAG_CLICKABLE);
 
     // Name-based widget lookup for navigation buttons and icons
-    const char* button_names[] = {"nav_btn_home", "nav_btn_controls", "nav_btn_filament", "nav_btn_settings", "nav_btn_advanced"};
-    const char* icon_names[] = {"nav_icon_home", "nav_icon_controls", "nav_icon_filament", "nav_icon_settings", "nav_icon_advanced"};
+    const char* button_names[] = {"nav_btn_home", "nav_btn_controls", "nav_btn_filament", "nav_btn_settings", "nav_btn_advanced", "nav_btn_print_select"};
+    const char* icon_names[] = {"nav_icon_home", "nav_icon_controls", "nav_icon_filament", "nav_icon_settings", "nav_icon_advanced", "nav_icon_print_select"};
 
     // Bind colors to icon widgets and add click event handlers to buttons
     for (int i = 0; i < UI_PANEL_COUNT; i++) {

@@ -1,0 +1,50 @@
+<component>
+	<!-- Test Card Component for Dynamic Instantiation -->
+	<view extends="lv_obj"
+	      width="200"
+	      style_bg_color="#card_bg"
+	      style_radius="8"
+	      style_pad_all="12"
+	      flex_flow="column">
+
+		<!-- Placeholder thumbnail (gray square) -->
+		<lv_obj name="card_thumbnail"
+		        width="176"
+		        height="176"
+		        style_bg_color="#card_bg_dark"
+		        style_radius="6"/>
+
+		<!-- Filename label -->
+		<lv_label name="card_filename"
+		          text="test.gcode"
+		          style_text_font="montserrat_16"
+		          style_text_color="#text_primary"
+		          style_pad_top="8"/>
+
+		<!-- Metadata row -->
+		<lv_obj flex_flow="row" style_pad_gap="12" style_pad_top="4">
+			<!-- Print time -->
+			<lv_obj flex_flow="row" style_pad_gap="4">
+				<lv_label text="#icon_clock"
+				          style_text_font="fa_icons_16"
+				          style_text_color="#primary_color"/>
+				<lv_label name="card_print_time"
+				          text="0m"
+				          style_text_font="montserrat_16"
+				          style_text_color="#primary_color"/>
+			</lv_obj>
+
+			<!-- Filament weight -->
+			<lv_obj flex_flow="row" style_pad_gap="4">
+				<lv_label text="#icon_leaf"
+				          style_text_font="fa_icons_16"
+				          style_text_color="#primary_color"/>
+				<lv_label name="card_filament"
+				          text="0g"
+				          style_text_font="montserrat_16"
+				          style_text_color="#primary_color"/>
+			</lv_obj>
+		</lv_obj>
+
+	</view>
+</component>

@@ -5,6 +5,7 @@
 		<color name="bg_dark" value="0x1a1a1a"/>
 		<color name="panel_bg" value="0x111410"/>
 		<color name="card_bg" value="0x202020"/>
+		<color name="card_bg_dark" value="0x3a3d42"/>
 
 		<!-- Text colors -->
 		<color name="text_primary" value="0xffffff"/>

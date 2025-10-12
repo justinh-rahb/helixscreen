@@ -9,6 +9,7 @@ typedef enum {
     UI_PANEL_FILAMENT,
     UI_PANEL_SETTINGS,
     UI_PANEL_ADVANCED,
+    UI_PANEL_PRINT_SELECT,
     UI_PANEL_COUNT
 } ui_panel_id_t;
 

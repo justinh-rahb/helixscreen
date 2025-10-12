@@ -59,7 +59,7 @@ TEST_BIN := $(BIN_DIR)/run_tests
 TEST_SRCS := $(wildcard $(TEST_UNIT_DIR)/*.cpp)
 TEST_OBJS := $(patsubst $(TEST_UNIT_DIR)/%.cpp,$(OBJ_DIR)/tests/%.o,$(TEST_SRCS))
 
-.PHONY: all clean run test
+.PHONY: all clean run test test-cards
 
 all: $(TARGET)
 
@@ -134,4 +134,23 @@ $(OBJ_DIR)/tests/%.o: $(TEST_UNIT_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	@echo "Compiling test: $<..."
 	@$(CXX) $(CXXFLAGS) -I$(TEST_FRAMEWORK_DIR) $(INCLUDES) $(LV_CONF) -c $< -o $@
+
+# Dynamic card instantiation test
+TEST_CARDS_BIN := $(BIN_DIR)/test_dynamic_cards
+TEST_CARDS_OBJ := $(OBJ_DIR)/test_dynamic_cards.o
+
+test-cards: $(TEST_CARDS_BIN)
+	@echo "Running dynamic card test..."
+	@$(TEST_CARDS_BIN)
+
+$(TEST_CARDS_BIN): $(TEST_CARDS_OBJ) $(LVGL_OBJS) $(FONT_OBJS)
+	@mkdir -p $(BIN_DIR)
+	@echo "Linking test_dynamic_cards..."
+	@$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+	@echo "✓ Test binary ready: $@"
+
+$(TEST_CARDS_OBJ): $(SRC_DIR)/test_dynamic_cards.cpp
+	@mkdir -p $(dir $@)
+	@echo "Compiling $<..."
+	@$(CXX) $(CXXFLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@
 
