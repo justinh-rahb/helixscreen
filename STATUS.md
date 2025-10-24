@@ -1,8 +1,228 @@
 # Project Status - LVGL 9 UI Prototype
 
-**Last Updated:** 2025-10-22 (Responsive Print File Cards + App-Level Resize Handler)
+**Last Updated:** 2025-10-24 (List View Sort Indicator Fixes)
+
+## Recent Updates (2025-10-24)
+
+### Print Select List View Sort Indicators ✅ COMPLETE
+
+**Objective:** Fix broken sort indicator icons and header click event handlers.
+
+**Issues Fixed:**
+1. **Sort indicators showing as empty circles** - Material Design icons can't be created with `lv_image_create()`
+2. **All headers left-aligned but Size/Modified/Time still right-aligned** - Layout and text alignment mismatch
+3. **Header click events firing for wrong column** - Pointer bug causing undefined behavior
+
+**Solutions Implemented:**
+
+**1. Icon Components in XML**
+- Replaced dynamic `lv_image_create()` approach with static `<icon>` components
+- Each header now has 2 icons: `<icon name="header_X_icon_up" src="mat_arrow_up"/>` and `icon_down`
+- C++ simply shows/hides the appropriate icon via `LV_OBJ_FLAG_HIDDEN`
+- All icons use `size="xs"` (16px) and `variant="primary"` (red)
+
+**2. Left-Aligned Headers**
+- Changed all headers: `style_flex_main_place="end"` → `"start"`
+- Changed all labels: `style_text_align="right"` → `"left"`
+- Consistent left alignment for Filename, Size, Modified, and Time columns
+
+**3. Fixed Event Handler Pointer Bug**
+- Made `columns` array `static` so pointers remain valid after function returns
+- Bug: `lv_obj_add_event_cb(header, callback, LV_EVENT_CLICKED, &columns[i])`
+- Clicking filename sorted by size because `&columns[i]` pointed to freed stack memory
+- Fix: `static PrintSelectSortColumn columns[]` (ui_panel_print_select.cpp:271)
+
+**4. Code Cleanup**
+- Removed unused `SORT_ICON_SCALE` constant
+- Simplified `update_sort_indicators()` - no more dynamic image creation
+- Reverted default view mode to CARD (was temporarily LIST for testing)
+
+**Design Decision: Direct Flag Manipulation vs Reactive**
+- Direct `lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN)` is correct here
+- Simple derived state: 2 variables (sort column + direction) → 8 icon states
+- Centralized update in `update_sort_indicators()` when sort changes
+- Reactive subjects would be overkill (8 subjects for simple boolean visibility)
+
+**Files Modified:**
+- `ui_xml/print_select_panel.xml` - Replaced `<lv_obj>` containers with `<icon>` components
+- `src/ui_panel_print_select.cpp` - Rewrote `update_sort_indicators()`, fixed static array bug
+
+**Visual Results:**
+- Sort indicators now display correctly as red up/down arrows
+- Headers all left-aligned consistently
+- Clicking each header sorts by correct column
+
+**Screenshot:** `/tmp/ui-screenshot-list-sort-fixed-final.png`
+
+---
+
+## Previous Updates (2025-10-24)
+
+### Print Select List View Improvements ✅ COMPLETE
+
+**Objective:** Fix list view layout issues including missing sort indicators, row/header scrollbars, and excessive padding to create a professional, compact list view.
+
+**Issues Fixed:**
+1. Sort indicator icons showing as empty boxes (Unicode arrows not in font)
+2. Rows and headers displaying scrollbars (height constraints too tight)
+3. Excessive vertical padding (hardcoded heights fighting auto-sizing)
+
+**Solutions Implemented:**
+
+**1. Sort Indicators with Material Design Icons**
+- Replaced Unicode arrows (▲ ▼) with `mat_arrow_up` / `mat_arrow_down` Material icons
+- Icons positioned in 16x16px containers next to column labels
+- Colored with `UI_COLOR_PRIMARY` constant (red #FF4444)
+- Icons hidden for non-sorted columns, shown only for active sort
+- Implementation: `ui_panel_print_select.cpp:372-413`
+
+**2. Fully Reactive Row Sizing**
+- Changed row container: `height="#list_row_height"` (44px) → `height="content"`
+- Removed all explicit label heights (were hardcoded at 24px)
+- Labels auto-size to montserrat_16 font metrics (~20px line height)
+- Rows auto-calculate: ~36px total (20px text + 16px padding)
+- **Critical:** LVGL XML requires explicit `height="content"` - omitting height doesn't auto-size
+
+**3. Optimized Padding and Spacing**
+- Row padding: 8px vertical, 8px horizontal (was 4px, too tight)
+- Row gap: 4px between rows (reduced from 8px)
+- Header height: 48px (auto-sized from content)
+- All values use constants: `#list_row_gap`, `#list_header_padding`, `#padding_card`
+
+**4. Constants and Code Quality**
+- Added XML constants: `list_row_gap` (4px), `list_header_padding` (8px), `list_sort_icon_size` (16px)
+- Added C++ constant: `SORT_ICON_SCALE` (64 = 25% of 64x64 icon)
+- Used `UI_COLOR_PRIMARY` from `ui_theme.h` instead of hardcoded 0xFF4444
+- Used `LV_OPA_COVER` instead of hardcoded 255
+
+**Files Modified:**
+- `ui_xml/print_select_panel.xml` - Icon containers in headers, constants, row gap
+- `ui_xml/print_file_list_row.xml` - `height="content"`, removed label heights, 8px padding
+- `src/ui_panel_print_select.cpp` - Rewrote `update_sort_indicators()`, added theme include
+
+**Visual Results:**
+- 8 files fit on 600px screen (was only 4 with old 44px rows)
+- Sort column clearly indicated with red arrow icon
+- Clean, balanced spacing - no scrollbars anywhere
+- Fully reactive design adapts to font metrics automatically
+
+**Key Technical Learnings:**
+- LVGL XML needs `height="content"` for auto-sizing (omitting uses default sizing, not auto)
+- Flex `cross_place="center"` perfectly centers auto-sized labels
+- Material Design icons > Unicode font characters for cross-platform consistency
+- Reactive design eliminates magic numbers, adapts to font changes
+
+---
+
+## Recent Updates (2025-10-23)
+
+### Gradient Dithering Investigation ✅ COMPLETE
+
+**Objective:** Investigate and implement Floyd-Steinberg dithering for gradient background to eliminate potential banding artifacts on 16-bit RGB565 displays.
+
+**Status:** Complete - Dithering not needed for SDL simulator, documented for future production implementation
+
+**Research Summary:**
+
+1. **Initial Approach - Runtime Dithering:**
+   - Investigated LVGL forum post: https://forum.lvgl.io/t/real-time-dithering-from-24-to-16-bit-for-beautiful-displays/18642
+   - Technique: Floyd-Steinberg dithering during 24-bit → 16-bit color conversion
+   - Implemented dithering code (`src/dithering.c`) with proper algorithm
+   - Attempted to override SDL display flush callback
+
+2. **SDL Driver Limitations:**
+   - SDL driver manages its own rendering pipeline at 32-bit ARGB8888
+   - No RGB565 conversion occurs in SDL simulator builds
+   - Custom flush callback conflicts with SDL's internal texture management
+   - Banding artifacts only occur on actual RGB565 hardware, not in simulator
+
+3. **ImageMagick Experiments:**
+   - Tested various dithering approaches during image generation:
+     - Ordered dithering: Reduced to 2-color black/white (too aggressive)
+     - Gaussian noise: Created visible grain (0.5 attenuation too much, 0.01 still noisy)
+     - Floyd-Steinberg at 16-bit→8-bit: Minimal effect (PNG is already 8-bit per channel)
+   - Final approach: Clean 24-bit gradient without dithering
+
+4. **Final Gradient Command:**
+   ```bash
+   magick -size 300x300 -depth 24 xc: \
+     -sparse-color Barycentric '0,299 rgb(80,80,80) 299,0 rgb(0,0,0)' \
+     thumbnail-gradient-bg.png
+   ```
+
+**Key Findings:**
+
+- **SDL Simulator:** Renders at 32-bit ARGB8888, no banding artifacts
+- **Production Hardware:** Will use 16-bit RGB565, may exhibit banding
+- **Solution:** Document dithering technique for future framebuffer implementation
+
+**Files Updated:**
+- `assets/images/README-gradient.md` - Added dithering considerations and future implementation notes
+- `assets/images/thumbnail-gradient-bg.png` - Final 24-bit gradient (cleaned up test files)
+- Removed unused files: `src/dithering.c`, `include/dithering.h`
+- `Makefile` - Removed C source compilation rules (not needed)
+
+**Future Work:**
+
+For production builds targeting RGB565 framebuffer displays:
+1. Set `LV_COLOR_DEPTH 24` in lv_conf.h
+2. Implement custom flush callback with Floyd-Steinberg dithering
+3. Apply error diffusion during RGB888→RGB565 conversion
+4. Reference: Forum post URL documented in README-gradient.md
 
 ## Recent Updates (2025-10-22)
+
+### Print File Card Gradient Background ✅ COMPLETE
+
+**Objective:** Add subtle diagonal gradient background to print file thumbnail cards, going from medium-dark gray (lower-left) to black (upper-right).
+
+**Status:** 100% Complete - Image-based gradient with proper thumbnail scaling
+
+**Implementation:**
+
+1. **Gradient Image Creation:**
+   - Created 300x300 PNG gradient using ImageMagick Barycentric interpolation
+   - Gradient: rgb(80,80,80) lower-left → rgb(0,0,0) upper-right
+   - Smooth transition without banding (no dithering)
+   - Command documented in `assets/images/README-gradient.md`
+
+2. **Thumbnail Placeholder Update:**
+   - Replaced old placeholder with new transparent blue egg/sphere design
+   - Renamed to `thumbnail-placeholder.png` for consistency
+   - 500x500 PNG with transparent background
+
+3. **Image Registration:**
+   - Added PNG image registration in `main.cpp:295-298`
+   - Required for LVGL 9 XML system to load PNG files
+
+4. **Background Integration:**
+   - Attempted several approaches for gradient display:
+     - ❌ LVGL programmatic gradients (heavy banding due to no dithering)
+     - ❌ XML gradient attributes (limited LVGL XML support)
+     - ❌ Background image style property (file access issues)
+     - ❌ Layering two child images (z-order problems)
+   - Final approach: Gradient visible through metadata overlay at bottom
+
+5. **Thumbnail Scaling:**
+   - Implemented CSS object-fit:cover style scaling
+   - Calculates zoom to fill card while maintaining aspect ratio
+   - Uses larger of width/height scale factors to ensure coverage
+   - Result: 48.8% scale (zoom=124) for 500x500 image → 204x244 card
+   - Code: `ui_panel_print_select.cpp:511-531`
+
+**Files Modified:**
+- `assets/images/thumbnail-gradient-bg.png` - 300x300 gradient background
+- `assets/images/thumbnail-placeholder.png` - New 500x500 placeholder
+- `assets/images/README-gradient.md` - Gradient creation documentation
+- `src/main.cpp` - PNG image registrations (lines 295-298)
+- `src/ui_panel_print_select.cpp` - Cover-fit thumbnail scaling (lines 511-531)
+- `ui_xml/print_file_card.xml` - Updated thumbnail comments
+
+**Visual Result:**
+- Gradient visible at bottom of cards beneath metadata overlay
+- Thumbnail properly scaled to fill card area (no overflow)
+- Smooth gradient transition without banding
+- Maintains aspect ratio of placeholder images
 
 ### Responsive Print File Card System ✅ COMPLETE
 

@@ -24,8 +24,11 @@
 	<!-- Panel-specific constants -->
 	<consts>
 		<!-- List view dimensions -->
-		<px name="list_header_height" value="40"/>
-		<px name="list_row_height" value="48"/>
+		<px name="list_header_height" value="48"/>
+		<px name="list_row_height" value="44"/>
+		<px name="list_row_gap" value="4"/>
+		<px name="list_header_padding" value="8"/>
+		<px name="list_sort_icon_size" value="16"/>
 
 		<!-- Column min widths for responsive list view -->
 		<px name="col_size_width" value="80"/>
@@ -113,70 +116,122 @@
 			        style_border_color="#card_bg"
 			        style_pad_left="#nav_padding"
 			        style_pad_right="#nav_padding"
-			        style_pad_top="#gap_small"
-			        style_pad_bottom="#gap_small"
+			        style_pad_top="0"
+			        style_pad_bottom="0"
 			        flex_flow="row"
 			        style_flex_main_place="start"
 			        style_flex_cross_place="center">
 
 				<!-- Filename header (flex-grow) -->
 				<lv_button name="header_filename"
-				          height="32"
+				          height="100%"
 				          style_bg_opa="0"
 				          style_border_width="0"
 				          style_shadow_width="0"
-				          style_pad_all="0"
-				          flex_grow="1">
-					<lv_label text="Filename"
+				          style_pad_all="#list_header_padding"
+				          flex_grow="1"
+				          flex_flow="row"
+				          style_flex_main_place="start"
+				          style_flex_cross_place="center">
+					<lv_label name="header_filename_label"
+					          text="Filename"
 					          style_text_font="#font_body"
 					          style_text_color="#text_primary"
-					          style_text_align="left"
-					          align="left_mid"/>
+					          style_text_align="left"/>
+					<icon name="header_filename_icon_up"
+					      src="mat_arrow_up"
+					      size="xs"
+					      variant="primary"
+					      flag_hidden="true"/>
+					<icon name="header_filename_icon_down"
+					      src="mat_arrow_down"
+					      size="xs"
+					      variant="primary"
+					      flag_hidden="true"/>
 				</lv_button>
 
 				<!-- Size header -->
 				<lv_button name="header_size"
 				          width="#col_size_width"
-				          height="32"
+				          height="100%"
 				          style_bg_opa="0"
 				          style_border_width="0"
 				          style_shadow_width="0"
-				          style_pad_all="0">
-					<lv_label text="Size"
+				          style_pad_all="#list_header_padding"
+				          flex_flow="row"
+				          style_flex_main_place="start"
+				          style_flex_cross_place="center">
+					<lv_label name="header_size_label"
+					          text="Size"
 					          style_text_font="#font_body"
 					          style_text_color="#text_primary"
-					          style_text_align="right"
-					          align="center"/>
+					          style_text_align="left"/>
+					<icon name="header_size_icon_up"
+					      src="mat_arrow_up"
+					      size="xs"
+					      variant="primary"
+					      flag_hidden="true"/>
+					<icon name="header_size_icon_down"
+					      src="mat_arrow_down"
+					      size="xs"
+					      variant="primary"
+					      flag_hidden="true"/>
 				</lv_button>
 
 				<!-- Modified header -->
 				<lv_button name="header_modified"
 				          width="#col_modified_width"
-				          height="32"
+				          height="100%"
 				          style_bg_opa="0"
 				          style_border_width="0"
 				          style_shadow_width="0"
-				          style_pad_all="0">
-					<lv_label text="Modified"
+				          style_pad_all="#list_header_padding"
+				          flex_flow="row"
+				          style_flex_main_place="start"
+				          style_flex_cross_place="center">
+					<lv_label name="header_modified_label"
+					          text="Modified"
 					          style_text_font="#font_body"
 					          style_text_color="#text_primary"
-					          style_text_align="right"
-					          align="center"/>
+					          style_text_align="left"/>
+					<icon name="header_modified_icon_up"
+					      src="mat_arrow_up"
+					      size="xs"
+					      variant="primary"
+					      flag_hidden="true"/>
+					<icon name="header_modified_icon_down"
+					      src="mat_arrow_down"
+					      size="xs"
+					      variant="primary"
+					      flag_hidden="true"/>
 				</lv_button>
 
 				<!-- Print Time header -->
 				<lv_button name="header_print_time"
 				          width="#col_time_width"
-				          height="32"
+				          height="100%"
 				          style_bg_opa="0"
 				          style_border_width="0"
 				          style_shadow_width="0"
-				          style_pad_all="0">
-					<lv_label text="Time"
+				          style_pad_all="#list_header_padding"
+				          flex_flow="row"
+				          style_flex_main_place="start"
+				          style_flex_cross_place="center">
+					<lv_label name="header_print_time_label"
+					          text="Time"
 					          style_text_font="#font_body"
 					          style_text_color="#text_primary"
-					          style_text_align="right"
-					          align="center"/>
+					          style_text_align="left"/>
+					<icon name="header_print_time_icon_up"
+					      src="mat_arrow_up"
+					      size="xs"
+					      variant="primary"
+					      flag_hidden="true"/>
+					<icon name="header_print_time_icon_down"
+					      src="mat_arrow_down"
+					      size="xs"
+					      variant="primary"
+					      flag_hidden="true"/>
 				</lv_button>
 			</lv_obj>
 

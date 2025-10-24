@@ -21,6 +21,7 @@
 #include "ui_panel_print_select.h"
 #include "ui_utils.h"
 #include "ui_fonts.h"
+#include "ui_theme.h"
 #include "lvgl/src/others/xml/lv_xml.h"
 #include <string>
 #include <vector>
@@ -28,7 +29,7 @@
 #include <ctime>
 
 // Default placeholder thumbnail for print files
-static const char* DEFAULT_PLACEHOLDER_THUMB = "A:assets/images/placeholder_thumb_centered.png";
+static const char* DEFAULT_PLACEHOLDER_THUMB = "A:assets/images/thumbnail-placeholder.png";
 
 // ============================================================================
 // File data structure
@@ -144,7 +145,7 @@ static CardDimensions calculate_card_dimensions(lv_obj_t* container) {
 // Static state
 // ============================================================================
 static std::vector<PrintFileData> file_list;
-static PrintSelectViewMode current_view_mode = PrintSelectViewMode::CARD;
+static PrintSelectViewMode current_view_mode = PrintSelectViewMode::CARD;  // Default view mode
 static PrintSelectSortColumn current_sort_column = PrintSelectSortColumn::FILENAME;
 static PrintSelectSortDirection current_sort_direction = PrintSelectSortDirection::ASCENDING;
 
@@ -261,12 +262,13 @@ void ui_panel_print_select_setup(lv_obj_t* panel_root, lv_obj_t* parent_screen) 
     }, LV_EVENT_CLICKED, nullptr);
 
     // Wire up column header click handlers
-    const char* header_names[] = {"header_filename", "header_size", "header_modified",
-                                  "header_print_time"};
-    PrintSelectSortColumn columns[] = {PrintSelectSortColumn::FILENAME,
-                                       PrintSelectSortColumn::SIZE,
-                                       PrintSelectSortColumn::MODIFIED,
-                                       PrintSelectSortColumn::PRINT_TIME};
+    static const char* header_names[] = {"header_filename", "header_size", "header_modified",
+                                         "header_print_time"};
+    // IMPORTANT: Static storage so pointers remain valid after function returns
+    static PrintSelectSortColumn columns[] = {PrintSelectSortColumn::FILENAME,
+                                              PrintSelectSortColumn::SIZE,
+                                              PrintSelectSortColumn::MODIFIED,
+                                              PrintSelectSortColumn::PRINT_TIME};
 
     for (int i = 0; i < 4; i++) {
         lv_obj_t* header = lv_obj_find_by_name(panel_root, header_names[i]);
@@ -370,29 +372,38 @@ void ui_panel_print_select_sort_by(PrintSelectSortColumn column) {
 }
 
 static void update_sort_indicators() {
-    // Update column header labels to show sort direction
+    // Update column header icons to show sort direction
     const char* header_names[] = {"header_filename", "header_size", "header_modified",
                                   "header_print_time"};
-    const char* column_labels[] = {"Filename", "Size", "Modified", "Time"};
     PrintSelectSortColumn columns[] = {PrintSelectSortColumn::FILENAME,
                                        PrintSelectSortColumn::SIZE,
                                        PrintSelectSortColumn::MODIFIED,
                                        PrintSelectSortColumn::PRINT_TIME};
 
     for (int i = 0; i < 4; i++) {
-        lv_obj_t* header = lv_obj_find_by_name(panel_root_widget, header_names[i]);
-        if (header) {
-            // Get label child
-            lv_obj_t* label = lv_obj_get_child(header, 0);
-            if (label) {
-                char text[64];
-                if (columns[i] == current_sort_column) {
-                    const char* arrow = (current_sort_direction == PrintSelectSortDirection::ASCENDING) ? "▲" : "▼";
-                    snprintf(text, sizeof(text), "%s %s", column_labels[i], arrow);
+        // Find both up and down icon components
+        char icon_up_name[64];
+        char icon_down_name[64];
+        snprintf(icon_up_name, sizeof(icon_up_name), "%s_icon_up", header_names[i]);
+        snprintf(icon_down_name, sizeof(icon_down_name), "%s_icon_down", header_names[i]);
+
+        lv_obj_t* icon_up = lv_obj_find_by_name(panel_root_widget, icon_up_name);
+        lv_obj_t* icon_down = lv_obj_find_by_name(panel_root_widget, icon_down_name);
+
+        if (icon_up && icon_down) {
+            if (columns[i] == current_sort_column) {
+                // Show appropriate arrow icon, hide the other
+                if (current_sort_direction == PrintSelectSortDirection::ASCENDING) {
+                    lv_obj_remove_flag(icon_up, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_add_flag(icon_down, LV_OBJ_FLAG_HIDDEN);
                 } else {
-                    snprintf(text, sizeof(text), "%s", column_labels[i]);
+                    lv_obj_add_flag(icon_up, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_remove_flag(icon_down, LV_OBJ_FLAG_HIDDEN);
                 }
-                lv_label_set_text(label, text);
+            } else {
+                // Hide both icons for non-sorted columns
+                lv_obj_add_flag(icon_up, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_add_flag(icon_down, LV_OBJ_FLAG_HIDDEN);
             }
         }
     }
@@ -494,6 +505,10 @@ static void populate_card_view() {
             lv_obj_set_height(card, dims.card_height);
             lv_obj_set_style_flex_grow(card, 0, LV_PART_MAIN);  // Disable flex_grow
 
+            // Set gradient background image on card root
+            lv_obj_set_style_bg_image_src(card, "A:assets/images/thumbnail-gradient-bg.png", LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(card, LV_OPA_COVER, LV_PART_MAIN);
+
             // Calculate proper filename label height based on font
             lv_obj_t* filename_label = lv_obj_find_by_name(card, "filename_label");
             if (filename_label) {
@@ -504,20 +519,25 @@ static void populate_card_view() {
                 }
             }
 
-            // Scale thumbnail image to fill card width
+            // Scale thumbnail to fill card (cover fit - may crop)
             lv_obj_t* thumbnail = lv_obj_find_by_name(card, "thumbnail");
             if (thumbnail) {
-                // Get image source size
-                int32_t img_w = lv_image_get_src_width(thumbnail);
-                int32_t img_h = lv_image_get_src_height(thumbnail);
+                // Get the source image dimensions
+                lv_image_header_t header;
+                lv_result_t res = lv_image_decoder_get_info(lv_image_get_src(thumbnail), &header);
 
-                if (img_w > 0 && img_h > 0) {
-                    // Calculate zoom to make width fill card (256 = 100% scale)
-                    uint16_t zoom = (dims.card_width * 256) / img_w;
+                if (res == LV_RESULT_OK && header.w > 0 && header.h > 0) {
+                    // Calculate scale to cover the card (like CSS object-fit: cover)
+                    float scale_w = (float)dims.card_width / header.w;
+                    float scale_h = (float)dims.card_height / header.h;
+                    float scale = (scale_w > scale_h) ? scale_w : scale_h;  // Use larger scale to cover
+
+                    uint16_t zoom = (uint16_t)(scale * 256);
                     lv_image_set_scale(thumbnail, zoom);
+                    lv_image_set_inner_align(thumbnail, LV_IMAGE_ALIGN_CENTER);
 
-                    LV_LOG_USER("Thumbnail zoom: img=%dx%d, card_width=%d, zoom=%d",
-                               img_w, img_h, dims.card_width, zoom);
+                    LV_LOG_USER("Thumbnail scale: img=%dx%d, card=%dx%d, zoom=%d (%.1f%%)",
+                               header.w, header.h, dims.card_width, dims.card_height, zoom, scale * 100);
                 }
             }
 
