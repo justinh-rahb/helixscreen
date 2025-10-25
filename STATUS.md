@@ -1,8 +1,39 @@
 # Project Status - LVGL 9 UI Prototype
 
-**Last Updated:** 2025-10-25 (Motion Panel Touch Feedback)
+**Last Updated:** 2025-10-25 (Navigation History Stack Bug Fix)
 
 ## Recent Updates (2025-10-25)
+
+### Navigation History Stack: Overlay Panel Parent Hierarchy Bug ✅ FIXED
+
+**Bug:** When navigating Home → Controls → Motion → Back, the motion panel remained visible instead of being hidden by the navigation system.
+
+**Root Cause:** Overlay panels (motion, nozzle temp, bed temp, extrusion) were being created as children of `content_area` instead of `screen`. The defensive hide logic in `ui_nav_go_back()` scans direct children of screen to find and hide overlay panels, so it never found these panels.
+
+**Investigation Process:**
+1. Added debug logging to trace navigation stack behavior
+2. Discovered defensive hide was scanning screen children but motion panel wasn't there
+3. Traced panel creation to `ui_panel_controls_wire_events()` which was using `lv_obj_get_parent(panel_obj)` to get parent reference
+4. This gave `content_area` (parent of controls panel) instead of `screen`
+
+**Solution:** Changed `ui_panel_controls_wire_events()` to accept screen parameter explicitly instead of deriving parent. This ensures all overlay panels are created as direct children of screen where navigation system can find them.
+
+**Files Modified:**
+- `include/ui_panel_controls.h` (line 47) - Added screen parameter to function signature
+- `src/ui_panel_controls.cpp` (lines 51-58) - Accept and use screen parameter directly
+- `src/main.cpp` (line 385) - Pass screen parameter to wire_events call
+- `src/ui_nav.cpp` (lines 367-403) - Added debug logging, removed "already hidden" check from defensive hide
+
+**Testing:**
+- Interactive testing: Home → Controls → Motion → Back now works correctly
+- Automated testing: All 4 screen sizes validated (tiny: 480x320, small: 800x480, medium: 1024x600, large: 1280x720)
+- Navigation history stack verified working as expected across all navigation paths
+
+**Pattern Documentation:**
+- Documented in HANDOFF.md Pattern #0: Navigation History Stack
+- Critical reminder: Always create overlay panels as direct children of screen, not content_area
+
+---
 
 ### Motion Panel Bottom Button Row Responsive Height ✅ COMPLETE
 
