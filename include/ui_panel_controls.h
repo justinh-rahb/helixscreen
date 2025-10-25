@@ -42,8 +42,9 @@ void ui_panel_controls_init_subjects();
  * Wires click handlers to each launcher card.
  *
  * @param panel_obj The controls panel object returned from lv_xml_create()
+ * @param screen The screen object (parent for overlay panels)
  */
-void ui_panel_controls_wire_events(lv_obj_t* panel_obj);
+void ui_panel_controls_wire_events(lv_obj_t* panel_obj, lv_obj_t* screen);
 
 /**
  * @brief Get the controls panel object

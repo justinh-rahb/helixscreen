@@ -48,14 +48,14 @@ void ui_panel_controls_init_subjects() {
     LV_LOG_USER("Controls panel subjects initialized");
 }
 
-void ui_panel_controls_wire_events(lv_obj_t* panel_obj) {
+void ui_panel_controls_wire_events(lv_obj_t* panel_obj, lv_obj_t* screen) {
     if (!panel_obj) {
         LV_LOG_ERROR("Cannot wire controls panel events: null panel object");
         return;
     }
 
-    // Store parent screen reference (needed for motion panel creation)
-    parent_screen = lv_obj_get_parent(panel_obj);
+    // Store screen reference (needed for overlay panel creation)
+    parent_screen = screen;
 
     // Find launcher card objects by name
     lv_obj_t* card_motion = lv_obj_find_by_name(panel_obj, "card_motion");

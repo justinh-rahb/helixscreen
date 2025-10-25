@@ -367,18 +367,19 @@ void ui_nav_push_overlay(lv_obj_t* overlay_panel) {
 }
 
 bool ui_nav_go_back() {
-    // DEFENSIVE: Always hide any visible overlay panels (not in panel_widgets)
+    LV_LOG_USER("=== ui_nav_go_back() called, stack depth: %zu ===", panel_stack.size());
+
+    // DEFENSIVE: Always hide any overlay panels (not in panel_widgets)
     // This handles cases where panels were shown via command line or other means
     lv_obj_t* screen = lv_screen_active();
     if (screen) {
+        LV_LOG_USER("Scanning %u screen children for overlays to hide", lv_obj_get_child_count(screen));
         for (uint32_t i = 0; i < lv_obj_get_child_count(screen); i++) {
             lv_obj_t* child = lv_obj_get_child(screen, i);
-            if (lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) {
-                continue;  // Already hidden
-            }
 
             // Don't hide app_layout (contains navbar + panels)
             if (child == app_layout_widget) {
+                LV_LOG_USER("  Child %u: app_layout (skip)", i);
                 continue;
             }
 
@@ -391,10 +392,12 @@ bool ui_nav_go_back() {
                 }
             }
 
-            // Hide any visible overlay panel
+            // Hide any overlay panel (even if already hidden, for consistency)
             if (!is_main_panel) {
                 lv_obj_add_flag(child, LV_OBJ_FLAG_HIDDEN);
-                LV_LOG_USER("Hiding visible overlay panel %p (defensive hide)", child);
+                LV_LOG_USER("  Child %u: %p - HIDING overlay panel", i, child);
+            } else {
+                LV_LOG_USER("  Child %u: %p - main panel (skip)", i, child);
             }
         }
     }

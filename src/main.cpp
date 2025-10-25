@@ -382,7 +382,7 @@ int main(int argc, char** argv) {
 
     // Setup controls panel (wire launcher card click handlers)
     ui_panel_controls_set(panels[UI_PANEL_CONTROLS]);
-    ui_panel_controls_wire_events(panels[UI_PANEL_CONTROLS]);
+    ui_panel_controls_wire_events(panels[UI_PANEL_CONTROLS], screen);
 
     // Setup print select panel (wires up events, creates overlays, NOTE: data populated later)
     ui_panel_print_select_setup(panels[UI_PANEL_PRINT_SELECT], screen);
