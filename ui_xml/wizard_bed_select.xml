@@ -29,7 +29,7 @@
 	      style_border_width="0"
 	      style_pad_all="0"
 	      flex_flow="column"
-	      flex_align="start center start"
+	      style_flex_main_place="start" style_flex_cross_place="center"
 	      name="wizard_bed_select_root">
 
 		<!-- Help text -->
@@ -49,7 +49,7 @@
 		        style_pad_all="#padding_normal"
 		        style_pad_gap="#gap_normal"
 		        flex_flow="column"
-		        flex_align="start start start">
+		        style_flex_main_place="start" style_flex_cross_place="start">
 
 			<!-- Heater selection -->
 			<lv_label text="Bed Heater"
