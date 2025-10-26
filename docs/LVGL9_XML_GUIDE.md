@@ -1238,38 +1238,95 @@ Source: `/lvgl/src/others/xml/lv_xml_style.c:240-241`
 
 ### Common Issues
 
-#### ⚠️ LV_SIZE_CONTENT not working correctly (CRITICAL)
+#### ⚠️ LV_SIZE_CONTENT Evaluation to Zero (CRITICAL)
 
-**Issue:** `LV_SIZE_CONTENT` frequently fails to calculate correct dimensions, especially for labels inside XML components with property substitution.
+**Issue:** `LV_SIZE_CONTENT` frequently evaluates to 0, causing widgets to be invisible or improperly sized.
 
 **Symptoms:**
 - Labels with `width="LV_SIZE_CONTENT"` render with zero width (invisible)
-- Cards with `height="LV_SIZE_CONTENT"` get unexpected scrollbars
-- Flex layouts don't size children correctly when using LV_SIZE_CONTENT
+- Containers with `height="LV_SIZE_CONTENT"` collapse to 0 height
+- Flex layouts show children at (0,0) with no size
 
-**Root Cause:** LVGL's auto-sizing calculations don't always work correctly in XML context, particularly when:
-- Using API properties (`$property_name`)
-- Inside flex containers
-- With dynamically created components
+**Root Cause - Deferred Layout Calculation:**
 
-**Fix:** **ALWAYS use explicit pixel dimensions instead of LV_SIZE_CONTENT**
+LVGL 9 uses **deferred layout** where sizes aren't calculated immediately when set. Layout updates happen in multiple passes:
+
+1. Children are processed first (recursively)
+2. Parent's size is refreshed via `lv_obj_refr_size()`
+3. Layout is applied to children
+
+When `lv_obj_refr_size()` calculates `LV_SIZE_CONTENT`, it reads child coordinates to determine the bounding box. **If children haven't been laid out yet**, their coordinates are still at defaults (0x0), causing the parent to calculate size as 0.
+
+**Source:** `lvgl/src/core/lv_obj_pos.c:1077-1170, 1224-1247`
+
+**When LV_SIZE_CONTENT Evaluates to Zero:**
+
+1. **Container queried before layout completes** - Layout update deferred via `layout_inv` flag
+2. **Flex container with children that also have LV_SIZE_CONTENT** - Circular dependency detected
+3. **Parent with LV_SIZE_CONTENT + child with percentage width** - Deliberately sized to 0 to prevent infinite loops (see `lvgl/src/core/lv_obj_pos.c:114-123`)
+4. **All children hidden or floating** - Calculation skips them, returns only intrinsic size
+
+**Fix 1: Call lv_obj_update_layout() After Creation**
+
+```cpp
+// Create structure
+lv_xml_create(screen, "app_layout", NULL);
+
+// Force layout calculation BEFORE querying sizes
+lv_obj_update_layout(screen);  // Critical!
+
+// NOW LV_SIZE_CONTENT works correctly
+int32_t actual_width = lv_obj_get_width(container);
+```
+
+**Why this works:** Forces deferred layout to run, recursively sizing all objects from children upward.
+
+**Fix 2: Use Explicit Dimensions (Recommended for XML)**
 
 ```xml
-<!-- ✗ DOESN'T WORK - Labels will be invisible -->
+<!-- ✗ RISKY - May evaluate to 0 if layout not updated -->
 <lv_label text="$metadata"
           width="LV_SIZE_CONTENT"
           height="LV_SIZE_CONTENT"/>
 
-<!-- ✓ WORKS - Use explicit dimensions -->
+<!-- ✓ SAFE - Always has predictable size -->
 <lv_label text="$metadata"
           width="70"
           height="20"/>
 ```
 
-**Recommendation:** Measure expected content size and add 10-20% padding for safety. For example:
-- Short labels (5-10 chars): `width="60-80"`
-- Medium labels (10-20 chars): `width="100-140"`
-- Numbers/times: `width="40-70"`
+**Fix 3: Use style_min_width / style_min_height for Flex Containers**
+
+```xml
+<!-- ✗ PROBLEMATIC - header/footer may collapse -->
+<lv_obj width="100%" height="LV_SIZE_CONTENT" flex_flow="row">
+
+<!-- ✓ BETTER - Guarantees minimum size -->
+<lv_obj width="100%" style_min_height="48" flex_flow="row">
+```
+
+**Circular Dependency Prevention:**
+
+LVGL deliberately sets child size to 0 when:
+- Parent has `width/height = LV_SIZE_CONTENT`
+- Child has `width/height = "100%"` (percentage)
+
+This prevents infinite loops where parent size depends on child, and child size depends on parent.
+
+**Source:** `lvgl/src/core/lv_obj_pos.c:114-123, 145-155`
+
+**Recommendations:**
+
+1. **For dynamic content in XML:** Use explicit pixel dimensions with 10-20% padding
+   - Short labels (5-10 chars): `width="60-80"`
+   - Medium labels (10-20 chars): `width="100-140"`
+   - Numbers/times: `width="40-70"`
+
+2. **For flex containers:** Use `style_min_width` / `style_min_height` instead of fixed `height` / `width`
+
+3. **For C++ dynamic creation:** Always call `lv_obj_update_layout()` before relying on LV_SIZE_CONTENT dimensions
+
+4. **Avoid circular dependencies:** Never use percentage-sized children inside LV_SIZE_CONTENT parents
 
 #### "No constant was found with name X"
 

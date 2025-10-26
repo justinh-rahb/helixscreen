@@ -106,41 +106,34 @@ if ! command -v magick &> /dev/null; then
     exit 1
 fi
 
-# Build
-info "Building prototype..."
-BUILD_OUTPUT=$(make -j$(sysctl -n hw.ncpu) 2>&1)
-BUILD_STATUS=$?
-
-if [ $BUILD_STATUS -ne 0 ]; then
-    error "Build failed"
-    echo "$BUILD_OUTPUT" | grep -E "(error:|Error)" || echo "$BUILD_OUTPUT"
-    exit 1
-fi
-
-# Show build summary
-echo "$BUILD_OUTPUT" | grep -E "(Compiling|Linking|Build complete|Patch applied)" || true
-success "Build complete"
-
 # Verify binary exists
 if [ ! -f "$BINARY_PATH" ]; then
     error "Binary not found: $BINARY_PATH"
+    info "Build the binary first with: make"
+    ls -la build/bin/ 2>/dev/null || info "build/bin/ directory doesn't exist yet"
     exit 1
+fi
+
+if [ ! -x "$BINARY_PATH" ]; then
+    error "Binary not executable: $BINARY_PATH"
+    chmod +x "$BINARY_PATH"
+    success "Made binary executable"
 fi
 
 # Clean old screenshots
 rm -f /tmp/ui-screenshot-*.bmp 2>/dev/null || true
 
-# Prepare run command
-RUN_CMD="${BINARY_PATH} $EXTRA_ARGS"
+# Prepare run command and args
 if [ -n "$PANEL" ]; then
-    RUN_CMD="$RUN_CMD -p ${PANEL}"
     info "Running ${BINARY} with panel: ${PANEL} (3 second timeout)..."
+    PANEL_ARG="-p ${PANEL}"
 else
     info "Running ${BINARY} (3 second timeout)..."
+    PANEL_ARG=""
 fi
 
-# Run and capture output
-RUN_OUTPUT=$(gtimeout 3 "$RUN_CMD" 2>&1 || true)
+# Run and capture output (use eval to properly handle argument expansion)
+RUN_OUTPUT=$(gtimeout 3 ${BINARY_PATH} ${EXTRA_ARGS} ${PANEL_ARG} 2>&1 || true)
 
 # Check for errors in output
 if echo "$RUN_OUTPUT" | grep -qi "error"; then

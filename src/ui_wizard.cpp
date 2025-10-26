@@ -19,6 +19,7 @@
  */
 
 #include "ui_wizard.h"
+#include "ui_keyboard.h"
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include <cstdio>
@@ -204,6 +205,14 @@ void ui_wizard_goto_step(WizardStep step) {
                     connection_port_input = lv_obj_find_by_name(connection_screen, "port_input");
                     connection_status_label = lv_obj_find_by_name(connection_screen, "connection_status");
 
+                    // Register textareas with global keyboard for auto show/hide
+                    if (connection_ip_input) {
+                        ui_keyboard_register_textarea(connection_ip_input);
+                    }
+                    if (connection_port_input) {
+                        ui_keyboard_register_textarea(connection_port_input);
+                    }
+
                     lv_obj_t* btn_test = lv_obj_find_by_name(connection_screen, "btn_test_connection");
                     if (btn_test) {
                         lv_obj_add_event_cb(btn_test, on_test_connection_clicked, LV_EVENT_CLICKED, nullptr);
@@ -225,6 +234,11 @@ void ui_wizard_goto_step(WizardStep step) {
                 if (printer_identify_screen) {
                     printer_name_input = lv_obj_find_by_name(printer_identify_screen, "printer_name_input");
                     printer_type_roller = lv_obj_find_by_name(printer_identify_screen, "printer_type_roller");
+
+                    // Register printer name input with keyboard
+                    if (printer_name_input) {
+                        ui_keyboard_register_textarea(printer_name_input);
+                    }
 
                     // Pre-fill printer name from config if available
                     std::string printer_name = config_instance->get<std::string>(config_instance->df() + "printer_name");

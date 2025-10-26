@@ -37,6 +37,7 @@
 #include "ui_component_keypad.h"
 #include "ui_component_header_bar.h"
 #include "ui_icon.h"
+#include "ui_keyboard.h"
 #include "ui_wizard.h"
 #include "ui_panel_step_test.h"
 #include "printer_state.h"
@@ -215,6 +216,7 @@ int main(int argc, char** argv) {
     bool show_keypad = false;  // Special flag for keypad testing
     bool show_step_test = false;  // Special flag for step progress widget testing
     bool force_wizard = false;  // Force wizard to run even if config exists
+    bool panel_requested = false;  // Track if user explicitly requested a panel via CLI
     int display_num = -1;  // Display number for window placement (-1 means unset)
     int x_pos = -1;  // X position for window placement (-1 means unset)
     int y_pos = -1;  // Y position for window placement (-1 means unset)
@@ -248,6 +250,7 @@ int main(int argc, char** argv) {
         } else if (strcmp(argv[i], "-p") == 0 || strcmp(argv[i], "--panel") == 0) {
             if (i + 1 < argc) {
                 const char* panel_arg = argv[++i];
+                panel_requested = true;  // User explicitly requested a panel
                 if (strcmp(panel_arg, "home") == 0) {
                     initial_panel = UI_PANEL_HOME;
                 } else if (strcmp(panel_arg, "controls") == 0) {
@@ -347,6 +350,7 @@ int main(int argc, char** argv) {
             // Legacy support: first positional arg is panel name
             if (i == 1 && argv[i][0] != '-') {
                 const char* panel_arg = argv[i];
+                panel_requested = true;  // User explicitly requested a panel
                 if (strcmp(panel_arg, "home") == 0) {
                     initial_panel = UI_PANEL_HOME;
                 } else if (strcmp(panel_arg, "controls") == 0) {
@@ -505,6 +509,9 @@ int main(int argc, char** argv) {
 
     // Register app_layout with navigation system (to prevent hiding it)
     ui_nav_set_app_layout(app_layout);
+
+    // Initialize global keyboard (for textareas throughout the app)
+    ui_keyboard_init(screen);
 
     // Find navbar and panel widgets
     // app_layout > navbar (child 0), content_area (child 1)
@@ -728,8 +735,8 @@ int main(int argc, char** argv) {
     LV_LOG_USER("Initializing Moonraker client...");
     MoonrakerClient moonraker_client;
 
-    // Check if first-run wizard is required (skip for special test panels)
-    if ((force_wizard || config->is_wizard_required()) && !show_step_test && !show_keypad) {
+    // Check if first-run wizard is required (skip for special test panels and explicit panel requests)
+    if ((force_wizard || config->is_wizard_required()) && !show_step_test && !show_keypad && !panel_requested) {
         LV_LOG_USER("Starting first-run configuration wizard");
 
         lv_obj_t* wizard = ui_wizard_create(screen, config, &moonraker_client, []() {

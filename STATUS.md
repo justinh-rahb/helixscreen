@@ -1,8 +1,137 @@
 # Project Status - LVGL 9 UI Prototype
 
-**Last Updated:** 2025-10-26 (Environment Variable Namespace Cleanup)
+**Last Updated:** 2025-10-26 (Global Keyboard & Wizard Layout Fixes)
 
-## Recent Updates (2025-10-26 Very Late Night - Session 5)
+## Recent Updates (2025-10-26 Very Late Night - Session 6)
+
+### Global Keyboard System & Wizard Responsive Layout ✅ COMPLETE
+
+**Objective:** Implement reusable virtual keyboard with auto show/hide on textarea focus, fix wizard first screen layout issues across display sizes
+
+**Problems Addressed:**
+1. No keyboard input support for textareas
+2. Wizard first screen had excessive spacing, poor responsiveness on tiny/small/large displays
+3. Screenshot script needed build logic removed for better separation of concerns
+
+**Implementation:**
+
+#### 1. Global Keyboard Module (`ui_keyboard`)
+
+Created new module for application-wide keyboard management:
+
+**Files Created:**
+- `include/ui_keyboard.h` - Clean API with 8 public functions
+- `src/ui_keyboard.cpp` - Full implementation with comprehensive logging
+
+**API Functions:**
+```cpp
+ui_keyboard_init(parent)               // Initialize once at startup
+ui_keyboard_register_textarea(ta)      // Enable auto show/hide for textarea
+ui_keyboard_show(ta) / ui_keyboard_hide()  // Manual control
+ui_keyboard_is_visible()               // Check visibility
+ui_keyboard_set_mode(mode)             // TEXT_LOWER/UPPER/SPECIAL/NUMBER
+ui_keyboard_set_position(align, x, y)  // Custom positioning
+ui_keyboard_get_instance()             // Access keyboard widget
+```
+
+**Features:**
+- Single global instance (memory efficient)
+- Automatic show on `LV_EVENT_FOCUSED`, hide on `LV_EVENT_DEFOCUSED`
+- Auto-hide on OK (`LV_EVENT_READY`) or Cancel (`LV_EVENT_CANCEL`) buttons
+- iOS/Android-style key popovers enabled
+- Positioned at `BOTTOM_MID` by default
+- Mode switching: ABC/abc/1# buttons built-in
+- Special keys: backspace, arrows, newline, +/- handled automatically
+
+**Integration:**
+- `src/main.cpp:514` - Keyboard initialized after app_layout creation
+- `src/ui_wizard.cpp:209-214, 239-241` - Wizard textareas registered:
+  - Connection screen: IP address & port inputs
+  - Printer identify screen: Printer name input
+
+#### 2. Wizard Layout Responsive Fixes
+
+**wizard_container.xml:**
+- **Compact header**: Removed title, uses `style_bg_opa="0"` (transparent), `style_pad_all="4"`, `montserrat_10` font
+- **Content alignment**: Changed from `center` to `start` (eliminates massive top spacing)
+- **Footer**: Uses `style_min_height` for consistency
+- **Removed fixed heights**: Header sizes to content naturally
+
+**wizard_connection.xml:**
+- Reduced font sizes: 16→14 for labels, 14→12 for help text
+- Tighter spacing: `style_pad_gap="4"` in columns
+- Removed test connection button and status label (cleaner layout)
+
+**globals.xml:**
+- Added `wizard_header_min_height="32"` (not used, sizes to content)
+- Added `wizard_footer_min_height="56"`
+- Kept responsive for all display sizes
+
+**Results:**
+- ✅ Tiny (480x320): Content fits without cutoff, minimal header
+- ✅ Small (800x480): Well-balanced, efficient vertical space usage
+- ✅ Large (1280x720): Content starts near top, no wasted space
+
+#### 3. Screenshot Script Enhancement
+
+**scripts/screenshot.sh:**
+- Removed build logic (build must be done separately with `make`)
+- Better error handling with binary verification
+- Added executable permission check and auto-fix
+- More robust argument handling for command expansion
+- Cleaner separation: script only captures screenshots, doesn't compile
+
+#### 4. LV_SIZE_CONTENT Research & Documentation
+
+**Deep dive into LVGL 9 deferred layout system:**
+
+Researched why `LV_SIZE_CONTENT` evaluates to 0, documented findings in `docs/LVGL9_XML_GUIDE.md:1241-1329`:
+
+**Root Cause:** LVGL 9 uses deferred layout calculation
+- Sizes not computed until `lv_obj_update_layout()` called
+- Parent with `LV_SIZE_CONTENT` reads child coordinates before layout completes
+- Children at (0,0) defaults → parent calculates size as 0
+
+**When It Fails:**
+1. Container queried before layout completes
+2. Circular dependencies (parent `LV_SIZE_CONTENT` + child percentage width)
+3. Flex containers with nested `LV_SIZE_CONTENT` children
+4. All children hidden/floating
+
+**Solutions Documented:**
+1. Call `lv_obj_update_layout()` after creation (forces layout calculation)
+2. Use explicit pixel dimensions in XML (recommended for static layouts)
+3. Use `style_min_height`/`style_min_width` for flex containers (prevents collapse)
+
+**Source Analysis:**
+- `lvgl/src/core/lv_obj_pos.c:1077-1170, 1224-1247` - Size calculation
+- `lvgl/src/layouts/flex/lv_flex.c:157-161, 221-223` - Flex handling
+- `lvgl/src/core/lv_obj_pos.c:114-123, 145-155` - Circular dependency prevention
+
+**Benefits:**
+- ✅ **Comprehensive documentation**: Future developers understand LV_SIZE_CONTENT pitfalls
+- ✅ **Multiple solutions**: Different approaches for different scenarios
+- ✅ **Source references**: Line numbers for deep understanding
+
+**Files Modified:**
+- `include/ui_keyboard.h` (new)
+- `src/ui_keyboard.cpp` (new)
+- `src/main.cpp` - Added keyboard init
+- `src/ui_wizard.cpp` - Registered wizard textareas
+- `ui_xml/wizard_container.xml` - Responsive layout fixes
+- `ui_xml/wizard_connection.xml` - Compact content layout
+- `ui_xml/globals.xml` - Wizard dimension constants
+- `scripts/screenshot.sh` - Removed build logic
+- `docs/LVGL9_XML_GUIDE.md` - LV_SIZE_CONTENT documentation
+
+**Testing:**
+- Built successfully with keyboard module
+- Wizard displays correctly on tiny/small/large screens
+- Keyboard module ready for use (interactive testing required)
+
+---
+
+## Previous Updates (2025-10-26 Very Late Night - Session 5)
 
 ### Environment Variable Namespace Cleanup ✅ COMPLETE
 

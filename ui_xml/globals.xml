@@ -105,8 +105,10 @@
 	<!-- Row height for button containers -->
 
 	<!-- Wizard-specific dimensions -->
-	<px name="wizard_header_height" value="80" />
-	<!-- Header height for wizard screens -->
+	<px name="wizard_header_min_height" value="32" />
+	<!-- Minimum header height for wizard screens (compact progress indicator) -->
+	<px name="wizard_footer_min_height" value="56" />
+	<!-- Minimum footer height for wizard screens (navigation buttons) -->
 	<px name="wizard_button_width" value="140" />
 	<!-- Width for wizard navigation buttons (Back/Next) -->
 	<px name="wizard_input_height" value="48" />

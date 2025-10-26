@@ -22,28 +22,26 @@
 	<!-- First-Run Configuration Wizard Container -->
 	<!-- Full-screen overlay with progress indicator and navigation controls -->
 	<view extends="lv_obj" width="100%" height="100%" style_bg_color="#panel_bg" style_bg_opa="255" style_border_width="0" style_pad_all="0" flex_flow="column" name="wizard_root">
-		<!-- HEADER: Title + Progress Indicator -->
-		<lv_obj width="100%" height="#wizard_header_height" style_bg_color="#nav_bg" style_border_width="0" style_pad_left="#padding_normal" style_pad_right="#padding_normal" style_pad_top="#gap_normal" style_pad_bottom="#gap_normal" flex_flow="column" style_flex_main_place="space_between" style_flex_cross_place="center" name="wizard_header">
-			<!-- Title -->
-			<lv_label name="wizard_title" text="First-Run Configuration" bind_text="wizard_title" style_text_color="#text_primary" style_text_font="montserrat_24"/>
-			<!-- Progress indicator: "Step 1 of 5" -->
-			<lv_label name="wizard_progress" text="Step 1 of 5" bind_text="wizard_progress" style_text_color="#text_secondary" style_text_font="montserrat_16"/>
+		<!-- HEADER: Progress Indicator Only (minimal padding) -->
+		<lv_obj width="100%" style_bg_opa="0" style_border_width="0" style_pad_all="4" flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" name="wizard_header">
+			<!-- Progress indicator: "Step 1 of 7" -->
+			<lv_label name="wizard_progress" text="Step 1 of 7" bind_text="wizard_progress" style_text_color="#text_muted" style_text_font="montserrat_10"/>
 		</lv_obj>
 		<!-- CONTENT AREA: Wizard screens load here dynamically -->
-		<lv_obj name="wizard_content" width="100%" flex_grow="1" scrollable="false" style_bg_opa="0" style_border_width="0" style_pad_all="#padding_medium" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
+		<lv_obj name="wizard_content" width="100%" flex_grow="1" scrollable="false" style_bg_opa="0" style_border_width="0" style_pad_left="#padding_medium" style_pad_right="#padding_medium" style_pad_top="#padding_medium" style_pad_bottom="#gap_small" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
 			<!-- Content screens inserted here by C++ -->
 		</lv_obj>
 		<!-- FOOTER: Navigation Buttons (Back / Next or Finish) -->
-		<lv_obj width="100%" height="#button_row_height" style_bg_opa="0" style_border_width="0" style_pad_all="#padding_small" style_pad_gap="#gap_normal" flex_flow="row" style_flex_main_place="space_between" style_flex_cross_place="center" name="wizard_footer">
+		<lv_obj width="100%" style_min_height="#wizard_footer_min_height" style_bg_opa="0" style_border_width="0" style_pad_left="#padding_small" style_pad_right="#padding_small" style_pad_top="#padding_tiny" style_pad_bottom="#padding_tiny" style_pad_gap="#gap_normal" flex_flow="row" style_flex_main_place="space_between" style_flex_cross_place="center" name="wizard_footer">
 			<!-- Back Button (hidden on first screen) -->
-			<lv_button name="btn_back" width="#wizard_button_width" height="#button_height_small" style_bg_color="#button_secondary_bg" style_text_color="#text_primary">
-				<lv_label text="Back" style_text_font="montserrat_18"/>
+			<lv_button name="btn_back" width="#wizard_button_width" style_min_height="#button_height_small" style_bg_color="#button_secondary_bg" style_text_color="#text_primary">
+				<lv_label text="Back" style_text_font="montserrat_16"/>
 			</lv_button>
 			<!-- Spacer -->
 			<lv_obj flex_grow="1" style_bg_opa="0" style_border_width="0"/>
 			<!-- Next/Finish Button -->
-			<lv_button name="btn_next" width="#wizard_button_width" height="#button_height_small" style_bg_color="#primary_color" style_text_color="#text_on_primary">
-				<lv_label name="btn_next_label" text="Next" bind_text="wizard_next_button_text" style_text_font="montserrat_18"/>
+			<lv_button name="btn_next" width="#wizard_button_width" style_min_height="#button_height_small" style_bg_color="#primary_color" style_text_color="#text_on_primary">
+				<lv_label name="btn_next_label" text="Next" bind_text="wizard_next_button_text" style_text_font="montserrat_16"/>
 			</lv_button>
 		</lv_obj>
 	</view>

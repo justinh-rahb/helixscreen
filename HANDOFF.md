@@ -1,11 +1,107 @@
 # Session Handoff Document
 
-**Last Updated:** 2025-10-26 Late Night
-**Current Focus:** Logging System Standardized - All Components Use spdlog
+**Last Updated:** 2025-10-26 Very Late Night
+**Current Focus:** Global Keyboard System & Wizard Layout Fixed
 
 ---
 
-## Recent Work (2025-10-26 Late Night - Session 4)
+## Current Session (2025-10-26 Very Late Night - Session 6)
+
+### Global Keyboard System Implemented ✅ COMPLETE
+
+**Created reusable virtual keyboard module with automatic show/hide on textarea focus.**
+
+**What Was Built:**
+- `include/ui_keyboard.h` + `src/ui_keyboard.cpp` - Full keyboard management system
+- Single global keyboard instance (memory efficient)
+- Auto show/hide on textarea focus/defocus events
+- Integrated with wizard connection and printer identify screens
+
+**Key API:**
+```cpp
+// One-time initialization in main.cpp
+ui_keyboard_init(lv_screen_active());
+
+// Register any textarea for auto keyboard
+ui_keyboard_register_textarea(my_textarea);
+
+// Manual control (optional)
+ui_keyboard_show(textarea);
+ui_keyboard_hide();
+ui_keyboard_set_mode(LV_KEYBOARD_MODE_NUMBER);  // TEXT_LOWER/UPPER/SPECIAL/NUMBER
+```
+
+**Features:**
+- Positioned at `BOTTOM_MID` by default
+- iOS/Android-style key popovers enabled
+- Handles ABC/abc/1# mode switching automatically
+- Auto-hides on OK (`LV_EVENT_READY`) or Cancel (`LV_EVENT_CANCEL`)
+- Comprehensive spdlog logging for debugging
+
+**Integration Points:**
+- `src/main.cpp:514` - Keyboard initialized after app_layout
+- `src/ui_wizard.cpp:209-214` - Connection screen textareas registered (IP, port)
+- `src/ui_wizard.cpp:239-241` - Printer identify textarea registered (name)
+
+**Testing:**
+- Built successfully, module ready for interactive use
+- To test: Run `./build/bin/helix-ui-proto --wizard -s small`, click on IP or port field
+- Keyboard will slide up from bottom automatically
+
+### Wizard First Screen Layout Fixed ✅ COMPLETE
+
+**Fixed excessive spacing and poor responsive layout across display sizes.**
+
+**Problems Solved:**
+1. Huge white header area wasting vertical space
+2. Content centered with massive gaps top/bottom on large screens
+3. Fonts too large, spacing too loose for tiny displays
+
+**Changes Made:**
+- `ui_xml/wizard_container.xml`:
+  - Header: Transparent background (`style_bg_opa="0"`), minimal padding (4px), tiny font (montserrat_10)
+  - Content: Changed from `center` to `start` alignment (eliminates top gap)
+  - Removed fixed heights, uses natural content sizing
+- `ui_xml/wizard_connection.xml`:
+  - Reduced font sizes (16→14 labels, 14→12 help text)
+  - Tighter column spacing (`style_pad_gap="4"`)
+  - Removed test button and status label for cleaner layout
+- `ui_xml/globals.xml`:
+  - Added wizard dimension constants for consistency
+
+**Results:**
+- ✅ Tiny (480x320): Fits without cutoff, minimal header
+- ✅ Small (800x480): Well-balanced, no wasted space
+- ✅ Large (1280x720): Content starts near top, efficient layout
+
+### Screenshot Script Enhanced ✅ COMPLETE
+
+**Removed build logic for better separation of concerns.**
+
+**Changes:**
+- Script now only captures screenshots (no compilation)
+- Better error handling and binary verification
+- Must run `make` separately before using screenshot script
+- Cleaner, more focused tool
+
+### LV_SIZE_CONTENT Research & Documentation ✅ COMPLETE
+
+**Deep dive into LVGL 9 deferred layout system to understand why LV_SIZE_CONTENT fails.**
+
+**Documented in `docs/LVGL9_XML_GUIDE.md:1241-1329`:**
+- Root cause: Deferred layout calculation (sizes computed lazily)
+- When it fails: Circular dependencies, pre-layout queries, nested LV_SIZE_CONTENT
+- Solutions: `lv_obj_update_layout()`, explicit dimensions, `style_min_height`
+- Source code references with line numbers
+
+**Benefits:**
+- Future developers understand why layouts collapse to 0
+- Multiple fix strategies documented
+- Comprehensive with LVGL source analysis
+
+---
+
+## Previous Session (2025-10-26 Late Night - Session 4)
 
 ### Logging System Refactoring ✅ COMPLETE
 
