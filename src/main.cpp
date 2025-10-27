@@ -327,6 +327,7 @@ int main(int argc, char** argv) {
     int y_pos = -1;  // Y position for window placement (-1 means unset)
     bool screenshot_enabled = false;  // Enable automatic screenshot
     int screenshot_delay_sec = 2;  // Screenshot delay in seconds (default: 2)
+    int timeout_sec = 0;  // Auto-quit timeout in seconds (0 = disabled)
 
     // Parse arguments
     for (int i = 1; i < argc; i++) {
@@ -483,6 +484,19 @@ int main(int argc, char** argv) {
                 }
                 // Otherwise, use default delay (next arg is probably a different flag)
             }
+        } else if (strcmp(argv[i], "--timeout") == 0 || strcmp(argv[i], "-t") == 0) {
+            if (i + 1 < argc) {
+                char* endptr;
+                long val = strtol(argv[++i], &endptr, 10);
+                if (*endptr != '\0' || val < 1 || val > 3600) {
+                    printf("Error: invalid timeout (must be 1-3600 seconds): %s\n", argv[i]);
+                    return 1;
+                }
+                timeout_sec = (int)val;
+            } else {
+                printf("Error: --timeout/-t requires a number argument\n");
+                return 1;
+            }
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             printf("Usage: %s [options]\n", argv[0]);
             printf("Options:\n");
@@ -495,6 +509,7 @@ int main(int argc, char** argv) {
             printf("  -x, --x-pos <n>      X coordinate for window position\n");
             printf("  -y, --y-pos <n>      Y coordinate for window position\n");
             printf("  --screenshot [sec]   Take screenshot after delay (default: 2 seconds)\n");
+            printf("  -t, --timeout <sec>  Auto-quit after specified seconds (1-3600)\n");
             printf("  -h, --help           Show this help message\n");
             printf("\nAvailable panels:\n");
             printf("  home, controls, motion, nozzle-temp, bed-temp, extrusion,\n");
@@ -1000,6 +1015,10 @@ int main(int argc, char** argv) {
     uint32_t screenshot_time = SDL_GetTicks() + (screenshot_delay_sec * 1000);
     bool screenshot_taken = false;
 
+    // Auto-quit timeout timer (if enabled)
+    uint32_t start_time = SDL_GetTicks();
+    uint32_t timeout_ms = timeout_sec * 1000;
+
     // Mock print simulation timer (tick every second)
     uint32_t last_tick_time = SDL_GetTicks();
 
@@ -1021,6 +1040,12 @@ int main(int argc, char** argv) {
         if (screenshot_enabled && !screenshot_taken && SDL_GetTicks() >= screenshot_time) {
             save_screenshot();
             screenshot_taken = true;
+        }
+
+        // Auto-quit after timeout (if enabled)
+        if (timeout_sec > 0 && (SDL_GetTicks() - start_time) >= timeout_ms) {
+            spdlog::info("Timeout reached ({} seconds) - exiting...", timeout_sec);
+            break;
         }
 
         // Tick mock print simulation (once per second)

@@ -106,15 +106,16 @@ HELIX_SCREENSHOT_DISPLAY=0 ./scripts/screenshot.sh helix-ui-proto output panel
 ```
 
 **Script features:**
-- ✅ Dependency validation (gtimeout, ImageMagick)
+- ✅ Dependency validation (ImageMagick)
 - ✅ Panel name validation with helpful error messages
 - ✅ Flexible argument handling (panel optional, flags pass-through)
 - ✅ Colored output with progress indicators
 - ✅ Opens window on display 1 by default (keeps terminal visible)
-- ✅ Automatic build before running
 - ✅ BMP → PNG conversion with cleanup
 - ✅ Comprehensive error handling
 - ✅ Optional auto-open: `HELIX_SCREENSHOT_OPEN=1 ./scripts/screenshot.sh ...`
+- ✅ Auto-screenshot and auto-quit (via `--screenshot 2 --timeout 3` flags)
+- ✅ No external timeout utility required (uses native binary flags)
 
 **Environment variables:**
 - `HELIX_SCREENSHOT_DISPLAY` - Override display (default: 1)
@@ -124,8 +125,14 @@ HELIX_SCREENSHOT_DISPLAY=0 ./scripts/screenshot.sh helix-ui-proto output panel
 - The binary accepts `--screenshot [seconds]` flag to take a screenshot after the specified delay
 - Default delay is 2 seconds if no value is provided (e.g., `--screenshot` or `--screenshot 2`)
 - Without the flag, no screenshot is taken (useful for interactive development)
-- The screenshot script automatically passes `--screenshot 2` for automated capture
-- Example: `./build/bin/helix-ui-proto --panel home --screenshot 3` (screenshot after 3 seconds)
+- The screenshot script automatically passes `--screenshot 2 --timeout 3` for automated capture
+- Example: `./build/bin/helix-ui-proto --panel home --screenshot 3 --timeout 5` (screenshot at 3s, quit at 5s)
+
+**Auto-quit timeout:**
+- Use `--timeout <seconds>` or `-t <seconds>` to automatically quit after specified time
+- Useful for automated screenshot workflows and CI/CD pipelines
+- Range: 1-3600 seconds (1 hour max)
+- Example: `./build/bin/helix-ui-proto --timeout 10` (quit after 10 seconds)
 
 **❌ Avoid:** Reading raw BMPs from `/tmp` and manually running `magick` commands. The screenshot script is the canonical way to capture UI states.
 

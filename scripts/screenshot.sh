@@ -1,7 +1,7 @@
 #!/bin/bash
 # HelixScreen UI Screenshot Utility
 #
-# Builds, runs, captures, and converts screenshots automatically
+# Runs binary with auto-screenshot and auto-quit, then converts to PNG
 #
 # Usage: ./screenshot.sh [binary_name] [output_name] [panel_name_or_flags...] [additional args...]
 #   binary_name: Name of binary to run (default: helix-ui-proto)
@@ -92,16 +92,12 @@ else
     info "Using display $HELIX_SCREENSHOT_DISPLAY from HELIX_SCREENSHOT_DISPLAY env var"
 fi
 
-# Add display and screenshot arguments to extra args
-# Screenshot after 2 seconds (within the 3-second timeout)
-EXTRA_ARGS="--display $HELIX_SCREENSHOT_DISPLAY --screenshot 2 $EXTRA_ARGS"
+# Add display, screenshot, and timeout arguments to extra args
+# Screenshot after 2 seconds, auto-quit after 3 seconds
+EXTRA_ARGS="--display $HELIX_SCREENSHOT_DISPLAY --screenshot 2 --timeout 3 $EXTRA_ARGS"
 
 # Check dependencies
 info "Checking dependencies..."
-if ! command -v gtimeout &> /dev/null; then
-    error "gtimeout not found (install with: brew install coreutils)"
-    exit 1
-fi
 if ! command -v magick &> /dev/null; then
     error "ImageMagick not found (install with: brew install imagemagick)"
     exit 1
@@ -126,15 +122,15 @@ rm -f /tmp/ui-screenshot-*.bmp 2>/dev/null || true
 
 # Prepare run command and args
 if [ -n "$PANEL" ]; then
-    info "Running ${BINARY} with panel: ${PANEL} (3 second timeout)..."
+    info "Running ${BINARY} with panel: ${PANEL} (auto-quit after 3 seconds)..."
     PANEL_ARG="-p ${PANEL}"
 else
-    info "Running ${BINARY} (3 second timeout)..."
+    info "Running ${BINARY} (auto-quit after 3 seconds)..."
     PANEL_ARG=""
 fi
 
-# Run and capture output (use eval to properly handle argument expansion)
-RUN_OUTPUT=$(gtimeout 3 ${BINARY_PATH} ${EXTRA_ARGS} ${PANEL_ARG} 2>&1 || true)
+# Run and capture output (binary will auto-quit after timeout)
+RUN_OUTPUT=$(${BINARY_PATH} ${EXTRA_ARGS} ${PANEL_ARG} 2>&1 || true)
 
 # Check for errors in output
 if echo "$RUN_OUTPUT" | grep -qi "error"; then
@@ -151,7 +147,7 @@ LATEST_BMP=$(ls -t /tmp/ui-screenshot-*.bmp 2>/dev/null | head -1)
 
 if [ -z "$LATEST_BMP" ]; then
     error "Screenshot not captured"
-    warn "Make sure the UI runs for at least 2 seconds for auto-screenshot"
+    warn "Binary should take screenshot after 2 seconds and quit after 3 seconds"
     echo ""
     echo "Last 10 lines of output:"
     echo "$RUN_OUTPUT" | tail -10
