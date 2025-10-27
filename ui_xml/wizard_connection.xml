@@ -17,26 +17,143 @@
   You should have received a copy of the GNU General Public License
   along with HelixScreen. If not, see <https://www.gnu.org/licenses/>.
 -->
-
 <component>
-	<!-- First-Run Wizard: Connection Screen -->
-	<!-- User enters Moonraker IP/hostname and port, tests connection -->
-	<view extends="lv_obj" width="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_gap="#gap_small" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start" name="wizard_connection_root">
-		<!-- Help text -->
-		<lv_label text="Enter your printer's network address" width="100%" style_text_font="montserrat_16" style_text_color="#text_primary"/>
-		<lv_label text="Usually looks like 192.168.1.100 or printer.local" width="100%" style_text_font="montserrat_12" style_text_color="#text_muted"/>
-		<!-- Horizontal input row: Network Address (left) and Port (right) -->
-		<lv_obj width="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_gap="#gap_small" flex_flow="row" style_flex_main_place="start" style_flex_cross_place="start">
-			<!-- Left column: Network Address (70% width) -->
-			<lv_obj width="70%" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_gap="4" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start">
-				<lv_label text="Network Address" width="100%" style_text_font="montserrat_14" style_text_color="#text_primary"/>
-				<lv_textarea name="ip_input" text="" placeholder_text="192.168.1.100" one_line="true" width="100%" style_min_height="#wizard_input_height" style_bg_color="#card_bg_dark" style_text_color="#text_primary" style_text_font="montserrat_16" style_radius="#card_radius" style_pad_all="#button_padding" style_border_width="#input_border_width" style_border_color="#text_primary" style_border_opa="100%" style_placeholder_text_color="#text_muted"/>
-			</lv_obj>
-			<!-- Right column: Port (28% width) -->
-			<lv_obj width="28%" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_gap="4" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start">
-				<lv_label text="Port" width="100%" style_text_font="montserrat_14" style_text_color="#text_primary"/>
-				<lv_textarea name="port_input" text="" placeholder_text="7125" one_line="true" width="100%" style_min_height="#wizard_input_height" style_bg_color="#card_bg_dark" style_text_color="#text_primary" style_text_font="montserrat_16" style_radius="#card_radius" style_pad_all="#button_padding" style_border_width="#input_border_width" style_border_color="#text_primary" style_border_opa="100%" style_placeholder_text_color="#text_muted"/>
-			</lv_obj>
-		</lv_obj>
-	</view>
+    <!-- First-Run Wizard: Connection Screen -->
+    <!-- User enters Moonraker IP/hostname and port, tests connection -->
+    <view extends="lv_obj"
+      	  width="100%"
+		  height="100%"
+		  scrollable="false"
+          style_bg_opa="0"
+          style_border_width="0"
+          style_pad_all="0"
+          flex_flow="row"
+          style_flex_main_place="start"
+          style_flex_cross_place="space_between"
+          name="wizard_connection_root">
+
+        <!-- Top Section: Instructions and Input Fields -->
+        <lv_obj width="100%"
+				scrollable="false"
+				height="100%"
+                style_bg_opa="0"
+                style_radius="0"
+                style_border_width="0"
+                style_pad_all="0"
+                style_pad_gap="#gap_normal"
+                flex_flow="column"
+                style_flex_main_place="start"
+                style_flex_cross_place="start">
+            <!-- Help text -->
+            <lv_label text="Enter your printer's network address"
+                      width="100%"
+                      style_text_font="montserrat_16"
+                      style_text_color="#text_primary"
+                      style_margin_bottom="4"/>
+            <lv_label text="Usually looks like 192.168.1.100 or printer.local"
+                      width="100%"
+                      style_text_font="montserrat_12"
+                      style_text_color="#text_muted"
+                      style_margin_bottom="12"/>
+            <!-- Horizontal input row: Network Address (left) and Port (right) -->
+            <lv_obj width="100%"
+                style_bg_opa="0"
+                style_border_width="0"
+                style_pad_all="0"
+                style_pad_gap="#gap_small"
+                flex_flow="row"
+                style_flex_main_place="start"
+                style_flex_cross_place="space_around">
+          
+                <!-- Left column: Network Address (flex_grow=2 gives ~67% width) -->
+                <lv_obj flex_grow="2"
+                        style_bg_opa="0"
+                        style_border_width="0"
+                        style_pad_all="0"
+                        style_pad_gap="6"
+                        flex_flow="column"
+                        style_flex_main_place="start"
+                        style_flex_cross_place="start">
+                    <lv_label text="Network Address"
+                            width="100%"
+                            style_text_font="montserrat_14"
+                            style_text_color="#text_primary"/>
+                    <lv_textarea name="ip_input"
+                                bind_text="connection_ip"
+                                placeholder_text="192.168.1.100"
+                                one_line="true"
+                                width="100%"
+                                style_min_height="#wizard_input_height"
+                                style_bg_color="#card_bg_dark"
+                                style_text_color="#text_primary"
+                                style_text_font="montserrat_16"
+                                style_radius="#card_radius"
+                                style_pad_all="#button_padding"
+                                style_border_width="#input_border_width"
+                                style_border_color="#text_primary"
+                                style_border_opa="50%"
+                                style_placeholder_text_color="#text_muted"/>
+                </lv_obj>
+                <!-- Right column: Port (flex_grow=1 gives ~33% width) -->
+                <lv_obj flex_grow="1"
+                        style_bg_opa="0"
+                        style_border_width="0"
+                        style_pad_all="0"
+                        style_pad_gap="6"
+                        flex_flow="column"
+                        style_flex_main_place="start"
+                        style_flex_cross_place="start">
+                    <lv_label text="Port"
+                            width="100%"
+                            style_text_font="montserrat_14"
+                            style_text_color="#text_primary"/>
+                    <lv_textarea name="port_input"
+                                bind_text="connection_port"
+                                placeholder_text="7125"
+                                one_line="true"
+                                width="100%"
+                                style_min_height="#wizard_input_height"
+                                style_bg_color="#card_bg_dark"
+                                style_text_color="#text_primary"
+                                style_text_font="montserrat_16"
+                                style_radius="#card_radius"
+                                style_pad_all="#button_padding"
+                                style_border_width="#input_border_width"
+                                style_border_color="#text_primary"
+                                style_border_opa="50%"
+                                style_placeholder_text_color="#text_muted"/>
+                </lv_obj>
+            </lv_obj>
+       
+            <!-- Horizontal input row: Network Address (left) and Port (right) -->
+            <lv_obj width="100%"
+                style_bg_opa="0"
+                style_border_width="0"
+                style_pad_all="0"
+                style_pad_gap="#gap_small"
+                flex_flow="row"
+                style_flex_main_place="start"
+                style_flex_cross_place="center">
+
+                <!-- Test Connection Button -->
+                <lv_button name="btn_test_connection"
+                        width="200"
+                        style_min_height="#button_height_small"
+                        style_bg_color="#primary_color"
+                        style_text_color="#text_on_primary">
+                    <lv_label text="Test Connection"
+                            style_text_font="montserrat_16"
+                            align="center"/>
+                </lv_button>
+
+                <!-- Connection Status Label -->
+                <lv_label name="connection_status"
+                        bind_text="connection_status"
+                        width="100%"
+                        style_text_font="montserrat_14"
+                        style_text_color="#text_secondary"
+                        style_text_align="center"/>
+            </lv_obj>
+        </lv_obj>
+    </view>
 </component>

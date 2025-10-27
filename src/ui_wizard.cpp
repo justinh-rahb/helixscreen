@@ -20,6 +20,7 @@
 
 #include "ui_wizard.h"
 #include "ui_keyboard.h"
+#include "wizard_validation.h"
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include <cstdio>
@@ -49,6 +50,15 @@ static char wizard_next_button_buffer[16];
 static lv_subject_t printer_detection_status;
 static char printer_detection_status_buffer[128];
 
+static lv_subject_t connection_status;
+static char connection_status_buffer[128];
+
+static lv_subject_t connection_ip;
+static char connection_ip_buffer[64];
+
+static lv_subject_t connection_port;
+static char connection_port_buffer[16];
+
 static bool subjects_initialized = false;
 
 // Screen object references
@@ -60,10 +70,6 @@ static lv_obj_t* fan_select_screen = nullptr;
 static lv_obj_t* led_select_screen = nullptr;
 static lv_obj_t* summary_screen = nullptr;
 
-// Connection screen widgets
-static lv_obj_t* connection_ip_input = nullptr;
-static lv_obj_t* connection_port_input = nullptr;
-static lv_obj_t* connection_status_label = nullptr;
 
 // Printer identification widgets
 static lv_obj_t* printer_name_input = nullptr;
@@ -81,6 +87,7 @@ static lv_obj_t* led_main_dropdown = nullptr;
 // Connection state
 static bool connection_tested = false;
 static bool connection_successful = false;
+static uint32_t connection_test_start_time = 0;  // Track when connection test started
 
 // Hardware mapping storage
 static std::string selected_bed_heater;
@@ -105,6 +112,7 @@ static bool validate_current_step();
 static void populate_hardware_dropdowns();
 static std::string get_dropdown_options_from_vector(const std::vector<std::string>& items, const std::string& none_option = "");
 static void detect_printer_type();
+static void check_connection_timeout(lv_timer_t* timer);
 
 void ui_wizard_init_subjects() {
     if (subjects_initialized) {
@@ -128,6 +136,18 @@ void ui_wizard_init_subjects() {
                            sizeof(printer_detection_status_buffer), "Detecting printer...");
     lv_xml_register_subject(nullptr, "printer_detection_status", &printer_detection_status);
 
+    lv_subject_init_string(&connection_status, connection_status_buffer, nullptr,
+                           sizeof(connection_status_buffer), "Enter IP address and port, then click Test Connection");
+    lv_xml_register_subject(nullptr, "connection_status", &connection_status);
+
+    lv_subject_init_string(&connection_ip, connection_ip_buffer, nullptr,
+                           sizeof(connection_ip_buffer), "127.0.0.1");
+    lv_xml_register_subject(nullptr, "connection_ip", &connection_ip);
+
+    lv_subject_init_string(&connection_port, connection_port_buffer, nullptr,
+                           sizeof(connection_port_buffer), "7125");
+    lv_xml_register_subject(nullptr, "connection_port", &connection_port);
+
     subjects_initialized = true;
     spdlog::info("Wizard subjects initialized");
 }
@@ -144,6 +164,12 @@ lv_obj_t* ui_wizard_create(lv_obj_t* parent,
     config_instance = config;
     mr_client_instance = mr_client;
     completion_callback = on_complete;
+
+    // Initialize connection subjects from config
+    std::string host = config_instance->get<std::string>(config_instance->df() + "moonraker_host");
+    int port = config_instance->get<int>(config_instance->df() + "moonraker_port");
+    lv_subject_copy_string(&connection_ip, host.c_str());
+    lv_subject_copy_string(&connection_port, std::to_string(port).c_str());
 
     // Register event callbacks
     lv_xml_register_event_cb(nullptr, "on_back_clicked", on_back_clicked);
@@ -173,6 +199,9 @@ lv_obj_t* ui_wizard_create(lv_obj_t* parent,
     lv_obj_add_event_cb(btn_back, on_back_clicked, LV_EVENT_CLICKED, nullptr);
     lv_obj_add_event_cb(btn_next, on_next_clicked, LV_EVENT_CLICKED, nullptr);
 
+    // Create timer to check connection timeout (runs every second)
+    lv_timer_create(check_connection_timeout, 1000, nullptr);
+
     // Show first step
     ui_wizard_goto_step(WizardStep::CONNECTION);
 
@@ -199,28 +228,20 @@ void ui_wizard_goto_step(WizardStep step) {
             if (!connection_screen && wizard_content_area) {
                 connection_screen = (lv_obj_t*)lv_xml_create(wizard_content_area, "wizard_connection", nullptr);
                 if (connection_screen) {
-                    connection_ip_input = lv_obj_find_by_name(connection_screen, "ip_input");
-                    connection_port_input = lv_obj_find_by_name(connection_screen, "port_input");
-                    connection_status_label = lv_obj_find_by_name(connection_screen, "connection_status");
-
                     // Register textareas with global keyboard for auto show/hide
-                    if (connection_ip_input) {
-                        ui_keyboard_register_textarea(connection_ip_input);
+                    lv_obj_t* ip_input = lv_obj_find_by_name(connection_screen, "ip_input");
+                    lv_obj_t* port_input = lv_obj_find_by_name(connection_screen, "port_input");
+                    if (ip_input) {
+                        ui_keyboard_register_textarea(ip_input);
                     }
-                    if (connection_port_input) {
-                        ui_keyboard_register_textarea(connection_port_input);
+                    if (port_input) {
+                        ui_keyboard_register_textarea(port_input);
                     }
 
                     lv_obj_t* btn_test = lv_obj_find_by_name(connection_screen, "btn_test_connection");
                     if (btn_test) {
                         lv_obj_add_event_cb(btn_test, on_test_connection_clicked, LV_EVENT_CLICKED, nullptr);
                     }
-
-                    // Pre-fill with current config values
-                    std::string host = config_instance->get<std::string>(config_instance->df() + "moonraker_host");
-                    int port = config_instance->get<int>(config_instance->df() + "moonraker_port");
-                    if (connection_ip_input) lv_textarea_set_text(connection_ip_input, host.c_str());
-                    if (connection_port_input) lv_textarea_set_text(connection_port_input, std::to_string(port).c_str());
                 }
             }
             screen = connection_screen;
@@ -323,10 +344,10 @@ void ui_wizard_goto_step(WizardStep step) {
                     lv_label_set_text(summary_printer_type, selected_printer_type.c_str());
                 }
 
-                if (summary_host && connection_ip_input && connection_port_input) {
-                    std::string host_port = std::string(lv_textarea_get_text(connection_ip_input)) +
-                                          ":" +
-                                          std::string(lv_textarea_get_text(connection_port_input));
+                if (summary_host) {
+                    const char* host = static_cast<const char*>(lv_subject_get_pointer(&connection_ip));
+                    const char* port = static_cast<const char*>(lv_subject_get_pointer(&connection_port));
+                    std::string host_port = std::string(host ? host : "127.0.0.1") + ":" + std::string(port ? port : "7125");
                     lv_label_set_text(summary_host, host_port.c_str());
                 }
 
@@ -407,12 +428,14 @@ void ui_wizard_hide() {
 void ui_wizard_complete() {
     spdlog::info("Completing wizard - saving configuration");
 
-    // Save Moonraker connection details
-    std::string host = connection_ip_input ? lv_textarea_get_text(connection_ip_input) : "127.0.0.1";
-    std::string port_str = connection_port_input ? lv_textarea_get_text(connection_port_input) : "7125";
-    int port = std::stoi(port_str);
+    // Save Moonraker connection details (already saved during test connection, but save again for safety)
+    const char* host = static_cast<const char*>(lv_subject_get_pointer(&connection_ip));
+    const char* port_str = static_cast<const char*>(lv_subject_get_pointer(&connection_port));
+    int port = port_str ? std::stoi(port_str) : 7125;
 
-    config_instance->set(config_instance->df() + "moonraker_host", host);
+    if (host) {
+        config_instance->set(config_instance->df() + "moonraker_host", std::string(host));
+    }
     config_instance->set(config_instance->df() + "moonraker_port", port);
 
     // Save printer identification
@@ -453,6 +476,27 @@ void ui_wizard_complete() {
 }
 
 // ============================================================================
+// Connection Timeout Handler
+// ============================================================================
+
+static void check_connection_timeout(lv_timer_t* timer) {
+    (void)timer;
+
+    // Check if connection test is in progress and has timed out (10 seconds)
+    if (connection_test_start_time > 0 && !connection_tested) {
+        uint32_t elapsed = lv_tick_get() - connection_test_start_time;
+        if (elapsed > 10000) {  // 10 second timeout
+            spdlog::warn("Connection test timed out after 10 seconds");
+            connection_tested = true;
+            connection_successful = false;
+            connection_test_start_time = 0;
+
+            lv_subject_copy_string(&connection_status, "Failed: Connection timeout");
+        }
+    }
+}
+
+// ============================================================================
 // Event Handlers
 // ============================================================================
 
@@ -472,52 +516,79 @@ static void on_test_connection_clicked(lv_event_t* e) {
     (void)e;
     spdlog::info("Wizard: Testing connection to Moonraker");
 
-    if (!connection_ip_input || !connection_port_input || !connection_status_label) {
-        spdlog::error("Connection screen widgets not initialized");
+    // Read host and port from subjects
+    const char* host = static_cast<const char*>(lv_subject_get_pointer(&connection_ip));
+    const char* port_str = static_cast<const char*>(lv_subject_get_pointer(&connection_port));
+
+    if (!host || strlen(host) == 0) {
+        lv_subject_copy_string(&connection_status, "Error: Please enter network address");
         return;
     }
 
-    const char* host = lv_textarea_get_text(connection_ip_input);
-    const char* port_str = lv_textarea_get_text(connection_port_input);
-
-    if (!host || strlen(host) == 0 || !port_str || strlen(port_str) == 0) {
-        lv_label_set_text(connection_status_label, "Error: Please enter IP and port");
+    if (!port_str || strlen(port_str) == 0) {
+        lv_subject_copy_string(&connection_status, "Error: Please enter port number");
         return;
     }
 
-    lv_label_set_text(connection_status_label, "Testing connection...");
+    // Validate IP/hostname
+    if (!is_valid_ip_or_hostname(host)) {
+        lv_subject_copy_string(&connection_status, "Error: Invalid IP address or hostname");
+        return;
+    }
+
+    // Validate port
+    if (!is_valid_port(port_str)) {
+        lv_subject_copy_string(&connection_status, "Error: Invalid port (1-65535)");
+        return;
+    }
+
+    lv_subject_copy_string(&connection_status, "Testing connection...");
+
+    // Reset connection state
+    connection_tested = false;
+    connection_successful = false;
+    connection_test_start_time = lv_tick_get();  // Start timeout timer
 
     // Build WebSocket URL
     std::string ws_url = "ws://" + std::string(host) + ":" + std::string(port_str) + "/websocket";
 
+    // Copy host/port to local variables for lambda capture
+    std::string host_copy = host;
+    std::string port_copy = port_str;
+
     // Test connection (async)
     mr_client_instance->connect(ws_url.c_str(),
-        [ws_url]() {
+        [ws_url, host_copy, port_copy]() {
             // On connected
             spdlog::info("Connection test successful: {}", ws_url);
             connection_tested = true;
             connection_successful = true;
+            connection_test_start_time = 0;  // Stop timeout timer
 
-            if (connection_status_label) {
-                lv_label_set_text(connection_status_label, "Connected! Discovering printer...");
-            }
+            lv_subject_copy_string(&connection_status, "Connected! Discovering printer...");
+
+            // Update config with new connection details
+            int port = std::stoi(port_copy);
+            config_instance->set(config_instance->df() + "moonraker_host", host_copy);
+            config_instance->set(config_instance->df() + "moonraker_port", port);
+            config_instance->save();
+            spdlog::info("Updated Moonraker config: {}:{}", host_copy, port);
 
             // Start auto-discovery
             mr_client_instance->discover_printer([]() {
                 spdlog::info("Printer discovery completed");
-                if (connection_status_label) {
-                    lv_label_set_text(connection_status_label, "Ready! Click Next to continue.");
-                }
+                lv_subject_copy_string(&connection_status, "Ready! Click Next to continue.");
             });
         },
         []() {
-            // On disconnected
-            spdlog::warn("Connection test failed or disconnected");
-            connection_tested = true;
-            connection_successful = false;
+            // On disconnected (only mark as failed if we haven't already succeeded)
+            if (!connection_successful) {
+                spdlog::warn("Connection test failed or disconnected");
+                connection_tested = true;
+                connection_successful = false;
+                connection_test_start_time = 0;  // Stop timeout timer
 
-            if (connection_status_label) {
-                lv_label_set_text(connection_status_label, "Failed: Could not connect");
+                lv_subject_copy_string(&connection_status, "Failed: Could not connect");
             }
         }
     );
@@ -581,9 +652,7 @@ static bool validate_current_step() {
     switch (current_step) {
         case WizardStep::CONNECTION:
             if (!connection_tested || !connection_successful) {
-                if (connection_status_label) {
-                    lv_label_set_text(connection_status_label, "Please test connection first");
-                }
+                lv_subject_copy_string(&connection_status, "Please test connection first");
                 return false;
             }
             return true;
