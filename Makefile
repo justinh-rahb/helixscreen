@@ -172,6 +172,9 @@ help:
 	@echo "  $(GREEN)apply-patches$(RESET)    - Apply LVGL patches"
 	@echo "  $(GREEN)generate-fonts$(RESET)   - Regenerate FontAwesome fonts from package.json"
 	@echo "  $(GREEN)icon$(RESET)             - Generate macOS .icns icon from logo"
+	@echo "  $(GREEN)material-icons-list$(RESET) - List all registered Material Design icons"
+	@echo "  $(GREEN)material-icons-convert$(RESET) - Convert SVGs to LVGL C arrays (SVGS=...)"
+	@echo "  $(GREEN)material-icons-add$(RESET) - Download and add Material icons (ICONS=...)"
 	@echo ""
 	@echo "$(CYAN)Build Options:$(RESET)"
 	@echo "  $(YELLOW)V=1$(RESET)              - Verbose mode (show full compiler commands)"
@@ -262,15 +265,43 @@ apply-patches:
 		touch $@; \
 	else \
 		echo "$(YELLOW)→ Regenerating FontAwesome fonts from package.json...$(RESET)"; \
-		npm run convert-all-fonts && \
-		touch $@ && \
-		echo "$(GREEN)✓ Fonts regenerated successfully$(RESET)"; \
+		if [ "$(PLATFORM)" = "macOS" ]; then \
+			npm run convert-all-fonts && touch $@ && echo "$(GREEN)✓ Fonts regenerated successfully$(RESET)"; \
+		else \
+			npm run convert-fonts-ci && touch $@ && echo "$(GREEN)✓ Fonts regenerated successfully (arrow fonts skipped on Linux)$(RESET)"; \
+		fi \
 	fi
 
 # Fonts depend on stamp file to ensure they're regenerated when needed
 $(FONT_SRCS): .fonts.stamp
 
 generate-fonts: .fonts.stamp
+
+# Material Design Icon Management
+material-icons-list:
+	@.venv/bin/python3 scripts/material_icons.py list
+
+material-icons-convert:
+ifndef SVGS
+	@echo "$(RED)Error: SVGS not specified$(RESET)"
+	@echo "Usage: make material-icons-convert SVGS=\"icon1.svg icon2.svg ...\""
+	@exit 1
+endif
+	@.venv/bin/python3 scripts/material_icons.py convert $(SVGS)
+
+material-icons-add:
+ifndef ICONS
+	@echo "$(RED)Error: ICONS not specified$(RESET)"
+	@echo "Usage: make material-icons-add ICONS=\"wifi-strength-1 wifi-strength-2 ...\""
+	@echo ""
+	@echo "$(CYAN)This will:$(RESET)"
+	@echo "  1. Download SVGs from Material Design Icons (google/material-design-icons)"
+	@echo "  2. Convert to 64x64 PNGs"
+	@echo "  3. Generate LVGL C arrays"
+	@echo "  4. Register in material_icons.h/.cpp"
+	@exit 1
+endif
+	@.venv/bin/python3 scripts/material_icons.py add $(ICONS)
 
 all: check-deps apply-patches generate-fonts $(TARGET)
 	$(ECHO) "$(GREEN)$(BOLD)✓ Build complete!$(RESET)"
