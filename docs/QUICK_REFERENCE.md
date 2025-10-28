@@ -326,26 +326,44 @@ scripts/
 
 ### Material Design Icons (Navigation)
 
-Convert SVG icons to LVGL 9 image format:
+**Automated Workflow using `material_icons.py`:**
 
 ```bash
-# Automated workflow: SVG → PNG → LVGL 9 C array
-./scripts/convert-material-icons-lvgl9.sh
+# List all registered Material Design icons
+make material-icons-list
+# OR: .venv/bin/python3 scripts/material_icons.py list
 
-# Manual conversion (if needed):
-# 1. SVG to PNG with Inkscape (preserves alpha)
-inkscape icon.svg --export-type=png --export-filename=icon.png -w 64 -h 64
+# Add new icons from Material Design Icons (download + convert + register)
+make material-icons-add ICONS="wifi-strength-1 wifi-strength-2 lock"
+# OR: .venv/bin/python3 scripts/material_icons.py add wifi-strength-1 wifi-strength-2 lock
 
-# 2. PNG to LVGL 9 C array with LVGLImage.py
-.venv/bin/python3 scripts/LVGLImage.py \
-  --ofmt C --cf RGB565A8 --compress NONE \
-  -o assets/images/material icon.png
+# Convert existing SVG files to LVGL C arrays
+make material-icons-convert SVGS="icon1.svg icon2.svg"
+# OR: .venv/bin/python3 scripts/material_icons.py convert icon1.svg icon2.svg
 ```
 
-**Critical Requirements:**
-- **Use Inkscape** (not ImageMagick) - ImageMagick loses alpha transparency
+**What the automated workflow does:**
+1. Downloads SVG from `google/material-design-icons` GitHub repo
+2. Converts SVG → PNG (64x64, alpha preserved)
+3. Converts PNG → LVGL C array (RGB565A8 format)
+4. Adds declarations to `include/material_icons.h`
+5. Registers in `src/material_icons.cpp`
+
+**Manual Conversion (if needed):**
+
+```bash
+# 1. SVG to PNG with ImageMagick (works well for Material Design)
+magick icon.svg -resize 64x64 -background none icon.png
+
+# 2. PNG to LVGL 9 C array with LVGLImage.py
+.venv/bin/python3 scripts/LVGLImage.py icon.png \
+  --ofmt C --cf RGB565A8 -o assets/images/material/icon.c
+```
+
+**Icon Format Requirements:**
 - **RGB565A8 format** - 16-bit RGB + 8-bit alpha, works with `lv_obj_set_style_img_recolor()`
-- **Alpha channel** - Without proper transparency, icons render as solid squares
+- **64x64 resolution** - Standard size for all Material Design icons
+- **Alpha channel preserved** - Without transparency, icons render as solid squares
 
 **Registration Pattern:**
 ```cpp
@@ -480,3 +498,63 @@ lv_xml_register_subject(...);  // Too late!
 lv_xml_register_subject(...);
 lv_xml_create(...);
 ```
+
+## CI/CD Testing
+
+### Test CI Build Locally (Before Push)
+
+**Ubuntu-like build:**
+```bash
+# Clean state
+make clean
+rm -rf ../libhv/lib
+
+# Build dependencies (as CI does)
+cd ../libhv
+./configure --with-openssl=no
+make -j$(nproc)
+
+# Build project
+cd ../prototype-ui9
+make -j$(nproc)
+./build/bin/helix-ui-proto --help
+```
+
+**macOS build:**
+```bash
+# Clean state
+make clean
+rm -rf ../libhv/lib
+
+# Build dependencies
+cd ../libhv
+./configure --with-openssl=no
+make -j$(sysctl -n hw.ncpu)
+
+# Build project
+cd ../prototype-ui9
+make -j$(sysctl -n hw.ncpu)
+./build/bin/helix-ui-proto --help
+```
+
+### Run Quality Checks Locally
+
+```bash
+# Check dependencies
+make check-deps
+
+# Validate XML encoding (ASCII is valid UTF-8 subset)
+for xml in ui_xml/*.xml; do
+  file "$xml" | grep -qE "UTF-8|ASCII" || echo "❌ $xml"
+done
+
+# Check copyright headers (excluding test files and generated files)
+for file in src/*.cpp include/*.h; do
+  basename=$(basename "$file")
+  if [[ "$basename" != test_*.cpp ]] && [[ "$basename" != *_data.h ]]; then
+    head -n 5 "$file" | grep -q "Copyright" || echo "⚠️  Missing: $file"
+  fi
+done
+```
+
+**See [CI_CD_GUIDE.md](CI_CD_GUIDE.md) for complete CI/CD documentation.**

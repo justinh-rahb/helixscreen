@@ -502,6 +502,14 @@ lv_obj_invalidate()              // Public redraw trigger
 - C/C++ and XML variants
 - **Reference this:** When creating any new source files
 
+**[CI_CD_GUIDE.md](docs/CI_CD_GUIDE.md)** - **GITHUB ACTIONS CI/CD PATTERNS**
+- Subdirectory workflow configuration (monorepo patterns)
+- Platform-specific dependency handling (macOS vs Linux)
+- Dependency build order (libhv before main build)
+- Quality check best practices (excluding test/generated files)
+- Local CI testing procedures
+- **Reference this:** When adding workflows or debugging CI failures
+
 ## File Organization
 
 ```
