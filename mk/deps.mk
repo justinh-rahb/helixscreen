@@ -336,8 +336,17 @@ install-deps:
 # Build libhv (configure + compile)
 libhv-build:
 	$(ECHO) "$(CYAN)Building libhv...$(RESET)"
+ifeq ($(UNAME_S),Darwin)
+	$(Q)cd $(LIBHV_DIR) && \
+		MACOSX_DEPLOYMENT_TARGET=$(MACOS_MIN_VERSION) \
+		CFLAGS="$(MACOS_DEPLOYMENT_TARGET)" \
+		CXXFLAGS="$(MACOS_DEPLOYMENT_TARGET)" \
+		./configure --with-http-client
+	$(Q)MACOSX_DEPLOYMENT_TARGET=$(MACOS_MIN_VERSION) $(MAKE) -C $(LIBHV_DIR) -j$(NPROC) libhv
+else
 	$(Q)cd $(LIBHV_DIR) && ./configure --with-http-client
 	$(Q)$(MAKE) -C $(LIBHV_DIR) -j$(NPROC) libhv
+endif
 	$(ECHO) "$(GREEN)✓ libhv built successfully$(RESET)"
 
 # Build wpa_supplicant client library (Linux only)

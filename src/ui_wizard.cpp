@@ -340,16 +340,40 @@ void ui_wizard_goto_step(WizardStep step) {
                         spdlog::error("[Wizard] WiFi password modal not found");
                     }
 
-                    // Dim network list container initially (WiFi starts disabled)
-                    if (network_list_container) {
-                        lv_obj_add_state(network_list_container, LV_STATE_DISABLED);
-                        lv_obj_set_style_opa(network_list_container, UI_DISABLED_OPA, LV_PART_MAIN);
+                    // Check actual WiFi status and initialize toggle accordingly
+                    bool wifi_connected = false;
+                    if (wifi_manager) {
+                        wifi_connected = wifi_manager->is_connected();
+
+                        if (wifi_connected) {
+                            std::string ssid = wifi_manager->get_connected_ssid();
+                            spdlog::info("[Wizard] WiFi already connected to: {}", ssid);
+                            std::string status_msg = "Connected: " + ssid;
+                            lv_subject_copy_string(&wifi_status, status_msg.c_str());
+                        }
                     }
 
-                    // Wire up WiFi toggle event handler
+                    // Initialize network list container state based on actual WiFi status
+                    if (network_list_container) {
+                        if (!wifi_connected) {
+                            lv_obj_add_state(network_list_container, LV_STATE_DISABLED);
+                            lv_obj_set_style_opa(network_list_container, UI_DISABLED_OPA, LV_PART_MAIN);
+                        } else {
+                            lv_obj_remove_state(network_list_container, LV_STATE_DISABLED);
+                            lv_obj_set_style_opa(network_list_container, 255, LV_PART_MAIN);
+                        }
+                    }
+
+                    // Wire up WiFi toggle event handler and initialize state
                     if (wifi_toggle_switch) {
+                        // Initialize toggle to match actual WiFi state
+                        if (wifi_connected) {
+                            lv_obj_add_state(wifi_toggle_switch, LV_STATE_CHECKED);
+                        }
+
                         lv_obj_add_event_cb(wifi_toggle_switch, on_wifi_toggle_changed, LV_EVENT_VALUE_CHANGED, nullptr);
-                        spdlog::info("[Wizard] WiFi toggle event handler registered");
+                        spdlog::info("[Wizard] WiFi toggle event handler registered (initial state: {})",
+                                   wifi_connected ? "ON" : "OFF");
                     } else {
                         spdlog::error("[Wizard] WiFi toggle switch not found");
                     }
@@ -816,6 +840,12 @@ static void wifi_scan_delay_callback(lv_timer_t* timer) {
     if (wifi_scan_delay_timer) {
         lv_timer_delete(wifi_scan_delay_timer);
         wifi_scan_delay_timer = nullptr;
+    }
+
+    // Safety check: ensure wifi_manager still exists
+    if (!wifi_manager) {
+        spdlog::warn("[WiFi] Scan delay timer fired after WiFi manager destroyed");
+        return;
     }
 
     spdlog::info("[WiFi] Starting network scan after delay");

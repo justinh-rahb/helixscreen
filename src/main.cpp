@@ -48,6 +48,7 @@
 #include "tips_manager.h"
 #include <spdlog/spdlog.h>
 #include <SDL.h>
+
 #include <cstdio>
 #include <cstring>
 #include <ctime>

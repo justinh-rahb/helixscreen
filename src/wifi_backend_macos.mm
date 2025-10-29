@@ -25,6 +25,7 @@
 #import <CoreLocation/CoreLocation.h>
 
 #include "wifi_backend_macos.h"
+#include "safe_log.h"
 #include <spdlog/spdlog.h>
 
 // ============================================================================
@@ -55,7 +56,8 @@ WifiBackendMacOS::~WifiBackendMacOS() {
         interface_ = nullptr;
     }
 
-    spdlog::debug("[WiFiMacOS] Backend destroyed");
+    // Use fprintf - spdlog may be destroyed during static cleanup
+    fprintf(stderr, "[WiFiMacOS] Backend destroyed\n");
 }
 
 // ============================================================================
@@ -116,7 +118,8 @@ void WifiBackendMacOS::stop() {
         return;
     }
 
-    spdlog::info("[WiFiMacOS] Stopping CoreWLAN backend");
+    // Use fprintf - spdlog may be destroyed during static cleanup
+    fprintf(stderr, "[WiFiMacOS] Stopping CoreWLAN backend\n");
 
     // Cancel any pending timers
     if (scan_timer_) {
@@ -131,7 +134,7 @@ void WifiBackendMacOS::stop() {
     running_ = false;
     connection_in_progress_ = false;
 
-    spdlog::info("[WiFiMacOS] CoreWLAN backend stopped");
+    fprintf(stderr, "[WiFiMacOS] CoreWLAN backend stopped\n");
 }
 
 bool WifiBackendMacOS::is_running() const {
@@ -448,9 +451,8 @@ WiFiError WifiBackendMacOS::check_system_prerequisites() {
     // Check location permission (required on macOS 10.15+)
     WiFiError perm_check = check_location_permission();
     if (!perm_check.success()) {
-        spdlog::warn("[WiFiMacOS] Location permission issue: {}",
-                    perm_check.technical_msg);
-        // Continue anyway - some operations may still work
+        // Location permission required for WiFi scanning - fail startup
+        return perm_check;
     }
 
     return WiFiErrorHelper::success();
@@ -475,10 +477,11 @@ WiFiError WifiBackendMacOS::check_wifi_hardware() {
 
 WiFiError WifiBackendMacOS::check_location_permission() {
     @autoreleasepool {
-        // Create a location manager instance to check authorization
-        CLLocationManager* locationManager = [[CLLocationManager alloc] init];
-        CLAuthorizationStatus status = [locationManager authorizationStatus];
-        [locationManager release];
+        // Use class method (deprecated but compatible with macOS 10.15)
+        #pragma clang diagnostic push
+        #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+        CLAuthorizationStatus status = [CLLocationManager authorizationStatus];
+        #pragma clang diagnostic pop
 
         switch (status) {
             case kCLAuthorizationStatusAuthorizedAlways:
@@ -487,6 +490,7 @@ WiFiError WifiBackendMacOS::check_location_permission() {
 
             case kCLAuthorizationStatusNotDetermined:
                 spdlog::warn("[WiFiMacOS] Location permission not determined");
+                spdlog::warn("[WiFiMacOS] Grant location permission: System Preferences → Security & Privacy → Location Services");
                 return WiFiError(WiFiResult::PERMISSION_DENIED,
                                "Location permission not determined",
                                "Location access required for WiFi scanning",
@@ -494,7 +498,8 @@ WiFiError WifiBackendMacOS::check_location_permission() {
 
             case kCLAuthorizationStatusDenied:
             case kCLAuthorizationStatusRestricted:
-                spdlog::warn("[WiFiMacOS] Location permission denied");
+                spdlog::warn("[WiFiMacOS] Location permission denied/restricted");
+                spdlog::warn("[WiFiMacOS] Grant location permission: System Preferences → Security & Privacy → Location Services");
                 return WiFiError(WiFiResult::PERMISSION_DENIED,
                                "Location permission denied",
                                "Location access required for WiFi scanning",

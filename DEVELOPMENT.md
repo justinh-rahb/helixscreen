@@ -119,6 +119,77 @@ Control which display the UI window appears on for dual-monitor workflows:
 **Available displays:**
 Run without arguments to see auto-detected display information in logs.
 
+## macOS Location Permission (WiFi Development)
+
+**Required for:** Testing real WiFi scanning/connection on macOS (CoreWLAN backend)
+
+macOS 10.15+ requires Location Services permission for WiFi scanning because network SSIDs can reveal physical location. The app will automatically fall back to mock WiFi backend if permission is not granted.
+
+### Why Manual Permission Grant is Needed
+
+macOS's TCC (Transparency, Consent, and Control) system only shows automatic permission dialogs for:
+- Signed app bundles (`.app` packages)
+- Apps distributed via Mac App Store
+
+Command-line binaries (like our development build) require manual permission grant.
+
+### Grant Location Permission for Development
+
+**Option 1: System Settings GUI (Recommended)**
+
+1. Open **System Settings** → **Privacy & Security** → **Location Services**
+2. Ensure "Location Services" is enabled at the top
+3. Click the **(+)** button at the bottom of the app list
+4. Navigate to: `/Users/YOUR_USERNAME/code/guppyscreen/prototype-ui9/build/bin/helix-ui-proto`
+5. Click "Open" to add the binary
+6. Toggle the switch next to "helix-ui-proto" to **ON**
+
+**Option 2: TCC Database (Advanced)**
+
+Directly add permission to the TCC database:
+
+```bash
+# Add location permission for the binary
+sqlite3 ~/Library/Application\ Support/com.apple.TCC/TCC.db \
+  "INSERT OR REPLACE INTO access VALUES('kTCCServiceLocation','$(pwd)/build/bin/helix-ui-proto',0,2,4,1,NULL,NULL,0,'UNUSED',NULL,0,1687910400);"
+
+# Restart the binary to pick up new permission
+```
+
+**Note:** You may need to grant Terminal.app "Full Disk Access" in System Settings for the `sqlite3` command to work.
+
+### Verify Permission Status
+
+Run the app with verbose logging to see permission status:
+
+```bash
+./build/bin/helix-ui-proto --wizard -vv 2>&1 | grep -i "location\|permission\|wifi"
+```
+
+**Expected output with permission granted:**
+```
+[info] [macOS] Location permission already granted
+[info] [WiFiMacOS] CoreWLAN backend initialized successfully
+```
+
+**Expected output without permission (falls back to mock):**
+```
+[warning] [WiFiMacOS] Location permission not determined
+[warning] [WifiBackend] CoreWLAN backend failed - falling back to mock
+```
+
+### Revoking Permission
+
+To test permission denial or reset state:
+
+```bash
+# Remove permission via System Settings
+# Settings → Privacy & Security → Location Services → Remove helix-ui-proto
+
+# Or reset via tccutil (requires SIP disabled or Full Disk Access)
+tccutil reset Location
+```
+
 ## Screenshot Workflow
 
 ### Interactive Screenshots

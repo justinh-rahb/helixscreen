@@ -19,6 +19,7 @@
  */
 
 #include "wifi_manager.h"
+#include "safe_log.h"
 #include "lvgl/lvgl.h"
 #include "spdlog/spdlog.h"
 
@@ -69,7 +70,8 @@ WiFiManager::WiFiManager()
 }
 
 WiFiManager::~WiFiManager() {
-    spdlog::debug("[WiFiManager] Destructor called");
+    // Use fprintf - spdlog may be destroyed during static cleanup
+    fprintf(stderr, "[WiFiManager] Destructor called\n");
 
     // Clean up scanning
     stop_scan();

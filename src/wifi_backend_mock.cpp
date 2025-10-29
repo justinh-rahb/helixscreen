@@ -19,6 +19,7 @@
  */
 
 #include "wifi_backend_mock.h"
+#include "safe_log.h"
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include <chrono>
@@ -37,7 +38,8 @@ WifiBackendMock::WifiBackendMock()
 
 WifiBackendMock::~WifiBackendMock() {
     stop();
-    spdlog::debug("[WifiBackend] Mock backend destroyed");
+    // Use fprintf - spdlog may be destroyed during static cleanup
+    fprintf(stderr, "[WifiBackend] Mock backend destroyed\n");
 }
 
 // ============================================================================
@@ -73,7 +75,8 @@ void WifiBackendMock::stop() {
     connected_ssid_.clear();
     connected_ip_.clear();
 
-    spdlog::info("[WifiBackend] Mock backend stopped");
+    // Use fprintf - spdlog may be destroyed during static cleanup
+    fprintf(stderr, "[WifiBackend] Mock backend stopped\n");
 }
 
 bool WifiBackendMock::is_running() const {
