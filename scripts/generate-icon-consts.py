@@ -38,6 +38,12 @@ ICONS = {
     'icon_check_circle': (0xF058, 'circle-check (connected)'),
     'icon_lock': (0xF023, 'lock (encrypted)'),
 
+    # WiFi signal strength icons
+    'icon_signal_wifi_1': (0xF6AC, 'wifi-1 (0-25% signal)'),
+    'icon_signal_wifi_2': (0xF6AA, 'wifi-2 (26-50% signal)'),
+    'icon_signal_wifi_3': (0xF6AB, 'wifi-3 (51-75% signal)'),
+    'icon_signal_wifi_4': (0xF1EB, 'wifi (76-100% signal)'),
+
     # Metadata icons
     'icon_clock': (0xF017, 'clock-o'),
     'icon_leaf': (0xF06C, 'leaf'),
