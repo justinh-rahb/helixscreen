@@ -1,0 +1,75 @@
+<!--
+  Copyright (C) 2025 356C LLC
+  Author: Preston Brown <pbrown@brown-house.net>
+
+  This file is part of HelixScreen.
+
+  HelixScreen is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  HelixScreen is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with HelixScreen. If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<component>
+	<!-- WiFi Network List Item - Reusable Component -->
+	<!-- Displays network SSID, signal strength icon, and security status -->
+	<!-- Subjects are created per-instance in C++ and bound programmatically -->
+
+	<view extends="lv_button"
+	      width="100%"
+	      height="#network_item_height"
+	      scrollable="false"
+	      style_bg_opa="0"
+	      style_border_width="0"
+	      style_shadow_width="0"
+	      style_pad_all="#list_item_padding"
+	      style_pad_gap="#list_item_padding"
+	      flex_flow="row"
+	      style_flex_main_place="start"
+	      style_flex_cross_place="center">
+
+		<!-- Signal strength icon (left) -->
+		<lv_label name="signal_icon"
+		          text="#icon_wifi"
+		          style_text_font="fa_icons_24"
+		          style_text_color="#text_secondary"/>
+
+		<!-- SSID and security type column (center) -->
+		<lv_obj flex_grow="1"
+		        height="100%"
+		        style_bg_opa="0"
+		        style_border_width="0"
+		        style_pad_all="0"
+		        style_pad_gap="4"
+		        flex_flow="column"
+		        style_flex_main_place="center"
+		        style_flex_cross_place="start">
+
+			<!-- Network SSID -->
+			<lv_label name="ssid_label"
+			          width="100%"
+			          style_text_font="#wifi_network_title_font"
+			          style_text_color="#text_primary"/>
+
+			<!-- Security type -->
+			<lv_label name="security_label"
+			          width="100%"
+			          style_text_font="montserrat_12"
+			          style_text_color="#text_muted"/>
+		</lv_obj>
+
+		<!-- Lock icon (right) - shown for secured networks -->
+		<lv_label name="lock_icon"
+		          text="#icon_lock"
+		          style_text_font="fa_icons_24"
+		          style_text_color="#text_secondary"/>
+	</view>
+</component>
