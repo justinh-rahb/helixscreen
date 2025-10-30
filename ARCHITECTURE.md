@@ -178,28 +178,86 @@ LVGL uses automatic memory management:
 
 ## Thread Safety
 
-### Single-Threaded UI
+### ⚠️ CRITICAL: LVGL Main Thread Requirement
 
-- **LVGL is NOT thread-safe** - all UI operations on main thread
-- Subject updates can be made from any thread
-- Use LVGL's task/timer system for delayed operations
+**LVGL is NOT thread-safe.** All widget creation and modification MUST happen on the main thread.
 
-### Data Update Pattern
+### Safe Operations from Any Thread
 
+**Subject updates are thread-safe:**
 ```cpp
 // Safe from any thread
 void update_temperature_from_background(int temp) {
     lv_subject_set_int(temp_current_subject, temp);
     // UI updates will happen on next LVGL timer cycle
 }
+```
 
+**Why this works:** Subjects use internal locking and defer UI updates to the main thread.
+
+### Unsafe Operations (Main Thread Only)
+
+**Widget manipulation requires main thread:**
+```cpp
 // Main thread only
 void handle_ui_event(lv_event_t* e) {
-    // Direct LVGL API calls only from main thread
     lv_obj_t* btn = lv_event_get_target(e);
-    lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKED);
+    lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKED);  // NOT safe from background threads
 }
 ```
+
+### Backend Integration Pattern: lv_async_call()
+
+**Problem:** Backend threads (networking, file I/O, WiFi scanning) need to update UI but cannot call LVGL APIs directly.
+
+**Solution:** Use `lv_async_call()` to marshal widget updates to the main thread:
+
+```cpp
+// Backend callback running in std::thread
+void WiFiManager::handle_scan_complete(const std::string& data) {
+    // Parse results (safe - no LVGL calls)
+    auto networks = parse_networks(data);
+
+    // Create data for dispatch
+    struct CallbackData {
+        std::vector<WiFiNetwork> networks;
+        std::function<void(const std::vector<WiFiNetwork>&)> callback;
+    };
+    auto* cb_data = new CallbackData{networks, scan_callback_};
+
+    // Dispatch to LVGL main thread
+    lv_async_call([](void* user_data) {
+        auto* data = static_cast<CallbackData*>(user_data);
+
+        // NOW safe to create/modify widgets
+        data->callback(data->networks);  // Calls populate_network_list()
+
+        delete data;  // Clean up
+    }, cb_data);
+}
+```
+
+**Key Points:**
+1. **Backend thread:** Parse data, prepare callback data structure
+2. **lv_async_call():** Queues lambda to execute on main thread
+3. **Main thread lambda:** Creates/modifies widgets safely
+4. **Memory management:** Heap-allocate data, delete in lambda
+
+**Without this pattern:** Race conditions, segfaults, undefined behavior when backend thread creates widgets while LVGL is rendering.
+
+**Reference Implementation:** `src/wifi_manager.cpp:102-190` (all event handlers use this pattern)
+
+### When to Use lv_async_call()
+
+✅ **Use when:**
+- Background thread needs to create widgets
+- Backend callback needs to call `lv_obj_*()` functions
+- Network/file operations complete and need to update UI
+
+❌ **Don't need when:**
+- Already on main thread (event handlers, timers)
+- Only updating subjects (they're thread-safe)
+- No LVGL API calls in the callback
 
 ## LVGL Configuration
 

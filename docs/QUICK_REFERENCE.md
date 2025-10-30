@@ -148,6 +148,72 @@ ui_icon_set_color(icon_widget, lv_color_hex(0xFF0000), LV_OPA_COVER);
 **Material Icon Names:**
 All icons use `mat_` prefix: `mat_home`, `mat_print`, `mat_pause`, `mat_heater`, `mat_bed`, `mat_fan`, `mat_extruder`, `mat_cancel`, `mat_refresh`, `mat_back`, `mat_delete`, etc. See [material_icons.cpp](../src/material_icons.cpp) for complete list.
 
+### ui_switch Component
+
+**Custom switch widget extending lv_switch with semantic size presets for responsive UI design.**
+
+**Properties:**
+- `size` - Semantic size string: `tiny`, `small`, `medium`, `large` (default: LVGL defaults)
+- `width` - Explicit width override (optional, overrides size preset)
+- `height` - Explicit height override (optional, overrides size preset)
+- `knob_pad` - Knob padding in pixels (optional, overrides size preset)
+- `checked` - Initial state: `true` or `false` (default: `false`)
+- `orientation` - Switch orientation: `auto`, `horizontal`, `vertical` (default: `auto`)
+
+```xml
+<!-- Basic usage with semantic size (recommended) -->
+<ui_switch size="medium"/>
+
+<!-- Different sizes -->
+<ui_switch size="tiny"/>
+<ui_switch size="small" checked="true"/>
+<ui_switch size="medium"/>
+<ui_switch size="large"/>
+
+<!-- Progressive enhancement: size preset + selective override -->
+<ui_switch size="medium" width="100"/>  <!-- Custom width, keeps medium height and knob_pad -->
+
+<!-- Backward compatible: explicit sizing still works -->
+<ui_switch width="64" height="32" knob_pad="2"/>
+
+<!-- Combine with standard LVGL properties -->
+<ui_switch size="medium" style_bg_color="#ff0000" style_margin_right="10"/>
+```
+
+**Available Sizes (screen-size-aware):**
+
+| Size | TINY (480×320) | SMALL (800×480) | LARGE (1280×720+) |
+|------|----------------|-----------------|-------------------|
+| `tiny` | 32×16px, pad=1 | 48×24px, pad=2 | 64×32px, pad=2 |
+| `small` | 40×20px, pad=1 | 64×32px, pad=2 | 88×44px, pad=3 |
+| `medium` | 48×24px, pad=2 | 80×40px, pad=3 | 112×56px, pad=4 |
+| `large` | 56×28px, pad=2 | 88×44px, pad=3 | 128×64px, pad=4 |
+
+**Implementation:**
+- Extends `lv_switch` widget from LVGL core
+- 3-pass XML parsing: extract → preset → override (enables progressive enhancement)
+- Size presets initialized at startup based on display resolution
+- `knob_pad` controls internal spacing (set via `style_pad_knob_all`)
+- No size parameter = LVGL's built-in defaults (unchanged behavior)
+
+**C++ Registration (done in main.cpp):**
+```cpp
+#include "ui_switch.h"
+
+// Register widget before XML component loading
+ui_switch_register();  // Must be before components that use <ui_switch>
+```
+
+**Why Use Size Presets:**
+- **Better ergonomics:** 1 parameter instead of 3 (width + height + knob_pad)
+- **Responsive by default:** Automatically adapts to screen size
+- **Consistent scaling:** `size="medium"` means appropriately sized on any device
+- **Progressive enhancement:** Use presets as defaults, override when needed
+
+**Files:**
+- `include/ui_switch.h` - Public API
+- `src/ui_switch.cpp` - Implementation with size preset system
+
 ### Step Progress Widget
 
 **Reusable step-by-step progress indicator for wizards and multi-step operations.**
