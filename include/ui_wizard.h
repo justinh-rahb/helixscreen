@@ -19,104 +19,93 @@
  */
 
 #pragma once
-
 #include "lvgl/lvgl.h"
-#include "config.h"
-#include "moonraker_client.h"
-
-#include <functional>
 
 /**
- * @brief First-Run Configuration Wizard
+ * Wizard Container - Responsive Multi-Step UI Component
  *
- * Multi-step wizard for initial HelixScreen setup:
- * 1. Connect to Moonraker instance
- * 2. Auto-discover printer components
- * 3. Map components to UI defaults
- * 4. Save configuration
+ * Clean separation: This component handles ONLY navigation and layout.
+ * Screen content and business logic belong in the wizard screen components.
+ *
+ * Initialization Order (CRITICAL):
+ *   1. Register XML components (globals.xml, wizard_container.xml)
+ *   2. ui_wizard_init_subjects()
+ *   3. ui_wizard_register_event_callbacks()
+ *   4. ui_wizard_register_responsive_constants()  <- BEFORE creating XML
+ *   5. ui_wizard_create(parent)
+ *   6. ui_wizard_navigate_to_step(1)
  */
 
 /**
- * @brief Wizard steps enum
- */
-enum class WizardStep {
-  WIFI_SETUP = 0,
-  CONNECTION = 1,
-  PRINTER_IDENTIFY = 2,
-  BED_SELECT = 3,
-  HOTEND_SELECT = 4,
-  FAN_SELECT = 5,
-  LED_SELECT = 6,
-  SUMMARY = 7,
-  TOTAL_STEPS = 8
-};
-
-/**
- * @brief Initialize wizard subjects
+ * Initialize wizard subjects
  *
- * Must be called BEFORE creating XML components.
+ * Creates and registers reactive subjects for wizard state:
+ * - current_step (int)
+ * - total_steps (int)
+ * - wizard_title (string)
+ * - wizard_progress (string, e.g. "Step 2 of 7")
+ * - wizard_next_button_text (string, "Next" or "Finish")
+ *
+ * MUST be called BEFORE creating XML components.
  */
 void ui_wizard_init_subjects();
 
 /**
- * @brief Create wizard UI
+ * Register responsive constants based on screen size
  *
- * Creates the wizard container and displays the first screen.
+ * Detects screen width and overrides globals.xml constants BEFORE widget creation:
+ * - TINY (width < 600):   padding=6,  gap=4,  header=28, button=110
+ * - SMALL (600-899):      padding=12, gap=8,  header=32, button=140
+ * - LARGE (width >= 900): padding=20, gap=12, header=40, button=160
+ *
+ * Also sets responsive fonts (montserrat_14/16/20 for header, montserrat_16/20/24 for title).
+ *
+ * MUST be called AFTER ui_wizard_init_subjects() and BEFORE ui_wizard_create().
+ */
+void ui_wizard_register_responsive_constants();
+
+/**
+ * Register event callbacks
+ *
+ * Registers internal navigation callbacks:
+ * - on_back_clicked
+ * - on_next_clicked
+ *
+ * MUST be called BEFORE creating XML components.
+ */
+void ui_wizard_register_event_callbacks();
+
+/**
+ * Create wizard container
+ *
+ * Creates the wizard UI from wizard_container.xml.
+ * Returns the root wizard object.
+ *
+ * Prerequisites:
+ * - ui_wizard_init_subjects() called
+ * - ui_wizard_register_event_callbacks() called
+ * - ui_wizard_register_responsive_constants() called
  *
  * @param parent Parent object (typically screen root)
- * @param config Config instance
- * @param mr_client MoonrakerClient instance for connection testing
- * @param on_complete Callback invoked when wizard completes successfully
- * @return The wizard root object
+ * @return The wizard root object, or NULL on failure
  */
-lv_obj_t* ui_wizard_create(lv_obj_t* parent,
-                            Config* config,
-                            MoonrakerClient* mr_client,
-                            std::function<void()> on_complete);
+lv_obj_t* ui_wizard_create(lv_obj_t* parent);
 
 /**
- * @brief Navigate to specific wizard step
+ * Navigate to specific step
  *
- * @param step Step to navigate to
- */
-void ui_wizard_goto_step(WizardStep step);
-
-/**
- * @brief Navigate to next wizard step
+ * Updates all wizard subjects (title, progress, button text).
+ * Handles back button visibility (hidden on step 1).
  *
- * Validates current step before proceeding.
+ * @param step Step number (1-based, e.g. 1 = first step, 7 = last step)
  */
-void ui_wizard_next();
+void ui_wizard_navigate_to_step(int step);
 
 /**
- * @brief Navigate to previous wizard step
- */
-void ui_wizard_back();
-
-/**
- * @brief Get current wizard step
+ * Set wizard title
  *
- * @return Current step
- */
-WizardStep ui_wizard_get_current_step();
-
-/**
- * @brief Check if wizard is active
+ * Updates the wizard_title subject.
  *
- * @return true if wizard is currently shown
+ * @param title New title string
  */
-bool ui_wizard_is_active();
-
-/**
- * @brief Hide wizard (without completing)
- *
- * Used when user cancels or wizard is dismissed.
- */
-void ui_wizard_hide();
-
-/**
- * @brief Complete wizard and save configuration
- *
- * Saves all selections to config file and invokes completion callback.
- */
-void ui_wizard_complete();
+void ui_wizard_set_title(const char* title);

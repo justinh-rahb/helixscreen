@@ -361,7 +361,123 @@ lv_subject_copy_string(&status_subject, "New status");
 - Subjects only accessible within specific component
 - Use for component-internal state
 
-### 3. Data Binding
+### 3. Runtime Constants & Dynamic Configuration
+
+XML constants can be registered and modified from C++ **before** widget creation, enabling responsive design without XML duplication.
+
+#### Runtime Constant API
+
+**Available Functions (lv_xml.h):**
+
+```cpp
+// Register or update a constant value
+lv_result_t lv_xml_register_const(lv_xml_component_scope_t* scope,
+                                   const char* name,
+                                   const char* value);
+
+// Retrieve a constant value
+const char* lv_xml_get_const(lv_xml_component_scope_t* scope,
+                              const char* name);
+```
+
+#### How Constants Work
+
+**Storage:** Constants are stored in a linked list per component scope (global or component-specific).
+
+**Resolution Timing:** Constants are resolved **once at parse time** when `lv_xml_create()` is called, NOT at render time.
+
+**Critical Implication:** You can modify constants before widget creation, but modifying them afterward won't affect already-created widgets.
+
+#### Responsive Design Pattern
+
+Use runtime constant modification for screen-size adaptation:
+
+```cpp
+// Detect screen size at startup (BEFORE creating wizard)
+int width = lv_display_get_horizontal_resolution(lv_display_get_default());
+
+// Calculate responsive values
+const char* padding_value;
+const char* gap_value;
+const char* header_height;
+
+if (width < 600) {          // TINY (480x320)
+    padding_value = "6";
+    gap_value = "4";
+    header_height = "28";
+} else if (width < 900) {   // SMALL (800x480)
+    padding_value = "12";
+    gap_value = "8";
+    header_height = "32";
+} else {                    // LARGE (1024x600+)
+    padding_value = "20";
+    gap_value = "12";
+    header_height = "40";
+}
+
+// Get globals scope and register constants BEFORE creating widgets
+lv_xml_component_scope_t* scope = lv_xml_component_get_scope("globals");
+lv_xml_register_const(scope, "wizard_padding", padding_value);
+lv_xml_register_const(scope, "wizard_gap", gap_value);
+lv_xml_register_const(scope, "wizard_header_height", header_height);
+
+// NOW create wizard - it picks up the responsive constants
+lv_obj_t* wizard = lv_xml_create(parent, "wizard_container", NULL);
+```
+
+**XML Usage:**
+
+```xml
+<!-- globals.xml - Define defaults (overridden by C++ at runtime) -->
+<consts>
+    <px name="wizard_padding" value="12"/>      <!-- Default for SMALL -->
+    <px name="wizard_gap" value="8"/>
+    <px name="wizard_header_height" value="32"/>
+</consts>
+
+<!-- wizard_container.xml - Uses constants reactively -->
+<view name="wizard_container">
+    <lv_obj width="100%" height="100%" flex_flow="column">
+        <lv_obj name="wizard_header"
+                width="100%" height="LV_SIZE_CONTENT"
+                style_min_height="#wizard_header_height"
+                style_pad_all="#wizard_padding"
+                style_pad_gap="#wizard_gap">
+            <!-- Header content -->
+        </lv_obj>
+
+        <lv_obj name="wizard_content" flex_grow="1"
+                style_pad_all="#wizard_padding">
+            <!-- Content area -->
+        </lv_obj>
+    </lv_obj>
+</view>
+```
+
+#### Scope Hierarchy
+
+**Global scope (NULL):**
+```cpp
+lv_xml_register_const(NULL, "primary_color", "0xff4444");  // Available to all components
+```
+
+**Component scope:**
+```cpp
+lv_xml_component_scope_t* scope = lv_xml_component_get_scope("my_component");
+lv_xml_register_const(scope, "local_padding", "10");  // Only in my_component
+```
+
+**Lookup order:** Component scope first, then falls back to globals.
+
+#### Limitations
+
+❌ **Cannot modify after widget creation:** Constants are resolved once at parse time
+❌ **No arithmetic:** Cannot use `calc(#padding * 2)` expressions
+❌ **String values only:** All constants are stored as strings, converted during parsing
+
+✅ **Best for:** Screen-size adaptation, theme switching, configuration-driven UIs
+
+### 4. Data Binding
 
 XML widgets can bind to subjects using **attribute bindings** (simple) or **child element bindings** (complex/conditional).
 
@@ -395,33 +511,46 @@ For straightforward data binding, use `bind_*` attributes:
 
 #### Advanced Child Element Bindings
 
-For conditional logic and complex bindings, use child elements:
+For conditional logic and complex bindings, use child elements. LVGL 9.4 provides three types of conditional bindings: **flag**, **state**, and **style**.
+
+##### A. Conditional Flag Bindings (Show/Hide, Enable/Disable)
+
+Control widget flags based on subject values:
 
 ```xml
-<!-- Conditional flag binding (show/hide based on subject) -->
 <lv_obj>
-    <lv_obj-bind_flag_if_eq subject="active_panel" flag="hidden" ref_value="0"/>
+    <!-- Hide when current_step == 1 -->
+    <lv_obj-bind_flag_if_eq subject="current_step" flag="hidden" ref_value="1"/>
+
+    <!-- Disable when level >= 100 -->
+    <lv_obj-bind_flag_if_ge subject="level" flag="disabled" ref_value="100"/>
+
+    <!-- Make scrollable when count > 5 -->
+    <lv_obj-bind_flag_if_gt subject="item_count" flag="scrollable" ref_value="5"/>
 </lv_obj>
 ```
 
-**Available conditional flag bindings:**
+**Available Conditional Operators:**
 
-| Element | Condition | Example |
-|---------|-----------|---------|
-| `<lv_obj-bind_flag_if_eq>` | `subject == ref_value` | Show when equal |
-| `<lv_obj-bind_flag_if_ne>` | `subject != ref_value` | Show when not equal |
-| `<lv_obj-bind_flag_if_gt>` | `subject > ref_value` | Enable when greater |
-| `<lv_obj-bind_flag_if_ge>` | `subject >= ref_value` | Enable when >= |
-| `<lv_obj-bind_flag_if_lt>` | `subject < ref_value` | Disable when less |
-| `<lv_obj-bind_flag_if_le>` | `subject <= ref_value` | Disable when <= |
+| Element | Condition | Behavior |
+|---------|-----------|----------|
+| `<lv_obj-bind_flag_if_eq>` | `subject == ref_value` | Set flag when equal, clear otherwise |
+| `<lv_obj-bind_flag_if_not_eq>` | `subject != ref_value` | Set flag when not equal, clear otherwise |
+| `<lv_obj-bind_flag_if_gt>` | `subject > ref_value` | Set flag when greater than |
+| `<lv_obj-bind_flag_if_ge>` | `subject >= ref_value` | Set flag when greater or equal |
+| `<lv_obj-bind_flag_if_lt>` | `subject < ref_value` | Set flag when less than |
+| `<lv_obj-bind_flag_if_le>` | `subject <= ref_value` | Set flag when less or equal |
 
-**Flags you can bind:**
+**Supported Flags (Common):**
 
 ```xml
-<!-- Common flags -->
+<!-- Visibility -->
 <lv_obj-bind_flag_if_eq subject="visible" flag="hidden" ref_value="0"/>
-<lv_obj-bind_flag_if_ge subject="level" flag="disabled" ref_value="100"/>
-<lv_obj-bind_flag_if_eq subject="interactive" flag="clickable" ref_value="1"/>
+
+<!-- Interaction -->
+<lv_obj-bind_flag_if_ge subject="level" flag="clickable" ref_value="100"/>
+
+<!-- Scrolling -->
 <lv_obj-bind_flag_if_lt subject="size" flag="scrollable" ref_value="10"/>
 
 <!-- All LV_OBJ_FLAG_* flags supported: -->
@@ -434,33 +563,195 @@ For conditional logic and complex bindings, use child elements:
 <!-- user_1, user_2, user_3, user_4 -->
 ```
 
-**Multiple conditional bindings:**
+**Real-World Example (Wizard Back Button):**
+
+```xml
+<!-- Back button hidden on first step -->
+<lv_button name="btn_back" width="#wizard_button_width" height="#button_height">
+    <lv_label text="Back"/>
+    <event_cb trigger="clicked" callback="on_back_clicked"/>
+    <lv_obj-bind_flag_if_eq subject="current_step" flag="hidden" ref_value="1"/>
+</lv_button>
+```
+
+##### B. Conditional State Bindings (Visual States)
+
+Control widget states (pressed, checked, disabled, focused) based on subject values:
 
 ```xml
 <lv_obj>
-    <!-- Hide when mode = 1 -->
-    <lv_obj-bind_flag_if_eq subject="mode" flag="hidden" ref_value="1"/>
-    <!-- Disable when level >= 100 -->
-    <lv_obj-bind_flag_if_ge subject="level" flag="disabled" ref_value="100"/>
-    <!-- Make scrollable when count > 5 -->
-    <lv_obj-bind_flag_if_gt subject="item_count" flag="scrollable" ref_value="5"/>
+    <!-- Disable button when WiFi is disabled -->
+    <lv_obj-bind_state_if_eq subject="wifi_enabled" state="disabled" ref_value="0"/>
+
+    <!-- Check toggle when dark mode is on -->
+    <lv_obj-bind_state_if_eq subject="dark_mode" state="checked" ref_value="1"/>
+
+    <!-- Focus input when ready -->
+    <lv_obj-bind_state_if_eq subject="input_ready" state="focused" ref_value="1"/>
 </lv_obj>
 ```
 
-**Conditional style binding:**
+**Available Conditional Operators:**
+
+| Element | Condition |
+|---------|-----------|
+| `<lv_obj-bind_state_if_eq>` | `subject == ref_value` |
+| `<lv_obj-bind_state_if_not_eq>` | `subject != ref_value` |
+| `<lv_obj-bind_state_if_gt>` | `subject > ref_value` |
+| `<lv_obj-bind_state_if_ge>` | `subject >= ref_value` |
+| `<lv_obj-bind_state_if_lt>` | `subject < ref_value` |
+| `<lv_obj-bind_state_if_le>` | `subject <= ref_value` |
+
+**Supported States:**
 
 ```xml
+<!-- State values: disabled, checked, focused, pressed, edited, -->
+<!-- focus_key, scrolled, scroll_on_focus -->
+
+<!-- Example: Disable connect button when no network selected -->
+<lv_button>
+    <lv_label text="Connect"/>
+    <lv_obj-bind_state_if_eq subject="network_selected" state="disabled" ref_value="0"/>
+</lv_button>
+```
+
+**Difference from Flag Bindings:**
+
+- **Flags** control widget behavior (hidden, clickable, scrollable)
+- **States** control visual appearance tied to LVGL's state system (disabled styling, checked styling, etc.)
+
+##### C. Conditional Style Bindings (Whole Style Objects)
+
+Apply entire style objects conditionally based on subject values:
+
+```xml
+<styles>
+    <style name="style_error" bg_color="0xff0000" text_color="0xffffff"/>
+    <style name="style_success" bg_color="0x00ff00" text_color="0x000000"/>
+    <style name="style_warning" bg_color="0xffaa00" text_color="0x000000"/>
+</styles>
+
 <lv_obj>
-    <!-- Apply style_dark when dark_mode subject equals 1 -->
-    <bind_style name="style_dark" subject="dark_mode" ref_value="1"/>
-    <!-- Apply style_warning when temperature >= 80 -->
-    <bind_style name="style_warning" subject="temperature" ref_value="80"/>
+    <!-- Apply error style when error_code == 1 -->
+    <lv_obj-bind_style name="style_error" subject="error_code" ref_value="1" selector="main"/>
+
+    <!-- Apply success style when status == 0 -->
+    <lv_obj-bind_style name="style_success" subject="status" ref_value="0" selector="main"/>
+
+    <!-- Apply warning style when temp >= 80 -->
+    <lv_obj-bind_style name="style_warning" subject="temp" ref_value="80" selector="main"/>
 </lv_obj>
 ```
 
-**When to use child elements vs attributes:**
-- **Attributes** → Simple direct binding (`bind_text`, `bind_value`)
-- **Child elements** → Conditional logic, multiple subjects, complex rules
+**Attributes:**
+
+- `name` - Style name from `<styles>` section (required)
+- `subject` - Subject name (required)
+- `ref_value` - Integer value for equality check (required)
+- `selector` - Style selector: `main`, `pressed`, `checked`, etc. (optional, defaults to `main`)
+
+**⚠️ LIMITATION:** Only equality check (`==`) is supported for style bindings. No `gt`, `lt`, `ne`, etc.
+
+**Why:** Style bindings apply entire pre-defined style objects, not individual properties.
+
+**Real-World Example (Temperature Warning):**
+
+```xml
+<styles>
+    <style name="temp_normal" text_color="0xffffff"/>
+    <style name="temp_warning" text_color="0xffaa00"/>
+    <style name="temp_critical" text_color="0xff0000"/>
+</styles>
+
+<lv_label bind_text="temperature">
+    <!-- Different colors for different temperature ranges -->
+    <lv_obj-bind_style name="temp_normal" subject="temp_state" ref_value="0" selector="main"/>
+    <lv_obj-bind_style name="temp_warning" subject="temp_state" ref_value="1" selector="main"/>
+    <lv_obj-bind_style name="temp_critical" subject="temp_state" ref_value="2" selector="main"/>
+</lv_label>
+```
+
+```cpp
+// C++ updates state based on temperature
+void update_temp_state(int temp) {
+    int state = (temp < 200) ? 0 : (temp < 250) ? 1 : 2;
+    lv_subject_set_int(&temp_state_subject, state);
+}
+```
+
+##### D. Conditional Binding Limitations
+
+**❌ Text Conditionals DO NOT EXIST:**
+
+There is no `bind_text_if_eq` or similar. To show different text based on conditions, use multiple labels with flag bindings:
+
+```xml
+<!-- Workaround: Multiple labels with conditional visibility -->
+<lv_label text="Idle">
+    <lv_obj-bind_flag_if_not_eq subject="state" flag="hidden" ref_value="0"/>
+</lv_label>
+<lv_label text="Active">
+    <lv_obj-bind_flag_if_not_eq subject="state" flag="hidden" ref_value="1"/>
+</lv_label>
+<lv_label text="Error">
+    <lv_obj-bind_flag_if_not_eq subject="state" flag="hidden" ref_value="2"/>
+</lv_label>
+```
+
+**❌ Style Property Conditionals DO NOT EXIST:**
+
+You cannot bind individual style properties conditionally (like `bind_style_pad_all_if_eq`). Use whole style objects with `<lv_obj-bind_style>` instead:
+
+```xml
+<!-- ❌ DOESN'T WORK: -->
+<lv_obj bind_style_pad_all_if_eq="subject" value="20" ref_value="1"/>
+
+<!-- ✅ WORKS: Define styles and bind them -->
+<styles>
+    <style name="large_padding" style_pad_all="20"/>
+    <style name="small_padding" style_pad_all="5"/>
+</styles>
+
+<lv_obj>
+    <lv_obj-bind_style name="large_padding" subject="size_mode" ref_value="1" selector="main"/>
+    <lv_obj-bind_style name="small_padding" subject="size_mode" ref_value="0" selector="main"/>
+</lv_obj>
+```
+
+**❌ Subjects Cannot Be Used Directly in Attributes:**
+
+```xml
+<!-- ❌ DOESN'T WORK: -->
+<lv_obj style_pad_all="subject:padding_value"/>
+
+<!-- ✅ WORKS: Use runtime constants or C++ dynamic styling -->
+```
+
+##### E. When to Use Each Binding Type
+
+**Use attribute bindings (`bind_text`, `bind_value`):**
+- Simple direct data display
+- No conditional logic needed
+- One subject → one property
+
+**Use flag bindings (`<lv_obj-bind_flag_if_*>`):**
+- Show/hide widgets conditionally
+- Enable/disable interaction
+- Control scrolling, layout behavior
+
+**Use state bindings (`<lv_obj-bind_state_if_*>`):**
+- Visual state changes (disabled styling, checked styling)
+- State-driven UI feedback
+
+**Use style bindings (`<lv_obj-bind_style>`):**
+- Apply complex style combinations
+- Theme switching
+- Multi-property visual changes
+
+**Use C++ observers for:**
+- Individual style property updates not covered by style objects
+- Complex multi-subject logic
+- Calculations or transformations
 
 #### Defining Subjects in globals.xml (Optional)
 
@@ -2146,10 +2437,17 @@ Unlike web browsers, there's no inspect tool. Use temporary background colors:
 
 ## Document History
 
+**2025-01-29:** Added verified LVGL 9.4 API patterns:
+- Section 3: Runtime Constants & Dynamic Configuration - Complete API reference with responsive design pattern
+- Section 4: Advanced Child Element Bindings - Expanded with state bindings, style bindings, and limitations
+- Conditional Binding Limitations - Documented what doesn't exist (text conditionals, style property conditionals)
+- Real-world examples for wizard containers and responsive UIs
+- Source code verified (lvgl/src/others/xml/)
+
 **2025-01-11:** Initial consolidated guide combining:
 - LVGL_XML_REFERENCE.md - XML syntax reference
 - LVGL9_CENTERING_GUIDE.md - Centering techniques and flex_align discovery
 - XML_UI_SYSTEM.md - Architecture and implementation patterns
 - Vertical Accent Bar Pattern - New UI pattern documentation
 
-**Contributors:** HelixScreen development team, based on LVGL 9.3 documentation and extensive prototype testing.
+**Contributors:** HelixScreen development team, based on LVGL 9.4 documentation and extensive prototype testing.

@@ -1,7 +1,7 @@
 # Session Handoff Document
 
-**Last Updated:** 2025-10-28
-**Current Focus:** WiFi system complete - Future work planning
+**Last Updated:** 2025-10-29
+**Current Focus:** Wizard container foundation ready for screen implementation
 
 ---
 
@@ -9,84 +9,40 @@
 
 ### ✅ Recently Completed
 
-**macOS WiFi Backend** (Completed 2025-10-28)
-- ✅ Created WifiBackendMacOS using CoreWLAN framework for real WiFi on macOS
-- ✅ Implemented network scanning, connection management, status queries
-- ✅ Location services permission handling (required for WiFi scanning on macOS 10.15+)
-- ✅ Factory pattern fallback chain: real backend → mock backend
-- ✅ Added .mm file support to build system (Objective-C++)
-- ✅ macOS frameworks: Foundation, CoreFoundation, Security, CoreWLAN, CoreLocation
-- ✅ Minimum macOS version enforced: 10.15 (Catalina) via deployment target
-- ✅ Build-time version checking in mk/deps.mk
-- ✅ LVGL public API compliance (timer user_data via public functions only)
+**Wizard Container Redesign** (Completed 2025-10-29)
+- ✅ Clean three-region layout (header/content/footer) using runtime constants
+- ✅ Responsive design: TINY (480x320), SMALL (800x480), LARGE (1280x720+)
+- ✅ Single XML template adapts via C++ screen detection
+- ✅ Horizontal header layout (progress + title) saves vertical space
+- ✅ Reactive navigation with conditional back button visibility
+- ✅ Subject-driven text updates (Next → Finish on last step)
+- ✅ Simplified API: init_subjects → register_constants → create → navigate
+- Commits: `[pending]`
 
-**WiFi Stage 2: Build System Integration** (Completed 2025-10-28)
-- ✅ Added wpa_supplicant build variables to Makefile (WPA_DIR, WPA_CLIENT_LIB, WPA_INC)
-- ✅ Created wpa_supplicant/.config for libwpa_client.a build
-- ✅ Platform-specific LDFLAGS (Linux includes libwpa_client.a, macOS excluded)
-- ✅ Added wpa_supplicant build target in mk/deps.mk (Linux only)
-- ✅ Updated check-deps to verify wpa_supplicant submodule
-- ✅ Updated clean target to clean wpa_supplicant
-- ✅ Verified build: libwpa_client.a (220K) builds and links successfully
-
-**Stage 0-1: Submodule Setup** (Completed 2025-10-28)
-- ✅ Converted libhv from symlink to git submodule (v1.3.1-54 → v1.3.4)
-- ✅ Added wpa_supplicant v2.11 as git submodule (hostap_2_11 tag)
-- ✅ Makes prototype-ui9 self-contained and CI/CD friendly
-- Commits: `6025c3c`, `394f0b7`
-
-**Phase 1: Node.js v22 Compatibility** (Completed 2025-10-28)
-- ✅ Upgraded canvas from v2.11.2 to v3.2.0 (Node v22 pre-built binaries)
-- ✅ Fixed LVGL pthread compilation with -D_GNU_SOURCE
-- ✅ Fixed C++ standard compliance in main.cpp (compound literals)
-- ✅ Full build succeeds with all dependencies satisfied
-- Commit: `83a867a`
-
-**Previous Work:**
-- WiFi wizard step 0 with password modal (commit 8cab855)
-- UI testing infrastructure with virtual input device (commit ded96ef)
-- 10 WiFi UI tests written (see `docs/UI_TESTING.md` for status)
-
-### ✅ Recently Completed
-
-**WiFi Implementation Stages 3-6** (Completed 2025-10-28)
-- ✅ **Stage 3**: WPA backend port complete (commit `4d6581a`)
-- ✅ **Stage 4**: WiFiManager integration with security hardening (commit `24b12b0`)
-- ✅ **Stage 5**: Real hardware testing with comprehensive robustness validation
-- ✅ **Stage 6**: Documentation updates and test harness creation
-
-**Stage 5 Real Hardware Testing Results:**
-- ✅ Graceful fallback with unconfigured wpa_supplicant (missing control interface)
-- ✅ Real WiFi hardware setup (RF-kill handling, interface management)
-- ✅ Live network scanning (32+ networks detected successfully)
-- ✅ Permission robustness (socket access, netdev group requirements)
-- ✅ Edge case handling (interface down, daemon restarts, missing hardware)
-- ✅ Non-destructive testing with complete system restoration
-- ✅ Test harness script for automated validation (`scripts/test_wifi_real.sh`)
-
-**WiFi Error Handling & Permission System** (Completed 2025-10-28)
-- ✅ **Comprehensive Error Propagation**: WiFiResult enum, WiFiError struct, user-friendly messages
-- ✅ **Permission Checking**: Socket access validation, netdev group testing, hardware detection
-- ✅ **Backend Interface Update**: All methods return WiFiError instead of bool
-- ✅ **Mock Backend Alignment**: Updated to match new error interface with realistic scenarios
-- ✅ **WiFiManager Integration**: Full error handling with graceful UI fallback behavior
-- ✅ **Hardware Detection**: Enables adaptive UI (skip WiFi setup when no hardware)
-- Commit: `8886bf6`
-
-**WiFi System Status:** PRODUCTION READY
-- Backend abstraction complete with pluggable implementations
-- **Cross-platform support**: macOS (CoreWLAN) + Linux (wpa_supplicant)
-- Security hardened (input validation, resource cleanup, thread safety)
-- Robust fallback behavior for diverse hardware scenarios
-- Comprehensive test coverage for real-world deployment
-- Comprehensive error handling with user-friendly messages
+**WiFi System** (Production Ready 2025-10-28)
+- Backend abstraction: macOS (CoreWLAN) + Linux (wpa_supplicant) + Mock
+- Security hardened, comprehensive error handling, real hardware validated
+- See git history for detailed implementation (commits `6025c3c` through `8886bf6`)
 
 ### Next Priorities
 
-**Future Work** (Post-WiFi Implementation):
-- **Phase 2**: Node.js/npm optional dependencies (make font generation optional)
-- **UI Testing**: Fix multiple fixture segfaults (1/10 tests passing)
-- **Additional Features**: As defined in `docs/ROADMAP.md`
+1. **Wizard Screens Implementation**
+   - WiFi setup screen (SSID list + password input)
+   - Moonraker connection screen (host/port/API key)
+   - Printer identification (type selection from 32 presets)
+   - Hardware configuration (bed/hotend/fan/LED selection)
+   - Summary/confirmation screen
+
+2. **Wizard Flow Logic**
+   - Screen switching mechanism (load into wizard_content container)
+   - State persistence between steps
+   - Validation and error handling
+   - Completion callback integration
+
+3. **Future Enhancements**
+   - **Phase 2**: Node.js/npm optional dependencies (make font generation optional)
+   - **UI Testing**: Fix multiple fixture segfaults (1/10 tests passing)
+   - **Additional Features**: As defined in `docs/ROADMAP.md`
 
 ---
 
@@ -133,7 +89,35 @@
 
 **Reference:** `docs/LVGL9_XML_GUIDE.md:634-716`, `.claude/agents/widget-maker.md:107-149`, `.claude/agents/ui-reviewer.md:101-152`
 
-### Pattern #1: Custom Switch Widget
+### Pattern #1: Runtime Constants for Responsive Design
+
+**Use case:** Single XML template that adapts to different screen sizes
+
+```cpp
+// C++ - Detect screen size and override constants BEFORE creating XML
+int width = lv_display_get_horizontal_resolution(lv_display_get_default());
+lv_xml_component_scope_t* scope = lv_xml_component_get_scope("globals");
+
+if (width < 600) {  // TINY
+    lv_xml_register_const(scope, "wizard_padding", "6");
+    lv_xml_register_const(scope, "wizard_gap", "4");
+} else if (width < 900) {  // SMALL
+    lv_xml_register_const(scope, "wizard_padding", "12");
+    lv_xml_register_const(scope, "wizard_gap", "8");
+} else {  // LARGE
+    lv_xml_register_const(scope, "wizard_padding", "20");
+    lv_xml_register_const(scope, "wizard_gap", "12");
+}
+
+// XML - Uses runtime-modified constants
+<lv_obj style_pad_all="#wizard_padding" style_pad_column="#wizard_gap">
+```
+
+**Why:** One XML template adapts to any screen size without duplication or C++ layout manipulation
+
+**Files:** `ui_wizard.cpp:71-124`, `wizard_container.xml`, `globals.xml:119-125`
+
+### Pattern #2: Custom Switch Widget
 
 **Available:** `<ui_switch>` registered for XML use
 
@@ -146,7 +130,7 @@
 
 **Files:** `include/ui_switch.h`, `src/ui_switch.cpp`, `src/main.cpp:643`
 
-### Pattern #2: Navigation History Stack
+### Pattern #3: Navigation History Stack
 
 **When to use:** Overlay panels (motion, temps, extrusion, keypad)
 
@@ -157,7 +141,7 @@ if (!ui_nav_go_back()) { /* fallback */ }
 
 **Files:** `ui_nav.h:54-62`, `ui_nav.cpp:250-327`
 
-### Pattern #3: Global Keyboard for Textareas
+### Pattern #4: Global Keyboard for Textareas
 
 ```cpp
 // One-time init in main.cpp (already done)
@@ -169,17 +153,17 @@ ui_keyboard_register_textarea(my_textarea);  // Auto show/hide on focus
 
 **Files:** `include/ui_keyboard.h`, `src/ui_keyboard.cpp`
 
-### Pattern #4: Subject Initialization Order
+### Pattern #5: Subject Initialization Order
 
 **MUST initialize subjects BEFORE creating XML:**
 
 ```cpp
-lv_xml_component_register_from_file("A:/ui_xml/my_panel.xml");
+lv_xml_register_component_from_file("A:/ui_xml/my_panel.xml");
 ui_my_panel_init_subjects();  // FIRST
 lv_xml_create(screen, "my_panel", NULL);  // AFTER
 ```
 
-### Pattern #5: Component Instantiation Names
+### Pattern #6: Component Instantiation Names
 
 **Always add explicit `name` attributes:**
 
@@ -190,7 +174,7 @@ lv_xml_create(screen, "my_panel", NULL);  // AFTER
 
 **Why:** Component `<view name="...">` doesn't propagate to instantiation
 
-### Pattern #6: Image Scaling in Flex Layouts
+### Pattern #7: Image Scaling in Flex Layouts
 
 ```cpp
 lv_obj_update_layout(container);  // Force layout calculation FIRST
@@ -201,7 +185,7 @@ ui_image_scale_to_cover(img, container);
 
 **Files:** `ui_utils.cpp:213-276`, `ui_panel_print_status.cpp:249-314`
 
-### Pattern #7: Logging Policy
+### Pattern #8: Logging Policy
 
 **ALWAYS use spdlog, NEVER printf/cout/LV_LOG:**
 
@@ -213,13 +197,13 @@ spdlog::error("Failed: {}", (int)enum_val);     // Cast enums
 
 **Reference:** `CLAUDE.md:77-134`
 
-### Pattern #8: Copyright Headers
+### Pattern #9: Copyright Headers
 
 **ALL new files MUST include GPL v3 header**
 
 **Reference:** `docs/COPYRIGHT_HEADERS.md`
 
-### Pattern #9: UI Testing Infrastructure
+### Pattern #10: UI Testing Infrastructure
 
 **See `docs/UI_TESTING.md` for complete UI testing guide**
 

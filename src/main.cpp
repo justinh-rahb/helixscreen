@@ -417,31 +417,14 @@ int main(int argc, char** argv) {
             force_wizard = true;
         } else if (strcmp(argv[i], "--wizard-step") == 0) {
             if (i + 1 < argc) {
-                const char* step_arg = argv[++i];
-                force_wizard = true;  // Force wizard to show
-                if (strcmp(step_arg, "wifi") == 0 || strcmp(step_arg, "wifi-setup") == 0) {
-                    wizard_step = static_cast<int>(WizardStep::WIFI_SETUP);
-                } else if (strcmp(step_arg, "connection") == 0) {
-                    wizard_step = static_cast<int>(WizardStep::CONNECTION);
-                } else if (strcmp(step_arg, "printer-identify") == 0 || strcmp(step_arg, "identify") == 0) {
-                    wizard_step = static_cast<int>(WizardStep::PRINTER_IDENTIFY);
-                } else if (strcmp(step_arg, "bed") == 0 || strcmp(step_arg, "bed-select") == 0) {
-                    wizard_step = static_cast<int>(WizardStep::BED_SELECT);
-                } else if (strcmp(step_arg, "hotend") == 0 || strcmp(step_arg, "hotend-select") == 0) {
-                    wizard_step = static_cast<int>(WizardStep::HOTEND_SELECT);
-                } else if (strcmp(step_arg, "fan") == 0 || strcmp(step_arg, "fan-select") == 0) {
-                    wizard_step = static_cast<int>(WizardStep::FAN_SELECT);
-                } else if (strcmp(step_arg, "led") == 0 || strcmp(step_arg, "led-select") == 0) {
-                    wizard_step = static_cast<int>(WizardStep::LED_SELECT);
-                } else if (strcmp(step_arg, "summary") == 0) {
-                    wizard_step = static_cast<int>(WizardStep::SUMMARY);
-                } else {
-                    printf("Unknown wizard step: %s\n", step_arg);
-                    printf("Available steps: wifi, connection, printer-identify, bed, hotend, fan, led, summary\n");
+                wizard_step = atoi(argv[++i]);
+                force_wizard = true;
+                if (wizard_step < 1 || wizard_step > 7) {
+                    printf("Error: wizard step must be 1-7\n");
                     return 1;
                 }
             } else {
-                printf("Error: --wizard-step requires an argument\n");
+                printf("Error: --wizard-step requires an argument (1-7)\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--display") == 0) {
@@ -1021,21 +1004,21 @@ int main(int argc, char** argv) {
 
     // Check if first-run wizard is required (skip for special test panels and explicit panel requests)
     if ((force_wizard || config->is_wizard_required()) && !show_step_test && !show_test_panel && !show_keypad && !panel_requested) {
-        LV_LOG_USER("Starting first-run configuration wizard");
+        spdlog::info("Starting first-run configuration wizard");
 
-        lv_obj_t* wizard = ui_wizard_create(screen, config, &moonraker_client, []() {
-            LV_LOG_USER("Wizard completed - configuration saved");
-            // Config will be reloaded on next connection attempt
-        });
+        // Register wizard event callbacks and responsive constants BEFORE creating
+        ui_wizard_register_event_callbacks();
+        ui_wizard_register_responsive_constants();
+
+        lv_obj_t* wizard = ui_wizard_create(screen);
 
         if (wizard) {
-            LV_LOG_USER("Wizard created successfully");
+            spdlog::info("Wizard created successfully");
 
-            // Jump to specific wizard step if requested via --wizard-step
-            if (wizard_step >= 0) {
-                LV_LOG_USER("Jumping to wizard step %d", wizard_step);
-                ui_wizard_goto_step(static_cast<WizardStep>(wizard_step));
-            }
+            // Set initial step
+            int initial_step = (wizard_step >= 1) ? wizard_step : 1;
+            ui_wizard_navigate_to_step(initial_step);
+            ui_wizard_set_title("Welcome to Setup");
 
             // Move keyboard to top layer so it appears above the full-screen wizard overlay
             lv_obj_t* keyboard = ui_keyboard_get_instance();
@@ -1044,7 +1027,7 @@ int main(int argc, char** argv) {
                 spdlog::debug("[Keyboard] Moved to foreground (above wizard overlay)");
             }
         } else {
-            LV_LOG_ERROR("Failed to create wizard");
+            spdlog::error("Failed to create wizard");
         }
     }
 

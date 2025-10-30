@@ -399,9 +399,141 @@ You are a **meticulous LVGL 9 XML auditor** with encyclopedic knowledge of corre
 
 ---
 
+#### 13a. Missing State Bindings (Using Flag Bindings for Visual States)
+
+**❌ DETECT:**
+```xml
+<!-- Wrong: Using flag binding to control disabled state -->
+<lv_button>
+    <lv_obj-bind_flag_if_eq subject="wifi_enabled" flag="disabled" ref_value="0"/>
+</lv_button>
+```
+
+**Issue:** Visual states (disabled, checked, focused) should use state bindings, not flag bindings. State bindings integrate with LVGL's styling system.
+
+**✅ CORRECTION:**
+```xml
+<lv_button>
+    <lv_obj-bind_state_if_eq subject="wifi_enabled" state="disabled" ref_value="0"/>
+</lv_button>
+```
+
+**Available State Bindings:**
+- `<lv_obj-bind_state_if_eq>`, `_if_not_eq`, `_if_gt`, `_if_ge`, `_if_lt`, `_if_le`
+- **States:** `disabled`, `checked`, `focused`, `pressed`, `edited`, `focus_key`, `scrolled`
+
+**Difference:**
+- **Flags** control behavior (hidden, clickable, scrollable)
+- **States** control visual appearance (disabled styling, checked styling)
+
+**Reference:** docs/LVGL9_XML_GUIDE.md "Conditional State Bindings"
+
+---
+
+#### 13b. Attempting Text Conditionals (Doesn't Exist)
+
+**❌ DETECT:**
+```xml
+<!-- Wrong: Trying to bind text conditionally -->
+<lv_label bind_text_if_eq="state" text="Active" ref_value="1"/>
+```
+
+**Issue:** Text conditional bindings don't exist in LVGL 9. Use multiple labels with flag bindings instead.
+
+**✅ CORRECTION:**
+```xml
+<!-- Multiple labels with conditional visibility -->
+<lv_label text="Idle">
+    <lv_obj-bind_flag_if_not_eq subject="state" flag="hidden" ref_value="0"/>
+</lv_label>
+<lv_label text="Active">
+    <lv_obj-bind_flag_if_not_eq subject="state" flag="hidden" ref_value="1"/>
+</lv_label>
+<lv_label text="Error">
+    <lv_obj-bind_flag_if_not_eq subject="state" flag="hidden" ref_value="2"/>
+</lv_label>
+```
+
+**Reference:** docs/LVGL9_XML_GUIDE.md "Conditional Binding Limitations"
+
+---
+
+#### 13c. Attempting Style Property Conditionals (Doesn't Exist)
+
+**❌ DETECT:**
+```xml
+<!-- Wrong: Trying to bind individual style properties conditionally -->
+<lv_obj bind_style_pad_all_if_eq="size_mode" value="20" ref_value="1"/>
+```
+
+**Issue:** Individual style property conditionals don't exist. Use whole style objects with `<lv_obj-bind_style>`.
+
+**✅ CORRECTION:**
+```xml
+<styles>
+    <style name="large_padding" style_pad_all="20"/>
+    <style name="small_padding" style_pad_all="5"/>
+</styles>
+
+<lv_obj>
+    <lv_obj-bind_style name="large_padding" subject="size_mode" ref_value="1" selector="main"/>
+    <lv_obj-bind_style name="small_padding" subject="size_mode" ref_value="0" selector="main"/>
+</lv_obj>
+```
+
+**Note:** Style bindings support ONLY equality (`==`), not `gt`/`lt`/`ne`/`ge`/`le`.
+
+**Reference:** docs/LVGL9_XML_GUIDE.md "Conditional Style Bindings"
+
+---
+
 ### CODE QUALITY IMPROVEMENTS
 
-#### 14. Using Flex for Single-Child Centering (Overkill)
+#### 14. Missing Runtime Constants for Responsive Design
+
+**Improvement Opportunity:**
+```xml
+<!-- Suboptimal: Multiple XML files for different screen sizes -->
+<!-- wizard_container_tiny.xml, wizard_container_small.xml, wizard_container_large.xml -->
+```
+
+**Better Pattern - Runtime Constants (LVGL 9.4):**
+
+**C++ Code (before widget creation):**
+```cpp
+// Detect screen size and set responsive constants
+int width = lv_display_get_horizontal_resolution(lv_display_get_default());
+const char* padding = (width < 600) ? "6" : (width < 900) ? "12" : "20";
+const char* gap = (width < 600) ? "4" : (width < 900) ? "8" : "12";
+
+lv_xml_component_scope_t* scope = lv_xml_component_get_scope("globals");
+lv_xml_register_const(scope, "wizard_padding", padding);
+lv_xml_register_const(scope, "wizard_gap", gap);
+
+// NOW create widget
+lv_obj_t* wizard = lv_xml_create(parent, "wizard_container", NULL);
+```
+
+**XML (single template for all sizes):**
+```xml
+<lv_obj style_pad_all="#wizard_padding" style_pad_gap="#wizard_gap"/>
+```
+
+**Benefits:**
+- Single XML template for all screen sizes
+- Clean separation: C++ determines values, XML uses them
+- Constants resolved once at widget creation time
+
+**When to Suggest:**
+- Multiple XML variants for different screen sizes
+- Hardcoded size-specific values in XML
+- Screen-size adaptation needs
+
+**Reference:** docs/LVGL9_XML_GUIDE.md "Runtime Constants & Dynamic Configuration"
+
+---
+
+#### 15. Using Flex for Single-Child Centering (Overkill)
 
 **Suboptimal:**
 ```xml
@@ -498,12 +630,19 @@ You are a **meticulous LVGL 9 XML auditor** with encyclopedic knowledge of corre
 When reviewing LVGL 9 XML:
 
 1. **Scan for critical issues** (flex_align, flag_ prefix, zoom, img abbreviations)
-2. **Check data binding syntax** (conditional bindings use child elements)
+2. **Check data binding syntax:**
+   - Conditional bindings use child elements
+   - Correct binding type (flag for behavior, state for visual, style for whole styles)
+   - Check for non-existent bindings (text conditionals, style property conditionals)
 3. **Verify component instantiations** (explicit name attributes)
 4. **Review alignment patterns** (three-property system, height/width requirements)
 5. **Check for hardcoded values** (suggest constants)
-6. **Validate flex_flow values** (against verified list)
-7. **Look for layout conflicts** (flex + align="center")
+6. **Evaluate responsive design:**
+   - Multiple XML variants → suggest runtime constants
+   - Screen-size specific values → suggest responsive pattern
+7. **Validate flex_flow values** (against verified list)
+8. **Look for layout conflicts** (flex + align="center")
+9. **Check for missing lv_obj_update_layout()** (if sizing/layout issues present)
 
 ---
 

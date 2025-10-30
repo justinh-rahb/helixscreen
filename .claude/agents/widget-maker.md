@@ -200,37 +200,138 @@ Use for direct property binding:
 </lv_obj>
 ```
 
-**Available Conditional Operators:**
-- `bind_flag_if_eq` - Equal to
-- `bind_flag_if_ne` - Not equal to
-- `bind_flag_if_gt` - Greater than
-- `bind_flag_if_ge` - Greater than or equal
-- `bind_flag_if_lt` - Less than
-- `bind_flag_if_le` - Less than or equal
+**Three Types of Conditional Bindings (LVGL 9.4):**
 
-**Common Bindable Flags:**
-- `hidden` - Show/hide widget
-- `disabled` - Enable/disable interaction
-- `clickable` - Make clickable/non-clickable
-- `scrollable` - Enable/disable scrolling
-- `checkable` - Make checkable/non-checkable
+##### A. Flag Bindings (Show/Hide, Enable/Disable)
 
-**Example - Multiple Conditions:**
+Control widget behavior flags:
+
 ```xml
 <lv_obj>
-    <!-- Hide when mode = 1 -->
-    <lv_obj-bind_flag_if_eq subject="mode" flag="hidden" ref_value="1"/>
+    <!-- Hide when current_step == 1 -->
+    <lv_obj-bind_flag_if_eq subject="current_step" flag="hidden" ref_value="1"/>
     <!-- Disable when level >= 100 -->
     <lv_obj-bind_flag_if_ge subject="level" flag="disabled" ref_value="100"/>
+    <!-- Make scrollable when count > 5 -->
+    <lv_obj-bind_flag_if_gt subject="item_count" flag="scrollable" ref_value="5"/>
 </lv_obj>
 ```
 
-**Conditional Style Binding:**
+**Available Operators:** `_if_eq`, `_if_not_eq`, `_if_gt`, `_if_ge`, `_if_lt`, `_if_le`
+
+**Common Flags:** `hidden`, `clickable`, `disabled`, `scrollable`, `checkable`, `ignore_layout`, `floating`
+
+##### B. State Bindings (Visual States)
+
+Control widget visual states (styling system):
+
 ```xml
 <lv_obj>
-    <bind_style name="style_dark" subject="dark_mode" ref_value="1"/>
+    <!-- Disable when WiFi is off -->
+    <lv_obj-bind_state_if_eq subject="wifi_enabled" state="disabled" ref_value="0"/>
+    <!-- Check when dark mode is on -->
+    <lv_obj-bind_state_if_eq subject="dark_mode" state="checked" ref_value="1"/>
 </lv_obj>
 ```
+
+**Available Operators:** `_if_eq`, `_if_not_eq`, `_if_gt`, `_if_ge`, `_if_lt`, `_if_le`
+
+**Common States:** `disabled`, `checked`, `focused`, `pressed`, `edited`
+
+**Difference:** Flags control behavior, states control visual appearance (disabled styling, checked styling).
+
+##### C. Style Bindings (Whole Style Objects)
+
+Apply entire pre-defined style objects conditionally:
+
+```xml
+<styles>
+    <style name="style_error" bg_color="0xff0000" text_color="0xffffff"/>
+    <style name="style_success" bg_color="0x00ff00"/>
+</styles>
+
+<lv_obj>
+    <!-- Apply error style when error_code == 1 -->
+    <lv_obj-bind_style name="style_error" subject="error_code" ref_value="1" selector="main"/>
+    <!-- Apply success style when status == 0 -->
+    <lv_obj-bind_style name="style_success" subject="status" ref_value="0" selector="main"/>
+</lv_obj>
+```
+
+**⚠️ LIMITATION:** Style bindings support ONLY equality (`==`), not gt/lt/ne/ge/le.
+
+**Why:** Binds entire style objects, not individual properties.
+
+#### Conditional Binding Limitations
+
+**❌ Text conditionals DON'T EXIST** - No `bind_text_if_eq`. Use multiple labels with flag bindings:
+
+```xml
+<lv_label text="Idle">
+    <lv_obj-bind_flag_if_not_eq subject="state" flag="hidden" ref_value="0"/>
+</lv_label>
+<lv_label text="Active">
+    <lv_obj-bind_flag_if_not_eq subject="state" flag="hidden" ref_value="1"/>
+</lv_label>
+```
+
+**❌ Style property conditionals DON'T EXIST** - No `bind_style_pad_all_if_eq`. Use whole style objects with `<lv_obj-bind_style>`.
+
+---
+
+### Runtime Constants & Responsive Design
+
+**NEW PATTERN (LVGL 9.4):** Constants can be modified from C++ **before** widget creation, enabling responsive UIs without XML duplication.
+
+#### Responsive Design Pattern
+
+```cpp
+// Detect screen size at startup (BEFORE creating widgets)
+int width = lv_display_get_horizontal_resolution(lv_display_get_default());
+
+// Calculate responsive values
+const char* padding_value = (width < 600) ? "6" : (width < 900) ? "12" : "20";
+const char* gap_value = (width < 600) ? "4" : (width < 900) ? "8" : "12";
+const char* header_height = (width < 600) ? "28" : (width < 900) ? "32" : "40";
+
+// Register constants BEFORE creating widgets
+lv_xml_component_scope_t* scope = lv_xml_component_get_scope("globals");
+lv_xml_register_const(scope, "wizard_padding", padding_value);
+lv_xml_register_const(scope, "wizard_gap", gap_value);
+lv_xml_register_const(scope, "wizard_header_height", header_height);
+
+// NOW create widgets - they pick up responsive constants
+lv_obj_t* wizard = lv_xml_create(parent, "wizard_container", NULL);
+```
+
+**XML Usage:**
+
+```xml
+<!-- globals.xml - Define defaults (overridden by C++ at runtime) -->
+<consts>
+    <px name="wizard_padding" value="12"/>      <!-- Default for SMALL screens -->
+    <px name="wizard_gap" value="8"/>
+    <px name="wizard_header_height" value="32"/>
+</consts>
+
+<!-- wizard_container.xml - Uses constants that adapt to screen size -->
+<lv_obj width="100%" height="LV_SIZE_CONTENT"
+        style_min_height="#wizard_header_height"
+        style_pad_all="#wizard_padding"
+        style_pad_gap="#wizard_gap">
+</lv_obj>
+```
+
+**Key Points:**
+- ✅ Constants resolved **once at widget creation time** (parse time)
+- ✅ Single XML template works for all screen sizes (480x320 → 1024x600+)
+- ✅ Clean separation: C++ determines values, XML uses them
+- ❌ Cannot modify constants AFTER widgets are created
+
+**When to Use:**
+- Screen-size adaptation (tiny/small/large displays)
+- Theme switching
+- Configuration-driven UIs
 
 ---
 
@@ -572,18 +673,33 @@ When you need a reusable value:
 
 Before presenting any XML, verify:
 
+**Layout & Alignment:**
 - [ ] **NO `flex_align` attribute used** (doesn't exist)
 - [ ] **Flex alignment uses THREE properties** (main_place, cross_place, track_place)
-- [ ] **NO `flag_` prefix on attributes** (use simplified syntax)
+- [ ] **Vertical centering container has `height="100%"`**
+- [ ] **LV_SIZE_CONTENT used appropriately** (encouraged for flex/dynamic content)
+
+**Conditional Bindings:**
 - [ ] **Conditional bindings use child elements** (not attributes)
+- [ ] **Using correct binding type** (flag for behavior, state for visual, style for whole styles)
+- [ ] **Text conditionals avoided** (use multiple labels with flag bindings instead)
+- [ ] **Style property conditionals avoided** (use whole style objects with bind_style instead)
+
+**Constants & Responsive:**
+- [ ] **Using semantic constants from globals.xml** (not hardcoded values)
+- [ ] **If using responsive design:** Constants modified BEFORE widget creation
+- [ ] **Runtime constants pattern documented** (if applicable)
+
+**Attributes & Syntax:**
+- [ ] **NO `flag_` prefix on attributes** (use simplified syntax: `hidden="true"` not `flag_hidden="true"`)
 - [ ] **Component instantiations have explicit `name` attributes**
 - [ ] **Image widgets use `scale_x/scale_y` not `zoom`**
 - [ ] **Image recolor uses `style_image_recolor` not `style_img_recolor`**
 - [ ] **Text centering has BOTH `style_text_align` AND `width="100%"`**
-- [ ] **Vertical centering container has `height="100%"`**
-- [ ] **Subjects referenced in bindings will be registered in C++ before XML creation**
-- [ ] **Global constants exist in globals.xml** (or will be added)
-- [ ] **LV_SIZE_CONTENT used appropriately** (encouraged for flex/dynamic content)
+
+**C++ Integration:**
+- [ ] **Subjects referenced will be registered BEFORE XML creation**
+- [ ] **Constants referenced exist in globals.xml** (or will be added/modified)
 
 ---
 

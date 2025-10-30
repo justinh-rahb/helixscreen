@@ -116,6 +116,14 @@
 	<px name="wizard_printer_img_height" value="140" />
 	<!-- Printer image height in printer identification screen -->
 
+	<!-- Wizard Container - Responsive constants (overridden by C++ at runtime) -->
+	<!-- These defaults are for SMALL screens (800x480). C++ sets values based on detected screen size. -->
+	<px name="wizard_padding" value="12"/>          <!-- Container padding: TINY=6, SMALL=12, LARGE=20 -->
+	<px name="wizard_gap" value="8"/>               <!-- Gap between flex items: TINY=4, SMALL=8, LARGE=12 -->
+	<px name="wizard_header_height" value="32"/>    <!-- Header min-height: TINY=28, SMALL=32, LARGE=40 -->
+	<str name="wizard_header_font" value="montserrat_16"/>   <!-- Progress font: TINY=14, SMALL=16, LARGE=20 -->
+	<str name="wizard_title_font" value="montserrat_20"/>    <!-- Title font: TINY=16, SMALL=20, LARGE=24 -->
+
 	<!-- Input field dimensions (text inputs, dropdowns, rollers) -->
 	<px name="input_border_width" value="1" />
 	<!-- Border width for input fields (prominent for visibility) -->
