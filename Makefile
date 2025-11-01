@@ -153,8 +153,8 @@ ifeq ($(UNAME_S),Darwin)
     # macOS - Uses CoreWLAN framework for WiFi (with fallback to mock)
     NPROC := $(shell sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
-    # Set minimum macOS version (10.15 Catalina for CoreWLAN/CoreLocation modern APIs)
-    MACOS_MIN_VERSION := 10.15
+    # Set minimum macOS version (14.0 Sonoma - matches SDL2 library requirement)
+    MACOS_MIN_VERSION := 14.0
     MACOS_DEPLOYMENT_TARGET := -mmacosx-version-min=$(MACOS_MIN_VERSION)
 
     CFLAGS += $(MACOS_DEPLOYMENT_TARGET)

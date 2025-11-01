@@ -72,6 +72,9 @@ static void ui_card_xml_apply(lv_xml_parser_state_t *state, const char **attrs)
     lv_obj_set_style_bg_color(obj, bg_color, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
 
+    // 1a. Disabled state: 50% opacity for visual feedback
+    lv_obj_set_style_opa(obj, LV_OPA_50, LV_PART_MAIN | LV_STATE_DISABLED);
+
     // 2. Border: 0 (no border by default)
     lv_obj_set_style_border_width(obj, 0, LV_PART_MAIN);
 
@@ -85,7 +88,7 @@ static void ui_card_xml_apply(lv_xml_parser_state_t *state, const char **attrs)
     // 5. Padding: Let LVGL theme provide responsive default (16/20/24px)
     //    User can override per-instance with style_pad_all attribute
 
-    spdlog::trace("[Card] Applied theme defaults: bg=card_bg, border=0, shadow=0");
+    spdlog::trace("[Card] Applied theme defaults: bg=card_bg, border=0, shadow=0, disabled_opa=50%");
 
     // Now apply standard lv_obj properties from XML (highest priority)
     // This allows XML attributes to override our defaults
