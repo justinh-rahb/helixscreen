@@ -1,290 +1,177 @@
 # Session Handoff Document
 
 **Last Updated:** 2025-11-02
-**Current Focus:** Architecture compliance cleanup COMPLETE + Wizard implementations functional
+**Current Focus:** Mock backend ready - proceed with Phase 2 (Dynamic Dropdown Population)
 
 ---
 
-## ✅ JUST COMPLETED: Constants & Colors Architecture Cleanup (2025-11-02)
+## ✅ CURRENT STATE
 
-**ALL hardcoded colors eliminated + globals.xml pruned by 27 constants**
+### Completed Phases
 
-### What Was Accomplished
+1. **Phase 1: Hardware Discovery Trigger** - ✅ COMPLETE
+   - Wizard triggers `discover_printer()` after successful connection
+   - Connection stays alive for hardware selection steps 4-7
+   - Hardware counts logged for debugging
 
-**Milestone 1-5: Fixed ALL Hardcoded Color Violations (25 total)**
-- Motion Panel: 10 colors → theme-aware component-local constants (commit 537f1e2)
-- Step Progress: 8 colors → theme-aware component-local constants (commit e5c4a4e)
-- Temperature Panels: 2 colors → theme-aware component-local constants (commit 5e7a92c)
-- WiFi List: 2 colors → theme-aware component-local constants (commit 5246cbc)
-- Home Panel: 3 colors → theme-aware component-local constants (commit 6d3068f)
+2. **Phase 4.1: Mock Backend** - ✅ COMPLETE (Just Finished)
+   - `MoonrakerClientMock` class created with 7 printer profiles
+   - Factory pattern integrated in `initialize_moonraker_client()` (main.cpp:759-766)
+   - Uses `TestConfig.should_mock_moonraker()` to select mock vs real client
+   - Realistic hardware data for testing without printer connection
 
-**Pattern Established:** All UI colors now use `*_light/*_dark` variant pairs in component-local `<consts>` blocks, loaded at runtime via `lv_xml_component_get_scope()` with graceful fallbacks. NO recompilation needed for theme changes.
+### What Works Now
 
-**Milestone 6: Moved Single-Use Constants (7 constants, commit 2e4cf33)**
-- home_panel.xml: 3 dimensions (printer_img_size, accent_bar_width/gap)
-- filament_panel.xml: 4 label heights (label_height_xs/sm/md/lg)
+- ✅ Moonraker client properly initialized (main.cpp:755)
+- ✅ Wizard can test connections and trigger hardware discovery
+- ✅ Mock backend provides test hardware (Voron 2.4, K1, FlashForge, etc.)
+- ✅ Test mode controlled via `--test` flag + `TestConfig`
 
-**Milestone 7: Deleted Unused Constants (20 constants, commit 0a31cf0)**
-- Motion panel redesign obsolete: 10 constants (jog_*, distance_*, home_*, position_*, z_controls_height)
-- Detail view obsolete: 3 constants (detail_metadata_height, detail_back_icon_size, detail_separator_height)
-- Step progress redesign: 3 constants (step_indicator_size, step_connector_width, step_spacing)
-- General UI: 4 constants (progress_bar_height, divider_height, divider_opacity, disabled_opa)
+### What Needs Work
 
-### Impact
-
-✅ **CLAUDE.md Rule #1 compliance:** NO hardcoded colors remain in C++
-✅ **Component locality:** Colors and single-use dimensions moved to components
-✅ **globals.xml cleanup:** 27 constants moved/deleted (7 moved + 20 deleted)
-✅ **Theme-aware:** All colors support light/dark mode without recompilation
-✅ **Build verified:** All changes tested and passing
-
-### Files Modified
-
-**XML (color constants added):**
-- ui_xml/motion_panel.xml, ui_xml/step_progress_test.xml
-- ui_xml/nozzle_temp_panel.xml, ui_xml/bed_temp_panel.xml
-- ui_xml/wifi_network_item.xml, ui_xml/home_panel.xml
-- ui_xml/filament_panel.xml
-
-**C++ (runtime color loading):**
-- src/ui_panel_motion.cpp, src/ui_step_progress.cpp
-- src/ui_panel_controls_temp.cpp, src/ui_wizard_wifi.cpp
-- src/ui_panel_home.cpp
-
-**Globals cleanup:**
-- ui_xml/globals.xml - 27 constants moved/deleted
-
-**Milestone 8: Extracted Jog Pad Widget (commit 1c2a281)**
-- Created reusable ui_jog_pad.h/.cpp widget (759 lines)
-- Reduced motion_panel.cpp from ~890 to ~400 lines (-55%)
-- Widget API: callbacks, distance control, theme-aware colors
-- Two-zone design: inner/outer rings for 1mm/10mm jogs
-- 8 directional zones + center home button
-
-### Remaining Refactoring Tasks
-
-- Refactor keypad to button matrix (260→40 lines)
-- Test all changes with --dark/--light on all screen sizes
+- ❌ Wizard steps 4-7 still use hardcoded dropdown values
+- ❌ No printer auto-detection yet
 
 ---
 
-## ✅ JUST COMPLETED: Real File Operations Integration (2025-11-02)
+## 🚀 NEXT PRIORITY: Phase 2 - Dynamic Dropdown Population
 
-**Print Select Panel now fetches real data from Moonraker**
+**Goal:** Replace hardcoded hardware lists with discovered hardware from MoonrakerClient
 
-**What Works:**
-- `ui_panel_print_select_refresh_files()` fetches real file list via `MoonrakerAPI::list_files()`
-- Nested async metadata fetching for each file via `get_file_metadata()`
-- Extracts print time (seconds → minutes) and filament weight (grams)
-- Cards/list rows update automatically as metadata arrives
-- Thumbnail URL construction (`construct_thumbnail_url()`) - logs URLs, download deferred
+### Files to Modify
 
-**Files Modified:**
-- `src/ui_panel_print_select.cpp` - Added config.h include, construct_thumbnail_url() helper, enhanced refresh_files() with nested callbacks
+1. **`src/ui_wizard_bed_select.cpp`** (Lines 70-85)
+   - Filter `client->get_heaters()` for bed-related heaters
+   - Filter `client->get_sensors()` for bed/chamber sensors
+   - Build dropdown options string and update dropdowns
 
-**Edge Cases Handled:**
-- Bounds checking (file_list changes during async ops)
-- Missing metadata → keeps placeholders (0 min, 0g)
-- Error callbacks log warnings without crashing
-- Empty file lists → shows existing empty state UI
+2. **`src/ui_wizard_hotend_select.cpp`** (Lines 70-85)
+   - Filter for extruder heaters ("extruder", "extruder1", etc.)
+   - Filter sensors for hotend/extruder sensors
+   - Populate dropdowns dynamically
 
-**What's Deferred:**
-- Actual HTTP thumbnail downloads (URL construction works, marked TODO)
-- Would need: libhv HttpClient integration, temp directory, file cleanup
+3. **`src/ui_wizard_fan_select.cpp`** (Lines 70-85)
+   - Categorize `client->get_fans()` into hotend vs part cooling
+   - Hotend: "heater_fan", "hotend_fan"
+   - Part cooling: "fan", "part_fan"
 
-**Testing:**
-- ✅ Builds cleanly (zero warnings)
-- ✅ Mock mode (`--test`) still works with test data
-- ⏳ Real Moonraker test requires live printer (code ready)
+4. **`src/ui_wizard_led_select.cpp`** (Lines 70-85)
+   - List all LED outputs from discovered hardware
+   - No filtering needed - just populate dropdown
 
-**Key Pattern - Async Metadata Loading:**
+### Implementation Pattern
+
 ```cpp
-api->list_files("gcodes", "", false, [api](const std::vector<FileInfo>& files) {
-    // Show files immediately with placeholders
-    for (const auto& file : files) { /* add to file_list */ }
-    populate_card_view();
+// In wizard step init function (called after discovery completes)
+void ui_wizard_step_X_setup(lv_obj_t* screen_root) {
+    MoonrakerClient* client = get_moonraker_client();
+    if (!client) return;
 
-    // Fetch metadata asynchronously
-    for (size_t i = 0; i < file_list.size(); i++) {
-        api->get_file_metadata(filename, [i, filename](const FileMetadata& m) {
-            // Bounds check, update file_list[i], re-render
-        });
+    // Get discovered hardware
+    auto items = client->get_heaters(); // or get_sensors(), get_fans(), etc.
+
+    // Filter for relevant items
+    std::vector<std::string> filtered;
+    for (const auto& item : items) {
+        if (item.find("bed") != std::string::npos) {
+            filtered.push_back(item);
+        }
     }
+
+    // Build options string (LVGL format: newline-separated)
+    std::string options;
+    for (const auto& item : filtered) {
+        if (!options.empty()) options += "\n";
+        options += item;
+    }
+    options += "\nNone"; // Always add "None" option
+
+    // Update dropdown
+    lv_obj_t* dropdown = lv_obj_find_by_name(screen_root, "heater_dropdown");
+    if (dropdown) {
+        lv_dropdown_set_options(dropdown, options.c_str());
+    }
+}
+```
+
+**Testing:** Use `--test` flag to test with mock data before testing with real printer.
+
+---
+
+## 📋 Critical Patterns Reference
+
+### Pattern #0: Test Mode Usage
+
+```bash
+# Test with mock Moonraker (Voron 2.4 profile)
+./build/bin/helix-ui-proto --test --wizard
+
+# Test with real Moonraker connection
+./build/bin/helix-ui-proto --test --real-moonraker --wizard
+
+# Production mode (no mocks)
+./build/bin/helix-ui-proto --wizard
+```
+
+```cpp
+// Check test mode in code
+if (get_test_config().should_mock_moonraker()) {
+    // Using mock backend
+}
+```
+
+### Pattern #1: Moonraker Client Access
+
+```cpp
+#include "app_globals.h"
+MoonrakerClient* client = get_moonraker_client();
+MoonrakerAPI* api = get_moonraker_api();
+
+// Get discovered hardware
+auto heaters = client->get_heaters();
+auto sensors = client->get_sensors();
+auto fans = client->get_fans();
+auto leds = client->get_leds();
+```
+
+### Pattern #2: Hardware Discovery
+
+```cpp
+client->discover_printer([]() {
+    spdlog::info("Discovery complete");
+    // Hardware now available via get_heaters(), etc.
 });
 ```
 
----
+### Pattern #3: Thread Safety
 
-## ✅ JUST COMPLETED: Wizard Baseline Implementations (2025-11-02)
+Moonraker callbacks run on background thread. Use notification_queue pattern (main.cpp:799-802) for LVGL updates.
 
-**All 8 wizard steps now have functional baseline C++ implementations!**
+### Pattern #4: Dynamic Dropdown Population
 
-### Wizard Framework (Complete)
-- Subject-based navigation (current_step, total_steps, wizard_title, wizard_progress)
-- Responsive constants system (SMALL ≤480, MEDIUM 481-800, LARGE >800px)
-- Back/Next navigation with automatic "Finish" button on step 8
-- Parent-defined constants pattern (wizard_container → child screens)
-- Theme-aware background colors
-- Next button control (enabled/disabled per screen)
-- total_steps = 8 (fixed throughout codebase)
-
-### All Steps Implemented ✅
-
-**Step 1: WiFi Setup** (ui_wizard_wifi.h/.cpp)
-- WiFi toggle, network scanning, password modal
-- Backend integration with WiFiManager (mock + real)
-
-**Step 2: Moonraker Connection** (ui_wizard_connection.h/.cpp)
-- IP/hostname + port validation
-- WebSocket connection testing with status feedback
-- Config persistence to `/moonraker/host` and `/moonraker/port`
-- Next button disabled until successful connection
-- Comprehensive unit tests (validation + UI)
-
-**Step 3: Printer Identification** (ui_wizard_printer_identify.h/.cpp)
-- Printer name textarea
-- Printer type roller (33 options: Voron, Prusa, Creality, Ender, Bambu, etc.)
-- Config persistence to `/printer/name` and `/printer/type`
-- Auto-detection status display (ready for Moonraker integration)
-
-**Step 4: Bed Select** (ui_wizard_bed_select.h/.cpp)
-- Bed heater dropdown (placeholder options)
-- Bed sensor dropdown (placeholder options)
-- Config persistence to `/printer/bed/heater` and `/printer/bed/sensor`
-
-**Step 5: Hotend Select** (ui_wizard_hotend_select.h/.cpp)
-- Extruder heater dropdown
-- Temperature sensor dropdown
-- Config persistence to `/printer/extruder/heater` and `/printer/extruder/sensor`
-
-**Step 6: Fan Select** (ui_wizard_fan_select.h/.cpp)
-- Hotend fan dropdown
-- Part cooling fan dropdown
-- Config persistence to `/printer/fans/hotend_fan` and `/printer/fans/part_cooling_fan`
-
-**Step 7: LED Select** (ui_wizard_led_select.h/.cpp)
-- LED strip dropdown (optional)
-- Config persistence to `/printer/led/strip`
-
-**Step 8: Summary** (ui_wizard_summary.h/.cpp)
-- Read-only display of all configurations
-- Loads from config: printer name, type, network address, hardware selections
-- "Finish" button replaces "Next" automatically
-
-### Files Created (12 new files)
-- `include/ui_wizard_printer_identify.h`, `src/ui_wizard_printer_identify.cpp`
-- `include/ui_wizard_bed_select.h`, `src/ui_wizard_bed_select.cpp`
-- `include/ui_wizard_hotend_select.h`, `src/ui_wizard_hotend_select.cpp`
-- `include/ui_wizard_fan_select.h`, `src/ui_wizard_fan_select.cpp`
-- `include/ui_wizard_led_select.h`, `src/ui_wizard_led_select.cpp`
-- `include/ui_wizard_summary.h`, `src/ui_wizard_summary.cpp`
-
-### Files Modified
-- `src/ui_wizard.cpp` - Wired all 8 steps, updated total_steps to 8
-- `src/main.cpp` - Updated CLI arg validation to allow steps 1-8
-- `include/ui_wizard.h` - Added ui_wizard_set_next_button_enabled()
-- `ui_xml/wizard_container.xml` - Added Next button control via subject
-
-### Next Priorities
-
-1. **Integrate real Moonraker data for Steps 4-6**
-   - Replace placeholder dropdown options with live Moonraker heater/sensor/fan queries
-   - Use `MoonrakerAPI::query_printer_objects()` to fetch available components
-   - Dynamically populate dropdowns based on printer.cfg
-
-2. **Implement Finish button handler**
-   - Save wizard completion flag to config
-   - Trigger transition to main application screen
-   - Handle "complete wizard" vs "skip wizard" paths
-
-3. **Add printer auto-detection to Step 3**
-   - Query Moonraker for printer info after connection (Step 2)
-   - Auto-populate printer name/type if detectable
-   - Allow manual override
-
-**Key Files:**
-- `src/ui_wizard.cpp` - Main navigation, loads all 8 steps
-- `src/ui_wizard_connection.cpp` - Step 2 with comprehensive tests
-- `src/ui_wizard_printer_identify.cpp` - Step 3 with 33 printer types
-- `src/ui_wizard_{bed,hotend,fan,led}_select.cpp` - Steps 4-7 hardware config
-- `src/ui_wizard_summary.cpp` - Step 8 final review
-- `ui_xml/wizard_*.xml` - All 8 XML layouts (complete)
-- `include/wizard_validation.h` - Input validation helpers
-- `tests/unit/test_wizard_connection*.cpp` - Comprehensive test suite
-
----
-
-## 📋 Critical Patterns for Wizard Work
-
-### Pattern #1: Flex Layout Height Requirements ⚠️
-
-**flex_grow children require parent with explicit height:**
-```xml
-<!-- ❌ BROKEN: Parent has no height -->
-<lv_obj flex_flow="row">
-    <lv_obj flex_grow="3">Left</lv_obj>
-    <lv_obj flex_grow="7">Right</lv_obj>
-</lv_obj>
-
-<!-- ✅ CORRECT: Parent has height, columns have height="100%" -->
-<lv_obj height="100%" flex_flow="row">
-    <lv_obj flex_grow="3" height="100%">Left</lv_obj>
-    <lv_obj flex_grow="7" height="100%">Right</lv_obj>
-</lv_obj>
-```
-**Fix:** Add `style_bg_color="#ff0000"` to visualize bounds. See `docs/LVGL9_XML_GUIDE.md:634-716`
-
-### Pattern #2: Runtime Constants (Responsive + Theme) ⚠️
-
-**Wizard uses heavily for screen size adaptation:**
 ```cpp
-// Detect size, override constants BEFORE creating XML
-int width = lv_display_get_horizontal_resolution(lv_display_get_default());
-lv_xml_component_scope_t* scope = lv_xml_component_get_scope("wizard_container");
-
-if (width < 600) {
-    lv_xml_register_const(scope, "wizard_padding", "6");
-} else {
-    lv_xml_register_const(scope, "wizard_padding", "20");
+std::string options;
+for (const auto& item : items) {
+    if (!options.empty()) options += "\n";
+    options += item;
 }
+lv_dropdown_set_options(dropdown, options.c_str());
 ```
-**See:** `ui_wizard.cpp:90-203` for complete wizard responsive pattern
-
-### Pattern #3: Subject Initialization Order ⚠️
-
-**Always init subjects BEFORE creating XML:**
-```cpp
-lv_xml_register_component_from_file("A:/ui_xml/my_panel.xml");
-ui_my_panel_init_subjects();  // FIRST
-lv_xml_create(screen, "my_panel", NULL);  // AFTER
-```
-
-### Pattern #4: Test Mode ⚠️
-
-**Wizard will use test mode - never auto-fallback to mocks:**
-```cpp
-if (config.should_mock_wifi()) {
-    return std::make_unique<WifiBackendMock>();
-}
-// Production: return nullptr if hardware fails, NO fallback
-```
-**See:** `test_config.h` for complete API
 
 ---
 
-## 🔧 Known Issues & Gotchas
+## 🔧 Known Issues
 
-### LVGL 9 XML Roller Options
-
-**Issue:** XML parser fails with `options="'item1\nitem2' normal"` syntax
-
-**Workaround:** Set roller options programmatically:
-```cpp
-lv_roller_set_options(roller, "Item 1\nItem 2\nItem 3", LV_ROLLER_MODE_NORMAL);
-```
-
-**Files:** `src/ui_wizard.cpp:352-387`
+### Hardcoded Hardware Options
+**Status:** Phase 2 will fix this
+**Files:** `ui_wizard_bed_select.cpp`, `ui_wizard_hotend_select.cpp`, `ui_wizard_fan_select.cpp`, `ui_wizard_led_select.cpp`
+**Lines:** ~70-85 in each file
 
 ---
 
-**Rule:** When work is complete, DELETE it from HANDOFF immediately. Keep this document lean and current.
+## 📚 Reference Documents
+
+- **Implementation Plan:** `docs/MOONRAKER_HARDWARE_DISCOVERY_PLAN.md` (5 phases detailed)
+- **Testing Guide:** `docs/TESTING_MOONRAKER_API.md` (if exists)
+
+**Next Session:** Implement Phase 2 - start with `ui_wizard_bed_select.cpp`

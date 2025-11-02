@@ -47,6 +47,7 @@
 #include "ui_icon_loader.h"
 #include "printer_state.h"
 #include "moonraker_client.h"
+#include "moonraker_client_mock.h"
 #include "moonraker_api.h"
 #include "app_globals.h"
 #include "test_config.h"
@@ -117,6 +118,7 @@ TestConfig* get_mutable_test_config() {
 
 // Forward declarations
 static void save_screenshot();
+static void initialize_moonraker_client(Config* config);
 
 // Parse command-line arguments
 // Returns true on success, false if help was shown or error occurred
@@ -750,6 +752,69 @@ static void save_screenshot() {
     lv_draw_buf_destroy(snapshot);
 }
 
+// Initialize Moonraker client and API instances
+static void initialize_moonraker_client(Config* config) {
+    spdlog::info("Initializing Moonraker client...");
+
+    // Create client instance (mock or real based on test mode)
+    if (get_test_config().should_mock_moonraker()) {
+        spdlog::info("[Test Mode] Creating MOCK Moonraker client (Voron 2.4 profile)");
+        moonraker_client = new MoonrakerClientMock(MoonrakerClientMock::PrinterType::VORON_24);
+    } else {
+        spdlog::info("Creating REAL Moonraker client");
+        moonraker_client = new MoonrakerClient();
+    }
+
+    // Configure timeouts from config file
+    uint32_t connection_timeout = config->get<int>(config->df() + "moonraker_connection_timeout_ms", 10000);
+    uint32_t request_timeout = config->get<int>(config->df() + "moonraker_request_timeout_ms", 30000);
+    uint32_t keepalive_interval = config->get<int>(config->df() + "moonraker_keepalive_interval_ms", 10000);
+    uint32_t reconnect_min_delay = config->get<int>(config->df() + "moonraker_reconnect_min_delay_ms", 200);
+    uint32_t reconnect_max_delay = config->get<int>(config->df() + "moonraker_reconnect_max_delay_ms", 2000);
+
+    moonraker_client->configure_timeouts(connection_timeout, request_timeout, keepalive_interval,
+                                        reconnect_min_delay, reconnect_max_delay);
+
+    spdlog::debug("Moonraker timeouts configured: connection={}ms, request={}ms, keepalive={}ms",
+                  connection_timeout, request_timeout, keepalive_interval);
+
+    // Set up state change callback to automatically update PrinterState
+    moonraker_client->set_state_change_callback(
+        [](ConnectionState old_state, ConnectionState new_state) {
+            const char* messages[] = {
+                "Disconnected",      // DISCONNECTED
+                "Connecting...",     // CONNECTING
+                "Connected",         // CONNECTED
+                "Reconnecting...",   // RECONNECTING
+                "Connection Failed"  // FAILED
+            };
+
+            // Convert enum to integer for subject (0-4)
+            int state_int = static_cast<int>(new_state);
+            printer_state.set_connection_state(state_int, messages[state_int]);
+
+            // Log state transitions
+            spdlog::debug("Connection state changed: {} -> {}",
+                         messages[static_cast<int>(old_state)],
+                         messages[state_int]);
+        }
+    );
+
+    // Register notification callback to queue updates for main thread
+    // CRITICAL: Moonraker callbacks run on background thread, but LVGL is NOT thread-safe
+    // Queue notifications here, process on main thread in event loop
+    moonraker_client->register_notify_update([](json& notification) {
+        std::lock_guard<std::mutex> lock(notification_mutex);
+        notification_queue.push(notification);
+    });
+
+    // Create MoonrakerAPI instance
+    spdlog::info("Creating MoonrakerAPI instance...");
+    moonraker_api = new MoonrakerAPI(*moonraker_client, printer_state);
+
+    spdlog::info("Moonraker client initialized (not connected yet)");
+}
+
 // Mock data generator (simulates printer state changes for testing)
 static void update_mock_printer_data() {
     static uint32_t tick_count = 0;
@@ -1035,198 +1100,9 @@ int main(int argc, char** argv) {
 
     spdlog::info("XML UI created successfully with reactive navigation");
 
-    // Auto-select home panel if not specified
-    if (initial_panel == -1) {
-        initial_panel = UI_PANEL_HOME;
-    }
-
-    // Switch to initial panel (if different from default HOME)
-    if (initial_panel != UI_PANEL_HOME) {
-        ui_nav_set_active((ui_panel_id_t)initial_panel);
-        spdlog::debug("Switched to panel %d\n", initial_panel);
-    }
-
-    // Force a few render cycles to ensure panel switch and layout complete
-    for (int i = 0; i < 5; i++) {
-        lv_timer_handler();
-        SDL_Delay(10);
-    }
-
-    // NOW populate print select panel data (after layout is stable)
-    ui_panel_print_select_populate_test_data(panels[UI_PANEL_PRINT_SELECT]);
-
-    // Keypad is initialized and ready to be shown when controls panel buttons are clicked
-
-    // Special case: Show keypad for testing
-    if (show_keypad) {
-        spdlog::debug("Auto-opening numeric keypad for testing...\n");
-        ui_keypad_config_t config = {
-            .initial_value = 210.0f,
-            .min_value = 0.0f,
-            .max_value = 350.0f,
-            .title_label = "Nozzle Temp",
-            .unit_label = "°C",
-            .allow_decimal = false,
-            .allow_negative = false,
-            .callback = nullptr,
-            .user_data = nullptr
-        };
-        ui_keypad_show(&config);
-    }
-
-    // Special case: Show motion panel if requested
-    if (show_motion) {
-        overlay_panels.motion = create_overlay_panel(screen, "motion_panel", "motion",
-                                                      panels, ui_panel_motion_setup);
-        if (overlay_panels.motion) {
-            // Set mock position data
-            ui_panel_motion_set_position(120.5f, 105.2f, 15.8f);
-        }
-    }
-
-    // Special case: Show nozzle temp panel if requested
-    if (show_nozzle_temp) {
-        overlay_panels.nozzle_temp = create_overlay_panel(screen, "nozzle_temp_panel", "nozzle temperature",
-                                                           panels, ui_panel_controls_temp_nozzle_setup);
-        if (overlay_panels.nozzle_temp) {
-            // Set mock temperature data
-            ui_panel_controls_temp_set_nozzle(25, 0);
-        }
-    }
-
-    // Special case: Show bed temp panel if requested
-    if (show_bed_temp) {
-        overlay_panels.bed_temp = create_overlay_panel(screen, "bed_temp_panel", "bed temperature",
-                                                        panels, ui_panel_controls_temp_bed_setup);
-        if (overlay_panels.bed_temp) {
-            // Set mock temperature data
-            ui_panel_controls_temp_set_bed(25, 0);
-        }
-    }
-
-    // Special case: Show extrusion panel if requested
-    if (show_extrusion) {
-        overlay_panels.extrusion = create_overlay_panel(screen, "extrusion_panel", "extrusion",
-                                                         panels, ui_panel_controls_extrusion_setup);
-        if (overlay_panels.extrusion) {
-            // Set mock temperature data (nozzle at room temp)
-            ui_panel_controls_extrusion_set_temp(25, 0);
-        }
-    }
-
-    // Special case: Show print status screen if requested
-    if (show_print_status) {
-        spdlog::debug("Showing print status screen...\n");
-
-        // Use already-created print status panel (no duplicate creation)
-        if (overlay_panels.print_status) {
-            // Hide all navigation panels
-            for (int i = 0; i < UI_PANEL_COUNT; i++) {
-                lv_obj_add_flag(panels[i], LV_OBJ_FLAG_HIDDEN);
-            }
-
-            // Show print status panel
-            lv_obj_clear_flag(overlay_panels.print_status, LV_OBJ_FLAG_HIDDEN);
-
-            // Start mock print simulation (3-hour print, 250 layers)
-            ui_panel_print_status_start_mock_print("awesome_benchy.gcode", 250, 10800);
-
-            spdlog::debug("Print status panel displayed with mock print running\n");
-        } else {
-            spdlog::error("Print status panel not created - cannot show");
-        }
-    }
-
-    // Special case: Show file detail view if requested
-    if (show_file_detail) {
-        spdlog::debug("Showing print file detail view...\n");
-
-        // Set file data for the first test file
-        ui_panel_print_select_set_file("Benchy.gcode",
-                                       "A:assets/images/thumbnail-placeholder.png",
-                                       "2h 30m", "45g");
-
-        // Show detail view
-        ui_panel_print_select_show_detail_view();
-
-        spdlog::debug("File detail view displayed\n");
-    }
-
-    // Special case: Show step progress widget test panel
-    if (show_step_test) {
-        spdlog::debug("Creating and showing step progress test panel...\n");
-
-        // Create step test panel (standalone, not part of app_layout)
-        lv_obj_t* step_test_panel = (lv_obj_t*)lv_xml_create(screen, "step_progress_test", nullptr);
-        if (step_test_panel) {
-            ui_panel_step_test_setup(step_test_panel);
-
-            // Hide app_layout to show only the test panel
-            lv_obj_add_flag(app_layout, LV_OBJ_FLAG_HIDDEN);
-
-            spdlog::debug("Step progress test panel displayed\n");
-        } else {
-            spdlog::error("Failed to create step progress test panel");
-        }
-    }
-
-    // Special case: Show test/development panel
-    if (show_test_panel) {
-        spdlog::debug("Creating and showing test panel...\n");
-
-        // Create test panel (standalone, not part of app_layout)
-        lv_obj_t* test_panel = (lv_obj_t*)lv_xml_create(screen, "test_panel", nullptr);
-        if (test_panel) {
-            // Setup panel (populate info labels)
-            ui_panel_test_setup(test_panel);
-            // Hide app_layout to show only the test panel
-            lv_obj_add_flag(app_layout, LV_OBJ_FLAG_HIDDEN);
-
-            spdlog::debug("Test panel displayed\n");
-        } else {
-            spdlog::error("Failed to create test panel");
-        }
-    }
-
-    // Initialize Moonraker connection
-    spdlog::info("Initializing Moonraker client...");
-    moonraker_client = new MoonrakerClient();
-
-    // Configure timeouts from config file
-    uint32_t connection_timeout = config->get<int>(config->df() + "moonraker_connection_timeout_ms", 10000);
-    uint32_t request_timeout = config->get<int>(config->df() + "moonraker_request_timeout_ms", 30000);
-    uint32_t keepalive_interval = config->get<int>(config->df() + "moonraker_keepalive_interval_ms", 10000);
-    uint32_t reconnect_min_delay = config->get<int>(config->df() + "moonraker_reconnect_min_delay_ms", 200);
-    uint32_t reconnect_max_delay = config->get<int>(config->df() + "moonraker_reconnect_max_delay_ms", 2000);
-    uint32_t timeout_check_interval = config->get<int>(config->df() + "moonraker_timeout_check_interval_ms", 2000);
-
-    moonraker_client->configure_timeouts(connection_timeout, request_timeout, keepalive_interval,
-                                        reconnect_min_delay, reconnect_max_delay);
-
-    spdlog::debug("Moonraker timeouts configured: connection={}ms, request={}ms, keepalive={}ms, check_interval={}ms",
-                  connection_timeout, request_timeout, keepalive_interval, timeout_check_interval);
-
-    // Set up state change callback to automatically update PrinterState
-    moonraker_client->set_state_change_callback(
-        [](ConnectionState old_state, ConnectionState new_state) {
-            const char* messages[] = {
-                "Disconnected",      // DISCONNECTED
-                "Connecting...",     // CONNECTING
-                "Connected",         // CONNECTED
-                "Reconnecting...",   // RECONNECTING
-                "Connection Failed"  // FAILED
-            };
-
-            // Convert enum to integer for subject (0-4)
-            int state_int = static_cast<int>(new_state);
-            printer_state.set_connection_state(state_int, messages[state_int]);
-
-            // Log state transitions
-            spdlog::debug("Connection state changed: {} -> {}",
-                         messages[static_cast<int>(old_state)],
-                         messages[state_int]);
-        }
-    );
+    // Initialize Moonraker client EARLY (before wizard, so it's available for connection test)
+    // But don't connect yet - just create the instances
+    initialize_moonraker_client(config);
 
     // Initialize global keyboard BEFORE wizard (required for textarea registration)
     // NOTE: Keyboard is created early but will appear on top due to being moved to top layer below
@@ -1260,44 +1136,37 @@ int main(int argc, char** argv) {
         }
     }
 
-    // Build WebSocket URL from config
-    std::string moonraker_url = "ws://" +
-                               config->get<std::string>(config->df() + "moonraker_host") + ":" +
-                               std::to_string(config->get<int>(config->df() + "moonraker_port")) + "/websocket";
+    // Connect to Moonraker (only if not in wizard and we have saved config)
+    // Wizard will handle its own connection test
+    std::string saved_host = config->get<std::string>(config->df() + "moonraker_host", "");
+    if (!force_wizard && !config->is_wizard_required() && !saved_host.empty()) {
+        // Build WebSocket URL from config
+        std::string moonraker_url = "ws://" +
+                                   config->get<std::string>(config->df() + "moonraker_host") + ":" +
+                                   std::to_string(config->get<int>(config->df() + "moonraker_port")) + "/websocket";
 
-    // Register notification callback to queue updates for main thread
-    // CRITICAL: Moonraker callbacks run on background thread, but LVGL is NOT thread-safe
-    // Queue notifications here, process on main thread in event loop
-    moonraker_client->register_notify_update([](json& notification) {
-        std::lock_guard<std::mutex> lock(notification_mutex);
-        notification_queue.push(notification);
-    });
+        // Connect to Moonraker
+        spdlog::info("Connecting to Moonraker at {}", moonraker_url);
+        int connect_result = moonraker_client->connect(moonraker_url.c_str(),
+            []() {
+                spdlog::info("✓ Connected to Moonraker");
+                // State change callback will handle updating PrinterState
 
-    // Create MoonrakerAPI instance
-    spdlog::info("Creating MoonrakerAPI instance...");
-    moonraker_api = new MoonrakerAPI(*moonraker_client, printer_state);
+                // Start auto-discovery (must be called AFTER connection is established)
+                moonraker_client->discover_printer([]() {
+                    spdlog::info("✓ Printer auto-discovery complete");
+                });
+            },
+            []() {
+                spdlog::warn("✗ Disconnected from Moonraker");
+                // State change callback will handle updating PrinterState
+            }
+        );
 
-    // Connect to Moonraker
-    spdlog::info("Connecting to Moonraker at {}", moonraker_url);
-    int connect_result = moonraker_client->connect(moonraker_url.c_str(),
-        []() {
-            spdlog::info("✓ Connected to Moonraker");
-            // State change callback will handle updating PrinterState
-
-            // Start auto-discovery (must be called AFTER connection is established)
-            moonraker_client->discover_printer([]() {
-                spdlog::info("✓ Printer auto-discovery complete");
-            });
-        },
-        []() {
-            spdlog::warn("✗ Disconnected from Moonraker");
+        if (connect_result != 0) {
+            spdlog::error("Failed to initiate Moonraker connection (code {})", connect_result);
             // State change callback will handle updating PrinterState
         }
-    );
-
-    if (connect_result != 0) {
-        spdlog::error("Failed to initiate Moonraker connection (code {})", connect_result);
-        // State change callback will handle updating PrinterState
     }
 
     // Auto-screenshot timer (configurable delay after UI creation)
@@ -1316,6 +1185,7 @@ int main(int argc, char** argv) {
 
     // Request timeout check timer (check every 2 seconds)
     uint32_t last_timeout_check = SDL_GetTicks();
+    uint32_t timeout_check_interval = config->get<int>(config->df() + "moonraker_timeout_check_interval_ms", 2000);
 
     // Main event loop - Let LVGL handle SDL events internally via lv_timer_handler()
     // Loop continues while display exists (exits when window closed)

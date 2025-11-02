@@ -158,9 +158,11 @@ public:
    * Calls printer.objects.list → server.info → printer.info → printer.objects.subscribe
    * in sequence, parsing discovered objects and populating PrinterState.
    *
+   * Virtual to allow mock override for testing without real printer connection.
+   *
    * @param on_complete Callback invoked when discovery completes successfully
    */
-  void discover_printer(std::function<void()> on_complete);
+  virtual void discover_printer(std::function<void()> on_complete);
 
   /**
    * @brief Parse object list from printer.objects.list response
@@ -263,6 +265,13 @@ private:
    */
   void cleanup_pending_requests();
 
+protected:
+  // Auto-discovered printer objects (protected to allow mock access)
+  std::vector<std::string> heaters_;   // Controllable heaters (extruders, bed, etc.)
+  std::vector<std::string> sensors_;   // Read-only temperature sensors
+  std::vector<std::string> fans_;      // All fan types
+  std::vector<std::string> leds_;      // LED outputs
+
 private:
   // Pending requests keyed by request ID
   std::map<uint32_t, PendingRequest> pending_requests_;
@@ -293,12 +302,6 @@ private:
   uint32_t keepalive_interval_ms_;
   uint32_t reconnect_min_delay_ms_;
   uint32_t reconnect_max_delay_ms_;
-
-  // Auto-discovered printer objects
-  std::vector<std::string> heaters_;   // Controllable heaters (extruders, bed, etc.)
-  std::vector<std::string> sensors_;   // Read-only temperature sensors
-  std::vector<std::string> fans_;      // All fan types
-  std::vector<std::string> leds_;      // LED outputs
 };
 
 #endif // MOONRAKER_CLIENT_H
