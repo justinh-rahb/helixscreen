@@ -461,6 +461,62 @@ lv_obj_invalidate()              // Public redraw trigger
 
 **When you need internal behavior:** Search for public API alternatives or file an issue with LVGL if no public interface exists.
 
+### 8. API Documentation Standards ⚠️
+
+**Rule**: All public APIs must be documented with Doxygen-style comments before committing.
+
+```cpp
+// ❌ WRONG - Undocumented public method
+class WiFiManager {
+public:
+    void connect(const std::string& ssid, const std::string& password);
+};
+
+// ✅ CORRECT - Properly documented with @brief, @param descriptions
+class WiFiManager {
+public:
+    /**
+     * @brief Connect to WiFi network
+     *
+     * Attempts to connect to the specified network. Operation is asynchronous;
+     * callback invoked when connection succeeds or fails.
+     *
+     * @param ssid Network name
+     * @param password Network password (empty for open networks)
+     */
+    void connect(const std::string& ssid, const std::string& password);
+};
+```
+
+**Pattern for complete documentation:**
+1. `@brief` - Mandatory one-line summary for all public classes/methods
+2. `@param` - Document ALL parameters with clear descriptions
+3. `@return` - Document return values for non-void functions
+4. Detailed description - Explain async behavior, thread safety, side effects
+5. Usage examples - Add for complex or non-obvious APIs
+
+**Reference examples:**
+- `include/moonraker_client.h` - Comprehensive method documentation
+- `include/wifi_manager.h` - Clear API with behavioral notes
+- `include/wifi_backend.h` - Abstract interface patterns
+- `include/ethernet_manager.h` - Concise with usage examples
+
+**Why**: Generated API documentation is automatically published to GitHub Pages on releases. Good documentation enables external developers to integrate with HelixScreen without reading source code.
+
+**Complete guide:** See **docs/DOXYGEN_GUIDE.md** for detailed patterns and best practices.
+
+**CI/CD**: Documentation is auto-generated and published:
+1. Push version tag: `git tag v0.1.0 && git push origin v0.1.0`
+2. GitHub Actions runs Doxygen
+3. Generated HTML committed to `docs/api/`
+4. GitHub Pages deploys automatically
+
+**Test locally before pushing:**
+```bash
+doxygen Doxyfile
+open build/docs/html/index.html  # Verify formatting and completeness
+```
+
 ## Common Gotchas
 
 **⚠️ READ DOCUMENTATION FIRST:** Before implementing features in these areas, **ALWAYS read the relevant documentation** to avoid common pitfalls:

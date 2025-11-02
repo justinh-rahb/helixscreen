@@ -572,6 +572,61 @@ python3 scripts/generate-icon-consts.py
 - **Material Design Images**: Navigation, primary actions, needs recoloring
 - **FontAwesome Fonts**: UI content, inline icons, text-based rendering
 
+## API Documentation
+
+### Generating Documentation Locally
+
+Generate Doxygen API documentation for local viewing:
+
+```bash
+# From project root
+doxygen Doxyfile
+
+# View output
+open build/docs/html/index.html       # macOS
+xdg-open build/docs/html/index.html   # Linux
+```
+
+Check output for:
+- Warnings/errors in terminal
+- All documented classes appear
+- Parameters and return values shown
+- Code examples render correctly
+
+### Online Documentation
+
+Published API docs: `https://<owner>.github.io/<repo>/api/`
+
+Documentation is automatically updated when version tags are pushed:
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+### Adding Doxygen Comments
+
+Document all public APIs with Doxygen-style comments:
+
+```cpp
+/**
+ * @brief Short one-line description
+ *
+ * Optional detailed description explaining behavior,
+ * thread safety, usage patterns, etc.
+ *
+ * @param name Parameter description
+ * @return Return value description
+ */
+ReturnType function_name(ParamType name);
+```
+
+**Reference files with excellent documentation:**
+- `include/moonraker_client.h` - Comprehensive method docs
+- `include/wifi_manager.h` - Clear API with behavioral notes
+- `include/wifi_backend.h` - Abstract interface patterns
+
+**Complete guide:** See [DOXYGEN_GUIDE.md](DOXYGEN_GUIDE.md) for detailed patterns and best practices.
+
 ## Debugging
 
 ```cpp
