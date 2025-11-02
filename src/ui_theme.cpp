@@ -114,10 +114,6 @@ void ui_theme_init(lv_display_t* display, bool use_dark_mode_param) {
         const char* text_primary_dark = lv_xml_get_const(NULL, "text_primary_dark");
         const char* header_text_light = lv_xml_get_const(NULL, "header_text_light");
         const char* header_text_dark = lv_xml_get_const(NULL, "header_text_dark");
-        const char* card_bg_light = lv_xml_get_const(NULL, "card_bg_light");
-        const char* card_bg_dark = lv_xml_get_const(NULL, "card_bg_dark");
-        const char* metadata_overlay_bg_light = lv_xml_get_const(NULL, "metadata_overlay_bg_light");
-        const char* metadata_overlay_bg_dark = lv_xml_get_const(NULL, "metadata_overlay_bg_dark");
 
         // Override runtime constants based on theme preference
         if (app_bg_light && app_bg_dark) {
@@ -137,18 +133,6 @@ void ui_theme_init(lv_display_t* display, bool use_dark_mode_param) {
             lv_xml_register_const(scope, "header_text_color", selected_header);
             spdlog::debug("[Theme] Registered header_text_color={} for {} mode",
                           selected_header, use_dark_mode ? "dark" : "light");
-        }
-        if (card_bg_light && card_bg_dark) {
-            const char* selected_card_bg = use_dark_mode ? card_bg_dark : card_bg_light;
-            lv_xml_register_const(scope, "card_bg", selected_card_bg);
-            spdlog::debug("[Theme] Registered card_bg={} for {} mode",
-                          selected_card_bg, use_dark_mode ? "dark" : "light");
-        }
-        if (metadata_overlay_bg_light && metadata_overlay_bg_dark) {
-            const char* selected_overlay_bg = use_dark_mode ? metadata_overlay_bg_dark : metadata_overlay_bg_light;
-            lv_xml_register_const(scope, "metadata_overlay_bg", selected_overlay_bg);
-            spdlog::debug("[Theme] Registered metadata_overlay_bg={} for {} mode",
-                          selected_overlay_bg, use_dark_mode ? "dark" : "light");
         }
 
         spdlog::debug("[Theme] Runtime constants set for {} mode", use_dark_mode ? "dark" : "light");

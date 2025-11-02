@@ -188,12 +188,6 @@
 	<!-- Card background colors (theme-aware: light/dark modes) -->
 	<color name="card_bg_light" value="#F0F3F9" />  <!-- Light mode: Pure white -->
 	<color name="card_bg_dark" value="#131313" />   <!-- Dark mode: Very dark gray -->
-	<color name="card_bg" value="#131313" />        <!-- Runtime-adjusted (default: dark) -->
-
-	<!-- Metadata overlay background (semi-transparent over images) -->
-	<color name="metadata_overlay_bg_light" value="#FFFFFF" />  <!-- Light mode: white -->
-	<color name="metadata_overlay_bg_dark" value="#000000" />   <!-- Dark mode: black -->
-	<color name="metadata_overlay_bg" value="#000000" />        <!-- Runtime-adjusted (default: dark) -->
 
 	<!-- Component dimensions -->
 	<px name="header_height" value="60" />
