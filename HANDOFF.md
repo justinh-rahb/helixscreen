@@ -73,11 +73,21 @@ api->list_files("gcodes", "", false, [api](const std::vector<FileInfo>& files) {
 - Responsive layout for all screen sizes
 - Backend integration with WiFiManager (mock + real)
 
+**Step 2: Moonraker Connection ✅ FULLY IMPLEMENTED (2025-11-02)**
+- IP address/hostname input validation
+- Port number validation (default: 7125)
+- Test Connection button with WebSocket validation
+- Status feedback (Testing..., Connected, Failed)
+- Thread-safe updates using LVGL subjects
+- MoonrakerClient integration with 5-second timeout
+- Comprehensive unit tests (validation + UI)
+- Fixed main.cpp duplicate navigation bug
+
 ### What Exists But NOT Wired ⚠️
 
 **8 XML Screens Created:**
 1. ✅ wizard_wifi_setup.xml (working)
-2. ⚠️ wizard_connection.xml (exists, not wired - Moonraker IP/port)
+2. ✅ wizard_connection.xml (working - Moonraker IP/port)
 3. ⚠️ wizard_printer_identify.xml (exists, not wired - printer type/name)
 4. ⚠️ wizard_bed_select.xml (exists, not wired - bed heater/sensor dropdowns)
 5. ⚠️ wizard_hotend_select.xml (exists, not wired - extruder dropdowns)
@@ -85,18 +95,17 @@ api->list_files("gcodes", "", false, [api](const std::vector<FileInfo>& files) {
 7. ⚠️ wizard_led_select.xml (exists, not wired - LED assignments)
 8. ⚠️ wizard_summary.xml (exists, not wired - review selections)
 
-**C++ Implementation Gaps** (ui_wizard.cpp:305-338):
-- Steps 2-7 show "not yet implemented" placeholders
+**C++ Implementation Gaps** (ui_wizard.cpp:319-338):
+- Steps 3-7 show "not yet implemented" placeholders
 - total_steps = 7 but 8 XML screens exist (mismatch to resolve)
-- Only WiFi screen has content creation function (ui_wizard_wifi_create())
+- WiFi and Connection screens working, rest need implementation
 
-### Next Session (Tomorrow Morning) 🌅
+### Next Session 🌅
 
-1. **Wire Step 2: Moonraker Connection**
-   - Connection test with spinner + status feedback
-   - IP address entry (numeric keypad)
-   - Save to config on success
-   - Trigger auto-discovery
+1. **Add to Connection Screen (Step 2):**
+   - Save configuration to helixconfig.json on success
+   - Trigger printer auto-discovery after connection
+   - Enable Next button only after successful test
 
 2. **Resolve step count mismatch** (7 vs 8 screens)
 
@@ -106,9 +115,13 @@ api->list_files("gcodes", "", false, [api](const std::vector<FileInfo>& files) {
    - Auto-populate from discovery
 
 **Key Files:**
-- `src/ui_wizard.cpp` - Navigation (WiFi only, rest TODOs)
+- `src/ui_wizard.cpp` - Navigation (Steps 1-2 working, rest TODOs)
 - `src/ui_wizard_wifi.cpp` - WiFi screen implementation
-- `ui_xml/wizard_*.xml` - 8 screens (1 working, 7 waiting)
+- `src/ui_wizard_connection.cpp` - Connection screen implementation (NEW)
+- `include/ui_wizard_connection.h` - Connection header (NEW)
+- `tests/unit/test_wizard_connection.cpp` - Validation tests (NEW)
+- `tests/unit/test_wizard_connection_ui.cpp` - UI tests (NEW)
+- `ui_xml/wizard_*.xml` - 8 screens (2 working, 6 waiting)
 - `include/wizard_validation.h` - IP/hostname/port helpers
 
 ---
