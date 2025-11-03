@@ -688,8 +688,16 @@ prototype-ui9/
 
 **See MANDATORY AGENT DELEGATION POLICY at top of this file.**
 
-**Project agents**: `widget-maker` (UI/XML work), `ui-reviewer` (UI auditing), `moonraker-api-agent` (Klipper integration)
-**General agents**: `Explore` (codebase exploration), `general-coding-agent` (multi-file C++), `refractor` (systematic changes 3+ files)
+**Project-specific agents** (see `.claude/agents/README.md` for complete reference):
+- `widget-maker` - LVGL 9 XML UI work (PRIMARY - 80% of development)
+- `ui-reviewer` - Screenshot verification, requirements validation
+- `critical-reviewer` - Security analysis, paranoid code review
+- `moonraker-api-agent` - Klipper/Moonraker WebSocket integration
+- `gcode-preview-agent` - Thumbnail extraction, file handling
+- `cross-platform-build-agent` - Build system, dependency issues
+- `test-harness-agent` - Unit testing, mocking, CI/CD
+
+**Built-in agents**: `Explore` (codebase exploration), `Plan` (task planning)
 
 ## Development Workflow
 
