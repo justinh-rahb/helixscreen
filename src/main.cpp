@@ -588,7 +588,8 @@ static bool init_lvgl() {
 }
 
 // Show splash screen with HelixScreen logo
-static void show_splash_screen() {
+// Currently disabled for faster dev iteration (see line 962)
+__attribute__((unused)) static void show_splash_screen() {
     spdlog::info("Showing splash screen");
 
     // Get the active screen
