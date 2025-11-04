@@ -18,17 +18,17 @@
  * along with HelixScreen. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef TEST_CONFIG_H
-#define TEST_CONFIG_H
+#ifndef RUNTIME_CONFIG_H
+#define RUNTIME_CONFIG_H
 
 /**
- * @brief Test mode configuration for development and testing
+ * @brief Runtime configuration for development and testing
  *
  * Controls which components use mock implementations vs real hardware.
  * In production mode (test_mode=false), NO mocks are ever used.
  * In test mode, mocks are used by default but can be overridden with --real-* flags.
  */
-struct TestConfig {
+struct RuntimeConfig {
     // Master test mode flag (--test)
     bool test_mode = false;
 
@@ -80,15 +80,15 @@ struct TestConfig {
 };
 
 /**
- * @brief Get global test configuration
- * @return Reference to the global test configuration
+ * @brief Get global runtime configuration
+ * @return Reference to the global runtime configuration
  */
-const TestConfig& get_test_config();
+const RuntimeConfig& get_runtime_config();
 
 /**
- * @brief Get mutable test configuration (for initialization only)
- * @return Pointer to the global test configuration
+ * @brief Get mutable runtime configuration (for initialization only)
+ * @return Pointer to the global runtime configuration
  */
-TestConfig* get_mutable_test_config();
+RuntimeConfig* get_mutable_runtime_config();
 
-#endif // TEST_CONFIG_H
+#endif // RUNTIME_CONFIG_H

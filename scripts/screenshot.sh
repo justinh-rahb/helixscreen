@@ -92,9 +92,10 @@ else
     info "Using display $HELIX_SCREENSHOT_DISPLAY from HELIX_SCREENSHOT_DISPLAY env var"
 fi
 
-# Add display, screenshot, and timeout arguments to extra args
+# Add display, screenshot, timeout, and test mode arguments to extra args
 # Screenshot after 2 seconds, auto-quit after 3 seconds
-EXTRA_ARGS="--display $HELIX_SCREENSHOT_DISPLAY --screenshot 2 --timeout 3 $EXTRA_ARGS"
+# Test mode: skip splash screen for faster automation
+EXTRA_ARGS="--display $HELIX_SCREENSHOT_DISPLAY --screenshot 2 --timeout 3 --test $EXTRA_ARGS"
 
 # Check dependencies
 info "Checking dependencies..."

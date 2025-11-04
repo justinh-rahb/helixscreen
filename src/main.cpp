@@ -50,7 +50,7 @@
 #include "moonraker_client_mock.h"
 #include "moonraker_api.h"
 #include "app_globals.h"
-#include "test_config.h"
+#include "runtime_config.h"
 #include "config.h"
 #include "tips_manager.h"
 #include <spdlog/spdlog.h>
@@ -79,8 +79,8 @@ static PrinterState printer_state;
 static MoonrakerClient* moonraker_client = nullptr;
 static MoonrakerAPI* moonraker_api = nullptr;
 
-// Test mode configuration
-static TestConfig g_test_config;
+// Runtime configuration
+static RuntimeConfig g_runtime_config;
 
 // Thread-safe queue for Moonraker notifications (cross-thread communication)
 static std::queue<json> notification_queue;
@@ -108,12 +108,12 @@ PrinterState& get_printer_state() {
     return printer_state;
 }
 
-const TestConfig& get_test_config() {
-    return g_test_config;
+const RuntimeConfig& get_runtime_config() {
+    return g_runtime_config;
 }
 
-TestConfig* get_mutable_test_config() {
-    return &g_test_config;
+RuntimeConfig* get_mutable_runtime_config() {
+    return &g_runtime_config;
 }
 
 // Forward declarations
@@ -319,15 +319,15 @@ static bool parse_command_line_args(int argc, char** argv,
             dark_mode = false;
             theme_requested = true;
         } else if (strcmp(argv[i], "--test") == 0) {
-            g_test_config.test_mode = true;
+            g_runtime_config.test_mode = true;
         } else if (strcmp(argv[i], "--real-wifi") == 0) {
-            g_test_config.use_real_wifi = true;
+            g_runtime_config.use_real_wifi = true;
         } else if (strcmp(argv[i], "--real-ethernet") == 0) {
-            g_test_config.use_real_ethernet = true;
+            g_runtime_config.use_real_ethernet = true;
         } else if (strcmp(argv[i], "--real-moonraker") == 0) {
-            g_test_config.use_real_moonraker = true;
+            g_runtime_config.use_real_moonraker = true;
         } else if (strcmp(argv[i], "--real-files") == 0) {
-            g_test_config.use_real_files = true;
+            g_runtime_config.use_real_files = true;
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "-vv") == 0 || strcmp(argv[i], "-vvv") == 0) {
             // Count the number of 'v' characters for verbosity level
             const char* p = argv[i];
@@ -413,36 +413,36 @@ static bool parse_command_line_args(int argc, char** argv,
     }
 
     // Validate test mode flags
-    if ((g_test_config.use_real_wifi || g_test_config.use_real_ethernet ||
-         g_test_config.use_real_moonraker || g_test_config.use_real_files) &&
-        !g_test_config.test_mode) {
+    if ((g_runtime_config.use_real_wifi || g_runtime_config.use_real_ethernet ||
+         g_runtime_config.use_real_moonraker || g_runtime_config.use_real_files) &&
+        !g_runtime_config.test_mode) {
         printf("Error: --real-* flags require --test mode\n");
         printf("Use --help for more information\n");
         return false;
     }
 
     // Print test mode configuration if enabled
-    if (g_test_config.test_mode) {
+    if (g_runtime_config.test_mode) {
         printf("╔════════════════════════════════════════╗\n");
         printf("║           TEST MODE ENABLED            ║\n");
         printf("╚════════════════════════════════════════╝\n");
 
-        if (g_test_config.use_real_wifi)
+        if (g_runtime_config.use_real_wifi)
             printf("  Using REAL WiFi hardware\n");
         else
             printf("  Using MOCK WiFi backend\n");
 
-        if (g_test_config.use_real_ethernet)
+        if (g_runtime_config.use_real_ethernet)
             printf("  Using REAL Ethernet hardware\n");
         else
             printf("  Using MOCK Ethernet backend\n");
 
-        if (g_test_config.use_real_moonraker)
+        if (g_runtime_config.use_real_moonraker)
             printf("  Using REAL Moonraker connection\n");
         else
             printf("  Using MOCK Moonraker responses\n");
 
-        if (g_test_config.use_real_files)
+        if (g_runtime_config.use_real_files)
             printf("  Using REAL files from printer\n");
         else
             printf("  Using TEST file data\n");
@@ -588,8 +588,7 @@ static bool init_lvgl() {
 }
 
 // Show splash screen with HelixScreen logo
-// Currently disabled for faster dev iteration (see line 962)
-__attribute__((unused)) static void show_splash_screen() {
+static void show_splash_screen() {
     spdlog::info("Showing splash screen");
 
     // Get the active screen
@@ -746,7 +745,7 @@ static void initialize_moonraker_client(Config* config) {
     spdlog::info("Initializing Moonraker client...");
 
     // Create client instance (mock or real based on test mode)
-    if (get_test_config().should_mock_moonraker()) {
+    if (get_runtime_config().should_mock_moonraker()) {
         spdlog::info("[Test Mode] Creating MOCK Moonraker client (Voron 2.4 profile)");
         moonraker_client = new MoonrakerClientMock(MoonrakerClientMock::PrinterType::VORON_24);
     } else {
@@ -959,8 +958,10 @@ int main(int argc, char** argv) {
         spdlog::info("Display DPI: {} (from LV_DPI_DEF)", lv_display_get_dpi(display));
     }
 
-    // Show splash screen (DISABLED for faster dev iteration)
-    // show_splash_screen();
+    // Show splash screen (skip in test mode for faster automation)
+    if (!g_runtime_config.test_mode) {
+        show_splash_screen();
+    }
 
     // Create main screen
     lv_obj_t* screen = lv_screen_active();

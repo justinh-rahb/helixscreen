@@ -19,27 +19,27 @@
  */
 
 #include "../catch_amalgamated.hpp"
-#include "test_config.h"
+#include "runtime_config.h"
 #include <cstring>
 #include <vector>
 #include <string>
 
 // Mock global test config for testing
-static TestConfig test_config_instance;
+static RuntimeConfig test_config_instance;
 
 // Mock accessor functions
-const TestConfig& get_test_config() {
+const RuntimeConfig& get_runtime_config() {
     return test_config_instance;
 }
 
-TestConfig* get_mutable_test_config() {
+RuntimeConfig* get_mutable_runtime_config() {
     return &test_config_instance;
 }
 
 // Helper function to simulate command-line parsing
 bool parse_test_args(const std::vector<std::string>& args) {
     // Reset config before each test
-    test_config_instance = TestConfig{};
+    test_config_instance = RuntimeConfig{};
 
     // Parse arguments
     for (size_t i = 0; i < args.size(); i++) {
@@ -71,7 +71,7 @@ bool parse_test_args(const std::vector<std::string>& args) {
 }
 
 TEST_CASE("TestConfig default initialization", "[test_config]") {
-    TestConfig config;
+    RuntimeConfig config;
 
     SECTION("All flags are false by default") {
         REQUIRE(config.test_mode == false);
@@ -91,7 +91,7 @@ TEST_CASE("TestConfig default initialization", "[test_config]") {
 }
 
 TEST_CASE("TestConfig test mode without real components", "[test_config]") {
-    TestConfig config;
+    RuntimeConfig config;
     config.test_mode = true;
 
     SECTION("All components use mocks by default in test mode") {
@@ -104,7 +104,7 @@ TEST_CASE("TestConfig test mode without real components", "[test_config]") {
 }
 
 TEST_CASE("TestConfig test mode with selective real components", "[test_config]") {
-    TestConfig config;
+    RuntimeConfig config;
     config.test_mode = true;
 
     SECTION("Real WiFi overrides mock") {
@@ -161,7 +161,7 @@ TEST_CASE("TestConfig test mode with selective real components", "[test_config]"
 }
 
 TEST_CASE("TestConfig production mode ignores real flags", "[test_config]") {
-    TestConfig config;
+    RuntimeConfig config;
     config.test_mode = false;  // Production mode
 
     SECTION("Real flags have no effect without test mode") {
@@ -182,14 +182,14 @@ TEST_CASE("TestConfig production mode ignores real flags", "[test_config]") {
 TEST_CASE("Command-line argument parsing", "[test_config]") {
     SECTION("No arguments - production mode") {
         REQUIRE(parse_test_args({}) == true);
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
         REQUIRE(config.test_mode == false);
         REQUIRE(config.should_mock_wifi() == false);
     }
 
     SECTION("Test mode only") {
         REQUIRE(parse_test_args({"--test"}) == true);
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
         REQUIRE(config.test_mode == true);
         REQUIRE(config.should_mock_wifi() == true);
         REQUIRE(config.should_mock_ethernet() == true);
@@ -199,7 +199,7 @@ TEST_CASE("Command-line argument parsing", "[test_config]") {
 
     SECTION("Test mode with real WiFi") {
         REQUIRE(parse_test_args({"--test", "--real-wifi"}) == true);
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
         REQUIRE(config.test_mode == true);
         REQUIRE(config.should_mock_wifi() == false);
         REQUIRE(config.should_mock_ethernet() == true);
@@ -207,7 +207,7 @@ TEST_CASE("Command-line argument parsing", "[test_config]") {
 
     SECTION("Test mode with multiple real components") {
         REQUIRE(parse_test_args({"--test", "--real-wifi", "--real-moonraker"}) == true);
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
         REQUIRE(config.test_mode == true);
         REQUIRE(config.should_mock_wifi() == false);
         REQUIRE(config.should_mock_moonraker() == false);
@@ -230,7 +230,7 @@ TEST_CASE("Command-line argument parsing", "[test_config]") {
     SECTION("Order independence") {
         // --test can come after --real-* flags
         REQUIRE(parse_test_args({"--real-wifi", "--test"}) == true);
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
         REQUIRE(config.test_mode == true);
         REQUIRE(config.should_mock_wifi() == false);
     }
@@ -238,19 +238,19 @@ TEST_CASE("Command-line argument parsing", "[test_config]") {
 
 TEST_CASE("TestConfig accessor functions", "[test_config]") {
     SECTION("get_test_config returns const reference") {
-        const TestConfig& config = get_test_config();
+        const RuntimeConfig& config = get_runtime_config();
         // Should compile - const reference
         bool is_test = config.is_test_mode();
         REQUIRE(is_test == false);  // Default state
     }
 
     SECTION("get_mutable_test_config allows modification") {
-        TestConfig* config = get_mutable_test_config();
+        RuntimeConfig* config = get_mutable_runtime_config();
         config->test_mode = true;
         config->use_real_wifi = true;
 
         // Verify changes are visible through const accessor
-        const TestConfig& const_config = get_test_config();
+        const RuntimeConfig& const_config = get_runtime_config();
         REQUIRE(const_config.test_mode == true);
         REQUIRE(const_config.use_real_wifi == true);
         REQUIRE(const_config.should_mock_wifi() == false);
@@ -260,7 +260,7 @@ TEST_CASE("TestConfig accessor functions", "[test_config]") {
 TEST_CASE("TestConfig use cases", "[test_config]") {
     SECTION("Development with no hardware") {
         parse_test_args({"--test"});
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
 
         // Everything should be mocked
         REQUIRE(config.should_mock_wifi() == true);
@@ -271,7 +271,7 @@ TEST_CASE("TestConfig use cases", "[test_config]") {
 
     SECTION("UI development with real printer") {
         parse_test_args({"--test", "--real-moonraker", "--real-files"});
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
 
         // Network mocked, printer real
         REQUIRE(config.should_mock_wifi() == true);
@@ -282,7 +282,7 @@ TEST_CASE("TestConfig use cases", "[test_config]") {
 
     SECTION("Network testing without printer") {
         parse_test_args({"--test", "--real-wifi", "--real-ethernet"});
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
 
         // Network real, printer mocked
         REQUIRE(config.should_mock_wifi() == false);
@@ -293,7 +293,7 @@ TEST_CASE("TestConfig use cases", "[test_config]") {
 
     SECTION("Integration testing") {
         parse_test_args({"--test", "--real-wifi", "--real-moonraker", "--real-files"});
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
 
         // WiFi and printer real, Ethernet mocked
         REQUIRE(config.should_mock_wifi() == false);
@@ -304,7 +304,7 @@ TEST_CASE("TestConfig use cases", "[test_config]") {
 
     SECTION("Production mode") {
         parse_test_args({});  // No arguments
-        const auto& config = get_test_config();
+        const auto& config = get_runtime_config();
 
         // Nothing should be mocked in production
         REQUIRE(config.should_mock_wifi() == false);

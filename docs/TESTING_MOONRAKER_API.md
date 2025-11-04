@@ -346,4 +346,4 @@ Document your test results here:
 - **MoonrakerAPI documentation**: `include/moonraker_api.h`
 - **Implementation guide**: `HANDOFF.md`
 - **Logging guide**: `CLAUDE.md` (spdlog usage)
-- **Test mode guide**: `include/test_config.h`
+- **Test mode guide**: `include/runtime_config.h`

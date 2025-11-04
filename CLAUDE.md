@@ -194,7 +194,7 @@ spdlog::info("Panel initialized");
 
 ### 4. NEVER Use Mock Implementations in Production Builds
 
-**Rule**: Mock implementations must NEVER be automatically used in production. Always check TestConfig before using mocks.
+**Rule**: Mock implementations must NEVER be automatically used in production. Always check RuntimeConfig before using mocks.
 
 ```cpp
 // ❌ WRONG - Automatic mock fallback (DANGEROUS)
@@ -203,7 +203,7 @@ if (!backend->start()) {
 }
 
 // ✅ CORRECT - Check test mode first
-const auto& config = get_test_config();
+const auto& config = get_runtime_config();
 if (config.should_mock_wifi()) {
     return std::make_unique<WifiBackendMock>();  // OK in test mode
 }

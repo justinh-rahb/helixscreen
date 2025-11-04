@@ -507,11 +507,11 @@ Key settings in `lv_conf.h` for XML support:
 
 The test mode system provides a comprehensive mocking infrastructure for development without hardware dependencies while ensuring production builds never accidentally use mock implementations.
 
-### TestConfig Structure
+### RuntimeConfig Structure
 
 ```cpp
-// test_config.h
-struct TestConfig {
+// runtime_config.h
+struct RuntimeConfig {
     bool test_mode = false;           // Master flag (--test)
     bool use_real_wifi = false;       // Override flag (--real-wifi)
     bool use_real_ethernet = false;   // Override flag (--real-ethernet)
@@ -532,7 +532,7 @@ Backend factories respect test configuration to control mock vs real selection:
 
 ```cpp
 std::unique_ptr<WifiBackend> WifiBackend::create() {
-    const auto& config = get_test_config();
+    const auto& config = get_runtime_config();
 
     // Test mode check FIRST
     if (config.should_mock_wifi()) {
@@ -592,7 +592,7 @@ std::unique_ptr<WifiBackend> WifiBackend::create() {
 
 ### Implementation Files
 
-- **Core:** `test_config.h`, `main.cpp:319-439`
+- **Core:** `runtime_config.h`, `main.cpp:319-439`
 - **WiFi:** `wifi_backend.cpp`, `wifi_backend_mock.cpp`
 - **Ethernet:** `ethernet_backend.cpp`, `ethernet_backend_mock.cpp`
 - **Tests:** `tests/unit/test_test_config.cpp`

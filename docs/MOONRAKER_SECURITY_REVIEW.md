@@ -1789,13 +1789,13 @@ Per project policy in CLAUDE.md Issue #4, mock implementations must NEVER be aut
 
 ```cpp
 // moonraker_client_mock.cpp
-#include "test_config.h"  // Add test config header
+#include "runtime_config.h"  // Add runtime config header
 
 MoonrakerClientMock::MoonrakerClientMock(PrinterType type)
     : printer_type_(type) {
 
     // Verify we're in test mode (enforce policy)
-    const auto& config = get_test_config();
+    const auto& config = get_runtime_config();
     if (!config.is_test_mode()) {
         spdlog::critical("MoonrakerClientMock instantiated in production mode!");
         spdlog::critical("Mock clients require --test command-line flag");
@@ -1813,7 +1813,7 @@ MoonrakerClientMock::MoonrakerClientMock(PrinterType type)
 // Test that mock rejects production mode
 TEST(MoonrakerClientMock, RejectsProductionMode) {
     // Temporarily clear test mode
-    auto& config = get_test_config();
+    auto& config = get_runtime_config();
     config.set_test_mode(false);
 
     // Should throw
@@ -2078,7 +2078,7 @@ on_error(err);
 The following files were not included in this review but may contain related issues:
 
 - `printer_state.cpp` - Verify buffer handling (Issue #10)
-- `test_config.h`/`test_config.cpp` - Mock validation requirements (Issue #16)
+- `runtime_config.h` - Mock validation requirements (Issue #16)
 - Any UI code that calls MoonrakerAPI methods - Verify they handle errors properly
 
 ---
