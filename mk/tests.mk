@@ -40,7 +40,7 @@ test-config: $(TEST_BIN)
 	}
 	$(ECHO) "$(GREEN)$(BOLD)✓ Config tests passed!$(RESET)"
 
-$(TEST_BIN): $(TEST_MAIN_OBJ) $(CATCH2_OBJ) $(UI_TEST_UTILS_OBJ) $(TEST_OBJS) $(OBJ_DIR)/wizard_validation.o $(OBJ_DIR)/config.o $(LVGL_OBJS) $(THORVG_OBJS) $(OBJ_DIR)/ui_nav.o $(OBJ_DIR)/ui_temp_graph.o $(OBJ_DIR)/wifi_manager.o $(OBJ_DIR)/wifi_backend.o $(OBJ_DIR)/wifi_backend_mock.o $(OBJCPP_OBJS) $(OBJ_DIR)/tips_manager.o $(OBJ_DIR)/ui_wizard.o $(OBJ_DIR)/ui_keyboard.o $(OBJ_DIR)/ui_switch.o $(OBJ_DIR)/moonraker_client.o $(OBJ_DIR)/printer_state.o $(LIBHV_LIB) $(WPA_DEPS)
+$(TEST_BIN): $(TEST_MAIN_OBJ) $(CATCH2_OBJ) $(UI_TEST_UTILS_OBJ) $(TEST_OBJS) $(OBJ_DIR)/wizard_validation.o $(OBJ_DIR)/config.o $(LVGL_OBJS) $(THORVG_OBJS) $(OBJ_DIR)/ui_nav.o $(OBJ_DIR)/ui_temp_graph.o $(OBJ_DIR)/wifi_manager.o $(OBJ_DIR)/wifi_backend.o $(OBJ_DIR)/wifi_backend_mock.o $(OBJ_DIR)/ethernet_manager.o $(OBJ_DIR)/ethernet_backend.o $(OBJ_DIR)/ethernet_backend_mock.o $(OBJCPP_OBJS) $(OBJ_DIR)/tips_manager.o $(OBJ_DIR)/ui_wizard.o $(OBJ_DIR)/ui_wizard_wifi.o $(OBJ_DIR)/ui_wizard_connection.o $(OBJ_DIR)/ui_wizard_bed_select.o $(OBJ_DIR)/ui_wizard_hotend_select.o $(OBJ_DIR)/ui_wizard_fan_select.o $(OBJ_DIR)/ui_wizard_led_select.o $(OBJ_DIR)/ui_wizard_printer_identify.o $(OBJ_DIR)/ui_wizard_summary.o $(OBJ_DIR)/ui_keyboard.o $(OBJ_DIR)/ui_modal.o $(OBJ_DIR)/ui_theme.o $(OBJ_DIR)/moonraker_client.o $(OBJ_DIR)/moonraker_api.o $(OBJ_DIR)/printer_state.o $(OBJ_DIR)/printer_detector.o $(LIBHV_LIB) $(WPA_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(ECHO) "$(MAGENTA)$(BOLD)[LD]$(RESET) run_tests"
 	$(Q)$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) || { \
