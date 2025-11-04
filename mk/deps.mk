@@ -307,6 +307,13 @@ install-deps:
 		fi; \
 	fi; \
 	echo ""; \
+	if [ ! -d "$(LVGL_DIR)/src" ]; then \
+		echo "$(CYAN)Initializing git submodules...$(RESET)"; \
+		git submodule update --init --recursive && echo "$(GREEN)✓ Submodules initialized$(RESET)" || echo "$(RED)✗ Submodule init failed$(RESET)"; \
+	else \
+		echo "$(GREEN)✓ Submodules already initialized$(RESET)"; \
+	fi; \
+	echo ""; \
 	if ! command -v npm >/dev/null 2>&1; then \
 		echo "$(YELLOW)⚠ npm not available - skipping npm install$(RESET)"; \
 	elif [ ! -f "node_modules/.bin/lv_font_conv" ]; then \
@@ -321,13 +328,6 @@ install-deps:
 		$(MAKE) libhv-build && echo "$(GREEN)✓ libhv built$(RESET)" || echo "$(RED)✗ libhv build failed$(RESET)"; \
 	else \
 		echo "$(GREEN)✓ libhv already built$(RESET)"; \
-	fi; \
-	echo ""; \
-	if [ ! -d "$(LVGL_DIR)/src" ]; then \
-		echo "$(CYAN)Initializing git submodules...$(RESET)"; \
-		git submodule update --init --recursive && echo "$(GREEN)✓ Submodules initialized$(RESET)" || echo "$(RED)✗ Submodule init failed$(RESET)"; \
-	else \
-		echo "$(GREEN)✓ Submodules already initialized$(RESET)"; \
 	fi; \
 	echo ""; \
 	echo "$(GREEN)$(BOLD)✓ Dependency installation complete!$(RESET)"; \

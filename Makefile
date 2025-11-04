@@ -99,7 +99,7 @@ OBJ_DIR := $(BUILD_DIR)/obj
 # LVGL
 LVGL_DIR := lvgl
 LVGL_INC := -I$(LVGL_DIR) -I$(LVGL_DIR)/src
-LVGL_SRCS := $(shell find $(LVGL_DIR)/src -name "*.c")
+LVGL_SRCS := $(shell find $(LVGL_DIR)/src -name "*.c" 2>/dev/null)
 LVGL_OBJS := $(patsubst $(LVGL_DIR)/%.c,$(OBJ_DIR)/lvgl/%.o,$(LVGL_SRCS))
 
 # ThorVG sources (.cpp files for SVG support)
@@ -107,7 +107,7 @@ THORVG_SRCS := $(shell find $(LVGL_DIR)/src/libs/thorvg -name "*.cpp" 2>/dev/nul
 THORVG_OBJS := $(patsubst $(LVGL_DIR)/%.cpp,$(OBJ_DIR)/lvgl/%.o,$(THORVG_SRCS))
 
 # LVGL Demos (separate target)
-LVGL_DEMO_SRCS := $(shell find $(LVGL_DIR)/demos -name "*.c")
+LVGL_DEMO_SRCS := $(shell find $(LVGL_DIR)/demos -name "*.c" 2>/dev/null)
 LVGL_DEMO_OBJS := $(patsubst $(LVGL_DIR)/%.c,$(OBJ_DIR)/lvgl/%.o,$(LVGL_DEMO_SRCS))
 
 # Application C sources
