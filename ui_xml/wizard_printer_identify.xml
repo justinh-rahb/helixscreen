@@ -84,8 +84,8 @@
 			<!-- Printer type selection -->
 			<text_body text="Printer Type"
 			           style_pad_bottom="#gap_small"/>
+		<!-- Roller options set from PrinterTypes::PRINTER_TYPES_ROLLER in C++ -->
 			<lv_roller name="printer_type_roller"
-					   options="'Generic Klipper\nVoron V0\nVoron V1\nVoron V2 250\nVoron V2 300\nVoron V2 350\nVoron Trident\nVoron Switchwire\nVoron Legacy\nCreality Ender 3\nCreality Ender 3 V2\nCreality Ender 3 S1\nCreality Ender 5\nCreality K1\nCreality K1 Max\nCreality K1C\nCreality CR-10\nCreality CR-6 SE\nPrusa i3 MK3/MK3S\nPrusa MK4\nPrusa Mini/Mini+\nPrusa XL\nAnycubic Kobra\nAnycubic Vyper\nAnycubic Chiron\nRat Rig V-Core 3\nRat Rig V-Minion\nFLSUN QQ-S\nFLSUN Super Racer\nFLSUN V400\nFlashForge AD5M\nFlashForge AD5M Pro\nOther / Custom' normal"
 					   width="100%"
 					   height="160"
 					   visible_row_count="5"

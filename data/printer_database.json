@@ -1,0 +1,279 @@
+{
+  "version": "1.0",
+  "description": "Printer auto-detection database with hardware fingerprints",
+  "printers": [
+    {
+      "id": "flashforge_ad5m_pro",
+      "name": "FlashForge AD5M Pro",
+      "manufacturer": "FlashForge",
+      "heuristics": [
+        {
+          "type": "sensor_match",
+          "field": "sensors",
+          "pattern": "tvocValue",
+          "confidence": 95,
+          "reason": "Detected tvocValue sensor (FlashForge AD5M Pro signature)"
+        },
+        {
+          "type": "sensor_match",
+          "field": "sensors",
+          "pattern": "tvoc",
+          "confidence": 95,
+          "reason": "Detected TVOC air quality sensor (FlashForge AD5M Pro signature)"
+        },
+        {
+          "type": "sensor_match",
+          "field": "sensors",
+          "pattern": "weightValue",
+          "confidence": 70,
+          "reason": "Detected weight sensor (FlashForge-like)"
+        },
+        {
+          "type": "sensor_match",
+          "field": "sensors",
+          "pattern": "weight",
+          "confidence": 70,
+          "reason": "Detected weight sensor (FlashForge-like)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "flashforge",
+          "confidence": 80,
+          "reason": "Hostname suggests FlashForge printer"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "ad5m",
+          "confidence": 80,
+          "reason": "Hostname suggests FlashForge AD5M Pro"
+        }
+      ]
+    },
+    {
+      "id": "voron_2_4",
+      "name": "Voron 2.4",
+      "manufacturer": "Voron",
+      "heuristics": [
+        {
+          "type": "fan_match",
+          "field": "fans",
+          "pattern": "bed_fans",
+          "confidence": 50,
+          "reason": "Detected bed fans (Voron-like, uncertain)"
+        },
+        {
+          "type": "fan_match",
+          "field": "fans",
+          "pattern": "bed_fan",
+          "confidence": 50,
+          "reason": "Detected bed fans (Voron-like, uncertain)"
+        },
+        {
+          "type": "fan_combo",
+          "field": "fans",
+          "patterns": ["bed_fans", "chamber"],
+          "confidence": 70,
+          "reason": "Detected bed fans and chamber control (Voron-like)"
+        },
+        {
+          "type": "fan_combo",
+          "field": "fans",
+          "patterns": ["bed_fans", "exhaust"],
+          "confidence": 70,
+          "reason": "Detected bed fans and exhaust control (Voron-like)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "voron",
+          "confidence": 75,
+          "reason": "Hostname suggests Voron printer (variant unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "v2",
+          "confidence": 85,
+          "reason": "Hostname suggests Voron 2.4"
+        }
+      ]
+    },
+    {
+      "id": "voron_0_1",
+      "name": "Voron 0.1",
+      "manufacturer": "Voron",
+      "heuristics": [
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "voron",
+          "confidence": 75,
+          "reason": "Hostname suggests Voron printer (variant unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "v0",
+          "confidence": 85,
+          "reason": "Hostname suggests Voron 0.1"
+        }
+      ]
+    },
+    {
+      "id": "voron_trident",
+      "name": "Voron Trident",
+      "manufacturer": "Voron",
+      "heuristics": [
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "voron",
+          "confidence": 75,
+          "reason": "Hostname suggests Voron printer (variant unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "trident",
+          "confidence": 85,
+          "reason": "Hostname suggests Voron Trident"
+        }
+      ]
+    },
+    {
+      "id": "voron_switchwire",
+      "name": "Voron Switchwire",
+      "manufacturer": "Voron",
+      "heuristics": [
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "voron",
+          "confidence": 75,
+          "reason": "Hostname suggests Voron printer (variant unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "switchwire",
+          "confidence": 85,
+          "reason": "Hostname suggests Voron Switchwire"
+        }
+      ]
+    },
+    {
+      "id": "creality_k1",
+      "name": "Creality K1",
+      "manufacturer": "Creality",
+      "heuristics": [
+        {
+          "type": "fan_match",
+          "field": "fans",
+          "pattern": "chamber_fan",
+          "confidence": 40,
+          "reason": "Detected chamber fan (Creality K1-like, guessing)"
+        },
+        {
+          "type": "fan_match",
+          "field": "fans",
+          "pattern": "chamber",
+          "confidence": 40,
+          "reason": "Detected chamber fan (Creality K1-like, guessing)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "creality",
+          "confidence": 60,
+          "reason": "Hostname suggests Creality printer (model unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "k1",
+          "confidence": 80,
+          "reason": "Hostname suggests Creality K1"
+        }
+      ]
+    },
+    {
+      "id": "creality_ender_3",
+      "name": "Creality Ender 3",
+      "manufacturer": "Creality",
+      "heuristics": [
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "creality",
+          "confidence": 60,
+          "reason": "Hostname suggests Creality printer (model unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "ender",
+          "confidence": 60,
+          "reason": "Hostname suggests Creality printer (model unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "ender3",
+          "confidence": 80,
+          "reason": "Hostname suggests Creality Ender 3"
+        }
+      ]
+    },
+    {
+      "id": "creality_ender_5",
+      "name": "Creality Ender 5",
+      "manufacturer": "Creality",
+      "heuristics": [
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "creality",
+          "confidence": 60,
+          "reason": "Hostname suggests Creality printer (model unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "ender",
+          "confidence": 60,
+          "reason": "Hostname suggests Creality printer (model unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "ender5",
+          "confidence": 80,
+          "reason": "Hostname suggests Creality Ender 5"
+        }
+      ]
+    },
+    {
+      "id": "creality_cr10",
+      "name": "Creality CR-10",
+      "manufacturer": "Creality",
+      "heuristics": [
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "creality",
+          "confidence": 60,
+          "reason": "Hostname suggests Creality printer (model unknown)"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "cr-10",
+          "confidence": 80,
+          "reason": "Hostname suggests Creality CR-10"
+        }
+      ]
+    }
+  ]
+}
