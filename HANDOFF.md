@@ -1,7 +1,7 @@
 # Session Handoff Document
 
 **Last Updated:** 2025-11-04
-**Current Focus:** Custom theme implementation complete, wizard polish continues
+**Current Focus:** WiFi mock backend refactored, password dialog visibility issue pending
 
 ---
 
@@ -9,7 +9,14 @@
 
 ### Completed Phases
 
-1. **Custom HelixScreen Theme** - ✅ COMPLETE
+1. **WiFi Mock Backend Refactoring** - ✅ COMPLETE
+   - Created `MockWiFiNetwork` struct to cleanly separate public network info from mock passwords
+   - All secured mock networks now use password `"12345678"` for testing
+   - Password validation in `connect_thread_func()` checks entered password against expected
+   - Connection timeout simulation for weak signals (<20% strength)
+   - Logs show modal is created but not visually appearing (investigation needed)
+
+2. **Custom HelixScreen Theme** - ✅ COMPLETE
    - Implemented custom LVGL wrapper theme (helix_theme.c) that extends default theme
    - Input widgets (textarea, dropdown, roller, spinbox) get computed background colors automatically
    - Dark mode: input backgrounds 22-27 RGB units lighter than cards (#35363A vs #1F1F1F)
@@ -46,6 +53,7 @@
 
 ### What Needs Work
 
+- 🔴 **WiFi password modal not visible** - Modal created in logs but not appearing on screen (needs z-index/visibility investigation)
 - ⚠️ Wizard steps 1-2 need polish and refinement (basic functionality complete)
 - ❌ Wizard steps 3 and 8 (printer ID, summary) need implementation
 - ❌ Real printer testing with connection screen (only tested with mock backend)
@@ -55,21 +63,21 @@
 
 ## 🚀 NEXT PRIORITIES
 
-### 1. Polish Wizard Connection Screen (Step 2)
+### 1. **URGENT: Fix WiFi Password Modal Visibility**
+- Modal is being created (logs confirm) but not visually appearing
+- Likely z-index, hidden flag, or parent visibility issue
+- Check modal system's z-order management and backdrop rendering
+
+### 2. Polish Wizard Connection Screen (Step 2)
 - Improve error messaging and user feedback
 - Add timeout handling for connection attempts
 - Test with real printer (no `--test` flag)
 - Refine layout and visual feedback
 
-### 2. Implement Printer Identification (Step 3)
+### 3. Implement Printer Identification (Step 3)
 - Allow user to name their printer
 - Store printer name in config
 - Validate input (non-empty, reasonable length)
-
-### 3. Real Printer End-to-End Testing
-- Test full wizard flow with live Moonraker connection
-- Verify hardware discovery and selection with various printer configs
-- Test edge cases (no bed, multiple extruders, custom fans, no LEDs)
 
 ---
 

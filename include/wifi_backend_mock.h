@@ -27,6 +27,22 @@
 #include <atomic>
 
 /**
+ * @brief Mock WiFi network with password for testing
+ *
+ * Extends public WiFiNetwork info (SSID, signal, security type) with mock-specific
+ * data (expected password). Real backends don't store passwords - they're only
+ * needed for mock authentication simulation.
+ */
+struct MockWiFiNetwork {
+    WiFiNetwork network;      ///< Public network info (SSID, signal, is_secured, security_type: "WPA2", "WPA3", "Open", etc.)
+    std::string password;     ///< Expected password for authentication (empty for open networks)
+
+    MockWiFiNetwork(const std::string& ssid, int strength, bool secured,
+                    const std::string& security, const std::string& pass = "")
+        : network(ssid, strength, secured, security), password(pass) {}
+};
+
+/**
  * @brief Mock WiFi backend for simulator and testing
  *
  * Provides fake WiFi functionality with realistic behavior:
@@ -83,8 +99,8 @@ private:
     std::atomic<bool> scan_active_{false};
     std::atomic<bool> connect_active_{false};
 
-    // Mock networks (realistic variety)
-    std::vector<WiFiNetwork> mock_networks_;
+    // Mock networks (realistic variety with passwords)
+    std::vector<MockWiFiNetwork> mock_networks_;
     std::mt19937 rng_;  // Random number generator for signal variations
 
     // ========================================================================
