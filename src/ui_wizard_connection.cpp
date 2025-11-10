@@ -263,9 +263,13 @@ static void on_test_connection_clicked(lv_event_t* e) {
         },
         // On disconnected callback
         []() {
-            // Only show error if we never successfully connected
-            MoonrakerClient* client = get_moonraker_client();
-            if (client && client->get_connection_state() == ConnectionState::FAILED) {
+            // Check if we're still in testing mode
+            int testing_state = lv_subject_get_int(&connection_testing);
+            spdlog::debug("[Wizard Connection] on_disconnected fired, connection_testing={}", testing_state);
+
+            // If we're still in testing mode, this disconnect means the test failed
+            // (connection_testing will be 0 if we successfully connected, since on_connected clears it)
+            if (testing_state == 1) {
                 spdlog::error("[Wizard Connection] Connection failed");
 
                 // Get error icon from globals.xml
@@ -277,6 +281,8 @@ static void on_test_connection_clicked(lv_event_t* e) {
                 lv_subject_set_int(&connection_testing, 0);  // Hide spinner
                 connection_validated = false;
                 lv_subject_set_int(&connection_test_passed, 0);  // Disable Next button via reactive binding
+            } else {
+                spdlog::debug("[Wizard Connection] Ignoring disconnect (not in testing mode)");
             }
         }
     );
