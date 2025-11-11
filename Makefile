@@ -202,6 +202,16 @@ else
     SPDLOG_INC := -I$(SPDLOG_DIR)/include
 endif
 
+# fmt (formatting library required by header-only spdlog)
+FMT_PKG_CONFIG := $(shell pkg-config --exists fmt 2>/dev/null && echo "yes")
+ifeq ($(FMT_PKG_CONFIG),yes)
+    # System fmt found via pkg-config
+    FMT_LIBS := $(shell pkg-config --libs fmt)
+else
+    # No system fmt - will need to be installed or use bundled version
+    FMT_LIBS :=
+endif
+
 # wpa_supplicant (WiFi control via wpa_ctrl interface)
 WPA_DIR := wpa_supplicant
 WPA_CLIENT_LIB := $(WPA_DIR)/wpa_supplicant/libwpa_client.a
@@ -209,6 +219,9 @@ WPA_INC := -I$(WPA_DIR)/src/common -I$(WPA_DIR)/src/utils
 
 # Include paths
 INCLUDES := -I. -I$(INC_DIR) $(LVGL_INC) $(LIBHV_INC) $(SPDLOG_INC) $(WPA_INC) $(SDL2_INC)
+
+# Common linker flags (used by both macOS and Linux)
+LDFLAGS_COMMON := $(SDL2_LIBS) $(LIBHV_LIBS) $(FMT_LIBS) -lm -lpthread
 
 # Platform-specific configuration
 ifeq ($(UNAME_S),Darwin)
@@ -221,14 +234,13 @@ ifeq ($(UNAME_S),Darwin)
 
     CFLAGS += $(MACOS_DEPLOYMENT_TARGET)
     CXXFLAGS += $(MACOS_DEPLOYMENT_TARGET)
-    LDFLAGS := $(SDL2_LIBS) $(LIBHV_LIBS) -lm -lpthread -framework Foundation -framework CoreFoundation -framework Security -framework CoreWLAN -framework CoreLocation -framework Cocoa -framework IOKit -framework CoreVideo -framework AudioToolbox -framework ForceFeedback -framework Carbon -framework CoreAudio -framework Metal -liconv
+    LDFLAGS := $(LDFLAGS_COMMON) -framework Foundation -framework CoreFoundation -framework Security -framework CoreWLAN -framework CoreLocation -framework Cocoa -framework IOKit -framework CoreVideo -framework AudioToolbox -framework ForceFeedback -framework Carbon -framework CoreAudio -framework Metal -liconv
     PLATFORM := macOS
     WPA_DEPS :=
 else
     # Linux - Include libwpa_client.a for WiFi control
     NPROC := $(shell nproc 2>/dev/null || echo 4)
-    # Note: LIBHV_LIBS contains the path to libhv.a when built from submodule
-    LDFLAGS := $(SDL2_LIBS) $(LIBHV_LIBS) $(WPA_CLIENT_LIB) -lssl -lcrypto -lm -lpthread -ldl
+    LDFLAGS := $(LDFLAGS_COMMON) $(WPA_CLIENT_LIB) -lssl -lcrypto -ldl
     PLATFORM := Linux
     WPA_DEPS := $(WPA_CLIENT_LIB)
 endif

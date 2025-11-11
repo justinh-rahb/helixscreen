@@ -175,6 +175,14 @@ check-deps:
 	else \
 		echo "$(GREEN)✓ spdlog:$(RESET) Using submodule version (header-only)"; \
 	fi; \
+	if pkg-config --exists fmt 2>/dev/null; then \
+		echo "$(GREEN)✓ fmt:$(RESET) Using system version $$(pkg-config --modversion fmt 2>/dev/null || echo 'unknown')"; \
+	else \
+		echo "$(YELLOW)⚠ fmt not found$(RESET) (required by header-only spdlog)"; WARN=1; \
+		echo "  Install: $(YELLOW)brew install fmt$(RESET) (macOS)"; \
+		echo "         $(YELLOW)sudo apt install libfmt-dev$(RESET) (Debian/Ubuntu)"; \
+		echo "         $(YELLOW)sudo dnf install fmt-devel$(RESET) (Fedora/RHEL)"; \
+	fi; \
 	if [ ! -d "$(LVGL_DIR)/src" ]; then \
 		echo "$(RED)✗ LVGL not found$(RESET) (submodule)"; ERROR=1; \
 		echo "  Run: $(YELLOW)git submodule update --init --recursive$(RESET)"; \
