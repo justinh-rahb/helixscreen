@@ -36,9 +36,9 @@ MoonrakerClient::MoonrakerClient(EventLoopPtr loop)
 }
 
 MoonrakerClient::~MoonrakerClient() {
-  // Cleanup any pending requests before destruction
-  spdlog::debug("[Moonraker Client] Destructor: {} pending requests", pending_requests_.size());
-  cleanup_pending_requests();
+  spdlog::debug("[Moonraker Client] Destructor called");
+  // Disconnect cleanly to close WebSocket and cleanup all resources
+  disconnect();
 }
 
 void MoonrakerClient::set_connection_state(ConnectionState new_state) {
@@ -75,9 +75,43 @@ void MoonrakerClient::set_connection_state(ConnectionState new_state) {
   }
 }
 
+void MoonrakerClient::disconnect() {
+  ConnectionState current_state = connection_state_.load();
+
+  // Only log if we're actually connected/connecting
+  if (current_state != ConnectionState::DISCONNECTED && current_state != ConnectionState::FAILED) {
+    spdlog::debug("[Moonraker Client] Disconnecting from WebSocket server");
+  }
+
+  // Clear callbacks BEFORE closing to prevent them from firing on a destroyed object.
+  // This is critical to prevent use-after-free if callbacks capture 'this' pointer.
+  onopen = nullptr;
+  onmessage = nullptr;
+  onclose = nullptr;
+
+  // Close the WebSocket connection (calls base class close())
+  // This resets libhv internal state and stops any pending connection attempts
+  close();
+
+  // Clean up any pending requests
+  cleanup_pending_requests();
+
+  // Reset connection state
+  set_connection_state(ConnectionState::DISCONNECTED);
+  reconnect_attempts_ = 0;
+}
+
 int MoonrakerClient::connect(const char* url,
                                std::function<void()> on_connected,
                                std::function<void()> on_disconnected) {
+  // Reset WebSocket state from previous connection attempt BEFORE setting new callbacks.
+  // This prevents libhv from rejecting the new open() call if we're already connecting/connected.
+  // Note: close() is safe to call even if already closed (idempotent).
+  close();
+
+  // Apply connection timeout to libhv (must be called before open())
+  setConnectTimeout(connection_timeout_ms_);
+
   spdlog::debug("[Moonraker Client] WebSocket connecting to {}", url);
   set_connection_state(ConnectionState::CONNECTING);
 
@@ -92,6 +126,18 @@ int MoonrakerClient::connect(const char* url,
 
   // Message received callback
   onmessage = [this, on_connected, on_disconnected](const std::string& msg) {
+    // Validate message size to prevent memory exhaustion
+    static constexpr size_t MAX_MESSAGE_SIZE = 1024 * 1024;  // 1 MB
+    if (msg.size() > MAX_MESSAGE_SIZE) {
+      spdlog::error("[Moonraker Client] Message too large: {} bytes (max: {})",
+                    msg.size(), MAX_MESSAGE_SIZE);
+      disconnect();
+      return;
+    }
+
+    // Check for timed out requests on each message (opportunistic cleanup)
+    check_request_timeouts();
+
     // Parse JSON message
     json j;
     try {
@@ -103,6 +149,13 @@ int MoonrakerClient::connect(const char* url,
 
     // Handle responses with request IDs (one-time callbacks)
     if (j.contains("id")) {
+      // Validate 'id' field type
+      if (!j["id"].is_number_integer()) {
+        spdlog::warn("[Moonraker Client] Invalid 'id' type in response: {}",
+                     j["id"].type_name());
+        return;
+      }
+
       uint64_t id = j["id"].get<uint64_t>();
 
       // Copy callbacks out before invoking to avoid deadlock
@@ -145,22 +198,50 @@ int MoonrakerClient::connect(const char* url,
 
     // Handle notifications (no request ID)
     if (j.contains("method")) {
+      // Validate 'method' field type
+      if (!j["method"].is_string()) {
+        spdlog::warn("[Moonraker Client] Invalid 'method' type in notification: {}",
+                     j["method"].type_name());
+        return;
+      }
+
       std::string method = j["method"].get<std::string>();
 
-      // Printer status updates (most common)
-      if (method == "notify_status_update") {
-        for (auto& cb : notify_callbacks_) {
+      // Copy callbacks to invoke (to avoid holding lock during callback execution)
+      std::vector<std::function<void(json)>> callbacks_to_invoke;
+
+      {
+        std::lock_guard<std::mutex> lock(callbacks_mutex_);
+
+        // Printer status updates (most common)
+        if (method == "notify_status_update" || method == "notify_filelist_changed") {
+          // Copy all notify callbacks
+          callbacks_to_invoke = notify_callbacks_;
+        }
+
+        // Method-specific persistent callbacks
+        auto method_it = method_callbacks_.find(method);
+        if (method_it != method_callbacks_.end()) {
+          for (auto& [handler_name, cb] : method_it->second) {
+            callbacks_to_invoke.push_back(cb);
+          }
+        }
+      }  // Release lock
+
+      // Invoke callbacks outside lock to prevent deadlock
+      for (auto& cb : callbacks_to_invoke) {
+        try {
           cb(j);
+        } catch (const std::exception& e) {
+          spdlog::error("[Moonraker Client] Callback for {} threw exception: {}",
+                        method, e.what());
+        } catch (...) {
+          spdlog::error("[Moonraker Client] Callback for {} threw unknown exception", method);
         }
       }
-      // File list changes
-      else if (method == "notify_filelist_changed") {
-        for (auto& cb : notify_callbacks_) {
-          cb(j);
-        }
-      }
+
       // Klippy disconnected from Moonraker
-      else if (method == "notify_klippy_disconnected") {
+      if (method == "notify_klippy_disconnected") {
         spdlog::warn("[Moonraker Client] Klipper disconnected from Moonraker");
         on_disconnected();
       }
@@ -168,14 +249,6 @@ int MoonrakerClient::connect(const char* url,
       else if (method == "notify_klippy_ready") {
         spdlog::info("[Moonraker Client] Klipper ready");
         on_connected();
-      }
-
-      // Method-specific persistent callbacks
-      auto method_it = method_callbacks_.find(method);
-      if (method_it != method_callbacks_.end()) {
-        for (auto& [handler_name, cb] : method_it->second) {
-          cb(j);
-        }
       }
     }
   };
@@ -229,12 +302,14 @@ int MoonrakerClient::connect(const char* url,
 }
 
 void MoonrakerClient::register_notify_update(std::function<void(json)> cb) {
+  std::lock_guard<std::mutex> lock(callbacks_mutex_);
   notify_callbacks_.push_back(cb);
 }
 
 void MoonrakerClient::register_method_callback(const std::string& method,
                                                 const std::string& handler_name,
                                                 std::function<void(json)> cb) {
+  std::lock_guard<std::mutex> lock(callbacks_mutex_);
   auto it = method_callbacks_.find(method);
   if (it == method_callbacks_.end()) {
     spdlog::debug("[Moonraker Client] Registering new method callback: {} (handler: {})",
@@ -287,7 +362,8 @@ int MoonrakerClient::send_jsonrpc(const std::string& method,
                                    std::function<void(json)> success_cb,
                                    std::function<void(const MoonrakerError&)> error_cb,
                                    uint32_t timeout_ms) {
-  uint64_t id = request_id_;
+  // Atomically fetch and increment to avoid race condition in concurrent calls
+  uint64_t id = request_id_.fetch_add(1);
 
   // Create pending request
   PendingRequest request;
@@ -310,8 +386,19 @@ int MoonrakerClient::send_jsonrpc(const std::string& method,
     spdlog::debug("[Moonraker Client] Registered request {} for method {}, total pending: {}", id, method, pending_requests_.size());
   }
 
-  // Send the request
-  int result = send_jsonrpc(method, params);
+  // Build and send JSON-RPC message with the registered ID
+  json rpc;
+  rpc["jsonrpc"] = "2.0";
+  rpc["method"] = method;
+  rpc["id"] = id;  // Use the ID we registered, not a new one
+
+  // Only include params if not null or empty
+  if (!params.is_null() && !params.empty()) {
+    rpc["params"] = params;
+  }
+
+  spdlog::debug("[Moonraker Client] send_jsonrpc: {}", rpc.dump());
+  int result = send(rpc.dump());
   spdlog::debug("[Moonraker Client] send_jsonrpc({}) returned {}", method, result);
   return result;
 }
