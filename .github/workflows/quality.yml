@@ -1,0 +1,65 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, "claude/**" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  copyright-check:
+    name: Copyright Headers
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check copyright headers
+      run: |
+        # Check that all source files have GPL v3 copyright headers
+        # Exclude submodules, node_modules, build artifacts
+
+        EXIT_CODE=0
+
+        # Check .cpp files
+        for file in $(find src include -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.mm" 2>/dev/null | grep -v '/\.' || true); do
+          if [ -f "$file" ]; then
+            if ! head -3 "$file" | grep -q "SPDX-License-Identifier: GPL-3.0-or-later"; then
+              echo "❌ Missing GPL v3 header: $file"
+              EXIT_CODE=1
+            fi
+          fi
+        done
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          echo "✅ All source files have proper copyright headers"
+        else
+          echo ""
+          echo "See docs/COPYRIGHT_HEADERS.md for the required header format"
+          exit 1
+        fi
+
+  style-check:
+    name: Code Style
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Check for common issues
+      run: |
+        EXIT_CODE=0
+
+        # Check for TODO/FIXME/XXX comments (informational only)
+        echo "🔍 Checking for TODO/FIXME markers..."
+        if grep -rn "TODO\|FIXME\|XXX" src include --include="*.cpp" --include="*.c" --include="*.h" --include="*.mm" 2>/dev/null | head -20; then
+          echo "ℹ️  Found TODO/FIXME markers (informational only)"
+        else
+          echo "✅ No TODO/FIXME markers found"
+        fi
+
+        echo ""
+        echo "✅ Code style check complete"
+        exit $EXIT_CODE

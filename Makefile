@@ -3,6 +3,20 @@
 #
 # HelixScreen UI Prototype - Main Makefile
 # LVGL 9 + SDL2 simulator with modular build system
+#
+# ⚠️ CRITICAL: Always use 'make' or 'make -j' - NEVER invoke gcc/g++ directly!
+# The build system handles:
+#   - Dependency management (libhv, lvgl, SDL2)
+#   - Platform detection (macOS vs Linux)
+#   - Parallel builds (-j auto-detects cores)
+#   - Patch application for multi-display support
+#
+# Common commands:
+#   make -j       # Parallel incremental build (daily development)
+#   make build    # Clean build from scratch
+#   make help     # Show all available targets
+#
+# See: DEVELOPMENT.md for complete build instructions
 
 # Use bash for all shell commands (needed for [[ ]] and read -n)
 SHELL := /bin/bash
@@ -89,6 +103,9 @@ endif
 CFLAGS := -std=c11 -Wall -Wextra -O2 -g -D_GNU_SOURCE
 CXXFLAGS := -std=c++17 -Wall -Wextra -O2 -g
 
+# Platform detection (needed early for conditional compilation)
+UNAME_S := $(shell uname -s)
+
 # Directories
 SRC_DIR := src
 INC_DIR := include
@@ -119,8 +136,14 @@ APP_SRCS := $(filter-out $(SRC_DIR)/test_dynamic_cards.cpp $(SRC_DIR)/test_respo
 APP_OBJS := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(APP_SRCS))
 
 # Objective-C++ sources (macOS only - .mm files)
-OBJCPP_SRCS := $(wildcard $(SRC_DIR)/*.mm)
-OBJCPP_OBJS := $(patsubst $(SRC_DIR)/%.mm,$(OBJ_DIR)/%.o,$(OBJCPP_SRCS))
+# Only include on macOS, exclude on Linux to avoid linking errors
+ifeq ($(UNAME_S),Darwin)
+    OBJCPP_SRCS := $(wildcard $(SRC_DIR)/*.mm)
+    OBJCPP_OBJS := $(patsubst $(SRC_DIR)/%.mm,$(OBJ_DIR)/%.o,$(OBJCPP_SRCS))
+else
+    OBJCPP_SRCS :=
+    OBJCPP_OBJS :=
+endif
 
 # Fonts
 FONT_SRCS := assets/fonts/fa_icons_64.c assets/fonts/fa_icons_48.c assets/fonts/fa_icons_32.c assets/fonts/fa_icons_24.c assets/fonts/fa_icons_16.c assets/fonts/arrows_64.c assets/fonts/arrows_48.c assets/fonts/arrows_32.c
@@ -130,18 +153,54 @@ FONT_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(FONT_SRCS))
 MATERIAL_ICON_SRCS := $(wildcard assets/images/material/*.c)
 MATERIAL_ICON_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(MATERIAL_ICON_SRCS))
 
-# SDL2
-SDL2_CFLAGS := $(shell sdl2-config --cflags)
-SDL2_LIBS := $(shell sdl2-config --libs)
+# SDL2 - Use system version if available, otherwise build from submodule
+SDL2_SYSTEM_AVAILABLE := $(shell command -v sdl2-config 2>/dev/null)
+ifneq ($(SDL2_SYSTEM_AVAILABLE),)
+    # System SDL2 found - use it
+    SDL2_INC := $(shell sdl2-config --cflags)
+    SDL2_LIBS := $(shell sdl2-config --libs)
+    SDL2_LIB :=
+else
+    # No system SDL2 - build from submodule
+    SDL2_DIR := sdl2
+    SDL2_BUILD_DIR := $(SDL2_DIR)/build
+    SDL2_LIB := $(SDL2_BUILD_DIR)/libSDL2.a
+    SDL2_INC := -I$(SDL2_DIR)/include -I$(SDL2_BUILD_DIR)/include -I$(SDL2_BUILD_DIR)/include-config-release
+    SDL2_LIBS := $(SDL2_LIB)
+endif
 
-# libhv (WebSocket client for Moonraker) - symlinked from parent repo submodule
-LIBHV_DIR := libhv
-LIBHV_INC := -I$(LIBHV_DIR)/include -I$(LIBHV_DIR)/cpputil -I$(LIBHV_DIR)
-LIBHV_LIB := $(LIBHV_DIR)/lib/libhv.a
+# libhv (WebSocket client for Moonraker) - Use system version if available, otherwise build from submodule
+LIBHV_PKG_CONFIG := $(shell pkg-config --exists libhv 2>/dev/null && echo "yes")
+ifeq ($(LIBHV_PKG_CONFIG),yes)
+    # System libhv found via pkg-config
+    LIBHV_INC := $(shell pkg-config --cflags libhv)
+    LIBHV_LIBS := $(shell pkg-config --libs libhv)
+    LIBHV_LIB :=
+else
+    # No system libhv - build from submodule
+    LIBHV_DIR := libhv
+    LIBHV_INC := -I$(LIBHV_DIR)/include -I$(LIBHV_DIR)/cpputil -I$(LIBHV_DIR)
+    # Check both possible locations for libhv.a (lib/ and root build directory)
+    LIBHV_LIB_PATHS := $(LIBHV_DIR)/lib/libhv.a $(LIBHV_DIR)/libhv.a
+    LIBHV_LIB := $(firstword $(wildcard $(LIBHV_LIB_PATHS)))
+    ifeq ($(LIBHV_LIB),)
+        # Neither exists yet - default to lib/ path for dependency rules
+        LIBHV_LIB := $(LIBHV_DIR)/lib/libhv.a
+    endif
+    LIBHV_LIBS := $(LIBHV_LIB)
+endif
 
-# spdlog (logging library) - symlinked from parent repo submodule
-SPDLOG_DIR := spdlog
-SPDLOG_INC := -I$(SPDLOG_DIR)/include
+# spdlog (logging library) - Use system version if available, otherwise use submodule
+SPDLOG_SYSTEM_PATHS := /usr/include/spdlog /usr/local/include/spdlog /opt/homebrew/include/spdlog
+SPDLOG_SYSTEM_AVAILABLE := $(firstword $(wildcard $(SPDLOG_SYSTEM_PATHS)))
+ifneq ($(SPDLOG_SYSTEM_AVAILABLE),)
+    # System spdlog found - use it (header-only library)
+    SPDLOG_INC := -I$(dir $(SPDLOG_SYSTEM_AVAILABLE))
+else
+    # No system spdlog - use submodule
+    SPDLOG_DIR := spdlog
+    SPDLOG_INC := -I$(SPDLOG_DIR)/include
+endif
 
 # wpa_supplicant (WiFi control via wpa_ctrl interface)
 WPA_DIR := wpa_supplicant
@@ -149,10 +208,9 @@ WPA_CLIENT_LIB := $(WPA_DIR)/wpa_supplicant/libwpa_client.a
 WPA_INC := -I$(WPA_DIR)/src/common -I$(WPA_DIR)/src/utils
 
 # Include paths
-INCLUDES := -I. -I$(INC_DIR) $(LVGL_INC) $(LIBHV_INC) $(SPDLOG_INC) $(WPA_INC) $(SDL2_CFLAGS)
+INCLUDES := -I. -I$(INC_DIR) $(LVGL_INC) $(LIBHV_INC) $(SPDLOG_INC) $(WPA_INC) $(SDL2_INC)
 
-# Platform detection and configuration
-UNAME_S := $(shell uname -s)
+# Platform-specific configuration
 ifeq ($(UNAME_S),Darwin)
     # macOS - Uses CoreWLAN framework for WiFi (with fallback to mock)
     NPROC := $(shell sysctl -n hw.ncpu 2>/dev/null || echo 4)
@@ -163,13 +221,14 @@ ifeq ($(UNAME_S),Darwin)
 
     CFLAGS += $(MACOS_DEPLOYMENT_TARGET)
     CXXFLAGS += $(MACOS_DEPLOYMENT_TARGET)
-    LDFLAGS := $(SDL2_LIBS) -lm -lpthread -framework Foundation -framework CoreFoundation -framework Security -framework CoreWLAN -framework CoreLocation
+    LDFLAGS := $(SDL2_LIBS) $(LIBHV_LIBS) -lm -lpthread -framework Foundation -framework CoreFoundation -framework Security -framework CoreWLAN -framework CoreLocation -framework Cocoa -framework IOKit -framework CoreVideo -framework AudioToolbox -framework ForceFeedback -framework Carbon -framework CoreAudio -framework Metal -liconv
     PLATFORM := macOS
     WPA_DEPS :=
 else
     # Linux - Include libwpa_client.a for WiFi control
     NPROC := $(shell nproc 2>/dev/null || echo 4)
-    LDFLAGS := $(SDL2_LIBS) $(WPA_CLIENT_LIB) -lm -lpthread
+    # Note: LIBHV_LIBS contains the path to libhv.a when built from submodule
+    LDFLAGS := $(SDL2_LIBS) $(LIBHV_LIBS) $(WPA_CLIENT_LIB) -lssl -lcrypto -lm -lpthread -ldl
     PLATFORM := Linux
     WPA_DEPS := $(WPA_CLIENT_LIB)
 endif

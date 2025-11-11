@@ -1,0 +1,59 @@
+diff --git a/config.mk b/config.mk
+index e3ed7ab..978c8b4 100644
+--- a/config.mk
++++ b/config.mk
+@@ -17,4 +17,4 @@ WITH_OPENSSL=no
+ WITH_GNUTLS=no
+ WITH_MBEDTLS=no
+ WITH_KCP=no
+-CONFIG_DATE=20220224
++CONFIG_DATE=20251104
+\ No newline at end of file
+diff --git a/hconfig.h b/hconfig.h
+index 03d4ef2..be8997c 100644
+--- a/hconfig.h
++++ b/hconfig.h
+@@ -10,7 +10,7 @@
+ #endif
+ 
+ #ifndef HAVE_STDATOMIC_H
+-#define HAVE_STDATOMIC_H 0
++#define HAVE_STDATOMIC_H 1
+ #endif
+ 
+ #ifndef HAVE_SYS_TYPES_H
+@@ -34,11 +34,11 @@
+ #endif
+ 
+ #ifndef HAVE_ENDIAN_H
+-#define HAVE_ENDIAN_H 1
++#define HAVE_ENDIAN_H 0
+ #endif
+ 
+ #ifndef HAVE_SYS_ENDIAN_H
+-#define HAVE_SYS_ENDIAN_H 0
++#define HAVE_SYS_ENDIAN_H 1
+ #endif
+ 
+ #ifndef HAVE_GETTID
+@@ -82,7 +82,7 @@
+ #endif
+ 
+ #ifndef HAVE_EVENTFD
+-#define HAVE_EVENTFD 1
++#define HAVE_EVENTFD 0
+ #endif
+ 
+ #ifndef HAVE_SETPROCTITLE
+@@ -92,11 +92,8 @@
+ /* #undef WITH_OPENSSL */
+ /* #undef WITH_GNUTLS */
+ /* #undef WITH_MBEDTLS */
+-
+ /* #undef ENABLE_UDS */
+ /* #undef USE_MULTIMAP */
+-
+-#define WITH_WEPOLL     1
+ /* #undef WITH_KCP */
+ 
+ #endif // HV_CONFIG_H_

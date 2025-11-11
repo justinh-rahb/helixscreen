@@ -13,11 +13,12 @@ all: check-deps apply-patches generate-fonts $(TARGET)
 $(LIBHV_LIB):
 	$(Q)$(MAKE) libhv-build
 
-# Link binary
-$(TARGET): $(LIBHV_LIB) $(APP_C_OBJS) $(APP_OBJS) $(OBJCPP_OBJS) $(LVGL_OBJS) $(THORVG_OBJS) $(FONT_OBJS) $(MATERIAL_ICON_OBJS) $(WPA_DEPS)
+# Link binary (SDL2_LIB is empty if using system SDL2)
+# Note: Filter out library archives from $^ to avoid duplicate linking, then add via LDFLAGS
+$(TARGET): $(SDL2_LIB) $(LIBHV_LIB) $(APP_C_OBJS) $(APP_OBJS) $(OBJCPP_OBJS) $(LVGL_OBJS) $(THORVG_OBJS) $(FONT_OBJS) $(MATERIAL_ICON_OBJS) $(WPA_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(ECHO) "$(MAGENTA)$(BOLD)[LD]$(RESET) $@"
-	$(Q)$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS) || { \
+	$(Q)$(CXX) $(CXXFLAGS) $(filter-out %.a,$^) -o $@ $(LDFLAGS) || { \
 		echo "$(RED)$(BOLD)✗ Linking failed!$(RESET)"; \
 		echo "$(YELLOW)Command:$(RESET) $(CXX) $(CXXFLAGS) [objects] -o $@ $(LDFLAGS)"; \
 		exit 1; \
@@ -26,8 +27,8 @@ $(TARGET): $(LIBHV_LIB) $(APP_C_OBJS) $(APP_OBJS) $(OBJCPP_OBJS) $(LVGL_OBJS) $(
 # Collect all header dependencies
 HEADERS := $(shell find $(INC_DIR) -name "*.h" 2>/dev/null)
 
-# Compile app C sources (depend on headers)
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(HEADERS)
+# Compile app C sources (depend on headers and libhv for hv/json.hpp)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(HEADERS) $(LIBHV_LIB)
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(BLUE)[CC]$(RESET) $<"
 ifeq ($(V),1)
@@ -39,8 +40,8 @@ endif
 		exit 1; \
 	}
 
-# Compile app C++ sources (depend on headers)
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(HEADERS)
+# Compile app C++ sources (depend on headers and libhv for hv/json.hpp)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp $(HEADERS) $(LIBHV_LIB)
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(BLUE)[CXX]$(RESET) $<"
 ifeq ($(V),1)
@@ -52,8 +53,8 @@ endif
 		exit 1; \
 	}
 
-# Compile app Objective-C++ sources (macOS .mm files, depend on headers)
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.mm $(HEADERS)
+# Compile app Objective-C++ sources (macOS .mm files, depend on headers and libhv for hv/json.hpp)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.mm $(HEADERS) $(LIBHV_LIB)
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(BLUE)[OBJCXX]$(RESET) $<"
 ifeq ($(V),1)
@@ -123,6 +124,10 @@ clean:
 		echo "$(GREEN)✓ Already clean (no build directory)$(RESET)"; \
 	fi
 	$(Q)rm -f .fonts.stamp
+	$(Q)if [ -d "$(SDL2_BUILD_DIR)" ]; then \
+		echo "$(YELLOW)→ Cleaning SDL2 build...$(RESET)"; \
+		rm -rf $(SDL2_BUILD_DIR); \
+	fi
 ifneq ($(UNAME_S),Darwin)
 	$(Q)if [ -f "$(WPA_CLIENT_LIB)" ]; then \
 		echo "$(YELLOW)→ Cleaning wpa_supplicant...$(RESET)"; \

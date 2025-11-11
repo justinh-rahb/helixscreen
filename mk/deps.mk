@@ -43,14 +43,19 @@ check-deps:
 			fi; \
 		fi; \
 	fi; \
-	if ! command -v sdl2-config >/dev/null 2>&1; then \
-		echo "$(RED)✗ SDL2 not found$(RESET)"; ERROR=1; \
-		MISSING_DEPS="$$MISSING_DEPS sdl2"; \
-		echo "  Install: $(YELLOW)brew install sdl2$(RESET) (macOS)"; \
-		echo "         $(YELLOW)sudo apt install libsdl2-dev$(RESET) (Debian/Ubuntu)"; \
-		echo "         $(YELLOW)sudo dnf install SDL2-devel$(RESET) (Fedora/RHEL)"; \
+	if command -v sdl2-config >/dev/null 2>&1; then \
+		echo "$(GREEN)✓ SDL2:$(RESET) Using system version $$(sdl2-config --version)"; \
 	else \
-		echo "$(GREEN)✓ SDL2 found:$(RESET) $$(sdl2-config --version)"; \
+		echo "$(GREEN)✓ SDL2:$(RESET) Will build from submodule (sdl2/)"; \
+		if ! command -v cmake >/dev/null 2>&1; then \
+			echo "$(RED)✗ cmake not found (required for SDL2 build)$(RESET)"; ERROR=1; \
+			MISSING_DEPS="$$MISSING_DEPS cmake"; \
+			echo "  Install: $(YELLOW)brew install cmake$(RESET) (macOS)"; \
+			echo "         $(YELLOW)sudo apt install cmake$(RESET) (Debian/Ubuntu)"; \
+			echo "         $(YELLOW)sudo dnf install cmake$(RESET) (Fedora/RHEL)"; \
+		else \
+			echo "$(GREEN)✓ cmake found:$(RESET) $$(cmake --version | head -n1)"; \
+		fi; \
 	fi; \
 	if ! command -v make >/dev/null 2>&1; then \
 		echo "$(RED)✗ make not found$(RESET)"; ERROR=1; \
@@ -154,17 +159,21 @@ check-deps:
 			fi; \
 		fi; \
 	fi; \
-	if [ ! -f "$(LIBHV_LIB)" ]; then \
+	if pkg-config --exists libhv 2>/dev/null; then \
+		echo "$(GREEN)✓ libhv:$(RESET) Using system version $$(pkg-config --modversion libhv 2>/dev/null || echo 'unknown')"; \
+	elif [ ! -f "$(LIBHV_DIR)/lib/libhv.a" ]; then \
 		echo "$(YELLOW)⚠ libhv not built$(RESET)"; WARN=1; \
 		echo "  Run: $(YELLOW)make libhv-build$(RESET)"; \
 	else \
-		echo "$(GREEN)✓ libhv found:$(RESET) $(LIBHV_LIB)"; \
+		echo "$(GREEN)✓ libhv:$(RESET) Using submodule version"; \
 	fi; \
-	if [ ! -d "$(SPDLOG_DIR)/include" ]; then \
+	if [ -d "/usr/include/spdlog" ] || [ -d "/usr/local/include/spdlog" ] || [ -d "/opt/homebrew/include/spdlog" ]; then \
+		echo "$(GREEN)✓ spdlog:$(RESET) Using system version (header-only)"; \
+	elif [ ! -d "$(SPDLOG_DIR)/include" ]; then \
 		echo "$(RED)✗ spdlog not found$(RESET) (submodule)"; ERROR=1; \
 		echo "  Run: $(YELLOW)git submodule update --init --recursive$(RESET)"; \
 	else \
-		echo "$(GREEN)✓ spdlog found:$(RESET) $(SPDLOG_DIR)"; \
+		echo "$(GREEN)✓ spdlog:$(RESET) Using submodule version (header-only)"; \
 	fi; \
 	if [ ! -d "$(LVGL_DIR)/src" ]; then \
 		echo "$(RED)✗ LVGL not found$(RESET) (submodule)"; ERROR=1; \
@@ -348,6 +357,36 @@ else
 	$(Q)$(MAKE) -C $(LIBHV_DIR) -j$(NPROC) libhv
 endif
 	$(ECHO) "$(GREEN)✓ libhv built successfully$(RESET)"
+
+# Build SDL2 from submodule (CMake build)
+sdl2-build:
+	$(ECHO) "$(CYAN)Building SDL2 from submodule...$(RESET)"
+	$(Q)mkdir -p $(SDL2_BUILD_DIR)
+ifeq ($(UNAME_S),Darwin)
+	$(Q)cd $(SDL2_BUILD_DIR) && \
+		MACOSX_DEPLOYMENT_TARGET=$(MACOS_MIN_VERSION) \
+		cmake .. \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_OSX_DEPLOYMENT_TARGET=$(MACOS_MIN_VERSION) \
+			-DSDL_SHARED=OFF \
+			-DSDL_STATIC=ON \
+			-DSDL_TEST=OFF \
+			-DSDL_TESTS=OFF
+	$(Q)MACOSX_DEPLOYMENT_TARGET=$(MACOS_MIN_VERSION) cmake --build $(SDL2_BUILD_DIR) --config Release -j$(NPROC)
+else
+	$(Q)cd $(SDL2_BUILD_DIR) && \
+		cmake .. \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DSDL_SHARED=OFF \
+			-DSDL_STATIC=ON \
+			-DSDL_TEST=OFF \
+			-DSDL_TESTS=OFF
+	$(Q)cmake --build $(SDL2_BUILD_DIR) --config Release -j$(NPROC)
+endif
+	$(ECHO) "$(GREEN)✓ SDL2 built successfully$(RESET)"
+
+$(SDL2_LIB):
+	$(Q)$(MAKE) sdl2-build
 
 # Build wpa_supplicant client library (Linux only)
 ifneq ($(UNAME_S),Darwin)
