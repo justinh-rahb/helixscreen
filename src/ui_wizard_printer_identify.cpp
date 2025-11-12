@@ -274,15 +274,14 @@ static void on_printer_name_changed(lv_event_t* e) {
                               "Enter printer details or wait for auto-detection");
     }
 
-    // Save to config if valid
+    // Update config (in-memory, persisted on cleanup)
     if (printer_identify_validated) {
         Config* config = Config::get_instance();
         try {
-            config->set("/printer/name", trimmed);  // Save trimmed version
-            config->save();
-            spdlog::info("[Wizard Printer] Saved printer name to config: '{}'", trimmed);
+            config->set("/printer/name", trimmed);  // Update in-memory config
+            spdlog::debug("[Wizard Printer] Updated printer name in config: '{}'", trimmed);
         } catch (const std::exception& e) {
-            spdlog::error("[Wizard Printer] Failed to save config: {}", e.what());
+            spdlog::error("[Wizard Printer] Failed to update config: {}", e.what());
         }
     }
 }
@@ -299,7 +298,7 @@ static void on_printer_type_changed(lv_event_t* e) {
     // Update subject
     lv_subject_set_int(&printer_type_selected, selected);
 
-    // Save to config
+    // Update config (in-memory, persisted on cleanup)
     Config* config = Config::get_instance();
     try {
         config->set("/printer/type_index", (int)selected);
@@ -309,10 +308,9 @@ static void on_printer_type_changed(lv_event_t* e) {
         lv_roller_get_selected_str(roller, buf, sizeof(buf));
         config->set("/printer/type", std::string(buf));
 
-        config->save();
-        spdlog::debug("[Wizard Printer] Saved printer type to config: {}", buf);
+        spdlog::debug("[Wizard Printer] Updated printer type in config: {}", buf);
     } catch (const std::exception& e) {
-        spdlog::error("[Wizard Printer] Failed to save config: {}", e.what());
+        spdlog::error("[Wizard Printer] Failed to update config: {}", e.what());
     }
 }
 
@@ -387,6 +385,15 @@ lv_obj_t* ui_wizard_printer_identify_create(lv_obj_t* parent) {
 
 void ui_wizard_printer_identify_cleanup() {
     spdlog::debug("[Wizard Printer] Cleaning up printer identification screen");
+
+    // Persist config changes to disk
+    Config* config = Config::get_instance();
+    try {
+        config->save();
+        spdlog::info("[Wizard Printer] Saved printer identification settings to config");
+    } catch (const std::exception& e) {
+        spdlog::error("[Wizard Printer] Failed to save config: {}", e.what());
+    }
 
     // Reset UI references
     printer_identify_screen_root = nullptr;
