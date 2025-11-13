@@ -518,6 +518,7 @@ static void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/print_status_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/filament_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/settings_panel.xml");
+    lv_xml_register_component_from_file("A:ui_xml/bed_mesh_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/advanced_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/test_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/print_select_panel.xml");

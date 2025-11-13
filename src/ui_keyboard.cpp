@@ -167,8 +167,8 @@ static const char* const kb_map_alpha_lc[] = {
     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "\n",
     // Row 2: q-p (10 letters)
     "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "\n",
-    // Row 3: a-l (9 letters, no Enter yet)
-    "a", "s", "d", "f", "g", "h", "j", "k", "l", "\n",
+    // Row 3: spacer + a-l (9 letters) + spacer for alignment
+    "", "a", "s", "d", "f", "g", "h", "j", "k", "l", "", "\n",
     // Row 4: [SHIFT] z-m [BACKSPACE] - shift on left, backspace on right (above Enter)
     LV_SYMBOL_UP, "z", "x", "c", "v", "b", "n", "m", LV_SYMBOL_BACKSPACE, "\n",
     // Row 5: [?123] [SPACE-wide] [.] [ENTER]
@@ -181,9 +181,11 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_alpha_lc[] = {
     // Row 2: q-p (equal width)
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
-    // Row 3: a-l (equal width, slightly wider than rows 1-2)
+    // Row 3: spacer + a-l + spacer for alignment (width 2 on each side)
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_HIDDEN | 2),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_HIDDEN | 2),
     // Row 4: Shift (wide) + z-m (regular) + Backspace (wide)
     static_cast<lv_buttonmatrix_ctrl_t>(LV_KEYBOARD_CTRL_BUTTON_FLAGS | 6), // Shift
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
@@ -202,10 +204,10 @@ static const char* const kb_map_alpha_uc[] = {
     "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "\n",
     // Row 2: Q-P (10 letters, uppercase)
     "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "\n",
-    // Row 3: A-L (9 letters, uppercase)
-    "A", "S", "D", "F", "G", "H", "J", "K", "L", "\n",
-    // Row 4: [SHIFT] Z-M [BACKSPACE]
-    LV_SYMBOL_UP, "Z", "X", "C", "V", "B", "N", "M", LV_SYMBOL_BACKSPACE, "\n",
+    // Row 3: spacer + A-L (9 letters) + spacer for alignment
+    "", "A", "S", "D", "F", "G", "H", "J", "K", "L", "", "\n",
+    // Row 4: [SHIFT] Z-M [BACKSPACE] - eject symbol to indicate uppercase mode
+    LV_SYMBOL_EJECT, "Z", "X", "C", "V", "B", "N", "M", LV_SYMBOL_BACKSPACE, "\n",
     // Row 5: [?123] [SPACE-wide] [.] [ENTER]
     "?123", " ", ".", LV_SYMBOL_NEW_LINE, ""};
 
@@ -216,9 +218,11 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_alpha_uc[] = {
     // Row 2: Q-P (equal width)
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
-    // Row 3: A-L (equal width)
+    // Row 3: spacer + A-L + spacer for alignment (width 2 on each side)
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_HIDDEN | 2),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_HIDDEN | 2),
     // Row 4: Shift (wide) + Z-M (regular) + Backspace (wide)
     static_cast<lv_buttonmatrix_ctrl_t>(LV_KEYBOARD_CTRL_BUTTON_FLAGS | 6), // Shift (active)
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
@@ -238,8 +242,8 @@ static const char* const kb_map_numbers_symbols[] = {
     "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "\n",
     // Row 2: More symbols
     "-", "/", ":", ";", "(", ")", "$", "&", "@", "\"", "\n",
-    // Row 3: Additional punctuation
-    ".", ",", "?", "!", "'", "\"", "+", "=", "_", "\n",
+    // Row 3: spacer + punctuation + spacer for alignment
+    "", ".", ",", "?", "!", "'", "\"", "+", "=", "_", "", "\n",
     // Row 4: [#+=] (symbols page 2) + misc + [BACKSPACE]
     "#+=", "[", "]", "{", "}", "|", "\\", "<", ">", LV_SYMBOL_BACKSPACE, "\n",
     // Row 5: [ABC] (back to alpha) + [SPACE-wide] + [.] + [ENTER]
@@ -252,9 +256,11 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_numbers_symbols[] = {
     // Row 2: More symbols (equal width)
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
-    // Row 3: Punctuation (equal width)
+    // Row 3: spacer + punctuation + spacer for alignment
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_HIDDEN | 2),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
     LV_KB_BTN(4), LV_KB_BTN(4), LV_KB_BTN(4),
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_HIDDEN | 2),
     // Row 4: Mode switch + brackets/symbols + Backspace
     static_cast<lv_buttonmatrix_ctrl_t>(LV_KEYBOARD_CTRL_BUTTON_FLAGS |
                                         5), // #+= (future: more symbols)
@@ -584,6 +590,7 @@ static void apply_keyboard_mode() {
         spdlog::debug("[Keyboard] Switched to numbers/symbols");
         break;
     }
+
 }
 
 /**
@@ -608,25 +615,51 @@ static void keyboard_event_cb(lv_event_t* e) {
             // Switch from alpha mode to numbers/symbols
             g_mode = MODE_NUMBERS_SYMBOLS;
             apply_keyboard_mode();
-            spdlog::info("[Keyboard] Mode switch: ?123 -> numbers/symbols");
+            // Remove the "?123" text that was added to textarea
+            if (g_context_textarea) {
+                const char* text = lv_textarea_get_text(g_context_textarea);
+                size_t len = strlen(text);
+                if (len >= 4) { // "?123" is 4 characters
+                    lv_textarea_delete_char(g_context_textarea);
+                    lv_textarea_delete_char(g_context_textarea);
+                    lv_textarea_delete_char(g_context_textarea);
+                    lv_textarea_delete_char(g_context_textarea);
+                }
+            }
+            spdlog::debug("[Keyboard] Mode switch: ?123 -> numbers/symbols");
         } else if (btn_text && strcmp(btn_text, "ABC") == 0) {
             // Switch from numbers/symbols to alpha lowercase
             g_mode = MODE_ALPHA_LC;
             apply_keyboard_mode();
-            spdlog::info("[Keyboard] Mode switch: ABC -> alpha lowercase");
-        } else if (btn_text && strcmp(btn_text, LV_SYMBOL_UP) == 0) {
-            // Toggle uppercase/lowercase
+            // Remove the "ABC" text that was added to textarea
+            if (g_context_textarea) {
+                lv_textarea_delete_char(g_context_textarea);
+                lv_textarea_delete_char(g_context_textarea);
+                lv_textarea_delete_char(g_context_textarea);
+            }
+            spdlog::debug("[Keyboard] Mode switch: ABC -> alpha lowercase");
+        } else if (btn_text &&
+                   (strcmp(btn_text, LV_SYMBOL_UP) == 0 || strcmp(btn_text, LV_SYMBOL_EJECT) == 0)) {
+            // Toggle uppercase/lowercase (recognize both LV_SYMBOL_UP and LV_SYMBOL_EJECT)
             if (g_mode == MODE_ALPHA_LC) {
                 g_mode = MODE_ALPHA_UC;
             } else if (g_mode == MODE_ALPHA_UC) {
                 g_mode = MODE_ALPHA_LC;
             }
             apply_keyboard_mode();
-            spdlog::info("[Keyboard] Mode switch: Shift -> {}",
-                         g_mode == MODE_ALPHA_UC ? "uppercase" : "lowercase");
+            // Remove the shift symbol that was added to textarea
+            if (g_context_textarea) {
+                lv_textarea_delete_char(g_context_textarea);
+            }
+            spdlog::debug("[Keyboard] Mode switch: Shift -> {}",
+                          g_mode == MODE_ALPHA_UC ? "uppercase" : "lowercase");
         } else if (btn_text && strcmp(btn_text, LV_SYMBOL_NEW_LINE) == 0) {
             // Enter key - emit ready event (handled above)
             lv_obj_send_event(keyboard, LV_EVENT_READY, NULL);
+            // Remove the newline that might have been added
+            if (g_context_textarea) {
+                lv_textarea_delete_char(g_context_textarea);
+            }
         }
     }
 }
@@ -657,8 +690,8 @@ void ui_keyboard_init(lv_obj_t* parent) {
     g_mode = MODE_ALPHA_LC;
     apply_keyboard_mode();
 
-    // Apply styling - theme handles colors, set opacity for transparency
-    lv_obj_set_style_bg_opa(g_keyboard, LV_OPA_80, LV_PART_MAIN); // 80% opacity = 20% transparent
+    // Apply styling - theme handles colors, set opacity for solid background
+    lv_obj_set_style_bg_opa(g_keyboard, LV_OPA_COVER, LV_PART_MAIN); // Fully opaque background
     lv_obj_set_style_bg_opa(g_keyboard, LV_OPA_COVER, LV_PART_ITEMS);
     lv_obj_set_style_radius(g_keyboard, 8, LV_PART_ITEMS); // Rounded key corners
 

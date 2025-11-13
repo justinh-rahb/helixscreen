@@ -24,6 +24,7 @@
 #include "ui_panel_settings.h"
 
 #include "ui_nav.h"
+#include "ui_panel_bed_mesh.h"
 
 #include <spdlog/spdlog.h>
 
@@ -41,8 +42,8 @@ static void card_printer_info_clicked(lv_event_t* e);
 static void card_about_clicked(lv_event_t* e);
 
 void ui_panel_settings_init_subjects() {
-    // TODO: Initialize subjects for sub-screens when needed
-    // For now, no subjects needed at launcher level
+    // Initialize bed mesh panel subjects
+    ui_panel_bed_mesh_init_subjects();
     spdlog::info("Settings panel subjects initialized");
 }
 
@@ -111,29 +112,25 @@ static void card_display_clicked(lv_event_t* e) {
 
 static void card_bed_mesh_clicked(lv_event_t* e) {
     (void)e;
-    spdlog::debug("Bed Mesh card clicked - opening Bed Mesh Calibration sub-screen");
+    spdlog::debug("Bed Mesh card clicked - opening Bed Mesh Visualization");
 
     // Create bed mesh panel on first access
     if (!bed_mesh_panel && parent_screen) {
-        spdlog::debug("Creating bed mesh calibration panel...");
+        spdlog::debug("Creating bed mesh visualization panel...");
 
-        // TODO: Once bed_mesh_calibration_panel.xml is created, use it here
-        // For now, create a simple placeholder panel
-        bed_mesh_panel = lv_obj_create(parent_screen);
-        lv_obj_set_size(bed_mesh_panel, LV_PCT(100), LV_PCT(100));
-        lv_obj_set_style_bg_opa(bed_mesh_panel, 180, 0);
-        lv_obj_set_style_border_width(bed_mesh_panel, 0, 0);
-        lv_obj_align(bed_mesh_panel, LV_ALIGN_CENTER, 0, 0);
+        // Create from XML
+        bed_mesh_panel = (lv_obj_t*)lv_xml_create(parent_screen, "bed_mesh_panel", nullptr);
+        if (bed_mesh_panel) {
+            // Setup event handlers and renderer
+            ui_panel_bed_mesh_setup(bed_mesh_panel, parent_screen);
 
-        // Add placeholder text
-        lv_obj_t* label = lv_label_create(bed_mesh_panel);
-        lv_label_set_text(label, "Bed Mesh Calibration\n\n(Coming in Phase 2)");
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_28, 0);
-        lv_obj_center(label);
-
-        // Initially hidden
-        lv_obj_add_flag(bed_mesh_panel, LV_OBJ_FLAG_HIDDEN);
-        spdlog::info("Bed mesh calibration panel placeholder created");
+            // Initially hidden
+            lv_obj_add_flag(bed_mesh_panel, LV_OBJ_FLAG_HIDDEN);
+            spdlog::info("Bed mesh visualization panel created");
+        } else {
+            spdlog::error("Failed to create bed mesh panel from XML");
+            return;
+        }
     }
 
     // Push bed mesh panel onto navigation history and show it

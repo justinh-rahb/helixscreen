@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<!--
+  Copyright (C) 2025 356C LLC
+  Author: Preston Brown <pbrown@brown-house.net>
+
+  This file is part of HelixScreen.
+
+  HelixScreen is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  HelixScreen is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with HelixScreen. If not, see <https://www.gnu.org/licenses/>.
+-->
+
+<!--
+  Bed Mesh Visualization Panel
+
+  3D visualization of printer bed mesh height maps with interactive rotation controls.
+  Uses bed_mesh_renderer.h for 3D rendering to canvas.
+
+  Required widgets:
+  - bed_mesh_canvas: Canvas widget (600×400) for 3D visualization
+  - mesh_info_label: Label showing mesh dimensions
+  - rotation_x_label: Label showing X rotation angle (tilt)
+  - rotation_y_label: Label showing Z rotation angle (spin)
+  - rotation_x_slider: Slider for X rotation control
+  - rotation_z_slider: Slider for Z rotation control
+  - back_button: Navigation back button
+-->
+
+<component name="bed_mesh_panel">
+  <!-- Full-screen panel -->
+  <lv_obj width="lv_pct(100)" height="lv_pct(100)" style_bg_color="lv_xml_get_const('background')" style_bg_opa="255">
+    <lv_obj flex_flow="column" width="lv_pct(100)" height="lv_pct(100)" style_pad_all="0" style_border_width="0">
+
+      <!-- Header with title and back button -->
+      <lv_obj name="bed_mesh_header" width="lv_pct(100)" height="60" flex_flow="row" style_bg_color="lv_xml_get_const('card_background')" style_pad_all="12" style_pad_gap="12">
+        <!-- Back button -->
+        <lv_button name="back_button" width="48" height="48">
+          <lv_label text="&lt;" style_text_font="lv_font_montserrat_24"/>
+        </lv_button>
+
+        <!-- Title -->
+        <lv_label text="Bed Mesh Visualization" style_text_font="lv_font_montserrat_24" flex_grow="1" style_text_align="left"/>
+
+        <!-- Info label (mesh dimensions) -->
+        <lv_label name="mesh_info_label" text="Mesh: --" style_text_font="lv_font_montserrat_16" style_text_color="lv_xml_get_const('text_secondary')"/>
+      </lv_obj>
+
+      <!-- Content area -->
+      <lv_obj name="bed_mesh_content" width="lv_pct(100)" flex_grow="1" flex_flow="column" style_pad_all="12" style_pad_gap="12" style_border_width="0">
+
+        <!-- Canvas container (centered) -->
+        <lv_obj width="lv_pct(100)" flex_grow="1" style_pad_all="0" style_border_width="0">
+          <lv_canvas name="bed_mesh_canvas" width="600" height="400" style_align="center"/>
+        </lv_obj>
+
+        <!-- Rotation controls -->
+        <lv_obj width="lv_pct(100)" height="80" flex_flow="column" style_pad_all="12" style_pad_gap="8" style_bg_color="lv_xml_get_const('card_background')" style_radius="8" style_border_width="0">
+
+          <!-- X rotation (tilt) -->
+          <lv_obj width="lv_pct(100)" height="28" flex_flow="row" style_pad_all="0" style_pad_gap="12" style_border_width="0">
+            <lv_label name="rotation_x_label" text="Tilt: -45°" width="100" style_text_align="left"/>
+            <lv_slider name="rotation_x_slider" flex_grow="1" height="28"/>
+          </lv_obj>
+
+          <!-- Z rotation (spin) -->
+          <lv_obj width="lv_pct(100)" height="28" flex_flow="row" style_pad_all="0" style_pad_gap="12" style_border_width="0">
+            <lv_label name="rotation_y_label" text="Spin: 45°" width="100" style_text_align="left"/>
+            <lv_slider name="rotation_z_slider" flex_grow="1" height="28"/>
+          </lv_obj>
+
+        </lv_obj>
+
+      </lv_obj>
+
+    </lv_obj>
+  </lv_obj>
+</component>
