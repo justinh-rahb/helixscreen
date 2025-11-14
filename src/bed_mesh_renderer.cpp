@@ -69,6 +69,8 @@ static void generate_mesh_quads(bed_mesh_renderer_t* renderer);
 static void sort_quads_by_depth(std::vector<bed_mesh_quad_3d_t>& quads);
 static void render_quad(lv_obj_t* canvas, const bed_mesh_quad_3d_t& quad, int canvas_width,
                         int canvas_height, const bed_mesh_view_state_t* view, bool use_gradient);
+static void render_grid_lines(lv_obj_t* canvas, const bed_mesh_renderer_t* renderer,
+                              int canvas_width, int canvas_height);
 
 // Public API implementation
 
@@ -239,12 +241,14 @@ bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_obj_t* canvas) {
     int canvas_width = lv_obj_get_width(canvas);
     int canvas_height = lv_obj_get_height(canvas);
 
-    spdlog::debug("Canvas dimensions: {}x{}", canvas_width, canvas_height);
-
+    // Skip rendering if canvas dimensions are invalid (flex layout not yet calculated)
     if (canvas_width <= 0 || canvas_height <= 0) {
-        spdlog::error("Invalid canvas dimensions: {}x{}", canvas_width, canvas_height);
+        spdlog::debug("Skipping render: invalid canvas dimensions {}x{} (layout not ready)",
+                      canvas_width, canvas_height);
         return false;
     }
+
+    spdlog::debug("Canvas dimensions: {}x{}", canvas_width, canvas_height);
 
     spdlog::debug("Rendering mesh to {}x{} canvas (dragging={})", canvas_width, canvas_height,
                   renderer->view_state.is_dragging);
@@ -295,6 +299,9 @@ bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_obj_t* canvas) {
     for (const auto& quad : renderer->quads) {
         render_quad(canvas, quad, canvas_width, canvas_height, &renderer->view_state, use_gradient);
     }
+
+    // Render wireframe grid on top
+    render_grid_lines(canvas, renderer, canvas_width, canvas_height);
 
     // Invalidate canvas for LVGL redraw
     lv_obj_invalidate(canvas);
@@ -727,6 +734,96 @@ static void sort_quads_by_depth(std::vector<bed_mesh_quad_3d_t>& quads) {
                   // Descending order: furthest (largest depth) first
                   return a.avg_depth > b.avg_depth;
               });
+}
+
+/**
+ * Render wireframe grid lines over the mesh surface
+ * Draws horizontal and vertical lines connecting mesh vertices
+ */
+static void render_grid_lines(lv_obj_t* canvas, const bed_mesh_renderer_t* renderer,
+                              int canvas_width, int canvas_height) {
+    if (!renderer || !renderer->has_mesh_data) {
+        return;
+    }
+
+    // Initialize canvas layer for drawing
+    lv_layer_t layer;
+    lv_canvas_init_layer(canvas, &layer);
+
+    // Configure line drawing style
+    lv_draw_line_dsc_t line_dsc;
+    lv_draw_line_dsc_init(&line_dsc);
+    line_dsc.color = lv_color_make(80, 80, 80); // Dark gray
+    line_dsc.width = 1;
+    line_dsc.opa = LV_OPA_60; // 60% opacity
+
+    // Center mesh Z values (must match quad generation for proper alignment)
+    double z_center = (renderer->mesh_min_z + renderer->mesh_max_z) / 2.0;
+
+    // Project all mesh vertices to screen space once
+    std::vector<std::vector<bed_mesh_point_3d_t>> projected_points(renderer->rows);
+    for (int row = 0; row < renderer->rows; row++) {
+        projected_points[row].resize(renderer->cols);
+        for (int col = 0; col < renderer->cols; col++) {
+            // Convert mesh coordinates to world space (matching quad generation exactly)
+            double world_x = (col - renderer->cols / 2.0) * BED_MESH_SCALE;
+            // Y is inverted: mesh[0] = front edge (far from viewer after rotation)
+            double world_y = ((renderer->rows - 1 - row) - renderer->rows / 2.0) * BED_MESH_SCALE;
+            // Z is centered and scaled (matching quad vertex Z calculation)
+            double world_z = (renderer->mesh[row][col] - z_center) * renderer->view_state.z_scale;
+
+            // Project to screen space
+            projected_points[row][col] = project_3d_to_2d(world_x, world_y, world_z, canvas_width,
+                                                          canvas_height, &renderer->view_state);
+        }
+    }
+
+    // Draw horizontal grid lines (connect points in same row)
+    for (int row = 0; row < renderer->rows; row++) {
+        for (int col = 0; col < renderer->cols - 1; col++) {
+            const auto& p1 = projected_points[row][col];
+            const auto& p2 = projected_points[row][col + 1];
+
+            // Bounds check (allow some margin for partially visible lines)
+            if (p1.screen_x >= -10 && p1.screen_x < canvas_width + 10 && p1.screen_y >= -10 &&
+                p1.screen_y < canvas_height + 10 && p2.screen_x >= -10 &&
+                p2.screen_x < canvas_width + 10 && p2.screen_y >= -10 &&
+                p2.screen_y < canvas_height + 10) {
+                // Set line endpoints in descriptor
+                line_dsc.p1.x = static_cast<lv_value_precise_t>(p1.screen_x);
+                line_dsc.p1.y = static_cast<lv_value_precise_t>(p1.screen_y);
+                line_dsc.p2.x = static_cast<lv_value_precise_t>(p2.screen_x);
+                line_dsc.p2.y = static_cast<lv_value_precise_t>(p2.screen_y);
+
+                lv_draw_line(&layer, &line_dsc);
+            }
+        }
+    }
+
+    // Draw vertical grid lines (connect points in same column)
+    for (int col = 0; col < renderer->cols; col++) {
+        for (int row = 0; row < renderer->rows - 1; row++) {
+            const auto& p1 = projected_points[row][col];
+            const auto& p2 = projected_points[row + 1][col];
+
+            // Bounds check
+            if (p1.screen_x >= -10 && p1.screen_x < canvas_width + 10 && p1.screen_y >= -10 &&
+                p1.screen_y < canvas_height + 10 && p2.screen_x >= -10 &&
+                p2.screen_x < canvas_width + 10 && p2.screen_y >= -10 &&
+                p2.screen_y < canvas_height + 10) {
+                // Set line endpoints in descriptor
+                line_dsc.p1.x = static_cast<lv_value_precise_t>(p1.screen_x);
+                line_dsc.p1.y = static_cast<lv_value_precise_t>(p1.screen_y);
+                line_dsc.p2.x = static_cast<lv_value_precise_t>(p2.screen_x);
+                line_dsc.p2.y = static_cast<lv_value_precise_t>(p2.screen_y);
+
+                lv_draw_line(&layer, &line_dsc);
+            }
+        }
+    }
+
+    // Finish layer and apply to canvas
+    lv_canvas_finish_layer(canvas, &layer);
 }
 
 static void render_quad(lv_obj_t* canvas, const bed_mesh_quad_3d_t& quad, int canvas_width,

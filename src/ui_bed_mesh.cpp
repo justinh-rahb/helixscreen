@@ -97,6 +97,13 @@ static void bed_mesh_size_changed_cb(lv_event_t* e) {
 
     spdlog::debug("[bed_mesh] SIZE_CHANGED: {}x{}", new_width, new_height);
 
+    // Skip reallocation if dimensions are invalid (flex layout not ready)
+    if (new_width <= 0 || new_height <= 0) {
+        spdlog::debug("[bed_mesh] Skipping buffer reallocation: invalid dimensions {}x{}",
+                      new_width, new_height);
+        return;
+    }
+
     // Reallocate buffer to match new canvas size
     size_t new_buffer_size = LV_CANVAS_BUF_SIZE(new_width, new_height, 24, 1);
     void* new_buffer = realloc(data->buffer, new_buffer_size);
