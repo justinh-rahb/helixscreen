@@ -79,7 +79,7 @@ Use these checklists before starting common tasks to avoid frequent mistakes.
 - [ ] **Check ROADMAP.md:** Is this feature already planned?
 - [ ] **Check HANDOFF.md:** Any blockers or related active work?
 - [ ] **Study existing patterns:** Find similar feature, review implementation
-- [ ] **Use appropriate agent:** Widget-maker (UI), moonraker-api-agent (backend), etc.
+- [ ] **Use appropriate agent/skill:** Widget-maker (UI), moonraker skill (backend), etc.
 - [ ] **Reference architecture:** Read ARCHITECTURE.md for system design
 
 **Reference:** ARCHITECTURE.md, ROADMAP.md, HANDOFF.md

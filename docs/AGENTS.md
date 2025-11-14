@@ -58,21 +58,24 @@ This directory contains specialized AI agents for the HelixScreen project. Each 
 
 ---
 
-### 4. 🌐 [Moonraker API Agent](./moonraker-api-agent.md)
-**Expertise:** WebSocket communication, Klipper API, real-time updates, printer state management
+### 4. 🌐 Moonraker Skill (use `/moonraker`)
+**Expertise:** WebSocket communication, JSON-RPC protocols, real-time updates, safety validation, connection lifecycle, testing infrastructure
 
-**Use this agent for:**
-- Implementing new Klipper/Moonraker API calls
-- Handling WebSocket notifications and callbacks
-- Managing printer state synchronization
-- Debugging communication issues
-- Adding new printer control features
+**Use this skill for:**
+- Implementing Klipper/Moonraker WebSocket features
+- Handling JSON-RPC requests and notifications
+- Managing connection lifecycle and retry logic
+- Configuring safety limits and validation
+- Testing with MoonrakerClientMock and LVGL mocks
+- Understanding error handling patterns
 
 **Example prompts:**
-- "How do I subscribe to temperature updates?"
-- "Implement a panel that controls LED lights via Moonraker"
-- "Debug why my WebSocket callbacks aren't being triggered"
-- "Add support for the new Klipper exclude_object API"
+- "How do I implement temperature control with safety validation?"
+- "Show me the connection state machine and retry logic"
+- "How do I test WebSocket code without a real printer?"
+- "What's the pattern for optimistic UI updates?"
+
+**Note:** This is a Claude Code *skill* (not agent), invoke with `/moonraker` command.
 
 ---
 
@@ -174,7 +177,7 @@ For complex tasks, multiple agents can work together:
 3. 🔎 **Critical Reviewer** - Pre-commit code review
 
 **For backend/API work:**
-1. 🌐 **Moonraker API** - WebSocket and Klipper integration
+1. 🌐 **Moonraker Skill** - WebSocket and Klipper integration (use `/moonraker`)
 2. 🖼️ **G-code Preview** - File handling and thumbnails
 3. 🧪 **Test Harness** - Comprehensive testing
 
@@ -230,12 +233,12 @@ Agents are versioned with the project. When updating:
 
 ## Quick Reference
 
-| Task | Agent |
+| Task | Agent/Skill |
 |------|-------|
 | Create/modify XML UI | 🎨 Widget Maker |
 | Review UI screenshots | 🔍 UI Reviewer |
 | Security/quality review | 🔎 Critical Reviewer |
-| Moonraker API integration | 🌐 Moonraker API |
+| Moonraker API integration | 🌐 Moonraker Skill (`/moonraker`) |
 | G-code file handling | 🖼️ G-code Preview |
 | Build system issues | 🔨 Cross-Platform Build |
 | Testing & CI/CD | 🧪 Test Harness |

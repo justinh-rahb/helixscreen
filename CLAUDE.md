@@ -22,15 +22,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Task → Agent Mapping (USE THESE)
 
-| Task Type | Agent | When |
+| Task Type | Agent/Skill | When |
 |-----------|-------|------|
-| **UI/XML** | `widget-maker` | ANY XML/LVGL work - NO EXCEPTIONS |
-| **Moonraker** | `moonraker-api-agent` | WebSocket, API, mocking, connection handling |
+| **UI/XML** | `widget-maker` agent | ANY XML/LVGL work - NO EXCEPTIONS |
+| **Moonraker** | `moonraker` skill | WebSocket, API, mocking, connection handling, safety validation |
 | **Testing** | `test-harness-agent` | Unit tests, mocking, CI/CD |
 | **Build issues** | `cross-platform-build-agent` | Dependencies, Makefile, compilation |
-| **Codebase exploration** | `Explore` (quick/medium/thorough) | "How does X work?", "Where is Y?" |
-| **Multi-file refactor** | `general-purpose` | Changes across 3+ files |
-| **Security review** | `critical-reviewer` | Paranoid code review |
+| **Codebase exploration** | `Explore` agent (quick/medium/thorough) | "How does X work?", "Where is Y?" |
+| **Multi-file refactor** | `general-purpose` agent | Changes across 3+ files |
+| **Security review** | `critical-reviewer` agent | Paranoid code review |
 
 **See ~/.claude/CLAUDE.md for threshold rules. When in doubt, delegate.**
 
