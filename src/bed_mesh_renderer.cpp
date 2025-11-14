@@ -239,6 +239,8 @@ bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_obj_t* canvas) {
     int canvas_width = lv_obj_get_width(canvas);
     int canvas_height = lv_obj_get_height(canvas);
 
+    spdlog::debug("Canvas dimensions: {}x{}", canvas_width, canvas_height);
+
     if (canvas_width <= 0 || canvas_height <= 0) {
         spdlog::error("Invalid canvas dimensions: {}x{}", canvas_width, canvas_height);
         return false;
@@ -453,6 +455,10 @@ static bed_mesh_rgb_t lerp_color(bed_mesh_rgb_t a, bed_mesh_rgb_t b, double t) {
 
 static void fill_triangle_solid(lv_obj_t* canvas, int x1, int y1, int x2, int y2, int x3, int y3,
                                 lv_color_t color) {
+    // Get canvas dimensions for bounds checking
+    int canvas_width = lv_obj_get_width(canvas);
+    int canvas_height = lv_obj_get_height(canvas);
+
     // Sort vertices by Y coordinate (bubble sort for 3 elements)
     if (y1 > y2) {
         std::swap(y1, y2);
@@ -471,6 +477,12 @@ static void fill_triangle_solid(lv_obj_t* canvas, int x1, int y1, int x2, int y2
     if (y1 == y3)
         return;
 
+    // Skip triangles completely outside canvas bounds
+    if (y3 < 0 || y1 >= canvas_height)
+        return;
+    if (std::max({x1, x2, x3}) < 0 || std::min({x1, x2, x3}) >= canvas_width)
+        return;
+
     // Prepare draw descriptor
     lv_draw_rect_dsc_t dsc;
     lv_draw_rect_dsc_init(&dsc);
@@ -478,8 +490,11 @@ static void fill_triangle_solid(lv_obj_t* canvas, int x1, int y1, int x2, int y2
     dsc.bg_opa = LV_OPA_90;
     dsc.border_width = 0;
 
-    // Scanline fill
-    for (int y = y1; y <= y3; y++) {
+    // Scanline fill with bounds clipping
+    int y_start = std::max(y1, 0);
+    int y_end = std::min(y3, canvas_height - 1);
+
+    for (int y = y_start; y <= y_end; y++) {
         // Compute left/right edges
         double t_long = (y - y1) / static_cast<double>(y3 - y1);
         int x_long = x1 + static_cast<int>(t_long * (x3 - x1));
@@ -503,19 +518,25 @@ static void fill_triangle_solid(lv_obj_t* canvas, int x1, int y1, int x2, int y2
             }
         }
 
-        // Ensure x_left <= x_right
-        int x_left = std::min(x_long, x_short);
-        int x_right = std::max(x_long, x_short);
+        // Ensure x_left <= x_right and clip to canvas bounds
+        int x_left = std::max(std::min(x_long, x_short), 0);
+        int x_right = std::min(std::max(x_long, x_short), canvas_width - 1);
 
-        // Draw horizontal line pixel by pixel
-        for (int px = x_left; px <= x_right; px++) {
-            lv_canvas_set_px(canvas, px, y, color, LV_OPA_90);
+        // Draw horizontal line pixel by pixel (only if valid range)
+        if (x_left <= x_right) {
+            for (int px = x_left; px <= x_right; px++) {
+                lv_canvas_set_px(canvas, px, y, color, LV_OPA_90);
+            }
         }
     }
 }
 
 static void fill_triangle_gradient(lv_obj_t* canvas, int x1, int y1, lv_color_t c1, int x2, int y2,
                                    lv_color_t c2, int x3, int y3, lv_color_t c3) {
+    // Get canvas dimensions for bounds checking
+    int canvas_width = lv_obj_get_width(canvas);
+    int canvas_height = lv_obj_get_height(canvas);
+
     // Sort vertices by Y coordinate, keeping colors aligned
     struct Vertex {
         int x, y;
@@ -536,14 +557,24 @@ static void fill_triangle_gradient(lv_obj_t* canvas, int x1, int y1, lv_color_t 
     if (v[0].y == v[2].y)
         return;
 
+    // Skip triangles completely outside canvas bounds
+    if (v[2].y < 0 || v[0].y >= canvas_height)
+        return;
+    if (std::max({v[0].x, v[1].x, v[2].x}) < 0 ||
+        std::min({v[0].x, v[1].x, v[2].x}) >= canvas_width)
+        return;
+
     // Prepare draw descriptor
     lv_draw_rect_dsc_t dsc;
     lv_draw_rect_dsc_init(&dsc);
     dsc.bg_opa = LV_OPA_90;
     dsc.border_width = 0;
 
-    // Scanline fill with color interpolation
-    for (int y = v[0].y; y <= v[2].y; y++) {
+    // Scanline fill with color interpolation and bounds clipping
+    int y_start = std::max(v[0].y, 0);
+    int y_end = std::min(v[2].y, canvas_height - 1);
+
+    for (int y = y_start; y <= y_end; y++) {
         // Interpolate along long edge (v0 -> v2)
         double t_long = (y - v[0].y) / static_cast<double>(v[2].y - v[0].y);
         int x_long = v[0].x + static_cast<int>(t_long * (v[2].x - v[0].x));
@@ -574,9 +605,9 @@ static void fill_triangle_gradient(lv_obj_t* canvas, int x1, int y1, lv_color_t 
             }
         }
 
-        // Ensure left/right ordering
-        int x_left = std::min(x_long, x_short);
-        int x_right = std::max(x_long, x_short);
+        // Ensure left/right ordering and clip to canvas bounds
+        int x_left = std::max(std::min(x_long, x_short), 0);
+        int x_right = std::min(std::max(x_long, x_short), canvas_width - 1);
         bed_mesh_rgb_t c_left = (x_long < x_short) ? c_long : c_short;
         bed_mesh_rgb_t c_right = (x_long < x_short) ? c_short : c_long;
 
