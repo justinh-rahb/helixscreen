@@ -58,10 +58,10 @@ static const unsigned char bayer_matrix_8x8[8][8] = {
 /* Dithering strength - adjust based on output bit depth */
 #if TGL_FEATURE_RENDER_BITS == 32
     /* 8-bit per channel output */
-    #define DITHER_AMPLITUDE 4  /* Adds ±2 levels of noise */
+    #define DITHER_AMPLITUDE 16  /* Adds ±8 levels of noise for visibility */
 #elif TGL_FEATURE_RENDER_BITS == 16
     /* 5/6/5 bit output needs stronger dithering */
-    #define DITHER_AMPLITUDE 8  /* Adds ±4 levels of noise */
+    #define DITHER_AMPLITUDE 32  /* Adds ±16 levels of noise */
 #endif
 
 /* Apply ordered dithering to a color component */

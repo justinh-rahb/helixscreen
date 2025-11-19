@@ -415,23 +415,30 @@ test-tinygl-reference: $(TINYGL_TEST_FRAMEWORK_BIN)
 	$(Q)$(TINYGL_TEST_FRAMEWORK_BIN) reference
 	$(ECHO) "$(GREEN)✓ Reference images generated$(RESET)"
 
-# Build TinyGL test framework
+# Build TinyGL test framework (only if TinyGL is enabled)
+ifeq ($(ENABLE_TINYGL_3D),yes)
 $(TINYGL_TEST_FRAMEWORK_BIN): $(TINYGL_TEST_FRAMEWORK_OBJS) $(TINYGL_LIB)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(ECHO) "$(MAGENTA)[LD]$(RESET) tinygl_test_runner"
-	$(Q)$(CXX) $(CXXFLAGS) $(TINYGL_TEST_FRAMEWORK_OBJS) -o $@ $(TINYGL_LIB) $(LDFLAGS) -lm
+	$(Q)$(CXX) $(CXXFLAGS) $(TINYGL_TEST_FRAMEWORK_OBJS) -o $@ $(TINYGL_LIB) $(FMT_LIBS) -lm
 	$(ECHO) "$(GREEN)✓ TinyGL test framework ready$(RESET)"
 
 # Compile test framework
 $(OBJ_DIR)/tinygl_test_framework.o: $(TINYGL_TEST_DIR)/tinygl_test_framework.cpp $(TINYGL_TEST_DIR)/tinygl_test_framework.h
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(BLUE)[TEST]$(RESET) tinygl_test_framework.cpp"
-	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) $(TINYGL_INC) -I$(TINYGL_TEST_DIR) -c $< -o $@
+	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) $(TINYGL_INC) -I$(TINYGL_TEST_DIR) -std=c++17 -c $< -o $@
 
 $(OBJ_DIR)/tinygl_test_runner.o: $(TINYGL_TEST_DIR)/test_runner.cpp $(TINYGL_TEST_DIR)/tinygl_test_framework.h
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(BLUE)[TEST]$(RESET) test_runner.cpp"
-	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) $(TINYGL_INC) -I$(TINYGL_TEST_DIR) -c $< -o $@
+	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) $(TINYGL_INC) -I$(TINYGL_TEST_DIR) -std=c++17 -c $< -o $@
+else
+# Stub targets when TinyGL is disabled
+test-tinygl-framework test-tinygl-quality test-tinygl-performance test-tinygl-reference:
+	$(ECHO) "$(YELLOW)⚠ TinyGL tests skipped (ENABLE_TINYGL_3D=no)$(RESET)"
+	$(ECHO) "  Rebuild with: make ENABLE_TINYGL_3D=yes $@"
+endif
 
 # Clean TinyGL test artifacts
 clean-tinygl-tests:

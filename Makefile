@@ -330,6 +330,9 @@ help:
 	echo "  $${G}test-integration$${X} - Run integration tests (with mocks)"; \
 	echo "  $${G}test-cards$${X}       - Test dynamic card instantiation"; \
 	echo "  $${G}test-print-select$${X} - Test print select panel"; \
+	echo "  $${G}test-tinygl-framework$${X} - Run TinyGL rendering tests"; \
+	echo "  $${G}test-tinygl-quality$${X} - Test TinyGL visual quality"; \
+	echo "  $${G}test-tinygl-performance$${X} - Benchmark TinyGL performance"; \
 	echo ""; \
 	echo "$${C}Run Targets:$${X}"; \
 	echo "  $${G}run$${X}              - Build and run the UI prototype"; \

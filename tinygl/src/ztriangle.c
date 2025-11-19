@@ -42,8 +42,8 @@ static GLfloat edgeFunction(GLfloat ax, GLfloat ay, GLfloat bx, GLfloat by, GLfl
 #define NODRAWTEST(c) /* a comment */
 #endif
 
-#define ZCMP(z, zpix, _a, c) (((!zbdt) || (z >= zpix)) STIPTEST(_a) NODRAWTEST(c))
-#define ZCMPSIMP(z, zpix, _a, crabapple) (((!zbdt) || (z >= zpix)) STIPTEST(_a))
+#define ZCMP(z, zpix, _a, c) (((!zbdt) || (z <= zpix)) STIPTEST(_a) NODRAWTEST(c))
+#define ZCMPSIMP(z, zpix, _a, crabapple) (((!zbdt) || (z <= zpix)) STIPTEST(_a))
 
 void ZB_fillTriangleFlat(ZBuffer* zb, ZBufferPoint* p0, ZBufferPoint* p1, ZBufferPoint* p2) {
 	GLubyte zbdt = zb->depth_test;
@@ -61,14 +61,18 @@ void ZB_fillTriangleFlat(ZBuffer* zb, ZBufferPoint* p0, ZBufferPoint* p1, ZBuffe
 
 
 #define DRAW_INIT()                                                                                                                                            \
-	{ color = RGB_TO_PIXEL(p2->r, p2->g, p2->b); }
+	{ /* Color will be computed per-pixel with dithering */ }
 
 #define PUT_PIXEL(_a)                                                                                                                                          \
 	{                                                                                                                                                          \
 		{                                                                                                                                                      \
 			register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;                                                                                                    \
-			if (ZCMPSIMP(zz, pz[_a], _a, color)) {                                                                                                             \
-				TGL_BLEND_FUNC(color, (pp[_a])) /*pp[_a] = color;*/                                                                                            \
+			/* Calculate pixel position for dithering */                                                                                                       \
+			GLint px = ((GLint)(pp - (PIXEL*)pp1) + _a) % zb->xsize;                                                                                           \
+			GLint py = ((GLint)(pp1 - (PIXEL*)zb->pbuf)) / zb->xsize;                                                                                          \
+			PIXEL dithered_color = RGB_TO_PIXEL_COND(p2->r, p2->g, p2->b, px, py);                                                                         \
+			if (ZCMPSIMP(zz, pz[_a], _a, dithered_color)) {                                                                                                    \
+				TGL_BLEND_FUNC(dithered_color, (pp[_a])) /*pp[_a] = dithered_color;*/                                                                          \
 				if (zbdw)                                                                                                                                      \
 					pz[_a] = zz;                                                                                                                               \
 			}                                                                                                                                                  \
@@ -80,7 +84,10 @@ void ZB_fillTriangleFlat(ZBuffer* zb, ZBufferPoint* p0, ZBufferPoint* p1, ZBuffe
 }
 
 void ZB_fillTriangleFlatNOBLEND(ZBuffer* zb, ZBufferPoint* p0, ZBufferPoint* p1, ZBufferPoint* p2) {
-	PIXEL color = RGB_TO_PIXEL(p2->r, p2->g, p2->b);
+	/* Color components for dithering */
+	GLint r = p2->r;
+	GLint g = p2->g;
+	GLint b = p2->b;
 	GLubyte zbdw = zb->depth_write;
 	GLubyte zbdt = zb->depth_test;
 	TGL_STIPPLEVARS
@@ -98,7 +105,10 @@ void ZB_fillTriangleFlatNOBLEND(ZBuffer* zb, ZBufferPoint* p0, ZBufferPoint* p1,
 		{                                                                                                                                                      \
 			register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;                                                                                                    \
 			if (ZCMPSIMP(zz, pz[_a], _a, 0)) {                                                                                                                 \
-				pp[_a] = color;                                                                                                                                \
+				/* Calculate pixel position for dithering */                                                                                                   \
+				GLint px = ((GLint)(pp - (PIXEL*)pp1) + _a) % zb->xsize;                                                                                       \
+				GLint py = ((GLint)(pp1 - (PIXEL*)zb->pbuf)) / zb->xsize;                                                                                      \
+				pp[_a] = RGB_TO_PIXEL_COND(r, g, b, px, py);                                                                                               \
 				if (zbdw)                                                                                                                                      \
 					pz[_a] = zz;                                                                                                                               \
 			}                                                                                                                                                  \
@@ -195,7 +205,10 @@ void ZB_fillTriangleSmoothNOBLEND(ZBuffer* zb, ZBufferPoint* p0, ZBufferPoint* p
 		{                                                                                                                                                      \
 			register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;                                                                                                    \
 			if (ZCMPSIMP(zz, pz[_a], _a, 0)) {                                                                                                                 \
-				pp[_a] = RGB_TO_PIXEL_DITHERED(or1, og1, ob1, dither_x + _a, dither_y);                                                                        \
+				/* Calculate pixel position for dithering */                                                                                                   \
+				GLint px = ((GLint)(pp - (PIXEL*)pp1) + _a) % zb->xsize;                                                                                       \
+				GLint py = ((GLint)(pp1 - (PIXEL*)zb->pbuf)) / zb->xsize;                                                                                      \
+				pp[_a] = RGB_TO_PIXEL_COND(or1, og1, ob1, px, py);                                                                                         \
 				if (zbdw)                                                                                                                                      \
 					pz[_a] = zz;                                                                                                                               \
 			}                                                                                                                                                  \
@@ -212,7 +225,10 @@ void ZB_fillTriangleSmoothNOBLEND(ZBuffer* zb, ZBufferPoint* p0, ZBufferPoint* p
 			register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;                                                                                                    \
 			/*c = RGB_TO_PIXEL(or1, og1, ob1);*/                                                                                                               \
 			if (ZCMPSIMP(zz, pz[_a], _a, 0)) {                                                                                                                 \
-				pp[_a] = RGB_TO_PIXEL_DITHERED(or1, og1, ob1, dither_x + _a, dither_y);                                                                        \
+				/* Calculate pixel position for dithering */                                                                                                   \
+				GLint px = ((GLint)(pp - (PIXEL*)pp1) + _a) % zb->xsize;                                                                                       \
+				GLint py = ((GLint)(pp1 - (PIXEL*)zb->pbuf)) / zb->xsize;                                                                                      \
+				pp[_a] = RGB_TO_PIXEL_COND(or1, og1, ob1, px, py);                                                                                         \
 				if (zbdw)                                                                                                                                      \
 					pz[_a] = zz;                                                                                                                               \
 			}                                                                                                                                                  \
@@ -234,7 +250,10 @@ void ZB_fillTriangleSmoothNOBLEND(ZBuffer* zb, ZBufferPoint* p0, ZBufferPoint* p
 		{                                                                                                                                                      \
 			register GLuint zz = z >> ZB_POINT_Z_FRAC_BITS;                                                                                                    \
 			if (ZCMPSIMP(zz, pz[_a], _a, 0)) {                                                                                                                 \
-				pp[_a] = RGB_TO_PIXEL_DITHERED(or1, og1, ob1, dither_x + _a, dither_y);                                                                        \
+				/* Calculate pixel position for dithering */                                                                                                   \
+				GLint px = ((GLint)(pp - (PIXEL*)pp1) + _a) % zb->xsize;                                                                                       \
+				GLint py = ((GLint)(pp1 - (PIXEL*)zb->pbuf)) / zb->xsize;                                                                                      \
+				pp[_a] = RGB_TO_PIXEL_COND(or1, og1, ob1, px, py);                                                                        \
                                                                                                                                                                \
 				if (zbdw)                                                                                                                                      \
 					pz[_a] = zz;                                                                                                                               \

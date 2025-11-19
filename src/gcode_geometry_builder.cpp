@@ -251,6 +251,21 @@ RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
         prev_end_pos = segment.end;
     }
 
+    // Add END cap for the final segment (closes the last tube end)
+    if (prev_end_cap.has_value()) {
+        const auto& end_cap = prev_end_cap.value();
+        // End cap faces forward (blocks view into tube from ahead)
+        // Triangle strip: BL, TL, BR, TR creates two triangles forming a square
+        geometry.strips.push_back({end_cap[0], end_cap[5], end_cap[2], end_cap[4]});
+
+        // Update triangle count
+        if (!simplified.empty() && simplified.back().is_extrusion) {
+            geometry.extrusion_triangle_count += 2;
+        } else {
+            geometry.travel_triangle_count += 2;
+        }
+    }
+
     spdlog::debug("Segment Y range: [{:.1f}, {:.1f}]", seg_y_min, seg_y_max);
 
     // Store quantization parameters for dequantization during rendering
@@ -569,11 +584,22 @@ GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, Ribbon
     // Left face strip: [start_TL, end_TL, start_BL, end_BL]
     geometry.strips.push_back({start_cap[6], end_cap[6], start_cap[7], end_cap[7]});
 
-    // Update counters (8 triangles per segment)
+    // Track triangle count
+    int triangle_count = 8; // 4 side faces × 2 triangles each
+
+    // Add START cap if this segment doesn't connect to previous (new vertices were created)
+    if (!prev_start_cap.has_value()) {
+        // Start cap faces backward (blocks view into tube from behind)
+        // Triangle strip: BL, BR, TL, TR creates two triangles forming a square
+        geometry.strips.push_back({start_cap[7], start_cap[1], start_cap[5], start_cap[3]});
+        triangle_count += 2;
+    }
+
+    // Update counters
     if (segment.is_extrusion) {
-        geometry.extrusion_triangle_count += 8;
+        geometry.extrusion_triangle_count += triangle_count;
     } else {
-        geometry.travel_triangle_count += 8;
+        geometry.travel_triangle_count += triangle_count;
     }
 
     // Return end cap for next segment to reuse
