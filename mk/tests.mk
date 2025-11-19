@@ -415,6 +415,14 @@ test-tinygl-reference: $(TINYGL_TEST_FRAMEWORK_BIN)
 	$(Q)$(TINYGL_TEST_FRAMEWORK_BIN) reference
 	$(ECHO) "$(GREEN)✓ Reference images generated$(RESET)"
 
+test-tinygl-verify: $(TINYGL_TEST_FRAMEWORK_BIN)
+	$(ECHO) "$(CYAN)$(BOLD)Verifying TinyGL rendering against references...$(RESET)"
+	$(Q)$(TINYGL_TEST_FRAMEWORK_BIN) --verify || { \
+		echo "$(RED)$(BOLD)✗ Verification failed!$(RESET)"; \
+		exit 1; \
+	}
+	$(ECHO) "$(GREEN)$(BOLD)✓ All verification tests passed!$(RESET)"
+
 # Build TinyGL test framework
 $(TINYGL_TEST_FRAMEWORK_BIN): $(TINYGL_TEST_FRAMEWORK_OBJS) $(TINYGL_LIB)
 	$(Q)mkdir -p $(BIN_DIR)
