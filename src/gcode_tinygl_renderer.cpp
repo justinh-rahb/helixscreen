@@ -53,8 +53,6 @@ void GCodeTinyGLRenderer::set_viewport_size(int width, int height) {
 
     // Reinitialize TinyGL with new size
     shutdown_tinygl();
-
-    spdlog::debug("TinyGL viewport resized to {}x{}", width, height);
 }
 
 void GCodeTinyGLRenderer::set_filament_color(const std::string& hex_color) {
@@ -104,6 +102,7 @@ size_t GCodeTinyGLRenderer::get_triangle_count() const {
 
 void GCodeTinyGLRenderer::init_tinygl() {
     if (zbuffer_) {
+        spdlog::warn("TinyGL init_tinygl() called but zbuffer_ already exists!");
         return; // Already initialized
     }
 
@@ -119,13 +118,14 @@ void GCodeTinyGLRenderer::init_tinygl() {
     // Get framebuffer pointer from ZBuffer
     framebuffer_ = (unsigned int*)zb->pbuf;
 
-    // Verify the actual ZBuffer dimensions
-    spdlog::warn("TinyGL ZBuffer actual size: {}x{} (requested: {}x{})",
-                 zb->xsize, zb->ysize, viewport_width_, viewport_height_);
+    // Use the ACTUAL ZBuffer dimensions (TinyGL may round for alignment)
+    // This is CRITICAL - using wrong dimensions causes massive rendering distortion!
+    viewport_width_ = zb->xsize;
+    viewport_height_ = zb->ysize;
 
     glInit(zb);
 
-    // Set up OpenGL state
+    // Set up OpenGL state with ACTUAL dimensions
     glViewport(0, 0, viewport_width_, viewport_height_);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -138,16 +138,10 @@ void GCodeTinyGLRenderer::init_tinygl() {
     glCullFace(GL_BACK);
 
     setup_lighting();
-
-    spdlog::info("TinyGL INIT: framebuffer={}x{}, aspect={:.3f}",
-                 viewport_width_, viewport_height_,
-                 (float)viewport_width_ / (float)viewport_height_);
 }
 
 void GCodeTinyGLRenderer::shutdown_tinygl() {
     if (zbuffer_) {
-        spdlog::info("TinyGL SHUTDOWN: releasing {}x{} framebuffer",
-                     viewport_width_, viewport_height_);
         glClose();
         ZB_close(static_cast<ZBuffer*>(zbuffer_));
         zbuffer_ = nullptr;
@@ -181,6 +175,73 @@ void GCodeTinyGLRenderer::setup_lighting() {
     glLightfv(GL_LIGHT1, GL_AMBIENT, fill_ambient);
     glLightfv(GL_LIGHT1, GL_DIFFUSE, fill_diffuse);
     glLightfv(GL_LIGHT1, GL_SPECULAR, fill_specular);
+}
+
+void GCodeTinyGLRenderer::render_bounding_box(const ParsedGCodeFile& gcode) {
+    // Only render if we have a highlighted object
+    if (highlighted_object_.empty()) {
+        return;
+    }
+
+    // Find the highlighted object in the G-code data
+    auto it = gcode.objects.find(highlighted_object_);
+    if (it == gcode.objects.end()) {
+        return; // Object not found
+    }
+
+    const GCodeObject& obj = it->second;
+    const AABB& bbox = obj.bounding_box;
+
+    // Disable lighting for wireframe (flat bright white)
+    glDisable(GL_LIGHTING);
+    glColor3f(1.0f, 1.0f, 1.0f); // Pure white
+
+    // Draw 12 edges of the axis-aligned bounding box
+    glBegin(GL_LINES);
+
+    // Bottom rectangle (Z = min)
+    glVertex3f(bbox.min.x, bbox.min.y, bbox.min.z);
+    glVertex3f(bbox.max.x, bbox.min.y, bbox.min.z);
+
+    glVertex3f(bbox.max.x, bbox.min.y, bbox.min.z);
+    glVertex3f(bbox.max.x, bbox.max.y, bbox.min.z);
+
+    glVertex3f(bbox.max.x, bbox.max.y, bbox.min.z);
+    glVertex3f(bbox.min.x, bbox.max.y, bbox.min.z);
+
+    glVertex3f(bbox.min.x, bbox.max.y, bbox.min.z);
+    glVertex3f(bbox.min.x, bbox.min.y, bbox.min.z);
+
+    // Top rectangle (Z = max)
+    glVertex3f(bbox.min.x, bbox.min.y, bbox.max.z);
+    glVertex3f(bbox.max.x, bbox.min.y, bbox.max.z);
+
+    glVertex3f(bbox.max.x, bbox.min.y, bbox.max.z);
+    glVertex3f(bbox.max.x, bbox.max.y, bbox.max.z);
+
+    glVertex3f(bbox.max.x, bbox.max.y, bbox.max.z);
+    glVertex3f(bbox.min.x, bbox.max.y, bbox.max.z);
+
+    glVertex3f(bbox.min.x, bbox.max.y, bbox.max.z);
+    glVertex3f(bbox.min.x, bbox.min.y, bbox.max.z);
+
+    // Vertical edges (connecting bottom to top)
+    glVertex3f(bbox.min.x, bbox.min.y, bbox.min.z);
+    glVertex3f(bbox.min.x, bbox.min.y, bbox.max.z);
+
+    glVertex3f(bbox.max.x, bbox.min.y, bbox.min.z);
+    glVertex3f(bbox.max.x, bbox.min.y, bbox.max.z);
+
+    glVertex3f(bbox.max.x, bbox.max.y, bbox.min.z);
+    glVertex3f(bbox.max.x, bbox.max.y, bbox.max.z);
+
+    glVertex3f(bbox.min.x, bbox.max.y, bbox.min.z);
+    glVertex3f(bbox.min.x, bbox.max.y, bbox.max.z);
+
+    glEnd();
+
+    // Re-enable lighting for subsequent geometry
+    glEnable(GL_LIGHTING);
 }
 
 void GCodeTinyGLRenderer::build_geometry(const ParsedGCodeFile& gcode) {
@@ -233,6 +294,12 @@ void GCodeTinyGLRenderer::build_geometry(const ParsedGCodeFile& gcode) {
             layer.segments = std::move(filtered_segments);
         }
         spdlog::debug("Move filtering: travels={}, extrusions={}", show_travels_, show_extrusions_);
+    }
+
+    // Configure highlighted object (segments will be brightened)
+    geometry_builder_->set_highlighted_object(highlighted_object_);
+    if (!highlighted_object_.empty()) {
+        spdlog::debug("Highlighting object: '{}'", highlighted_object_);
     }
 
     // Build optimized ribbon geometry
@@ -312,9 +379,6 @@ void GCodeTinyGLRenderer::draw_to_lvgl(lv_layer_t* layer) {
             spdlog::error("Failed to create LVGL draw buffer");
             return;
         }
-        spdlog::info("TinyGL DRAW: created draw_buf {}x{}, aspect={:.3f}",
-                     viewport_width_, viewport_height_,
-                     (float)viewport_width_ / (float)viewport_height_);
     }
 
     // Copy TinyGL framebuffer to LVGL draw buffer
@@ -331,6 +395,7 @@ void GCodeTinyGLRenderer::draw_to_lvgl(lv_layer_t* layer) {
     }
 
     // Draw image to layer
+    // Note: Use exact framebuffer dimensions to avoid scaling artifacts
     lv_draw_image_dsc_t img_dsc;
     lv_draw_image_dsc_init(&img_dsc);
     img_dsc.src = draw_buf_;
@@ -338,8 +403,8 @@ void GCodeTinyGLRenderer::draw_to_lvgl(lv_layer_t* layer) {
     lv_area_t area;
     area.x1 = 0;
     area.y1 = 0;
-    area.x2 = viewport_width_ - 1;
-    area.y2 = viewport_height_ - 1;
+    area.x2 = viewport_width_ - 1;  // Actual framebuffer width
+    area.y2 = viewport_height_ - 1; // Actual framebuffer height
 
     lv_draw_image(layer, &img_dsc, &area);
 }
@@ -359,6 +424,9 @@ void GCodeTinyGLRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode
 
     // Render 3D geometry
     render_geometry(camera);
+
+    // Render bounding box wireframe for highlighted object
+    render_bounding_box(gcode);
 
     // Draw to LVGL
     draw_to_lvgl(layer);
@@ -410,6 +478,95 @@ void GCodeTinyGLRenderer::reset_colors() {
 void GCodeTinyGLRenderer::set_global_opacity(lv_opa_t opacity) {
     global_opacity_ = opacity;
     // Opacity affects final rendering - could be applied during draw_to_lvgl
+}
+
+std::optional<std::string> GCodeTinyGLRenderer::pick_object(const glm::vec2& screen_pos,
+                                                            const ParsedGCodeFile& gcode,
+                                                            const GCodeCamera& camera) const {
+    // Segment-based picking: find closest rendered segment to click point
+    // Reuses same algorithm as GCodeRenderer for consistency
+
+    glm::mat4 transform = camera.get_view_projection_matrix();
+    float closest_distance = std::numeric_limits<float>::max();
+    std::optional<std::string> picked_object;
+
+    const float PICK_THRESHOLD = 15.0f; // pixels - how close to segment to register click
+
+    // Determine visible layer range
+    int layer_start = layer_start_;
+    int layer_end = (layer_end_ < 0 || layer_end_ >= static_cast<int>(gcode.layers.size()))
+                        ? static_cast<int>(gcode.layers.size()) - 1
+                        : layer_end_;
+
+    for (int layer_idx = layer_start; layer_idx <= layer_end; ++layer_idx) {
+        if (layer_idx < 0 || layer_idx >= static_cast<int>(gcode.layers.size())) {
+            continue;
+        }
+
+        const Layer& layer = gcode.layers[layer_idx];
+
+        for (const auto& segment : layer.segments) {
+            // Only check extrusion segments (TinyGL doesn't render travels)
+            if (!segment.is_extrusion || !show_extrusions_) {
+                continue;
+            }
+
+            // Skip segments without object names
+            if (segment.object_name.empty()) {
+                continue;
+            }
+
+            // Project segment endpoints to screen space
+            // Use camera's projection helper (same as GCodeRenderer)
+            glm::vec4 start_clip = transform * glm::vec4(segment.start, 1.0f);
+            glm::vec4 end_clip = transform * glm::vec4(segment.end, 1.0f);
+
+            // Perspective divide
+            if (std::abs(start_clip.w) < 0.0001f || std::abs(end_clip.w) < 0.0001f) {
+                continue;
+            }
+
+            glm::vec3 start_ndc = glm::vec3(start_clip) / start_clip.w;
+            glm::vec3 end_ndc = glm::vec3(end_clip) / end_clip.w;
+
+            // Clip to NDC bounds [-1, 1]
+            if (start_ndc.x < -1.0f || start_ndc.x > 1.0f || start_ndc.y < -1.0f ||
+                start_ndc.y > 1.0f || end_ndc.x < -1.0f || end_ndc.x > 1.0f || end_ndc.y < -1.0f ||
+                end_ndc.y > 1.0f) {
+                continue; // Simplified: skip segments with any point outside view
+            }
+
+            // NDC to screen space
+            glm::vec2 start_screen((start_ndc.x + 1.0f) * 0.5f * viewport_width_,
+                                   (1.0f - start_ndc.y) * 0.5f * viewport_height_);
+            glm::vec2 end_screen((end_ndc.x + 1.0f) * 0.5f * viewport_width_,
+                                 (1.0f - end_ndc.y) * 0.5f * viewport_height_);
+
+            // Calculate distance from click point to line segment
+            glm::vec2 v = end_screen - start_screen;
+            glm::vec2 w = screen_pos - start_screen;
+
+            // Project click onto line segment (clamped to [0,1])
+            float segment_length_sq = glm::dot(v, v);
+            float t = (segment_length_sq > 0.0001f)
+                          ? std::clamp(glm::dot(w, v) / segment_length_sq, 0.0f, 1.0f)
+                          : 0.0f;
+
+            // Closest point on segment to click
+            glm::vec2 closest_point = start_screen + t * v;
+
+            // Distance from click to closest point on segment
+            float dist = glm::length(screen_pos - closest_point);
+
+            // Update if this is the closest segment within threshold
+            if (dist < PICK_THRESHOLD && dist < closest_distance) {
+                closest_distance = dist;
+                picked_object = segment.object_name;
+            }
+        }
+    }
+
+    return picked_object;
 }
 
 GCodeTinyGLRenderer::RenderingOptions GCodeTinyGLRenderer::get_options() const {

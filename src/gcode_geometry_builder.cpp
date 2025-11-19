@@ -391,6 +391,15 @@ GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, Ribbon
     float mid_z = (segment.start.z + segment.end.z) * 0.5f;
     uint32_t rgb = compute_color_rgb(mid_z, quant.min_bounds.z, quant.max_bounds.z);
 
+    // Brighten color if this segment belongs to highlighted object
+    if (!highlighted_object_.empty() && segment.object_name == highlighted_object_) {
+        constexpr float HIGHLIGHT_BRIGHTNESS = 1.8f;
+        uint8_t r = static_cast<uint8_t>(std::min(255.0f, ((rgb >> 16) & 0xFF) * HIGHLIGHT_BRIGHTNESS));
+        uint8_t g = static_cast<uint8_t>(std::min(255.0f, ((rgb >> 8) & 0xFF) * HIGHLIGHT_BRIGHTNESS));
+        uint8_t b = static_cast<uint8_t>(std::min(255.0f, (rgb & 0xFF) * HIGHLIGHT_BRIGHTNESS));
+        rgb = (r << 16) | (g << 8) | b;
+    }
+
     // End cross-section (always need to generate these)
     glm::vec3 end_bl = segment.end - perp_horizontal * half_width - perp_vertical * half_height;
     glm::vec3 end_br = segment.end + perp_horizontal * half_width - perp_vertical * half_height;

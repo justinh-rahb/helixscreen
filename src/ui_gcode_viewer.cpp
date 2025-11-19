@@ -28,6 +28,7 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <unordered_set>
 
 // Widget state (stored in LVGL object user_data)
 struct gcode_viewer_state_t {
@@ -47,6 +48,9 @@ struct gcode_viewer_state_t {
     bool is_dragging{false};
     lv_point_t drag_start{0, 0};
     lv_point_t last_drag_pos{0, 0};
+
+    // Selection state (future-proofed for multi-select)
+    std::unordered_set<std::string> selected_objects;
 
     // Rendering settings
     bool use_filament_color{true}; // Auto-apply filament color from metadata
@@ -91,24 +95,7 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
         return;
     }
 
-    // Update renderer viewport size
-    lv_area_t coords;
-    lv_obj_get_coords(obj, &coords);
-    int width = lv_area_get_width(&coords);
-    int height = lv_area_get_height(&coords);
-
-    static int draw_count = 0;
-    if (draw_count++ < 10) {  // Only log first 10 draws to avoid spam
-        spdlog::warn("GCodeViewer DRAW #{}: widget={}x{}, cam={}x{}, aspect={:.3f}",
-                     draw_count, width, height,
-                     st->camera->get_viewport_width(), st->camera->get_viewport_height(),
-                     (float)width / (float)height);
-    }
-
-    st->renderer->set_viewport_size(width, height);
-    st->camera->set_viewport_size(width, height);
-
-    // Render G-code
+    // Render G-code (viewport size is already set by SIZE_CHANGED event)
     st->renderer->render(layer, *st->gcode_file, *st->camera);
 }
 
@@ -176,7 +163,7 @@ static void gcode_viewer_pressing_cb(lv_event_t* e) {
 }
 
 /**
- * @brief Touch release callback - end drag gesture
+ * @brief Touch release callback - handle click vs drag gesture
  */
 static void gcode_viewer_release_cb(lv_event_t* e) {
     lv_obj_t* obj = lv_event_get_target_obj(e);
@@ -185,9 +172,56 @@ static void gcode_viewer_release_cb(lv_event_t* e) {
     if (!st)
         return;
 
-    st->is_dragging = false;
+    // Get release position
+    lv_indev_t* indev = lv_indev_active();
+    if (!indev) {
+        st->is_dragging = false;
+        return;
+    }
 
-    spdlog::trace("GCodeViewer: Release");
+    lv_point_t point;
+    lv_indev_get_point(indev, &point);
+
+    // Calculate total drag distance from initial press
+    int dx = abs(point.x - st->drag_start.x);
+    int dy = abs(point.y - st->drag_start.y);
+
+    const int CLICK_THRESHOLD = 10; // pixels - distinguish click from drag
+
+    // If movement was minimal, treat as click and try to pick object
+    if (dx < CLICK_THRESHOLD && dy < CLICK_THRESHOLD && st->gcode_file) {
+        spdlog::debug("GCodeViewer: Click detected at ({}, {})", point.x, point.y);
+        const char* picked = ui_gcode_viewer_pick_object(obj, point.x, point.y);
+
+        if (picked && picked[0] != '\0') {
+            // Object clicked - toggle selection
+            std::string picked_name(picked);
+
+            if (st->selected_objects.count(picked_name) > 0) {
+                // Already selected - deselect
+                st->selected_objects.erase(picked_name);
+                spdlog::info("GCodeViewer: Deselected object '{}'", picked_name);
+
+                // Clear highlighting
+                ui_gcode_viewer_set_highlighted_object(obj, nullptr);
+            } else {
+                // Not selected - select it (single selection mode)
+                st->selected_objects.clear(); // Clear any previous selection
+                st->selected_objects.insert(picked_name);
+                spdlog::info("GCodeViewer: Selected object '{}'", picked_name);
+
+                // Highlight the selected object
+                ui_gcode_viewer_set_highlighted_object(obj, picked_name.c_str());
+            }
+        } else {
+            spdlog::debug("GCodeViewer: Click at ({}, {}) - no object found (G-code may lack EXCLUDE_OBJECT metadata)",
+                         point.x, point.y);
+        }
+        // Note: If no object picked, keep current selection (per user requirements)
+    }
+
+    st->is_dragging = false;
+    spdlog::trace("GCodeViewer: Release at ({}, {}), drag=({}, {})", point.x, point.y, dx, dy);
 }
 
 /**
@@ -213,7 +247,7 @@ static void gcode_viewer_size_changed_cb(lv_event_t* e) {
     // Trigger redraw with new aspect ratio
     lv_obj_invalidate(obj);
 
-    spdlog::warn("GCodeViewer SIZE_CHANGED: {}x{}, aspect={:.3f}",
+    spdlog::info("GCodeViewer SIZE_CHANGED: {}x{}, aspect={:.3f}",
                  width, height, (float)width / (float)height);
 }
 
@@ -277,7 +311,7 @@ lv_obj_t* ui_gcode_viewer_create(lv_obj_t* parent) {
     if (width > 0 && height > 0) {
         st->camera->set_viewport_size(width, height);
         st->renderer->set_viewport_size(width, height);
-        spdlog::warn("GCodeViewer INIT: viewport={}x{}, aspect={:.3f}",
+        spdlog::info("GCodeViewer INIT: viewport={}x{}, aspect={:.3f}",
                      width, height, (float)width / (float)height);
     } else {
         spdlog::error("GCodeViewer INIT: Invalid size {}x{}, using defaults", width, height);
@@ -306,16 +340,9 @@ void ui_gcode_viewer_load_file(lv_obj_t* obj, const char* file_path) {
 
         gcode::GCodeParser parser;
         std::string line;
-        size_t line_count = 0;
 
         while (std::getline(file, line)) {
             parser.parse_line(line);
-            line_count++;
-
-            // TODO: Update progress UI every N lines
-            if (line_count % 1000 == 0) {
-                spdlog::debug("GCodeViewer: Parsed {} lines...", line_count);
-            }
         }
 
         file.close();

@@ -125,12 +125,15 @@ class GCodeTinyGLRenderer {
     RenderingOptions get_options() const;
 
     /**
-     * @brief Pick object at screen position (not implemented)
+     * @brief Pick object at screen position
+     * @param screen_pos Screen coordinates (pixels)
+     * @param gcode Parsed G-code file
+     * @param camera Current camera
+     * @return Object name if picked, nullopt otherwise
      */
-    std::optional<std::string> pick_object(const glm::vec2&, const ParsedGCodeFile&,
-                                           const GCodeCamera&) const {
-        return std::nullopt;
-    }
+    std::optional<std::string> pick_object(const glm::vec2& screen_pos,
+                                           const ParsedGCodeFile& gcode,
+                                           const GCodeCamera& camera) const;
 
     /**
      * @brief Show/hide travel moves
@@ -228,6 +231,12 @@ class GCodeTinyGLRenderer {
      * @brief Setup lighting (two-point studio setup)
      */
     void setup_lighting();
+
+    /**
+     * @brief Render bounding box wireframe for highlighted object
+     * @param gcode Parsed G-code file (contains object bounds)
+     */
+    void render_bounding_box(const ParsedGCodeFile& gcode);
 
     // Configuration
     int viewport_width_{800};

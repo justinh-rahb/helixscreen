@@ -431,30 +431,66 @@ void GCodeRenderer::draw_line(lv_layer_t* layer, const glm::vec2& p1, const glm:
 std::optional<std::string> GCodeRenderer::pick_object(const glm::vec2& screen_pos,
                                                       const ParsedGCodeFile& gcode,
                                                       const GCodeCamera& camera) const {
-    // Get ray from screen position
-    glm::vec3 ray_dir = camera.screen_to_world_ray(screen_pos);
-    (void)ray_dir; // Reserved for future ray-polygon intersection
-
-    // For orthographic projection, ray origin is screen position projected onto Z=0 plane
-    // For simplicity, just test against object center points
+    // Segment-based picking: find closest rendered segment to click point
+    // This works even without EXCLUDE_OBJECT metadata by checking segment.object_name
 
     glm::mat4 transform = camera.get_view_projection_matrix();
     float closest_distance = std::numeric_limits<float>::max();
     std::optional<std::string> picked_object;
 
-    for (const auto& [name, obj] : gcode.objects) {
-        // Project object center to screen
-        glm::vec3 center_3d(obj.center.x, obj.center.y, 0.0f);
-        auto center_screen = project_to_screen(center_3d, transform);
+    const float PICK_THRESHOLD = 15.0f; // pixels - how close to segment to register click
 
-        if (center_screen) {
-            // Calculate distance from touch point to object center
-            float dist = glm::length(*center_screen - screen_pos);
+    // Iterate through visible layers
+    int layer_start = options_.layer_start;
+    int layer_end = (options_.layer_end < 0 || options_.layer_end >= static_cast<int>(gcode.layers.size()))
+                        ? static_cast<int>(gcode.layers.size()) - 1
+                        : options_.layer_end;
 
-            // Pick if within 30 pixel radius and closest
-            if (dist < 30.0f && dist < closest_distance) {
+    for (int layer_idx = layer_start; layer_idx <= layer_end; ++layer_idx) {
+        if (layer_idx < 0 || layer_idx >= static_cast<int>(gcode.layers.size())) {
+            continue;
+        }
+
+        const Layer& layer = gcode.layers[layer_idx];
+
+        for (const auto& segment : layer.segments) {
+            // Only check segments that would be rendered
+            if (!should_render_segment(segment)) {
+                continue;
+            }
+
+            // Skip segments without object names
+            if (segment.object_name.empty()) {
+                continue;
+            }
+
+            // Project segment endpoints to screen space
+            auto start_screen = project_to_screen(segment.start, transform);
+            auto end_screen = project_to_screen(segment.end, transform);
+
+            // Skip if either endpoint is off-screen
+            if (!start_screen || !end_screen) {
+                continue;
+            }
+
+            // Calculate distance from click point to line segment
+            glm::vec2 v = *end_screen - *start_screen;
+            glm::vec2 w = screen_pos - *start_screen;
+
+            // Project click onto line segment (clamped to [0,1])
+            float segment_length_sq = glm::dot(v, v);
+            float t = (segment_length_sq > 0.0001f) ? std::clamp(glm::dot(w, v) / segment_length_sq, 0.0f, 1.0f) : 0.0f;
+
+            // Closest point on segment to click
+            glm::vec2 closest_point = *start_screen + t * v;
+
+            // Distance from click to closest point on segment
+            float dist = glm::length(screen_pos - closest_point);
+
+            // Update if this is the closest segment within threshold
+            if (dist < PICK_THRESHOLD && dist < closest_distance) {
                 closest_distance = dist;
-                picked_object = name;
+                picked_object = segment.object_name;
             }
         }
     }
