@@ -932,7 +932,7 @@ void glHint(GLint target,GLint mode);
 void glGetIntegerv(GLint pname,GLint *params);
 void glGetFloatv(GLint pname, GLfloat *v);
 const GLubyte* glGetString(GLenum name);
-GLenum glGetError();
+GLenum glGetError(void);
 void glFrontFace(GLint mode);
 
 /* opengl 1.2 arrays */

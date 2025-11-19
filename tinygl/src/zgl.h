@@ -427,8 +427,8 @@ void glopTranslate(GLParam *p);*/
 void gl_enable_disable_light(GLint light, GLint v);
 void gl_shade_vertex(GLVertex* v);
 
-void glInitTextures();
-void glEndTextures();
+void glInitTextures(void);
+void glEndTextures(void);
 GLTexture* alloc_texture(GLint h);
 
 /* image_util.c */
@@ -454,7 +454,7 @@ GLSpecBuf* specbuf_get_buffer(const GLint shininess_i, const GLfloat shininess);
 /* this clip epsilon is needed to avoid some rounding errors after
    several clipping stages */
 
-static void gl_eval_viewport() {
+static void gl_eval_viewport(void) {
 	GLContext* c = gl_get_context();
 	GLViewport* v;
 	GLfloat zsize = (1 << (ZB_Z_BITS + ZB_POINT_Z_FRAC_BITS));

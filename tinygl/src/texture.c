@@ -109,7 +109,7 @@ GLTexture* alloc_texture(GLint h) {
 	return t;
 }
 
-void glInitTextures() {
+void glInitTextures(void) {
 	/* textures */
 	GLContext* c = gl_get_context();
 	c->texture_2d_enabled = 0;

@@ -192,7 +192,7 @@ void glopPolygonOffset(GLParam* p) {
 	c->offset_units = p[2].f;
 }
 
-GLenum glGetError() {
+GLenum glGetError(void) {
 #if TGL_FEATURE_ERROR_CHECK == 1
 	GLContext* c = gl_get_context();
 	GLenum eflag = c->error_flag;
@@ -256,4 +256,4 @@ void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format
 	/* TODO: implement read pixels.*/
 }
 
-void glFinish() { return; }
+void glFinish(void) { return; }
