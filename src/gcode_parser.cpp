@@ -492,10 +492,19 @@ void GCodeParser::add_segment(const glm::vec3& start, const glm::vec3& end, bool
     global_bounds_.expand(start);
     global_bounds_.expand(end);
 
-    // Update object bounding box
-    if (!current_object_.empty() && objects_.count(current_object_) > 0) {
+    // Update object bounding box (only for extrusion moves, not travels)
+    if (!current_object_.empty() && objects_.count(current_object_) > 0 && is_extrusion) {
         objects_[current_object_].bounding_box.expand(start);
         objects_[current_object_].bounding_box.expand(end);
+
+        // Debug: Log first few extrusion segments per object
+        static std::map<std::string, int> segment_counts;
+        segment_counts[current_object_]++;
+        if (segment_counts[current_object_] <= 3) {
+            spdlog::trace("Object '{}' extrusion segment: start=({:.2f},{:.2f},{:.2f}) "
+                          "end=({:.2f},{:.2f},{:.2f})",
+                          current_object_, start.x, start.y, start.z, end.x, end.y, end.z);
+        }
     }
 }
 
@@ -566,6 +575,16 @@ ParsedGCodeFile GCodeParser::finalize() {
 
     spdlog::info("Parsed G-code: {} layers, {} segments, {} objects", result.layers.size(),
                  result.total_segments, result.objects.size());
+
+    // Debug: Log object bounding boxes
+    for (const auto& [name, obj] : result.objects) {
+        spdlog::debug("Object '{}' AABB: min=({:.2f},{:.2f},{:.2f}) max=({:.2f},{:.2f},{:.2f}) "
+                      "center=({:.2f},{:.2f},{:.2f})",
+                      name, obj.bounding_box.min.x, obj.bounding_box.min.y, obj.bounding_box.min.z,
+                      obj.bounding_box.max.x, obj.bounding_box.max.y, obj.bounding_box.max.z,
+                      obj.bounding_box.center().x, obj.bounding_box.center().y,
+                      obj.bounding_box.center().z);
+    }
 
     // Reset state for potential reuse
     reset();

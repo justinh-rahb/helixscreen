@@ -233,25 +233,36 @@ void GCodeTinyGLRenderer::render_bounding_box(const ParsedGCodeFile& gcode) {
     glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, white);
     glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, white);
 
-    // Draw 4 rectangles as line loops using transformed coordinates
-    // Bottom rectangle (Z = min)
-    glBegin(GL_LINE_LOOP);
-    glVertex3f(bbox_min.x, bbox_min.y, bbox_min.z);
-    glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z);
-    glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z);
-    glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
-    glEnd();
-
-    // Top rectangle (Z = max)
-    glBegin(GL_LINE_LOOP);
-    glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
-    glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
-    glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
-    glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
-    glEnd();
-
-    // Vertical edges connecting bottom to top (4 lines)
+    // Draw complete wireframe cube using GL_LINES (12 edges total)
     glBegin(GL_LINES);
+
+    // Bottom rectangle (4 edges at Z = min)
+    glVertex3f(bbox_min.x, bbox_min.y, bbox_min.z);
+    glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z);
+
+    glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z);
+    glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z);
+
+    glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z);
+    glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
+
+    glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
+    glVertex3f(bbox_min.x, bbox_min.y, bbox_min.z);
+
+    // Top rectangle (4 edges at Z = max)
+    glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
+    glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
+
+    glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
+    glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
+
+    glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
+    glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
+
+    glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
+    glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
+
+    // Vertical edges (4 edges connecting bottom to top)
     glVertex3f(bbox_min.x, bbox_min.y, bbox_min.z);
     glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
 
@@ -263,6 +274,7 @@ void GCodeTinyGLRenderer::render_bounding_box(const ParsedGCodeFile& gcode) {
 
     glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
     glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
+
     glEnd();
 
     // Reset material state to defaults (no emission, gray diffuse)

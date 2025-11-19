@@ -13,6 +13,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <limits>
 #include <map>
 #include <memory>
 #include <string>
@@ -42,8 +43,10 @@ namespace gcode {
  * @brief Axis-aligned bounding box for spatial queries
  */
 struct AABB {
-    glm::vec3 min{0.0f, 0.0f, 0.0f};
-    glm::vec3 max{0.0f, 0.0f, 0.0f};
+    glm::vec3 min{std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(),
+                  std::numeric_limits<float>::infinity()};
+    glm::vec3 max{-std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(),
+                  -std::numeric_limits<float>::infinity()};
 
     /**
      * @brief Get center point of bounding box
@@ -72,10 +75,10 @@ struct AABB {
 
     /**
      * @brief Check if bounding box is empty (not initialized)
-     * @return true if empty (min == max)
+     * @return true if empty (min > max)
      */
     bool is_empty() const {
-        return min == max;
+        return min.x > max.x || min.y > max.y || min.z > max.z;
     }
 };
 
