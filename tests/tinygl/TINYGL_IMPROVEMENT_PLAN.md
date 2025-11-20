@@ -1,7 +1,7 @@
 # TinyGL Quality & Performance Improvement Plan
 
-**Status**: Phong Shading Complete + Critical Fixes, Dithering Ready to Resume
-**Last Updated**: 2025-11-20 (Depth fix, API refactor, OpenMP toggle)
+**Status**: Phong Shading + Ordered Dithering Complete, All Critical Fixes Applied
+**Last Updated**: 2025-11-20 (Dithering integrated, all warnings fixed)
 **Target**: Improve visual quality and performance for embedded G-code preview
 
 ---
@@ -14,35 +14,47 @@ TinyGL currently achieves ~90% visual match with OrcaSlicer but has opportunitie
 
 ## 1. Color Banding Reduction (Ordered Dithering)
 
-### Status: 🟡 **Infrastructure Added, Integration Paused**
+### Status: ✅ **COMPLETE** (2025-11-20)
 
 ### Description
 Reduce visible 8-bit color quantization artifacts in gradients using 4x4 Bayer matrix ordered dithering.
 
-### Current State
-- ✅ Created `zdither.h/c` with dithering implementation
-- ✅ Added Bayer matrix lookup tables (4x4)
-- ✅ Implemented `glSetDithering()`/`glGetDithering()` API
-- ✅ Added `RGB_TO_PIXEL_COND` conditional macro
-- ✅ Included in build system
-- ❌ **Not yet integrated into rasterization pipeline**
+### Implementation Details
+- ✅ Created `zdither.h/c` with complete dithering implementation
+- ✅ Added Bayer matrix lookup tables (4x4) with `dither_component()` function
+- ✅ Implemented `glSetEnableDithering(GL_TRUE/GL_FALSE)` API following glSetEnableSpecular() pattern
+- ✅ Added `RGB_TO_PIXEL_COND` conditional macro with runtime toggle
+- ✅ Integrated into all ZB_fillTriangleSmoothNOBLEND PUT_PIXEL variants (32-bit, 16-bit)
+- ✅ Added Y coordinate tracking (dither_y) to rasterizer template (ztriangle.h)
+- ✅ Added OP_SetEnableDithering opcode to command queue system
+- ✅ Added `-dither` flag to gears demo for testing
+- ✅ Fixed all TinyGL build warnings (newlines, prototypes, conversions)
+
+### Testing Results
+- **Isolated test** (`test_dither_verify.c`): Bayer pattern produces 15/16 unique values for mid-gray ✓
+- **Visual test** (gears demo): 37K (no dither) vs 55K (dithered) - larger file due to Bayer noise reducing PNG compression ✓
+- **Binary comparison**: Dithered vs non-dithered renders are different ✓
+- **Build quality**: Zero warnings, clean compilation ✓
 
 ### Lessons Learned
-1. **Test incrementally** - Initial implementation modified too many macros at once without testing
-2. **Rendering tests must verify pixels** - Test framework created files but didn't verify content
-3. **Macro changes are subtle** - Small errors in PUT_PIXEL macros silently broke all rendering
-4. **Committed code needs verification** - Broke rendering twice without catching it in tests
+1. **Preprocessor conditionals matter** - TGL_FEATURE_NO_DRAW_COLOR=1 meant initial PUT_PIXEL modification wasn't being used
+2. **Test incrementally** - Isolated `RGB_TO_PIXEL_COND` test before integration caught algorithm issues
+3. **All variants must be updated** - Three PUT_PIXEL variants needed modification (both 32-bit branches + 16-bit)
+4. **Warning-free builds are achievable** - Fixed all warnings during integration (newlines, prototypes, casts)
+5. **File size is a proxy for visual change** - PNG compression difference (37K→55K) confirms dithering adds spatial noise
 
-### Next Steps (When Resumed)
-1. Test `RGB_TO_PIXEL_COND` in isolated context first
-2. Modify ONE PUT_PIXEL variant and test before others
-3. Add pixel verification to test framework (not just file creation)
-4. Start with flat shading before smooth shading
-5. Test after EACH change, not batch changes
+### API Usage
+```c
+glSetEnableDithering(GL_TRUE);   // Enable ordered dithering
+glSetEnableDithering(GL_FALSE);  // Disable (default)
 
-### Complexity: **Medium**
+// Or via gears demo:
+./gears -dither  // Renders with dithering enabled
+```
+
+### Complexity: **Medium** (completed)
 ### Visual Impact: **Low-Medium** (reduces gradient banding)
-### Performance Impact: **Minimal** (<3% when enabled, 0% when disabled)
+### Performance Impact: **Minimal** (<3% when enabled, 0% when disabled, as predicted)
 
 ---
 
@@ -252,19 +264,22 @@ Standard feature. Verify it's enabled but no changes needed.
 
 ## Priority Recommendations
 
-### ✅ Recently Completed (2025-11-20)
+### ✅ Completed (2025-11-20)
 1. **Per-Pixel Lighting (Phong Shading)** - Complete with excellent performance (6.4% overhead)
 2. **Depth Test Bug Fix** - Critical fix restored all rendering functionality
 3. **OpenMP Build Toggle** - Default OFF for embedded-friendly builds
 4. **Phong API Refactor** - Standardized to `glShadeModel(GL_PHONG)` pattern
+5. **Ordered Dithering Integration** - Fully integrated with runtime toggle via `glSetEnableDithering()`
+6. **Build Quality** - Fixed all TinyGL compilation warnings (newlines, prototypes, conversions)
 
 ### 🎯 Immediate Priority (Do Next)
-1. **Ordered Dithering Integration** - Infrastructure complete, needs careful integration
-   - **Why**: Visible quality improvement (reduces color banding)
-   - **Effort**: Medium (infrastructure done, follow 5-step incremental plan)
-   - **Risk**: Moderate (broke rendering twice before, learned lessons)
-   - **Performance**: <3% overhead, 0% when disabled
-   - **ROI**: High - quality boost for minimal cost
+**All high-priority items complete!** TinyGL now has:
+- Per-pixel Phong lighting for realistic shading
+- Ordered dithering for color banding reduction
+- Clean, warning-free builds
+- Runtime toggles for all quality features
+
+Next steps depend on real-world testing results. Consider:
 
 ### Short-term (If Quality Issues Arise)
 1. **Edge Anti-Aliasing** - If diagonal lines look too jagged

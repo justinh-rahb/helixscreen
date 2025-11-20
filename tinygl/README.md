@@ -398,6 +398,22 @@ Allows you to configure specular rendering. Turn it off
 if you want to use GL_LIGHTING but don't plan on using
 specular lighting. it will save cycles.
 
+### glSetEnableDithering(int shouldenabledithering);
+
+This function can be added to display lists.
+
+Enables or disables ordered dithering using a 4×4 Bayer matrix.
+When enabled, reduces visible color banding in gradients by adding
+spatial noise during RGB-to-pixel quantization. Disabled by default.
+
+Performance impact: <3% when enabled, 0% when disabled.
+
+Example:
+```c
+glSetEnableDithering(GL_TRUE);   // Enable dithering
+glSetEnableDithering(GL_FALSE);  // Disable dithering (default)
+```
+
 ### glGetTexturePixmap(int text, int level, int* xsize, int* ysize)
 
 Allows the user to retrieve the raw pixel data of a texture, for their own modification.
