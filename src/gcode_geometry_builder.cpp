@@ -458,14 +458,8 @@ RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
     }
 
     if (total_segs > 0) {
-        spdlog::info("═══ TOP LAYER Z={:.2f}mm SUMMARY ═══", max_z);
-        spdlog::info("  Total segments: {}", total_segs);
-        spdlog::info("  Extrusion: {} | Travel: {}", extrusion_segs, travel_segs);
-        spdlog::info("  By angle:");
-        spdlog::info("    Diagonal 45°: {}", diagonal_45_segs);
-        spdlog::info("    Horizontal:   {}", horizontal_segs);
-        spdlog::info("    Vertical:     {}", vertical_segs);
-        spdlog::info("    Other angles: {}", other_angle_segs);
+        spdlog::debug("Top layer Z={:.2f}mm: {} segments ({} extrusion, {} travel)",
+                      max_z, total_segs, extrusion_segs, travel_segs);
     }
 
     // Store quantization parameters for dequantization during rendering
@@ -591,6 +585,23 @@ GeometryBuilder::TubeCap
 GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, RibbonGeometry& geometry,
                                           const QuantizationParams& quant,
                                           std::optional<TubeCap> prev_start_cap) {
+
+    // Read tube cross-section configuration
+    static int tube_sides = -1;  // Cache config value (read once)
+    if (tube_sides == -1) {
+        tube_sides = Config::get_instance()->get<int>("/gcode_viewer/tube_sides", 16);
+
+        // Validate: only 4, 8, or 16 sides supported
+        if (tube_sides != 4 && tube_sides != 8 && tube_sides != 16) {
+            spdlog::warn("Invalid tube_sides={} (must be 4, 8, or 16), defaulting to 16", tube_sides);
+            tube_sides = 16;
+        }
+
+        spdlog::info("G-code tube geometry: N={} sides (elliptical cross-section) [NOTE: Only N=4 currently supported, N=8/16 coming soon]", tube_sides);
+    }
+
+    const int N = tube_sides;  // Number of sides for this segment
+    (void)N;  // Suppress unused warning during Phase 1
 
     // Determine tube dimensions
     float width;
