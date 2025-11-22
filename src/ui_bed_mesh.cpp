@@ -32,6 +32,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <atomic>
 #include <cstdlib>
 
 // Canvas dimensions and rotation defaults are now in ui_bed_mesh.h
@@ -252,6 +253,16 @@ static void* bed_mesh_xml_create(lv_xml_parser_state_t* state, const char** attr
     LV_UNUSED(attrs);
 
     void* parent = lv_xml_state_get_parent(state);
+
+    // Run gradient benchmark once on first widget creation
+    // This spawns a background thread that measures rendering performance
+    // Uses atomic compare-exchange to prevent race condition with multiple simultaneous widget creations
+    static std::atomic<bool> benchmark_started{false};
+    bool expected = false;
+    if (benchmark_started.compare_exchange_strong(expected, true)) {
+        // Only one thread executes this block
+        bed_mesh_renderer_run_benchmark();
+    }
 
     // Create base object (NOT canvas!)
     lv_obj_t* obj = lv_obj_create((lv_obj_t*)parent);

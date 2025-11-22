@@ -235,6 +235,25 @@ void bed_mesh_renderer_auto_color_range(bed_mesh_renderer_t* renderer);
 bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer,
                               int canvas_width, int canvas_height);
 
+/**
+ * @brief Run off-screen gradient rendering benchmark
+ *
+ * Measures the FPS capability of gradient interpolation rendering by simulating
+ * the computational workload without actual LVGL drawing operations. This benchmark:
+ * - Runs in a background thread (non-blocking)
+ * - Uses a small test mesh (7x7 points)
+ * - Renders 100 frames with varying rotations
+ * - Calculates average FPS from elapsed time
+ * - Returns true if FPS >= 15.0 (gradient is fast enough)
+ *
+ * IMPORTANT: This function spawns a detached background thread and returns immediately.
+ * The benchmark result will be logged asynchronously. Call this ONCE during widget
+ * initialization.
+ *
+ * @return true if gradient rendering is fast enough (>= 15 FPS), false otherwise
+ */
+bool bed_mesh_renderer_run_benchmark(void);
+
 #ifdef __cplusplus
 }
 #endif

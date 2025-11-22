@@ -26,9 +26,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
+#include <thread>
 #include <vector>
 
 // ============================================================================
@@ -82,7 +86,7 @@ constexpr lv_opa_t AXIS_LINE_OPACITY = LV_OPA_80;     // 80% opacity for axis in
 // Color gradient lookup table (pre-computed for performance)
 constexpr int COLOR_GRADIENT_LUT_SIZE = 1024; // 1024 samples for smooth gradient
 lv_color_t g_color_gradient_lut[COLOR_GRADIENT_LUT_SIZE];
-bool g_color_gradient_lut_initialized = false;
+std::once_flag g_color_gradient_lut_init_flag;
 
 } // anonymous namespace
 
@@ -656,12 +660,9 @@ static bed_mesh_point_3d_t project_3d_to_2d(double x, double y, double z, int ca
 /**
  * Initialize color gradient lookup table (called once at startup)
  * Pre-computes all gradient colors to avoid repeated calculations
+ * Thread-safe via std::call_once
  */
 static void init_color_gradient_lut() {
-    if (g_color_gradient_lut_initialized) {
-        return; // Already initialized
-    }
-
     // Pre-compute gradient for normalized values [0.0, 1.0]
     for (int i = 0; i < COLOR_GRADIENT_LUT_SIZE; i++) {
         double normalized = static_cast<double>(i) / (COLOR_GRADIENT_LUT_SIZE - 1);
@@ -712,15 +713,12 @@ static void init_color_gradient_lut() {
         g_color_gradient_lut[i] = lv_color_make(r, g, b);
     }
 
-    g_color_gradient_lut_initialized = true;
     spdlog::debug("Initialized color gradient LUT with {} samples", COLOR_GRADIENT_LUT_SIZE);
 }
 
 static lv_color_t height_to_color(double value, double min_val, double max_val) {
-    // Ensure LUT is initialized
-    if (!g_color_gradient_lut_initialized) {
-        init_color_gradient_lut();
-    }
+    // Ensure LUT is initialized (thread-safe, runs exactly once)
+    std::call_once(g_color_gradient_lut_init_flag, init_color_gradient_lut);
 
     // Apply color compression for enhanced contrast
     double data_range = max_val - min_val;
@@ -1228,6 +1226,316 @@ static void render_axis_labels(lv_layer_t* layer, const bed_mesh_renderer_t* ren
     }
 }
 
+// ============================================================================
+// Gradient Rendering Benchmark
+// ============================================================================
+
+/**
+ * Global flags for gradient benchmark state (thread-safe communication)
+ * - g_gradient_benchmark_started: Prevents duplicate benchmark threads (TOCTOU protection)
+ * - g_gradient_benchmark_complete: Set when benchmark finishes
+ * - g_gradient_fallback_disabled: Set to true if FPS >= 15.0 (disable solid-color fallback)
+ */
+static std::atomic<bool> g_gradient_benchmark_started{false};
+static std::atomic<bool> g_gradient_benchmark_complete{false};
+static std::atomic<bool> g_gradient_fallback_disabled{false};
+
+/**
+ * Benchmark helper: Simulate gradient triangle fill computation
+ * This performs all the gradient interpolation math without actual LVGL drawing
+ */
+static void benchmark_triangle_gradient(int x1, int y1, lv_color_t c1, int x2, int y2,
+                                        lv_color_t c2, int x3, int y3, lv_color_t c3,
+                                        int canvas_width, int canvas_height) {
+    // Convert to RGB for interpolation
+    struct Vertex {
+        int x, y;
+        bed_mesh_rgb_t color;
+    };
+    Vertex v[3] = {{x1, y1, {c1.red, c1.green, c1.blue}},
+                   {x2, y2, {c2.red, c2.green, c2.blue}},
+                   {x3, y3, {c3.red, c3.green, c3.blue}}};
+
+    // Sort by Y coordinate
+    if (v[0].y > v[1].y)
+        std::swap(v[0], v[1]);
+    if (v[1].y > v[2].y)
+        std::swap(v[1], v[2]);
+    if (v[0].y > v[1].y)
+        std::swap(v[0], v[1]);
+
+    // Skip degenerate triangles
+    if (v[0].y == v[2].y)
+        return;
+
+    // Bounds check
+    if (v[2].y < 0 || v[0].y >= canvas_height)
+        return;
+    if (std::max({v[0].x, v[1].x, v[2].x}) < 0 ||
+        std::min({v[0].x, v[1].x, v[2].x}) >= canvas_width)
+        return;
+
+    // Scanline loop (measure computational cost)
+    int y_start = std::max(v[0].y, 0);
+    int y_end = std::min(v[2].y, canvas_height - 1);
+
+    for (int y = y_start; y <= y_end; y++) {
+        // Interpolate along long edge (v0 -> v2)
+        double t_long = (y - v[0].y) / static_cast<double>(v[2].y - v[0].y);
+        int x_long = v[0].x + static_cast<int>(t_long * (v[2].x - v[0].x));
+        bed_mesh_rgb_t c_long = lerp_color(v[0].color, v[2].color, t_long);
+
+        // Interpolate along short edge
+        int x_short;
+        bed_mesh_rgb_t c_short;
+        if (y < v[1].y) {
+            if (v[1].y == v[0].y) {
+                x_short = v[0].x;
+                c_short = v[0].color;
+            } else {
+                double t = (y - v[0].y) / static_cast<double>(v[1].y - v[0].y);
+                x_short = v[0].x + static_cast<int>(t * (v[1].x - v[0].x));
+                c_short = lerp_color(v[0].color, v[1].color, t);
+            }
+        } else {
+            if (v[2].y == v[1].y) {
+                x_short = v[1].x;
+                c_short = v[1].color;
+            } else {
+                double t = (y - v[1].y) / static_cast<double>(v[2].y - v[1].y);
+                x_short = v[1].x + static_cast<int>(t * (v[2].x - v[1].x));
+                c_short = lerp_color(v[1].color, v[2].color, t);
+            }
+        }
+
+        // Compute scanline endpoints
+        int x_left = std::max(std::min(x_long, x_short), 0);
+        int x_right = std::min(std::max(x_long, x_short), canvas_width - 1);
+        bed_mesh_rgb_t c_left = (x_long < x_short) ? c_long : c_short;
+        bed_mesh_rgb_t c_right = (x_long < x_short) ? c_short : c_long;
+
+        int line_width = x_right - x_left + 1;
+        if (line_width <= 0)
+            continue;
+
+        // Simulate gradient segment rendering (measure computational cost)
+        if (line_width >= BED_MESH_GRADIENT_MIN_LINE_WIDTH) {
+            int segments = std::min(BED_MESH_GRADIENT_SEGMENTS, line_width / 4);
+            if (segments < 1)
+                segments = 1;
+
+            for (int seg = 0; seg < segments; seg++) {
+                double t = (seg + 0.5) / segments;
+                // Simulate color interpolation computation
+                volatile bed_mesh_rgb_t seg_color = lerp_color(c_left, c_right, t);
+                (void)seg_color; // Prevent optimization
+            }
+        }
+    }
+}
+
+/**
+ * Background thread function that runs the gradient rendering benchmark
+ */
+static void run_gradient_benchmark_thread() {
+    spdlog::info("[bed_mesh] Starting gradient rendering benchmark...");
+
+    // Create test mesh data (7x7 points, simple sine wave pattern)
+    constexpr int test_rows = 7;
+    constexpr int test_cols = 7;
+    std::vector<std::vector<float>> test_mesh(test_rows, std::vector<float>(test_cols));
+
+    for (int row = 0; row < test_rows; row++) {
+        for (int col = 0; col < test_cols; col++) {
+            // Simple sine wave pattern for realistic Z variation
+            double x_norm = col / static_cast<double>(test_cols - 1);
+            double y_norm = row / static_cast<double>(test_rows - 1);
+            test_mesh[row][col] =
+                static_cast<float>(0.5 * std::sin(x_norm * M_PI * 2) * std::cos(y_norm * M_PI * 2));
+        }
+    }
+
+    // Convert to row pointers for renderer API
+    std::vector<const float*> row_ptrs(test_rows);
+    for (int i = 0; i < test_rows; i++) {
+        row_ptrs[i] = test_mesh[i].data();
+    }
+
+    // Create temporary renderer for benchmark
+    bed_mesh_renderer_t* bench_renderer = bed_mesh_renderer_create();
+    if (!bench_renderer) {
+        spdlog::error("[bed_mesh] Benchmark failed: could not create renderer");
+        g_gradient_benchmark_complete.store(true);
+        return;
+    }
+
+    // Set test mesh data
+    if (!bed_mesh_renderer_set_mesh_data(bench_renderer, row_ptrs.data(), test_rows, test_cols)) {
+        spdlog::error("[bed_mesh] Benchmark failed: could not set mesh data");
+        bed_mesh_renderer_destroy(bench_renderer);
+        g_gradient_benchmark_complete.store(true);
+        return;
+    }
+
+    // Benchmark parameters
+    constexpr int canvas_width = 600;
+    constexpr int canvas_height = 400;
+    constexpr int num_frames = 100;
+
+    // Start timer
+    auto start_time = std::chrono::high_resolution_clock::now();
+
+    // Render frames with varying rotations (simulate realistic workload)
+    for (int frame = 0; frame < num_frames; frame++) {
+        // Vary rotation angles to test different projections
+        double angle_x = -45.0 + (frame % 30) * 1.5;
+        double angle_z = (frame * 3.6); // Full rotation over 100 frames
+
+        bed_mesh_renderer_set_rotation(bench_renderer, angle_x, angle_z);
+
+        // Generate quads (this is the core computational work)
+        bed_mesh_view_state_t view_state;
+        view_state.angle_x = angle_x;
+        view_state.angle_z = angle_z;
+        view_state.z_scale = BED_MESH_DEFAULT_Z_SCALE;
+        view_state.fov_scale = 100.0;
+        view_state.is_dragging = false;
+
+        // Update trig cache
+        double x_angle_rad = view_state.angle_x * M_PI / 180.0;
+        double z_angle_rad = view_state.angle_z * M_PI / 180.0;
+        view_state.cached_cos_x = std::cos(x_angle_rad);
+        view_state.cached_sin_x = std::sin(x_angle_rad);
+        view_state.cached_cos_z = std::cos(z_angle_rad);
+        view_state.cached_sin_z = std::sin(z_angle_rad);
+        view_state.trig_cache_valid = true;
+
+        // Generate quads (simplified from generate_mesh_quads)
+        std::vector<bed_mesh_quad_3d_t> quads;
+        double z_center = 0.0; // Test mesh centered at 0
+
+        for (int row = 0; row < test_rows - 1; row++) {
+            for (int col = 0; col < test_cols - 1; col++) {
+                bed_mesh_quad_3d_t quad;
+
+                // Compute vertices (simplified)
+                double base_x_0 = mesh_col_to_world_x(col, test_cols);
+                double base_x_1 = mesh_col_to_world_x(col + 1, test_cols);
+                double base_y_0 = mesh_row_to_world_y(row, test_rows);
+                double base_y_1 = mesh_row_to_world_y(row + 1, test_rows);
+
+                quad.vertices[0].x = base_x_0;
+                quad.vertices[0].y = base_y_1;
+                quad.vertices[0].z =
+                    mesh_z_to_world_z(test_mesh[row + 1][col], z_center, view_state.z_scale);
+                quad.vertices[0].color = height_to_color(test_mesh[row + 1][col], -0.5, 0.5);
+
+                quad.vertices[1].x = base_x_1;
+                quad.vertices[1].y = base_y_1;
+                quad.vertices[1].z =
+                    mesh_z_to_world_z(test_mesh[row + 1][col + 1], z_center, view_state.z_scale);
+                quad.vertices[1].color = height_to_color(test_mesh[row + 1][col + 1], -0.5, 0.5);
+
+                quad.vertices[2].x = base_x_0;
+                quad.vertices[2].y = base_y_0;
+                quad.vertices[2].z =
+                    mesh_z_to_world_z(test_mesh[row][col], z_center, view_state.z_scale);
+                quad.vertices[2].color = height_to_color(test_mesh[row][col], -0.5, 0.5);
+
+                quad.vertices[3].x = base_x_1;
+                quad.vertices[3].y = base_y_0;
+                quad.vertices[3].z =
+                    mesh_z_to_world_z(test_mesh[row][col + 1], z_center, view_state.z_scale);
+                quad.vertices[3].color = height_to_color(test_mesh[row][col + 1], -0.5, 0.5);
+
+                quads.push_back(quad);
+            }
+        }
+
+        // Simulate gradient rendering for all quads
+        for (const auto& quad : quads) {
+            // Project vertices
+            bed_mesh_point_3d_t projected[4];
+            for (int i = 0; i < 4; i++) {
+                projected[i] = project_3d_to_2d(quad.vertices[i].x, quad.vertices[i].y,
+                                                quad.vertices[i].z, canvas_width, canvas_height,
+                                                &view_state);
+            }
+
+            // Render triangles (computational simulation only)
+            benchmark_triangle_gradient(projected[0].screen_x, projected[0].screen_y,
+                                        quad.vertices[0].color, projected[1].screen_x,
+                                        projected[1].screen_y, quad.vertices[1].color,
+                                        projected[2].screen_x, projected[2].screen_y,
+                                        quad.vertices[2].color, canvas_width, canvas_height);
+
+            benchmark_triangle_gradient(projected[1].screen_x, projected[1].screen_y,
+                                        quad.vertices[1].color, projected[2].screen_x,
+                                        projected[2].screen_y, quad.vertices[2].color,
+                                        projected[3].screen_x, projected[3].screen_y,
+                                        quad.vertices[3].color, canvas_width, canvas_height);
+        }
+    }
+
+    // Stop timer
+    auto end_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end_time - start_time;
+
+    // Calculate FPS
+    double fps = num_frames / elapsed.count();
+
+    // Cleanup
+    bed_mesh_renderer_destroy(bench_renderer);
+
+    // Determine if gradient fallback should be disabled
+    bool disable_fallback = (fps >= 15.0);
+
+    // Update global flags
+    g_gradient_fallback_disabled.store(disable_fallback);
+    g_gradient_benchmark_complete.store(true);
+
+    // Log result
+    if (disable_fallback) {
+        spdlog::info("[bed_mesh] Gradient benchmark: {:.1f} FPS (solid-color fallback disabled)",
+                     fps);
+    } else {
+        spdlog::info("[bed_mesh] Gradient benchmark: {:.1f} FPS (solid-color fallback enabled)",
+                     fps);
+    }
+}
+
+bool bed_mesh_renderer_run_benchmark(void) {
+    // Atomic check-and-set to prevent duplicate benchmark threads (TOCTOU protection)
+    bool expected = false;
+    if (!g_gradient_benchmark_started.compare_exchange_strong(expected, true)) {
+        // Another thread already started/completed benchmark
+        spdlog::debug("[bed_mesh] Benchmark already started/complete, skipping");
+        return g_gradient_fallback_disabled.load();
+    }
+
+    // Double-check if benchmark somehow completed between check and set
+    if (g_gradient_benchmark_complete.load()) {
+        spdlog::debug("[bed_mesh] Benchmark already complete (race detected), skipping");
+        return g_gradient_fallback_disabled.load();
+    }
+
+    // Spawn detached background thread (non-blocking) with exception handling
+    try {
+        std::thread benchmark_thread(run_gradient_benchmark_thread);
+        benchmark_thread.detach();
+        spdlog::debug("[bed_mesh] Gradient benchmark thread spawned");
+    } catch (const std::system_error& e) {
+        spdlog::error("[bed_mesh] Failed to spawn benchmark thread: {}", e.what());
+        // Set flags to safe defaults (use fallback, mark complete to prevent retries)
+        g_gradient_fallback_disabled.store(false, std::memory_order_release);
+        g_gradient_benchmark_complete.store(true, std::memory_order_release);
+        return false;
+    }
+
+    // Return current state (will be updated asynchronously)
+    return g_gradient_fallback_disabled.load(std::memory_order_acquire);
+}
+
 static void render_quad(lv_layer_t* layer, const bed_mesh_quad_3d_t& quad, int canvas_width,
                         int canvas_height, const bed_mesh_view_state_t* view, bool use_gradient) {
     // Project all 4 vertices to screen space
@@ -1250,8 +1558,13 @@ static void render_quad(lv_layer_t* layer, const bed_mesh_quad_3d_t& quad, int c
      * Using indices [0,1,2] and [1,3,2] creates CCW winding for front-facing triangles
      */
 
+    // Check if benchmark has completed and gradient fallback should be disabled
+    // If the system is fast enough (>= 15 FPS), always use gradient mode even during drag
+    bool force_gradient = g_gradient_benchmark_complete.load() && g_gradient_fallback_disabled.load();
+    bool render_gradient = use_gradient || force_gradient;
+
     // Triangle 1: [0]BL → [1]BR → [2]TL
-    if (use_gradient) {
+    if (render_gradient) {
         fill_triangle_gradient(layer, projected[0].screen_x, projected[0].screen_y,
                                quad.vertices[0].color, projected[1].screen_x, projected[1].screen_y,
                                quad.vertices[1].color, projected[2].screen_x, projected[2].screen_y,
@@ -1263,7 +1576,7 @@ static void render_quad(lv_layer_t* layer, const bed_mesh_quad_3d_t& quad, int c
     }
 
     // Triangle 2: [1]BR → [3]TR → [2]TL
-    if (use_gradient) {
+    if (render_gradient) {
         fill_triangle_gradient(layer, projected[1].screen_x, projected[1].screen_y,
                                quad.vertices[1].color, projected[2].screen_x, projected[2].screen_y,
                                quad.vertices[2].color, projected[3].screen_x, projected[3].screen_y,
