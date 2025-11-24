@@ -24,12 +24,19 @@
 #include "ui_theme.h"
 
 #include "helix_theme.h"
+#include "ui_error_reporting.h"
 #include "lvgl/lvgl.h"
 #include "lvgl/src/xml/lv_xml.h"
+#include "lvgl/src/libs/expat/expat.h"
 
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
 
 static lv_theme_t* current_theme = nullptr;
 static bool use_dark_mode = true;
@@ -46,6 +53,92 @@ lv_color_t ui_theme_parse_color(const char* hex_str) {
 }
 
 // No longer needed - helix_theme.c handles all color patching and input widget styling
+
+// Expat callback data for collecting color base names with _light suffix
+struct ColorParserData {
+    std::vector<std::string> light_color_bases;  // Base names (without _light suffix)
+};
+
+// Expat element start handler - finds <color name="xxx_light"> elements
+static void XMLCALL color_element_start(void* user_data, const XML_Char* name,
+                                        const XML_Char** attrs) {
+    if (strcmp(name, "color") != 0) return;
+
+    ColorParserData* data = static_cast<ColorParserData*>(user_data);
+
+    // Find the "name" attribute
+    for (int i = 0; attrs[i]; i += 2) {
+        if (strcmp(attrs[i], "name") == 0) {
+            const char* color_name = attrs[i + 1];
+            size_t len = strlen(color_name);
+
+            // Check if name ends with "_light"
+            const char* suffix = "_light";
+            size_t suffix_len = strlen(suffix);
+            if (len > suffix_len && strcmp(color_name + len - suffix_len, suffix) == 0) {
+                // Extract base name (without _light)
+                std::string base_name(color_name, len - suffix_len);
+                data->light_color_bases.push_back(base_name);
+            }
+            break;
+        }
+    }
+}
+
+/**
+ * Auto-register theme-aware color constants from globals.xml
+ *
+ * Parses globals.xml to find color pairs (xxx_light, xxx_dark) and registers
+ * the base name (xxx) as a runtime constant with the appropriate value
+ * based on current theme mode.
+ */
+static void ui_theme_register_color_pairs(lv_xml_component_scope_t* scope, bool dark_mode) {
+    // Read globals.xml
+    std::ifstream file("ui_xml/globals.xml");
+    if (!file.is_open()) {
+        NOTIFY_ERROR("Could not open ui_xml/globals.xml for color pair registration");
+        return;
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string xml_content = buffer.str();
+    file.close();
+
+    // Parse with expat to find _light colors
+    ColorParserData parser_data;
+    XML_Parser parser = XML_ParserCreate(nullptr);
+    XML_SetUserData(parser, &parser_data);
+    XML_SetElementHandler(parser, color_element_start, nullptr);
+
+    if (XML_Parse(parser, xml_content.c_str(), xml_content.size(), XML_TRUE) == XML_STATUS_ERROR) {
+        NOTIFY_ERROR("XML parse error in globals.xml line {}: {}",
+                     XML_GetCurrentLineNumber(parser),
+                     XML_ErrorString(XML_GetErrorCode(parser)));
+        XML_ParserFree(parser);
+        return;
+    }
+    XML_ParserFree(parser);
+
+    // For each _light color, check if _dark exists and register base name
+    int registered = 0;
+    for (const auto& base_name : parser_data.light_color_bases) {
+        std::string light_name = base_name + "_light";
+        std::string dark_name = base_name + "_dark";
+
+        const char* light_val = lv_xml_get_const(nullptr, light_name.c_str());
+        const char* dark_val = lv_xml_get_const(nullptr, dark_name.c_str());
+
+        if (light_val && dark_val) {
+            const char* selected = dark_mode ? dark_val : light_val;
+            lv_xml_register_const(scope, base_name.c_str(), selected);
+            spdlog::trace("[Theme] Auto-registered color: {} -> {}", base_name, selected);
+            registered++;
+        }
+    }
+
+    spdlog::debug("[Theme] Auto-registered {} theme-aware color pairs", registered);
+}
 
 void ui_theme_register_responsive_padding(lv_display_t* display) {
     // Use custom breakpoints optimized for our hardware: max(hor_res, ver_res)
@@ -121,37 +214,21 @@ void ui_theme_init(lv_display_t* display, bool use_dark_mode_param) {
         std::exit(EXIT_FAILURE);
     }
 
-    // Read light/dark color variants from XML (MUST exist - fail-fast if missing)
-    const char* app_bg_light = lv_xml_get_const(NULL, "app_bg_color_light");
-    const char* app_bg_dark = lv_xml_get_const(NULL, "app_bg_color_dark");
-    const char* text_primary_light = lv_xml_get_const(NULL, "text_primary_light");
-    const char* text_primary_dark = lv_xml_get_const(NULL, "text_primary_dark");
-    const char* header_text_light = lv_xml_get_const(NULL, "header_text_light");
-    const char* header_text_dark = lv_xml_get_const(NULL, "header_text_dark");
+    // Auto-register all color pairs from globals.xml (xxx_light/xxx_dark -> xxx)
+    // This handles app_bg_color, text_primary, header_text, theme_grey, card_bg, etc.
+    ui_theme_register_color_pairs(scope, use_dark_mode);
 
-    // Validate ALL required color variants exist
-    if (!app_bg_light || !app_bg_dark) {
-        spdlog::critical("[Theme] FATAL: Missing app_bg_color_light/dark in globals.xml");
-        std::exit(EXIT_FAILURE);
+    // Validate critical color pairs were registered (fail-fast if missing)
+    static const char* required_colors[] = {
+        "app_bg_color", "text_primary", "header_text", nullptr
+    };
+    for (const char** name = required_colors; *name != nullptr; ++name) {
+        if (!lv_xml_get_const(nullptr, *name)) {
+            spdlog::critical("[Theme] FATAL: Missing required color pair {}_light/{}_dark in globals.xml",
+                             *name, *name);
+            std::exit(EXIT_FAILURE);
+        }
     }
-    if (!text_primary_light || !text_primary_dark) {
-        spdlog::critical("[Theme] FATAL: Missing text_primary_light/dark in globals.xml");
-        std::exit(EXIT_FAILURE);
-    }
-    if (!header_text_light || !header_text_dark) {
-        spdlog::critical("[Theme] FATAL: Missing header_text_light/dark in globals.xml");
-        std::exit(EXIT_FAILURE);
-    }
-
-    // Register runtime constants based on theme preference
-    const char* selected_bg = use_dark_mode ? app_bg_dark : app_bg_light;
-    lv_xml_register_const(scope, "app_bg_color", selected_bg);
-
-    const char* selected_text = use_dark_mode ? text_primary_dark : text_primary_light;
-    lv_xml_register_const(scope, "text_primary", selected_text);
-
-    const char* selected_header = use_dark_mode ? header_text_dark : header_text_light;
-    lv_xml_register_const(scope, "header_text_color", selected_header);
 
     spdlog::debug("[Theme] Runtime constants set for {} mode", use_dark_mode ? "dark" : "light");
 
@@ -175,33 +252,29 @@ void ui_theme_init(lv_display_t* display, bool use_dark_mode_param) {
         base_font = &lv_font_montserrat_16;
     }
 
-    // Read color variants for theme initialization
-    const char* screen_bg_str = use_dark_mode ? lv_xml_get_const(NULL, "app_bg_color_dark")
-                                              : lv_xml_get_const(NULL, "app_bg_color_light");
-    const char* card_bg_str = use_dark_mode ? lv_xml_get_const(NULL, "card_bg_dark")
-                                            : lv_xml_get_const(NULL, "card_bg_light");
-    const char* theme_grey_str = use_dark_mode ? lv_xml_get_const(NULL, "theme_grey_dark")
-                                               : lv_xml_get_const(NULL, "theme_grey_light");
+    // Read color values from auto-registered constants
+    const char* screen_bg_str = lv_xml_get_const(nullptr, "app_bg_color");
+    const char* card_bg_str = lv_xml_get_const(nullptr, "card_bg");
+    const char* theme_grey_str = lv_xml_get_const(nullptr, "theme_grey");
+    const char* text_primary_str = lv_xml_get_const(nullptr, "text_primary");
 
-    if (!screen_bg_str || !card_bg_str || !theme_grey_str) {
-        spdlog::error("[Theme] Failed to read color variants from globals.xml");
+    if (!screen_bg_str || !card_bg_str || !theme_grey_str || !text_primary_str) {
+        spdlog::error("[Theme] Failed to read auto-registered color constants");
         return;
     }
 
     lv_color_t screen_bg = ui_theme_parse_color(screen_bg_str);
     lv_color_t card_bg = ui_theme_parse_color(card_bg_str);
     lv_color_t theme_grey = ui_theme_parse_color(theme_grey_str);
+    lv_color_t text_primary_color = ui_theme_parse_color(text_primary_str);
 
     // Read border radius from globals.xml
-    const char* border_radius_str = lv_xml_get_const(NULL, "border_radius");
+    const char* border_radius_str = lv_xml_get_const(nullptr, "border_radius");
     if (!border_radius_str) {
         spdlog::error("[Theme] Failed to read border_radius from globals.xml");
         return;
     }
     int32_t border_radius = atoi(border_radius_str);
-
-    // Parse text primary color for theme-aware button text
-    lv_color_t text_primary_color = ui_theme_parse_color(selected_text);
 
     // Initialize custom HelixScreen theme (wraps LVGL default theme)
     current_theme =

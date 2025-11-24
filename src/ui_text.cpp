@@ -40,7 +40,7 @@
  *
  * @param label Label widget to style
  * @param font_const_name Name of font constant in globals.xml (e.g., "font_heading")
- * @param color_const_name Name of color constant in globals.xml (e.g., "header_text_color")
+ * @param color_const_name Name of color constant in globals.xml (e.g., "header_text")
  */
 static void apply_semantic_style(lv_obj_t* label, const char* font_const_name,
                                  const char* color_const_name) {
@@ -78,7 +78,7 @@ static void* ui_text_heading_create(lv_xml_parser_state_t* state, const char** a
     LV_UNUSED(attrs);
     lv_obj_t* parent = (lv_obj_t*)lv_xml_state_get_parent(state);
     lv_obj_t* label = lv_label_create(parent);
-    apply_semantic_style(label, "font_heading", "header_text_color");
+    apply_semantic_style(label, "font_heading", "header_text");
     return label;
 }
 

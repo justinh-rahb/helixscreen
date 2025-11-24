@@ -23,6 +23,7 @@
 
 #include "ui_bed_mesh.h"
 #include "ui_card.h"
+#include "ui_dialog.h"
 #include "ui_component_header_bar.h"
 #include "ui_component_keypad.h"
 #include "ui_error_reporting.h"
@@ -1196,6 +1197,7 @@ int main(int argc, char** argv) {
     ui_icon_register_widget();
     ui_switch_register();
     ui_card_register();
+    ui_dialog_register();
     ui_bed_mesh_register();
     ui_gcode_viewer_register();
 
@@ -1308,10 +1310,10 @@ int main(int argc, char** argv) {
 
     spdlog::debug("XML UI created successfully with reactive navigation");
 
-    // Test notification system (commented out - uncomment for testing)
-    // NOTIFY_INFO("Notification system initialized successfully");
-    // NOTIFY_WARNING("This is a test warning notification");
-    // NOTIFY_ERROR("This is a test error notification");
+    // Add test notifications on startup (for testing notification history panel)
+    NOTIFY_INFO("Notification system initialized successfully");
+    NOTIFY_WARNING("This is a test warning notification");
+    NOTIFY_ERROR("This is a test error notification");
     // NOTIFY_SUCCESS("Test success notification");
 
     // Initialize Moonraker client EARLY (before wizard, so it's available for connection test)
