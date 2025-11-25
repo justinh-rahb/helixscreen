@@ -57,9 +57,18 @@ MoonrakerClient::MoonrakerClient(EventLoopPtr loop)
 
 MoonrakerClient::~MoonrakerClient() {
     spdlog::debug("[Moonraker Client] Destructor called");
-    // Set flag to prevent callbacks from executing during destruction
+
+    // Set destroying flag FIRST - this signals set_connection_state() to skip callback invocation
+    // even if it has already copied the callback. The check after copying will see this flag.
     is_destroying_.store(true);
-    // Disconnect cleanly to close WebSocket and cleanup all resources
+
+    // Clear callback under lock (redundant safety - the flag is the primary guard)
+    {
+        std::lock_guard<std::mutex> lock(state_callback_mutex_);
+        state_change_callback_ = nullptr;
+    }
+
+    // Disconnect cleanly - this may trigger state changes, but is_destroying_ prevents callbacks
     disconnect();
 }
 
@@ -97,10 +106,21 @@ void MoonrakerClient::set_connection_state(ConnectionState new_state) {
             reconnect_attempts_ = 0; // Reset on successful connection
         }
 
-        // Invoke state change callback if set
-        if (state_change_callback_) {
+        // Copy callback under lock to prevent race with destructor clearing it
+        // We invoke OUTSIDE the lock so we don't hold mutex during LVGL operations
+        std::function<void(ConnectionState, ConnectionState)> callback_copy;
+        {
+            std::lock_guard<std::mutex> lock(state_callback_mutex_);
+            if (state_change_callback_ && !is_destroying_.load()) {
+                callback_copy = state_change_callback_;
+            }
+        }
+
+        // Double-check is_destroying_ AFTER releasing lock but BEFORE invoking callback
+        // This catches the race where destructor set the flag between our copy and invocation
+        if (callback_copy && !is_destroying_.load()) {
             try {
-                state_change_callback_(old_state, new_state);
+                callback_copy(old_state, new_state);
             } catch (const std::exception& e) {
                 LOG_ERROR_INTERNAL("[Moonraker Client] State change callback threw exception: {}",
                                    e.what());

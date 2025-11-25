@@ -457,6 +457,7 @@ class MoonrakerClient : public hv::WebSocketClient {
     std::atomic<ConnectionState> connection_state_;
     std::atomic_bool is_destroying_{false}; // Prevent callbacks during destruction
     std::function<void(ConnectionState, ConnectionState)> state_change_callback_;
+    mutable std::mutex state_callback_mutex_; // Protect state_change_callback_ during destruction
     uint32_t connection_timeout_ms_;
     uint32_t reconnect_attempts_ = 0;
     uint32_t max_reconnect_attempts_ = 0; // 0 = infinite
