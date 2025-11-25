@@ -23,6 +23,7 @@
 
 #include "ui_panel_controls_extrusion.h"
 
+#include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav.h"
 #include "ui_panel_common.h"
@@ -198,8 +199,8 @@ LVGL_SAFE_EVENT_CB_WITH_EVENT(amount_button_cb, event, {
 LVGL_SAFE_EVENT_CB(extrude_button_cb, {
     if (!UITemperatureUtils::is_extrusion_safe(nozzle_current,
                                                AppConstants::Temperature::MIN_EXTRUSION_TEMP)) {
-        spdlog::warn("[Extrusion] Extrude blocked: nozzle too cold ({}°C < {}°C)", nozzle_current,
-                     AppConstants::Temperature::MIN_EXTRUSION_TEMP);
+        NOTIFY_WARNING("Nozzle too cold for extrusion ({}°C, min: {}°C)", nozzle_current,
+                       AppConstants::Temperature::MIN_EXTRUSION_TEMP);
         return;
     }
 
@@ -211,8 +212,8 @@ LVGL_SAFE_EVENT_CB(extrude_button_cb, {
 LVGL_SAFE_EVENT_CB(retract_button_cb, {
     if (!UITemperatureUtils::is_extrusion_safe(nozzle_current,
                                                AppConstants::Temperature::MIN_EXTRUSION_TEMP)) {
-        spdlog::warn("[Extrusion] Retract blocked: nozzle too cold ({}°C < {}°C)", nozzle_current,
-                     AppConstants::Temperature::MIN_EXTRUSION_TEMP);
+        NOTIFY_WARNING("Nozzle too cold for retraction ({}°C, min: {}°C)", nozzle_current,
+                       AppConstants::Temperature::MIN_EXTRUSION_TEMP);
         return;
     }
 

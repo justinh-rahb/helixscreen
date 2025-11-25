@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ui_notification_history.h"
+#include "ui_error_reporting.h"
+
 #include <spdlog/spdlog.h>
 #include <hv/json.hpp>
 #include <fstream>
@@ -180,7 +182,7 @@ bool NotificationHistory::save_to_disk(const char* path) const {
         // Write to file
         std::ofstream file(path);
         if (!file.is_open()) {
-            spdlog::error("Failed to open notification history file for writing: {}", path);
+            LOG_WARN_INTERNAL("Failed to open notification history file for writing: {}", path);
             return false;
         }
 
@@ -191,7 +193,7 @@ bool NotificationHistory::save_to_disk(const char* path) const {
         return true;
 
     } catch (const std::exception& e) {
-        spdlog::error("Failed to save notification history: {}", e.what());
+        LOG_WARN_INTERNAL("Failed to save notification history: {}", e.what());
         return false;
     }
 }

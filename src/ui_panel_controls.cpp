@@ -24,6 +24,7 @@
 #include "ui_panel_controls.h"
 
 #include "ui_component_keypad.h"
+#include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav.h"
 #include "ui_panel_controls_extrusion.h"
@@ -53,7 +54,8 @@ LVGL_SAFE_EVENT_CB(card_motion_clicked, {
         motion_panel = (lv_obj_t*)lv_xml_create(parent_screen, "motion_panel", nullptr);
 
         if (!motion_panel) {
-            spdlog::error("Failed to create motion panel from XML");
+            LOG_ERROR_INTERNAL("Failed to create motion panel from XML");
+            NOTIFY_ERROR("Failed to load motion panel");
             return;
         }
 
@@ -80,7 +82,8 @@ LVGL_SAFE_EVENT_CB(card_nozzle_temp_clicked, {
         nozzle_temp_panel = (lv_obj_t*)lv_xml_create(parent_screen, "nozzle_temp_panel", nullptr);
 
         if (!nozzle_temp_panel) {
-            spdlog::error("Failed to create nozzle temp panel from XML");
+            LOG_ERROR_INTERNAL("Failed to create nozzle temp panel from XML");
+            NOTIFY_ERROR("Failed to load temperature panel");
             return;
         }
 
@@ -107,7 +110,8 @@ LVGL_SAFE_EVENT_CB(card_bed_temp_clicked, {
         bed_temp_panel = (lv_obj_t*)lv_xml_create(parent_screen, "bed_temp_panel", nullptr);
 
         if (!bed_temp_panel) {
-            spdlog::error("Failed to create bed temp panel from XML");
+            LOG_ERROR_INTERNAL("Failed to create bed temp panel from XML");
+            NOTIFY_ERROR("Failed to load temperature panel");
             return;
         }
 
@@ -134,7 +138,8 @@ LVGL_SAFE_EVENT_CB(card_extrusion_clicked, {
         extrusion_panel = (lv_obj_t*)lv_xml_create(parent_screen, "extrusion_panel", nullptr);
 
         if (!extrusion_panel) {
-            spdlog::error("Failed to create extrusion panel from XML");
+            LOG_ERROR_INTERNAL("Failed to create extrusion panel from XML");
+            NOTIFY_ERROR("Failed to load extrusion panel");
             return;
         }
 

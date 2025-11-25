@@ -922,7 +922,8 @@ static void create_detail_view() {
         (lv_obj_t*)lv_xml_create(parent_screen_widget, "print_file_detail", nullptr);
 
     if (!detail_view_widget) {
-        spdlog::error("Failed to create detail view from XML");
+        LOG_ERROR_INTERNAL("Failed to create detail view from XML");
+        NOTIFY_ERROR("Failed to load file details");
         return;
     }
 
@@ -1018,11 +1019,10 @@ static void create_detail_view() {
                         },
                         // Error callback
                         [filename_to_print](const MoonrakerError& error) {
-                            spdlog::error("Failed to start print for {}: {} ({})",
-                                          filename_to_print, error.message,
-                                          error.get_type_string());
-
-                            // TODO: Show error message to user
+                            NOTIFY_ERROR("Failed to start print: {}", error.message);
+                            LOG_ERROR_INTERNAL("Print start failed for {}: {} ({})",
+                                              filename_to_print, error.message,
+                                              error.get_type_string());
                         });
                 } else {
                     // Fall back to mock print if MoonrakerAPI not available
@@ -1150,7 +1150,7 @@ void ui_panel_print_select_show_delete_confirmation() {
                             hide_delete_confirmation();
                         });
                 } else {
-                    spdlog::warn("MoonrakerAPI not available - cannot delete file");
+                    NOTIFY_WARNING("Cannot delete file: printer not connected");
                     hide_delete_confirmation();
                 }
             },

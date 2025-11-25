@@ -23,6 +23,7 @@
 
 #include "ui_panel_home.h"
 
+#include "ui_error_reporting.h"
 #include "ui_fonts.h"
 #include "ui_nav.h"
 #include "ui_subject_registry.h"
@@ -259,7 +260,8 @@ lv_obj_t* ui_panel_home_create(lv_obj_t* parent) {
     // Create the XML component (will bind to subjects automatically)
     home_panel = (lv_obj_t*)lv_xml_create(parent, "home_panel", nullptr);
     if (!home_panel) {
-        spdlog::error("Failed to create home_panel from XML");
+        LOG_ERROR_INTERNAL("Failed to create home_panel from XML");
+        NOTIFY_ERROR("Failed to load home panel");
         return nullptr;
     }
 

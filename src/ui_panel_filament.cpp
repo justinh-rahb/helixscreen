@@ -24,6 +24,7 @@
 #include "ui_panel_filament.h"
 
 #include "ui_component_keypad.h"
+#include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav.h"
 #include "ui_subject_registry.h"
@@ -285,8 +286,8 @@ static void preset_custom_button_cb(lv_event_t* e) {
 LVGL_SAFE_EVENT_CB(load_button_cb, {
     if (!UITemperatureUtils::is_extrusion_safe(nozzle_current,
                                                AppConstants::Temperature::MIN_EXTRUSION_TEMP)) {
-        spdlog::warn("[Filament] Load blocked: nozzle too cold ({}°C < {}°C)", nozzle_current,
-                     AppConstants::Temperature::MIN_EXTRUSION_TEMP);
+        NOTIFY_WARNING("Nozzle too cold for filament load ({}°C, min: {}°C)", nozzle_current,
+                       AppConstants::Temperature::MIN_EXTRUSION_TEMP);
         return;
     }
 
@@ -298,8 +299,8 @@ LVGL_SAFE_EVENT_CB(load_button_cb, {
 LVGL_SAFE_EVENT_CB(unload_button_cb, {
     if (!UITemperatureUtils::is_extrusion_safe(nozzle_current,
                                                AppConstants::Temperature::MIN_EXTRUSION_TEMP)) {
-        spdlog::warn("[Filament] Unload blocked: nozzle too cold ({}°C < {}°C)", nozzle_current,
-                     AppConstants::Temperature::MIN_EXTRUSION_TEMP);
+        NOTIFY_WARNING("Nozzle too cold for filament unload ({}°C, min: {}°C)", nozzle_current,
+                       AppConstants::Temperature::MIN_EXTRUSION_TEMP);
         return;
     }
 
@@ -311,8 +312,8 @@ LVGL_SAFE_EVENT_CB(unload_button_cb, {
 LVGL_SAFE_EVENT_CB(purge_button_cb, {
     if (!UITemperatureUtils::is_extrusion_safe(nozzle_current,
                                                AppConstants::Temperature::MIN_EXTRUSION_TEMP)) {
-        spdlog::warn("[Filament] Purge blocked: nozzle too cold ({}°C < {}°C)", nozzle_current,
-                     AppConstants::Temperature::MIN_EXTRUSION_TEMP);
+        NOTIFY_WARNING("Nozzle too cold for purge ({}°C, min: {}°C)", nozzle_current,
+                       AppConstants::Temperature::MIN_EXTRUSION_TEMP);
         return;
     }
 
@@ -332,7 +333,8 @@ lv_obj_t* ui_panel_filament_create(lv_obj_t* parent) {
 
     filament_panel = (lv_obj_t*)lv_xml_create(parent, "filament_panel", nullptr);
     if (!filament_panel) {
-        spdlog::error("[Filament] Failed to create filament_panel from XML");
+        LOG_ERROR_INTERNAL("[Filament] Failed to create filament_panel from XML");
+        NOTIFY_ERROR("Failed to load filament panel");
         return nullptr;
     }
 

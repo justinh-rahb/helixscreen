@@ -96,7 +96,8 @@ lv_obj_t* ui_wizard_fan_select_create(lv_obj_t* parent) {
     // Create screen from XML
     fan_select_screen_root = (lv_obj_t*)lv_xml_create(parent, "wizard_fan_select", nullptr);
     if (!fan_select_screen_root) {
-        spdlog::error("[Wizard Fan] Failed to create screen from XML");
+        LOG_ERROR_INTERNAL("[Wizard Fan] Failed to create screen from XML");
+        NOTIFY_ERROR("Failed to load fan configuration screen");
         return nullptr;
     }
 
