@@ -34,9 +34,14 @@ The refactored `TempControlPanel` (`include/ui_temp_control_panel.h`, `src/ui_te
 
 ---
 
-## Phase 1: Infrastructure (Week 1)
+## Phase 1: Infrastructure (Week 1) - ✅ COMPLETE
 
-### 1.1 Create PanelBase Abstract Class
+### 1.1 Create PanelBase Abstract Class - ✅ COMPLETE
+
+**Completed 2025-11-25:**
+- `include/ui_panel_base.h` - Full Doxygen documentation
+- `src/ui_panel_base.cpp` - RAII observer cleanup, move semantics
+- `docs/PANEL_MIGRATION.md` - Tracking document created
 
 **File:** `include/ui_panel_base.h`
 
@@ -97,15 +102,21 @@ All panels will inherit from `PanelBase` for consistent observer cleanup and API
 
 ---
 
-## Phase 2: Simple Panels (Week 2)
+## Phase 2: Simple Panels (Week 2) - 🔄 IN PROGRESS
 
 Start with simplest panels to validate the pattern:
 
-| Order | Panel | Lines | Complexity | Key Learning |
-|-------|-------|-------|------------|--------------|
-| 1 | `ui_panel_test` | 102 | Minimal | Template validation |
-| 2 | `ui_panel_glyphs` | 194 | Display only | No subjects |
-| 3 | `ui_panel_step_test` | 162 | Minimal | Basic callbacks |
+| Order | Panel | Lines | Complexity | Status |
+|-------|-------|-------|------------|--------|
+| 1 | `ui_panel_test` | 102 | Minimal | ✅ COMPLETE (2025-11-25) |
+| 2 | `ui_panel_glyphs` | 194 | Display only | 📋 Next |
+| 3 | `ui_panel_step_test` | 162 | Minimal | 📋 Pending |
+
+**TestPanel Migration Notes (2025-11-25):**
+- Template validated successfully
+- Deprecated wrapper pattern works - warnings guide migration
+- Required `app_globals.h` for `get_printer_state()` singleton access
+- Simple panels with no subjects just set `subjects_initialized_ = true`
 
 **Milestone:** Validated template, documented gotchas.
 
