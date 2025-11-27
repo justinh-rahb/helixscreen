@@ -255,23 +255,34 @@ $(TEST_CARDS_OBJ): $(SRC_DIR)/test_dynamic_cards.cpp
 	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@
 
 # LV_SIZE_CONTENT behavior test
+# Tests nested flex containers with SIZE_CONTENT to verify propagation patch behavior
 TEST_SIZE_CONTENT_BIN := $(BIN_DIR)/test_size_content
-TEST_SIZE_CONTENT_OBJ := $(OBJ_DIR)/test_size_content.o
+TEST_SIZE_CONTENT_OBJ := $(OBJ_DIR)/tests/test_size_content.o
 
 test-size-content: $(TEST_SIZE_CONTENT_BIN)
 	$(ECHO) "$(CYAN)Running LV_SIZE_CONTENT behavior test...$(RESET)"
 	$(Q)$(TEST_SIZE_CONTENT_BIN)
 
-$(TEST_SIZE_CONTENT_BIN): $(TEST_SIZE_CONTENT_OBJ) $(LVGL_OBJS) $(THORVG_OBJS)
+# Run with propagation enabled to verify patch works
+test-size-content-enabled: $(TEST_SIZE_CONTENT_BIN)
+	$(ECHO) "$(CYAN)Running SIZE_CONTENT test (propagation should be enabled)...$(RESET)"
+	$(Q)$(TEST_SIZE_CONTENT_BIN) "[size_content]" -v
+
+# Run only the proof test that compares on vs off
+test-size-content-proof: $(TEST_SIZE_CONTENT_BIN)
+	$(ECHO) "$(CYAN)Running SIZE_CONTENT proof test...$(RESET)"
+	$(Q)$(TEST_SIZE_CONTENT_BIN) "[proof]" -v
+
+$(TEST_SIZE_CONTENT_BIN): $(TEST_SIZE_CONTENT_OBJ) $(CATCH2_OBJ) $(TEST_MAIN_OBJ) $(LVGL_OBJS) $(THORVG_OBJS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(ECHO) "$(MAGENTA)[LD]$(RESET) test_size_content"
 	$(Q)$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 	$(ECHO) "$(GREEN)✓ Test binary ready: $@$(RESET)"
 
-$(TEST_SIZE_CONTENT_OBJ): test_size_content.cpp
+$(TEST_SIZE_CONTENT_OBJ): $(TEST_UNIT_DIR)/test_size_content.cpp
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(BLUE)[TEST]$(RESET) $<"
-	$(Q)$(CXX) $(CXXFLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@
+	$(Q)$(CXX) $(CXXFLAGS) -I$(TEST_DIR) $(INCLUDES) $(LV_CONF) -c $< -o $@
 
 # Responsive theme and breakpoint test
 TEST_RESPONSIVE_THEME_BIN := $(BIN_DIR)/test_responsive_theme

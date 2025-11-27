@@ -652,16 +652,6 @@ void PrintSelectPanel::populate_card_view() {
             lv_obj_set_height(card, dims.card_height);
             lv_obj_set_style_flex_grow(card, 0, LV_PART_MAIN);
 
-            // Calculate proper filename label height
-            lv_obj_t* filename_label = lv_obj_find_by_name(card, "filename_label");
-            if (filename_label) {
-                const lv_font_t* font = lv_obj_get_style_text_font(filename_label, LV_PART_MAIN);
-                if (font) {
-                    lv_coord_t line_height = lv_font_get_line_height(font);
-                    lv_obj_set_height(filename_label, line_height);
-                }
-            }
-
             // For directories: recolor icon, hide metadata, reduce overlay height
             if (file.is_dir) {
                 // Recolor the folder icon to amber/yellow (classic folder color)

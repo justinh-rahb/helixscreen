@@ -474,7 +474,7 @@ lv_obj_t* wizard = lv_xml_create(parent, "wizard_container", NULL);
 <view name="wizard_container">
     <lv_obj width="100%" height="100%" flex_flow="column">
         <lv_obj name="wizard_header"
-                width="100%" height="LV_SIZE_CONTENT"
+                width="100%" height="content"
                 style_min_height="#wizard_header_height"
                 style_pad_all="#wizard_padding"
                 style_pad_gap="#wizard_gap">
@@ -1173,10 +1173,11 @@ This pattern is used extensively (wizard screens, settings pages, etc.):
    - If one column is short, it constrains the entire row
    - **Solution:** Add `height="100%"` to ALL columns
 
-2. **LV_SIZE_CONTENT in nested grid (not flex):**
+2. **SIZE_CONTENT in nested grid (not flex):**
    - Grid layouts don't have the propagation patch that flex has
    - Nested grid containers with SIZE_CONTENT may need `lv_obj_update_layout()`
    - **Note:** Nested flex with SIZE_CONTENT now works thanks to our propagation patch
+   - **XML syntax:** Use `height="content"` NOT `height="LV_SIZE_CONTENT"`
 
 3. **Missing flex_grow chain:**
    - Every level needs proper sizing: `wrapper → row → columns`
@@ -2324,97 +2325,52 @@ Source: `/lvgl/src/others/xml/lv_xml_style.c:240-241`
 
 ### Common Issues
 
-#### ⚠️ LV_SIZE_CONTENT Evaluation to Zero (CRITICAL)
+#### ⚠️ SIZE_CONTENT: XML vs C++ Syntax
 
-**Issue:** `LV_SIZE_CONTENT` frequently evaluates to 0, causing widgets to be invisible or improperly sized.
+**CRITICAL:** In XML, use `"content"`, NOT `"LV_SIZE_CONTENT"`.
 
-**Symptoms:**
-- Labels with `width="LV_SIZE_CONTENT"` render with zero width (invisible)
-- Containers with `height="LV_SIZE_CONTENT"` collapse to 0 height
-- Flex layouts show children at (0,0) with no size
+```xml
+<!-- ✅ CORRECT -->
+<lv_obj width="content" height="content"/>
 
-**Root Cause - Deferred Layout Calculation:**
-
-LVGL 9 uses **deferred layout** where sizes aren't calculated immediately when set. Layout updates happen in multiple passes:
-
-1. Children are processed first (recursively)
-2. Parent's size is refreshed via `lv_obj_refr_size()`
-3. Layout is applied to children
-
-When `lv_obj_refr_size()` calculates `LV_SIZE_CONTENT`, it reads child coordinates to determine the bounding box. **If children haven't been laid out yet**, their coordinates are still at defaults (0x0), causing the parent to calculate size as 0.
-
-**Source:** `lvgl/src/core/lv_obj_pos.c:1077-1170, 1224-1247`
-
-**Verified Test Results** (from `test_size_content.cpp`):
-
-```
-Test 1: Label with LV_SIZE_CONTENT
-  BEFORE lv_obj_update_layout(): width=0, height=0
-  AFTER lv_obj_update_layout():  width=72, height=16  ✓
-
-Test 2: Container with LV_SIZE_CONTENT + child
-  BEFORE adding child:           width=0, height=0
-  AFTER adding child (no update): width=0, height=0
-  AFTER lv_obj_update_layout():  width=125, height=60 ✓
-
-Test 4: Flex container with LV_SIZE_CONTENT
-  BEFORE lv_obj_update_layout(): width=0, height=0
-  AFTER lv_obj_update_layout():  width=234, height=62 ✓
-
-Test 5: Nested LV_SIZE_CONTENT
-  BEFORE update:                 Outer=0x0, Inner=0x0
-  AFTER update:                  Outer=204x104, Inner=160x60 ✓
+<!-- ❌ WRONG - Parses as 0! -->
+<lv_obj width="LV_SIZE_CONTENT" height="LV_SIZE_CONTENT"/>
 ```
 
-**When LV_SIZE_CONTENT Evaluates to Zero:**
+**Why:** The XML parser recognizes the string `"content"` and converts it to the `LV_SIZE_CONTENT` constant. Using `"LV_SIZE_CONTENT"` directly in XML fails to parse correctly.
 
-1. **Container queried before layout completes** - Layout update deferred via `layout_inv` flag
-2. **Container created but children not yet added** - No children to measure
-3. **All children hidden or floating** - Calculation skips them, returns only intrinsic size
-
-**When LV_SIZE_CONTENT DOES Work (Verified):**
-
-1. **After `lv_obj_update_layout()` is called** - Forces immediate layout calculation
-2. **Widgets with intrinsic size** - Labels, buttons, checkboxes, images default to LV_SIZE_CONTENT
-3. **Flex containers** - Works correctly with flex_flow when layout is updated
-4. **Nested SIZE_CONTENT** - Parent and child both with SIZE_CONTENT work when updated
-5. **Percentage children** - LVGL 9 handles this intelligently (see Test 3: calculated 88x94, not 0)
-
-**Solution: Our Application Calls lv_obj_update_layout() Strategically**
-
-LV_SIZE_CONTENT is **ENCOURAGED** for appropriate use cases. Our application ensures layout updates happen at key points:
-
+**In C++ code:** Use the constant `LV_SIZE_CONTENT`:
 ```cpp
-// Main UI initialization (main.cpp:671)
-lv_obj_t* app_layout = lv_xml_create(screen, "app_layout", NULL);
-lv_obj_update_layout(screen);  // Ensures all SIZE_CONTENT widgets sized
-
-// Dynamic component creation
-lv_obj_t* panel = lv_xml_create(parent, "my_panel", NULL);
-lv_obj_update_layout(panel);  // Force layout calculation
-int32_t width = lv_obj_get_width(panel);  // Now accurate
+lv_obj_set_width(obj, LV_SIZE_CONTENT);  // ✅ Correct in C++
 ```
 
-**When to Use LV_SIZE_CONTENT (Encouraged ✅):**
+**When SIZE_CONTENT Works Well:**
 
 ```xml
 <!-- ✅ EXCELLENT - Flex container auto-sizes to children -->
-<lv_obj flex_flow="row" width="LV_SIZE_CONTENT" height="LV_SIZE_CONTENT"
+<lv_obj flex_flow="row" width="content" height="content"
         style_pad_all="#padding_small">
     <lv_button>Action</lv_button>
     <lv_button>Cancel</lv_button>
 </lv_obj>
 
 <!-- ✅ GOOD - Label sizes to dynamic text -->
-<lv_label text="$status_message"
-          width="LV_SIZE_CONTENT"
-          height="LV_SIZE_CONTENT"/>
+<lv_label text="$status_message" width="content" height="content"/>
 
 <!-- ✅ GOOD - Vertical stack sizes to content -->
-<lv_obj flex_flow="column" width="100%" height="LV_SIZE_CONTENT">
+<lv_obj flex_flow="column" width="100%" height="content">
     <!-- Dynamic children added in C++ -->
 </lv_obj>
 ```
+
+**For complex layouts:** Call `lv_obj_update_layout()` after XML creation to ensure correct sizing:
+
+```cpp
+lv_obj_t* panel = lv_xml_create(parent, "my_panel", NULL);
+lv_obj_update_layout(panel);  // Ensures SIZE_CONTENT calculates correctly
+```
+
+See **docs/LV_SIZE_CONTENT_GUIDE.md** for complete technical details.
 
 **When to Use Explicit Dimensions:**
 
@@ -2429,20 +2385,9 @@ int32_t width = lv_obj_get_width(panel);  // Now accurate
 <lv_obj width="33%" height="100%"/>
 ```
 
-**Circular Dependency Handling:**
-
-LVGL 9 has intelligent circular dependency prevention:
-- Parent has `width/height = LV_SIZE_CONTENT`
-- Child has `width/height = "100%"` (percentage)
-
-**In LVGL 8:** Child was sized to 0 to prevent infinite loops
-**In LVGL 9:** Sizes both correctly using sophisticated layout solver (verified in test_size_content.cpp Test 3)
-
-**Source:** `lvgl/src/core/lv_obj_pos.c:114-123, 145-155`
-
 **Best Practices:**
 
-1. **Use LV_SIZE_CONTENT freely in XML** - Our application ensures layout updates at strategic points
+1. **Use `"content"` freely in XML** (NOT `"LV_SIZE_CONTENT"`) - Our application ensures layout updates at strategic points
 
 2. **For C++ dynamic creation:** ALWAYS call `lv_obj_update_layout()` after creating widgets
    ```cpp
@@ -2452,8 +2397,8 @@ LVGL 9 has intelligent circular dependency prevention:
    ```
 
 3. **Troubleshooting layout issues:** If you encounter sizing problems (0x0, collapsed, invisible):
-   - **BE SKEPTICAL** that `lv_obj_update_layout()` has been called recently enough
-   - Test by adding layout update after XML creation
+   - First check: Are you using `"content"` in XML (not `"LV_SIZE_CONTENT"`)?
+   - Verify `lv_obj_update_layout()` has been called after creation
    - Check test_size_content.cpp for diagnostic patterns
 
 4. **Prefer semantic constants** for explicit dimensions:

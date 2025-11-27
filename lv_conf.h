@@ -716,7 +716,7 @@
 #define LV_USE_FLEX 1
 
 /*Propagate SIZE_CONTENT refresh to ancestors (fixes nested SIZE_CONTENT collapse)*/
-#define LV_FLEX_PROPAGATE_SIZE_CONTENT 1
+#define LV_FLEX_PROPAGATE_SIZE_CONTENT 0
 
 /*A layout similar to Grid in CSS.*/
 #define LV_USE_GRID 1

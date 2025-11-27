@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <!-- Copyright 2025 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-
 <component>
   <!-- Print File Card Component - Responsive Flexbox Layout
 	     Uses flex_grow with min/max constraints to adapt to any screen size.
@@ -13,7 +12,6 @@
     <prop type="string" name="print_time"/>
     <prop type="string" name="filament_weight"/>
   </api>
-
   <consts>
     <!-- Component-specific spacing (not in globals) -->
     <px name="metadata_top_pad" value="4"/>
@@ -24,17 +22,13 @@
     <px name="card_max_width" value="230"/>
     <px name="card_height" value="245"/>
     <int name="metadata_overlay_opacity" value="204"/>
-
     <!-- Thumbnail height (overridden by C++ based on card width) -->
     <px name="thumbnail_height" value="150"/>
     <!-- Metadata overlay minimum height -->
     <px name="metadata_overlay_min_height" value="70"/>
-    <!-- Filename label height (single line, recalculated in C++ based on font) -->
-    <px name="filename_label_height" value="20"/>
     <!-- Metadata label minimum width to prevent crushing -->
     <px name="metadata_label_min_width" value="35"/>
   </consts>
-
   <view extends="ui_card" style_flex_basis="#card_base_width" flex_grow="1" style_min_width="#card_min_width" style_max_width="#card_max_width" height="#card_height" style_radius="#border_radius" style_pad_all="0" style_clip_corner="true" clickable="true" name="card_root">
     <!-- Diagonal gradient background (bright top-right to dark bottom-left) -->
     <ui_gradient_canvas width="100%" height="100%" dither="true"/>
@@ -45,7 +39,7 @@
       <!-- Inner overlay with rounded corners - taller to extend above clip, hiding top radius -->
       <lv_obj width="100%" height="78" style_bg_opa="#metadata_overlay_opacity" style_border_width="0" style_radius="#border_radius" style_pad_left="#gap_tiny" style_pad_right="#gap_tiny" style_pad_top="14" style_pad_bottom="#gap_tiny" align="bottom_mid" flex_flow="column" scrollable="false" name="metadata_overlay">
         <!-- Filename label (single line, truncated with ...) -->
-        <lv_label text="$filename" width="100%" height="#filename_label_height" long_mode="dots" style_text_font="montserrat_14" name="filename_label"/>
+        <lv_label text="$filename" width="100%" height="20" long_mode="dots" style_text_font="montserrat_14" name="filename_label"/>
         <!-- Metadata row (horizontal layout, responsive) -->
         <lv_obj width="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_top="#metadata_top_pad" flex_flow="row" style_pad_gap="#gap_tiny" flex_grow="1" name="metadata_row">
           <!-- Print time (icon + text) -->

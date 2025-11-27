@@ -1,7 +1,6 @@
 <?xml version="1.0"?>
 <!-- Copyright 2025 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-
 <component>
   <!-- Motion Sub-Screen: XYZ Movement & Homing -->
   <!-- Simplified button grid design (vs circular jog pad) -->
@@ -50,7 +49,7 @@
         <!-- Outer ring = large jogs, inner circle = small jogs -->
         <!-- Custom draw shows concentric circles, radial dividers, axis labels, home icon -->
         <!-- Click detection uses angle from center to determine direction -->
-        <lv_obj name="jog_pad_container" width="LV_SIZE_CONTENT" height="LV_SIZE_CONTENT" style_bg_opa="0" style_pad_all="0" style_border_width="0" style_border_opa="0" style_radius="160" scrollable="false" clickable="true" align="center">
+        <lv_obj name="jog_pad_container" width="content" height="content" style_bg_opa="0" style_pad_all="0" style_border_width="0" style_border_opa="0" style_radius="160" scrollable="false" clickable="true" align="center">
           <!-- No child widgets - all graphics drawn via LV_EVENT_DRAW_POST -->
           <!-- Click handled via LV_EVENT_CLICKED with angle-based direction detection -->
         </lv_obj>

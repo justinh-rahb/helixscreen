@@ -859,24 +859,31 @@ Unknown attributes are **silently ignored** without any warnings or errors. If a
 3. Confirm the attribute exists for that widget type
 4. Test with known-working examples first
 
-### 5. LV_SIZE_CONTENT Often Unreliable
+### 5. SIZE_CONTENT: XML Syntax
 
-Using `width="content"` or `height="content"` frequently fails to calculate correct dimensions, especially:
-- For labels inside XML components with property substitution
-- Inside flex containers
-- With dynamically created components
+**CRITICAL:** In XML, use `"content"`, NOT `"LV_SIZE_CONTENT"`.
 
-**Recommendation:** Use explicit pixel dimensions instead of `LV_SIZE_CONTENT`.
-
-**❌ UNRELIABLE:**
+**✅ CORRECT:**
 ```xml
 <lv_label text="Dynamic text" width="content" height="content"/>
+<lv_obj flex_flow="column" width="100%" height="content">
+    <!-- Children -->
+</lv_obj>
 ```
 
-**✅ RELIABLE:**
+**❌ WRONG - Parses as 0:**
 ```xml
-<lv_label text="Dynamic text" width="120" height="30"/>
+<lv_label text="Dynamic text" width="LV_SIZE_CONTENT" height="LV_SIZE_CONTENT"/>
 ```
+
+**Why:** The XML parser only recognizes the string `"content"`. Using `"LV_SIZE_CONTENT"` directly fails to parse correctly and evaluates to 0.
+
+**In C++ code:** Use the constant `LV_SIZE_CONTENT`:
+```cpp
+lv_obj_set_width(obj, LV_SIZE_CONTENT);  // ✅ Correct in C++
+```
+
+**For complex layouts:** Call `lv_obj_update_layout()` after XML creation to ensure SIZE_CONTENT calculates correctly. See **docs/LV_SIZE_CONTENT_GUIDE.md** for complete details.
 
 ---
 

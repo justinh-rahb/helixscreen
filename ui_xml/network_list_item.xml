@@ -1,11 +1,10 @@
 <?xml version="1.0"?>
 <!-- Copyright 2025 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-
 <component>
   <!-- WiFi Network List Item Component -->
   <!-- Displays: SSID, signal strength icon, lock icon for encrypted networks, connected indicator -->
-  <view extends="lv_obj" width="100%" height="LV_SIZE_CONTENT" style_min_height="44" style_bg_opa="0" style_border_width="0" style_pad_all="#gap_tiny" style_pad_gap="#gap_tiny" flex_flow="row" clickable="true" style_flex_main_place="space_between" style_flex_cross_place="center" name="network_item_root">
+  <view extends="lv_obj" width="100%" height="content" style_min_height="44" style_bg_opa="0" style_border_width="0" style_pad_all="#gap_tiny" style_pad_gap="#gap_tiny" flex_flow="row" clickable="true" style_flex_main_place="space_between" style_flex_cross_place="center" name="network_item_root">
     <!-- Left: SSID -->
     <lv_label name="network_ssid" text="Network Name" style_text_font="montserrat_16" flex_grow="1"/>
     <!-- Right: Connected indicator + Signal icon -->
