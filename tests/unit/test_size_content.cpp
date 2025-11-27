@@ -86,8 +86,9 @@ class SizeContentTestFixture {
      * @brief Force layout calculation for all pending changes
      */
     void update_layout() {
+        // Just update layout - don't call lv_timer_handler() as it may block
+        // waiting for tick updates in headless mode
         lv_obj_update_layout(screen);
-        lv_timer_handler();
     }
 
     /**
@@ -648,9 +649,9 @@ TEST_CASE_METHOD(SizeContentTestFixture,
     lv_obj_t* p_disabled = create_flex_container(gp_disabled, LV_FLEX_FLOW_COLUMN, false, true);
     create_fixed_box(p_disabled, 100, 77);
 
-    // Important: Do NOT call update_layout here - we want to see the
-    // natural (potentially broken) behavior
-    lv_timer_handler();
+    // Don't call update_layout - just trigger minimal layout calculation
+    // to see the natural (potentially broken) behavior without propagation
+    lv_obj_update_layout(gp_disabled);
 
     int32_t gp_disabled_h = lv_obj_get_height(gp_disabled);
 
