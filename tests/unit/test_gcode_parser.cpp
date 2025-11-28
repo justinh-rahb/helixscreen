@@ -5,11 +5,12 @@
 
 #include "gcode_parser.h"
 
-#include "../catch_amalgamated.hpp"
 #include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+
+#include "../catch_amalgamated.hpp"
 
 using namespace gcode;
 using Catch::Approx;
@@ -265,8 +266,8 @@ TEST_CASE("GCodeParser - Move type differentiation", "[gcode][parser]") {
     GCodeParser parser;
 
     SECTION("G0 commands are travel moves") {
-        parser.parse_line("G0 X10 Y10 Z0.2");  // Travel move (no extrusion)
-        parser.parse_line("G0 X20 Y20");       // Another travel
+        parser.parse_line("G0 X10 Y10 Z0.2"); // Travel move (no extrusion)
+        parser.parse_line("G0 X20 Y20");      // Another travel
 
         auto file = parser.finalize();
 
@@ -278,8 +279,8 @@ TEST_CASE("GCodeParser - Move type differentiation", "[gcode][parser]") {
     }
 
     SECTION("G1 without E parameter is travel move") {
-        parser.parse_line("G1 X10 Y10 Z0.2");  // No E = travel
-        parser.parse_line("G1 X20 Y20");       // No E = travel
+        parser.parse_line("G1 X10 Y10 Z0.2"); // No E = travel
+        parser.parse_line("G1 X20 Y20");      // No E = travel
 
         auto file = parser.finalize();
 
@@ -289,8 +290,8 @@ TEST_CASE("GCodeParser - Move type differentiation", "[gcode][parser]") {
     }
 
     SECTION("G1 with E parameter is extrusion move") {
-        parser.parse_line("G1 X10 Y10 Z0.2 E0.5");  // Has E = extrusion
-        parser.parse_line("G1 X20 Y20 E1.0");       // Has E = extrusion
+        parser.parse_line("G1 X10 Y10 Z0.2 E0.5"); // Has E = extrusion
+        parser.parse_line("G1 X20 Y20 E1.0");      // Has E = extrusion
 
         auto file = parser.finalize();
 
@@ -302,25 +303,25 @@ TEST_CASE("GCodeParser - Move type differentiation", "[gcode][parser]") {
     }
 
     SECTION("G1 with decreasing E during movement is retraction (travel move)") {
-        parser.parse_line("M82");  // Absolute extrusion mode
-        parser.parse_line("G1 X10 Y10 Z0.2 E1.0");   // Extrusion
-        parser.parse_line("G1 X15 Y15 E0.5");        // Move with retraction (E decreases)
-        parser.parse_line("G1 X20 Y20");             // Travel after retraction
+        parser.parse_line("M82");                  // Absolute extrusion mode
+        parser.parse_line("G1 X10 Y10 Z0.2 E1.0"); // Extrusion
+        parser.parse_line("G1 X15 Y15 E0.5");      // Move with retraction (E decreases)
+        parser.parse_line("G1 X20 Y20");           // Travel after retraction
 
         auto file = parser.finalize();
 
         // First move is extrusion, second has negative E delta (retraction), third is travel
         REQUIRE(file.total_segments == 3);
         REQUIRE(file.layers[0].segments[0].is_extrusion == true);
-        REQUIRE(file.layers[0].segments[1].is_extrusion == false);  // Negative E = retraction
-        REQUIRE(file.layers[0].segments[2].is_extrusion == false);  // Travel
+        REQUIRE(file.layers[0].segments[1].is_extrusion == false); // Negative E = retraction
+        REQUIRE(file.layers[0].segments[2].is_extrusion == false); // Travel
     }
 
     SECTION("Mixed G0 and G1 commands") {
-        parser.parse_line("G1 X10 Y10 Z0.2 E1.0");  // G1 extrusion
-        parser.parse_line("G0 X20 Y20");            // G0 travel
-        parser.parse_line("G1 X30 Y30 E2.0");       // G1 extrusion
-        parser.parse_line("G0 X0 Y0");              // G0 travel
+        parser.parse_line("G1 X10 Y10 Z0.2 E1.0"); // G1 extrusion
+        parser.parse_line("G0 X20 Y20");           // G0 travel
+        parser.parse_line("G1 X30 Y30 E2.0");      // G1 extrusion
+        parser.parse_line("G0 X0 Y0");             // G0 travel
 
         auto file = parser.finalize();
 
@@ -329,10 +330,10 @@ TEST_CASE("GCodeParser - Move type differentiation", "[gcode][parser]") {
         REQUIRE(file.layers[0].segment_count_travel == 2);
 
         // Verify specific segment types
-        REQUIRE(file.layers[0].segments[0].is_extrusion == true);   // G1 E1.0
-        REQUIRE(file.layers[0].segments[1].is_extrusion == false);  // G0
-        REQUIRE(file.layers[0].segments[2].is_extrusion == true);   // G1 E2.0
-        REQUIRE(file.layers[0].segments[3].is_extrusion == false);  // G0
+        REQUIRE(file.layers[0].segments[0].is_extrusion == true);  // G1 E1.0
+        REQUIRE(file.layers[0].segments[1].is_extrusion == false); // G0
+        REQUIRE(file.layers[0].segments[2].is_extrusion == true);  // G1 E2.0
+        REQUIRE(file.layers[0].segments[3].is_extrusion == false); // G0
     }
 }
 
@@ -340,9 +341,9 @@ TEST_CASE("GCodeParser - Extrusion amount tracking", "[gcode][parser]") {
     GCodeParser parser;
 
     SECTION("Track extrusion delta in absolute mode (M82)") {
-        parser.parse_line("M82");  // Absolute extrusion
+        parser.parse_line("M82"); // Absolute extrusion
         parser.parse_line("G1 X10 Y10 Z0.2 E1.0");
-        parser.parse_line("G1 X20 Y20 E3.0");  // Delta = 3.0 - 1.0 = 2.0
+        parser.parse_line("G1 X20 Y20 E3.0"); // Delta = 3.0 - 1.0 = 2.0
 
         auto file = parser.finalize();
 
@@ -351,9 +352,9 @@ TEST_CASE("GCodeParser - Extrusion amount tracking", "[gcode][parser]") {
     }
 
     SECTION("Track extrusion delta in relative mode (M83)") {
-        parser.parse_line("M83");  // Relative extrusion
-        parser.parse_line("G1 X10 Y10 Z0.2 E1.5");  // Delta = 1.5
-        parser.parse_line("G1 X20 Y20 E2.0");       // Delta = 2.0
+        parser.parse_line("M83");                  // Relative extrusion
+        parser.parse_line("G1 X10 Y10 Z0.2 E1.5"); // Delta = 1.5
+        parser.parse_line("G1 X20 Y20 E2.0");      // Delta = 2.0
 
         auto file = parser.finalize();
 
@@ -362,9 +363,9 @@ TEST_CASE("GCodeParser - Extrusion amount tracking", "[gcode][parser]") {
     }
 
     SECTION("Retraction has negative extrusion amount") {
-        parser.parse_line("M82");  // Absolute extrusion
+        parser.parse_line("M82"); // Absolute extrusion
         parser.parse_line("G1 X10 Y10 Z0.2 E5.0");
-        parser.parse_line("G1 X15 Y15 E3.0");  // Move with retract: delta = 3.0 - 5.0 = -2.0
+        parser.parse_line("G1 X15 Y15 E3.0"); // Move with retract: delta = 3.0 - 5.0 = -2.0
 
         auto file = parser.finalize();
 
@@ -377,8 +378,8 @@ TEST_CASE("GCodeParser - Travel move characteristics", "[gcode][parser]") {
     GCodeParser parser;
 
     SECTION("Travel moves create segments with start and end positions") {
-        parser.parse_line("G0 X10 Y10 Z0.2");  // Move to (10,10,0.2)
-        parser.parse_line("G0 X100 Y100");      // Travel to (100,100)
+        parser.parse_line("G0 X10 Y10 Z0.2"); // Move to (10,10,0.2)
+        parser.parse_line("G0 X100 Y100");    // Travel to (100,100)
 
         auto file = parser.finalize();
 
@@ -402,7 +403,7 @@ TEST_CASE("GCodeParser - Travel move characteristics", "[gcode][parser]") {
 
     SECTION("Z-only travel moves (layer changes)") {
         parser.parse_line("G1 X10 Y10 Z0.2 E1");
-        parser.parse_line("G0 Z0.4");  // Z-hop / layer change
+        parser.parse_line("G0 Z0.4"); // Z-hop / layer change
         parser.parse_line("G1 X10 Y10 E2");
 
         auto file = parser.finalize();
@@ -427,9 +428,9 @@ TEST_CASE("GCodeParser - Extrusion move characteristics", "[gcode][parser]") {
     }
 
     SECTION("Extrusion width calculated from E delta and distance") {
-        parser.parse_line("; layer_height = 0.2");  // Set layer height metadata
+        parser.parse_line("; layer_height = 0.2"); // Set layer height metadata
         parser.parse_line("G1 X0 Y0 Z0.2 E0");
-        parser.parse_line("G1 X10 Y0 E1.5");  // 10mm move with 1.5mm³ extrusion
+        parser.parse_line("G1 X10 Y0 E1.5"); // 10mm move with 1.5mm³ extrusion
 
         auto file = parser.finalize();
 
@@ -437,8 +438,8 @@ TEST_CASE("GCodeParser - Extrusion move characteristics", "[gcode][parser]") {
         // Just verify it's set to a reasonable value if calculated
         auto& seg = file.layers[0].segments[1];
         if (seg.width > 0) {
-            REQUIRE(seg.width > 0.1f);   // Minimum reasonable width
-            REQUIRE(seg.width < 2.0f);   // Maximum reasonable width
+            REQUIRE(seg.width > 0.1f); // Minimum reasonable width
+            REQUIRE(seg.width < 2.0f); // Maximum reasonable width
         }
     }
 }
@@ -458,7 +459,7 @@ TEST_CASE("extract_header_metadata - OrcaSlicer file footer parsing", "[gcode][m
         std::ofstream out(temp_path);
         out << "; generated by OrcaSlicer 2.3.1\n";
         out << "; total layer number: 100\n";
-        out << "G1 X10 Y10 Z0.2\n";  // Some G-code to simulate content
+        out << "G1 X10 Y10 Z0.2\n"; // Some G-code to simulate content
         out << "G1 X20 Y20\n";
         // Footer metadata (like OrcaSlicer produces)
         out << "; estimated printing time (normal mode) = 36m 25s\n";
@@ -640,5 +641,185 @@ TEST_CASE("extract_header_metadata - Real OrcaSlicer file", "[gcode][metadata][i
         // "; total filament used [g] = 10.98" at line ~126289
         REQUIRE(metadata.filament_used_g > 0);
         REQUIRE(metadata.filament_used_g == Approx(10.98));
+    }
+
+    SECTION("Parses filament type from header") {
+        // "; filament_type = PLA" in header
+        REQUIRE(metadata.filament_type == "PLA");
+    }
+}
+
+// ============================================================================
+// Filament Type Detection Tests
+// ============================================================================
+
+TEST_CASE("extract_header_metadata - Filament type parsing", "[gcode][metadata][filament_type]") {
+    SECTION("Parse simple filament_type (PLA)") {
+        std::string temp_path = "/tmp/test_filament_type_pla.gcode";
+        std::ofstream out(temp_path);
+        out << "; generated by TestSlicer 1.0\n";
+        out << "; filament_type = PLA\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        REQUIRE(metadata.filament_type == "PLA");
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Parse semicolon-separated multi-extruder filament_type (extracts first type)") {
+        // OrcaSlicer/PrusaSlicer format for multi-extruder: "PLA;PLA;PLA;PLA"
+        std::string temp_path = "/tmp/test_filament_type_multi.gcode";
+        std::ofstream out(temp_path);
+        out << "; generated by PrusaSlicer 2.6\n";
+        out << "; filament_type = PLA;PLA;PLA;PLA\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        // Should extract just the first type "PLA", not the full string
+        REQUIRE(metadata.filament_type == "PLA");
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Parse PETG filament type") {
+        std::string temp_path = "/tmp/test_filament_type_petg.gcode";
+        std::ofstream out(temp_path);
+        out << "; filament_type = PETG\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        REQUIRE(metadata.filament_type == "PETG");
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Parse ABS filament type") {
+        std::string temp_path = "/tmp/test_filament_type_abs.gcode";
+        std::ofstream out(temp_path);
+        out << "; filament_type = ABS\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        REQUIRE(metadata.filament_type == "ABS");
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Parse TPU filament type") {
+        std::string temp_path = "/tmp/test_filament_type_tpu.gcode";
+        std::ofstream out(temp_path);
+        out << "; filament_type = TPU\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        REQUIRE(metadata.filament_type == "TPU");
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Parse ASA filament type") {
+        std::string temp_path = "/tmp/test_filament_type_asa.gcode";
+        std::ofstream out(temp_path);
+        out << "; filament_type = ASA\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        REQUIRE(metadata.filament_type == "ASA");
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Parse Nylon filament type") {
+        std::string temp_path = "/tmp/test_filament_type_nylon.gcode";
+        std::ofstream out(temp_path);
+        out << "; filament_type = Nylon\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        REQUIRE(metadata.filament_type == "Nylon");
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Parse PC (Polycarbonate) filament type") {
+        std::string temp_path = "/tmp/test_filament_type_pc.gcode";
+        std::ofstream out(temp_path);
+        out << "; filament_type = PC\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        REQUIRE(metadata.filament_type == "PC");
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Handle missing filament_type (remains empty)") {
+        std::string temp_path = "/tmp/test_filament_type_missing.gcode";
+        std::ofstream out(temp_path);
+        out << "; generated by TestSlicer 1.0\n";
+        out << "; total layer number: 100\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        // filament_type should be empty when not present in file
+        REQUIRE(metadata.filament_type.empty());
+
+        std::remove(temp_path.c_str());
+    }
+
+    SECTION("Parse mixed multi-extruder filament types (extracts first type)") {
+        // Different materials for different extruders
+        std::string temp_path = "/tmp/test_filament_type_mixed.gcode";
+        std::ofstream out(temp_path);
+        out << "; generated by OrcaSlicer 2.3.1\n";
+        out << "; filament_type = PETG;PLA;ABS\n";
+        out << "G1 X10 Y10 Z0.2\n";
+        out.close();
+
+        auto metadata = extract_header_metadata(temp_path);
+
+        // Should extract just the first type "PETG"
+        REQUIRE(metadata.filament_type == "PETG");
+
+        std::remove(temp_path.c_str());
+    }
+}
+
+TEST_CASE("extract_header_metadata - Real multi-extruder file", "[gcode][metadata][integration]") {
+    // Test with actual multi-extruder G-code file if it exists
+    std::string test_file = "assets/test_gcodes/Benchbin_MK4_MMU3.gcode";
+
+    std::ifstream check(test_file);
+    if (!check.good()) {
+        SKIP("Test G-code file not found: " << test_file);
+    }
+    check.close();
+
+    auto metadata = extract_header_metadata(test_file);
+
+    SECTION("Parses filament type from multi-extruder file") {
+        // File has "; filament_type = PLA;PLA;PLA;PLA"
+        // Should extract just "PLA"
+        REQUIRE_FALSE(metadata.filament_type.empty());
+        REQUIRE(metadata.filament_type == "PLA");
     }
 }

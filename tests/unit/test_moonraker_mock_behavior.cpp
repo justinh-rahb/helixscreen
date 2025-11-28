@@ -2176,3 +2176,144 @@ TEST_CASE("MoonrakerClientMock BED_MESH_CLEAR clears active mesh",
         mock.disconnect();
     }
 }
+
+// ============================================================================
+// Filament Type in Metadata Response Tests
+// ============================================================================
+
+TEST_CASE("MoonrakerClientMock - file metadata includes filament_type",
+          "[mock][api][metadata][filament_type]") {
+    MoonrakerClientMock mock(MoonrakerClientMock::PrinterType::VORON_24);
+
+    SECTION("Metadata response includes filament_type field") {
+        // Request metadata for 3DBenchy which has "; filament_type = PLA"
+        json params = {{"filename", "3DBenchy.gcode"}};
+        json response;
+        bool callback_invoked = false;
+
+        mock.send_jsonrpc("server.files.metadata", params, [&](json resp) {
+            response = resp;
+            callback_invoked = true;
+        });
+
+        REQUIRE(callback_invoked);
+        REQUIRE(response.contains("result"));
+
+        const json& result = response["result"];
+        REQUIRE(result.contains("filament_type"));
+        REQUIRE(result["filament_type"].is_string());
+    }
+
+    SECTION("Filament type matches G-code file (3DBenchy = PLA)") {
+        // 3DBenchy.gcode contains "; filament_type = PLA"
+        json params = {{"filename", "3DBenchy.gcode"}};
+        json response;
+        bool callback_invoked = false;
+
+        mock.send_jsonrpc("server.files.metadata", params, [&](json resp) {
+            response = resp;
+            callback_invoked = true;
+        });
+
+        REQUIRE(callback_invoked);
+        REQUIRE(response.contains("result"));
+
+        const json& result = response["result"];
+        REQUIRE(result.contains("filament_type"));
+        REQUIRE(result["filament_type"].get<std::string>() == "PLA");
+    }
+
+    SECTION("Filament type from multi-extruder file extracts first type") {
+        // Benchbin_MK4_MMU3.gcode contains "; filament_type = PLA;PLA;PLA;PLA"
+        json params = {{"filename", "Benchbin_MK4_MMU3.gcode"}};
+        json response;
+        bool callback_invoked = false;
+
+        mock.send_jsonrpc("server.files.metadata", params, [&](json resp) {
+            response = resp;
+            callback_invoked = true;
+        });
+
+        REQUIRE(callback_invoked);
+        REQUIRE(response.contains("result"));
+
+        const json& result = response["result"];
+        REQUIRE(result.contains("filament_type"));
+        // Should extract just "PLA", not "PLA;PLA;PLA;PLA"
+        REQUIRE(result["filament_type"].get<std::string>() == "PLA");
+    }
+
+    SECTION("Filament type is empty for files without filament_type header") {
+        // xyz-10mm-calibration-cube.gcode might not have filament_type
+        // This test verifies the field exists and handles missing data gracefully
+        json params = {{"filename", "xyz-10mm-calibration-cube.gcode"}};
+        json response;
+        bool callback_invoked = false;
+
+        mock.send_jsonrpc("server.files.metadata", params, [&](json resp) {
+            response = resp;
+            callback_invoked = true;
+        });
+
+        REQUIRE(callback_invoked);
+        REQUIRE(response.contains("result"));
+
+        const json& result = response["result"];
+        // Field should always be present (may be empty string)
+        REQUIRE(result.contains("filament_type"));
+        REQUIRE(result["filament_type"].is_string());
+    }
+}
+
+TEST_CASE("MoonrakerClientMock - file metadata with success/error callbacks",
+          "[mock][api][metadata][filament_type]") {
+    MoonrakerClientMock mock(MoonrakerClientMock::PrinterType::VORON_24);
+
+    SECTION("Success callback returns metadata with filament_type") {
+        json params = {{"filename", "3DBenchy.gcode"}};
+        json response;
+        bool success_invoked = false;
+        bool error_invoked = false;
+
+        mock.send_jsonrpc(
+            "server.files.metadata", params,
+            [&](json resp) {
+                response = resp;
+                success_invoked = true;
+            },
+            [&](const MoonrakerError& err) {
+                (void)err;
+                error_invoked = true;
+            });
+
+        REQUIRE(success_invoked);
+        REQUIRE_FALSE(error_invoked);
+        REQUIRE(response.contains("result"));
+
+        const json& result = response["result"];
+        REQUIRE(result.contains("filament_type"));
+        REQUIRE(result["filament_type"].get<std::string>() == "PLA");
+    }
+
+    SECTION("Error callback invoked for missing filename") {
+        json params = {}; // Missing filename parameter
+        bool success_invoked = false;
+        bool error_invoked = false;
+        MoonrakerError captured_error;
+
+        mock.send_jsonrpc(
+            "server.files.metadata", params,
+            [&](json resp) {
+                (void)resp;
+                success_invoked = true;
+            },
+            [&](const MoonrakerError& err) {
+                captured_error = err;
+                error_invoked = true;
+            });
+
+        REQUIRE(error_invoked);
+        REQUIRE_FALSE(success_invoked);
+        REQUIRE(captured_error.type == MoonrakerErrorType::VALIDATION_ERROR);
+    }
+}
