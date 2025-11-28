@@ -12,7 +12,10 @@
 #include "ui_theme.h"
 
 #include "app_globals.h"
+#include "config.h"
+#include "moonraker_api.h"
 #include "printer_state.h"
+#include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
 
@@ -28,14 +31,34 @@ HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
     : PanelBase(printer_state, api) {
     // Initialize buffer contents with default values
     std::strcpy(status_buffer_, "Welcome to HelixScreen");
-    std::strcpy(temp_buffer_, "30 °C");
+    std::strcpy(temp_buffer_, "-- °C");
     std::strcpy(network_icon_buffer_, ICON_WIFI);
     std::strcpy(network_label_buffer_, "Wi-Fi");
     std::strcpy(network_color_buffer_, "0xff4444");
 
-    // Default colors (will be overwritten by init_home_panel_colors)
-    light_icon_on_color_ = lv_color_hex(0xFFD700);
-    light_icon_off_color_ = lv_color_hex(0x909090);
+    // Subscribe to PrinterState extruder temperature for reactive updates
+    extruder_temp_observer_ = lv_subject_add_observer(printer_state_.get_extruder_temp_subject(),
+                                                      extruder_temp_observer_cb, this);
+
+    spdlog::debug("[{}] Subscribed to PrinterState extruder temperature", get_name());
+
+    // Load configured LED from wizard settings and tell PrinterState to track it
+    Config* config = Config::get_instance();
+    if (config) {
+        configured_led_ = config->get<std::string>(WizardConfigPaths::LED_STRIP, "");
+        if (!configured_led_.empty()) {
+            // Tell PrinterState to track this LED for state updates
+            printer_state_.set_tracked_led(configured_led_);
+
+            // Subscribe to LED state changes from PrinterState
+            led_state_observer_ = lv_subject_add_observer(printer_state_.get_led_state_subject(),
+                                                          led_state_observer_cb, this);
+
+            spdlog::info("[{}] Configured LED: {} (observing state)", get_name(), configured_led_);
+        } else {
+            spdlog::debug("[{}] No LED configured - light control will be hidden", get_name());
+        }
+    }
 }
 
 HomePanel::~HomePanel() {
@@ -49,7 +72,17 @@ HomePanel::~HomePanel() {
 
     tip_rotation_timer_ = nullptr;
 
-    // Observers cleaned up by PanelBase::~PanelBase()
+    // RAII cleanup: remove PrinterState observers
+    if (extruder_temp_observer_) {
+        lv_observer_remove(extruder_temp_observer_);
+        extruder_temp_observer_ = nullptr;
+    }
+    if (led_state_observer_) {
+        lv_observer_remove(led_state_observer_);
+        led_state_observer_ = nullptr;
+    }
+
+    // Other observers cleaned up by PanelBase::~PanelBase()
 }
 
 // ============================================================================
@@ -64,21 +97,17 @@ void HomePanel::init_subjects() {
 
     spdlog::debug("[{}] Initializing subjects", get_name());
 
-    // Initialize theme-aware colors for light icon
-    init_home_panel_colors();
-
     // Initialize subjects with default values
+    // Note: LED state (led_state) is managed by PrinterState and already registered
     UI_SUBJECT_INIT_AND_REGISTER_STRING(status_subject_, status_buffer_, "Welcome to HelixScreen",
                                         "status_text");
-    UI_SUBJECT_INIT_AND_REGISTER_STRING(temp_subject_, temp_buffer_, "30 °C", "temp_text");
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(temp_subject_, temp_buffer_, "-- °C", "temp_text");
     UI_SUBJECT_INIT_AND_REGISTER_STRING(network_icon_subject_, network_icon_buffer_, ICON_WIFI,
                                         "network_icon");
     UI_SUBJECT_INIT_AND_REGISTER_STRING(network_label_subject_, network_label_buffer_, "Wi-Fi",
                                         "network_label");
     UI_SUBJECT_INIT_AND_REGISTER_STRING(network_color_subject_, network_color_buffer_, "0xff4444",
                                         "network_color");
-    UI_SUBJECT_INIT_AND_REGISTER_COLOR(light_icon_color_subject_, light_icon_off_color_,
-                                       "light_icon_color");
 
     // Register event callbacks BEFORE loading XML
     // Note: These use static trampolines that will look up the global instance
@@ -102,25 +131,24 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
         return;
     }
 
-    spdlog::debug("[{}] Setting up observers...", get_name());
+    spdlog::debug("[{}] Setting up...", get_name());
 
-    // Light icon needs C++ for img_recolor (on/off state) - no XML binding for this
-    // Network icon/label use bind_text in XML - no C++ lookup needed!
-    light_icon_ = lv_obj_find_by_name(panel_, "light_icon");
-    if (!light_icon_) {
-        spdlog::error("[{}] Failed to find light_icon widget", get_name());
-        return;
+    // Find light-related widgets for conditional hiding
+    light_button_ = lv_obj_find_by_name(panel_, "light_button");
+    light_divider_ = lv_obj_find_by_name(panel_, "divider2");
+
+    // If no LED is configured, hide the light button and divider
+    // Note: LED on/off visual state is handled by XML binding to PrinterState's led_state subject
+    if (configured_led_.empty()) {
+        if (light_button_) {
+            lv_obj_add_flag(light_button_, LV_OBJ_FLAG_HIDDEN);
+            spdlog::debug("[{}] Light button hidden (no LED configured)", get_name());
+        }
+        if (light_divider_) {
+            lv_obj_add_flag(light_divider_, LV_OBJ_FLAG_HIDDEN);
+            spdlog::debug("[{}] Light divider hidden (no LED configured)", get_name());
+        }
     }
-
-    // Light icon color observer - needed for on/off visual state
-    auto* light_obs = lv_subject_add_observer(&light_icon_color_subject_, light_observer_cb, this);
-    register_observer(light_obs);
-
-    // Apply initial light icon color (observers only fire on *changes*, not initial state)
-    lv_color_t initial_color = lv_subject_get_color(&light_icon_color_subject_);
-    lv_obj_set_style_img_recolor(light_icon_, initial_color, LV_PART_MAIN);
-    lv_obj_set_style_img_recolor_opa(light_icon_, 255, LV_PART_MAIN);
-    spdlog::debug("[{}] Applied initial light icon color", get_name());
 
     // Apply responsive icon font sizes (fonts are discrete, can't be scaled in XML)
     setup_responsive_icon_fonts();
@@ -137,32 +165,6 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 // ============================================================================
 // PRIVATE HELPERS
 // ============================================================================
-
-void HomePanel::init_home_panel_colors() {
-    lv_xml_component_scope_t* scope = lv_xml_component_get_scope("home_panel");
-    if (scope) {
-        bool use_dark_mode = ui_theme_is_dark_mode();
-
-        // Load light icon ON color
-        const char* on_str =
-            lv_xml_get_const(scope, use_dark_mode ? "light_icon_on_dark" : "light_icon_on_light");
-        light_icon_on_color_ = on_str ? ui_theme_parse_color(on_str) : lv_color_hex(0xFFD700);
-
-        // Load light icon OFF color
-        const char* off_str =
-            lv_xml_get_const(scope, use_dark_mode ? "light_icon_off_dark" : "light_icon_off_light");
-        light_icon_off_color_ = off_str ? ui_theme_parse_color(off_str) : lv_color_hex(0x909090);
-
-        spdlog::debug("[{}] Light icon colors loaded: on={}, off={} ({})", get_name(),
-                      on_str ? on_str : "default", off_str ? off_str : "default",
-                      use_dark_mode ? "dark" : "light");
-    } else {
-        // Fallback to defaults if scope not found
-        light_icon_on_color_ = lv_color_hex(0xFFD700);
-        light_icon_off_color_ = lv_color_hex(0x909090);
-        spdlog::warn("[{}] Failed to get home_panel component scope, using defaults", get_name());
-    }
-}
 
 void HomePanel::update_tip_of_day() {
     auto tip = TipsManager::get_instance()->get_random_unique_tip();
@@ -232,9 +234,14 @@ void HomePanel::setup_responsive_icon_fonts() {
         lv_obj_set_style_text_font(temp_label, label_font, 0);
     }
 
-    // Light icon (Material Design icon widget) - also set size for consistency
-    if (light_icon_) {
-        ui_icon_set_size(light_icon_, mat_icon_size);
+    // Light icons (Material Design icon widgets) - set size for both on/off states
+    lv_obj_t* light_icon_off = lv_obj_find_by_name(panel_, "light_icon_off");
+    lv_obj_t* light_icon_on = lv_obj_find_by_name(panel_, "light_icon_on");
+    if (light_icon_off) {
+        ui_icon_set_size(light_icon_off, mat_icon_size);
+    }
+    if (light_icon_on) {
+        ui_icon_set_size(light_icon_on, mat_icon_size);
     }
 
     spdlog::debug("[{}] Set icons to {}px, labels to {} for screen height {}", get_name(), icon_px,
@@ -248,11 +255,43 @@ void HomePanel::setup_responsive_icon_fonts() {
 void HomePanel::handle_light_toggle() {
     spdlog::info("[{}] Light button clicked", get_name());
 
-    // Toggle the light state
-    set_light(!light_on_);
+    // Check if LED is configured
+    if (configured_led_.empty()) {
+        spdlog::warn("[{}] Light toggle called but no LED configured", get_name());
+        return;
+    }
 
-    // TODO: Add callback to send command to Klipper
-    spdlog::debug("[{}] Light toggled: {}", get_name(), light_on_ ? "ON" : "OFF");
+    // Toggle to opposite of current state
+    // Note: UI will update when Moonraker notification arrives (via PrinterState observer)
+    bool new_state = !light_on_;
+
+    // Send command to Moonraker
+    if (api_) {
+        if (new_state) {
+            api_->set_led_on(
+                configured_led_,
+                [this]() {
+                    spdlog::info("[{}] LED turned ON - waiting for state update", get_name());
+                },
+                [](const MoonrakerError& err) {
+                    spdlog::error("Failed to turn LED on: {}", err.message);
+                    NOTIFY_ERROR("Failed to turn light on: {}", err.user_message());
+                });
+        } else {
+            api_->set_led_off(
+                configured_led_,
+                [this]() {
+                    spdlog::info("[{}] LED turned OFF - waiting for state update", get_name());
+                },
+                [](const MoonrakerError& err) {
+                    spdlog::error("Failed to turn LED off: {}", err.message);
+                    NOTIFY_ERROR("Failed to turn light off: {}", err.user_message());
+                });
+        }
+    } else {
+        spdlog::warn("[{}] API not available - cannot control LED", get_name());
+        NOTIFY_ERROR("Cannot control light: printer not connected");
+    }
 }
 
 void HomePanel::handle_print_card_clicked() {
@@ -280,17 +319,20 @@ void HomePanel::handle_tip_rotation_timer() {
     update_tip_of_day();
 }
 
-void HomePanel::on_light_color_changed(lv_subject_t* subject) {
-    if (!light_icon_) {
-        return;
-    }
+void HomePanel::on_led_state_changed(int state) {
+    // Update local light_on_ state from PrinterState's led_state subject
+    light_on_ = (state != 0);
 
-    // Update light icon color using image recolor (on/off visual state)
-    lv_color_t color = lv_subject_get_color(subject);
-    lv_obj_set_style_img_recolor(light_icon_, color, LV_PART_MAIN);
-    lv_obj_set_style_img_recolor_opa(light_icon_, 255, LV_PART_MAIN);
+    spdlog::debug("[{}] LED state changed: {} (from PrinterState)", get_name(),
+                  light_on_ ? "ON" : "OFF");
+}
 
-    spdlog::trace("[{}] Light observer updated icon color", get_name());
+void HomePanel::on_extruder_temp_changed(int temp) {
+    // Format temperature for display and update the string subject
+    std::snprintf(temp_buffer_, sizeof(temp_buffer_), "%d °C", temp);
+    lv_subject_copy_string(&temp_subject_, temp_buffer_);
+
+    spdlog::trace("[{}] Extruder temperature updated: {}°C", get_name(), temp);
 }
 
 // ============================================================================
@@ -331,10 +373,17 @@ void HomePanel::tip_rotation_timer_cb(lv_timer_t* timer) {
     }
 }
 
-void HomePanel::light_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
+void HomePanel::led_state_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
     auto* self = static_cast<HomePanel*>(lv_observer_get_user_data(observer));
     if (self) {
-        self->on_light_color_changed(subject);
+        self->on_led_state_changed(lv_subject_get_int(subject));
+    }
+}
+
+void HomePanel::extruder_temp_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<HomePanel*>(lv_observer_get_user_data(observer));
+    if (self) {
+        self->on_extruder_temp_changed(lv_subject_get_int(subject));
     }
 }
 
@@ -379,16 +428,10 @@ void HomePanel::set_network(network_type_t type) {
 }
 
 void HomePanel::set_light(bool is_on) {
+    // Note: The actual LED state is managed by PrinterState via Moonraker notifications.
+    // This method is only used for local state updates when API is unavailable.
     light_on_ = is_on;
-
-    if (is_on) {
-        // Light is on - show theme-aware ON color
-        lv_subject_set_color(&light_icon_color_subject_, light_icon_on_color_);
-    } else {
-        // Light is off - show theme-aware OFF color
-        lv_subject_set_color(&light_icon_color_subject_, light_icon_off_color_);
-    }
-    spdlog::debug("[{}] Updated light state to: {}", get_name(), is_on ? "ON" : "OFF");
+    spdlog::debug("[{}] Local light state: {}", get_name(), is_on ? "ON" : "OFF");
 }
 
 // ============================================================================

@@ -3,6 +3,7 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 
 <component>
+
   <!-- Component-local constants for theme-aware colors and dimensions -->
   <consts>
     <!-- Light icon color when light is ON (bright yellow) -->
@@ -17,6 +18,7 @@
     <!-- Printer image container: percentage of parent for responsive sizing -->
     <percentage name="printer_container_width" value="40%"/>
   </consts>
+
   <!-- Now references global constants from globals.xml -->
   <view extends="lv_obj" width="100%" height="100%" style_pad_all="0" style_border_width="0" flex_flow="column">
     <!-- Top section: Printer visualization + Tip (60% of height via flex_grow="3") -->
@@ -65,9 +67,18 @@
         </lv_obj>
         <!-- Vertical divider -->
         <lv_obj name="divider2" width="1" height="80%" style_bg_color="#text_secondary" style_bg_opa="50%" style_border_width="0" style_pad_all="0"/>
-        <!-- Light control button - uses icon widget for crisp discrete sizing -->
+        <!-- Light control button - uses two icons with conditional visibility for reactive on/off state -->
         <lv_button name="light_button" flex_grow="1" height="100%" style_bg_opa="0%" style_border_width="0" style_pad_all="0" style_shadow_width="0">
-          <icon name="light_icon" src="mat_light" align="center"/>
+          <!-- OFF state icon (gray) - visible when led_state == 0 -->
+          <icon name="light_icon_off" src="mat_light" align="center"
+                style_image_recolor="#light_icon_off_dark" style_image_recolor_opa="255">
+            <lv_obj-bind_flag_if_not_eq subject="led_state" flag="hidden" ref_value="0"/>
+          </icon>
+          <!-- ON state icon (gold) - visible when led_state == 1 -->
+          <icon name="light_icon_on" src="mat_light" align="center"
+                style_image_recolor="#light_icon_on_dark" style_image_recolor_opa="255">
+            <lv_obj-bind_flag_if_eq subject="led_state" flag="hidden" ref_value="0"/>
+          </icon>
           <event_cb trigger="clicked" callback="light_toggle_cb"/>
         </lv_button>
       </ui_card>

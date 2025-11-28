@@ -137,7 +137,7 @@ class HomePanel : public PanelBase {
     lv_subject_t network_icon_subject_;
     lv_subject_t network_label_subject_;
     lv_subject_t network_color_subject_;
-    lv_subject_t light_icon_color_subject_;
+    // Note: LED state uses PrinterState's led_state subject directly for XML binding
 
     // Subject storage buffers
     char status_buffer_[512]; // Large for tip title + content
@@ -155,22 +155,20 @@ class HomePanel : public PanelBase {
     PrintingTip current_tip_;
     TipDetailModal tip_modal_; // RAII modal - auto-hides on destruction
 
+    // Configured LED name from wizard (empty = no LED configured)
+    std::string configured_led_;
+
     // Timer for tip rotation
     lv_timer_t* tip_rotation_timer_ = nullptr;
 
-    // Theme-aware colors (cached)
-    lv_color_t light_icon_on_color_;
-    lv_color_t light_icon_off_color_;
-
-    // Light icon widget reference (for img_recolor on/off state - no XML binding for this)
-    // Note: Network widgets removed - XML bind_text handles updates automatically
-    lv_obj_t* light_icon_ = nullptr;
+    // Light control widget references (for conditional hiding when no LED)
+    lv_obj_t* light_button_ = nullptr;
+    lv_obj_t* light_divider_ = nullptr;
 
     //
     // === Private Helpers ===
     //
 
-    void init_home_panel_colors();
     void update_tip_of_day();
     void setup_responsive_icon_fonts();
 
@@ -184,7 +182,8 @@ class HomePanel : public PanelBase {
     void handle_tip_rotation_timer();
 
     // Observer instance methods
-    void on_light_color_changed(lv_subject_t* subject);
+    void on_extruder_temp_changed(int temp);
+    void on_led_state_changed(int state);
 
     //
     // === Static Trampolines ===
@@ -194,7 +193,15 @@ class HomePanel : public PanelBase {
     static void print_card_clicked_cb(lv_event_t* e);
     static void tip_text_clicked_cb(lv_event_t* e);
     static void tip_rotation_timer_cb(lv_timer_t* timer);
-    static void light_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
+    static void extruder_temp_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
+    static void led_state_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
+
+    //
+    // === PrinterState Observers (RAII managed) ===
+    //
+
+    lv_observer_t* extruder_temp_observer_ = nullptr;
+    lv_observer_t* led_state_observer_ = nullptr;
 };
 
 // Global instance accessor (needed by main.cpp)

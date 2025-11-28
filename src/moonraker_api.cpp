@@ -23,9 +23,10 @@
 
 #include "moonraker_api.h"
 
-#include "spdlog/spdlog.h"
-#include "ui_notification.h"
 #include "ui_error_reporting.h"
+#include "ui_notification.h"
+
+#include "spdlog/spdlog.h"
 
 #include <algorithm>
 #include <cctype>
@@ -192,7 +193,8 @@ void MoonrakerAPI::list_files(const std::string& root, const std::string& path, 
                               FileListCallback on_success, ErrorCallback on_error) {
     // Validate root parameter
     if (!is_safe_identifier(root)) {
-        NOTIFY_ERROR("File path error: '{}' is not a valid location. Please check the root name.", root);
+        NOTIFY_ERROR("File path error: '{}' is not a valid location. Please check the root name.",
+                     root);
         if (on_error) {
             MoonrakerError err;
             err.type = MoonrakerErrorType::VALIDATION_ERROR;
@@ -205,7 +207,8 @@ void MoonrakerAPI::list_files(const std::string& root, const std::string& path, 
 
     // Validate path if provided
     if (!path.empty() && !is_safe_path(path)) {
-        NOTIFY_ERROR("Invalid file path '{}'. Path contains unsafe characters or references.", path);
+        NOTIFY_ERROR("Invalid file path '{}'. Path contains unsafe characters or references.",
+                     path);
         if (on_error) {
             MoonrakerError err;
             err.type = MoonrakerErrorType::VALIDATION_ERROR;
@@ -562,8 +565,8 @@ void MoonrakerAPI::move_axis(char axis, double distance, double feedrate,
 
     // Validate distance is within safety limits
     if (!is_safe_distance(distance, safety_limits_)) {
-        NOTIFY_ERROR("Move distance {:.1f}mm is too large. Maximum: {:.1f}mm.",
-                     std::abs(distance), safety_limits_.max_relative_distance_mm);
+        NOTIFY_ERROR("Move distance {:.1f}mm is too large. Maximum: {:.1f}mm.", std::abs(distance),
+                     safety_limits_.max_relative_distance_mm);
         if (on_error) {
             MoonrakerError err;
             err.type = MoonrakerErrorType::VALIDATION_ERROR;
@@ -578,8 +581,8 @@ void MoonrakerAPI::move_axis(char axis, double distance, double feedrate,
 
     // Validate feedrate if specified (0 means use default, negative is invalid)
     if (feedrate != 0 && !is_safe_feedrate(feedrate, safety_limits_)) {
-        NOTIFY_ERROR("Speed {:.0f}mm/min is too fast. Maximum: {:.0f}mm/min.",
-                     feedrate, safety_limits_.max_feedrate_mm_min);
+        NOTIFY_ERROR("Speed {:.0f}mm/min is too fast. Maximum: {:.0f}mm/min.", feedrate,
+                     safety_limits_.max_feedrate_mm_min);
         if (on_error) {
             MoonrakerError err;
             err.type = MoonrakerErrorType::VALIDATION_ERROR;
@@ -616,8 +619,8 @@ void MoonrakerAPI::move_to_position(char axis, double position, double feedrate,
 
     // Validate position is within safety limits
     if (!is_safe_position(position, safety_limits_)) {
-        NOTIFY_ERROR("Position {:.1f}mm is out of range. Valid: {:.1f}mm to {:.1f}mm.",
-                     position, safety_limits_.min_absolute_position_mm,
+        NOTIFY_ERROR("Position {:.1f}mm is out of range. Valid: {:.1f}mm to {:.1f}mm.", position,
+                     safety_limits_.min_absolute_position_mm,
                      safety_limits_.max_absolute_position_mm);
         if (on_error) {
             MoonrakerError err;
@@ -633,8 +636,8 @@ void MoonrakerAPI::move_to_position(char axis, double position, double feedrate,
 
     // Validate feedrate if specified (0 means use default, negative is invalid)
     if (feedrate != 0 && !is_safe_feedrate(feedrate, safety_limits_)) {
-        NOTIFY_ERROR("Speed {:.0f}mm/min is too fast. Maximum: {:.0f}mm/min.",
-                     feedrate, safety_limits_.max_feedrate_mm_min);
+        NOTIFY_ERROR("Speed {:.0f}mm/min is too fast. Maximum: {:.0f}mm/min.", feedrate,
+                     safety_limits_.max_feedrate_mm_min);
         if (on_error) {
             MoonrakerError err;
             err.type = MoonrakerErrorType::VALIDATION_ERROR;
@@ -717,9 +720,8 @@ void MoonrakerAPI::set_fan_speed(const std::string& fan, double speed, SuccessCa
 
     // Validate speed percentage
     if (!is_safe_fan_speed(speed, safety_limits_)) {
-        NOTIFY_ERROR("Fan speed {:.0f}% is out of range. Valid: {:.0f}% to {:.0f}%.",
-                     speed, safety_limits_.min_fan_speed_percent,
-                     safety_limits_.max_fan_speed_percent);
+        NOTIFY_ERROR("Fan speed {:.0f}% is out of range. Valid: {:.0f}% to {:.0f}%.", speed,
+                     safety_limits_.min_fan_speed_percent, safety_limits_.max_fan_speed_percent);
         if (on_error) {
             MoonrakerError err;
             err.type = MoonrakerErrorType::VALIDATION_ERROR;
@@ -749,6 +751,59 @@ void MoonrakerAPI::set_fan_speed(const std::string& fan, double speed, SuccessCa
     spdlog::info("[Moonraker API] Setting {} speed to {}%", fan, speed);
 
     execute_gcode(gcode.str(), on_success, on_error);
+}
+
+void MoonrakerAPI::set_led(const std::string& led, double red, double green, double blue,
+                           double white, SuccessCallback on_success, ErrorCallback on_error) {
+    // Validate LED name
+    if (!is_safe_identifier(led)) {
+        NOTIFY_ERROR("Invalid LED name '{}'. Contains unsafe characters.", led);
+        if (on_error) {
+            MoonrakerError err;
+            err.type = MoonrakerErrorType::VALIDATION_ERROR;
+            err.message = "Invalid LED name contains illegal characters";
+            err.method = "set_led";
+            on_error(err);
+        }
+        return;
+    }
+
+    // Clamp color values to 0.0-1.0 range
+    red = std::clamp(red, 0.0, 1.0);
+    green = std::clamp(green, 0.0, 1.0);
+    blue = std::clamp(blue, 0.0, 1.0);
+    white = std::clamp(white, 0.0, 1.0);
+
+    // Extract just the LED name without the type prefix (e.g., "neopixel " or "led ")
+    std::string led_name = led;
+    size_t space_pos = led.find(' ');
+    if (space_pos != std::string::npos) {
+        led_name = led.substr(space_pos + 1);
+    }
+
+    // Build SET_LED G-code command
+    std::ostringstream gcode;
+    gcode << "SET_LED LED=" << led_name << " RED=" << red << " GREEN=" << green << " BLUE=" << blue;
+
+    // Only add WHITE parameter if non-zero (for RGBW LEDs)
+    if (white > 0.0) {
+        gcode << " WHITE=" << white;
+    }
+
+    spdlog::info("[Moonraker API] Setting LED {}: R={:.2f} G={:.2f} B={:.2f} W={:.2f}", led_name,
+                 red, green, blue, white);
+
+    execute_gcode(gcode.str(), on_success, on_error);
+}
+
+void MoonrakerAPI::set_led_on(const std::string& led, SuccessCallback on_success,
+                              ErrorCallback on_error) {
+    set_led(led, 1.0, 1.0, 1.0, 1.0, on_success, on_error);
+}
+
+void MoonrakerAPI::set_led_off(const std::string& led, SuccessCallback on_success,
+                               ErrorCallback on_error) {
+    set_led(led, 0.0, 0.0, 0.0, 0.0, on_success, on_error);
 }
 
 // ============================================================================
@@ -946,9 +1001,8 @@ void MoonrakerAPI::update_safety_limits_from_printer(SuccessCallback on_success,
                     on_success();
                 }
             } catch (const std::exception& e) {
-                LOG_ERROR_INTERNAL(
-                    "Failed to parse printer configuration for safety limits: {}",
-                    e.what());
+                LOG_ERROR_INTERNAL("Failed to parse printer configuration for safety limits: {}",
+                                   e.what());
                 if (on_success) {
                     on_success(); // Continue with defaults on parse error
                 }

@@ -297,6 +297,45 @@ class MoonrakerAPI {
     void set_fan_speed(const std::string& fan, double speed, SuccessCallback on_success,
                        ErrorCallback on_error);
 
+    /**
+     * @brief Set LED color/brightness
+     *
+     * Controls LED output by name. For simple on/off control, use brightness 1.0 or 0.0.
+     * Supports neopixel, dotstar, led, and pca9632 LED types.
+     *
+     * @param led LED name (e.g., "neopixel chamber_light", "led status_led")
+     * @param red Red component (0.0-1.0)
+     * @param green Green component (0.0-1.0)
+     * @param blue Blue component (0.0-1.0)
+     * @param white Optional white component for RGBW LEDs (0.0-1.0, default 0.0)
+     * @param on_success Success callback
+     * @param on_error Error callback
+     */
+    void set_led(const std::string& led, double red, double green, double blue, double white,
+                 SuccessCallback on_success, ErrorCallback on_error);
+
+    /**
+     * @brief Turn LED on (full white)
+     *
+     * Convenience method to turn LED on at full brightness.
+     *
+     * @param led LED name
+     * @param on_success Success callback
+     * @param on_error Error callback
+     */
+    void set_led_on(const std::string& led, SuccessCallback on_success, ErrorCallback on_error);
+
+    /**
+     * @brief Turn LED off
+     *
+     * Convenience method to turn LED off.
+     *
+     * @param led LED name
+     * @param on_success Success callback
+     * @param on_error Error callback
+     */
+    void set_led_off(const std::string& led, SuccessCallback on_success, ErrorCallback on_error);
+
     // ========================================================================
     // System Control Operations
     // ========================================================================

@@ -42,8 +42,9 @@ PrinterState::~PrinterState() {}
 
 void PrinterState::reset_for_testing() {
     if (!subjects_initialized_) {
-        spdlog::debug("[PrinterState] reset_for_testing: subjects not initialized, nothing to reset");
-        return;  // Nothing to reset
+        spdlog::debug(
+            "[PrinterState] reset_for_testing: subjects not initialized, nothing to reset");
+        return; // Nothing to reset
     }
 
     spdlog::info("[PrinterState] reset_for_testing: Deinitializing subjects to clear observers");
@@ -65,6 +66,7 @@ void PrinterState::reset_for_testing() {
     lv_subject_deinit(&printer_connection_state_);
     lv_subject_deinit(&printer_connection_message_);
     lv_subject_deinit(&network_status_);
+    lv_subject_deinit(&led_state_);
 
     subjects_initialized_ = false;
 }
@@ -108,7 +110,11 @@ void PrinterState::init_subjects(bool register_xml) {
 
     // Network connectivity subject (WiFi/Ethernet)
     // TODO: Get actual network status from EthernetManager/WiFiManager
-    lv_subject_init_int(&network_status_, 2); // 0=DISCONNECTED, 1=CONNECTING, 2=CONNECTED (mock mode default)
+    lv_subject_init_int(&network_status_,
+                        2); // 0=DISCONNECTED, 1=CONNECTING, 2=CONNECTED (mock mode default)
+
+    // LED state subject (0=off, 1=on, derived from LED color data)
+    lv_subject_init_int(&led_state_, 0);
 
     // Register all subjects with LVGL XML system (CRITICAL for XML bindings)
     if (register_xml) {
@@ -130,6 +136,7 @@ void PrinterState::init_subjects(bool register_xml) {
         lv_xml_register_subject(NULL, "printer_connection_state", &printer_connection_state_);
         lv_xml_register_subject(NULL, "printer_connection_message", &printer_connection_message_);
         lv_xml_register_subject(NULL, "network_status", &network_status_);
+        lv_xml_register_subject(NULL, "led_state", &led_state_);
     } else {
         spdlog::debug("[PrinterState] Skipping XML registration (tests mode)");
     }
@@ -266,6 +273,37 @@ void PrinterState::update_from_status(const json& state) {
         }
     }
 
+    // Update LED state if we're tracking an LED
+    // LED object names in Moonraker are like "neopixel chamber_light" or "led status_led"
+    if (!tracked_led_name_.empty() && state.contains(tracked_led_name_)) {
+        const auto& led = state[tracked_led_name_];
+
+        if (led.contains("color_data") && led["color_data"].is_array() &&
+            !led["color_data"].empty()) {
+            // color_data is array of [R, G, B, W] arrays (one per LED in strip)
+            // For on/off, we check if any color component of the first LED is > 0
+            const auto& first_led = led["color_data"][0];
+            if (first_led.is_array() && first_led.size() >= 3) {
+                double r = first_led[0].get<double>();
+                double g = first_led[1].get<double>();
+                double b = first_led[2].get<double>();
+                double w = (first_led.size() >= 4) ? first_led[3].get<double>() : 0.0;
+
+                // LED is "on" if any color component is non-zero
+                bool is_on = (r > 0.001 || g > 0.001 || b > 0.001 || w > 0.001);
+                int new_state = is_on ? 1 : 0;
+
+                int old_state = lv_subject_get_int(&led_state_);
+                if (new_state != old_state) {
+                    lv_subject_set_int(&led_state_, new_state);
+                    spdlog::debug(
+                        "[PrinterState] LED {} state: {} (R={:.2f} G={:.2f} B={:.2f} W={:.2f})",
+                        tracked_led_name_, is_on ? "ON" : "OFF", r, g, b, w);
+                }
+            }
+        }
+    }
+
     // Cache full state for complex queries
     json_state_.merge_patch(state);
 }
@@ -287,12 +325,23 @@ void PrinterState::set_printer_connection_state(int state, const char* message) 
     spdlog::debug("[PrinterState] Setting printer_connection_state_ subject (at {}) to value {}",
                   (void*)&printer_connection_state_, state);
     lv_subject_set_int(&printer_connection_state_, state);
-    spdlog::debug("[PrinterState] Subject value now: {}", lv_subject_get_int(&printer_connection_state_));
+    spdlog::debug("[PrinterState] Subject value now: {}",
+                  lv_subject_get_int(&printer_connection_state_));
     lv_subject_copy_string(&printer_connection_message_, message);
-    spdlog::debug("[PrinterState] Printer connection state update complete, observers should be notified");
+    spdlog::debug(
+        "[PrinterState] Printer connection state update complete, observers should be notified");
 }
 
 void PrinterState::set_network_status(int status) {
     spdlog::debug("[PrinterState] Network status changed: {}", status);
     lv_subject_set_int(&network_status_, status);
+}
+
+void PrinterState::set_tracked_led(const std::string& led_name) {
+    tracked_led_name_ = led_name;
+    if (!led_name.empty()) {
+        spdlog::info("[PrinterState] Tracking LED: {}", led_name);
+    } else {
+        spdlog::debug("[PrinterState] LED tracking disabled");
+    }
 }

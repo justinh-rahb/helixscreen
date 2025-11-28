@@ -38,19 +38,19 @@ using json = nlohmann::json;
  * @brief Network connection status states
  */
 enum class NetworkStatus {
-    DISCONNECTED,  ///< No network connection
-    CONNECTING,    ///< Connecting to network
-    CONNECTED      ///< Connected to network
+    DISCONNECTED, ///< No network connection
+    CONNECTING,   ///< Connecting to network
+    CONNECTED     ///< Connected to network
 };
 
 /**
  * @brief Printer connection status states
  */
 enum class PrinterStatus {
-    DISCONNECTED,  ///< Printer not connected
-    READY,         ///< Printer connected and ready
-    PRINTING,      ///< Printer actively printing
-    ERROR          ///< Printer in error state
+    DISCONNECTED, ///< Printer not connected
+    READY,        ///< Printer connected and ready
+    PRINTING,     ///< Printer actively printing
+    ERROR         ///< Printer in error state
 };
 
 /**
@@ -195,6 +195,40 @@ class PrinterState {
         return &network_status_;
     } // 0=disconnected, 1=connecting, 2=connected (matches NetworkStatus enum)
 
+    // LED state subject (for home panel light control)
+    lv_subject_t* get_led_state_subject() {
+        return &led_state_;
+    } // 0=off, 1=on (derived from LED color data)
+
+    /**
+     * @brief Set which LED to track for state updates
+     *
+     * Call this after loading config to tell PrinterState which LED object
+     * to monitor from Moonraker notifications. The LED name should match
+     * the Klipper config (e.g., "neopixel chamber_light", "led status_led").
+     *
+     * @param led_name Full LED name including type prefix, or empty to disable
+     */
+    void set_tracked_led(const std::string& led_name);
+
+    /**
+     * @brief Get the currently tracked LED name
+     *
+     * @return LED name being tracked, or empty string if none
+     */
+    const std::string& get_tracked_led() const {
+        return tracked_led_name_;
+    }
+
+    /**
+     * @brief Check if an LED is configured for tracking
+     *
+     * @return true if a LED name has been set
+     */
+    bool has_tracked_led() const {
+        return !tracked_led_name_.empty();
+    }
+
     /**
      * @brief Set printer connection state (Moonraker WebSocket)
      *
@@ -213,7 +247,9 @@ class PrinterState {
      * Used to distinguish "never connected" (gray icon) from "disconnected after
      * being connected" (yellow warning icon).
      */
-    bool was_ever_connected() const { return was_ever_connected_; }
+    bool was_ever_connected() const {
+        return was_ever_connected_;
+    }
 
     /**
      * @brief Set network connectivity status
@@ -254,6 +290,12 @@ class PrinterState {
 
     // Network connectivity subject (WiFi/Ethernet)
     lv_subject_t network_status_; // Integer: uses NetworkStatus enum values
+
+    // LED state subject
+    lv_subject_t led_state_; // Integer: 0=off, 1=on
+
+    // Tracked LED name (e.g., "neopixel chamber_light")
+    std::string tracked_led_name_;
 
     // String buffers for subject storage
     char print_filename_buf_[256];
