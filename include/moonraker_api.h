@@ -437,6 +437,20 @@ class MoonrakerAPI {
      */
     void update_safety_limits_from_printer(SuccessCallback on_success, ErrorCallback on_error);
 
+    // ========================================================================
+    // Internal Access (for CommandSequencer integration)
+    // ========================================================================
+
+    /**
+     * @brief Get reference to underlying MoonrakerClient
+     *
+     * Required by CommandSequencer which needs direct client access for
+     * G-code execution and state observation.
+     *
+     * @return Reference to MoonrakerClient
+     */
+    MoonrakerClient& get_client() { return client_; }
+
   private:
     MoonrakerClient& client_;
 

@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include "command_sequencer.h"
 #include "ui_panel_base.h"
 
 #include <ctime>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -294,6 +296,12 @@ class PrintSelectPanel : public PanelBase {
     lv_obj_t* confirmation_dialog_widget_ = nullptr;
     lv_obj_t* print_status_panel_widget_ = nullptr;
 
+    // Pre-print option checkboxes (looked up during create_detail_view)
+    lv_obj_t* bed_leveling_checkbox_ = nullptr;
+    lv_obj_t* qgl_checkbox_ = nullptr;
+    lv_obj_t* z_tilt_checkbox_ = nullptr;
+    lv_obj_t* nozzle_clean_checkbox_ = nullptr;
+
     //
     // === Subject Buffers ===
     //
@@ -324,6 +332,9 @@ class PrintSelectPanel : public PanelBase {
     PrintSelectSortColumn current_sort_column_ = PrintSelectSortColumn::FILENAME;
     PrintSelectSortDirection current_sort_direction_ = PrintSelectSortDirection::ASCENDING;
     bool panel_initialized_ = false; ///< Guard flag for resize callback
+
+    /// Command sequencer for pre-print operations (created lazily when print starts)
+    std::unique_ptr<gcode::CommandSequencer> pre_print_sequencer_;
 
     //
     // === Internal Methods ===

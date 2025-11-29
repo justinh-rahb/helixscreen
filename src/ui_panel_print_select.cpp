@@ -919,6 +919,12 @@ void PrintSelectPanel::create_detail_view() {
     lv_obj_add_event_cb(detail_view_widget_, on_detail_backdrop_clicked_static, LV_EVENT_CLICKED,
                         this);
 
+    // Look up pre-print option checkboxes
+    bed_leveling_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "bed_leveling_checkbox");
+    qgl_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "qgl_checkbox");
+    z_tilt_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "z_tilt_checkbox");
+    nozzle_clean_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "nozzle_clean_checkbox");
+
     spdlog::debug("[{}] Detail view created", get_name());
 }
 
@@ -988,28 +994,107 @@ void PrintSelectPanel::start_print() {
     std::string filename_to_print(selected_filename_buffer_);
     auto* self = this;
 
+    // Helper to check if checkbox is visible and checked
+    auto is_option_enabled = [](lv_obj_t* checkbox) -> bool {
+        if (!checkbox)
+            return false;
+        // Only consider it enabled if visible (not hidden) and checked
+        bool is_visible = !lv_obj_has_flag(checkbox, LV_OBJ_FLAG_HIDDEN);
+        bool is_checked = lv_obj_has_state(checkbox, LV_STATE_CHECKED);
+        return is_visible && is_checked;
+    };
+
+    // Read pre-print option states
+    bool do_bed_leveling = is_option_enabled(bed_leveling_checkbox_);
+    bool do_qgl = is_option_enabled(qgl_checkbox_);
+    bool do_z_tilt = is_option_enabled(z_tilt_checkbox_);
+    bool do_nozzle_clean = is_option_enabled(nozzle_clean_checkbox_);
+
+    bool has_pre_print_ops = do_bed_leveling || do_qgl || do_z_tilt || do_nozzle_clean;
+
+    spdlog::info("[{}] Starting print: {} (pre-print: mesh={}, qgl={}, z_tilt={}, clean={})",
+                 get_name(), filename_to_print, do_bed_leveling, do_qgl, do_z_tilt, do_nozzle_clean);
+
     if (api_) {
-        spdlog::info("[{}] Starting print: {}", get_name(), filename_to_print);
+        if (has_pre_print_ops) {
+            // Create command sequencer for pre-print operations
+            pre_print_sequencer_ = std::make_unique<gcode::CommandSequencer>(
+                api_->get_client(), *api_, printer_state_);
 
-        api_->start_print(
-            filename_to_print,
-            // Success callback
-            [self]() {
-                spdlog::info("[{}] Print started successfully", self->get_name());
+            // Always home first if doing any pre-print operations
+            pre_print_sequencer_->add_operation(gcode::OperationType::HOMING, {}, "Homing");
 
-                if (self->print_status_panel_widget_) {
-                    self->hide_detail_view();
-                    ui_nav_push_overlay(self->print_status_panel_widget_);
-                } else {
-                    spdlog::error("[{}] Print status panel not set", self->get_name());
-                }
-            },
-            // Error callback
-            [self, filename_to_print](const MoonrakerError& error) {
-                NOTIFY_ERROR("Failed to start print: {}", error.message);
-                LOG_ERROR_INTERNAL("[{}] Print start failed for {}: {} ({})", self->get_name(),
-                                   filename_to_print, error.message, error.get_type_string());
-            });
+            // Add selected operations in logical order
+            if (do_qgl) {
+                pre_print_sequencer_->add_operation(gcode::OperationType::QGL, {},
+                                                    "Quad Gantry Level");
+            }
+            if (do_z_tilt) {
+                pre_print_sequencer_->add_operation(gcode::OperationType::Z_TILT, {},
+                                                    "Z-Tilt Adjust");
+            }
+            if (do_bed_leveling) {
+                pre_print_sequencer_->add_operation(gcode::OperationType::BED_LEVELING, {},
+                                                    "Bed Mesh Calibration");
+            }
+            if (do_nozzle_clean) {
+                pre_print_sequencer_->add_operation(gcode::OperationType::NOZZLE_CLEAN, {},
+                                                    "Clean Nozzle");
+            }
+
+            // Add the actual print start as the final operation
+            gcode::OperationParams print_params;
+            print_params.filename = filename_to_print;
+            pre_print_sequencer_->add_operation(gcode::OperationType::START_PRINT, print_params,
+                                                "Starting Print");
+
+            // Start the sequence
+            pre_print_sequencer_->start(
+                // Progress callback
+                [self](const std::string& op_name, int step, int total, float progress) {
+                    spdlog::info("[{}] Pre-print progress: {} ({}/{}, {:.0f}%)", self->get_name(),
+                                 op_name, step, total, progress * 100.0f);
+                    // TODO: Update UI with progress (toast or overlay)
+                },
+                // Completion callback
+                [self](bool success, const std::string& error) {
+                    if (success) {
+                        spdlog::info("[{}] Pre-print sequence complete, print started",
+                                     self->get_name());
+                        if (self->print_status_panel_widget_) {
+                            self->hide_detail_view();
+                            ui_nav_push_overlay(self->print_status_panel_widget_);
+                        }
+                    } else {
+                        NOTIFY_ERROR("Pre-print failed: {}", error);
+                        LOG_ERROR_INTERNAL("[{}] Pre-print sequence failed: {}", self->get_name(),
+                                           error);
+                    }
+                    // Clean up sequencer
+                    self->pre_print_sequencer_.reset();
+                });
+        } else {
+            // No pre-print operations - start print directly
+            api_->start_print(
+                filename_to_print,
+                // Success callback
+                [self]() {
+                    spdlog::info("[{}] Print started successfully", self->get_name());
+
+                    if (self->print_status_panel_widget_) {
+                        self->hide_detail_view();
+                        ui_nav_push_overlay(self->print_status_panel_widget_);
+                    } else {
+                        spdlog::error("[{}] Print status panel not set", self->get_name());
+                    }
+                },
+                // Error callback
+                [self, filename_to_print](const MoonrakerError& error) {
+                    NOTIFY_ERROR("Failed to start print: {}", error.message);
+                    LOG_ERROR_INTERNAL("[{}] Print start failed for {}: {} ({})", self->get_name(),
+                                       filename_to_print, error.message, error.get_type_string());
+                });
+        }
     } else {
         // Fall back to mock print
         spdlog::warn("[{}] MoonrakerAPI not available - using mock print", get_name());

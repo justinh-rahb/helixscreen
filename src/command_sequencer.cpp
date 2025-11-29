@@ -305,6 +305,15 @@ CompletionCondition CommandSequencer::get_completion_condition(OperationType typ
                 return val.is_string() && val.get<std::string>() == "Ready";
             };
             break;
+
+        case OperationType::START_PRINT:
+            // Print started when print_stats.state changes to "printing"
+            cond.object_name = "print_stats";
+            cond.field_path = "state";
+            cond.check = [](const json& val) {
+                return val.is_string() && val.get<std::string>() == "printing";
+            };
+            break;
     }
 
     return cond;
@@ -355,6 +364,30 @@ void CommandSequencer::execute_next() {
 }
 
 void CommandSequencer::send_operation_command(const QueuedOperation& op) {
+    // START_PRINT is special - use the Moonraker API's start_print method
+    if (op.type == OperationType::START_PRINT) {
+        if (op.params.filename.empty()) {
+            handle_failure("START_PRINT missing filename");
+            return;
+        }
+
+        spdlog::debug("[CommandSequencer] Starting print via API: {}", op.params.filename);
+
+        api_.start_print(
+            op.params.filename,
+            [name = op.display_name]() {
+                spdlog::debug("[CommandSequencer] Print start command sent for '{}'", name);
+                // Note: This just means the command was sent, not that print started
+            },
+            [this, name = op.display_name](const MoonrakerError& err) {
+                spdlog::error("[CommandSequencer] Print start failed for '{}': {}", name,
+                              err.message);
+                handle_failure("Print start error: " + err.message);
+            });
+        return;
+    }
+
+    // All other operations use G-code
     std::string gcode = generate_gcode(op);
 
     spdlog::debug("[CommandSequencer] Sending G-code: {}", gcode);
@@ -481,6 +514,14 @@ std::string CommandSequencer::generate_gcode(const QueuedOperation& op) const {
             }
             if (op.params.duration_minutes > 0) {
                 gcode << " DURATION=" << op.params.duration_minutes;
+            }
+            break;
+
+        case OperationType::START_PRINT:
+            // START_PRINT is special - uses Moonraker API, not G-code
+            // This generates the SDCARD_PRINT_FILE command as fallback
+            if (!op.params.filename.empty()) {
+                gcode << "SDCARD_PRINT_FILE FILENAME=" << op.params.filename;
             }
             break;
     }
