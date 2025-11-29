@@ -121,13 +121,14 @@ TEST_CASE("PrinterState: Observer fires when network status changes", "[printer_
                            observer_cb, &callback_count);
 
     // LVGL auto-notifies observers when first added (fires immediately with current value)
-    REQUIRE(callback_count == 1); // Callback fired immediately with initial value (0)
+    // Note: init_subjects() initializes network_status to CONNECTED (2) as mock mode default
+    REQUIRE(callback_count == 1); // Callback fired immediately with initial value
 
-    // Change network status - should trigger observer again
-    state.set_network_status(static_cast<int>(NetworkStatus::CONNECTED));
+    // Change network status to a DIFFERENT value - should trigger observer again
+    state.set_network_status(static_cast<int>(NetworkStatus::DISCONNECTED));
 
     REQUIRE(callback_count == 2); // Callback fired again with new value
-    REQUIRE(lv_subject_get_int(state.get_network_status_subject()) == static_cast<int>(NetworkStatus::CONNECTED));
+    REQUIRE(lv_subject_get_int(state.get_network_status_subject()) == static_cast<int>(NetworkStatus::DISCONNECTED));
 }
 
 TEST_CASE("PrinterState: Multiple observers on same subject all fire", "[printer_state][observer]") {
@@ -169,6 +170,7 @@ TEST_CASE("PrinterState: Multiple observers on same subject all fire", "[printer
 TEST_CASE("PrinterState: Initialization sets default values", "[printer_state][init]") {
     lv_init();
     PrinterState& state = get_printer_state();
+    state.reset_for_testing();  // Reset singleton state from previous tests
     state.init_subjects();
 
     // Temperature subjects should be initialized to 0
@@ -199,8 +201,9 @@ TEST_CASE("PrinterState: Initialization sets default values", "[printer_state][i
     // Printer connection state should be DISCONNECTED
     REQUIRE(lv_subject_get_int(state.get_printer_connection_state_subject()) == static_cast<int>(ConnectionState::DISCONNECTED));
 
-    // Network status should be DISCONNECTED
-    REQUIRE(lv_subject_get_int(state.get_network_status_subject()) == static_cast<int>(NetworkStatus::DISCONNECTED));
+    // Network status is initialized to CONNECTED (mock mode default)
+    // In production, actual network status comes from EthernetManager/WiFiManager
+    REQUIRE(lv_subject_get_int(state.get_network_status_subject()) == static_cast<int>(NetworkStatus::CONNECTED));
 }
 
 // ============================================================================
@@ -536,10 +539,12 @@ TEST_CASE("PrinterState: Network status initialization", "[printer_state][networ
     lv_init();
 
     PrinterState& state = get_printer_state();
+    state.reset_for_testing();  // Reset singleton state from previous tests
     state.init_subjects();
 
-    // Should start at DISCONNECTED
-    REQUIRE(lv_subject_get_int(state.get_network_status_subject()) == static_cast<int>(NetworkStatus::DISCONNECTED));
+    // Network status is initialized to CONNECTED (mock mode default)
+    // In production, actual network status comes from EthernetManager/WiFiManager
+    REQUIRE(lv_subject_get_int(state.get_network_status_subject()) == static_cast<int>(NetworkStatus::CONNECTED));
 }
 
 TEST_CASE("PrinterState: Set network status updates subject", "[printer_state][network]") {
@@ -603,6 +608,7 @@ TEST_CASE("PrinterState: Printer and network status are independent", "[printer_
 TEST_CASE("PrinterState: Ignore invalid notification methods", "[printer_state][error]") {
     lv_init();
     PrinterState& state = get_printer_state();
+    state.reset_for_testing();  // Reset singleton state from previous tests
     state.init_subjects();
 
     json notification = {
@@ -621,6 +627,7 @@ TEST_CASE("PrinterState: Ignore invalid notification methods", "[printer_state][
 TEST_CASE("PrinterState: Handle missing fields gracefully", "[printer_state][error]") {
     lv_init();
     PrinterState& state = get_printer_state();
+    state.reset_for_testing();  // Reset singleton state from previous tests
     state.init_subjects();
 
     SECTION("Missing 'method' field") {
