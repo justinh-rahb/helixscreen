@@ -805,17 +805,19 @@ void PrintStatusPanel::on_print_filename_changed(const char* filename) {
 
 void PrintStatusPanel::on_speed_factor_changed(int speed) {
     speed_percent_ = speed;
-    std::snprintf(speed_buf_, sizeof(speed_buf_), "%d%%", speed_percent_);
-    lv_subject_copy_string(&speed_subject_, speed_buf_);
-
+    if (subjects_initialized_) {
+        std::snprintf(speed_buf_, sizeof(speed_buf_), "%d%%", speed_percent_);
+        lv_subject_copy_string(&speed_subject_, speed_buf_);
+    }
     spdlog::trace("[{}] Speed factor updated: {}%", get_name(), speed);
 }
 
 void PrintStatusPanel::on_flow_factor_changed(int flow) {
     flow_percent_ = flow;
-    std::snprintf(flow_buf_, sizeof(flow_buf_), "%d%%", flow_percent_);
-    lv_subject_copy_string(&flow_subject_, flow_buf_);
-
+    if (subjects_initialized_) {
+        std::snprintf(flow_buf_, sizeof(flow_buf_), "%d%%", flow_percent_);
+        lv_subject_copy_string(&flow_subject_, flow_buf_);
+    }
     spdlog::trace("[{}] Flow factor updated: {}%", get_name(), flow);
 }
 

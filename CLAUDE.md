@@ -78,7 +78,10 @@ make -j                          # Parallel incremental build (daily development
 make build                       # Clean parallel build with progress/timing
 ./build/bin/helix-ui-proto       # Run (default: home panel, small screen)
 ./build/bin/helix-ui-proto -p motion -s large  # Specific panel/size
+./build/bin/helix-ui-proto --test              # Run with mock printer (REQUIRED for testing without real printer!)
 ```
+
+**⚠️ IMPORTANT:** When testing UI without a real printer connection, ALWAYS use `--test` flag. This enables the mock Moonraker client which simulates printer state, temperatures, and responses. Without `--test`, panels expecting printer data will show nothing.
 
 **Common commands**:
 - `make -j` - Parallel incremental build (auto-detects cores)

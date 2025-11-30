@@ -74,7 +74,7 @@ TempControlPanel::TempControlPanel(PrinterState& printer_state, MoonrakerAPI* ap
     bed_target_observer_ = lv_subject_add_observer(printer_state_.get_bed_target_subject(),
                                                    bed_target_observer_cb, this);
 
-    spdlog::info("[TempPanel] Constructed - subscribed to PrinterState temperature subjects");
+    spdlog::debug("[TempPanel] Constructed - subscribed to PrinterState temperature subjects");
 }
 
 TempControlPanel::~TempControlPanel() {
@@ -224,6 +224,11 @@ void TempControlPanel::on_nozzle_temp_changed(int temp) {
     nozzle_current_ = temp;
     update_nozzle_display();
 
+    // Guard: don't track graph points until subjects initialized
+    if (!subjects_initialized_) {
+        return;
+    }
+
     // Track timestamp on first point
     if (nozzle_start_time_ms_ == 0) {
         nozzle_start_time_ms_ = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -259,6 +264,11 @@ void TempControlPanel::on_nozzle_target_changed(int target) {
 void TempControlPanel::on_bed_temp_changed(int temp) {
     bed_current_ = temp;
     update_bed_display();
+
+    // Guard: don't track graph points until subjects initialized
+    if (!subjects_initialized_) {
+        return;
+    }
 
     // Track timestamp on first point
     if (bed_start_time_ms_ == 0) {
@@ -297,6 +307,11 @@ void TempControlPanel::on_bed_target_changed(int target) {
 // ============================================================================
 
 void TempControlPanel::update_nozzle_display() {
+    // Guard: don't update subject if not initialized yet (observer fires during construction)
+    if (!subjects_initialized_) {
+        return;
+    }
+
     // Show pending value if user has selected but not confirmed yet
     // Otherwise show actual target from Moonraker
     int display_target = (nozzle_pending_ >= 0) ? nozzle_pending_ : nozzle_target_;
@@ -321,6 +336,11 @@ void TempControlPanel::update_nozzle_display() {
 }
 
 void TempControlPanel::update_bed_display() {
+    // Guard: don't update subject if not initialized yet (observer fires during construction)
+    if (!subjects_initialized_) {
+        return;
+    }
+
     // Show pending value if user has selected but not confirmed yet
     // Otherwise show actual target from Moonraker
     int display_target = (bed_pending_ >= 0) ? bed_pending_ : bed_target_;
@@ -519,7 +539,7 @@ void TempControlPanel::nozzle_confirm_cb(lv_event_t* e) {
     // Use pending value if set, otherwise use current target (fallback, shouldn't happen)
     int target = (self->nozzle_pending_ >= 0) ? self->nozzle_pending_ : self->nozzle_target_;
 
-    spdlog::info("[TempPanel] Nozzle temperature confirmed: {}°C (pending={})", target,
+    spdlog::debug("[TempPanel] Nozzle temperature confirmed: {}°C (pending={})", target,
                  self->nozzle_pending_);
 
     // Clear pending BEFORE navigation (since we're about to send the command)
@@ -555,18 +575,18 @@ void TempControlPanel::bed_confirm_cb(lv_event_t* e) {
     // Use pending value if set, otherwise use current target (fallback, shouldn't happen)
     int target = (self->bed_pending_ >= 0) ? self->bed_pending_ : self->bed_target_;
 
-    spdlog::info("[TempPanel] Bed temperature confirmed: {}°C (pending={}, api_={})", target,
+    spdlog::debug("[TempPanel] Bed temperature confirmed: {}°C (pending={}, api_={})", target,
                  self->bed_pending_, self->api_ ? "valid" : "NULL");
 
     // Clear pending BEFORE navigation (since we're about to send the command)
     self->bed_pending_ = -1;
 
     if (self->api_) {
-        spdlog::info("[TempPanel] Calling api_->set_temperature(heater_bed, {})", target);
+        spdlog::debug("[TempPanel] Calling api_->set_temperature(heater_bed, {})", target);
         self->api_->set_temperature(
             "heater_bed", static_cast<double>(target),
             [target]() {
-                spdlog::info("[TempPanel] set_temperature SUCCESS for bed: {}°C", target);
+                spdlog::debug("[TempPanel] set_temperature SUCCESS for bed: {}°C", target);
                 if (target == 0) {
                     NOTIFY_SUCCESS("Bed heater turned off");
                 } else {
@@ -716,7 +736,7 @@ void TempControlPanel::setup_nozzle_panel(lv_obj_t* panel, lv_obj_t* parent_scre
     // Read current values from PrinterState (observers only fire on changes, not initial state)
     nozzle_current_ = lv_subject_get_int(printer_state_.get_extruder_temp_subject());
     nozzle_target_ = lv_subject_get_int(printer_state_.get_extruder_target_subject());
-    spdlog::info("[TempPanel] Nozzle initial state from PrinterState: current={}°C, target={}°C",
+    spdlog::debug("[TempPanel] Nozzle initial state from PrinterState: current={}°C, target={}°C",
                  nozzle_current_, nozzle_target_);
 
     // Update display with initial values
@@ -744,7 +764,7 @@ void TempControlPanel::setup_nozzle_panel(lv_obj_t* panel, lv_obj_t* parent_scre
         }
     }
 
-    spdlog::info("[TempPanel] Setting up nozzle panel...");
+    spdlog::debug("[TempPanel] Setting up nozzle panel...");
 
     // Create Y-axis labels
     lv_obj_t* y_axis_labels = lv_obj_find_by_name(overlay_content, "y_axis_labels");
@@ -775,7 +795,7 @@ void TempControlPanel::setup_nozzle_panel(lv_obj_t* panel, lv_obj_t* parent_scre
     setup_preset_buttons(overlay_content, HEATER_NOZZLE);
     setup_custom_button(overlay_content, HEATER_NOZZLE);
 
-    spdlog::info("[TempPanel] Nozzle panel setup complete!");
+    spdlog::debug("[TempPanel] Nozzle panel setup complete!");
 }
 
 void TempControlPanel::setup_bed_panel(lv_obj_t* panel, lv_obj_t* parent_screen) {
@@ -784,7 +804,7 @@ void TempControlPanel::setup_bed_panel(lv_obj_t* panel, lv_obj_t* parent_screen)
     // Read current values from PrinterState (observers only fire on changes, not initial state)
     bed_current_ = lv_subject_get_int(printer_state_.get_bed_temp_subject());
     bed_target_ = lv_subject_get_int(printer_state_.get_bed_target_subject());
-    spdlog::info("[TempPanel] Bed initial state from PrinterState: current={}°C, target={}°C",
+    spdlog::debug("[TempPanel] Bed initial state from PrinterState: current={}°C, target={}°C",
                  bed_current_, bed_target_);
 
     // Update display with initial values
@@ -812,7 +832,7 @@ void TempControlPanel::setup_bed_panel(lv_obj_t* panel, lv_obj_t* parent_screen)
         }
     }
 
-    spdlog::info("[TempPanel] Setting up bed panel...");
+    spdlog::debug("[TempPanel] Setting up bed panel...");
 
     // Create Y-axis labels
     lv_obj_t* y_axis_labels = lv_obj_find_by_name(overlay_content, "y_axis_labels");
@@ -842,7 +862,7 @@ void TempControlPanel::setup_bed_panel(lv_obj_t* panel, lv_obj_t* parent_screen)
     setup_preset_buttons(overlay_content, HEATER_BED);
     setup_custom_button(overlay_content, HEATER_BED);
 
-    spdlog::info("[TempPanel] Bed panel setup complete!");
+    spdlog::debug("[TempPanel] Bed panel setup complete!");
 }
 
 // ============================================================================
@@ -870,11 +890,11 @@ void TempControlPanel::set_bed(int current, int target) {
 void TempControlPanel::set_nozzle_limits(int min_temp, int max_temp) {
     nozzle_min_temp_ = min_temp;
     nozzle_max_temp_ = max_temp;
-    spdlog::info("[TempPanel] Nozzle limits updated: {}-{}°C", min_temp, max_temp);
+    spdlog::debug("[TempPanel] Nozzle limits updated: {}-{}°C", min_temp, max_temp);
 }
 
 void TempControlPanel::set_bed_limits(int min_temp, int max_temp) {
     bed_min_temp_ = min_temp;
     bed_max_temp_ = max_temp;
-    spdlog::info("[TempPanel] Bed limits updated: {}-{}°C", min_temp, max_temp);
+    spdlog::debug("[TempPanel] Bed limits updated: {}-{}°C", min_temp, max_temp);
 }
