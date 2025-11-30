@@ -7,6 +7,7 @@
 #include "ui_event_safety.h"
 #include "ui_nav.h"
 #include "ui_panel_extrusion.h"
+#include "ui_panel_fan.h"
 #include "ui_panel_motion.h"
 #include "ui_panel_temp_control.h"
 
@@ -22,6 +23,8 @@ class MotionPanel;
 MotionPanel& get_global_motion_panel();
 class ExtrusionPanel;
 ExtrusionPanel& get_global_extrusion_panel();
+class FanPanel;
+FanPanel& get_global_fan_panel();
 
 // ============================================================================
 // CONSTRUCTOR
@@ -103,7 +106,6 @@ void ControlsPanel::setup_card_handlers() {
     lv_obj_add_event_cb(card_motors, on_motors_clicked, LV_EVENT_CLICKED, this);
 
     // clickable flags are now declared in XML (controls_panel.xml)
-    // card_fan intentionally left non-clickable (Phase 2 placeholder)
 
     spdlog::debug("[{}] Card handlers wired", get_name());
 }
@@ -253,8 +255,38 @@ void ControlsPanel::handle_extrusion_clicked() {
 }
 
 void ControlsPanel::handle_fan_clicked() {
-    spdlog::debug("[{}] Fan card clicked - Phase 2 feature", get_name());
-    // TODO: Create and show fan control sub-screen (Phase 2)
+    spdlog::debug("[{}] Fan card clicked - opening Fan Control sub-screen", get_name());
+
+    // Create fan panel on first access (lazy initialization)
+    if (!fan_panel_ && parent_screen_) {
+        spdlog::debug("[{}] Creating fan panel...", get_name());
+
+        // Initialize fan panel subjects
+        auto& fan_panel_instance = get_global_fan_panel();
+        if (!fan_panel_instance.are_subjects_initialized()) {
+            fan_panel_instance.init_subjects();
+        }
+
+        // Create from XML
+        fan_panel_ = static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "fan_panel", nullptr));
+        if (fan_panel_) {
+            // Setup event handlers for fan panel
+            fan_panel_instance.setup(fan_panel_, parent_screen_);
+
+            // Initially hidden
+            lv_obj_add_flag(fan_panel_, LV_OBJ_FLAG_HIDDEN);
+            spdlog::info("[{}] Fan panel created and initialized", get_name());
+        } else {
+            LOG_ERROR_INTERNAL("Failed to create fan panel from XML");
+            NOTIFY_ERROR("Failed to load fan panel");
+            return;
+        }
+    }
+
+    // Push fan panel onto navigation history and show it
+    if (fan_panel_) {
+        ui_nav_push_overlay(fan_panel_);
+    }
 }
 
 void ControlsPanel::handle_motors_clicked() {

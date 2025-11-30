@@ -32,7 +32,7 @@ class TempControlPanel;
  * - Nozzle Temp: Extruder temperature control
  * - Bed Temp: Heatbed temperature control
  * - Extrusion: Filament extrusion/retraction controls
- * - Fan: (Phase 2 - placeholder)
+ * - Fan: Part cooling fan control with slider and presets
  * - Motors: Disable steppers (TODO)
  *
  * ## Migration Notes:
@@ -110,6 +110,7 @@ class ControlsPanel : public PanelBase {
     lv_obj_t* nozzle_temp_panel_ = nullptr;
     lv_obj_t* bed_temp_panel_ = nullptr;
     lv_obj_t* extrusion_panel_ = nullptr;
+    lv_obj_t* fan_panel_ = nullptr;
 
     //
     // === Private Helpers ===

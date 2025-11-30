@@ -41,15 +41,14 @@
       <!-- Subtitle -->
       <text_small text="Filament control"/>
     </ui_card>
-    <!-- Card 5: Fan Control (Phase 2 - Placeholder) -->
-    <ui_card name="card_fan" width="#launcher_card_width" height="#launcher_card_height" flex_flow="column" flex_main_place="center" flex_cross_place="center" style_radius="#border_radius_large" style_pad_all="#launcher_card_padding" style_opa="128">
-      <!-- Disabled appearance -->
+    <!-- Card 5: Fan Control -->
+    <ui_card name="card_fan" width="#launcher_card_width" height="#launcher_card_height" flex_flow="column" flex_main_place="center" flex_cross_place="center" style_radius="#border_radius_large" style_pad_all="#launcher_card_padding" clickable="true">
       <!-- Icon -->
-      <icon src="mat_fan" variant="secondary" style_pad_bottom="#launcher_card_icon_padding"/>
+      <icon src="mat_fan" variant="accent" style_pad_bottom="#launcher_card_icon_padding"/>
       <!-- Label -->
       <text_body text="Fan Control" style_pad_bottom="#launcher_card_title_padding"/>
       <!-- Subtitle -->
-      <text_small text="Coming soon"/>
+      <text_small text="Part cooling"/>
     </ui_card>
     <!-- Card 6: Motors Disable -->
     <ui_card name="card_motors" width="#launcher_card_width" height="#launcher_card_height" flex_flow="column" flex_main_place="center" flex_cross_place="center" style_radius="#border_radius_large" style_pad_all="#launcher_card_padding" clickable="true">

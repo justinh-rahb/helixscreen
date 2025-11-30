@@ -38,6 +38,7 @@
 #include "ui_panel_bed_mesh.h"
 #include "ui_panel_controls.h"
 #include "ui_panel_extrusion.h"
+#include "ui_panel_fan.h"
 #include "ui_panel_filament.h"
 #include "ui_panel_gcode_test.h"
 #include "ui_panel_glyphs.h"
@@ -217,7 +218,7 @@ static void initialize_moonraker_client(Config* config);
 // Returns true on success, false if help was shown or error occurred
 static bool parse_command_line_args(
     int argc, char** argv, int& initial_panel, bool& show_motion, bool& show_nozzle_temp,
-    bool& show_bed_temp, bool& show_extrusion, bool& show_print_status, bool& show_file_detail,
+    bool& show_bed_temp, bool& show_extrusion, bool& show_fan, bool& show_print_status, bool& show_file_detail,
     bool& show_keypad, bool& show_keyboard, bool& show_step_test, bool& show_test_panel,
     bool& show_gcode_test, bool& show_bed_mesh, bool& show_glyphs, bool& show_gradient_test,
     bool& force_wizard, int& wizard_step, bool& panel_requested, int& display_num, int& x_pos,
@@ -269,6 +270,9 @@ static bool parse_command_line_args(
                 } else if (strcmp(panel_arg, "extrusion") == 0) {
                     initial_panel = UI_PANEL_CONTROLS;
                     show_extrusion = true;
+                } else if (strcmp(panel_arg, "fan") == 0) {
+                    initial_panel = UI_PANEL_CONTROLS;
+                    show_fan = true;
                 } else if (strcmp(panel_arg, "print-status") == 0 ||
                            strcmp(panel_arg, "printing") == 0) {
                     show_print_status = true;
@@ -303,7 +307,7 @@ static bool parse_command_line_args(
                 } else {
                     printf("Unknown panel: %s\n", panel_arg);
                     printf("Available panels: home, controls, motion, nozzle-temp, bed-temp, "
-                           "bed-mesh, extrusion, print-status, filament, settings, advanced, "
+                           "bed-mesh, extrusion, fan, print-status, filament, settings, advanced, "
                            "print-select, step-test, test, gcode-test, glyphs, gradient-test\n");
                     return false;
                 }
@@ -784,6 +788,7 @@ static void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/nozzle_temp_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/bed_temp_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/extrusion_panel.xml");
+    lv_xml_register_component_from_file("A:ui_xml/fan_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/print_status_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/filament_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/settings_panel.xml");
@@ -1138,6 +1143,7 @@ int main(int argc, char** argv) {
     bool show_nozzle_temp = false;   // Special flag for nozzle temp sub-screen
     bool show_bed_temp = false;      // Special flag for bed temp sub-screen
     bool show_extrusion = false;     // Special flag for extrusion sub-screen
+    bool show_fan = false;           // Special flag for fan control sub-screen
     bool show_print_status = false;  // Special flag for print status screen
     bool show_file_detail = false;   // Special flag for file detail view
     bool show_keypad = false;        // Special flag for keypad testing
@@ -1164,7 +1170,7 @@ int main(int argc, char** argv) {
 
     // Parse command-line arguments (returns false for help/error)
     if (!parse_command_line_args(argc, argv, initial_panel, show_motion, show_nozzle_temp,
-                                 show_bed_temp, show_extrusion, show_print_status, show_file_detail,
+                                 show_bed_temp, show_extrusion, show_fan, show_print_status, show_file_detail,
                                  show_keypad, show_keyboard, show_step_test, show_test_panel,
                                  show_gcode_test, show_bed_mesh, show_glyphs, show_gradient_test,
                                  force_wizard, wizard_step, panel_requested, display_num, x_pos,
@@ -1516,6 +1522,18 @@ int main(int argc, char** argv) {
             if (overlay_panels.extrusion) {
                 get_global_extrusion_panel().setup(overlay_panels.extrusion, screen);
                 ui_nav_push_overlay(overlay_panels.extrusion);
+            }
+        }
+        if (show_fan) {
+            spdlog::debug("Opening fan control overlay as requested by command-line flag");
+            auto& fan_panel = get_global_fan_panel();
+            if (!fan_panel.are_subjects_initialized()) {
+                fan_panel.init_subjects();
+            }
+            lv_obj_t* fan_obj = (lv_obj_t*)lv_xml_create(screen, "fan_panel", nullptr);
+            if (fan_obj) {
+                fan_panel.setup(fan_obj, screen);
+                ui_nav_push_overlay(fan_obj);
             }
         }
         if (show_print_status && overlay_panels.print_status) {
