@@ -136,6 +136,9 @@ void GCodeTinyGLRenderer::init_tinygl() {
         return; // Already initialized
     }
 
+    spdlog::info("TinyGL init_tinygl() called with viewport_width_={}, viewport_height_={}",
+                 viewport_width_, viewport_height_);
+
     // Initialize TinyGL (it allocates its own framebuffer)
     ZBuffer* zb = ZB_open(viewport_width_, viewport_height_, ZB_MODE_RGBA, 0);
     if (!zb) {
@@ -150,6 +153,8 @@ void GCodeTinyGLRenderer::init_tinygl() {
 
     // Use the ACTUAL ZBuffer dimensions (TinyGL may round for alignment)
     // This is CRITICAL - using wrong dimensions causes massive rendering distortion!
+    spdlog::info("TinyGL ZBuffer created: requested={}x{}, actual={}x{}",
+                 viewport_width_, viewport_height_, zb->xsize, zb->ysize);
     viewport_width_ = zb->xsize;
     viewport_height_ = zb->ysize;
 
@@ -612,7 +617,7 @@ void GCodeTinyGLRenderer::render_layer_range(int start_layer, int end_layer, flo
     }
 }
 
-void GCodeTinyGLRenderer::draw_to_lvgl(lv_layer_t* layer) {
+void GCodeTinyGLRenderer::draw_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_coords) {
     if (!framebuffer_) {
         return;
     }
@@ -645,23 +650,24 @@ void GCodeTinyGLRenderer::draw_to_lvgl(lv_layer_t* layer) {
         dest[i * 3 + 2] = (pixel >> 16) & 0xFF; // B (from TinyGL R channel)
     }
 
-    // Draw image to layer
-    // Note: Use exact framebuffer dimensions to avoid scaling artifacts
+    // Draw image to layer at widget's screen position
+    // IMPORTANT: lv_draw_image area must be in absolute screen coordinates!
     lv_draw_image_dsc_t img_dsc;
     lv_draw_image_dsc_init(&img_dsc);
     img_dsc.src = draw_buf_;
 
-    lv_area_t area;
-    area.x1 = 0;
-    area.y1 = 0;
-    area.x2 = viewport_width_ - 1;  // Actual framebuffer width
-    area.y2 = viewport_height_ - 1; // Actual framebuffer height
+    // Use widget coordinates as the draw area (absolute screen position)
+    lv_area_t area = *widget_coords;
+
+    spdlog::debug("TinyGL draw_to_lvgl: draw_buf={}x{}, widget_coords=({},{}) to ({},{})",
+                  (int)draw_buf_->header.w, (int)draw_buf_->header.h,
+                  area.x1, area.y1, area.x2, area.y2);
 
     lv_draw_image(layer, &img_dsc, &area);
 }
 
 void GCodeTinyGLRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode,
-                                 const GCodeCamera& camera) {
+                                 const GCodeCamera& camera, const lv_area_t* widget_coords) {
     // Initialize TinyGL if needed
     if (!zbuffer_) {
         init_tinygl();
@@ -681,8 +687,8 @@ void GCodeTinyGLRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode
                   highlighted_objects_.size(), gcode.objects.size());
     render_bounding_box(gcode);
 
-    // Draw to LVGL
-    draw_to_lvgl(layer);
+    // Draw to LVGL at widget's screen position
+    draw_to_lvgl(layer, widget_coords);
 
     // Draw camera debug info overlay (if verbose mode OR camera params set via CLI)
     const RuntimeConfig& config = get_runtime_config();

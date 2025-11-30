@@ -89,6 +89,11 @@ ICONS = {
     'icon_cube': (0xF1B2, 'cube (PETG)'),
     'icon_edit': (0xF044, 'edit (custom)'),
     'icon_triangle_exclamation': (0xF071, 'triangle-exclamation (warning)'),
+
+    # Print control icons
+    'icon_play': (0xF04B, 'play (start/resume)'),
+    'icon_pause': (0xF04C, 'pause'),
+    'icon_stop': (0xF04D, 'stop (cancel)'),
 }
 
 GLOBALS_FILE = 'ui_xml/globals.xml'

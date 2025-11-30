@@ -164,8 +164,12 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
 
     last_frame_time = frame_start;
 
+    // Get widget's absolute screen coordinates for drawing
+    lv_area_t widget_coords;
+    lv_obj_get_coords(obj, &widget_coords);
+
     // Render G-code (viewport size is already set by SIZE_CHANGED event)
-    st->renderer->render(layer, *st->gcode_file, *st->camera);
+    st->renderer->render(layer, *st->gcode_file, *st->camera, &widget_coords);
 
     // Log FPS every 60 frames (controlled by spdlog level)
     if (++frame_count >= 60) {

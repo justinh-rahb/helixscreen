@@ -55,6 +55,20 @@ enum class PrinterStatus {
 };
 
 /**
+ * @brief Klipper firmware state (klippy_state from Moonraker)
+ *
+ * Represents the state of the Klipper firmware service, independent of
+ * the Moonraker WebSocket connection. When klippy_state is not READY,
+ * the printer cannot accept G-code commands even if Moonraker is connected.
+ */
+enum class KlippyState {
+    READY = 0,   ///< Normal operation, printer ready for commands
+    STARTUP = 1, ///< Klipper is starting up (during RESTART/FIRMWARE_RESTART)
+    SHUTDOWN = 2, ///< Emergency shutdown (M112)
+    ERROR = 3    ///< Klipper error state (check klippy.log)
+};
+
+/**
  * @brief Print job state (from Moonraker print_stats.state)
  *
  * Represents the state of the current print job as reported by Klipper/Moonraker.
@@ -275,6 +289,11 @@ class PrinterState {
         return &network_status_;
     } // 0=disconnected, 1=connecting, 2=connected (matches NetworkStatus enum)
 
+    // Klipper firmware state subject
+    lv_subject_t* get_klippy_state_subject() {
+        return &klippy_state_;
+    } // 0=ready, 1=startup, 2=shutdown, 3=error (matches KlippyState enum)
+
     // LED state subject (for home panel light control)
     lv_subject_t* get_led_state_subject() {
         return &led_state_;
@@ -367,6 +386,17 @@ class PrinterState {
     }
 
     /**
+     * @brief Set Klipper firmware state
+     *
+     * Updates klippy_state subject. Called when Moonraker sends klippy state
+     * notifications (notify_klippy_ready, notify_klippy_disconnected) or when
+     * the mock simulates RESTART/FIRMWARE_RESTART.
+     *
+     * @param state KlippyState enum value
+     */
+    void set_klippy_state(KlippyState state);
+
+    /**
      * @brief Set network connectivity status
      *
      * Updates network_status_ subject based on WiFi/Ethernet availability.
@@ -433,6 +463,9 @@ class PrinterState {
 
     // Network connectivity subject (WiFi/Ethernet)
     lv_subject_t network_status_; // Integer: uses NetworkStatus enum values
+
+    // Klipper firmware state subject
+    lv_subject_t klippy_state_; // Integer: uses KlippyState enum values
 
     // LED state subject
     lv_subject_t led_state_; // Integer: 0=off, 1=on

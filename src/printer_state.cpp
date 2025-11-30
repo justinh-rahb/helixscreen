@@ -126,6 +126,7 @@ void PrinterState::reset_for_testing() {
     lv_subject_deinit(&printer_connection_state_);
     lv_subject_deinit(&printer_connection_message_);
     lv_subject_deinit(&network_status_);
+    lv_subject_deinit(&klippy_state_);
     lv_subject_deinit(&led_state_);
 
     subjects_initialized_ = false;
@@ -178,6 +179,9 @@ void PrinterState::init_subjects(bool register_xml) {
     lv_subject_init_int(&network_status_,
                         2); // 0=DISCONNECTED, 1=CONNECTING, 2=CONNECTED (mock mode default)
 
+    // Klipper firmware state subject (default to READY)
+    lv_subject_init_int(&klippy_state_, static_cast<int>(KlippyState::READY));
+
     // LED state subject (0=off, 1=on, derived from LED color data)
     lv_subject_init_int(&led_state_, 0);
 
@@ -213,6 +217,7 @@ void PrinterState::init_subjects(bool register_xml) {
         lv_xml_register_subject(NULL, "printer_connection_state", &printer_connection_state_);
         lv_xml_register_subject(NULL, "printer_connection_message", &printer_connection_message_);
         lv_xml_register_subject(NULL, "network_status", &network_status_);
+        lv_xml_register_subject(NULL, "klippy_state", &klippy_state_);
         lv_xml_register_subject(NULL, "led_state", &led_state_);
         lv_xml_register_subject(NULL, "excluded_objects_version", &excluded_objects_version_);
         lv_xml_register_subject(NULL, "printer_has_qgl", &printer_has_qgl_);
@@ -424,6 +429,28 @@ void PrinterState::update_from_status(const json& state) {
         }
     }
 
+    // Update klippy state from webhooks (for restart simulation)
+    if (state.contains("webhooks")) {
+        const auto& webhooks = state["webhooks"];
+        if (webhooks.contains("state")) {
+            std::string klippy_state_str = webhooks["state"].get<std::string>();
+            KlippyState new_state = KlippyState::READY; // default
+
+            if (klippy_state_str == "ready") {
+                new_state = KlippyState::READY;
+            } else if (klippy_state_str == "startup") {
+                new_state = KlippyState::STARTUP;
+            } else if (klippy_state_str == "shutdown") {
+                new_state = KlippyState::SHUTDOWN;
+            } else if (klippy_state_str == "error") {
+                new_state = KlippyState::ERROR;
+            }
+
+            lv_subject_set_int(&klippy_state_, static_cast<int>(new_state));
+            spdlog::debug("[PrinterState] Klippy state from webhooks: {}", klippy_state_str);
+        }
+    }
+
     // Cache full state for complex queries
     json_state_.merge_patch(state);
 }
@@ -455,6 +482,13 @@ void PrinterState::set_printer_connection_state(int state, const char* message) 
 void PrinterState::set_network_status(int status) {
     spdlog::debug("[PrinterState] Network status changed: {}", status);
     lv_subject_set_int(&network_status_, status);
+}
+
+void PrinterState::set_klippy_state(KlippyState state) {
+    const char* state_names[] = {"READY", "STARTUP", "SHUTDOWN", "ERROR"};
+    int state_int = static_cast<int>(state);
+    spdlog::info("[PrinterState] Klippy state changed: {} ({})", state_names[state_int], state_int);
+    lv_subject_set_int(&klippy_state_, state_int);
 }
 
 void PrinterState::set_tracked_led(const std::string& led_name) {

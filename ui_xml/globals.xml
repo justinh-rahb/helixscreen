@@ -309,6 +309,60 @@
     <!-- Subjects for reactive data binding                                   -->
     <!-- Subjects are initialized in C++ code before XML loading              -->
     <!-- ===================================================================== -->
-  </consts>
+  
+		<!-- ===================================================================== -->
+		<!-- FontAwesome icon constants - AUTO-GENERATED - DO NOT EDIT MANUALLY   -->
+		<!-- Run: python3 scripts/generate-icon-consts.py                         -->
+		<!-- ===================================================================== -->
+		<str name="icon_advanced" value=""/>  <!-- U+F142 ellipsis-vertical -->
+		<str name="icon_arrow_down" value="↓"/>  <!-- U+2193 downwards arrow -->
+		<str name="icon_arrow_down_left" value="↙"/>  <!-- U+2199 diagonal down-left -->
+		<str name="icon_arrow_down_right" value="↘"/>  <!-- U+2198 diagonal down-right -->
+		<str name="icon_arrow_down_to_line" value=""/>  <!-- U+F33D arrow-down-to-line (load) -->
+		<str name="icon_arrow_left" value="←"/>  <!-- U+2190 leftwards arrow -->
+		<str name="icon_arrow_right" value="→"/>  <!-- U+2192 rightwards arrow -->
+		<str name="icon_arrow_up" value="↑"/>  <!-- U+2191 upwards arrow -->
+		<str name="icon_arrow_up_left" value="↖"/>  <!-- U+2196 diagonal up-left -->
+		<str name="icon_arrow_up_line" value=""/>  <!-- U+F342 arrow-up-from-line -->
+		<str name="icon_arrow_up_right" value="↗"/>  <!-- U+2197 diagonal up-right -->
+		<str name="icon_arrows_all" value=""/>  <!-- U+F0B2 arrows-up-down-left-right -->
+		<str name="icon_backspace" value=""/>  <!-- U+F55A delete-left -->
+		<str name="icon_check_circle" value=""/>  <!-- U+F058 circle-check (connected) -->
+		<str name="icon_chevron_down" value=""/>  <!-- U+F078 chevron-down -->
+		<str name="icon_chevron_left" value=""/>  <!-- U+F053 chevron-left -->
+		<str name="icon_chevron_up" value=""/>  <!-- U+F077 chevron-up -->
+		<str name="icon_clock" value=""/>  <!-- U+F017 clock-o -->
+		<str name="icon_controls" value=""/>  <!-- U+F1DE sliders -->
+		<str name="icon_cube" value=""/>  <!-- U+F1B2 cube (PETG) -->
+		<str name="icon_droplet" value=""/>  <!-- U+F043 droplet (purge) -->
+		<str name="icon_edit" value=""/>  <!-- U+F044 edit (custom) -->
+		<str name="icon_ethernet" value=""/>  <!-- U+F796 ethernet -->
+		<str name="icon_fan" value=""/>  <!-- U+F863 fan -->
+		<str name="icon_filament" value=""/>  <!-- U+F008 film -->
+		<str name="icon_fire" value=""/>  <!-- U+F06D fire -->
+		<str name="icon_folder" value=""/>  <!-- U+F07C folder-open -->
+		<str name="icon_home" value=""/>  <!-- U+F015 house -->
+		<str name="icon_leaf" value=""/>  <!-- U+F06C leaf -->
+		<str name="icon_lightbulb" value=""/>  <!-- U+F0EB lightbulb -->
+		<str name="icon_list" value=""/>  <!-- U+F03A list -->
+		<str name="icon_lock" value=""/>  <!-- U+F023 lock (encrypted) -->
+		<str name="icon_pause" value=""/>  <!-- U+F04C pause -->
+		<str name="icon_play" value=""/>  <!-- U+F04B play (start/resume) -->
+		<str name="icon_power_off" value=""/>  <!-- U+F011 power-off -->
+		<str name="icon_question_circle" value=""/>  <!-- U+F059 circle-question -->
+		<str name="icon_settings" value=""/>  <!-- U+F013 gear -->
+		<str name="icon_signal_wifi_1" value=""/>  <!-- U+F6AC wifi-1 (0-25% signal) -->
+		<str name="icon_signal_wifi_2" value=""/>  <!-- U+F6AA wifi-2 (26-50% signal) -->
+		<str name="icon_signal_wifi_3" value=""/>  <!-- U+F6AB wifi-3 (51-75% signal) -->
+		<str name="icon_signal_wifi_4" value=""/>  <!-- U+F1EB wifi (76-100% signal) -->
+		<str name="icon_stop" value=""/>  <!-- U+F04D stop (cancel) -->
+		<str name="icon_temperature" value=""/>  <!-- U+F2C7 thermometer-half -->
+		<str name="icon_th_large" value=""/>  <!-- U+F009 th-large -->
+		<str name="icon_trash" value=""/>  <!-- U+F1F8 trash -->
+		<str name="icon_triangle_exclamation" value=""/>  <!-- U+F071 triangle-exclamation (warning) -->
+		<str name="icon_wifi" value=""/>  <!-- U+F1EB wifi -->
+		<str name="icon_wifi_slash" value=""/>  <!-- U+F127 wifi-slash -->
+		<str name="icon_xmark_circle" value=""/>  <!-- U+F057 circle-xmark (error/failed) -->
+</consts>
   <view extends="lv_obj"/>
 </component>

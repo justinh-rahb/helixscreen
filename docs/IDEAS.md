@@ -12,6 +12,7 @@
 * AFC control
 * belt tension: The printer uses controlled belt excitation combined with stroboscopic feedback from the LED to visualize belt resonance
 * LVGL slider knob clipping bug: When `lv_slider` is set to `width="100%"`, the knob extends beyond the widget bounds at min/max positions, getting clipped by parent containers. Currently worked around with extra padding + `flag_overflow_visible`. Root cause: slider doesn't account for knob radius in its size calculation. Should investigate `lv_slider.c` position_knob() and ext_draw_size logic to make the widget self-contained.
+* **LVGL lv_bar value=0 bug** (submit upstream PR/issue): When `lv_bar` is created with default cur_value=0 and XML sets `value=0`, the bar shows FULL instead of empty. Root cause: `lv_bar_set_value()` at line 105 of `lv_bar.c` returns early with `if(bar->cur_value == value) return;` without triggering proper layout invalidation. Workaround: call `lv_bar_set_value(1)` then `lv_bar_set_value(0)` to force update. Affects any bar that needs to display 0% initially.
 
 ---
 

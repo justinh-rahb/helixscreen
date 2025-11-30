@@ -1,20 +1,19 @@
 # LVGL 9 XML UI Prototype - Development Roadmap
 
-**Last Updated:** 2025-11-29 (Evening)
+**Last Updated:** 2025-11-30
 
 ---
 
 ## 🎯 Current Priorities
 
-1. **Phase 11:** Finish wizard connection/summary screens
+1. **Phase 5:** Fan Control Sub-Screen (currently "Coming soon")
 2. **Phase 8:** Implement thumbnail HTTP downloads
 3. **Phase 8:** File upload functionality
 4. **Phase 12:** Production readiness
-5. **Phase 15:** Continue reactive UI architecture improvements
 
-**Completed Phases:** 1, 2, 3, 4, 13, 14
+**Completed Phases:** 1, 2, 3, 4, 11, 13, 14
 **Mostly Complete:** 5, 7, 8, 15
-**In Progress:** 6, 9, 10, 11
+**In Progress:** 6, 9, 10
 
 ---
 
@@ -461,26 +460,26 @@
   - Print errors
   - File system errors
 
-## 🎯 Phase 11: First-Run Configuration Wizard (HIGH PRIORITY)
+## ✅ Phase 11: First-Run Configuration Wizard (COMPLETED)
 
-**Priority: High** - Initial setup flow for new installations
+**Priority: N/A** - Completed 2025-11-30
 
-**Status: IN PROGRESS** - Hardware selection complete, other steps pending
+**Status: COMPLETE** - All 7 wizard steps fully implemented with class-based architecture
 
-**Progress:**
-- ✅ Wizard framework (navigation, responsive constants, subjects)
-- ✅ WiFi setup screen (fully working)
-- ✅ **Hardware selection screens (steps 4-7)** - ✅ COMPLETE (2025-11-02)
-  - Dynamic dropdown population from MoonrakerClient discovery
-  - Hardware filtering (bed, hotend, fans by type, LEDs)
-  - Fixed critical layout bug (LV_SIZE_CONTENT → flex_grow)
-  - Config template updated with all wizard fields
-- ✅ **Wizard header component extraction** (2025-11-27)
-  - Reusable wizard_header_bar.xml component
-  - Contextual subtitles per wizard step
-  - Improved UX with consistent navigation
-- ⚠️ Connection/printer ID/summary screens (XML exists, not fully wired)
-- ⏳ Next: Real printer testing + remaining wizard step implementation
+**Summary:**
+- ✅ **Step 1: WiFi Setup** - Network scanning, password entry, async callbacks
+- ✅ **Step 2: Moonraker Connection** - IP/port entry, RFC 1035 validation, connection testing
+- ✅ **Step 3: Printer Identify** - Type selection, auto-detection with confidence scoring
+- ✅ **Step 4: Heater Selection** - Bed/hotend heater dropdowns from discovery
+- ✅ **Step 5: Fan Selection** - Hotend fan, part cooling fan dropdowns
+- ✅ **Step 6: LED Selection** - Optional LED strip selection
+- ✅ **Step 7: Summary** - Read-only review of all selections, finish button
+
+**Key Infrastructure:**
+- Reusable `wizard_header_bar.xml` component with contextual subtitles
+- Class-based architecture (all steps migrated to WizardXxxStep classes)
+- `ui_wizard_helpers.h` for dropdown population and config save/restore
+- Responsive constants for small/medium/large displays
 
 ### User Story
 New users need a guided setup wizard to:
@@ -488,85 +487,44 @@ New users need a guided setup wizard to:
 2. Map auto-discovered printer components to UI defaults
 3. Save these mappings for consistent behavior
 
-### Requirements
+### Requirements (All Complete)
 
-- [ ] **First-Run Detection**
-  - [ ] Detect missing/incomplete configuration on startup
-  - [ ] Show wizard automatically on first run
-  - [ ] Allow re-run from settings panel ("Reset Configuration")
-  - [ ] Skip wizard if config is complete
+- [x] **First-Run Detection** ✅
+  - [x] Detect missing/incomplete configuration on startup
+  - [x] Show wizard automatically on first run
+  - [x] Allow re-run from settings panel ("Reset Configuration")
+  - [x] Skip wizard if config is complete
 
-- [ ] **Moonraker Connection Screen**
-  - [ ] Manual IP address entry field with validation
-  - [ ] Port configuration field (default 7125)
-  - [ ] "Test Connection" button with spinner/status feedback
-  - [ ] Connection status display (success/error messages)
-  - [ ] "Next" button (disabled until successful connection)
-  - [ ] Save connection settings to helixconfig.json
-  - [ ] Optional future enhancement: mDNS/Bonjour auto-discovery scan
+- [x] **Moonraker Connection Screen** ✅
+  - [x] Manual IP address entry field with RFC 1035 validation
+  - [x] Port configuration field (default 7125)
+  - [x] "Test Connection" button with spinner/status feedback
+  - [x] Connection status display (success/error messages)
+  - [x] "Next" button (disabled until successful connection via `connection_test_passed` subject)
+  - [x] Save connection settings to helixconfig.json
+  - [ ] Future enhancement: mDNS/Bonjour auto-discovery scan
 
-- [x] **Hardware Mapping Wizard** - ✅ UI COMPLETE (Backend wiring pending)
+- [x] **Hardware Mapping Wizard** ✅
   - [x] Auto-detect available components via printer.objects.list
   - [x] Multi-screen wizard flow (one category per screen):
-    1. ✅ **Heated Bed Selection**
-       - Dropdown: Select heater (filtered by "bed" keyword)
-       - Dropdown: Select sensor (all sensors shown)
-       - Dynamic population from MoonrakerClient
-    2. ✅ **Hotend Selection**
-       - Dropdown: Select heater (filtered by "extruder"/"hotend")
-       - Dropdown: Select sensor (filtered by "extruder"/"hotend")
-       - Dynamic population from MoonrakerClient
-    3. ✅ **Fan Selection**
-       - Dropdown: Hotend fan (filtered: "heater_fan", "hotend_fan")
-       - Dropdown: Part cooling fan (filtered: excludes heater fans)
-       - Dynamic population from MoonrakerClient
-    4. ✅ **LED Selection**
-       - Dropdown: Main LED (all LEDs shown)
-       - "None" option available
-  - [x] Back/Next navigation buttons on each screen (part of wizard framework)
-  - [ ] Summary screen showing all selections before saving (pending)
-  - [x] Save mappings to config file under printer-specific section (event callbacks wired)
+    1. ✅ **Heated Bed Selection** - Dropdown filtered by "bed" keyword
+    2. ✅ **Hotend Selection** - Dropdown filtered by "extruder"/"hotend"
+    3. ✅ **Fan Selection** - Hotend fan + part cooling fan dropdowns
+    4. ✅ **LED Selection** - Optional LED strip with "None" option
+  - [x] Back/Next navigation buttons on each screen
+  - [x] Summary screen showing all selections before saving
+  - [x] Save mappings to config file under printer-specific section
 
-- [ ] **Configuration Storage**
-  - [ ] Extend helixconfig.json schema with hardware mappings:
-    ```json
-    {
-      "printers": {
-        "default_printer": {
-          "moonraker_host": "192.168.1.112",
-          "moonraker_port": 7125,
-          "hardware_map": {
-            "heated_bed": {
-              "heater": "heater_bed",
-              "sensor": "heater_bed"
-            },
-            "hotend": {
-              "heater": "extruder",
-              "sensor": "extruder"
-            },
-            "fans": {
-              "hotend_fan": "heater_fan hotend_fan",
-              "part_cooling_fan": "fan",
-              "bed_fans": ["fan_generic bed_fan_1", "fan_generic bed_fan_2"]
-            },
-            "leds": {
-              "main_led": "neopixel chamber_led"
-            }
-          }
-        }
-      }
-    }
-    ```
-  - [ ] Config validation on load
-  - [ ] Migration logic for old configs
+- [x] **Configuration Storage** ✅
+  - [x] helixconfig.json schema with hardware mappings
+  - [x] Config save/restore via `ui_wizard_helpers.h`
+  - [x] `wizard_config_paths.h` defines all JSON pointer paths
 
-- [ ] **UI Components Needed**
-  - [ ] Wizard panel wrapper (progress indicator, back/next/finish buttons)
-  - [ ] IP address input field with numeric keypad integration
-  - [ ] Dropdown/select widgets for component selection
-  - [ ] Multi-select checkbox list for optional components
-  - [ ] Success/error message overlays
-  - [ ] Progress spinner for connection testing
+- [x] **UI Components** ✅
+  - [x] Wizard container with progress indicator, back/next/finish buttons
+  - [x] Textarea input fields with validation
+  - [x] Dropdown/roller widgets for component selection
+  - [x] Success/error status messages via `wizard_header_bar.xml` subtitle
 
 ### Design Notes
 
@@ -583,16 +541,11 @@ New users need a guided setup wizard to:
 
 ### Testing
 
-- [ ] Test with no config file (first run)
-- [ ] Test with partial config (migration)
-- [ ] Test with complete config (skip wizard)
-- [ ] Test connection failures (invalid IP, port, timeout)
-- [ ] Test with various printer configurations:
-  - Single extruder
-  - Multi-extruder (extruder + extruder1)
-  - No heated bed
-  - Multiple fans
-  - No LEDs
+- [x] Test with no config file (first run)
+- [x] Test with partial config (migration)
+- [x] Test with complete config (skip wizard)
+- [x] Test connection failures (invalid IP, port, timeout)
+- [x] Test with various printer configurations
 
 ---
 
@@ -774,10 +727,11 @@ lv_subject_set_int(&safety_warning_subject_, show ? 1 : 0);
 
 ---
 
-## Recent Work (2025-11-14 to 2025-11-29)
+## Recent Work (2025-11-14 to 2025-11-30)
 
 | Feature | Phase | Date |
 |---------|-------|------|
+| **First-Run Wizard COMPLETE (all 7 steps)** | 11 | 2025-11-30 |
 | **Exclude Object feature (touch-to-exclude with undo)** | 6, 8 | 2025-11-29 |
 | **Bed mesh deferred render fix (hidden panels)** | 6 | 2025-11-29 |
 | Deferred render pattern documentation | - | 2025-11-29 |

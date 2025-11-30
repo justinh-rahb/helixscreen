@@ -30,6 +30,7 @@
 #include "app_globals.h"
 #include "printer_state.h"
 
+#include <cstring>
 #include <spdlog/spdlog.h>
 
 // Forward declaration for class-based API
@@ -41,6 +42,13 @@ static lv_obj_t* printer_icon = nullptr;
 static lv_obj_t* notification_icon = nullptr;
 static lv_obj_t* notification_badge = nullptr;
 static lv_obj_t* notification_badge_count = nullptr;
+
+// Cached state for combined printer icon logic
+static int32_t cached_connection_state = 0;
+static int32_t cached_klippy_state = 0; // 0=READY, 1=STARTUP, 2=SHUTDOWN, 3=ERROR
+
+// Forward declaration
+static void update_printer_icon_combined();
 
 // Observer callback for network state changes
 static void network_status_observer(lv_observer_t* observer, lv_subject_t* subject) {
@@ -54,35 +62,81 @@ static void network_status_observer(lv_observer_t* observer, lv_subject_t* subje
 
 // Observer callback for printer connection state changes
 static void printer_connection_observer(lv_observer_t* observer, lv_subject_t* subject) {
-    int32_t connection_state = lv_subject_get_int(subject);
+    cached_connection_state = lv_subject_get_int(subject);
+    spdlog::debug("[StatusBar] Connection state changed to: {}", cached_connection_state);
+    update_printer_icon_combined();
+}
 
-    spdlog::debug("[StatusBar] Observer fired! Connection state changed to: {}", connection_state);
+// Observer callback for klippy state changes
+static void klippy_state_observer(lv_observer_t* observer, lv_subject_t* subject) {
+    cached_klippy_state = lv_subject_get_int(subject);
+    spdlog::debug("[StatusBar] Klippy state changed to: {}", cached_klippy_state);
+    update_printer_icon_combined();
+}
 
-    // Map MoonrakerClient::ConnectionState to PrinterStatus
-    // ConnectionState: 0=DISCONNECTED, 1=CONNECTING, 2=CONNECTED, 3=RECONNECTING, 4=FAILED
-    PrinterStatus status;
-    switch (connection_state) {
-    case 2: // CONNECTED
-        status = PrinterStatus::READY;
-        spdlog::debug("[StatusBar] Mapped state 2 (CONNECTED) -> PrinterStatus::READY");
-        break;
-    case 4: // FAILED
-        status = PrinterStatus::ERROR;
-        spdlog::debug("[StatusBar] Mapped state 4 (FAILED) -> PrinterStatus::ERROR");
-        break;
-    case 0: // DISCONNECTED
-    case 1: // CONNECTING
-    case 3: // RECONNECTING
-    default:
-        status = PrinterStatus::DISCONNECTED;
-        spdlog::debug("[StatusBar] Mapped state {} -> PrinterStatus::DISCONNECTED",
-                      connection_state);
-        break;
+// Combined logic to update printer icon based on both connection and klippy state
+static void update_printer_icon_combined() {
+    if (!printer_icon) {
+        return;
     }
 
-    spdlog::debug("[StatusBar] Calling ui_status_bar_update_printer() with status={}",
-                  static_cast<int>(status));
-    ui_status_bar_update_printer(status);
+    // Klippy state takes precedence when connected
+    // ConnectionState: 0=DISCONNECTED, 1=CONNECTING, 2=CONNECTED, 3=RECONNECTING, 4=FAILED
+    // KlippyState: 0=READY, 1=STARTUP, 2=SHUTDOWN, 3=ERROR
+
+    lv_color_t color;
+    const char* icon_text = "\uF03E"; // Default: 3D printer icon (LV_SYMBOL_IMAGE)
+    bool use_sync_icon = false;
+
+    if (cached_connection_state == 2) { // CONNECTED to Moonraker
+        // Check klippy state
+        switch (cached_klippy_state) {
+        case 1: // STARTUP (restarting)
+            color = ui_theme_parse_color(lv_xml_get_const(NULL, "warning_color"));
+            icon_text = "\uF021"; // fa-sync icon
+            use_sync_icon = true;
+            spdlog::debug("[StatusBar] Klippy STARTUP -> sync icon, orange");
+            break;
+        case 2: // SHUTDOWN
+        case 3: // ERROR
+            color = ui_theme_parse_color(lv_xml_get_const(NULL, "error_color"));
+            spdlog::debug("[StatusBar] Klippy SHUTDOWN/ERROR -> printer icon, red");
+            break;
+        case 0: // READY
+        default:
+            color = ui_theme_parse_color(lv_xml_get_const(NULL, "success_color"));
+            spdlog::debug("[StatusBar] Klippy READY -> printer icon, green");
+            break;
+        }
+    } else if (cached_connection_state == 4) { // FAILED
+        color = ui_theme_parse_color(lv_xml_get_const(NULL, "error_color"));
+        spdlog::debug("[StatusBar] Connection FAILED -> printer icon, red");
+    } else { // DISCONNECTED, CONNECTING, RECONNECTING
+        if (get_printer_state().was_ever_connected()) {
+            color = ui_theme_parse_color(lv_xml_get_const(NULL, "warning_color"));
+            spdlog::debug("[StatusBar] Disconnected (was connected) -> printer icon, yellow");
+        } else {
+            color = ui_theme_parse_color(lv_xml_get_const(NULL, "text_secondary"));
+            spdlog::debug("[StatusBar] Never connected -> printer icon, gray");
+        }
+    }
+
+    // Update icon text if changed
+    const char* current_text = lv_label_get_text(printer_icon);
+    if (strcmp(current_text, icon_text) != 0) {
+        lv_label_set_text(printer_icon, icon_text);
+        // If using sync icon, use FA font; otherwise use heading font
+        if (use_sync_icon) {
+            lv_obj_set_style_text_font(printer_icon,
+                                       lv_xml_get_font(NULL, "fa_icons_24"), 0);
+        } else {
+            lv_obj_set_style_text_font(printer_icon,
+                                       lv_xml_get_font(NULL, "font_heading"), 0);
+        }
+    }
+
+    // Update color
+    lv_obj_set_style_text_color(printer_icon, color, 0);
 }
 
 // Event callback for notification history button
@@ -164,6 +218,12 @@ void ui_status_bar_init() {
     spdlog::debug("[StatusBar] Registering observer on printer_connection_state_subject at {}",
                   (void*)conn_subject);
     lv_subject_add_observer(conn_subject, printer_connection_observer, nullptr);
+
+    // Klippy state observer (for RESTART/FIRMWARE_RESTART handling)
+    lv_subject_t* klippy_subject = printer_state.get_klippy_state_subject();
+    spdlog::debug("[StatusBar] Registering observer on klippy_state_subject at {}",
+                  (void*)klippy_subject);
+    lv_subject_add_observer(klippy_subject, klippy_state_observer, nullptr);
 
     // Set bell icon to neutral color (stays this way - badge color indicates severity)
     // Unlike network/printer icons which change color based on state, bell stays neutral

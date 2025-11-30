@@ -58,10 +58,12 @@ class GCodeTinyGLRenderer {
      * @param layer LVGL draw layer (from draw event callback)
      * @param gcode Parsed G-code file
      * @param camera Camera with view/projection matrices
+     * @param widget_coords Absolute screen coordinates of the widget
      *
      * Main rendering function. Call from LVGL draw event callback.
      */
-    void render(lv_layer_t* layer, const ParsedGCodeFile& gcode, const GCodeCamera& camera);
+    void render(lv_layer_t* layer, const ParsedGCodeFile& gcode, const GCodeCamera& camera,
+                const lv_area_t* widget_coords);
 
     /**
      * @brief Set viewport size
@@ -353,8 +355,9 @@ class GCodeTinyGLRenderer {
     /**
      * @brief Convert TinyGL framebuffer to LVGL image and draw to layer
      * @param layer LVGL draw layer
+     * @param widget_coords Absolute screen coordinates of the widget
      */
-    void draw_to_lvgl(lv_layer_t* layer);
+    void draw_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_coords);
 
     /**
      * @brief Setup lighting (two-point studio setup)

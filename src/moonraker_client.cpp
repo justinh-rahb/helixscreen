@@ -24,6 +24,8 @@
 
 #include "moonraker_client.h"
 
+#include "app_globals.h"
+#include "printer_state.h"
 #include "ui_error_reporting.h"
 #include "ui_notification.h"
 
@@ -413,6 +415,9 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
                 if (method == "notify_klippy_disconnected") {
                     spdlog::warn("[Moonraker Client] Klipper disconnected from Moonraker");
 
+                    // Update klippy state in PrinterState (SHUTDOWN = firmware disconnected)
+                    get_printer_state().set_klippy_state(KlippyState::SHUTDOWN);
+
                     // Show critical modal to user
                     ui_notification_error("Printer Firmware Disconnected",
                                           "Klipper has disconnected from Moonraker. Check for "
@@ -434,6 +439,9 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
                 // Klippy reconnected to Moonraker
                 else if (method == "notify_klippy_ready") {
                     spdlog::info("[Moonraker Client] Klipper ready");
+
+                    // Update klippy state in PrinterState (READY = firmware ready)
+                    get_printer_state().set_klippy_state(KlippyState::READY);
 
                     // Invoke user callback with exception safety
                     try {

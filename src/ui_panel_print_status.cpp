@@ -127,8 +127,9 @@ void PrintStatusPanel::init_subjects() {
                                         "bed_temp_text");
     UI_SUBJECT_INIT_AND_REGISTER_STRING(speed_subject_, speed_buf_, "100%", "print_speed_text");
     UI_SUBJECT_INIT_AND_REGISTER_STRING(flow_subject_, flow_buf_, "100%", "print_flow_text");
-    UI_SUBJECT_INIT_AND_REGISTER_STRING(pause_button_subject_, pause_button_buf_, "Pause",
-                                        "pause_button_text");
+    // Pause button icon (F04C=pause, F04B=play)
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(pause_button_subject_, pause_button_buf_, "\xEF\x81\x8C",
+                                        "pause_button_icon");
 
     // Preparing state subjects
     UI_SUBJECT_INIT_AND_REGISTER_INT(preparing_visible_subject_, 0, "preparing_visible");
@@ -136,11 +137,13 @@ void PrintStatusPanel::init_subjects() {
                                         "Preparing...", "preparing_operation");
     UI_SUBJECT_INIT_AND_REGISTER_INT(preparing_progress_subject_, 0, "preparing_progress");
 
+    // Progress bar subject (integer 0-100 for XML bind_value)
+
     // Viewer mode subject (0=thumbnail, 1=gcode viewer)
     UI_SUBJECT_INIT_AND_REGISTER_INT(gcode_viewer_mode_subject_, 0, "gcode_viewer_mode");
 
     subjects_initialized_ = true;
-    spdlog::debug("[{}] Subjects initialized (14 subjects)", get_name());
+    spdlog::debug("[{}] Subjects initialized (15 subjects)", get_name());
 }
 
 void PrintStatusPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
@@ -260,6 +263,10 @@ void PrintStatusPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     progress_bar_ = lv_obj_find_by_name(overlay_content, "print_progress");
     if (progress_bar_) {
         lv_bar_set_range(progress_bar_, 0, 100);
+        // WORKAROUND: LVGL bar has a bug where setting value=0 when cur_value=0
+        // causes early return without proper layout update, showing full bar.
+        // Force update by setting to 1 first, then 0.
+        lv_bar_set_value(progress_bar_, 1, LV_ANIM_OFF);
         lv_bar_set_value(progress_bar_, 0, LV_ANIM_OFF);
         spdlog::debug("[{}]   ✓ Progress bar", get_name());
     } else {
@@ -321,6 +328,11 @@ void PrintStatusPanel::load_gcode_file(const char* file_path) {
 
             // Show the viewer (hide gradient and thumbnail)
             self->show_gcode_viewer(true);
+
+            // Force layout recalculation now that viewer is visible
+            lv_obj_update_layout(viewer);
+            // Reset camera to fit model to new viewport dimensions
+            ui_gcode_viewer_reset_camera(viewer);
 
             // Set print progress to layer 0 (entire model in ghost mode initially)
             ui_gcode_viewer_set_print_progress(viewer, 0);
@@ -388,16 +400,11 @@ void PrintStatusPanel::update_all_displays() {
     std::snprintf(flow_buf_, sizeof(flow_buf_), "%d%%", flow_percent_);
     lv_subject_copy_string(&flow_subject_, flow_buf_);
 
-    // Update progress bar widget directly
-    if (progress_bar_) {
-        lv_bar_set_value(progress_bar_, current_progress_, LV_ANIM_OFF);
-    }
-
-    // Update pause button text based on state
+    // Update pause button icon based on state (F04B=play, F04C=pause)
     if (current_state_ == PrintState::Paused) {
-        std::snprintf(pause_button_buf_, sizeof(pause_button_buf_), "Resume");
+        std::snprintf(pause_button_buf_, sizeof(pause_button_buf_), "\xEF\x81\x8B"); // play icon
     } else {
-        std::snprintf(pause_button_buf_, sizeof(pause_button_buf_), "Pause");
+        std::snprintf(pause_button_buf_, sizeof(pause_button_buf_), "\xEF\x81\x8C"); // pause icon
     }
     lv_subject_copy_string(&pause_button_subject_, pause_button_buf_);
 }
@@ -525,6 +532,14 @@ void PrintStatusPanel::handle_cancel_button() {
 
 void PrintStatusPanel::handle_resize() {
     spdlog::debug("[{}] Handling resize event", get_name());
+
+    // Reset gcode viewer camera to fit new dimensions
+    if (gcode_viewer_ && !lv_obj_has_flag(gcode_viewer_, LV_OBJ_FLAG_HIDDEN)) {
+        // Force layout recalculation so viewer gets correct dimensions
+        lv_obj_update_layout(gcode_viewer_);
+        ui_gcode_viewer_reset_camera(gcode_viewer_);
+        spdlog::debug("[{}] Reset gcode viewer camera after resize", get_name());
+    }
 }
 
 // ============================================================================
@@ -714,14 +729,14 @@ void PrintStatusPanel::on_print_progress_changed(int progress) {
     if (current_progress_ > 100)
         current_progress_ = 100;
 
+    // Guard: subjects may not be initialized if called from constructor's observer setup
+    if (!subjects_initialized_) {
+        return;
+    }
+
     // Update progress text
     std::snprintf(progress_text_buf_, sizeof(progress_text_buf_), "%d%%", current_progress_);
     lv_subject_copy_string(&progress_text_subject_, progress_text_buf_);
-
-    // Update progress bar widget directly
-    if (progress_bar_) {
-        lv_bar_set_value(progress_bar_, current_progress_, LV_ANIM_OFF);
-    }
 
     spdlog::trace("[{}] Progress updated: {}%", get_name(), current_progress_);
 }
