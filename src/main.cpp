@@ -56,6 +56,7 @@
 #include "ui_severity_card.h"
 #include "ui_status_bar.h"
 #include "ui_switch.h"
+#include "ui_toast.h"
 #include "ui_text.h"
 #include "ui_theme.h"
 #include "ui_utils.h"
@@ -1472,6 +1473,9 @@ int main(int argc, char** argv) {
 
     // Initialize status bar (must be after XML creation and layout update)
     ui_status_bar_init();
+
+    // Initialize toast notification system (registers close button callback)
+    ui_toast_init();
 
     // Initialize shared overlay backdrop
     ui_nav_init_overlay_backdrop(screen);
