@@ -27,6 +27,7 @@
 
 #include "hv/WebSocketClient.h"
 #include "moonraker_error.h"
+#include "moonraker_events.h"
 #include "moonraker_request.h"
 #include "printer_capabilities.h"
 #include "spdlog/spdlog.h"
@@ -480,6 +481,16 @@ class MoonrakerClient : public hv::WebSocketClient {
     }
 
     /**
+     * @brief Register callback for transport events
+     *
+     * Only one handler can be registered at a time. Registering a new
+     * handler replaces the previous one.
+     *
+     * @param cb Callback function, or nullptr to unregister
+     */
+    void register_event_handler(MoonrakerEventCallback cb);
+
+    /**
      * @brief Set connection timeout in milliseconds
      *
      * @param timeout_ms Connection timeout (default 10000ms)
@@ -546,6 +557,19 @@ class MoonrakerClient : public hv::WebSocketClient {
      * @param status Raw printer status object
      */
     void dispatch_status_update(const json& status);
+
+    /**
+     * @brief Emit event to registered handler
+     *
+     * Thread-safe. If no handler is registered, the event is logged and dropped.
+     *
+     * @param type Event type
+     * @param message Human-readable message
+     * @param is_error true for error events, false for warnings
+     * @param details Additional details (optional)
+     */
+    void emit_event(MoonrakerEventType type, const std::string& message, bool is_error = false,
+                    const std::string& details = "");
 
   private:
     /**
@@ -618,6 +642,10 @@ class MoonrakerClient : public hv::WebSocketClient {
     std::function<void()> last_on_disconnected_;          // Callback from last connect()
     std::function<void()> last_discovery_complete_;       // Callback from last discover_printer()
     mutable std::mutex reconnect_mutex_;                  // Protect stored connection info
+
+    // Event handler for transport events (decouples from UI layer)
+    MoonrakerEventCallback event_handler_;
+    mutable std::mutex event_handler_mutex_;
 };
 
 #endif // MOONRAKER_CLIENT_H
