@@ -806,13 +806,15 @@ void WizardWifiStep::show_password_modal(const char* ssid) {
 
     spdlog::debug("[{}] Showing password modal for SSID: {}", get_name(), ssid);
 
-    ui_modal_keyboard_config_t kbd_config = {.auto_position = true};
+    ui_modal_keyboard_config_t kbd_config = {
+        .auto_position = true, .alignment = LV_ALIGN_BOTTOM_MID, .x = 0, .y = 0};
 
-    ui_modal_config_t config = {.position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER},
-                                .backdrop_opa = 180,
-                                .keyboard = &kbd_config,
-                                .persistent = false,
-                                .on_close = nullptr};
+    ui_modal_config_t config = {
+        .position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER, .x = 0, .y = 0},
+        .backdrop_opa = 180,
+        .keyboard = &kbd_config,
+        .persistent = false,
+        .on_close = nullptr};
 
     const char* attrs[] = {"ssid", ssid, NULL};
     password_modal_ = ui_modal_show("wifi_password_modal", &config, attrs);

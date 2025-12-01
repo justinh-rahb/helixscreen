@@ -334,7 +334,7 @@ lv_obj_t* ui_step_progress_create(lv_obj_t* parent, const ui_step_t* steps, int 
 
         // Create step number label (shown for PENDING/ACTIVE states)
         lv_obj_t* step_number = lv_label_create(circle);
-        char num_buf[4];
+        char num_buf[16]; // Increased buffer size to handle larger step numbers
         snprintf(num_buf, sizeof(num_buf), "%d", i + 1); // 1-indexed step numbers
         lv_label_set_text(step_number, num_buf);
         lv_obj_align(step_number, LV_ALIGN_CENTER, 0, 0);

@@ -29,11 +29,11 @@ namespace gcode {
  * @brief Parameters for a sequenced operation
  */
 struct OperationParams {
-    std::string filename;              ///< For START_PRINT
-    double temperature = 0.0;          ///< For preheat operations
-    int duration_minutes = 0;          ///< For chamber soak
-    std::string profile_name;          ///< For BED_MESH_PROFILE LOAD=...
-    std::map<std::string, std::string> extra;  ///< Additional macro parameters
+    std::string filename;                     ///< For START_PRINT
+    double temperature = 0.0;                 ///< For preheat operations
+    int duration_minutes = 0;                 ///< For chamber soak
+    std::string profile_name;                 ///< For BED_MESH_PROFILE LOAD=...
+    std::map<std::string, std::string> extra; ///< Additional macro parameters
 };
 
 /**
@@ -42,21 +42,21 @@ struct OperationParams {
 struct QueuedOperation {
     OperationType type;
     OperationParams params;
-    std::string display_name;  ///< Human-readable name for UI
-    std::chrono::milliseconds timeout{300000};  ///< Default 5 minutes
+    std::string display_name;                  ///< Human-readable name for UI
+    std::chrono::milliseconds timeout{300000}; ///< Default 5 minutes
 };
 
 /**
  * @brief State of the command sequencer
  */
 enum class SequencerState {
-    IDLE,        ///< No operations queued or running
-    RUNNING,     ///< Executing operations
-    WAITING,     ///< Waiting for operation completion (state change)
-    CANCELLING,  ///< Cancel requested, waiting for safe stop
-    CANCELLED,   ///< Sequence was cancelled
-    COMPLETED,   ///< All operations finished successfully
-    FAILED,      ///< An operation failed or timed out
+    IDLE,       ///< No operations queued or running
+    RUNNING,    ///< Executing operations
+    WAITING,    ///< Waiting for operation completion (state change)
+    CANCELLING, ///< Cancel requested, waiting for safe stop
+    CANCELLED,  ///< Sequence was cancelled
+    COMPLETED,  ///< All operations finished successfully
+    FAILED,     ///< An operation failed or timed out
 };
 
 /**
@@ -65,9 +65,9 @@ enum class SequencerState {
  * Defines what Moonraker state to watch and what condition indicates completion.
  */
 struct CompletionCondition {
-    std::string object_name;        ///< Moonraker object to watch (e.g., "toolhead")
-    std::string field_path;         ///< JSON path within object (e.g., "homed_axes")
-    std::function<bool(const json&)> check;  ///< Returns true when complete
+    std::string object_name;                ///< Moonraker object to watch (e.g., "toolhead")
+    std::string field_path;                 ///< JSON path within object (e.g., "homed_axes")
+    std::function<bool(const json&)> check; ///< Returns true when complete
 };
 
 /**
@@ -97,16 +97,11 @@ struct CompletionCondition {
  * @endcode
  */
 class CommandSequencer {
-public:
-    using ProgressCallback = std::function<void(
-        const std::string& operation_name,
-        int current_step,
-        int total_steps,
-        float estimated_progress)>;
+  public:
+    using ProgressCallback = std::function<void(const std::string& operation_name, int current_step,
+                                                int total_steps, float estimated_progress)>;
 
-    using CompletionCallback = std::function<void(
-        bool success,
-        const std::string& error_message)>;
+    using CompletionCallback = std::function<void(bool success, const std::string& error_message)>;
 
     /**
      * @brief Construct sequencer with required dependencies
@@ -186,17 +181,23 @@ public:
     /**
      * @brief Get current sequencer state
      */
-    [[nodiscard]] SequencerState state() const { return sequencer_state_.load(); }
+    [[nodiscard]] SequencerState state() const {
+        return sequencer_state_.load();
+    }
 
     /**
      * @brief Get current step number (1-indexed)
      */
-    [[nodiscard]] int current_step() const { return current_step_.load(); }
+    [[nodiscard]] int current_step() const {
+        return current_step_.load();
+    }
 
     /**
      * @brief Get total number of steps
      */
-    [[nodiscard]] int total_steps() const { return total_steps_.load(); }
+    [[nodiscard]] int total_steps() const {
+        return total_steps_.load();
+    }
 
     /**
      * @brief Check if sequencer is currently executing
@@ -246,9 +247,11 @@ public:
     /**
      * @brief Force state for testing
      */
-    void force_state(SequencerState new_state) { sequencer_state_.store(new_state); }
+    void force_state(SequencerState new_state) {
+        sequencer_state_.store(new_state);
+    }
 
-private:
+  private:
     /**
      * @brief Execute the next operation in the queue
      */
@@ -291,9 +294,9 @@ private:
 
     // Dependencies (references - must remain valid)
     // client_ and printer_state_ reserved for future state-aware sequencing
-    [[maybe_unused]] MoonrakerClient& client_;
+    MoonrakerClient& client_;
     MoonrakerAPI& api_;
-    [[maybe_unused]] PrinterState& printer_state_;
+    PrinterState& printer_state_;
 
     // Queue and current operation
     std::queue<QueuedOperation> queue_;
@@ -325,4 +328,4 @@ private:
  */
 [[nodiscard]] std::string sequencer_state_name(SequencerState state);
 
-}  // namespace gcode
+} // namespace gcode

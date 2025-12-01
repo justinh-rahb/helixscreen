@@ -6,7 +6,6 @@
 #include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "printer_state.h"
-
 #include "spdlog/spdlog.h"
 
 #include <sstream>
@@ -19,6 +18,9 @@ namespace gcode {
 
 CommandSequencer::CommandSequencer(MoonrakerClient& client, MoonrakerAPI& api, PrinterState& state)
     : client_(client), api_(api), printer_state_(state) {
+    // Suppress unused warnings for reserved fields
+    (void)client_;
+    (void)printer_state_;
     spdlog::debug("[CommandSequencer] Created");
 }
 
@@ -34,8 +36,8 @@ CommandSequencer::~CommandSequencer() {
 // ============================================================================
 
 void CommandSequencer::add_operation(OperationType type, const OperationParams& params,
-                                      const std::string& display_name,
-                                      std::chrono::milliseconds timeout) {
+                                     const std::string& display_name,
+                                     std::chrono::milliseconds timeout) {
     if (is_running()) {
         spdlog::warn("[CommandSequencer] Cannot add operation while running");
         return;
@@ -192,7 +194,8 @@ void CommandSequencer::process_state_update(const json& notification) {
     }
 
     // Extract status from notification
-    // Moonraker sends: {"jsonrpc": "2.0", "method": "notify_status_update", "params": [status, timestamp]}
+    // Moonraker sends: {"jsonrpc": "2.0", "method": "notify_status_update", "params": [status,
+    // timestamp]}
     json status;
     if (notification.contains("params") && notification["params"].is_array() &&
         !notification["params"].empty()) {
@@ -234,8 +237,7 @@ void CommandSequencer::simulate_state_update(const json& status) {
 
         // Check completion
         if (check_operation_complete(current_op_.value(), status)) {
-            spdlog::info("[CommandSequencer] Operation '{}' completed",
-                         current_op_->display_name);
+            spdlog::info("[CommandSequencer] Operation '{}' completed", current_op_->display_name);
             // Mark for next execution but don't call execute_next while holding lock
             current_op_.reset();
             sequencer_state_.store(SequencerState::RUNNING);
@@ -257,63 +259,59 @@ CompletionCondition CommandSequencer::get_completion_condition(OperationType typ
     CompletionCondition cond;
 
     switch (type) {
-        case OperationType::HOMING:
-            cond.object_name = "toolhead";
-            cond.field_path = "homed_axes";
-            cond.check = [](const json& val) {
-                if (!val.is_string()) return false;
-                std::string axes = val.get<std::string>();
-                // Check for xyz (case-insensitive)
-                return axes.find('x') != std::string::npos &&
-                       axes.find('y') != std::string::npos &&
-                       axes.find('z') != std::string::npos;
-            };
-            break;
+    case OperationType::HOMING:
+        cond.object_name = "toolhead";
+        cond.field_path = "homed_axes";
+        cond.check = [](const json& val) {
+            if (!val.is_string())
+                return false;
+            std::string axes = val.get<std::string>();
+            // Check for xyz (case-insensitive)
+            return axes.find('x') != std::string::npos && axes.find('y') != std::string::npos &&
+                   axes.find('z') != std::string::npos;
+        };
+        break;
 
-        case OperationType::QGL:
-            cond.object_name = "quad_gantry_level";
-            cond.field_path = "applied";
-            cond.check = [](const json& val) {
-                return val.is_boolean() && val.get<bool>();
-            };
-            break;
+    case OperationType::QGL:
+        cond.object_name = "quad_gantry_level";
+        cond.field_path = "applied";
+        cond.check = [](const json& val) { return val.is_boolean() && val.get<bool>(); };
+        break;
 
-        case OperationType::Z_TILT:
-            cond.object_name = "z_tilt";
-            cond.field_path = "applied";
-            cond.check = [](const json& val) {
-                return val.is_boolean() && val.get<bool>();
-            };
-            break;
+    case OperationType::Z_TILT:
+        cond.object_name = "z_tilt";
+        cond.field_path = "applied";
+        cond.check = [](const json& val) { return val.is_boolean() && val.get<bool>(); };
+        break;
 
-        case OperationType::BED_LEVELING:
-            cond.object_name = "bed_mesh";
-            cond.field_path = "profile_name";
-            cond.check = [](const json& val) {
-                // Complete when profile_name is non-empty (mesh loaded)
-                return val.is_string() && !val.get<std::string>().empty();
-            };
-            break;
+    case OperationType::BED_LEVELING:
+        cond.object_name = "bed_mesh";
+        cond.field_path = "profile_name";
+        cond.check = [](const json& val) {
+            // Complete when profile_name is non-empty (mesh loaded)
+            return val.is_string() && !val.get<std::string>().empty();
+        };
+        break;
 
-        case OperationType::NOZZLE_CLEAN:
-        case OperationType::PURGE_LINE:
-        case OperationType::CHAMBER_SOAK:
-            // These complete when idle_timeout returns to "Ready"
-            cond.object_name = "idle_timeout";
-            cond.field_path = "state";
-            cond.check = [](const json& val) {
-                return val.is_string() && val.get<std::string>() == "Ready";
-            };
-            break;
+    case OperationType::NOZZLE_CLEAN:
+    case OperationType::PURGE_LINE:
+    case OperationType::CHAMBER_SOAK:
+        // These complete when idle_timeout returns to "Ready"
+        cond.object_name = "idle_timeout";
+        cond.field_path = "state";
+        cond.check = [](const json& val) {
+            return val.is_string() && val.get<std::string>() == "Ready";
+        };
+        break;
 
-        case OperationType::START_PRINT:
-            // Print started when print_stats.state changes to "printing"
-            cond.object_name = "print_stats";
-            cond.field_path = "state";
-            cond.check = [](const json& val) {
-                return val.is_string() && val.get<std::string>() == "printing";
-            };
-            break;
+    case OperationType::START_PRINT:
+        // Print started when print_stats.state changes to "printing"
+        cond.object_name = "print_stats";
+        cond.field_path = "state";
+        cond.check = [](const json& val) {
+            return val.is_string() && val.get<std::string>() == "printing";
+        };
+        break;
     }
 
     return cond;
@@ -345,9 +343,8 @@ void CommandSequencer::execute_next() {
     queue_.pop();
     current_step_.fetch_add(1);
 
-    spdlog::info("[CommandSequencer] Executing step {}/{}: {}",
-                 current_step_.load(), total_steps_.load(),
-                 current_op_->display_name);
+    spdlog::info("[CommandSequencer] Executing step {}/{}: {}", current_step_.load(),
+                 total_steps_.load(), current_op_->display_name);
 
     // Record start time for timeout
     operation_start_time_ = std::chrono::steady_clock::now();
@@ -448,7 +445,8 @@ void CommandSequencer::notify_progress() {
         std::string name = current_op_.has_value() ? current_op_->display_name : "";
         int step = current_step_.load();
         int total = total_steps_.load();
-        float progress = total > 0 ? static_cast<float>(step - 1) / static_cast<float>(total) : 0.0f;
+        float progress =
+            total > 0 ? static_cast<float>(step - 1) / static_cast<float>(total) : 0.0f;
 
         on_progress_(name, step, total, progress);
     }
@@ -458,7 +456,7 @@ void CommandSequencer::notify_complete(bool success, const std::string& error) {
     std::lock_guard<std::mutex> lock(callback_mutex_);
     if (on_complete_) {
         on_complete_(success, error);
-        on_complete_ = nullptr;  // One-shot callback
+        on_complete_ = nullptr; // One-shot callback
     }
 }
 
@@ -466,69 +464,69 @@ std::string CommandSequencer::generate_gcode(const QueuedOperation& op) const {
     std::ostringstream gcode;
 
     switch (op.type) {
-        case OperationType::HOMING:
-            gcode << "G28";
-            break;
+    case OperationType::HOMING:
+        gcode << "G28";
+        break;
 
-        case OperationType::QGL:
-            gcode << "QUAD_GANTRY_LEVEL";
-            break;
+    case OperationType::QGL:
+        gcode << "QUAD_GANTRY_LEVEL";
+        break;
 
-        case OperationType::Z_TILT:
-            gcode << "Z_TILT_ADJUST";
-            break;
+    case OperationType::Z_TILT:
+        gcode << "Z_TILT_ADJUST";
+        break;
 
-        case OperationType::BED_LEVELING:
-            if (!op.params.profile_name.empty()) {
-                gcode << "BED_MESH_PROFILE LOAD=" << op.params.profile_name;
-            } else {
-                gcode << "BED_MESH_CALIBRATE";
-            }
-            break;
+    case OperationType::BED_LEVELING:
+        if (!op.params.profile_name.empty()) {
+            gcode << "BED_MESH_PROFILE LOAD=" << op.params.profile_name;
+        } else {
+            gcode << "BED_MESH_CALIBRATE";
+        }
+        break;
 
-        case OperationType::NOZZLE_CLEAN:
-            // Try common macro names - caller should specify via params
-            if (op.params.extra.count("macro")) {
-                gcode << op.params.extra.at("macro");
-            } else {
-                gcode << "CLEAN_NOZZLE";
-            }
-            break;
+    case OperationType::NOZZLE_CLEAN:
+        // Try common macro names - caller should specify via params
+        if (op.params.extra.count("macro")) {
+            gcode << op.params.extra.at("macro");
+        } else {
+            gcode << "CLEAN_NOZZLE";
+        }
+        break;
 
-        case OperationType::PURGE_LINE:
-            if (op.params.extra.count("macro")) {
-                gcode << op.params.extra.at("macro");
-            } else {
-                gcode << "PURGE_LINE";
-            }
-            break;
+    case OperationType::PURGE_LINE:
+        if (op.params.extra.count("macro")) {
+            gcode << op.params.extra.at("macro");
+        } else {
+            gcode << "PURGE_LINE";
+        }
+        break;
 
-        case OperationType::CHAMBER_SOAK:
-            if (op.params.extra.count("macro")) {
-                gcode << op.params.extra.at("macro");
-            } else {
-                gcode << "HEAT_SOAK";
-            }
-            if (op.params.temperature > 0) {
-                gcode << " TEMP=" << static_cast<int>(op.params.temperature);
-            }
-            if (op.params.duration_minutes > 0) {
-                gcode << " DURATION=" << op.params.duration_minutes;
-            }
-            break;
+    case OperationType::CHAMBER_SOAK:
+        if (op.params.extra.count("macro")) {
+            gcode << op.params.extra.at("macro");
+        } else {
+            gcode << "HEAT_SOAK";
+        }
+        if (op.params.temperature > 0) {
+            gcode << " TEMP=" << static_cast<int>(op.params.temperature);
+        }
+        if (op.params.duration_minutes > 0) {
+            gcode << " DURATION=" << op.params.duration_minutes;
+        }
+        break;
 
-        case OperationType::START_PRINT:
-            // START_PRINT is special - uses Moonraker API, not G-code
-            // This generates the SDCARD_PRINT_FILE command as fallback
-            if (!op.params.filename.empty()) {
-                gcode << "SDCARD_PRINT_FILE FILENAME=" << op.params.filename;
-            }
-            break;
+    case OperationType::START_PRINT:
+        // START_PRINT is special - uses Moonraker API, not G-code
+        // This generates the SDCARD_PRINT_FILE command as fallback
+        if (!op.params.filename.empty()) {
+            gcode << "SDCARD_PRINT_FILE FILENAME=" << op.params.filename;
+        }
+        break;
     }
 
     // Add any extra parameters
     for (const auto& kv : op.params.extra) {
-        if (kv.first != "macro") {  // Already handled
+        if (kv.first != "macro") { // Already handled
             gcode << " " << kv.first << "=" << kv.second;
         }
     }
@@ -542,23 +540,23 @@ std::string CommandSequencer::generate_gcode(const QueuedOperation& op) const {
 
 std::string sequencer_state_name(SequencerState state) {
     switch (state) {
-        case SequencerState::IDLE:
-            return "idle";
-        case SequencerState::RUNNING:
-            return "running";
-        case SequencerState::WAITING:
-            return "waiting";
-        case SequencerState::CANCELLING:
-            return "cancelling";
-        case SequencerState::CANCELLED:
-            return "cancelled";
-        case SequencerState::COMPLETED:
-            return "completed";
-        case SequencerState::FAILED:
-            return "failed";
-        default:
-            return "unknown";
+    case SequencerState::IDLE:
+        return "idle";
+    case SequencerState::RUNNING:
+        return "running";
+    case SequencerState::WAITING:
+        return "waiting";
+    case SequencerState::CANCELLING:
+        return "cancelling";
+    case SequencerState::CANCELLED:
+        return "cancelled";
+    case SequencerState::COMPLETED:
+        return "completed";
+    case SequencerState::FAILED:
+        return "failed";
+    default:
+        return "unknown";
     }
 }
 
-}  // namespace gcode
+} // namespace gcode

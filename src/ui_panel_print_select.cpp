@@ -14,11 +14,11 @@
 
 #include "app_globals.h"
 #include "config.h"
-#include "runtime_config.h"
-#include "usb_manager.h"
 #include "lvgl/src/xml/lv_xml.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
+#include "runtime_config.h"
+#include "usb_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -442,14 +442,12 @@ void PrintSelectPanel::refresh_files() {
 
                         // Also update detail view if this file is currently selected
                         if (strcmp(self->selected_filename_buffer_, filename.c_str()) == 0) {
-                            spdlog::debug(
-                                "[{}] Updating detail view for selected file: {}", self->get_name(),
-                                filename);
-                            self->set_selected_file(
-                                filename.c_str(),
-                                self->file_list_[i].thumbnail_path.c_str(),
-                                self->file_list_[i].print_time_str.c_str(),
-                                self->file_list_[i].filament_str.c_str());
+                            spdlog::debug("[{}] Updating detail view for selected file: {}",
+                                          self->get_name(), filename);
+                            self->set_selected_file(filename.c_str(),
+                                                    self->file_list_[i].thumbnail_path.c_str(),
+                                                    self->file_list_[i].print_time_str.c_str(),
+                                                    self->file_list_[i].filament_str.c_str());
                         }
                     },
                     // Metadata error callback
@@ -577,11 +575,12 @@ void PrintSelectPanel::hide_detail_view() {
 
 void PrintSelectPanel::show_delete_confirmation() {
     // Configure modal
-    ui_modal_config_t config = {.position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER},
-                                .backdrop_opa = 180,
-                                .keyboard = nullptr,
-                                .persistent = false,
-                                .on_close = nullptr};
+    ui_modal_config_t config = {
+        .position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER, .x = 0, .y = 0},
+        .backdrop_opa = 180,
+        .keyboard = nullptr,
+        .persistent = false,
+        .on_close = nullptr};
 
     // Create message with current filename
     char msg_buf[256];
@@ -1014,8 +1013,8 @@ void PrintSelectPanel::start_print() {
         PrintJobState current_state = printer_state_.get_print_job_state();
         const char* state_str = print_job_state_to_string(current_state);
         NOTIFY_ERROR("Cannot start print: printer is {}", state_str);
-        spdlog::warn("[{}] Attempted to start print while printer is in {} state",
-                     get_name(), state_str);
+        spdlog::warn("[{}] Attempted to start print while printer is in {} state", get_name(),
+                     state_str);
         return;
     }
 
@@ -1041,7 +1040,8 @@ void PrintSelectPanel::start_print() {
     bool has_pre_print_ops = do_bed_leveling || do_qgl || do_z_tilt || do_nozzle_clean;
 
     spdlog::info("[{}] Starting print: {} (pre-print: mesh={}, qgl={}, z_tilt={}, clean={})",
-                 get_name(), filename_to_print, do_bed_leveling, do_qgl, do_z_tilt, do_nozzle_clean);
+                 get_name(), filename_to_print, do_bed_leveling, do_qgl, do_z_tilt,
+                 do_nozzle_clean);
 
     if (api_) {
         // Check if user disabled operations that are embedded in the G-code file.
@@ -1049,15 +1049,15 @@ void PrintSelectPanel::start_print() {
         std::vector<gcode::OperationType> ops_to_disable = collect_ops_to_disable();
 
         if (!ops_to_disable.empty()) {
-            spdlog::info("[{}] User disabled {} embedded operations - modifying G-code",
-                         get_name(), ops_to_disable.size());
+            spdlog::info("[{}] User disabled {} embedded operations - modifying G-code", get_name(),
+                         ops_to_disable.size());
             modify_and_print(filename_to_print, ops_to_disable);
             return; // modify_and_print handles everything including navigation
         }
         if (has_pre_print_ops) {
             // Create command sequencer for pre-print operations
-            pre_print_sequencer_ = std::make_unique<gcode::CommandSequencer>(
-                api_->get_client(), *api_, printer_state_);
+            pre_print_sequencer_ = std::make_unique<gcode::CommandSequencer>(api_->get_client(),
+                                                                             *api_, printer_state_);
 
             // Always home first if doing any pre-print operations
             pre_print_sequencer_->add_operation(gcode::OperationType::HOMING, {}, "Homing");
@@ -1314,7 +1314,8 @@ void PrintSelectPanel::scan_gcode_for_operations(const std::string& filename) {
             self->cached_scan_filename_ = filename;
 
             if (self->cached_scan_result_->operations.empty()) {
-                spdlog::debug("[{}] No embedded operations found in {}", self->get_name(), filename);
+                spdlog::debug("[{}] No embedded operations found in {}", self->get_name(),
+                              filename);
             } else {
                 spdlog::info("[{}] Found {} embedded operations in {}:", self->get_name(),
                              self->cached_scan_result_->operations.size(), filename);
@@ -1378,7 +1379,7 @@ std::vector<gcode::OperationType> PrintSelectPanel::collect_ops_to_disable() con
 }
 
 void PrintSelectPanel::modify_and_print(const std::string& original_filename,
-                                         const std::vector<gcode::OperationType>& ops_to_disable) {
+                                        const std::vector<gcode::OperationType>& ops_to_disable) {
     if (!api_) {
         NOTIFY_ERROR("Cannot start print - not connected to printer");
         return;
@@ -1394,7 +1395,8 @@ void PrintSelectPanel::modify_and_print(const std::string& original_filename,
     std::string file_path =
         current_path_.empty() ? original_filename : current_path_ + "/" + original_filename;
 
-    spdlog::info("[{}] Modifying G-code to disable {} operations", get_name(), ops_to_disable.size());
+    spdlog::info("[{}] Modifying G-code to disable {} operations", get_name(),
+                 ops_to_disable.size());
 
     auto* self = this;
 
@@ -1415,8 +1417,9 @@ void PrintSelectPanel::modify_and_print(const std::string& original_filename,
 
             // Step 3: Upload to .helix_temp directory with unique name
             // Using timestamp to avoid conflicts
-            std::string temp_filename =
-                ".helix_temp/modified_" + std::to_string(std::time(nullptr)) + "_" + original_filename;
+            std::string temp_filename = ".helix_temp/modified_" +
+                                        std::to_string(std::time(nullptr)) + "_" +
+                                        original_filename;
 
             spdlog::info("[{}] Uploading modified G-code to {}", self->get_name(), temp_filename);
 
@@ -1574,11 +1577,9 @@ void PrintSelectPanel::refresh_usb_files() {
         if (file_data.file_size_bytes < 1024) {
             file_data.size_str = std::to_string(file_data.file_size_bytes) + " B";
         } else if (file_data.file_size_bytes < 1024 * 1024) {
-            file_data.size_str =
-                std::to_string(file_data.file_size_bytes / 1024) + " KB";
+            file_data.size_str = std::to_string(file_data.file_size_bytes / 1024) + " KB";
         } else {
-            file_data.size_str =
-                std::to_string(file_data.file_size_bytes / (1024 * 1024)) + " MB";
+            file_data.size_str = std::to_string(file_data.file_size_bytes / (1024 * 1024)) + " MB";
         }
 
         // Format modified date

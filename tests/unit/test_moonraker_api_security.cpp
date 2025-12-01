@@ -1065,7 +1065,7 @@ TEST_CASE("MoonrakerClient destructor clears callbacks", "[moonraker][security][
 
         // Register a persistent callback
         bool notify_callback_called = false;
-        client->register_notify_update([&notify_callback_called](json j) {
+        client->register_notify_update([&notify_callback_called](json /* j */) {
             notify_callback_called = true;
         });
 

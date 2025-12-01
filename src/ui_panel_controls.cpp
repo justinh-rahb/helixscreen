@@ -296,16 +296,16 @@ void ControlsPanel::handle_motors_clicked() {
     spdlog::debug("[{}] Motors Disable card clicked - showing confirmation", get_name());
 
     // Create modal config
-    ui_modal_config_t config = {.position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER},
-                                .backdrop_opa = 180,
-                                .keyboard = nullptr,
-                                .persistent = false,
-                                .on_close = nullptr};
+    ui_modal_config_t config = {
+        .position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER, .x = 0, .y = 0},
+        .backdrop_opa = 180,
+        .keyboard = nullptr,
+        .persistent = false,
+        .on_close = nullptr};
 
     // Create attributes for title and message
-    const char* attrs[] = {"title",   "Disable Motors?",
-                           "message", "Release all stepper motors. Position will be lost.",
-                           nullptr};
+    const char* attrs[] = {"title", "Disable Motors?", "message",
+                           "Release all stepper motors. Position will be lost.", nullptr};
 
     // Show modal
     motors_confirmation_dialog_ = ui_modal_show("confirmation_dialog", &config, attrs);
@@ -343,7 +343,7 @@ void ControlsPanel::handle_motors_confirm() {
     // Send M84 command to disable motors
     if (api_) {
         api_->execute_gcode(
-            "M84",  // Klipper command to disable steppers
+            "M84", // Klipper command to disable steppers
             []() {
                 spdlog::info("[ControlsPanel] Motors disabled successfully");
                 ui_notification_success("Motors disabled");

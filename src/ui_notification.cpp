@@ -98,10 +98,11 @@ static void async_error_callback(void* user_data) {
         if (data->modal && data->title) {
             // Show modal dialog for critical errors
             ui_modal_config_t config = {
-                .position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER},
+                .position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER, .x = 0, .y = 0},
                 .backdrop_opa = 180,
                 .keyboard = nullptr,
-                .persistent = false};
+                .persistent = false,
+                .on_close = nullptr};
 
             const char* attrs[] = {"title", data->title, "message", data->message, nullptr};
 
@@ -302,10 +303,11 @@ void ui_notification_error(const char* title, const char* message, bool modal) {
         if (modal && title) {
             // Show modal dialog for critical errors
             ui_modal_config_t config = {
-                .position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER},
+                .position = {.use_alignment = true, .alignment = LV_ALIGN_CENTER, .x = 0, .y = 0},
                 .backdrop_opa = 180,
                 .keyboard = nullptr,
-                .persistent = false};
+                .persistent = false,
+                .on_close = nullptr};
 
             const char* attrs[] = {"title", title, "message", message, nullptr};
 
