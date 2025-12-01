@@ -2,10 +2,14 @@
 
 This document provides testing procedures for verifying the Moonraker API integrations across all UI panels.
 
+> **Architecture Reference:** For the overall Moonraker layer architecture (transport vs domain layers, event system, mock architecture), see [`docs/MOONRAKER_ARCHITECTURE.md`](MOONRAKER_ARCHITECTURE.md).
+
 ## ✅ Completed Integration Work
 
 **Date**: 2025-11-02
 **Work**: Wired 18 UI operations across 9 files to MoonrakerAPI
+
+**Update 2025-11-30**: Major refactor completed - UI panels now use `MoonrakerAPI` for domain operations instead of `MoonrakerClient`. See `docs/MOONRAKER_ARCHITECTURE.md` for details on the new layer separation.
 
 ### Summary
 
@@ -269,39 +273,50 @@ Since unit tests can't mock non-virtual methods, validate through code inspectio
 
 ---
 
-## Future Test Enhancements
+## Test Enhancements (2025-11 Refactor)
 
-### Option 1: Make API Methods Virtual
+The 2025-11 refactor addressed several of the testing limitations:
 
-Update `moonraker_api.h` to make methods virtual:
+### ✅ Implemented: Virtual API Methods
+
+`MoonrakerAPI` now has virtual methods with a mock subclass (`MoonrakerAPIMock`):
 
 ```cpp
 class MoonrakerAPI {
 public:
-    virtual void move_axis(...);
-    virtual void home_axes(...);
-    virtual void set_temperature(...);
-    // etc.
+    virtual ~MoonrakerAPI() = default;
+    virtual void download_file(...);
+    virtual void upload_file(...);
+    // Domain methods delegating to client
+};
+
+class MoonrakerAPIMock : public MoonrakerAPI {
+    // Overrides for local file testing
 };
 ```
 
-This would enable traditional mock-based unit testing.
+### ✅ Implemented: Shared Mock State
 
-### Option 2: Dependency Injection
-
-Pass `MoonrakerAPI*` to panel initialization functions instead of using global `get_moonraker_api()`:
+`MockPrinterState` coordinates between `MoonrakerClientMock` and `MoonrakerAPIMock`:
 
 ```cpp
-lv_obj_t* ui_panel_motion_create(lv_obj_t* parent, MoonrakerAPI* api);
+auto state = std::make_shared<MockPrinterState>();
+client.set_mock_state(state);
+api.set_mock_state(state);
+// Excluded objects, temperatures now sync between mocks
 ```
 
-### Option 3: Integration Test Harness
+### ✅ Implemented: Integration Test Suite
 
-Create automated integration tests that:
-1. Start mock Moonraker server
-2. Programmatically trigger UI events
-3. Verify API calls received by mock server
-4. Check UI state changes
+See `tests/unit/test_moonraker_full_stack.cpp` for automated integration tests covering:
+- Print workflow with object exclusion
+- Temperature control cycles
+- Domain method parity (API vs Client)
+- Event emission and handling
+
+### Remaining Enhancement: Dependency Injection
+
+Panels still use global `get_moonraker_api()`. Future work could pass `MoonrakerAPI*` to panels for better testability.
 
 ---
 

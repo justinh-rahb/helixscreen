@@ -30,7 +30,7 @@
 #include <string>
 #include <vector>
 
-class MoonrakerClient;
+class MoonrakerAPI;
 
 /**
  * @file ui_wizard_helpers.h
@@ -73,22 +73,22 @@ int find_item_index(const std::vector<std::string>& items, const std::string& na
  * @brief Restore dropdown selection from config with guessing fallback
  *
  * Attempts to restore saved selection from config. If no saved value exists,
- * calls the specified guessing method on MoonrakerClient. Updates both the
+ * calls the specified guessing method on MoonrakerAPI. Updates both the
  * dropdown widget and subject with selected index.
  *
  * @param dropdown LVGL dropdown widget
  * @param subject Subject to update with selected index
  * @param items Item names vector (must match dropdown options order)
  * @param config_path JSON path to saved value (e.g., "/printer/bed_heater")
- * @param client MoonrakerClient instance for hardware guessing (can be nullptr)
- * @param guess_method_fn Function pointer to MoonrakerClient guess method (can be nullptr)
+ * @param api MoonrakerAPI instance for hardware guessing (can be nullptr)
+ * @param guess_method_fn Function to call on MoonrakerAPI for guess (can be nullptr)
  * @param log_prefix Logging prefix (e.g., "[Wizard Bed]")
  * @return Selected index
  */
 int restore_dropdown_selection(lv_obj_t* dropdown, lv_subject_t* subject,
                                const std::vector<std::string>& items, const char* config_path,
-                               MoonrakerClient* client,
-                               std::function<std::string(MoonrakerClient*)> guess_method_fn,
+                               MoonrakerAPI* api,
+                               std::function<std::string(MoonrakerAPI*)> guess_method_fn,
                                const char* log_prefix);
 
 /**

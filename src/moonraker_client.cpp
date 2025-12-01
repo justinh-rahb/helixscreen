@@ -27,7 +27,6 @@
 #include "app_globals.h"
 #include "printer_state.h"
 #include "ui_error_reporting.h"
-#include "ui_notification.h"
 
 using namespace hv;
 
@@ -96,14 +95,13 @@ void MoonrakerClient::set_connection_state(ConnectionState new_state) {
                 spdlog::error("[Moonraker Client] Max reconnect attempts ({}) exceeded",
                               max_reconnect_attempts_);
 
-                // Show critical modal only once during reconnect sequence
+                // Emit event only once during reconnect sequence
                 if (!g_already_notified_max_attempts.load()) {
-                    ui_notification_error("Connection Failed",
-                                          fmt::format("Unable to reach printer after {} attempts. "
-                                                      "Check power and network connection.",
-                                                      max_reconnect_attempts_)
-                                              .c_str(),
-                                          true);
+                    emit_event(MoonrakerEventType::CONNECTION_FAILED,
+                               fmt::format("Unable to reach printer after {} attempts. "
+                                           "Check power and network connection.",
+                                           max_reconnect_attempts_),
+                               true);
                     g_already_notified_max_attempts.store(true);
                 }
 
@@ -270,14 +268,12 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
                 spdlog::error("[Moonraker Client] Message too large: {} bytes (max: {})",
                               msg.size(), MAX_MESSAGE_SIZE);
 
-                // Show user-facing error - this indicates a protocol problem
-                ui_notification_error(
-                    nullptr,
-                    fmt::format("Received oversized data from printer ({} bytes). This may "
-                                "indicate a communication error.",
-                                msg.size())
-                        .c_str(),
-                    false);
+                // Emit event - this indicates a protocol problem
+                emit_event(MoonrakerEventType::MESSAGE_OVERSIZED,
+                           fmt::format("Received oversized data from printer ({} bytes). "
+                                       "This may indicate a communication error.",
+                                       msg.size()),
+                           true);
 
                 disconnect();
                 return;
@@ -338,12 +334,11 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
                     spdlog::error("[Moonraker Client] Request {} failed: {}", method_name,
                                   error.message);
 
-                    // Show user-facing error notification
-                    ui_notification_error(
-                        nullptr,
-                        fmt::format("Printer command '{}' failed: {}", method_name, error.message)
-                            .c_str(),
-                        false);
+                    // Emit RPC error event
+                    emit_event(MoonrakerEventType::RPC_ERROR,
+                               fmt::format("Printer command '{}' failed: {}", method_name,
+                                           error.message),
+                               true, method_name);
 
                     if (error_cb) {
                         error_cb(error);
@@ -418,11 +413,11 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
                     // Update klippy state in PrinterState (SHUTDOWN = firmware disconnected)
                     get_printer_state().set_klippy_state(KlippyState::SHUTDOWN);
 
-                    // Show critical modal to user
-                    ui_notification_error("Printer Firmware Disconnected",
-                                          "Klipper has disconnected from Moonraker. Check for "
-                                          "errors in your printer interface.",
-                                          true);
+                    // Emit event for UI layer to handle
+                    emit_event(MoonrakerEventType::KLIPPY_DISCONNECTED,
+                               "Klipper has disconnected from Moonraker. Check for errors in your "
+                               "printer interface.",
+                               true);
 
                     // Invoke user callback with exception safety
                     try {
@@ -487,10 +482,10 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
                 spdlog::warn("[Moonraker Client] WebSocket connection closed");
                 was_connected_ = false;
 
-                // Notify user with rate limiting to prevent spam during reconnect loop
+                // Emit event with rate limiting to prevent spam during reconnect loop
                 if (!g_already_notified_disconnect.load()) {
-                    ui_notification_warning(
-                        "Connection to printer lost - attempting to reconnect...");
+                    emit_event(MoonrakerEventType::CONNECTION_LOST,
+                               "Connection to printer lost - attempting to reconnect...", false);
                     g_already_notified_disconnect.store(true);
                 }
 
@@ -592,6 +587,38 @@ bool MoonrakerClient::unsubscribe_notify_update(SubscriptionId id) {
     }
     spdlog::debug("[Moonraker Client] Unsubscribe failed: notify callback ID {} not found", id);
     return false;
+}
+
+void MoonrakerClient::register_event_handler(MoonrakerEventCallback cb) {
+    std::lock_guard<std::mutex> lock(event_handler_mutex_);
+    event_handler_ = std::move(cb);
+    spdlog::debug("[Moonraker Client] Event handler {}",
+                  event_handler_ ? "registered" : "unregistered");
+}
+
+void MoonrakerClient::emit_event(MoonrakerEventType type, const std::string& message, bool is_error,
+                                 const std::string& details) {
+    MoonrakerEventCallback handler;
+    {
+        std::lock_guard<std::mutex> lock(event_handler_mutex_);
+        handler = event_handler_;
+    }
+
+    if (handler) {
+        MoonrakerEvent evt{type, message, details, is_error};
+        try {
+            handler(evt);
+        } catch (const std::exception& e) {
+            spdlog::error("[Moonraker Client] Event handler threw exception: {}", e.what());
+        }
+    } else {
+        // No handler registered - just log the event
+        if (is_error) {
+            spdlog::error("[Moonraker Event] {}: {}", static_cast<int>(type), message);
+        } else {
+            spdlog::warn("[Moonraker Event] {}: {}", static_cast<int>(type), message);
+        }
+    }
 }
 
 void MoonrakerClient::dispatch_status_update(const json& status) {
@@ -828,8 +855,9 @@ void MoonrakerClient::discover_printer(std::function<void()> on_complete) {
                 spdlog::error("[Moonraker Client]   Error details: {}", response["error"].dump());
             }
 
-            // Show user-facing error notification
-            ui_notification_error(nullptr, "Failed to query printer objects from Moonraker", false);
+            // Emit discovery failed event
+            emit_event(MoonrakerEventType::DISCOVERY_FAILED,
+                       "Failed to query printer objects from Moonraker", true);
             return;
         }
 
@@ -929,11 +957,12 @@ void MoonrakerClient::discover_printer(std::function<void()> on_complete) {
                             spdlog::error("[Moonraker Client] Subscription failed: {}",
                                           sub_response["error"].dump());
 
-                            // Show user-facing warning notification
+                            // Emit discovery failed event (subscription is part of discovery)
                             std::string error_msg = sub_response["error"].dump();
-                            ui_notification_warning(
-                                fmt::format("Failed to subscribe to printer updates: {}", error_msg)
-                                    .c_str());
+                            emit_event(MoonrakerEventType::DISCOVERY_FAILED,
+                                       fmt::format("Failed to subscribe to printer updates: {}",
+                                                   error_msg),
+                                       false); // Warning, not error - discovery still completes
                         }
 
                         // Discovery complete - notify observers
@@ -1233,12 +1262,13 @@ void MoonrakerClient::check_request_timeouts() {
                 spdlog::warn("[Moonraker Client] Request {} ({}) timed out after {}ms", id,
                              request.method, request.get_elapsed_ms());
 
-                // Show user-facing warning notification
+                // Emit timeout event
                 std::string method_name = request.method;
                 uint32_t timeout = request.timeout_ms;
-                ui_notification_warning(
-                    fmt::format("Printer command '{}' timed out after {}ms", method_name, timeout)
-                        .c_str());
+                emit_event(MoonrakerEventType::REQUEST_TIMEOUT,
+                           fmt::format("Printer command '{}' timed out after {}ms", method_name,
+                                       timeout),
+                           false, method_name);
 
                 // Capture callback in lambda if present
                 if (request.error_callback) {

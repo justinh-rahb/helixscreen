@@ -163,7 +163,7 @@ struct bed_mesh_quad_3d_t {
 ```
 1. Mesh Data Input
    ↓
-   MoonrakerClient::BedMeshProfile (JSON from Klipper)
+   BedMeshProfile (JSON from Klipper, defined in moonraker_domain_service.h)
 
 2. Data Conversion & Storage
    ↓

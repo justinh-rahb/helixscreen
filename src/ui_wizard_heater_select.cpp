@@ -12,6 +12,7 @@
 #include "app_globals.h"
 #include "config.h"
 #include "lvgl/lvgl.h"
+#include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "wizard_config_paths.h"
 
@@ -137,7 +138,7 @@ lv_obj_t* WizardHeaterSelectStep::create(lv_obj_t* parent) {
         [](MoonrakerClient* c) -> const auto& { return c->get_heaters(); },
         "bed", // Filter for bed-related heaters
         true,  // Allow "None" option
-        WizardConfigPaths::BED_HEATER, [](MoonrakerClient* c) { return c->guess_bed_heater(); },
+        WizardConfigPaths::BED_HEATER, [](MoonrakerAPI* api) { return api->guess_bed_heater(); },
         "[Wizard Heater]");
 
     // Attach bed heater dropdown callback programmatically
@@ -154,7 +155,7 @@ lv_obj_t* WizardHeaterSelectStep::create(lv_obj_t* parent) {
         "extruder", // Filter for extruder-related heaters
         true,       // Allow "None" option
         WizardConfigPaths::HOTEND_HEATER,
-        [](MoonrakerClient* c) { return c->guess_hotend_heater(); }, "[Wizard Heater]");
+        [](MoonrakerAPI* api) { return api->guess_hotend_heater(); }, "[Wizard Heater]");
 
     // Attach hotend heater dropdown callback programmatically
     lv_obj_t* hotend_heater_dropdown = lv_obj_find_by_name(screen_root_, "hotend_heater_dropdown");

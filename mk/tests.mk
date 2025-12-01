@@ -101,7 +101,8 @@ TEST_USB_DEPS := \
 # Settings components (required by ui_panel_settings.o)
 TEST_SETTINGS_DEPS := \
     $(OBJ_DIR)/settings_manager.o \
-    $(OBJ_DIR)/ui_panel_calibration_zoffset.o
+    $(OBJ_DIR)/ui_panel_calibration_zoffset.o \
+    $(OBJ_DIR)/ui_panel_calibration_pid.o
 
 # Moonraker/printer components
 # Note: LIBHV_LIB is in LDFLAGS via LIBHV_LIBS, not needed here
@@ -110,6 +111,7 @@ TEST_MOONRAKER_DEPS := \
     $(OBJ_DIR)/moonraker_client.o \
     $(OBJ_DIR)/moonraker_client_mock.o \
     $(OBJ_DIR)/moonraker_api.o \
+    $(OBJ_DIR)/moonraker_api_mock.o \
     $(OBJ_DIR)/printer_state.o \
     $(OBJ_DIR)/printer_detector.o \
     $(OBJ_DIR)/printer_capabilities.o \

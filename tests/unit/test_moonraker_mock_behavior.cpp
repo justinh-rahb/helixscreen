@@ -1,4 +1,4 @@
-// Copyright 2025 HelixScreen
+// Copyright 2025 356C LLC
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 /*
@@ -2573,4 +2573,88 @@ TEST_CASE("MoonrakerClientMock restart simulation", "[mock][restart]") {
     }
 
     (void)sub_id; // Callback auto-unregisters when mock destructs
+}
+
+// ============================================================================
+// EXCLUDE_OBJECT G-code Parsing Tests
+// ============================================================================
+
+/**
+ * @brief Tests for EXCLUDE_OBJECT command parsing in gcode_script()
+ *
+ * The mock should track excluded objects when receiving EXCLUDE_OBJECT commands
+ * from the UI (e.g., when user taps to exclude an object during printing).
+ *
+ * Real Klipper syntax:
+ *   EXCLUDE_OBJECT NAME=Part_1
+ *   EXCLUDE_OBJECT NAME="Part With Spaces"
+ */
+TEST_CASE("MoonrakerClientMock parses EXCLUDE_OBJECT command", "[mock][gcode][exclude_object]") {
+    MoonrakerClientMock mock(MoonrakerClientMock::PrinterType::VORON_24);
+    mock.connect("ws://test", []() {}, []() {});
+
+    SECTION("EXCLUDE_OBJECT NAME=Part_1 adds object to excluded set") {
+        mock.gcode_script("EXCLUDE_OBJECT NAME=Part_1");
+
+        auto excluded = mock.get_excluded_objects();
+        REQUIRE(excluded.size() == 1);
+        REQUIRE(excluded.count("Part_1") == 1);
+    }
+
+    SECTION("EXCLUDE_OBJECT with quoted name") {
+        mock.gcode_script("EXCLUDE_OBJECT NAME=\"Part With Spaces\"");
+
+        auto excluded = mock.get_excluded_objects();
+        REQUIRE(excluded.size() == 1);
+        REQUIRE(excluded.count("Part With Spaces") == 1);
+    }
+
+    SECTION("EXCLUDE_OBJECT without NAME parameter is ignored") {
+        // Invalid syntax - should not crash, should log warning
+        mock.gcode_script("EXCLUDE_OBJECT");
+
+        auto excluded = mock.get_excluded_objects();
+        REQUIRE(excluded.empty());
+    }
+
+    SECTION("Multiple objects can be excluded") {
+        mock.gcode_script("EXCLUDE_OBJECT NAME=Part_1");
+        mock.gcode_script("EXCLUDE_OBJECT NAME=Part_2");
+        mock.gcode_script("EXCLUDE_OBJECT NAME=cube_3");
+
+        auto excluded = mock.get_excluded_objects();
+        REQUIRE(excluded.size() == 3);
+        REQUIRE(excluded.count("Part_1") == 1);
+        REQUIRE(excluded.count("Part_2") == 1);
+        REQUIRE(excluded.count("cube_3") == 1);
+    }
+
+    SECTION("Excluding same object twice is idempotent") {
+        mock.gcode_script("EXCLUDE_OBJECT NAME=Part_1");
+        mock.gcode_script("EXCLUDE_OBJECT NAME=Part_1");
+
+        auto excluded = mock.get_excluded_objects();
+        REQUIRE(excluded.size() == 1);
+    }
+
+    SECTION("Excluded objects are cleared on RESTART") {
+        mock.gcode_script("EXCLUDE_OBJECT NAME=Part_1");
+        REQUIRE(mock.get_excluded_objects().size() == 1);
+
+        mock.gcode_script("RESTART");
+        // Give restart simulation a moment to process
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+        REQUIRE(mock.get_excluded_objects().empty());
+    }
+
+    SECTION("Excluded objects are cleared on new print start") {
+        mock.gcode_script("EXCLUDE_OBJECT NAME=Part_1");
+        REQUIRE(mock.get_excluded_objects().size() == 1);
+
+        // Start a new print
+        mock.gcode_script("SDCARD_PRINT_FILE FILENAME=test.gcode");
+
+        REQUIRE(mock.get_excluded_objects().empty());
+    }
 }

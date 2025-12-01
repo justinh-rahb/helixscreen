@@ -1158,6 +1158,25 @@ static void initialize_moonraker_client(Config* config) {
     spdlog::debug("Moonraker timeouts configured: connection={}ms, request={}ms, keepalive={}ms",
                   connection_timeout, request_timeout, keepalive_interval);
 
+    // Register event handler to translate transport events to UI notifications
+    // This decouples the transport layer (MoonrakerClient) from the UI layer
+    moonraker_client->register_event_handler([](const MoonrakerEvent& evt) {
+        const char* title = nullptr;
+        if (evt.type == MoonrakerEventType::CONNECTION_FAILED) {
+            title = "Connection Failed";
+        } else if (evt.type == MoonrakerEventType::KLIPPY_DISCONNECTED) {
+            title = "Printer Firmware Disconnected";
+        }
+
+        if (evt.is_error) {
+            ui_notification_error(title, evt.message.c_str(),
+                                  evt.type == MoonrakerEventType::CONNECTION_FAILED ||
+                                      evt.type == MoonrakerEventType::KLIPPY_DISCONNECTED);
+        } else {
+            ui_notification_warning(evt.message.c_str());
+        }
+    });
+
     // Set up state change callback to queue updates for main thread
     // CRITICAL: This callback runs on the Moonraker event loop thread, NOT the main thread.
     // LVGL is NOT thread-safe, so we must NOT call any LVGL functions here.

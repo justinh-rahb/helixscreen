@@ -9,7 +9,7 @@
 #include "ui_subject_registry.h"
 
 #include "app_globals.h"
-#include "moonraker_client.h"
+#include "moonraker_api.h"
 
 #include <spdlog/spdlog.h>
 
@@ -87,13 +87,14 @@ void BedMeshPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     // Setup Moonraker subscription for mesh updates
     setup_moonraker_subscription();
 
-    // Load initial mesh data from MoonrakerClient
-    MoonrakerClient* client = get_moonraker_client();
-    if (client && client->has_bed_mesh()) {
-        const auto& mesh = client->get_active_bed_mesh();
-        spdlog::info("[{}] Active mesh: profile='{}', size={}x{}", get_name(), mesh.name,
-                     mesh.x_count, mesh.y_count);
-        on_mesh_update_internal(mesh);
+    // Load initial mesh data from MoonrakerAPI
+    if (api_ && api_->has_bed_mesh()) {
+        const BedMeshProfile* mesh = api_->get_active_bed_mesh();
+        if (mesh) {
+            spdlog::info("[{}] Active mesh: profile='{}', size={}x{}", get_name(), mesh->name,
+                         mesh->x_count, mesh->y_count);
+            on_mesh_update_internal(*mesh);
+        }
     } else {
         spdlog::info("[{}] No mesh data available from Moonraker", get_name());
     }
@@ -154,14 +155,13 @@ void BedMeshPanel::setup_profile_dropdown() {
         return;
     }
 
-    MoonrakerClient* client = get_moonraker_client();
-    if (!client) {
+    if (!api_) {
         lv_dropdown_set_options(profile_dropdown_, "(no connection)");
-        spdlog::warn("[{}] Cannot populate dropdown - Moonraker client is null", get_name());
+        spdlog::warn("[{}] Cannot populate dropdown - MoonrakerAPI is null", get_name());
         return;
     }
 
-    const auto& profiles = client->get_bed_mesh_profiles();
+    const auto profiles = api_->get_bed_mesh_profiles();
     if (profiles.empty()) {
         lv_dropdown_set_options(profile_dropdown_, "(no profiles)");
         spdlog::warn("[{}] No bed mesh profiles available", get_name());
@@ -179,13 +179,13 @@ void BedMeshPanel::setup_profile_dropdown() {
     spdlog::debug("[{}] Profile dropdown populated with {} profiles", get_name(), profiles.size());
 
     // Set selected index to match active profile
-    const auto& active_mesh = client->get_active_bed_mesh();
-    if (!active_mesh.name.empty()) {
+    const BedMeshProfile* active_mesh = api_->get_active_bed_mesh();
+    if (active_mesh && !active_mesh->name.empty()) {
         for (size_t i = 0; i < profiles.size(); i++) {
-            if (profiles[i] == active_mesh.name) {
+            if (profiles[i] == active_mesh->name) {
                 lv_dropdown_set_selected(profile_dropdown_, static_cast<uint32_t>(i));
                 spdlog::debug("[{}] Set dropdown to active profile: {}", get_name(),
-                              active_mesh.name);
+                              active_mesh->name);
                 break;
             }
         }
@@ -198,31 +198,37 @@ void BedMeshPanel::setup_profile_dropdown() {
 }
 
 void BedMeshPanel::setup_moonraker_subscription() {
-    MoonrakerClient* client = get_moonraker_client();
-    if (!client) {
-        spdlog::warn("[{}] Cannot subscribe to Moonraker - client is null", get_name());
+    if (!api_) {
+        spdlog::warn("[{}] Cannot subscribe to Moonraker - API is null", get_name());
         return;
     }
 
-    // Note: We capture 'this' in the lambda. This is safe because:
+    // Note: We capture 'this' and 'api_' in the lambda. This is safe because:
     // 1. Panels are destroyed when the app exits
     // 2. MoonrakerClient doesn't outlive the UI
     // If we had a proper unregister API, we'd use it in the destructor.
-    client->register_notify_update([this, client](nlohmann::json notification) {
+    //
+    // We use get_client() to access the transport layer for subscriptions,
+    // which is appropriate since subscriptions are a transport-level concern.
+    MoonrakerAPI* api = api_;
+    api_->get_client().register_notify_update([this, api](nlohmann::json notification) {
         // Check if this notification contains bed_mesh updates
         if (notification.contains("params") && notification["params"].is_array() &&
             !notification["params"].empty()) {
             const nlohmann::json& params = notification["params"][0];
             if (params.contains("bed_mesh") && params["bed_mesh"].is_object()) {
-                // Mesh data was updated - refresh UI
-                on_mesh_update_internal(client->get_active_bed_mesh());
+                // Mesh data was updated - refresh UI via MoonrakerAPI
+                const BedMeshProfile* mesh = api->get_active_bed_mesh();
+                if (mesh) {
+                    on_mesh_update_internal(*mesh);
+                }
             }
         }
     });
     spdlog::debug("[{}] Registered Moonraker callback for mesh updates", get_name());
 }
 
-void BedMeshPanel::on_mesh_update_internal(const MoonrakerClient::BedMeshProfile& mesh) {
+void BedMeshPanel::on_mesh_update_internal(const BedMeshProfile& mesh) {
     spdlog::debug("[{}] on_mesh_update_internal called, probed_matrix.size={}", get_name(),
                   mesh.probed_matrix.size());
 
@@ -345,26 +351,28 @@ void BedMeshPanel::on_profile_dropdown_changed(lv_event_t* e) {
 
     spdlog::info("[{}] Profile selected: {}", self->get_name(), buf);
 
-    // Load the selected profile via G-code command
-    MoonrakerClient* client = get_moonraker_client();
-    if (client) {
+    // Load the selected profile via G-code command using MoonrakerAPI
+    if (self->api_) {
         std::string cmd = "BED_MESH_PROFILE LOAD=" + std::string(buf);
-        client->gcode_script(cmd);
-        spdlog::debug("[{}] Sent G-code: {}", self->get_name(), cmd);
-        // UI will update automatically via Moonraker notification callback
+        self->api_->execute_gcode(
+            cmd,
+            [self, cmd]() {
+                spdlog::debug("[{}] G-code sent: {}", self->get_name(), cmd);
+                // UI will update automatically via Moonraker notification callback
+            },
+            [self](const MoonrakerError& err) {
+                spdlog::error("[{}] Failed to load profile: {}", self->get_name(), err.message);
+            });
     } else {
-        spdlog::warn("[{}] Cannot load profile - Moonraker client is null", self->get_name());
+        spdlog::warn("[{}] Cannot load profile - MoonrakerAPI is null", self->get_name());
     }
 }
 
 BedMeshPanel& get_global_bed_mesh_panel() {
     if (!g_bed_mesh_panel) {
-        // Create with dummy PrinterState - legacy API doesn't have proper DI
-        extern PrinterState& get_printer_state();
-        g_bed_mesh_panel = std::make_unique<BedMeshPanel>(get_printer_state(), nullptr);
+        // Create with PrinterState and MoonrakerAPI from app globals
+        g_bed_mesh_panel =
+            std::make_unique<BedMeshPanel>(get_printer_state(), get_moonraker_api());
     }
     return *g_bed_mesh_panel;
 }
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"

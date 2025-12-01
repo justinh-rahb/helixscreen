@@ -11,6 +11,7 @@
 #include "app_globals.h"
 #include "config.h"
 #include "lvgl/lvgl.h"
+#include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "wizard_config_paths.h"
 
@@ -170,6 +171,9 @@ lv_obj_t* WizardFanSelectStep::create(lv_obj_t* parent) {
     // Add "None" to items vector to match dropdown
     part_fan_items_.push_back("None");
 
+    // Get MoonrakerAPI for restore dropdown selection (needed for type signature)
+    MoonrakerAPI* api = get_moonraker_api();
+
     // Find and configure hotend fan dropdown
     lv_obj_t* hotend_dropdown = lv_obj_find_by_name(screen_root_, "hotend_fan_dropdown");
     if (hotend_dropdown) {
@@ -178,7 +182,7 @@ lv_obj_t* WizardFanSelectStep::create(lv_obj_t* parent) {
         // Restore saved selection (no guessing method for fans)
         WizardHelpers::restore_dropdown_selection(hotend_dropdown, &hotend_fan_selected_,
                                                   hotend_fan_items_, WizardConfigPaths::HOTEND_FAN,
-                                                  client,
+                                                  api,
                                                   nullptr, // No guessing method for hotend fans
                                                   "[Wizard Fan]");
     }
@@ -197,7 +201,7 @@ lv_obj_t* WizardFanSelectStep::create(lv_obj_t* parent) {
         // Restore saved selection (no guessing method for fans)
         WizardHelpers::restore_dropdown_selection(part_dropdown, &part_fan_selected_,
                                                   part_fan_items_, WizardConfigPaths::PART_FAN,
-                                                  client,
+                                                  api,
                                                   nullptr, // No guessing method for part fans
                                                   "[Wizard Fan]");
     }

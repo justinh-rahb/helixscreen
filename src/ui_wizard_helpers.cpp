@@ -24,7 +24,7 @@
 #include "ui_wizard_helpers.h"
 
 #include "config.h"
-#include "moonraker_client.h"
+#include "moonraker_api.h"
 
 #include <spdlog/spdlog.h>
 
@@ -71,8 +71,8 @@ int find_item_index(const std::vector<std::string>& items, const std::string& na
 
 int restore_dropdown_selection(lv_obj_t* dropdown, lv_subject_t* subject,
                                const std::vector<std::string>& items, const char* config_path,
-                               MoonrakerClient* client,
-                               std::function<std::string(MoonrakerClient*)> guess_method_fn,
+                               MoonrakerAPI* api,
+                               std::function<std::string(MoonrakerAPI*)> guess_method_fn,
                                const char* log_prefix) {
     int selected_index = 0; // Default to first option
 
@@ -86,9 +86,9 @@ int restore_dropdown_selection(lv_obj_t* dropdown, lv_subject_t* subject,
             if (selected_index > 0 || (!items.empty() && items[0] == saved_item)) {
                 spdlog::debug("{} Restored selection: {}", log_prefix, saved_item);
             }
-        } else if (client && guess_method_fn) {
-            // No saved config, try guessing
-            std::string guessed = guess_method_fn(client);
+        } else if (api && guess_method_fn) {
+            // No saved config, try guessing via MoonrakerAPI
+            std::string guessed = guess_method_fn(api);
             if (!guessed.empty()) {
                 selected_index = find_item_index(items, guessed, 0);
                 if (selected_index > 0 || (!items.empty() && items[0] == guessed)) {

@@ -27,6 +27,8 @@
 
 #include "app_globals.h"
 #include "config.h"
+#include "moonraker_api.h"
+#include "moonraker_client.h"
 
 #include <spdlog/spdlog.h>
 
@@ -48,14 +50,16 @@ bool wizard_populate_hardware_dropdown(
     std::vector<std::string>& items_out,
     std::function<const std::vector<std::string>&(MoonrakerClient*)> moonraker_getter,
     const char* prefix_filter, bool allow_none, const char* config_key,
-    std::function<std::string(MoonrakerClient*)> guess_fallback, const char* log_prefix) {
+    std::function<std::string(MoonrakerAPI*)> guess_fallback, const char* log_prefix) {
     if (!root || !dropdown_name || !subject) {
         spdlog::error("{} Invalid parameters for dropdown population", log_prefix);
         return false;
     }
 
-    // Get Moonraker client
+    // Get Moonraker client for hardware discovery
     MoonrakerClient* client = get_moonraker_client();
+    // Get MoonrakerAPI for guess fallback functions
+    MoonrakerAPI* api = get_moonraker_api();
 
     // Clear and build items list
     items_out.clear();
@@ -90,8 +94,8 @@ bool wizard_populate_hardware_dropdown(
 
     lv_dropdown_set_options(dropdown, options_str.c_str());
 
-    // Restore saved selection with guessing fallback
-    WizardHelpers::restore_dropdown_selection(dropdown, subject, items_out, config_key, client,
+    // Restore saved selection with guessing fallback (now uses MoonrakerAPI)
+    WizardHelpers::restore_dropdown_selection(dropdown, subject, items_out, config_key, api,
                                               guess_fallback, log_prefix);
 
     spdlog::debug("{} Populated dropdown '{}' with {} items", log_prefix, dropdown_name,
