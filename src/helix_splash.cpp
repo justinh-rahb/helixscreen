@@ -1,0 +1,171 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file helix_splash.cpp
+ * @brief Minimal splash screen binary for embedded targets
+ *
+ * This is a lightweight splash screen that starts instantly while the main
+ * helix-ui-proto application initializes in parallel. It displays the
+ * HelixScreen logo with a fade-in animation and automatically exits when
+ * the main app takes over the framebuffer.
+ *
+ * Design goals:
+ * - Minimal dependencies (LVGL + display backend only, no libhv/spdlog/etc)
+ * - Fast startup (~50ms to first frame)
+ * - Automatic handoff when main app opens display
+ * - Graceful exit on SIGTERM/SIGINT
+ *
+ * For desktop development, the main app uses its own splash screen.
+ * This binary is only built and used on embedded Linux targets.
+ */
+
+#include <lvgl.h>
+#include <signal.h>
+#include <unistd.h>
+#include <cstring>
+#include <cstdlib>
+#include <cstdio>
+
+#include "display_backend.h"
+
+// Signal handling for graceful shutdown
+// SIGTERM/SIGINT: graceful shutdown (e.g., system shutdown)
+// SIGUSR1: main app is ready, hand off display immediately
+static volatile sig_atomic_t g_quit = 0;
+
+static void signal_handler(int sig) {
+    (void)sig;
+    g_quit = 1;
+}
+
+// Default screen dimensions (can be overridden via command line)
+static constexpr int DEFAULT_WIDTH = 800;
+static constexpr int DEFAULT_HEIGHT = 480;
+
+// Splash timing
+static constexpr int FADE_DURATION_MS = 300;   // Fast fade-in
+static constexpr int FRAME_DELAY_US = 16000;   // ~60 FPS
+
+// Dark theme background color (matches app theme)
+static constexpr uint32_t BG_COLOR_DARK = 0x121212;
+
+/**
+ * @brief Parse command line arguments
+ */
+static void parse_args(int argc, char** argv, int& width, int& height) {
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-w") == 0 && i + 1 < argc) {
+            width = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "-h") == 0 && i + 1 < argc) {
+            height = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--help") == 0) {
+            printf("Usage: helix-splash [-w width] [-h height]\n");
+            printf("  -w <width>   Screen width (default: %d)\n", DEFAULT_WIDTH);
+            printf("  -h <height>  Screen height (default: %d)\n", DEFAULT_HEIGHT);
+            exit(0);
+        }
+    }
+}
+
+/**
+ * @brief Animation callback for fade-in effect
+ */
+static void fade_anim_cb(void* obj, int32_t value) {
+    lv_obj_set_style_opa(static_cast<lv_obj_t*>(obj), value, LV_PART_MAIN);
+}
+
+/**
+ * @brief Create and configure the splash screen UI
+ */
+static lv_obj_t* create_splash_ui(lv_obj_t* screen, int width, int height) {
+    // Set dark background
+    lv_obj_set_style_bg_color(screen, lv_color_hex(BG_COLOR_DARK), 0);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, 0);
+    lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Create container for logo (will be animated)
+    lv_obj_t* container = lv_obj_create(screen);
+    lv_obj_set_size(container, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(container, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(container, 0, LV_PART_MAIN);
+    lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_opa(container, LV_OPA_TRANSP, LV_PART_MAIN);  // Start invisible
+    lv_obj_center(container);
+
+    // Create logo image
+    lv_obj_t* logo = lv_image_create(container);
+    const char* logo_path = "A:assets/images/helixscreen-logo.png";
+    lv_image_set_src(logo, logo_path);
+
+    // Scale logo to 60% of screen width (50% on tiny screens)
+    lv_image_header_t header;
+    if (lv_image_decoder_get_info(logo_path, &header) == LV_RESULT_OK) {
+        int target_size = (width * 3) / 5;  // 60%
+        if (height < 500) {
+            target_size = width / 2;  // 50% on tiny screens
+        }
+        int scale = (target_size * 256) / header.w;
+        lv_image_set_scale(logo, scale);
+    } else {
+        // Fallback if we can't get dimensions
+        lv_image_set_scale(logo, 128);  // 50%
+    }
+
+    // Start fade-in animation
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, container);
+    lv_anim_set_values(&anim, LV_OPA_TRANSP, LV_OPA_COVER);
+    lv_anim_set_duration(&anim, FADE_DURATION_MS);
+    lv_anim_set_path_cb(&anim, lv_anim_path_ease_in);
+    lv_anim_set_exec_cb(&anim, fade_anim_cb);
+    lv_anim_start(&anim);
+
+    return container;
+}
+
+int main(int argc, char** argv) {
+    // Set up signal handlers
+    // SIGTERM/SIGINT: graceful shutdown
+    // SIGUSR1: main app ready, hand off display
+    signal(SIGTERM, signal_handler);
+    signal(SIGINT, signal_handler);
+    signal(SIGUSR1, signal_handler);
+
+    // Parse command line arguments
+    int width = DEFAULT_WIDTH;
+    int height = DEFAULT_HEIGHT;
+    parse_args(argc, argv, width, height);
+
+    // Initialize LVGL
+    lv_init();
+
+    // Create display backend using shared library
+    auto backend = DisplayBackend::create();
+    if (!backend) {
+        fprintf(stderr, "helix-splash: Failed to create display backend\n");
+        return 1;
+    }
+
+    // Create display
+    lv_display_t* display = backend->create_display(width, height);
+    if (!display) {
+        fprintf(stderr, "helix-splash: Failed to create display\n");
+        return 1;
+    }
+
+    // Create splash UI
+    lv_obj_t* screen = lv_screen_active();
+    lv_obj_t* container = create_splash_ui(screen, width, height);
+    (void)container;  // Used by animation, no need to track
+
+    // Main loop - run until signaled to quit
+    // Exit signals: SIGTERM, SIGINT (shutdown), SIGUSR1 (main app ready)
+    while (!g_quit) {
+        lv_timer_handler();
+        usleep(FRAME_DELAY_US);
+    }
+
+    // Cleanup is handled automatically by destructors
+    return 0;
+}

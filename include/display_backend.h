@@ -128,6 +128,17 @@ class DisplayBackend {
      */
     virtual bool is_available() const = 0;
 
+    /**
+     * @brief Check if the display is still active/owned by this process
+     *
+     * Used by the splash screen to detect when the main app takes over
+     * the display. For framebuffer/DRM backends, this checks if another
+     * process has opened the display device.
+     *
+     * @return true if display is still active, false if taken over
+     */
+    virtual bool is_active() const { return true; }
+
     // ========================================================================
     // Factory Methods
     // ========================================================================
@@ -152,6 +163,13 @@ class DisplayBackend {
      * @return Backend instance, or nullptr if no backend available
      */
     static std::unique_ptr<DisplayBackend> create_auto();
+
+    /**
+     * @brief Convenience: auto-detect and create backend
+     *
+     * Same as create_auto(), provided for simpler calling code.
+     */
+    static std::unique_ptr<DisplayBackend> create() { return create_auto(); }
 };
 
 // ============================================================================

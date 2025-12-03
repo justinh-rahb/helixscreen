@@ -24,6 +24,8 @@
 #ifndef RUNTIME_CONFIG_H
 #define RUNTIME_CONFIG_H
 
+#include <sys/types.h>  // For pid_t
+
 /**
  * @brief Runtime configuration for development and testing
  *
@@ -35,6 +37,7 @@ struct RuntimeConfig {
     bool test_mode = false; ///< Master test mode flag (--test)
 
     bool skip_splash = false; ///< Skip splash screen (--skip-splash, independent of test mode)
+    pid_t splash_pid = 0;     ///< External splash process PID (--splash-pid, 0 = none)
 
     bool use_real_wifi = false; ///< Use real WiFi backend (--real-wifi, requires --test)
     bool use_real_ethernet =

@@ -99,6 +99,8 @@
 #include <mutex>
 #include <queue>
 #include <unistd.h>
+#include <signal.h>
+#include <cerrno>
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
@@ -466,6 +468,9 @@ static bool parse_command_line_args(
             g_runtime_config.test_mode = true;
         } else if (strcmp(argv[i], "--skip-splash") == 0) {
             g_runtime_config.skip_splash = true;
+        } else if (strncmp(argv[i], "--splash-pid=", 13) == 0) {
+            // External splash process PID - will send SIGUSR1 when display ready
+            g_runtime_config.splash_pid = static_cast<pid_t>(atoi(argv[i] + 13));
         } else if (strcmp(argv[i], "--real-wifi") == 0) {
             g_runtime_config.use_real_wifi = true;
         } else if (strcmp(argv[i], "--real-ethernet") == 0) {
@@ -1953,6 +1958,18 @@ int main(int argc, char** argv) {
     uint32_t last_timeout_check = helix_get_ticks();
     uint32_t timeout_check_interval =
         config->get<int>(config->df() + "moonraker_timeout_check_interval_ms", 2000);
+
+    // Signal external splash process that we're ready to take over the display
+    // This is a graceful handoff - splash will exit on receiving SIGUSR1
+    if (g_runtime_config.splash_pid > 0) {
+        if (kill(g_runtime_config.splash_pid, SIGUSR1) == 0) {
+            spdlog::debug("Sent SIGUSR1 to splash process (PID {})", g_runtime_config.splash_pid);
+        } else {
+            // Not an error - splash may have already exited or PID invalid
+            spdlog::debug("Could not signal splash process (PID {}): {}",
+                          g_runtime_config.splash_pid, strerror(errno));
+        }
+    }
 
     // Main event loop - LVGL handles display events internally via lv_timer_handler()
     // Loop continues while display exists and quit not requested

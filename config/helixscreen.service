@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# systemd service file for HelixScreen
+#
+# This service launches HelixScreen with an early splash screen for
+# instant visual feedback during boot. The launcher starts a lightweight
+# splash binary in parallel with the main app. When the main app is ready,
+# it sends SIGUSR1 to the splash process, which then exits gracefully.
+#
+# Installation:
+#   sudo cp helixscreen.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable helixscreen
+#   sudo systemctl start helixscreen
+#
+# Logs:
+#   sudo journalctl -u helixscreen -f
+
+[Unit]
+Description=HelixScreen 3D Printer Touch UI
+Documentation=https://github.com/your-org/helixscreen
+After=multi-user.target network.target
+
+# Wait for display hardware to be ready
+After=systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+
+[Service]
+Type=simple
+
+# Run as root for framebuffer access (or create udev rules for user access)
+User=root
+Group=root
+
+# Working directory for config/assets
+WorkingDirectory=/opt/helixscreen
+
+# Use launcher script for splash + main app
+ExecStart=/opt/helixscreen/bin/helix-launcher.sh
+
+# Environment variables
+Environment="HELIX_SCREEN_WIDTH=800"
+Environment="HELIX_SCREEN_HEIGHT=480"
+
+# Restart policy - always restart unless explicitly stopped
+Restart=always
+RestartSec=3
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security hardening (can be relaxed if needed)
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+NoNewPrivileges=true
+
+# Allow framebuffer/DRM access
+SupplementaryGroups=video input render
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=helixscreen
+
+[Install]
+WantedBy=multi-user.target
