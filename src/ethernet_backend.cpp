@@ -42,30 +42,26 @@ std::unique_ptr<EthernetBackend> EthernetBackend::create() {
     }
 
 #ifdef __APPLE__
-    // macOS: Try native backend first, fallback to mock if no interface
+    // macOS: Use native backend (handles missing interface gracefully)
     spdlog::debug("[EthernetBackend] Creating macOS backend");
     auto backend = std::make_unique<EthernetBackendMacOS>();
 
     if (backend->has_interface()) {
         spdlog::debug("[EthernetBackend] macOS backend initialized (interface found)");
-        return backend;
+    } else {
+        spdlog::info("[EthernetBackend] No Ethernet interface found");
     }
-
-    // No Ethernet interface found, use mock
-    spdlog::warn("[EthernetBackend] No Ethernet interface found - using mock backend");
-    return std::make_unique<EthernetBackendMock>();
+    return backend;
 #else
-    // Linux: Try native backend first, fallback to mock if no interface
+    // Linux: Use native backend (handles missing interface gracefully)
     spdlog::debug("[EthernetBackend] Creating Linux backend");
     auto backend = std::make_unique<EthernetBackendLinux>();
 
     if (backend->has_interface()) {
         spdlog::debug("[EthernetBackend] Linux backend initialized (interface found)");
-        return backend;
+    } else {
+        spdlog::info("[EthernetBackend] No Ethernet interface found");
     }
-
-    // No Ethernet interface found, use mock
-    spdlog::warn("[EthernetBackend] No Ethernet interface found - using mock backend");
-    return std::make_unique<EthernetBackendMock>();
+    return backend;
 #endif
 }
