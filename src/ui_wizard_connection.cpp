@@ -469,19 +469,17 @@ void WizardConnectionStep::on_auto_probe_success() {
 
     auto_probe_state_ = AutoProbeState::SUCCEEDED;
 
-    // Auto-fill the IP field (both subject and widget)
+    // Update subjects - reactive binding automatically updates textareas!
     lv_subject_copy_string(&connection_ip_, "127.0.0.1");
+    lv_subject_copy_string(&connection_port_, "7125");
 
-    // Update textarea widget directly
+    // Hide help text on successful auto-probe
     if (screen_root_) {
-        lv_obj_t* ip_input = lv_obj_find_by_name(screen_root_, "ip_input");
-        if (ip_input) {
-            lv_textarea_set_text(ip_input, "127.0.0.1");
+        lv_obj_t* help_text = lv_obj_find_by_name(screen_root_, "help_text");
+        if (help_text) {
+            lv_obj_add_flag(help_text, LV_OBJ_FLAG_HIDDEN);
         }
     }
-
-    // Port already defaults to 7125, but ensure subject is set
-    lv_subject_copy_string(&connection_port_, "7125");
 
     // Show success status
     const char* check_icon = lv_xml_get_const(nullptr, "icon_check_circle");

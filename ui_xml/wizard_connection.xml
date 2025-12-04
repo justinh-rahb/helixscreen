@@ -18,12 +18,12 @@
         <!-- Left -->
         <lv_obj flex_grow="3" style_border_width="0" style_pad_all="0" style_pad_gap="#space_xs" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start">
           <text_body text="Network Address" width="100%"/>
-          <lv_textarea name="ip_input" bind_text="connection_ip" placeholder_text="127.0.0.1" width="100%" height="#input_height"/>
+          <text_input name="ip_input" bind_text="connection_ip" placeholder_text="127.0.0.1" width="100%"/>
         </lv_obj>
         <!-- Right -->
         <lv_obj flex_grow="1" style_border_width="0" style_pad_all="0" style_pad_gap="#space_xs" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start">
           <text_body text="Port" width="100%"/>
-          <lv_textarea name="port_input" bind_text="connection_port" placeholder_text="7125" width="100%" height="#input_height"/>
+          <text_input name="port_input" bind_text="connection_port" placeholder_text="7125" keyboard_hint="numeric" width="100%"/>
         </lv_obj>
       </lv_obj>
       <!-- network address and port -->
@@ -47,8 +47,8 @@
             <text_body name="connection_status_text" bind_text="connection_status_text"/>
           </lv_obj>
         </lv_obj>
-        <!-- Help text: connection must be tested -->
-        <text_small text="Connection must be tested successfully to continue" style_text_color="#text_secondary"/>
+        <!-- Help text: connection must be tested (hidden on successful auto-probe) -->
+        <text_small name="help_text" text="Connection must be tested successfully to continue" style_text_color="#text_secondary"/>
       </lv_obj>
     </ui_card>
   </view>

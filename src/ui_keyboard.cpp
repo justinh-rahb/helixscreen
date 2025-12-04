@@ -25,6 +25,7 @@
 
 #include "ui_event_safety.h"
 #include "ui_fonts.h"
+#include "ui_text_input.h"
 #include "ui_theme.h"
 
 #include "config.h"
@@ -1052,8 +1053,17 @@ void ui_keyboard_show(lv_obj_t* textarea) {
 
     spdlog::info("[Keyboard] Showing keyboard for textarea: {}", (void*)textarea);
 
-    // Reset keyboard to lowercase mode on each show
-    g_mode = MODE_ALPHA_LC;
+    // Check for keyboard hint on the textarea to determine initial mode
+    KeyboardHint hint = ui_text_input_get_keyboard_hint(textarea);
+
+    if (hint == KeyboardHint::NUMERIC) {
+        // Start in numbers/symbols mode
+        g_mode = MODE_NUMBERS_SYMBOLS;
+        spdlog::debug("[Keyboard] Using NUMERIC keyboard hint");
+    } else {
+        // Default: start in lowercase mode
+        g_mode = MODE_ALPHA_LC;
+    }
     apply_keyboard_mode();
 
     // Assign textarea to keyboard (standard LVGL API)

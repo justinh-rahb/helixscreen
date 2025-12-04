@@ -60,6 +60,7 @@
 #include "ui_status_bar.h"
 #include "ui_switch.h"
 #include "ui_text.h"
+#include "ui_text_input.h"
 #include "ui_theme.h"
 #include "ui_toast.h"
 #include "ui_utils.h"
@@ -893,6 +894,7 @@ static void register_xml_components() {
 
     // Register semantic text widgets (AFTER theme init, BEFORE components that use them)
     ui_text_init();
+    ui_text_input_init(); // <text_input> with bind_text support
 
     // Register custom widgets (BEFORE components that use them)
     ui_gcode_viewer_register();
