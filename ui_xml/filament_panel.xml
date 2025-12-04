@@ -44,22 +44,22 @@
         <!-- Row 1: PLA, PETG -->
         <lv_obj width="100%" height="#button_height" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false" flex_flow="row" style_flex_main_place="space_between" style_flex_cross_place="center" style_pad_gap="#space_md">
           <lv_button name="preset_pla" flex_grow="1" height="#button_height" style_radius="#space_xs" style_border_width="0" flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_xs">
-            <lv_label text="#icon_leaf" style_text_font="fa_icons_16"/>
+            <lv_label text="#icon_leaf" style_text_font="mdi_icons_16"/>
             <text_body text="PLA"/>
           </lv_button>
           <lv_button name="preset_petg" flex_grow="1" height="#button_height" style_radius="#space_xs" style_border_width="0" flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_xs">
-            <lv_label text="#icon_cube" style_text_font="fa_icons_16"/>
+            <lv_label text="#icon_cube" style_text_font="mdi_icons_16"/>
             <text_body text="PETG"/>
           </lv_button>
         </lv_obj>
         <!-- Row 2: ABS, Custom -->
         <lv_obj width="100%" height="#button_height" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false" flex_flow="row" style_flex_main_place="space_between" style_flex_cross_place="center" style_pad_gap="#space_md">
           <lv_button name="preset_abs" flex_grow="1" height="#button_height" style_radius="#space_xs" style_border_width="0" flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_xs">
-            <lv_label text="#icon_fire" style_text_font="fa_icons_16"/>
+            <lv_label text="#icon_fire" style_text_font="mdi_icons_16"/>
             <text_body text="ABS"/>
           </lv_button>
           <lv_button name="preset_custom" flex_grow="1" height="#button_height" style_radius="#space_xs" style_border_width="0" flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_xs">
-            <lv_label text="#icon_edit" style_text_font="fa_icons_16"/>
+            <lv_label text="#icon_edit" style_text_font="mdi_icons_16"/>
             <text_body text="Custom..."/>
           </lv_button>
         </lv_obj>

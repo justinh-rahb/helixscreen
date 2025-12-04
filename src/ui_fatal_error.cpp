@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // HelixScreen - Fatal Error Display Implementation
+//
+// Note: This is a bootstrap component that runs BEFORE the XML system is loaded.
+// Direct font references are acceptable here since we can't use the theme system.
 
 #include "ui_fatal_error.h"
+
+#include "ui_fonts.h"
 
 #include <lvgl.h>
 
@@ -53,20 +58,20 @@ void ui_show_fatal_error(const char* title, const char* message, const char* con
     // Warning icon (using Unicode character - works with montserrat fonts)
     lv_obj_t* icon = lv_label_create(container);
     lv_label_set_text(icon, LV_SYMBOL_WARNING);
-    lv_obj_set_style_text_font(icon, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(icon, &noto_sans_28, 0);
     lv_obj_set_style_text_color(icon, lv_color_hex(0xFF4444), 0);
 
     // Title
     lv_obj_t* title_label = lv_label_create(container);
     lv_label_set_text(title_label, title);
-    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(title_label, &noto_sans_24, 0);
     lv_obj_set_style_text_color(title_label, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_style_pad_top(title_label, 10, 0);
 
     // Message
     lv_obj_t* msg_label = lv_label_create(container);
     lv_label_set_text(msg_label, message);
-    lv_obj_set_style_text_font(msg_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(msg_label, &noto_sans_16, 0);
     lv_obj_set_style_text_color(msg_label, lv_color_hex(0xCCCCCC), 0);
     lv_obj_set_style_pad_top(msg_label, 15, 0);
     lv_obj_set_width(msg_label, LV_PCT(100));
@@ -76,7 +81,7 @@ void ui_show_fatal_error(const char* title, const char* message, const char* con
     if (suggestions && suggestions[0]) {
         lv_obj_t* suggest_header = lv_label_create(container);
         lv_label_set_text(suggest_header, "Troubleshooting:");
-        lv_obj_set_style_text_font(suggest_header, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(suggest_header, &noto_sans_14, 0);
         lv_obj_set_style_text_color(suggest_header, lv_color_hex(0xFFCC00), 0);
         lv_obj_set_style_pad_top(suggest_header, 20, 0);
 
@@ -84,7 +89,7 @@ void ui_show_fatal_error(const char* title, const char* message, const char* con
         for (int i = 0; suggestions[i] != nullptr; i++) {
             lv_obj_t* suggest = lv_label_create(container);
             lv_label_set_text_fmt(suggest, LV_SYMBOL_RIGHT " %s", suggestions[i]);
-            lv_obj_set_style_text_font(suggest, &lv_font_montserrat_12, 0);
+            lv_obj_set_style_text_font(suggest, &noto_sans_12, 0);
             lv_obj_set_style_text_color(suggest, lv_color_hex(0xAAAAAA), 0);
             lv_obj_set_style_pad_top(suggest, 5, 0);
             lv_obj_set_width(suggest, LV_PCT(100));

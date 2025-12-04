@@ -23,6 +23,7 @@
 
 #include "ui_jog_pad.h"
 
+#include "ui_fonts.h"
 #include "ui_theme.h"
 #include "ui_widget_memory.h"
 
@@ -321,7 +322,7 @@ static void jog_pad_draw_cb(lv_event_t* e) {
     lv_draw_label_dsc_init(&home_label_dsc);
     home_label_dsc.color = state->jog_color_home_text;
     home_label_dsc.text = LV_SYMBOL_HOME;
-    home_label_dsc.font = &lv_font_montserrat_28;
+    home_label_dsc.font = &noto_sans_28;
     home_label_dsc.align = LV_TEXT_ALIGN_CENTER;
 
     lv_area_t home_label_area;
@@ -357,7 +358,7 @@ static void jog_pad_draw_cb(lv_event_t* e) {
     lv_draw_label_dsc_t label_dsc;
     lv_draw_label_dsc_init(&label_dsc);
     label_dsc.color = state->jog_color_distance_labels;
-    label_dsc.font = &lv_font_montserrat_14;
+    label_dsc.font = &noto_sans_14;
     label_dsc.align = LV_TEXT_ALIGN_CENTER;
 
     lv_area_t label_area;
@@ -382,7 +383,7 @@ static void jog_pad_draw_cb(lv_event_t* e) {
 
     // Draw axis labels (cardinal directions)
     label_dsc.color = state->jog_color_axis_labels;
-    label_dsc.font = &lv_font_montserrat_16;
+    label_dsc.font = &noto_sans_16;
 
     // Y+ (North)
     label_dsc.text = "Y+";

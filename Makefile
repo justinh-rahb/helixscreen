@@ -190,8 +190,12 @@ else
     OBJCPP_OBJS :=
 endif
 
-# Fonts
-FONT_SRCS := assets/fonts/fa_icons_64.c assets/fonts/fa_icons_48.c assets/fonts/fa_icons_32.c assets/fonts/fa_icons_24.c assets/fonts/fa_icons_16.c assets/fonts/arrows_64.c assets/fonts/arrows_48.c assets/fonts/arrows_32.c
+# Fonts - Material Design Icons, Unicode arrows, and Noto Sans text fonts
+FONT_SRCS := assets/fonts/mdi_icons_64.c assets/fonts/mdi_icons_48.c assets/fonts/mdi_icons_32.c assets/fonts/mdi_icons_24.c assets/fonts/mdi_icons_16.c assets/fonts/arrows_64.c assets/fonts/arrows_48.c assets/fonts/arrows_32.c
+# Noto Sans - Regular weight (10-28px)
+FONT_SRCS += assets/fonts/noto_sans_10.c assets/fonts/noto_sans_12.c assets/fonts/noto_sans_14.c assets/fonts/noto_sans_16.c assets/fonts/noto_sans_18.c assets/fonts/noto_sans_20.c assets/fonts/noto_sans_24.c assets/fonts/noto_sans_26.c assets/fonts/noto_sans_28.c
+# Noto Sans - Bold weight (14-28px)
+FONT_SRCS += assets/fonts/noto_sans_bold_14.c assets/fonts/noto_sans_bold_16.c assets/fonts/noto_sans_bold_18.c assets/fonts/noto_sans_bold_20.c assets/fonts/noto_sans_bold_24.c assets/fonts/noto_sans_bold_28.c
 FONT_OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(FONT_SRCS))
 
 # Material Design Icons
@@ -479,7 +483,7 @@ help:
 	echo "$${C}Tools:$${X}"; \
 	echo "  $${G}tools$${X}             - Build diagnostic tools"; \
 	echo "  $${G}moonraker-inspector$${X} - Query Moonraker printer metadata"; \
-	echo "  $${G}generate-fonts$${X}    - Regenerate FontAwesome fonts"; \
+	echo "  $${G}generate-fonts$${X}    - Regenerate MDI icon fonts"; \
 	echo "  $${G}icon$${X}              - Generate app icon from logo"; \
 	echo ""; \
 	echo "$${C}More Help:$${X}  $${D}(use these for detailed target lists)$${X}"; \

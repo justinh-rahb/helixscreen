@@ -356,7 +356,7 @@ deploy-pi:
 # Deploy and run in foreground (kills any existing instance first)
 deploy-pi-run: deploy-pi
 	@echo "$(CYAN)Starting helix-screen on $(PI_HOST)...$(RESET)"
-	ssh -t $(PI_SSH_TARGET) "cd $(PI_DEPLOY_DIR) && killall helix-screen helix-splash 2>/dev/null || true; ./config/helix-launcher.sh"
+	ssh -t $(PI_SSH_TARGET) "cd $(PI_DEPLOY_DIR) && killall helix-screen helix-splash 2>/dev/null || true; sleep 0.5; ./config/helix-launcher.sh"
 
 # Convenience: SSH into the Pi
 pi-ssh:

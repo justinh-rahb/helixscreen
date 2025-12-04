@@ -86,7 +86,7 @@
             <text_body text="0" style_text_color="#text_primary" align="center"/>
           </lv_button>
           <lv_button name="btn_backspace" flex_grow="1" height="100%" style_radius="#button_radius" style_border_width="0">
-            <lv_label text="#icon_backspace" style_text_font="fa_icons_24" style_text_color="#text_primary" align="center"/>
+            <lv_label text="#icon_backspace" style_text_font="mdi_icons_24" style_text_color="#text_primary" align="center"/>
           </lv_button>
         </lv_obj>
       </lv_obj>

@@ -815,12 +815,13 @@ static bool parse_command_line_args(
 static void register_fonts_and_images() {
     spdlog::debug("Registering fonts and images...");
 
-    // FontAwesome icon fonts (various sizes for different UI elements)
-    lv_xml_register_font(NULL, "fa_icons_64", &fa_icons_64);
-    lv_xml_register_font(NULL, "fa_icons_48", &fa_icons_48);
-    lv_xml_register_font(NULL, "fa_icons_32", &fa_icons_32);
-    lv_xml_register_font(NULL, "fa_icons_24", &fa_icons_24);
-    lv_xml_register_font(NULL, "fa_icons_16", &fa_icons_16);
+    // Material Design Icons (various sizes for different UI elements)
+    // Source: https://pictogrammers.com/library/mdi/
+    lv_xml_register_font(NULL, "mdi_icons_64", &mdi_icons_64);
+    lv_xml_register_font(NULL, "mdi_icons_48", &mdi_icons_48);
+    lv_xml_register_font(NULL, "mdi_icons_32", &mdi_icons_32);
+    lv_xml_register_font(NULL, "mdi_icons_24", &mdi_icons_24);
+    lv_xml_register_font(NULL, "mdi_icons_16", &mdi_icons_16);
 
     // Arrow icon fonts (for directional controls)
     lv_xml_register_font(NULL, "arrows_64", &arrows_64);
@@ -832,18 +833,40 @@ static void register_fonts_and_images() {
     // - text_body uses font_body (14/18/20 for small/medium/large breakpoints)
     // - text_small uses font_small (12/16/18 for small/medium/large breakpoints)
     // ALL sizes used by the responsive typography system MUST be registered here!
-    lv_xml_register_font(NULL, "montserrat_10", &lv_font_montserrat_10);
-    lv_xml_register_font(NULL, "montserrat_12", &lv_font_montserrat_12); // text_small (small)
-    lv_xml_register_font(NULL, "montserrat_14", &lv_font_montserrat_14); // text_body (small)
-    lv_xml_register_font(NULL, "montserrat_16", &lv_font_montserrat_16); // text_small (medium)
+    // NOTE: Registering as "montserrat_*" for XML compatibility but using noto_sans_* fonts
+    lv_xml_register_font(NULL, "montserrat_10", &noto_sans_10);
+    lv_xml_register_font(NULL, "montserrat_12", &noto_sans_12); // text_small (small)
+    lv_xml_register_font(NULL, "montserrat_14", &noto_sans_14); // text_body (small)
+    lv_xml_register_font(NULL, "montserrat_16", &noto_sans_16); // text_small (medium)
     lv_xml_register_font(NULL, "montserrat_18",
-                         &lv_font_montserrat_18); // text_body (medium), text_small (large)
+                         &noto_sans_18); // text_body (medium), text_small (large)
     lv_xml_register_font(NULL, "montserrat_20",
-                         &lv_font_montserrat_20); // text_heading (small), text_body (large)
-    lv_xml_register_font(NULL, "montserrat_24", &lv_font_montserrat_24);
-    lv_xml_register_font(NULL, "montserrat_26", &lv_font_montserrat_26); // text_heading (medium)
+                         &noto_sans_20); // text_heading (small), text_body (large)
+    lv_xml_register_font(NULL, "montserrat_24", &noto_sans_24);
+    lv_xml_register_font(NULL, "montserrat_26", &noto_sans_26); // text_heading (medium)
     lv_xml_register_font(NULL, "montserrat_28",
-                         &lv_font_montserrat_28); // text_heading (large), numeric displays
+                         &noto_sans_28); // text_heading (large), numeric displays
+
+    // Noto Sans fonts - same sizes as Montserrat, with extended Unicode support
+    // (includes ©®™€£¥°±•… and other symbols)
+    lv_xml_register_font(NULL, "noto_sans_10", &noto_sans_10);
+    lv_xml_register_font(NULL, "noto_sans_12", &noto_sans_12);
+    lv_xml_register_font(NULL, "noto_sans_14", &noto_sans_14);
+    lv_xml_register_font(NULL, "noto_sans_16", &noto_sans_16);
+    lv_xml_register_font(NULL, "noto_sans_18", &noto_sans_18);
+    lv_xml_register_font(NULL, "noto_sans_20", &noto_sans_20);
+    lv_xml_register_font(NULL, "noto_sans_24", &noto_sans_24);
+    lv_xml_register_font(NULL, "noto_sans_26", &noto_sans_26);
+    lv_xml_register_font(NULL, "noto_sans_28", &noto_sans_28);
+
+    // Noto Sans Bold fonts (for future use)
+    lv_xml_register_font(NULL, "noto_sans_bold_14", &noto_sans_bold_14);
+    lv_xml_register_font(NULL, "noto_sans_bold_16", &noto_sans_bold_16);
+    lv_xml_register_font(NULL, "noto_sans_bold_18", &noto_sans_bold_18);
+    lv_xml_register_font(NULL, "noto_sans_bold_20", &noto_sans_bold_20);
+    lv_xml_register_font(NULL, "noto_sans_bold_24", &noto_sans_bold_24);
+    lv_xml_register_font(NULL, "noto_sans_bold_28", &noto_sans_bold_28);
+
     lv_xml_register_image(NULL, "A:assets/images/printer_400.png",
                           "A:assets/images/printer_400.png");
     lv_xml_register_image(NULL, "filament_spool", "A:assets/images/filament_spool.png");

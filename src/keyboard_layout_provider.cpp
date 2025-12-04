@@ -247,23 +247,20 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_alpha_uc[] = {
                                         LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 3) // Enter
 };
 
-// Numbers and symbols layout
-// Provides common punctuation and symbols with [ABC] button to return to alpha mode
+// Numbers and symbols layout (4 rows, matching alpha keyboard structure)
+// Provides numbers 1-0 on row 1, common symbols on row 2, punctuation + mode switch on row 3
 static const char* const kb_map_numbers_symbols[] = {
-    // Row 1: Special characters and numbers
-    "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "\n",
-    // Row 2: More symbols
-    "-", "/", ":", ";", "(", ")", "$", "&", "@", "\"", "\n",
-    // Row 3: [SPACER] Additional punctuation [SPACER]
-    " ", ".", ",", "?", "!", "'", "\"", "+", "=", "_", " ", "\n",
-    // Row 4: [#+=] + brackets/symbols + [BACKSPACE] (8 buttons like alpha row 4)
-    "#+=", "[", "]", "{", "}", "|", "\\", LV_SYMBOL_BACKSPACE, "\n",
-    // Row 5: XYZ (back to alpha) + CLOSE + COMMA + SPACEBAR + PERIOD + ENTER
-    // Using "XYZ" to avoid LVGL's "ABC"/"abc" mode checks
+    // Row 1: Numbers 1-0 (10 keys)
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "\n",
+    // Row 2: Common symbols (10 keys)
+    "-", "/", ":", ";", "(", ")", "$", "&", "@", "*", "\n",
+    // Row 3: #+= + punctuation + Backspace (matches alpha row 3 structure)
+    "#+=", ".", ",", "?", "!", "\"", LV_SYMBOL_BACKSPACE, "\n",
+    // Row 4: XYZ + CLOSE + COMMA + SPACEBAR + PERIOD + ENTER
     "XYZ", LV_SYMBOL_KEYBOARD, ",", SPACEBAR_TEXT, ".", LV_SYMBOL_NEW_LINE, ""};
 
 static const lv_buttonmatrix_ctrl_t kb_ctrl_numbers_symbols[] = {
-    // Row 1: Special chars and numbers (equal width) - NO_REPEAT
+    // Row 1: Numbers 1-0 (10 keys, equal width 4)
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
@@ -284,7 +281,7 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_numbers_symbols[] = {
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    // Row 2: More symbols (equal width) - NO_REPEAT
+    // Row 2: Common symbols (10 keys, equal width 4)
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
@@ -305,47 +302,22 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_numbers_symbols[] = {
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    // Row 3: disabled spacer + punctuation + disabled spacer (2 + 36 + 2 = 40) - NO_REPEAT
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_DISABLED | 2),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_DISABLED | 2),
-    // Row 4: #+= (wide) + brackets/symbols (regular) + Backspace (wide) - mark #+=, Backspace as
-    // CUSTOM_1
+    // Row 3: #+= (wide) + 5 punctuation + Backspace (wide)
     static_cast<lv_buttonmatrix_ctrl_t>(LV_KEYBOARD_CTRL_BUTTON_FLAGS |
                                         LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 6), // #+=
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // .
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // ,
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // ?
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // !
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // "
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_CHECKED |
-                                        LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 10), // Backspace
-    // Row 5: XYZ + CLOSE + COMMA + SPACEBAR + PERIOD + ENTER (2 + 3 + 2 + 12 + 2 + 3 = 24) - mark
-    // mode/control buttons as CUSTOM_1
+                                        LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 6), // Backspace
+    // Row 4: XYZ + CLOSE + COMMA + SPACEBAR + PERIOD + ENTER
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_CHECKED |
                                         LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 2), // XYZ
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_CHECKED |
@@ -360,22 +332,23 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_numbers_symbols[] = {
                                         LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 3) // Enter
 };
 
-// Alternative symbols layout (#+= mode)
-// Provides additional symbols with [123] button to return to ?123 mode
+// Alternative symbols layout (#+= mode, 4 rows)
+// Provides additional ASCII symbols and extended Unicode characters
 static const char* const kb_map_alt_symbols[] = {
-    // Row 1: Brackets and math symbols
-    "[", "]", "{", "}", "#", "%", "^", "*", "+", "=", "\n",
-    // Row 2: Special characters (ASCII only - Unicode glyphs not in font)
-    "_", "\\", "|", "~", "<", ">", "$", "&", "@", "*", "\n",
-    // Row 3: [SPACER] Punctuation [SPACER]
-    " ", ".", ",", "?", "!", "'", "\"", ";", ":", "-", " ", "\n",
-    // Row 4: [123] + misc symbols + [BACKSPACE] (ASCII only - Unicode glyphs not in font)
-    "123", "`", "^", "~", "-", "_", LV_SYMBOL_BACKSPACE, "\n",
-    // Row 5: XYZ + CLOSE + COMMA + SPACEBAR + PERIOD + ENTER
+    // Row 1: Brackets & math (10 keys)
+    "[", "]", "{", "}", "#", "%", "^", "+", "=", "_", "\n",
+    // Row 2: Misc ASCII + bullet/ellipsis (10 keys)
+    "\\", "|", "`", "~", "<", ">", "'", ";", "\xe2\x80\xa2", "\xe2\x80\xa6", "\n", // • …
+    // Row 3: 123 + Extended symbols + Backspace (10 keys)
+    // UTF-8 encoding: © = \xc2\xa9, ® = \xc2\xae, ™ = \xe2\x84\xa2, € = \xe2\x82\xac,
+    //                 £ = \xc2\xa3, ¥ = \xc2\xa5, ° = \xc2\xb0, ± = \xc2\xb1
+    "123", "\xc2\xa9", "\xc2\xae", "\xe2\x84\xa2", "\xe2\x82\xac", "\xc2\xa3", "\xc2\xa5",
+    "\xc2\xb0", "\xc2\xb1", LV_SYMBOL_BACKSPACE, "\n",
+    // Row 4: XYZ + CLOSE + COMMA + SPACEBAR + PERIOD + ENTER
     "XYZ", LV_SYMBOL_KEYBOARD, ",", SPACEBAR_TEXT, ".", LV_SYMBOL_NEW_LINE, ""};
 
 static const lv_buttonmatrix_ctrl_t kb_ctrl_alt_symbols[] = {
-    // Row 1: Brackets and math (equal width) - NO_REPEAT
+    // Row 1: Brackets & math (10 keys, equal width 4)
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
@@ -396,7 +369,7 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_alt_symbols[] = {
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    // Row 2: Special chars and currency (equal width) - NO_REPEAT
+    // Row 2: Misc ASCII + bullet/ellipsis (10 keys, equal width 4)
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
@@ -417,45 +390,28 @@ static const lv_buttonmatrix_ctrl_t kb_ctrl_alt_symbols[] = {
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
                                         LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    // Row 3: disabled spacer + punctuation + disabled spacer (2 + 36 + 2 = 40) - NO_REPEAT
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_DISABLED | 2),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
-    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_DISABLED | 2),
-    // Row 4: 123 (wide) + misc symbols (regular) + Backspace (wide) - mark 123, Backspace as
-    // CUSTOM_1
+    // Row 3: 123 + 8 extended symbols + Backspace (all width 4)
     static_cast<lv_buttonmatrix_ctrl_t>(LV_KEYBOARD_CTRL_BUTTON_FLAGS |
-                                        LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 6), // 123
+                                        LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 4), // 123
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // ©
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // ®
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // ™
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // €
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
-                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4),
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // £
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // ¥
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // °
+    static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_POPOVER |
+                                        LV_BUTTONMATRIX_CTRL_NO_REPEAT | 4), // ±
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_CHECKED |
-                                        LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 14), // Backspace
-    // Row 5: XYZ + CLOSE + COMMA + SPACEBAR + PERIOD + ENTER (2 + 3 + 2 + 12 + 2 + 3 = 24) - mark
-    // mode/control buttons as CUSTOM_1
+                                        LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 4), // Backspace
+    // Row 4: XYZ + CLOSE + COMMA + SPACEBAR + PERIOD + ENTER
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_CHECKED |
                                         LV_BUTTONMATRIX_CTRL_CUSTOM_1 | 2), // XYZ
     static_cast<lv_buttonmatrix_ctrl_t>(LV_BUTTONMATRIX_CTRL_CHECKED |

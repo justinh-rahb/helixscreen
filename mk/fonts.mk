@@ -12,7 +12,7 @@
 		echo "$(YELLOW)⚠ npm not found - skipping font generation$(RESET)"; \
 		touch $@; \
 	else \
-		echo "$(YELLOW)→ Regenerating FontAwesome fonts from package.json...$(RESET)"; \
+		echo "$(YELLOW)→ Regenerating MDI icon fonts from package.json...$(RESET)"; \
 		if [ "$(PLATFORM)" = "macOS" ]; then \
 			npm run convert-all-fonts && touch $@ && echo "$(GREEN)✓ Fonts regenerated successfully$(RESET)"; \
 		else \

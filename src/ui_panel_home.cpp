@@ -183,32 +183,32 @@ void HomePanel::setup_responsive_icon_fonts() {
     int32_t screen_height = lv_display_get_vertical_resolution(display);
 
     // Select icon sizes and label fonts based on screen size
-    const lv_font_t* fa_icon_font;
+    const lv_font_t* mdi_icon_font;
     const char* mat_icon_size;
     const lv_font_t* label_font;
     int icon_px;
 
     if (screen_height <= UI_SCREEN_TINY_H) {
-        fa_icon_font = &fa_icons_24; // Tiny: 24px icons
-        mat_icon_size = "sm";        // 24x24
-        label_font = UI_FONT_SMALL;  // Smaller text labels to save space
+        mdi_icon_font = &mdi_icons_24; // Tiny: 24px icons
+        mat_icon_size = "sm";          // 24x24
+        label_font = UI_FONT_SMALL;    // Smaller text labels to save space
         icon_px = 24;
     } else if (screen_height <= UI_SCREEN_SMALL_H) {
-        fa_icon_font = &fa_icons_32; // Small: 32px icons
-        mat_icon_size = "md";        // 32x32
-        label_font = UI_FONT_BODY;   // Normal text
+        mdi_icon_font = &mdi_icons_32; // Small: 32px icons
+        mat_icon_size = "md";          // 32x32
+        label_font = UI_FONT_BODY;     // Normal text
         icon_px = 32;
     } else {
-        fa_icon_font = &fa_icons_64; // Medium/Large: 64px icons
-        mat_icon_size = "xl";        // 64x64
-        label_font = UI_FONT_BODY;   // Normal text
+        mdi_icon_font = &mdi_icons_64; // Medium/Large: 64px icons
+        mat_icon_size = "xl";          // 64x64
+        label_font = UI_FONT_BODY;     // Normal text
         icon_px = 64;
     }
 
-    // Network icon (FontAwesome label)
+    // Network icon (MDI label)
     lv_obj_t* network_icon = lv_obj_find_by_name(panel_, "network_icon");
     if (network_icon) {
-        lv_obj_set_style_text_font(network_icon, fa_icon_font, 0);
+        lv_obj_set_style_text_font(network_icon, mdi_icon_font, 0);
     }
 
     // Network label text

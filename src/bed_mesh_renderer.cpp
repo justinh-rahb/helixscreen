@@ -23,6 +23,8 @@
 
 #include "bed_mesh_renderer.h"
 
+#include "ui_fonts.h"
+
 #include "bed_mesh_coordinate_transform.h"
 #include "bed_mesh_gradient.h"
 #include "bed_mesh_projection.h"
@@ -1456,7 +1458,7 @@ static void render_axis_labels(lv_layer_t* layer, const bed_mesh_renderer_t* ren
     lv_draw_label_dsc_t label_dsc;
     lv_draw_label_dsc_init(&label_dsc);
     label_dsc.color = lv_color_white();
-    label_dsc.font = &lv_font_montserrat_14;
+    label_dsc.font = &noto_sans_14;
     label_dsc.opa = LV_OPA_90;
     label_dsc.align = LV_TEXT_ALIGN_CENTER;
 
@@ -1578,8 +1580,8 @@ static void render_numeric_axis_ticks(lv_layer_t* layer, const bed_mesh_renderer
     lv_draw_label_dsc_t label_dsc;
     lv_draw_label_dsc_init(&label_dsc);
     label_dsc.color = lv_color_white();
-    label_dsc.font = &lv_font_montserrat_10; // Smaller font for numeric labels
-    label_dsc.opa = LV_OPA_80;               // Slightly more transparent than axis letters
+    label_dsc.font = &noto_sans_10; // Smaller font for numeric labels
+    label_dsc.opa = LV_OPA_80;      // Slightly more transparent than axis letters
     label_dsc.align = LV_TEXT_ALIGN_CENTER;
     label_dsc.text_local = 1; // Tell LVGL to copy text (we use stack buffers)
 

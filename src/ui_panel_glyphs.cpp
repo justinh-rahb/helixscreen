@@ -3,6 +3,7 @@
 
 #include "ui_panel_glyphs.h"
 
+#include "ui_fonts.h"
 #include "ui_theme.h"
 
 #include "app_globals.h"
@@ -118,14 +119,14 @@ static lv_obj_t* create_glyph_item(lv_obj_t* parent, const GlyphInfo& glyph) {
     lv_obj_t* icon_label = lv_label_create(item);
     lv_label_set_text(icon_label, glyph.symbol);
     lv_obj_set_style_text_color(icon_label, ui_theme_get_color("text_primary"), 0);
-    lv_obj_set_style_text_font(icon_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(icon_label, &noto_sans_24, 0);
     lv_obj_set_width(icon_label, LV_SIZE_CONTENT);
 
     // Name label
     lv_obj_t* name_label = lv_label_create(item);
     lv_label_set_text(name_label, glyph.name);
     lv_obj_set_style_text_color(name_label, ui_theme_get_color("text_primary"), 0);
-    lv_obj_set_style_text_font(name_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(name_label, &noto_sans_16, 0);
     lv_obj_set_flex_grow(name_label, 1);
 
     return item;

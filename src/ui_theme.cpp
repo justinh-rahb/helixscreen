@@ -24,6 +24,7 @@
 #include "ui_theme.h"
 
 #include "ui_error_reporting.h"
+#include "ui_fonts.h"
 
 #include "helix_theme.h"
 #include "lvgl/lvgl.h"
@@ -350,8 +351,8 @@ void ui_theme_init(lv_display_t* display, bool use_dark_mode_param) {
     const char* font_body_name = lv_xml_get_const(NULL, font_variant_name);
     const lv_font_t* base_font = font_body_name ? lv_xml_get_font(NULL, font_body_name) : nullptr;
     if (!base_font) {
-        spdlog::warn("[Theme] Failed to get font '{}', using montserrat_16", font_variant_name);
-        base_font = &lv_font_montserrat_16;
+        spdlog::warn("[Theme] Failed to get font '{}', using noto_sans_16", font_variant_name);
+        base_font = &noto_sans_16;
     }
 
     // Read color values from auto-registered constants
@@ -558,7 +559,7 @@ void ui_theme_apply_bg_color(lv_obj_t* obj, const char* base_name, lv_part_t par
  * This includes ascender, descender, and line gap. Useful for calculating layout
  * heights before widgets are created.
  *
- * @param font Font to query (e.g., UI_FONT_HEADING, &lv_font_montserrat_16)
+ * @param font Font to query (e.g., UI_FONT_HEADING, &noto_sans_16)
  * @return Line height in pixels, or 0 if font is NULL
  *
  * Examples:

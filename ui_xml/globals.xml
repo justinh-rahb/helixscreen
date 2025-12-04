@@ -145,20 +145,43 @@
          runtime by ui_theme_register_responsive_fonts() - do NOT define them
          here or responsive overrides will be silently ignored. -->
     <!-- font_heading variants (section headings, large text) -->
-    <string name="font_heading_small" value="montserrat_20"/>
-    <string name="font_heading_medium" value="montserrat_26"/>
-    <string name="font_heading_large" value="montserrat_28"/>
+    <string name="font_heading_small" value="noto_sans_20"/>
+    <string name="font_heading_medium" value="noto_sans_26"/>
+    <string name="font_heading_large" value="noto_sans_28"/>
     <!-- NO BASE font_heading - registered at runtime -->
     <!-- font_body variants (standard body text) -->
-    <string name="font_body_small" value="montserrat_14"/>
-    <string name="font_body_medium" value="montserrat_18"/>
-    <string name="font_body_large" value="montserrat_20"/>
+    <string name="font_body_small" value="noto_sans_14"/>
+    <string name="font_body_medium" value="noto_sans_18"/>
+    <string name="font_body_large" value="noto_sans_20"/>
     <!-- NO BASE font_body - registered at runtime -->
     <!-- font_small variants (hints, helpers, chart labels) -->
-    <string name="font_small_small" value="montserrat_12"/>
-    <string name="font_small_medium" value="montserrat_16"/>
-    <string name="font_small_large" value="montserrat_18"/>
+    <string name="font_small_small" value="noto_sans_12"/>
+    <string name="font_small_medium" value="noto_sans_16"/>
+    <string name="font_small_large" value="noto_sans_18"/>
     <!-- NO BASE font_small - registered at runtime -->
+    <!-- ===================================================================== -->
+    <!-- Icon Typography - Responsive Material Design Icon Fonts               -->
+    <!-- ===================================================================== -->
+    <!-- icon_font_sm: Small inline icons (metadata, hints, small indicators) -->
+    <string name="icon_font_sm_small" value="mdi_icons_16"/>
+    <string name="icon_font_sm_medium" value="mdi_icons_16"/>
+    <string name="icon_font_sm_large" value="mdi_icons_24"/>
+    <!-- NO BASE icon_font_sm - registered at runtime -->
+    <!-- icon_font_md: Standard UI icons (buttons, status, notifications) -->
+    <string name="icon_font_md_small" value="mdi_icons_24"/>
+    <string name="icon_font_md_medium" value="mdi_icons_24"/>
+    <string name="icon_font_md_large" value="mdi_icons_32"/>
+    <!-- NO BASE icon_font_md - registered at runtime -->
+    <!-- icon_font_lg: Large icons (cards, status panels, emphasis) -->
+    <string name="icon_font_lg_small" value="mdi_icons_32"/>
+    <string name="icon_font_lg_medium" value="mdi_icons_48"/>
+    <string name="icon_font_lg_large" value="mdi_icons_48"/>
+    <!-- NO BASE icon_font_lg - registered at runtime -->
+    <!-- icon_font_xl: Navigation/hero icons (nav bar, large displays) -->
+    <string name="icon_font_xl_small" value="mdi_icons_48"/>
+    <string name="icon_font_xl_medium" value="mdi_icons_64"/>
+    <string name="icon_font_xl_large" value="mdi_icons_64"/>
+    <!-- NO BASE icon_font_xl - registered at runtime -->
     <!-- Theme colors -->
     <color name="primary_color" value="#AD2724"/>
     <color name="secondary_color" value="#37AEB3"/>
@@ -230,113 +253,119 @@
     <percentage name="overlay_panel_width_large" value="83%"/>
     <!-- Large overlay width (motion, complex 2-column panels) -->
     <!-- ===================================================================== -->
-    <!-- FontAwesome icon constants - AUTO-GENERATED - DO NOT EDIT MANUALLY   -->
-    <!-- Run: python3 scripts/generate-icon-consts.py                         -->
+    <!-- Material Design Icon constants - MDI codepoints (U+F0000 range)       -->
+    <!-- Source: https://pictogrammers.com/library/mdi/                        -->
     <!-- ===================================================================== -->
-    <str name="icon_advanced" value="&#xF142;"/>
-    <!-- U+F142 ellipsis-vertical -->
-    <str name="icon_arrow_down" value="&#x2193;"/>
-    <!-- U+2193 downwards arrow -->
-    <str name="icon_arrow_down_left" value="&#x2199;"/>
-    <!-- U+2199 diagonal down-left -->
-    <str name="icon_arrow_down_right" value="&#x2198;"/>
-    <!-- U+2198 diagonal down-right -->
-    <str name="icon_arrow_down_to_line" value="&#xF33D;"/>
-    <!-- U+F33D arrow-down-to-line (load) -->
-    <str name="icon_arrow_left" value="&#x2190;"/>
-    <!-- U+2190 leftwards arrow -->
-    <str name="icon_arrow_right" value="&#x2192;"/>
-    <!-- U+2192 rightwards arrow -->
-    <str name="icon_arrow_up" value="&#x2191;"/>
-    <!-- U+2191 upwards arrow -->
-    <str name="icon_arrow_up_left" value="&#x2196;"/>
-    <!-- U+2196 diagonal up-left -->
-    <str name="icon_arrow_up_line" value="&#xF342;"/>
-    <!-- U+F342 arrow-up-from-line -->
-    <str name="icon_arrow_up_right" value="&#x2197;"/>
-    <!-- U+2197 diagonal up-right -->
-    <str name="icon_arrows_all" value="&#xF0B2;"/>
-    <!-- U+F0B2 arrows-up-down-left-right -->
-    <str name="icon_backspace" value="&#xF55A;"/>
-    <!-- U+F55A delete-left -->
-    <str name="icon_check_circle" value="&#xF058;"/>
-    <!-- U+F058 circle-check (connected) -->
-    <str name="icon_chevron_down" value="&#xF078;"/>
-    <!-- U+F078 chevron-down -->
-    <str name="icon_chevron_left" value="&#xF053;"/>
-    <!-- U+F053 chevron-left -->
-    <str name="icon_chevron_up" value="&#xF077;"/>
-    <!-- U+F077 chevron-up -->
-    <str name="icon_clock" value="&#xF017;"/>
-    <!-- U+F017 clock-o -->
-    <str name="icon_controls" value="&#xF1DE;"/>
-    <!-- U+F1DE sliders -->
-    <str name="icon_cube" value="&#xF1B2;"/>
-    <!-- U+F1B2 cube (PETG) -->
-    <str name="icon_droplet" value="&#xF043;"/>
-    <!-- U+F043 droplet (purge) -->
-    <str name="icon_edit" value="&#xF044;"/>
-    <!-- U+F044 edit (custom) -->
-    <str name="icon_ethernet" value="&#xF796;"/>
-    <!-- U+F796 ethernet -->
-    <str name="icon_fan" value="&#xF863;"/>
-    <!-- U+F863 fan -->
-    <str name="icon_filament" value="&#xF008;"/>
-    <!-- U+F008 film -->
-    <str name="icon_fire" value="&#xF06D;"/>
-    <!-- U+F06D fire -->
-    <str name="icon_folder" value="&#xF07C;"/>
-    <!-- U+F07C folder-open -->
-    <str name="icon_home" value="&#xF015;"/>
-    <!-- U+F015 house -->
-    <str name="icon_leaf" value="&#xF06C;"/>
-    <!-- U+F06C leaf -->
-    <str name="icon_lightbulb" value="&#xF0EB;"/>
-    <!-- U+F0EB lightbulb -->
-    <str name="icon_list" value="&#xF03A;"/>
-    <!-- U+F03A list -->
-    <str name="icon_lock" value="&#xF023;"/>
-    <!-- U+F023 lock (encrypted) -->
-    <str name="icon_pause" value="&#xF04C;"/>
-    <!-- U+F04C pause -->
-    <str name="icon_play" value="&#xF04B;"/>
-    <!-- U+F04B play (start/resume) -->
-    <str name="icon_power_off" value="&#xF011;"/>
-    <!-- U+F011 power-off -->
-    <str name="icon_question_circle" value="&#xF059;"/>
-    <!-- U+F059 circle-question -->
-    <str name="icon_settings" value="&#xF013;"/>
-    <!-- U+F013 gear -->
-    <str name="icon_signal_wifi_1" value="&#xF6AC;"/>
-    <!-- U+F6AC wifi-1 (0-25% signal) -->
-    <str name="icon_signal_wifi_2" value="&#xF6AA;"/>
-    <!-- U+F6AA wifi-2 (26-50% signal) -->
-    <str name="icon_signal_wifi_3" value="&#xF6AB;"/>
-    <!-- U+F6AB wifi-3 (51-75% signal) -->
-    <str name="icon_signal_wifi_4" value="&#xF1EB;"/>
-    <!-- U+F1EB wifi (76-100% signal) -->
-    <str name="icon_stop" value="&#xF04D;"/>
-    <!-- U+F04D stop (cancel) -->
-    <str name="icon_temperature" value="&#xF2C7;"/>
-    <!-- U+F2C7 thermometer-half -->
-    <str name="icon_th_large" value="&#xF009;"/>
-    <!-- U+F009 th-large -->
-    <str name="icon_trash" value="&#xF1F8;"/>
-    <!-- U+F1F8 trash -->
-    <str name="icon_triangle_exclamation" value="&#xF071;"/>
-    <!-- U+F071 triangle-exclamation (warning) -->
-    <str name="icon_wifi" value="&#xF1EB;"/>
-    <!-- U+F1EB wifi -->
-    <str name="icon_wifi_slash" value="&#xF127;"/>
-    <!-- U+F127 wifi-slash -->
-    <str name="icon_xmark_circle" value="&#xF057;"/>
-    <!-- U+F057 circle-xmark (error/failed) -->
-    <str name="icon_xmark" value="&#xF00D;"/>
-    <!-- U+F00D xmark (close) -->
-    <str name="icon_check" value="&#xF00C;"/>
-    <!-- U+F00C check (ok/success) -->
-    <str name="icon_info_circle" value="&#xF05A;"/>
-    <!-- U+F05A circle-info (info) -->
+    <str name="icon_advanced" value="&#xF01D9;"/>
+    <!-- U+F01D9 dots-vertical -->
+    <str name="icon_arrow_down" value="&#xF0045;"/>
+    <!-- U+F0045 arrow-down -->
+    <str name="icon_arrow_down_left" value="&#xF0041;"/>
+    <!-- U+F0041 arrow-bottom-left -->
+    <str name="icon_arrow_down_right" value="&#xF0043;"/>
+    <!-- U+F0043 arrow-bottom-right -->
+    <str name="icon_arrow_down_to_line" value="&#xF072E;"/>
+    <!-- U+F072E arrow-down-bold (load) -->
+    <str name="icon_arrow_left" value="&#xF004D;"/>
+    <!-- U+F004D arrow-left -->
+    <str name="icon_arrow_right" value="&#xF0054;"/>
+    <!-- U+F0054 arrow-right -->
+    <str name="icon_arrow_up" value="&#xF005D;"/>
+    <!-- U+F005D arrow-up -->
+    <str name="icon_arrow_up_left" value="&#xF005C;"/>
+    <!-- U+F005C arrow-top-left -->
+    <str name="icon_arrow_up_line" value="&#xF0737;"/>
+    <!-- U+F0737 arrow-up-bold (unload) -->
+    <str name="icon_arrow_up_right" value="&#xF005E;"/>
+    <!-- U+F005E arrow-top-right -->
+    <str name="icon_arrows_all" value="&#xF0026;"/>
+    <!-- U+F0026 arrow-all -->
+    <str name="icon_backspace" value="&#xF00AC;"/>
+    <!-- U+F00AC backspace -->
+    <str name="icon_bell" value="&#xF009A;"/>
+    <!-- U+F009A bell (notifications) -->
+    <str name="icon_bluetooth" value="&#xF00AF;"/>
+    <!-- U+F00AF bluetooth -->
+    <str name="icon_check_circle" value="&#xF05E1;"/>
+    <!-- U+F05E1 check-circle-outline (connected) -->
+    <str name="icon_chevron_down" value="&#xF0140;"/>
+    <!-- U+F0140 chevron-down -->
+    <str name="icon_chevron_left" value="&#xF0141;"/>
+    <!-- U+F0141 chevron-left -->
+    <str name="icon_chevron_up" value="&#xF0143;"/>
+    <!-- U+F0143 chevron-up -->
+    <str name="icon_clock" value="&#xF0150;"/>
+    <!-- U+F0150 clock-outline -->
+    <str name="icon_controls" value="&#xF08E9;"/>
+    <!-- U+F08E9 tune-variant -->
+    <str name="icon_cube" value="&#xF1A2F;"/>
+    <!-- U+F1A2F cube-outline (PETG) -->
+    <str name="icon_droplet" value="&#xF058C;"/>
+    <!-- U+F058C water (purge) -->
+    <str name="icon_edit" value="&#xF03EB;"/>
+    <!-- U+F03EB pencil (custom) -->
+    <str name="icon_ethernet" value="&#xF0200;"/>
+    <!-- U+F0200 ethernet -->
+    <str name="icon_fan" value="&#xF0210;"/>
+    <!-- U+F0210 fan -->
+    <str name="icon_filament" value="&#xF097A;"/>
+    <!-- U+F097A film -->
+    <str name="icon_fire" value="&#xF0238;"/>
+    <!-- U+F0238 fire -->
+    <str name="icon_folder" value="&#xF0770;"/>
+    <!-- U+F0770 folder-open -->
+    <str name="icon_home" value="&#xF02DC;"/>
+    <!-- U+F02DC home -->
+    <str name="icon_leaf" value="&#xF0436;"/>
+    <!-- U+F0436 leaf -->
+    <str name="icon_lightbulb" value="&#xF0335;"/>
+    <!-- U+F0335 lightbulb -->
+    <str name="icon_list" value="&#xF0279;"/>
+    <!-- U+F0279 format-list-bulleted -->
+    <str name="icon_lock" value="&#xF033E;"/>
+    <!-- U+F033E lock (encrypted) -->
+    <str name="icon_pause" value="&#xF03E4;"/>
+    <!-- U+F03E4 pause -->
+    <str name="icon_play" value="&#xF040A;"/>
+    <!-- U+F040A play (start/resume) -->
+    <str name="icon_power_off" value="&#xF0425;"/>
+    <!-- U+F0425 power -->
+    <str name="icon_question_circle" value="&#xF02D7;"/>
+    <!-- U+F02D7 help-circle -->
+    <str name="icon_settings" value="&#xF0493;"/>
+    <!-- U+F0493 cog -->
+    <str name="icon_signal_wifi_1" value="&#xF091F;"/>
+    <!-- U+F091F wifi-strength-1 (0-25% signal) -->
+    <str name="icon_signal_wifi_2" value="&#xF0922;"/>
+    <!-- U+F0922 wifi-strength-2 (26-50% signal) -->
+    <str name="icon_signal_wifi_3" value="&#xF0925;"/>
+    <!-- U+F0925 wifi-strength-3 (51-75% signal) -->
+    <str name="icon_signal_wifi_4" value="&#xF05A9;"/>
+    <!-- U+F05A9 wifi (76-100% signal) -->
+    <str name="icon_stop" value="&#xF04DB;"/>
+    <!-- U+F04DB stop (cancel) -->
+    <str name="icon_temperature" value="&#xF050F;"/>
+    <!-- U+F050F thermometer -->
+    <str name="icon_th_large" value="&#xF0588;"/>
+    <!-- U+F0588 view-grid -->
+    <str name="icon_trash" value="&#xF01B4;"/>
+    <!-- U+F01B4 delete -->
+    <str name="icon_triangle_exclamation" value="&#xF0026;"/>
+    <!-- U+F0026 alert (warning) -->
+    <str name="icon_usb" value="&#xF05E0;"/>
+    <!-- U+F05E0 usb -->
+    <str name="icon_wifi" value="&#xF05A9;"/>
+    <!-- U+F05A9 wifi -->
+    <str name="icon_wifi_slash" value="&#xF05AA;"/>
+    <!-- U+F05AA wifi-off -->
+    <str name="icon_xmark_circle" value="&#xF0159;"/>
+    <!-- U+F0159 close-circle (error/failed) -->
+    <str name="icon_xmark" value="&#xF0156;"/>
+    <!-- U+F0156 close -->
+    <str name="icon_check" value="&#xF012C;"/>
+    <!-- U+F012C check (ok/success) -->
+    <str name="icon_info_circle" value="&#xF02FC;"/>
+    <!-- U+F02FC information (info) -->
   </consts>
   <view extends="lv_obj"/>
 </component>

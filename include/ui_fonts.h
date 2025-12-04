@@ -25,76 +25,122 @@
 
 #include "lvgl/lvgl.h"
 
-// FontAwesome 6 Free Solid icons - multiple sizes
-LV_FONT_DECLARE(fa_icons_64); // Navigation bar icons
-LV_FONT_DECLARE(fa_icons_48); // Status card icons (large displays)
-LV_FONT_DECLARE(fa_icons_32); // Status card icons (small displays)
-LV_FONT_DECLARE(fa_icons_24); // General UI icons (tiny displays)
-LV_FONT_DECLARE(fa_icons_16); // Metadata icons (small inline)
+// Material Design Icons - multiple sizes
+// Source: https://pictogrammers.com/library/mdi/
+LV_FONT_DECLARE(mdi_icons_64); // Navigation bar icons
+LV_FONT_DECLARE(mdi_icons_48); // Status card icons (large displays)
+LV_FONT_DECLARE(mdi_icons_32); // Status card icons (small displays)
+LV_FONT_DECLARE(mdi_icons_24); // General UI icons (tiny displays)
+LV_FONT_DECLARE(mdi_icons_16); // Metadata icons (small inline)
 
 // Unicode arrows from Arial Unicode - multiple sizes
 LV_FONT_DECLARE(arrows_64); // ←↑→↓↖↗↙↘ at 64px
 LV_FONT_DECLARE(arrows_48); // ←↑→↓↖↗↙↘ at 48px
 LV_FONT_DECLARE(arrows_32); // ←↑→↓↖↗↙↘ at 32px
 
-// Navigation icons (available in 64px)
-#define ICON_HOME "\xEF\x80\x95"     // U+F015 house
-#define ICON_CONTROLS "\xEF\x87\x9E" // U+F1DE sliders
-#define ICON_FILAMENT "\xEF\x80\x88" // U+F008 film
-#define ICON_SETTINGS "\xEF\x80\x93" // U+F013 gear
-#define ICON_ADVANCED "\xEF\x85\x82" // U+F142 ellipsis-vertical
-#define ICON_FOLDER "\xEF\x81\xBC"   // U+F07C folder-open
+// Noto Sans - Regular weight with extended Unicode (©®™€£¥°±•…)
+LV_FONT_DECLARE(noto_sans_10);
+LV_FONT_DECLARE(noto_sans_12);
+LV_FONT_DECLARE(noto_sans_14);
+LV_FONT_DECLARE(noto_sans_16);
+LV_FONT_DECLARE(noto_sans_18);
+LV_FONT_DECLARE(noto_sans_20);
+LV_FONT_DECLARE(noto_sans_24);
+LV_FONT_DECLARE(noto_sans_26);
+LV_FONT_DECLARE(noto_sans_28);
 
-// Status card icons (available in 48px and 32px)
-#define ICON_TEMPERATURE "\xEF\x8B\x87" // U+F2C7 thermometer-half
-#define ICON_WIFI "\xEF\x87\xAB"        // U+F1EB wifi
-#define ICON_ETHERNET "\xEF\x9E\x96"    // U+F796 ethernet
-#define ICON_WIFI_SLASH "\xEF\x84\xA7"  // U+F127 wifi-slash
-#define ICON_LIGHTBULB "\xEF\x83\xAB"   // U+F0EB lightbulb
+// Noto Sans - Bold weight with extended Unicode
+LV_FONT_DECLARE(noto_sans_bold_14);
+LV_FONT_DECLARE(noto_sans_bold_16);
+LV_FONT_DECLARE(noto_sans_bold_18);
+LV_FONT_DECLARE(noto_sans_bold_20);
+LV_FONT_DECLARE(noto_sans_bold_24);
+LV_FONT_DECLARE(noto_sans_bold_28);
 
-// Metadata icons (available in 16px)
-#define ICON_CLOCK "\xEF\x80\x97" // U+F017 clock-o
-#define ICON_EDIT "\xEF\x81\x84"  // U+F044 edit
-#define ICON_LEAF "\xEF\x81\xAC"  // U+F06C leaf
-#define ICON_FIRE "\xEF\x81\xAD"  // U+F06D fire
-#define ICON_CUBE "\xEF\x86\xB2"  // U+F1B2 cube
+// =============================================================================
+// Material Design Icons - UTF-8 encoded codepoints
+// MDI uses Unicode Plane 15 Private Use Area (0xF0000+)
+// All codepoints from https://pictogrammers.com/library/mdi/
+//
+// UTF-8 encoding for Plane 15: 4 bytes per codepoint
+// Formula: F3 B0+((cp>>12)&0x0F) 80+((cp>>6)&0x3F) 80+(cp&0x3F)
+// =============================================================================
 
-// Detail view icons (available in 32px)
-#define ICON_CHEVRON_LEFT "\xEF\x81\x93" // U+F053 chevron-left
-#define ICON_TRASH "\xEF\x87\xB8"        // U+F1F8 trash
+// Navigation icons
+#define ICON_HOME "\xF3\xB0\x8B\x9C"     // U+F02DC home
+#define ICON_CONTROLS "\xF3\xB0\xA3\xA9" // U+F08E9 tune-variant
+#define ICON_FILAMENT "\xF3\xB0\xA5\xBA" // U+F097A film
+#define ICON_SETTINGS "\xF3\xB0\x92\x93" // U+F0493 cog
+#define ICON_ADVANCED "\xF3\xB0\x87\x99" // U+F01D9 dots-vertical
+#define ICON_FOLDER "\xF3\xB0\x9D\xB0"   // U+F0770 folder-open
 
-// View toggle icons (available in 32px)
-#define ICON_LIST "\xEF\x80\xBA"     // U+F03A list
-#define ICON_TH_LARGE "\xEF\x80\x89" // U+F009 th-large
+// Status & network icons
+#define ICON_TEMPERATURE "\xF3\xB0\x94\x8F"     // U+F050F thermometer
+#define ICON_WIFI "\xF3\xB0\x96\xA9"            // U+F05A9 wifi
+#define ICON_WIFI_STRENGTH_1 "\xF3\xB0\xA4\x9F" // U+F091F wifi-strength-1
+#define ICON_WIFI_STRENGTH_2 "\xF3\xB0\xA4\xA2" // U+F0922 wifi-strength-2
+#define ICON_WIFI_STRENGTH_3 "\xF3\xB0\xA4\xA5" // U+F0925 wifi-strength-3
+#define ICON_WIFI_SLASH "\xF3\xB0\x96\xAA"      // U+F05AA wifi-off
+#define ICON_ETHERNET "\xF3\xB0\x88\x80"        // U+F0200 ethernet
+#define ICON_LIGHTBULB "\xF3\xB0\x8C\xB5"       // U+F0335 lightbulb
+#define ICON_USB "\xF3\xB0\x97\xA0"             // U+F05E0 usb
+#define ICON_BLUETOOTH "\xF3\xB0\x82\xAF"       // U+F00AF bluetooth
 
-// Controls panel icons (available in 64px, 32px)
-#define ICON_ARROWS_ALL "\xEF\x82\xB2"    // U+F0B2 arrows-up-down-left-right
-#define ICON_FIRE "\xEF\x81\xAD"          // U+F06D fire
-#define ICON_ARROW_UP_LINE "\xEF\x8D\x82" // U+F342 arrow-up-from-line
-#define ICON_FAN "\xEF\xA1\xA3"           // U+F863 fan
-#define ICON_POWER_OFF "\xEF\x80\x91"     // U+F011 power-off
+// Media control icons
+#define ICON_PLAY "\xF3\xB0\x90\x8A"  // U+F040A play
+#define ICON_PAUSE "\xF3\xB0\x8F\xA4" // U+F03E4 pause
+#define ICON_STOP "\xF3\xB0\x93\x9B"  // U+F04DB stop
 
-// Motion control icons - using Unicode arrows (from separate arrows_XX fonts)
-#define ICON_ARROW_UP "\xE2\x86\x91"     // U+2191 upwards arrow ↑
-#define ICON_ARROW_DOWN "\xE2\x86\x93"   // U+2193 downwards arrow ↓
-#define ICON_ARROW_LEFT "\xE2\x86\x90"   // U+2190 leftwards arrow ←
-#define ICON_ARROW_RIGHT "\xE2\x86\x92"  // U+2192 rightwards arrow →
-#define ICON_CHEVRON_UP "\xEF\x81\xB7"   // U+F077 chevron-up
-#define ICON_CHEVRON_DOWN "\xEF\x81\xB8" // U+F078 chevron-down
+// UI element icons
+#define ICON_CHECK "\xF3\xB0\x84\xAC"                // U+F012C check
+#define ICON_CLOSE "\xF3\xB0\x85\x96"                // U+F0156 close
+#define ICON_CHECK_CIRCLE "\xF3\xB0\x97\xA1"         // U+F05E1 check-circle-outline
+#define ICON_XMARK_CIRCLE "\xF3\xB0\x85\x99"         // U+F0159 close-circle
+#define ICON_INFO_CIRCLE "\xF3\xB0\x8B\xBC"          // U+F02FC information
+#define ICON_QUESTION_CIRCLE "\xF3\xB0\x8B\x97"      // U+F02D7 help-circle
+#define ICON_TRIANGLE_EXCLAMATION "\xF3\xB0\x80\xA6" // U+F0026 alert
 
-// Diagonal direction icons (text labels for now, icons TBD)
-#define ICON_ARROW_UP_LEFT "\xE2\x86\x96"    // Unicode ↖ (fallback)
-#define ICON_ARROW_UP_RIGHT "\xE2\x86\x97"   // Unicode ↗ (fallback)
-#define ICON_ARROW_DOWN_LEFT "\xE2\x86\x99"  // Unicode ↙ (fallback)
-#define ICON_ARROW_DOWN_RIGHT "\xE2\x86\x98" // Unicode ↘ (fallback)
+// Arrow & chevron icons
+#define ICON_CHEVRON_LEFT "\xF3\xB0\x85\x81"       // U+F0141 chevron-left
+#define ICON_CHEVRON_RIGHT "\xF3\xB0\x85\x82"      // U+F0142 chevron-right
+#define ICON_CHEVRON_UP "\xF3\xB0\x85\x83"         // U+F0143 chevron-up
+#define ICON_CHEVRON_DOWN "\xF3\xB0\x85\x80"       // U+F0140 chevron-down
+#define ICON_ARROWS_ALL "\xF3\xB0\x80\xA6"         // U+F0026 arrow-all (same as alert)
+#define ICON_ARROW_UP_LINE "\xF3\xB0\x9C\xB7"      // U+F0737 arrow-up-bold
+#define ICON_ARROW_DOWN_TO_LINE "\xF3\xB0\x9C\xAE" // U+F072E arrow-down-bold
 
-// Keypad icons (available in 32px)
-#define ICON_BACKSPACE "\xEF\x95\x9A" // U+F55A delete-left
+// Action icons
+#define ICON_TRASH "\xF3\xB0\x86\xB4"     // U+F01B4 delete
+#define ICON_EDIT "\xF3\xB0\x8F\xAB"      // U+F03EB pencil
+#define ICON_BACKSPACE "\xF3\xB0\x82\xAC" // U+F00AC backspace
+#define ICON_LOCK "\xF3\xB0\x8C\xBE"      // U+F033E lock
 
-// Filament operations icons (available in 32px)
-#define ICON_ARROW_DOWN_TO_LINE "\xEF\x8C\xBD"   // U+F33D arrow-down-to-line (load)
-#define ICON_ARROW_UP_FROM_LINE "\xEF\x8D\x82"   // U+F342 arrow-up-from-line (unload)
-#define ICON_DROPLET "\xEF\x81\x83"              // U+F043 droplet (purge)
-#define ICON_CUBE "\xEF\x86\xB2"                 // U+F1B2 cube (PETG)
-#define ICON_EDIT "\xEF\x81\x84"                 // U+F044 edit (custom)
-#define ICON_TRIANGLE_EXCLAMATION "\xEF\x81\xB1" // U+F071 triangle-exclamation (warning)
+// Object icons
+#define ICON_CLOCK "\xF3\xB0\x85\x90"     // U+F0150 clock-outline
+#define ICON_CUBE "\xF3\xB1\xA8\xAF"      // U+F1A2F cube-outline
+#define ICON_DROPLET "\xF3\xB0\x96\x8C"   // U+F058C water
+#define ICON_FIRE "\xF3\xB0\x88\xB8"      // U+F0238 fire
+#define ICON_LEAF "\xF3\xB0\x90\xB6"      // U+F0436 leaf
+#define ICON_FAN "\xF3\xB0\x88\x90"       // U+F0210 fan
+#define ICON_POWER_OFF "\xF3\xB0\x90\xA5" // U+F0425 power
+#define ICON_BELL "\xF3\xB0\x82\x9A"      // U+F009A bell
+
+// List/grid icons
+#define ICON_LIST "\xF3\xB0\x89\xB9"     // U+F0279 format-list-bulleted
+#define ICON_TH_LARGE "\xF3\xB0\x96\x88" // U+F0588 view-grid
+
+// Motion control icons - using MDI arrows
+#define ICON_ARROW_UP "\xF3\xB0\x81\x9D"    // U+F005D arrow-up
+#define ICON_ARROW_DOWN "\xF3\xB0\x81\x85"  // U+F0045 arrow-down
+#define ICON_ARROW_LEFT "\xF3\xB0\x81\x8D"  // U+F004D arrow-left
+#define ICON_ARROW_RIGHT "\xF3\xB0\x81\x94" // U+F0054 arrow-right
+
+// Diagonal direction icons
+#define ICON_ARROW_UP_LEFT "\xF3\xB0\x81\x9C"    // U+F005C arrow-top-left
+#define ICON_ARROW_UP_RIGHT "\xF3\xB0\x81\x9E"   // U+F005E arrow-top-right
+#define ICON_ARROW_DOWN_LEFT "\xF3\xB0\x81\x81"  // U+F0041 arrow-bottom-left
+#define ICON_ARROW_DOWN_RIGHT "\xF3\xB0\x81\x83" // U+F0043 arrow-bottom-right
+
+// Filament operation icons (aliases to existing)
+#define ICON_ARROW_UP_FROM_LINE ICON_ARROW_UP_LINE          // unload
+#define ICON_ARROW_DOWN_TO_LINE_ALT ICON_ARROW_DOWN_TO_LINE // load

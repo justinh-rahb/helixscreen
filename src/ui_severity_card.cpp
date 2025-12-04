@@ -32,8 +32,8 @@ static const char* severity_to_color_const(const char* severity) {
 }
 
 /**
- * Map severity string to FontAwesome icon glyph
- * Uses glyphs from fa_icons_24 font
+ * Map severity string to icon glyph
+ * Uses LVGL built-in symbols
  */
 static const char* severity_to_icon(const char* severity) {
     if (!severity || strcmp(severity, "info") == 0) {

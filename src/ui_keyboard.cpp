@@ -24,6 +24,7 @@
 #include "ui_keyboard.h"
 
 #include "ui_event_safety.h"
+#include "ui_fonts.h"
 #include "ui_theme.h"
 
 #include "config.h"
@@ -133,6 +134,7 @@ static uint32_t g_pressed_btn_id = 0;     // Currently pressed button ID
 static const char* g_pressed_char = NULL; // Currently pressed character
 static const char* g_alternatives = NULL; // Alternative chars for pressed key
 static lv_point_t g_press_point;          // Initial press coordinates
+static lv_area_t g_pressed_key_area;      // Bounds of the pressed key (for release detection)
 
 // Shift key behavior tracking (iOS-style)
 static bool g_shift_just_pressed =
@@ -296,8 +298,12 @@ static void show_overlay(const lv_area_t* key_area, const char* alternatives) {
         lv_obj_t* label = lv_label_create(g_overlay);
         char char_str[2] = {alternatives[i], '\0'};
         lv_label_set_text(label, char_str);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_20, LV_PART_MAIN);
+        lv_obj_set_style_text_font(label, &noto_sans_20, LV_PART_MAIN);
         lv_obj_set_style_text_color(label, text_color, LV_PART_MAIN);
+
+        // Make label fill its flex cell for larger touch target
+        lv_obj_set_flex_grow(label, 1);
+        lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
         // Store the character in user_data for hit detection
         lv_obj_set_user_data(label, (void*)(uintptr_t)alternatives[i]);
@@ -329,8 +335,20 @@ static void show_overlay(const lv_area_t* key_area, const char* alternatives) {
     // Move overlay to foreground to ensure it appears above everything (keyboard, modals, etc.)
     lv_obj_move_foreground(g_overlay);
 
-    spdlog::info("[LongPress] Showing overlay with {} alternatives at ({}, {})", alt_count,
-                 overlay_x, overlay_y);
+    // Force layout update to ensure labels get their correct sizes/positions
+    lv_obj_update_layout(g_overlay);
+
+    spdlog::info("[LongPress] Showing overlay with {} alternatives at ({}, {}), size={}x{}",
+                 alt_count, overlay_x, overlay_y, overlay_width, overlay_height);
+
+    // Log each label's final position
+    for (size_t i = 0; i < alt_count; i++) {
+        lv_obj_t* label = lv_obj_get_child(g_overlay, static_cast<int32_t>(i));
+        lv_area_t label_area;
+        lv_obj_get_coords(label, &label_area);
+        spdlog::info("[LongPress] Created label[{}] '{}' at ({},{}) to ({},{})", i, alternatives[i],
+                     label_area.x1, label_area.y1, label_area.x2, label_area.y2);
+    }
 }
 
 /**
@@ -342,6 +360,11 @@ static void longpress_event_handler(lv_event_t* e) {
 
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t* keyboard = lv_event_get_target_obj(e);
+
+    // DEBUG: Log EVERY event that reaches this handler
+    spdlog::info("[LongPress] EVENT RECEIVED: code={} (PRESSED={}, LONG_PRESSED={}, RELEASED={})",
+                 (int)code, (int)LV_EVENT_PRESSED, (int)LV_EVENT_LONG_PRESSED,
+                 (int)LV_EVENT_RELEASED);
 
     if (code == LV_EVENT_PRESSED) {
         // Get pressed button info
@@ -399,6 +422,9 @@ static void longpress_event_handler(lv_event_t* e) {
             btn_area.y1 = g_press_point.y - 25;
             btn_area.y2 = g_press_point.y + 25;
 
+            // Save key area for release detection (to detect "lift on original key")
+            g_pressed_key_area = btn_area;
+
             // Show overlay
             show_overlay(&btn_area, g_alternatives);
 
@@ -408,41 +434,98 @@ static void longpress_event_handler(lv_event_t* e) {
 
     } else if (code == LV_EVENT_RELEASED) {
         // Handle release
+        spdlog::info("[LongPress] RELEASED event - state={}, overlay={}, textarea={}",
+                     (int)g_longpress_state, (void*)g_overlay, (void*)g_context_textarea);
+
         if (g_longpress_state == LP_LONG_DETECTED && g_overlay != NULL) {
-            // Long-press was active - check if user selected an alternative
+            // Long-press was active - determine what character (if any) to insert
+            // Priority: overlay selection > original key > nothing (cancel)
             lv_indev_t* indev = lv_indev_active();
             lv_point_t release_point;
 
+            spdlog::info("[LongPress] Long-press mode active, checking release position");
+
             if (indev) {
                 lv_indev_get_point(indev, &release_point);
+                spdlog::info("[LongPress] Release point: ({}, {})", release_point.x,
+                             release_point.y);
 
-                // Hit test against overlay labels
+                // Log overlay bounds
+                lv_area_t overlay_area;
+                lv_obj_get_coords(g_overlay, &overlay_area);
+                spdlog::info("[LongPress] Overlay bounds: ({},{}) to ({},{})", overlay_area.x1,
+                             overlay_area.y1, overlay_area.x2, overlay_area.y2);
+
+                // Log pressed key bounds
+                spdlog::info("[LongPress] Pressed key bounds: ({},{}) to ({},{})",
+                             g_pressed_key_area.x1, g_pressed_key_area.y1, g_pressed_key_area.x2,
+                             g_pressed_key_area.y2);
+
+                // First: Check if release is inside the OVERLAY area (not just labels)
+                // The overlay may have padding, so we check the full overlay bounds
+                // If inside, pick the nearest label by horizontal position
+                bool release_in_overlay = point_in_area(&overlay_area, &release_point);
+                spdlog::info("[LongPress] Release in overlay area: {}", release_in_overlay);
+
                 uint32_t child_count = lv_obj_get_child_count(g_overlay);
+                spdlog::info("[LongPress] Overlay has {} children (labels)", child_count);
                 char selected_char = 0;
 
-                for (uint32_t i = 0; i < child_count; i++) {
-                    lv_obj_t* label = lv_obj_get_child(g_overlay, static_cast<int32_t>(i));
-                    lv_area_t label_area;
-                    lv_obj_get_coords(label, &label_area);
+                if (release_in_overlay && child_count > 0) {
+                    // Find the closest label (by horizontal center distance)
+                    int32_t min_dist = INT32_MAX;
+                    for (uint32_t i = 0; i < child_count; i++) {
+                        lv_obj_t* label = lv_obj_get_child(g_overlay, static_cast<int32_t>(i));
+                        lv_area_t label_area;
+                        lv_obj_get_coords(label, &label_area);
+                        char label_char = (char)(uintptr_t)lv_obj_get_user_data(label);
 
-                    if (point_in_area(&label_area, &release_point)) {
-                        // User released on this alternative character
-                        selected_char = (char)(uintptr_t)lv_obj_get_user_data(label);
-                        break;
+                        // Calculate label center X
+                        int32_t label_center_x = (label_area.x1 + label_area.x2) / 2;
+                        int32_t dist = abs(release_point.x - label_center_x);
+
+                        spdlog::info(
+                            "[LongPress] Label[{}] '{}': ({},{}) to ({},{}), center_x={}, dist={}",
+                            i, label_char, label_area.x1, label_area.y1, label_area.x2,
+                            label_area.y2, label_center_x, dist);
+
+                        if (dist < min_dist) {
+                            min_dist = dist;
+                            selected_char = label_char;
+                        }
                     }
+                    spdlog::info("[LongPress] Selected nearest label '{}' (dist={})", selected_char,
+                                 min_dist);
                 }
 
                 if (selected_char != 0 && g_context_textarea != NULL) {
-                    // Insert the alternative character
+                    // Insert the alternative character (slide-to-select)
                     char str[2] = {selected_char, '\0'};
                     lv_textarea_add_text(g_context_textarea, str);
                     spdlog::info("[LongPress] Inserted alternative character: '{}'", selected_char);
+                } else if (point_in_area(&g_pressed_key_area, &release_point)) {
+                    // Released on original key - insert primary character
+                    spdlog::info("[LongPress] Release in original key area");
+                    if (g_pressed_char && g_context_textarea != NULL) {
+                        lv_textarea_add_text(g_context_textarea, g_pressed_char);
+                        spdlog::info("[LongPress] Inserted primary character: '{}'",
+                                     g_pressed_char);
+                    } else {
+                        spdlog::warn(
+                            "[LongPress] No primary char or textarea: pressed_char={}, textarea={}",
+                            g_pressed_char ? g_pressed_char : "NULL", (void*)g_context_textarea);
+                    }
                 } else {
-                    spdlog::debug("[LongPress] Released outside overlay - no character inserted");
+                    // Released outside both overlay and original key - cancel (no insertion)
+                    spdlog::info("[LongPress] Released outside overlay and key - cancelled (no "
+                                 "char inserted)");
                 }
+            } else {
+                spdlog::warn("[LongPress] No input device active!");
             }
 
             // Clean up overlay
+            spdlog::info("[LongPress] Cleaning up overlay");
             overlay_cleanup();
             g_longpress_state = LP_IDLE;
 
@@ -451,6 +534,8 @@ static void longpress_event_handler(lv_event_t* e) {
             spdlog::debug("[LongPress] Short press - normal input");
             g_longpress_state = LP_IDLE;
             overlay_cleanup();
+        } else {
+            spdlog::debug("[LongPress] RELEASED but state is IDLE - nothing to do");
         }
     }
 
@@ -554,6 +639,13 @@ static void keyboard_event_cb(lv_event_t* e) {
         spdlog::debug("[Keyboard] Close pressed - hiding keyboard");
         ui_keyboard_hide();
     } else if (code == LV_EVENT_VALUE_CHANGED) {
+        // Don't process normal key presses during long-press mode
+        // This prevents inserting unwanted chars when sliding off the overlay
+        if (g_longpress_state == LP_LONG_DETECTED) {
+            spdlog::debug("[Keyboard] Ignoring VALUE_CHANGED during long-press mode");
+            return; // Early exit - don't process this event
+        }
+
         // Get button info
         uint32_t btn_id = lv_buttonmatrix_get_selected_button(keyboard);
         const char* btn_text = lv_buttonmatrix_get_button_text(keyboard, btn_id);
@@ -781,7 +873,7 @@ static void keyboard_draw_alternative_chars(lv_event_t* e) {
                 // Create draw label descriptor
                 lv_draw_label_dsc_t label_dsc;
                 lv_draw_label_dsc_init(&label_dsc);
-                label_dsc.font = &lv_font_montserrat_12;
+                label_dsc.font = &noto_sans_12;
                 label_dsc.color = gray_color;
                 label_dsc.opa = LV_OPA_60;
 
@@ -889,7 +981,7 @@ void ui_keyboard_init(lv_obj_t* parent) {
     // Add custom draw handler to display alternative characters on keys
     lv_obj_add_event_cb(g_keyboard, keyboard_draw_alternative_chars, LV_EVENT_DRAW_POST_END, NULL);
 
-    spdlog::debug(
+    spdlog::info(
         "[Keyboard] Initialization complete (with long-press alternatives and visual hints)");
 }
 
@@ -938,7 +1030,7 @@ void ui_keyboard_show(lv_obj_t* textarea) {
         return;
     }
 
-    spdlog::debug("[Keyboard] Showing keyboard for textarea: {}", (void*)textarea);
+    spdlog::info("[Keyboard] Showing keyboard for textarea: {}", (void*)textarea);
 
     // Reset keyboard to lowercase mode on each show
     g_mode = MODE_ALPHA_LC;

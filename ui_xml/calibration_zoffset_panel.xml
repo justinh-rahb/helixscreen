@@ -111,7 +111,7 @@
       <!-- STATE: COMPLETE - Calibration finished -->
       <!-- ================================================================== -->
       <lv_obj name="state_complete" width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_lg" hidden="true" scrollable="false">
-        <lv_label text="#icon_check_circle" style_text_font="fa_icons_48" style_text_color="#success_color"/>
+        <lv_label text="#icon_check_circle" style_text_font="mdi_icons_48" style_text_color="#success_color"/>
         <text_heading text="Calibration Complete!" style_text_align="center"/>
         <text_body name="final_offset_label" text="New Z-Offset: 0.000" style_text_color="#text_secondary"/>
         <lv_button name="btn_done" width="140" height="56" style_radius="#border_radius">
@@ -122,7 +122,7 @@
       <!-- STATE: ERROR - Something went wrong -->
       <!-- ================================================================== -->
       <lv_obj name="state_error" width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_lg" hidden="true" scrollable="false">
-        <lv_label text="#icon_xmark_circle" style_text_font="fa_icons_48" style_text_color="#error_color"/>
+        <lv_label text="#icon_xmark_circle" style_text_font="mdi_icons_48" style_text_color="#error_color"/>
         <text_heading text="Calibration Failed" style_text_align="center"/>
         <text_body name="error_message" text="An error occurred during calibration." style_text_color="#text_secondary" width="80%" style_text_align="center" long_mode="wrap"/>
         <lv_obj width="100%" height="56" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row" style_flex_main_place="center" style_pad_gap="#space_md" scrollable="false">

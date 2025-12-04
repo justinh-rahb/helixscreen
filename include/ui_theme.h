@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "ui_fonts.h"
+
 #include "lvgl/lvgl.h"
 
 // Theme colors - only essential colors used by code that needs explicit control
@@ -76,19 +78,11 @@
 #define UI_NAV_WIDTH_MEDIUM 94 // Medium screens: 70px button + 12px padding each side
 #define UI_NAV_WIDTH_LARGE 102 // Large screens: 70px button + 16px padding each side
 
-// Font references (extern declarations for fonts used in C++ code)
-extern const lv_font_t lv_font_montserrat_10;
-extern const lv_font_t lv_font_montserrat_12;
-extern const lv_font_t lv_font_montserrat_14;
-extern const lv_font_t lv_font_montserrat_16;
-extern const lv_font_t lv_font_montserrat_20;
-extern const lv_font_t lv_font_montserrat_28;
-
-// Semantic font constants (matching globals.xml)
-#define UI_FONT_HEADING (&lv_font_montserrat_20) // Section headings, large text
-#define UI_FONT_BODY (&lv_font_montserrat_16)    // Standard body text, medium text
-#define UI_FONT_SMALL                                                                              \
-    (&lv_font_montserrat_12) // Small text (hints, helpers, warnings, chart labels)
+// Semantic font constants (matching globals.xml - uses Noto Sans)
+// Font declarations are in ui_fonts.h
+#define UI_FONT_HEADING (&noto_sans_20) // Section headings, large text
+#define UI_FONT_BODY (&noto_sans_16)    // Standard body text, medium text
+#define UI_FONT_SMALL (&noto_sans_12)   // Small text (hints, helpers, warnings, chart labels)
 
 /**
  * @brief Initialize LVGL theme system
