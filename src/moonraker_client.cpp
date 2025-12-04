@@ -59,25 +59,23 @@ MoonrakerClient::MoonrakerClient(EventLoopPtr loop)
 }
 
 MoonrakerClient::~MoonrakerClient() {
-    spdlog::debug("[Moonraker Client] Destructor called");
-
-    // Clean up pending requests FIRST - invoke error callbacks before destruction
-    // This must happen BEFORE is_destroying_ is set so callbacks can still fire
-    cleanup_pending_requests();
-
-    // Set destroying flag AFTER cleanup - this signals set_connection_state() to skip callback
-    // invocation even if it has already copied the callback. The check after copying will see this
-    // flag.
+    // Set destroying flag FIRST - during static destruction, mutexes may already be invalid.
+    // This flag prevents any callbacks from firing even if methods check it.
     is_destroying_.store(true);
 
-    // Clear callback under lock (redundant safety - the flag is the primary guard)
-    {
-        std::lock_guard<std::mutex> lock(state_callback_mutex_);
-        state_change_callback_ = nullptr;
-    }
+    // During static destruction (via exit()), mutexes may be in an invalid state.
+    // DO NOT lock any mutexes or call methods that lock mutexes.
+    // Just clear callbacks directly - no other thread should be accessing during destruction.
+    state_change_callback_ = nullptr;
 
-    // Disconnect cleanly - this may trigger state changes, but is_destroying_ prevents callbacks
-    disconnect();
+    // Close WebSocket connection without complex cleanup that might lock mutexes.
+    // The base class WebSocketClient destructor will handle socket cleanup.
+    onopen = []() {};
+    onmessage = [](const std::string&) {};
+    onclose = []() {};
+
+    // Note: We skip cleanup_pending_requests() and disconnect() because they use locks.
+    // Any pending requests will be abandoned - this is acceptable during shutdown.
 }
 
 void MoonrakerClient::set_connection_state(ConnectionState new_state) {
