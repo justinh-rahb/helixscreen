@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Git pre-commit hook for HelixScreen
 #
-# This hook runs quality checks (including clang-format) before each commit.
+# This hook runs quality checks before each commit using scripts/quality-checks.sh
 # Files with formatting issues are auto-fixed and staged.
 #
 # Setup (one-time):
@@ -13,44 +13,9 @@
 
 set -e
 
-echo "🔍 Running pre-commit quality checks..."
-echo ""
+# Change to repo root
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$REPO_ROOT"
 
-# Get list of staged C/C++ files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(cpp|c|h|hpp)$' || true)
-
-if [ -z "$STAGED_FILES" ]; then
-    echo "✅ No C/C++ files staged - skipping format check"
-    exit 0
-fi
-
-# Check if clang-format is available
-if ! command -v clang-format &> /dev/null; then
-    echo "⚠️  clang-format not found - skipping format check"
-    exit 0
-fi
-
-# Check formatting and auto-fix
-NEEDS_FORMAT=()
-for file in $STAGED_FILES; do
-    if [ -f "$file" ]; then
-        # Check if file needs formatting
-        if ! clang-format --dry-run --Werror "$file" &> /dev/null; then
-            NEEDS_FORMAT+=("$file")
-        fi
-    fi
-done
-
-if [ ${#NEEDS_FORMAT[@]} -gt 0 ]; then
-    echo "🎨 Auto-formatting ${#NEEDS_FORMAT[@]} file(s)..."
-    for file in "${NEEDS_FORMAT[@]}"; do
-        clang-format -i "$file"
-        git add "$file"
-        echo "   ✓ $file"
-    done
-    echo ""
-    echo "✅ Files formatted and re-staged"
-fi
-
-echo "✅ Pre-commit checks passed"
-exit 0
+# Run quality checks with staged-only mode and auto-fix
+exec ./scripts/quality-checks.sh --staged-only --auto-fix
