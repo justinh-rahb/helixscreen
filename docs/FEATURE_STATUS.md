@@ -23,11 +23,11 @@ This document tracks the implementation status of all features identified in the
 
 | Category | Complete | In Progress | Stub | Not Started | Total |
 |----------|----------|-------------|------|-------------|-------|
-| CRITICAL (Tier 1) | 2 | 1 | 4 | 0 | 7 |
-| HIGH (Tier 2) | 1 | 0 | 1 | 5 | 7 |
+| CRITICAL (Tier 1) | 3 | 1 | 4 | 0 | 8 |
+| HIGH (Tier 2) | 2 | 0 | 1 | 4 | 7 |
 | MEDIUM (Tier 3) | 0 | 0 | 0 | 7 | 7 |
 | DIFFERENTIATOR (Tier 4) | 0 | 0 | 0 | 5 | 5 |
-| **TOTAL** | **3** | **1** | **5** | **17** | **26** |
+| **TOTAL** | **5** | **1** | **5** | **16** | **27** |
 
 ---
 
@@ -37,7 +37,7 @@ These features ALL major competitors have. Required for feature parity.
 
 | Feature | Status | Files | Notes |
 |---------|--------|-------|-------|
-| **Temperature Presets** | ⬜ | - | PLA/PETG/ABS/etc preset buttons |
+| **Temperature Presets** | ✅ | `nozzle_temp_panel.xml`, `bed_temp_panel.xml` | Off/PLA/PETG/ABS presets implemented |
 | **Macro Panel** | 🚧 | `ui_xml/macro_panel.xml` | Stub with Coming Soon overlay |
 | **Console Panel** | 🚧 | `ui_xml/console_panel.xml` | Stub with Coming Soon overlay |
 | **Screws Tilt Adjust** | 🚧 | `ui_xml/screws_tilt_panel.xml` | Stub with Coming Soon overlay |
@@ -48,25 +48,20 @@ These features ALL major competitors have. Required for feature parity.
 ### Detailed Status
 
 #### Temperature Presets
-- **Status:** ⬜ Not Started
+- **Status:** ✅ Complete
 - **Priority:** CRITICAL
 - **Complexity:** MEDIUM
-- **Depends On:** None (existing temp panels work)
-- **Files to Create:**
-  - [ ] `ui_xml/temp_preset_modal.xml`
-  - [ ] `include/temperature_presets.h`
-  - [ ] `src/temperature_presets.cpp`
-- **Files to Modify:**
-  - [ ] `ui_xml/nozzle_temp_panel.xml`
-  - [ ] `ui_xml/bed_temp_panel.xml`
-  - [ ] `config/helixconfig.json.template`
-- **API:** None (just heater control)
+- **Implementation:** Built into temp panels directly
+- **Files:**
+  - [x] `ui_xml/nozzle_temp_panel.xml` - Off/PLA(210°C)/PETG(240°C)/ABS(250°C)
+  - [x] `ui_xml/bed_temp_panel.xml` - Off/PLA(60°C)/PETG(80°C)/ABS(100°C)
+- **API:** Uses existing heater control
 - **Checklist:**
-  - [ ] Default presets (PLA, PETG, ABS, TPU, ASA)
-  - [ ] Custom preset creation
-  - [ ] Preset editing/deletion
-  - [ ] Quick-apply from home screen
-  - [ ] Persist in config
+  - [x] Default presets (Off, PLA, PETG, ABS)
+  - [ ] Custom preset creation (future enhancement)
+  - [ ] Preset editing/deletion (future enhancement)
+  - [ ] Quick-apply from home screen (future enhancement)
+  - [ ] Persist in config (future enhancement)
 
 #### Macro Panel
 - **Status:** ⬜ Not Started
@@ -213,7 +208,7 @@ Most competitors have these. Should implement for competitive parity.
 | **Job Queue** | ⬜ | - | Batch printing queue |
 | **Update Manager** | ⬜ | - | Software updates |
 | **Timelapse Controls** | ⬜ | - | Moonraker-timelapse settings |
-| **Layer Display** | ✅ | `ui_xml/print_status_panel.xml:46` | Already implemented in print_status_panel |
+| **Layer Display** | ✅ | `ui_xml/print_status_panel.xml:45-46` | Implemented: `bind_text="print_layer_text"` |
 
 ### Detailed Status
 
@@ -287,13 +282,14 @@ Most competitors have these. Should implement for competitive parity.
   - [ ] Video library browser
 
 #### Layer Display
-- **Status:** ⬜ Not Started
+- **Status:** ✅ Complete
 - **Priority:** HIGH
 - **Complexity:** LOW
+- **Implementation:** `print_status_panel.xml:45-46`
 - **API:** `print_stats.info.current_layer`, `print_stats.info.total_layer`
 - **Checklist:**
-  - [ ] Current/total layers on print status
-  - [ ] Layer progress bar
+  - [x] Current/total layers on print status (`bind_text="print_layer_text"`)
+  - [ ] Layer progress bar (future enhancement)
 
 ---
 

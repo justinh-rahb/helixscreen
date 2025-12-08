@@ -61,7 +61,8 @@ make -j
 | Panel Stubs | ✅ Complete | 7 stub panels with Coming Soon overlays |
 | Component Registration | ✅ Complete | All new components in main.cpp |
 | **Power Device Control** | ✅ Complete | Full panel with UI polish (4/6 stages) |
-| Quick Wins | 🟡 In Progress | Layer display, temp presets remaining |
+| **Layer Display** | ✅ Complete | Already in `print_status_panel.xml` |
+| **Temperature Presets** | ✅ Complete | Already in temp panels (Off/PLA/PETG/ABS) |
 | Core Features | ⬜ Not Started | Macros, console, camera, history |
 
 ---
@@ -128,7 +129,7 @@ docs/POWER_PANEL_POLISH_PLAN.md # UI polish plan (Stages 1-4 complete)
 ### TIER 1: CRITICAL (All competitors have)
 | Feature | Complexity | Status |
 |---------|------------|--------|
-| Temperature Presets | MEDIUM | ⬜ Not Started |
+| **Temperature Presets** | MEDIUM | ✅ **COMPLETE** - Off/PLA/PETG/ABS in temp panels |
 | Macro Panel | MEDIUM | 🚧 Stub: `macro_panel.xml` |
 | Console Panel | HIGH | 🚧 Stub: `console_panel.xml` |
 | Screws Tilt Adjust | HIGH | 🚧 Stub: `screws_tilt_panel.xml` |
@@ -145,7 +146,7 @@ docs/POWER_PANEL_POLISH_PLAN.md # UI polish plan (Stages 1-4 complete)
 | Job Queue | MEDIUM | Needs dedicated panel |
 | Update Manager | MEDIUM | Needs dedicated panel |
 | Timelapse Controls | MEDIUM | Needs dedicated panel |
-| Layer Display | LOW | **QUICK WIN** - add to print_status_panel |
+| **Layer Display** | LOW | ✅ **COMPLETE** - in `print_status_panel.xml` |
 
 ### TIER 4: DIFFERENTIATORS (Beat ALL competitors!)
 | Feature | Notes |
@@ -158,33 +159,34 @@ docs/POWER_PANEL_POLISH_PLAN.md # UI polish plan (Stages 1-4 complete)
 
 ## Next Actions (Priority Order)
 
-### Phase 2: Quick Wins (Recommended Next)
+### ✅ Quick Wins - ALREADY COMPLETE
+- **Layer Display** - Already in `print_status_panel.xml:45-46` (`bind_text="print_layer_text"`)
+- **Temperature Presets** - Already in temp panels (Off/PLA/PETG/ABS buttons)
+- **Power Device Control** - Completed in Session 4
 
-#### 1. Layer Display (EASIEST - Quick Win)
-**Files to modify:**
-- `ui_xml/print_status_panel.xml` - Add layer counter
-- `src/ui_panel_print_status.cpp` - Subscribe to layer info
+### Phase 3: Core Features (Recommended Next)
 
-**API:** Already available via `print_stats.info.current_layer` and `print_stats.info.total_layer`
+#### 1. Macro Panel (MEDIUM complexity)
+**Convert stub to functional panel:**
+- `ui_xml/macro_panel.xml` - Replace Coming Soon with macro list
+- `include/ui_panel_macros.h` - Panel class
+- `src/ui_panel_macros.cpp` - Fetch and execute macros
 
-**Pattern:**
-```xml
-<text_body text="Layer:" style_text_color="#text_secondary"/>
-<lv_label bind_text="print_current_layer"/>
-<text_body text="/" style_text_color="#text_secondary"/>
-<lv_label bind_text="print_total_layers"/>
-```
+**API:** `printer.objects.query` for `gcode_macro *`
 
-#### 2. Temperature Presets (MEDIUM complexity)
+#### 2. Console Panel (HIGH complexity)
+**Convert stub to functional panel:**
+- `ui_xml/console_panel.xml` - Scrollable output + input
+- `include/ui_panel_console.h` - Panel class
+- `src/ui_panel_console.cpp` - G-code history and input
+
+**API:** `/server/gcode_store`, `notify_gcode_response`
+
+#### 3. Firmware Retraction (LOW complexity - Quick Win)
 **Files to create:**
-- `ui_xml/temp_preset_modal.xml`
-- `include/temperature_presets.h`
-- `src/temperature_presets.cpp`
+- Add to settings panel or create `ui_xml/retraction_panel.xml`
 
-**Files to modify:**
-- `ui_xml/nozzle_temp_panel.xml` - Add preset buttons
-- `ui_xml/bed_temp_panel.xml` - Add preset buttons
-- `config/helixconfig.json.template` - Add preset storage
+**API:** `firmware_retraction` printer object
 
 ---
 
