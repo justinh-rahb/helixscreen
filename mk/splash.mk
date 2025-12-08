@@ -32,19 +32,19 @@ endif
 # On macOS, the main app handles its own splash via SDL
 ifneq ($(UNAME_S),Darwin)
 
-# Compile splash source
+# Compile splash source (with dependency tracking for header changes)
 $(BUILD_DIR)/splash/%.o: src/%.cpp | $(BUILD_DIR)/splash
 	@echo "[CXX] $< (splash)"
-	$(Q)$(CXX) $(SPLASH_CXXFLAGS) -c $< -o $@
+	$(Q)$(CXX) $(SPLASH_CXXFLAGS) $(DEPFLAGS) -c $< -o $@
 
 # Splash needs config.o (display_backend_drm.cpp uses Config) and a UI notification stub
 # (config.cpp calls ui_notification_error on save failures)
 SPLASH_EXTRA_OBJS := $(OBJ_DIR)/config.o $(BUILD_DIR)/splash/ui_notification_stub.o
 
-# Compile notification stub for splash
+# Compile notification stub for splash (with dependency tracking)
 $(BUILD_DIR)/splash/ui_notification_stub.o: tools/ui_notification_stub.cpp | $(BUILD_DIR)/splash
 	@echo "[CXX] $< (splash stub)"
-	$(Q)$(CXX) $(SPLASH_CXXFLAGS) -c $< -o $@
+	$(Q)$(CXX) $(SPLASH_CXXFLAGS) $(DEPFLAGS) -c $< -o $@
 
 # Link splash binary
 # Dependencies: splash object, display library, LVGL objects (compiled from source), fonts
@@ -67,6 +67,9 @@ splash: $(SPLASH_BIN)
 .PHONY: clean-splash
 clean-splash:
 	$(Q)rm -rf $(BUILD_DIR)/splash $(SPLASH_BIN)
+
+# Include dependency files for header tracking
+-include $(wildcard $(BUILD_DIR)/splash/*.d)
 
 else
 # macOS: no-op targets

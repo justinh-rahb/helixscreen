@@ -148,8 +148,10 @@ check_essential() {
     echo -e "${BOLD}Essential Build Dependencies${RESET}"
 
     # C Compiler
+    # Handle ccache-wrapped compilers like "ccache cc" - extract actual compiler
     local cc_cmd="${CC:-cc}"
-    if command -v "$cc_cmd" >/dev/null 2>&1; then
+    local cc_actual="${cc_cmd##* }"  # Get last word (handles "ccache cc" -> "cc")
+    if command -v "$cc_actual" >/dev/null 2>&1; then
         ok "C compiler found: $($cc_cmd --version 2>&1 | head -n1)"
     else
         fail "C compiler ($cc_cmd) not found" "cc"
@@ -157,8 +159,10 @@ check_essential() {
     fi
 
     # C++ Compiler
+    # Handle ccache-wrapped compilers like "ccache c++" - extract actual compiler
     local cxx_cmd="${CXX:-c++}"
-    if command -v "$cxx_cmd" >/dev/null 2>&1; then
+    local cxx_actual="${cxx_cmd##* }"  # Get last word (handles "ccache c++" -> "c++")
+    if command -v "$cxx_actual" >/dev/null 2>&1; then
         ok "C++ compiler found: $($cxx_cmd --version 2>&1 | head -n1)"
     else
         fail "C++ compiler ($cxx_cmd) not found" "c++"

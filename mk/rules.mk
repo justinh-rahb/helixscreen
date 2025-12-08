@@ -134,7 +134,8 @@ DEPFILES := $(wildcard $(OBJ_DIR)/*.d $(OBJ_DIR)/**/*.d)
 # PCH only depends on its source header and external libraries (LVGL, spdlog)
 # Project headers are NOT included - changing app headers should not invalidate PCH
 # The PCH contains only stable, rarely-changing includes (see include/lvgl_pch.h)
-$(PCH): $(PCH_HEADER) $(LIBHV_LIB)
+# CRITICAL: lv_conf.h must be listed - it controls LVGL feature flags
+$(PCH): $(PCH_HEADER) $(LIBHV_LIB) lv_conf.h
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(MAGENTA)$(BOLD)[PCH]$(RESET) $<"
 ifeq ($(V),1)
@@ -188,25 +189,27 @@ endif
 	}
 
 # Compile LVGL sources (use SUBMODULE_CFLAGS to suppress third-party warnings)
+# CRITICAL: Uses DEPFLAGS to track lv_conf.h and LVGL header changes
 $(OBJ_DIR)/lvgl/%.o: $(LVGL_DIR)/%.c
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(CYAN)[CC]$(RESET) $<"
 ifeq ($(V),1)
-	$(Q)echo "$(YELLOW)Command:$(RESET) $(CC) $(SUBMODULE_CFLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@"
+	$(Q)echo "$(YELLOW)Command:$(RESET) $(CC) $(SUBMODULE_CFLAGS) $(DEPFLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@"
 endif
-	$(Q)$(CC) $(SUBMODULE_CFLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@ || { \
+	$(Q)$(CC) $(SUBMODULE_CFLAGS) $(DEPFLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@ || { \
 		echo "$(RED)$(BOLD)✗ Compilation failed:$(RESET) $<"; \
 		exit 1; \
 	}
 
 # Compile LVGL C++ sources (ThorVG) - use SUBMODULE_CXXFLAGS and PCH
+# CRITICAL: Uses DEPFLAGS to track lv_conf.h and LVGL header changes
 $(OBJ_DIR)/lvgl/%.o: $(LVGL_DIR)/%.cpp $(PCH)
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(CYAN)[CXX]$(RESET) $<"
 ifeq ($(V),1)
-	$(Q)echo "$(YELLOW)Command:$(RESET) $(CXX) $(SUBMODULE_CXXFLAGS) $(PCH_FLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@"
+	$(Q)echo "$(YELLOW)Command:$(RESET) $(CXX) $(SUBMODULE_CXXFLAGS) $(DEPFLAGS) $(PCH_FLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@"
 endif
-	$(Q)$(CXX) $(SUBMODULE_CXXFLAGS) $(PCH_FLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@ || { \
+	$(Q)$(CXX) $(SUBMODULE_CXXFLAGS) $(DEPFLAGS) $(PCH_FLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@ || { \
 		echo "$(RED)$(BOLD)✗ Compilation failed:$(RESET) $<"; \
 		exit 1; \
 	}
@@ -317,5 +320,17 @@ compile_commands:
 # Include generated .d files for proper header dependency tracking.
 # The - prefix means don't error if files don't exist (first build).
 # Files are generated during compilation with -MMD -MP flags.
+#
+# Pattern explanation:
+#   $(OBJ_DIR)/*.d        - App sources in obj root
+#   $(OBJ_DIR)/*/*.d      - App sources in subdirs (e.g., obj/tools/)
+#   $(OBJ_DIR)/lvgl/*.d   - LVGL sources (shallow)
+#   $(OBJ_DIR)/lvgl/*/*.d - LVGL sources (one level deep)
+#   $(OBJ_DIR)/lvgl/*/*/*.d - LVGL sources (two levels deep - libs/thorvg/*)
+#   $(OBJ_DIR)/lvgl/*/*/*/*.d - LVGL sources (three levels deep)
 -include $(wildcard $(OBJ_DIR)/*.d)
 -include $(wildcard $(OBJ_DIR)/*/*.d)
+-include $(wildcard $(OBJ_DIR)/lvgl/*.d)
+-include $(wildcard $(OBJ_DIR)/lvgl/*/*.d)
+-include $(wildcard $(OBJ_DIR)/lvgl/*/*/*.d)
+-include $(wildcard $(OBJ_DIR)/lvgl/*/*/*/*.d)
