@@ -224,6 +224,81 @@ void MoonrakerAPIMock::download_thumbnail(const std::string& thumbnail_path,
 }
 
 // ============================================================================
+// Power Device Methods
+// ============================================================================
+
+void MoonrakerAPIMock::get_power_devices(PowerDevicesCallback on_success, ErrorCallback on_error) {
+    (void)on_error; // Mock never fails
+
+    // Test empty state with: MOCK_EMPTY_POWER=1
+    if (std::getenv("MOCK_EMPTY_POWER")) {
+        spdlog::info("[MoonrakerAPIMock] Returning empty power devices (MOCK_EMPTY_POWER set)");
+        on_success({});
+        return;
+    }
+
+    spdlog::info("[MoonrakerAPIMock] Returning mock power devices");
+
+    // Initialize mock states if not already done
+    if (mock_power_states_.empty()) {
+        mock_power_states_["printer_psu"] = true;
+        mock_power_states_["led_strip"] = true;
+        mock_power_states_["enclosure_fan"] = false;
+        mock_power_states_["aux_outlet"] = false;
+    }
+
+    // Create mock device list that mimics real Moonraker responses
+    std::vector<PowerDevice> devices;
+
+    // Printer PSU - typically locked during printing
+    devices.push_back({
+        "printer_psu",                                    // device name
+        "gpio",                                           // type
+        mock_power_states_["printer_psu"] ? "on" : "off", // status
+        true                                              // locked_while_printing
+    });
+
+    // LED Strip - controllable anytime
+    devices.push_back({"led_strip", "gpio", mock_power_states_["led_strip"] ? "on" : "off", false});
+
+    // Enclosure Fan - controllable anytime
+    devices.push_back({"enclosure_fan", "klipper_device",
+                       mock_power_states_["enclosure_fan"] ? "on" : "off", false});
+
+    // Auxiliary Outlet
+    devices.push_back(
+        {"aux_outlet", "tplink_smartplug", mock_power_states_["aux_outlet"] ? "on" : "off", false});
+
+    if (on_success) {
+        on_success(devices);
+    }
+}
+
+void MoonrakerAPIMock::set_device_power(const std::string& device, const std::string& action,
+                                        SuccessCallback on_success, ErrorCallback on_error) {
+    (void)on_error; // Mock never fails
+
+    // Update mock state
+    bool new_state = false;
+    if (action == "on") {
+        new_state = true;
+    } else if (action == "off") {
+        new_state = false;
+    } else if (action == "toggle") {
+        new_state = !mock_power_states_[device];
+    }
+
+    mock_power_states_[device] = new_state;
+
+    spdlog::info("[MoonrakerAPIMock] Power device '{}' set to '{}' (state: {})", device, action,
+                 new_state ? "on" : "off");
+
+    if (on_success) {
+        on_success();
+    }
+}
+
+// ============================================================================
 // Shared State Methods
 // ============================================================================
 

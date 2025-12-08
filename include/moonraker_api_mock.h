@@ -5,6 +5,7 @@
 
 #include "moonraker_api.h"
 
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -174,6 +175,35 @@ class MoonrakerAPIMock : public MoonrakerAPI {
                             StringCallback on_success, ErrorCallback on_error) override;
 
     // ========================================================================
+    // Overridden Power Device Methods (return mock data)
+    // ========================================================================
+
+    /**
+     * @brief Get mock power devices for testing
+     *
+     * Returns a predefined list of power devices to test the Power Panel UI
+     * without needing a real Moonraker connection.
+     *
+     * @param on_success Callback with list of mock power devices
+     * @param on_error Error callback (never called - mock always succeeds)
+     */
+    void get_power_devices(PowerDevicesCallback on_success, ErrorCallback on_error) override;
+
+    /**
+     * @brief Mock set power device (logs but doesn't control hardware)
+     *
+     * Logs the command and updates internal mock state for testing.
+     * Always calls success callback.
+     *
+     * @param device Device name
+     * @param action Action ("on", "off", "toggle")
+     * @param on_success Success callback (always called)
+     * @param on_error Error callback (never called)
+     */
+    void set_device_power(const std::string& device, const std::string& action,
+                          SuccessCallback on_success, ErrorCallback on_error) override;
+
+    // ========================================================================
     // Shared State Methods
     // ========================================================================
 
@@ -250,6 +280,10 @@ class MoonrakerAPIMock : public MoonrakerAPI {
   private:
     // Shared mock state for coordination with MoonrakerClientMock
     std::shared_ptr<MockPrinterState> mock_state_;
+
+    // Mock power device states (for toggle testing)
+    std::map<std::string, bool> mock_power_states_;
+
     /**
      * @brief Find test file using fallback path search
      *

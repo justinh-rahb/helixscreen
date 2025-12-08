@@ -23,11 +23,11 @@ This document tracks the implementation status of all features identified in the
 
 | Category | Complete | In Progress | Stub | Not Started | Total |
 |----------|----------|-------------|------|-------------|-------|
-| CRITICAL (Tier 1) | 0 | 0 | 0 | 7 | 7 |
-| HIGH (Tier 2) | 0 | 0 | 0 | 7 | 7 |
+| CRITICAL (Tier 1) | 2 | 1 | 4 | 0 | 7 |
+| HIGH (Tier 2) | 1 | 0 | 1 | 5 | 7 |
 | MEDIUM (Tier 3) | 0 | 0 | 0 | 7 | 7 |
 | DIFFERENTIATOR (Tier 4) | 0 | 0 | 0 | 5 | 5 |
-| **TOTAL** | **0** | **0** | **0** | **26** | **26** |
+| **TOTAL** | **3** | **1** | **5** | **17** | **26** |
 
 ---
 
@@ -38,12 +38,12 @@ These features ALL major competitors have. Required for feature parity.
 | Feature | Status | Files | Notes |
 |---------|--------|-------|-------|
 | **Temperature Presets** | ⬜ | - | PLA/PETG/ABS/etc preset buttons |
-| **Macro Panel** | ⬜ | - | List/execute Klipper macros |
-| **Console Panel** | ⬜ | - | G-code console with keyboard |
-| **Screws Tilt Adjust** | ⬜ | - | Visual bed leveling with rotation indicators |
-| **Camera/Webcam** | ⬜ | - | MJPEG viewer, Crowsnest integration |
-| **Print History** | ⬜ | - | Past jobs list, statistics |
-| **Power Device Control** | ⬜ | - | Moonraker power devices on/off |
+| **Macro Panel** | 🚧 | `ui_xml/macro_panel.xml` | Stub with Coming Soon overlay |
+| **Console Panel** | 🚧 | `ui_xml/console_panel.xml` | Stub with Coming Soon overlay |
+| **Screws Tilt Adjust** | 🚧 | `ui_xml/screws_tilt_panel.xml` | Stub with Coming Soon overlay |
+| **Camera/Webcam** | 🚧 | `ui_xml/camera_panel.xml` | Stub with Coming Soon overlay |
+| **Print History** | 🟡 | `ui_xml/history_panel.xml` | **IN PROGRESS** in `helixscreen-print-history` worktree |
+| **Power Device Control** | ✅ | `ui_xml/power_panel.xml`, `src/ui_panel_power.cpp` | Complete - polished with XML components, friendly names, empty state |
 
 ### Detailed Status
 
@@ -175,22 +175,29 @@ These features ALL major competitors have. Required for feature parity.
   - [ ] Delete entries
 
 #### Power Device Control
-- **Status:** ⬜ Not Started
+- **Status:** ✅ Complete
 - **Priority:** HIGH
 - **Complexity:** LOW
 - **Depends On:** Power devices configured in Moonraker
-- **Files to Create:**
-  - [ ] `ui_xml/power_panel.xml`
-  - [ ] `ui_xml/power_device_row.xml`
-  - [ ] `include/ui_panel_power.h`
-  - [ ] `src/ui_panel_power.cpp`
+- **Files Created:**
+  - [x] `ui_xml/power_panel.xml`
+  - [x] `ui_xml/power_device_row.xml`
+  - [x] `include/ui_panel_power.h`
+  - [x] `src/ui_panel_power.cpp`
 - **API:** `/machine/device_power/devices`, `/machine/device_power/device`
 - **Checklist:**
-  - [ ] List all power devices
-  - [ ] On/Off/Toggle controls
-  - [ ] Status indicators
-  - [ ] Lock critical devices during print
-  - [ ] Quick access from home
+  - [x] List all power devices
+  - [x] On/Off/Toggle controls
+  - [x] Status indicators
+  - [x] Lock critical devices during print (with lock icon + status text)
+  - [ ] Quick access from home (optional, not implemented)
+- **UI Polish (Stages 1-4 complete):**
+  - [x] Design tokens (no hardcoded values)
+  - [x] Reusable XML component (`power_device_row.xml`)
+  - [x] Lock indicator with explanation text
+  - [x] Empty state UI with icon + guidance
+  - [x] Friendly device names (prettify heuristic)
+  - [x] Responsive `ui_switch` component
 
 ---
 
@@ -200,13 +207,13 @@ Most competitors have these. Should implement for competitive parity.
 
 | Feature | Status | Files | Notes |
 |---------|--------|-------|-------|
-| **Input Shaper Panel** | ⬜ | - | Resonance calibration UI |
+| **Input Shaper Panel** | 🚧 | `ui_xml/input_shaper_panel.xml` | Stub with Coming Soon overlay |
 | **Firmware Retraction** | ⬜ | - | View/adjust retraction settings |
 | **Spoolman Integration** | ⬜ | - | Filament tracking, QR scanner |
 | **Job Queue** | ⬜ | - | Batch printing queue |
 | **Update Manager** | ⬜ | - | Software updates |
 | **Timelapse Controls** | ⬜ | - | Moonraker-timelapse settings |
-| **Layer Display** | ⬜ | - | Current/total layer on print status |
+| **Layer Display** | ✅ | `ui_xml/print_status_panel.xml:46` | Already implemented in print_status_panel |
 
 ### Detailed Status
 
@@ -324,10 +331,10 @@ NO competitor does these well. Opportunity to lead.
 
 | Item | Status | Notes |
 |------|--------|-------|
-| **Coming Soon Component** | ⬜ | Reusable overlay for stubs |
+| **Coming Soon Component** | ✅ | `ui_xml/coming_soon_overlay.xml` - Complete |
 | **Nav Bar Updates** | ⬜ | Icons for new panels |
 | **Settings Reorganization** | ⬜ | Group new settings |
-| **Moonraker API Additions** | ⬜ | ~25 new endpoints |
+| **Moonraker API Additions** | 🟡 | ~25 new endpoints (Power API ✅ complete) |
 
 ---
 
@@ -409,8 +416,8 @@ ui_xml/
 ├── camera_pip.xml               [ ] Created  [ ] Tested
 ├── history_panel.xml            [ ] Created  [ ] Tested
 ├── history_item.xml             [ ] Created  [ ] Tested
-├── power_panel.xml              [ ] Created  [ ] Tested
-├── power_device_row.xml         [ ] Created  [ ] Tested
+├── power_panel.xml              [x] Created  [x] Tested
+├── power_device_row.xml         [x] Created  [x] Tested
 ├── input_shaper_panel.xml       [ ] Created  [ ] Tested
 ├── retraction_panel.xml         [ ] Created  [ ] Tested
 ├── spoolman_panel.xml           [ ] Created  [ ] Tested
@@ -426,7 +433,7 @@ include/
 ├── ui_panel_camera.h            [ ] Created  [ ] Tested
 ├── webcam_client.h              [ ] Created  [ ] Tested
 ├── ui_panel_history.h           [ ] Created  [ ] Tested
-├── ui_panel_power.h             [ ] Created  [ ] Tested
+├── ui_panel_power.h             [x] Created  [x] Tested
 ├── ui_panel_input_shaper.h      [ ] Created  [ ] Tested
 ├── ui_panel_retraction.h        [ ] Created  [ ] Tested
 ├── spoolman_client.h            [ ] Created  [ ] Tested
@@ -441,7 +448,7 @@ src/
 ├── ui_panel_camera.cpp          [ ] Created  [ ] Tested
 ├── webcam_client.cpp            [ ] Created  [ ] Tested
 ├── ui_panel_history.cpp         [ ] Created  [ ] Tested
-├── ui_panel_power.cpp           [ ] Created  [ ] Tested
+├── ui_panel_power.cpp           [x] Created  [x] Tested
 ├── ui_panel_input_shaper.cpp    [ ] Created  [ ] Tested
 ├── ui_panel_retraction.cpp      [ ] Created  [ ] Tested
 ├── spoolman_client.cpp          [ ] Created  [ ] Tested
@@ -461,12 +468,14 @@ ui_xml/
 └── home_panel.xml               [ ] Updated (quick access)
 
 include/
-├── moonraker_api.h              [ ] Updated (~25 new methods)
+├── moonraker_api.h              [x] Updated (Power API: get_power_devices, set_device_power)
+├── moonraker_api_mock.h         [x] Updated (Power API mock methods)
 └── moonraker_client.h           [ ] Updated (new subscriptions)
 
 src/
-├── main.cpp                     [ ] Updated (panel registration)
-├── moonraker_api.cpp            [ ] Updated (~25 new methods)
+├── main.cpp                     [x] Updated (power panel registration, power_device_row component)
+├── moonraker_api.cpp            [x] Updated (Power API implementation)
+├── moonraker_api_mock.cpp       [x] Updated (Power API mock with MOCK_EMPTY_POWER)
 └── ui_panel_print_status.cpp    [ ] Updated (layer display)
 
 config/
@@ -478,6 +487,49 @@ config/
 ## Session Notes
 
 Use this section to track progress across sessions.
+
+### Session 3 (2025-12-08)
+- **Goal:** Power Device Control implementation
+- **Completed:**
+  - Power Device Control panel functionally complete
+  - Added `get_power_devices()` and `set_device_power()` to MoonrakerAPI
+  - Created `ui_panel_power.h/cpp` with dynamic device row creation
+  - Updated `power_panel.xml` with functional layout
+  - Added mock power device support to MoonrakerAPIMock (4 test devices)
+  - Registered panel in `main.cpp` with `-p power` CLI option
+- **UI Review Findings:** 5 critical, 4 major issues identified
+  - Touch targets too small (26px vs 48px minimum)
+  - Hardcoded pixel values instead of design tokens
+  - No empty state UI, no lock indicator
+  - Created `POWER_PANEL_POLISH_PLAN.md` with 6-stage fix plan
+- **Status:** Power panel needs UI polish before marking complete
+
+### Session 4 (2025-12-08)
+- **Goal:** Power Panel UI Polish (Stages 1-4)
+- **Completed:**
+  - Fixed blue background bug (`ui_theme_parse_color` vs `ui_theme_get_color`)
+  - Created `power_device_row.xml` reusable XML component
+  - Replaced manual C++ widget creation with `lv_xml_create()` pattern
+  - Used existing `ui_switch` component with responsive `size="medium"`
+  - Added `prettify_device_name()` heuristic for friendly labels
+  - Added lock icon + "Locked during print" status for locked devices
+  - Added empty state UI with icon, heading, guidance text
+  - Added `MOCK_EMPTY_POWER=1` env var for testing empty state
+- **Key Fixes:**
+  - Violated Rule 12 (XML event_cb) - refactored to proper pattern
+  - Violated Rule 1 (design tokens) - removed all hardcoded values
+  - Toggle switches now use `ui_switch` instead of raw `lv_switch`
+- **Status:** Power Panel marked complete (Stages 5-6 optional)
+- **Next:** Error feedback enhancement (Stage 5) is optional polish
+
+### Session 2 (2025-12-08)
+- **Goal:** Infrastructure setup
+- **Completed:**
+  - Created `coming_soon_overlay.xml` component
+  - Created 7 panel stubs with Coming Soon overlays
+  - Fixed worktree build issues (ccache, submodules)
+  - Added `scripts/init-worktree.sh`
+- **Reference:** See FEATURE_PARITY_HANDOFF.md for details
 
 ### Session 1 (2025-12-08)
 - **Goal:** Research and documentation

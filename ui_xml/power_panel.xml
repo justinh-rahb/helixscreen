@@ -4,28 +4,32 @@
 <!--
   Power Panel - Moonraker power device control
 
-  Features (planned):
+  Features:
   - List all configured power devices
-  - On/Off/Toggle controls for each device
+  - On/Off toggle controls for each device
   - Status indicators (on/off/locked)
   - Lock critical devices during print
-  - Quick access from home screen
 
   Moonraker API:
   - GET /machine/device_power/devices
-  - GET /machine/device_power/device?device=<name>
   - POST /machine/device_power/device (action: on/off/toggle)
-
-  Status: STUB - Coming Soon
-  See: docs/FEATURE_STATUS.md for implementation progress
 -->
 <component>
   <view extends="lv_obj" name="power_panel" width="#overlay_panel_width" height="100%" align="right_mid" style_border_width="0" style_pad_all="0" style_bg_opa="255" style_bg_color="#card_bg" scrollable="false" flex_flow="column">
     <!-- Header Bar -->
     <header_bar name="overlay_header" title="Power Control"/>
-    <!-- Content Area with Coming Soon Overlay -->
-    <lv_obj name="panel_content" flex_grow="1" width="100%" style_bg_opa="0" style_border_width="0" scrollable="false">
-      <coming_soon_overlay feature_name="Power Control" feature_description="Control your Moonraker power devices. Turn printers, lights, and accessories on/off from the touchscreen." icon_name="power-plug"/>
+    <!-- Content Area -->
+    <lv_obj name="overlay_content" flex_grow="1" width="100%" style_bg_opa="0" style_pad_all="#space_lg" style_border_width="0" flex_flow="column" style_pad_gap="#space_md" scrollable="false">
+      <!-- Scrollable device list container -->
+      <lv_obj name="device_list" width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="true" scroll_dir="ver" flex_flow="column" style_pad_gap="#space_sm"/>
+      <!-- Empty state (shown when no devices configured) -->
+      <lv_obj name="empty_state" width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_md" hidden="true" scrollable="false">
+        <icon src="power_plug" size="xl" variant="secondary"/>
+        <text_heading text="No Power Devices" style_text_color="#text_secondary" style_text_align="center"/>
+        <text_body text="Configure devices in Moonraker" style_text_color="#text_secondary" style_text_align="center"/>
+      </lv_obj>
+      <!-- Status message at bottom -->
+      <text_small name="status_message" bind_text="power_status" text="" width="100%" style_text_align="center" style_text_color="#text_secondary"/>
     </lv_obj>
   </view>
 </component>

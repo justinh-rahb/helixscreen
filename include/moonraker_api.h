@@ -379,6 +379,43 @@ class MoonrakerAPI {
     void set_led_off(const std::string& led, SuccessCallback on_success, ErrorCallback on_error);
 
     // ========================================================================
+    // Power Device Control Operations
+    // ========================================================================
+
+    /**
+     * @brief Power device information
+     */
+    struct PowerDevice {
+        std::string device;                 ///< Device name (e.g., "printer", "led_strip")
+        std::string type;                   ///< Device type (e.g., "gpio", "klipper_device")
+        std::string status;                 ///< Current status ("on", "off", "error")
+        bool locked_while_printing = false; ///< Cannot be toggled during prints
+    };
+
+    using PowerDevicesCallback = std::function<void(const std::vector<PowerDevice>&)>;
+
+    /**
+     * @brief Get list of all configured power devices
+     *
+     * Queries Moonraker's /machine/device_power/devices endpoint
+     *
+     * @param on_success Callback with list of power devices
+     * @param on_error Error callback
+     */
+    virtual void get_power_devices(PowerDevicesCallback on_success, ErrorCallback on_error);
+
+    /**
+     * @brief Set power device state
+     *
+     * @param device Device name
+     * @param action Action to perform ("on", "off", "toggle")
+     * @param on_success Success callback
+     * @param on_error Error callback
+     */
+    virtual void set_device_power(const std::string& device, const std::string& action,
+                                  SuccessCallback on_success, ErrorCallback on_error);
+
+    // ========================================================================
     // System Control Operations
     // ========================================================================
 

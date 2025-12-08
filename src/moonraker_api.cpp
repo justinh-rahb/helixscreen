@@ -847,6 +847,170 @@ void MoonrakerAPI::set_led_off(const std::string& led, SuccessCallback on_succes
 }
 
 // ============================================================================
+// Power Device Control Operations
+// ============================================================================
+
+void MoonrakerAPI::get_power_devices(PowerDevicesCallback on_success, ErrorCallback on_error) {
+    if (http_base_url_.empty()) {
+        spdlog::error("[Moonraker API] HTTP base URL not configured for power devices");
+        if (on_error) {
+            MoonrakerError err;
+            err.type = MoonrakerErrorType::CONNECTION_LOST;
+            err.message = "Not connected to Moonraker";
+            err.method = "get_power_devices";
+            on_error(err);
+        }
+        return;
+    }
+
+    std::string url = http_base_url_ + "/machine/device_power/devices";
+    spdlog::debug("[Moonraker API] Fetching power devices from: {}", url);
+
+    launch_http_thread([url, on_success, on_error]() {
+        auto resp = requests::get(url.c_str());
+
+        if (!resp) {
+            spdlog::error("[Moonraker API] HTTP request failed for power devices");
+            if (on_error) {
+                MoonrakerError err;
+                err.type = MoonrakerErrorType::CONNECTION_LOST;
+                err.message = "HTTP request failed";
+                err.method = "get_power_devices";
+                on_error(err);
+            }
+            return;
+        }
+
+        if (resp->status_code != 200) {
+            spdlog::error("[Moonraker API] Power devices request failed: HTTP {}",
+                          static_cast<int>(resp->status_code));
+            if (on_error) {
+                MoonrakerError err;
+                err.type = MoonrakerErrorType::UNKNOWN;
+                err.code = static_cast<int>(resp->status_code);
+                err.message = "HTTP " + std::to_string(static_cast<int>(resp->status_code));
+                err.method = "get_power_devices";
+                on_error(err);
+            }
+            return;
+        }
+
+        // Parse JSON response
+        try {
+            json j = json::parse(resp->body);
+            std::vector<MoonrakerAPI::PowerDevice> devices;
+
+            if (j.contains("result") && j["result"].contains("devices")) {
+                for (const auto& [name, info] : j["result"]["devices"].items()) {
+                    MoonrakerAPI::PowerDevice dev;
+                    dev.device = name;
+                    dev.type = info.value("type", "unknown");
+                    dev.status = info.value("status", "off");
+                    dev.locked_while_printing = info.value("locked_while_printing", false);
+                    devices.push_back(dev);
+                }
+            }
+
+            spdlog::info("[Moonraker API] Found {} power devices", devices.size());
+            if (on_success) {
+                on_success(devices);
+            }
+        } catch (const std::exception& e) {
+            spdlog::error("[Moonraker API] Failed to parse power devices: {}", e.what());
+            if (on_error) {
+                MoonrakerError err;
+                err.type = MoonrakerErrorType::UNKNOWN;
+                err.message = e.what();
+                err.method = "get_power_devices";
+                on_error(err);
+            }
+        }
+    });
+}
+
+void MoonrakerAPI::set_device_power(const std::string& device, const std::string& action,
+                                    SuccessCallback on_success, ErrorCallback on_error) {
+    // Validate device name
+    if (!is_safe_identifier(device)) {
+        spdlog::error("[Moonraker API] Invalid device name: {}", device);
+        if (on_error) {
+            MoonrakerError err;
+            err.type = MoonrakerErrorType::VALIDATION_ERROR;
+            err.message = "Invalid device name";
+            err.method = "set_device_power";
+            on_error(err);
+        }
+        return;
+    }
+
+    // Validate action
+    if (action != "on" && action != "off" && action != "toggle") {
+        spdlog::error("[Moonraker API] Invalid power action: {}", action);
+        if (on_error) {
+            MoonrakerError err;
+            err.type = MoonrakerErrorType::VALIDATION_ERROR;
+            err.message = "Invalid action (must be on, off, or toggle)";
+            err.method = "set_device_power";
+            on_error(err);
+        }
+        return;
+    }
+
+    if (http_base_url_.empty()) {
+        spdlog::error("[Moonraker API] HTTP base URL not configured for power device control");
+        if (on_error) {
+            MoonrakerError err;
+            err.type = MoonrakerErrorType::CONNECTION_LOST;
+            err.message = "Not connected to Moonraker";
+            err.method = "set_device_power";
+            on_error(err);
+        }
+        return;
+    }
+
+    // Build URL with query params
+    std::string url =
+        http_base_url_ + "/machine/device_power/device?device=" + device + "&action=" + action;
+
+    spdlog::info("[Moonraker API] Setting power device '{}' to '{}'", device, action);
+
+    launch_http_thread([url, device, action, on_success, on_error]() {
+        auto resp = requests::post(url.c_str(), "");
+
+        if (!resp) {
+            spdlog::error("[Moonraker API] HTTP request failed for power device");
+            if (on_error) {
+                MoonrakerError err;
+                err.type = MoonrakerErrorType::CONNECTION_LOST;
+                err.message = "HTTP request failed";
+                err.method = "set_device_power";
+                on_error(err);
+            }
+            return;
+        }
+
+        if (resp->status_code != 200) {
+            spdlog::error("[Moonraker API] Power device command failed: HTTP {}",
+                          static_cast<int>(resp->status_code));
+            if (on_error) {
+                MoonrakerError err;
+                err.type = MoonrakerErrorType::UNKNOWN;
+                err.code = static_cast<int>(resp->status_code);
+                err.message = "HTTP " + std::to_string(static_cast<int>(resp->status_code));
+                err.method = "set_device_power";
+                on_error(err);
+            }
+            return;
+        }
+
+        spdlog::info("[Moonraker API] Power device '{}' set to '{}' successfully", device, action);
+        if (on_success) {
+            on_success();
+        }
+    });
+}
+
+// ============================================================================
 // System Control Operations
 // ============================================================================
 
