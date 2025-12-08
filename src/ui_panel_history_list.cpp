@@ -31,7 +31,16 @@ HistoryListPanel& get_global_history_list_panel() {
 
 void init_global_history_list_panel(PrinterState& printer_state, MoonrakerAPI* api) {
     g_history_list_panel = std::make_unique<HistoryListPanel>(printer_state, api);
-    spdlog::debug("[History List] Global instance initialized");
+
+    // Register XML event callbacks (must be done BEFORE XML is created)
+    lv_xml_register_event_cb(nullptr, "history_search_changed",
+                             HistoryListPanel::on_search_changed_static);
+    lv_xml_register_event_cb(nullptr, "history_filter_status_changed",
+                             HistoryListPanel::on_status_filter_changed_static);
+    lv_xml_register_event_cb(nullptr, "history_sort_changed",
+                             HistoryListPanel::on_sort_changed_static);
+
+    spdlog::debug("[History List] Global instance and event callbacks initialized");
 }
 
 // ============================================================================
@@ -91,11 +100,8 @@ void HistoryListPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
         lv_obj_set_style_text_font(sort_dropdown_, icon_font, LV_PART_INDICATOR);
     }
 
-    // Register XML event callbacks for filter controls
-    lv_xml_register_event_cb(nullptr, "history_search_changed", on_search_changed_static);
-    lv_xml_register_event_cb(nullptr, "history_filter_status_changed",
-                             on_status_filter_changed_static);
-    lv_xml_register_event_cb(nullptr, "history_sort_changed", on_sort_changed_static);
+    // Note: XML event callbacks are registered in init_global_history_list_panel()
+    // BEFORE the XML is created - that's when lv_xml_register_event_cb must be called
 
     // Wire up back button to navigation system
     ui_panel_setup_back_button(panel_);

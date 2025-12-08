@@ -137,6 +137,26 @@ class HistoryListPanel : public PanelBase {
      */
     void refresh_from_api();
 
+    //
+    // === Static Event Callbacks (public for XML registration) ===
+    //
+
+    /**
+     * @brief Static callback for search text changes
+     * @note Registered with lv_xml_register_event_cb() in init_global_history_list_panel()
+     */
+    static void on_search_changed_static(lv_event_t* e);
+
+    /**
+     * @brief Static callback for status filter dropdown changes
+     */
+    static void on_status_filter_changed_static(lv_event_t* e);
+
+    /**
+     * @brief Static callback for sort dropdown changes
+     */
+    static void on_sort_changed_static(lv_event_t* e);
+
   private:
     //
     // === Widget References ===
@@ -295,10 +315,7 @@ class HistoryListPanel : public PanelBase {
      */
     void on_sort_changed(int index);
 
-    // Static callback wrappers
-    static void on_search_changed_static(lv_event_t* e);
-    static void on_status_filter_changed_static(lv_event_t* e);
-    static void on_sort_changed_static(lv_event_t* e);
+    // Search timer callback (private - not used for XML registration)
     static void on_search_timer_static(lv_timer_t* timer);
 };
 
