@@ -26,6 +26,7 @@
 #include "ui_fonts.h"
 
 #include "bed_mesh_coordinate_transform.h"
+#include "bed_mesh_geometry.h"
 #include "bed_mesh_gradient.h"
 #include "bed_mesh_internal.h"
 #include "bed_mesh_overlays.h"
@@ -59,9 +60,6 @@ constexpr double INITIAL_FOV_SCALE = 150.0;    // Starting point for auto-scale 
 const lv_color_t CANVAS_BG_COLOR = lv_color_make(40, 40, 40); // Dark gray background
 
 // ========== Geometry & Visibility Constants (Phase 1 refactoring) ==========
-// Visibility margin for partially visible geometry
-constexpr int VISIBILITY_MARGIN_PX = 10;
-
 // Wall height factor (Mainsail-style: extends to 2x the mesh Z range above z_min)
 constexpr double WALL_HEIGHT_FACTOR = 2.0;
 
@@ -82,8 +80,6 @@ static void compute_projected_mesh_bounds(const bed_mesh_renderer_t* renderer, i
 static void compute_centering_offset(int mesh_min_x, int mesh_max_x, int mesh_min_y, int mesh_max_y,
                                      int layer_offset_x, int layer_offset_y, int canvas_width,
                                      int canvas_height, int* out_offset_x, int* out_offset_y);
-static void generate_mesh_quads(bed_mesh_renderer_t* renderer);
-static void sort_quads_by_depth(std::vector<bed_mesh_quad_3d_t>& quads);
 static void render_quad(lv_layer_t* layer, const bed_mesh_quad_3d_t& quad, bool use_gradient);
 
 // ============================================================================
@@ -229,7 +225,7 @@ bool bed_mesh_renderer_set_mesh_data(bed_mesh_renderer_t* renderer, const float*
     // Previously regenerated every frame (wasteful!) - now only on data change
     spdlog::debug("[MESH_DATA] Initial quad generation with z_scale={:.2f}",
                   renderer->view_state.z_scale);
-    generate_mesh_quads(renderer);
+    helix::mesh::generate_mesh_quads(renderer);
     spdlog::debug("Pre-generated {} quads from mesh data", renderer->quads.size());
 
     // State transition: UNINITIALIZED or READY_TO_RENDER → MESH_LOADED
@@ -340,7 +336,7 @@ void bed_mesh_renderer_set_z_scale(bed_mesh_renderer_t* renderer, double z_scale
 
     // Z-scale affects quad vertex Z coordinates - regenerate if changed
     if (changed && renderer->has_mesh_data) {
-        generate_mesh_quads(renderer);
+        helix::mesh::generate_mesh_quads(renderer);
         spdlog::debug("Regenerated quads due to z_scale change to {:.2f}", z_scale);
 
         // State transition: READY_TO_RENDER → MESH_LOADED (quads regenerated, projections invalid)
@@ -378,7 +374,7 @@ void bed_mesh_renderer_set_color_range(bed_mesh_renderer_t* renderer, double min
 
     // Color range affects quad vertex colors - regenerate if changed
     if (changed && renderer->has_mesh_data) {
-        generate_mesh_quads(renderer);
+        helix::mesh::generate_mesh_quads(renderer);
         spdlog::debug("Regenerated quads due to color range change");
 
         // State transition: READY_TO_RENDER → MESH_LOADED (quads regenerated, projections invalid)
@@ -407,7 +403,7 @@ void bed_mesh_renderer_auto_color_range(bed_mesh_renderer_t* renderer) {
 
         // Regenerate quads if color range changed
         if (changed) {
-            generate_mesh_quads(renderer);
+            helix::mesh::generate_mesh_quads(renderer);
             spdlog::debug("Regenerated quads due to auto color range change");
 
             // State transition: READY_TO_RENDER → MESH_LOADED (quads regenerated, projections
@@ -505,7 +501,7 @@ bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer, 
         spdlog::debug("[Z_SCALE] Changing z_scale from {:.2f} to {:.2f} (z_range={:.4f})",
                       renderer->view_state.z_scale, new_z_scale, z_range);
         renderer->view_state.z_scale = new_z_scale;
-        generate_mesh_quads(renderer);
+        helix::mesh::generate_mesh_quads(renderer);
         spdlog::debug("Regenerated quads due to dynamic z_scale change to {:.2f}", new_z_scale);
     } else {
         spdlog::debug("[Z_SCALE] Keeping z_scale at {:.2f} (z_range={:.4f})",
@@ -615,7 +611,7 @@ bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer, 
     auto t_project = std::chrono::high_resolution_clock::now();
 
     // Sort quads by depth using cached avg_depth (painter's algorithm - furthest first)
-    sort_quads_by_depth(renderer->quads);
+    helix::mesh::sort_quads_by_depth(renderer->quads);
     auto t_sort = std::chrono::high_resolution_clock::now();
 
     spdlog::trace("Rendering {} quads with {} mode", renderer->quads.size(),
@@ -978,174 +974,6 @@ static void compute_centering_offset(int mesh_min_x, int mesh_max_x, int mesh_mi
     spdlog::debug("[CENTERING] Mesh center: ({},{}) -> Canvas center: ({},{}) = offset ({},{})",
                   mesh_center_x, mesh_center_y, canvas_center_x, canvas_center_y, *out_offset_x,
                   *out_offset_y);
-}
-
-static void generate_mesh_quads(bed_mesh_renderer_t* renderer) {
-    if (!renderer || !renderer->has_mesh_data) {
-        return;
-    }
-
-    renderer->quads.clear();
-
-    // Pre-allocate capacity to avoid reallocations during generation
-    // Number of quads = (rows-1) × (cols-1)
-    int expected_quads = (renderer->rows - 1) * (renderer->cols - 1);
-    renderer->quads.reserve(static_cast<size_t>(expected_quads));
-
-    // Use cached z_center (computed once in compute_mesh_bounds)
-
-    // Generate quads for each mesh cell
-    for (int row = 0; row < renderer->rows - 1; row++) {
-        for (int col = 0; col < renderer->cols - 1; col++) {
-            bed_mesh_quad_3d_t quad;
-
-            // Compute base X,Y positions
-            double base_x_0, base_x_1, base_y_0, base_y_1;
-
-            if (renderer->geometry_computed) {
-                // Mainsail-style: Position mesh within bed using mesh_area bounds
-                // Interpolate printer coordinates from mesh indices
-                double cols_minus_1 = static_cast<double>(renderer->cols - 1);
-                double rows_minus_1 = static_cast<double>(renderer->rows - 1);
-
-                double printer_x0 =
-                    renderer->mesh_area_min_x +
-                    col / cols_minus_1 * (renderer->mesh_area_max_x - renderer->mesh_area_min_x);
-                double printer_x1 = renderer->mesh_area_min_x +
-                                    (col + 1) / cols_minus_1 *
-                                        (renderer->mesh_area_max_x - renderer->mesh_area_min_x);
-                double printer_y0 =
-                    renderer->mesh_area_min_y +
-                    row / rows_minus_1 * (renderer->mesh_area_max_y - renderer->mesh_area_min_y);
-                double printer_y1 = renderer->mesh_area_min_y +
-                                    (row + 1) / rows_minus_1 *
-                                        (renderer->mesh_area_max_y - renderer->mesh_area_min_y);
-
-                // Convert printer coordinates to world space
-                base_x_0 = helix::mesh::printer_x_to_world_x(printer_x0, renderer->bed_center_x,
-                                                             renderer->coord_scale);
-                base_x_1 = helix::mesh::printer_x_to_world_x(printer_x1, renderer->bed_center_x,
-                                                             renderer->coord_scale);
-                base_y_0 = helix::mesh::printer_y_to_world_y(printer_y0, renderer->bed_center_y,
-                                                             renderer->coord_scale);
-                base_y_1 = helix::mesh::printer_y_to_world_y(printer_y1, renderer->bed_center_y,
-                                                             renderer->coord_scale);
-            } else {
-                // Legacy: Index-based coordinates (centered around origin)
-                // Note: Y is inverted because mesh[0] = front edge
-                base_x_0 = helix::mesh::mesh_col_to_world_x(col, renderer->cols, BED_MESH_SCALE);
-                base_x_1 =
-                    helix::mesh::mesh_col_to_world_x(col + 1, renderer->cols, BED_MESH_SCALE);
-                base_y_0 = helix::mesh::mesh_row_to_world_y(row, renderer->rows, BED_MESH_SCALE);
-                base_y_1 =
-                    helix::mesh::mesh_row_to_world_y(row + 1, renderer->rows, BED_MESH_SCALE);
-            }
-
-            /**
-             * Quad vertex layout (view from above, looking down -Z axis):
-             *
-             *   mesh[row][col]         mesh[row][col+1]
-             *        [2]TL ──────────────── [3]TR
-             *         │                      │
-             *         │                      │
-             *         │       QUAD           │     ← One mesh cell
-             *         │     (row,col)        │
-             *         │                      │
-             *        [0]BL ──────────────── [1]BR
-             *   mesh[row+1][col]       mesh[row+1][col+1]
-             *
-             * Vertex indices: [0]=BL, [1]=BR, [2]=TL, [3]=TR
-             * Mesh mapping:   [0]=mesh[row+1][col], [1]=mesh[row+1][col+1],
-             *                 [2]=mesh[row][col],    [3]=mesh[row][col+1]
-             *
-             * Split into triangles for rasterization:
-             *   Triangle 1: [0]→[1]→[2] (BL→BR→TL, lower-right triangle)
-             *   Triangle 2: [1]→[3]→[2] (BR→TR→TL, upper-left triangle)
-             *
-             * Winding order: Counter-clockwise (CCW) for front-facing
-             */
-            quad.vertices[0].x = base_x_0;
-            quad.vertices[0].y = base_y_1;
-            quad.vertices[0].z = helix::mesh::mesh_z_to_world_z(
-                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col)],
-                renderer->cached_z_center, renderer->view_state.z_scale);
-            quad.vertices[0].color = bed_mesh_gradient_height_to_color(
-                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col)],
-                renderer->color_min_z, renderer->color_max_z);
-
-            quad.vertices[1].x = base_x_1;
-            quad.vertices[1].y = base_y_1;
-            quad.vertices[1].z = helix::mesh::mesh_z_to_world_z(
-                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col + 1)],
-                renderer->cached_z_center, renderer->view_state.z_scale);
-            quad.vertices[1].color = bed_mesh_gradient_height_to_color(
-                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col + 1)],
-                renderer->color_min_z, renderer->color_max_z);
-
-            quad.vertices[2].x = base_x_0;
-            quad.vertices[2].y = base_y_0;
-            quad.vertices[2].z = helix::mesh::mesh_z_to_world_z(
-                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col)],
-                renderer->cached_z_center, renderer->view_state.z_scale);
-            quad.vertices[2].color = bed_mesh_gradient_height_to_color(
-                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col)],
-                renderer->color_min_z, renderer->color_max_z);
-
-            quad.vertices[3].x = base_x_1;
-            quad.vertices[3].y = base_y_0;
-            quad.vertices[3].z = helix::mesh::mesh_z_to_world_z(
-                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col + 1)],
-                renderer->cached_z_center, renderer->view_state.z_scale);
-            quad.vertices[3].color = bed_mesh_gradient_height_to_color(
-                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col + 1)],
-                renderer->color_min_z, renderer->color_max_z);
-
-            // Compute center color for fast rendering
-            bed_mesh_rgb_t avg_color = {
-                static_cast<uint8_t>((quad.vertices[0].color.red + quad.vertices[1].color.red +
-                                      quad.vertices[2].color.red + quad.vertices[3].color.red) /
-                                     4),
-                static_cast<uint8_t>((quad.vertices[0].color.green + quad.vertices[1].color.green +
-                                      quad.vertices[2].color.green + quad.vertices[3].color.green) /
-                                     4),
-                static_cast<uint8_t>((quad.vertices[0].color.blue + quad.vertices[1].color.blue +
-                                      quad.vertices[2].color.blue + quad.vertices[3].color.blue) /
-                                     4)};
-            quad.center_color = lv_color_make(avg_color.r, avg_color.g, avg_color.b);
-
-            quad.avg_depth = 0.0; // Will be computed during projection
-
-            renderer->quads.push_back(quad);
-        }
-    }
-
-    // DEBUG: Log quad generation with z_scale used
-    spdlog::debug("[QUAD_GEN] Generated {} quads, z_scale={:.2f}, z_center={:.4f}",
-                  renderer->quads.size(), renderer->view_state.z_scale, renderer->cached_z_center);
-    // Log a sample quad to verify Z values
-    if (!renderer->quads.empty()) {
-        int center_row = (renderer->rows - 1) / 2;
-        int center_col = (renderer->cols - 1) / 2;
-        size_t center_quad_idx =
-            static_cast<size_t>(center_row * (renderer->cols - 1) + center_col);
-        if (center_quad_idx < renderer->quads.size()) {
-            const auto& q = renderer->quads[center_quad_idx];
-            spdlog::debug(
-                "[QUAD_GEN] Center quad[{}] TL world_z={:.2f}, from mesh_z={:.4f}", center_quad_idx,
-                q.vertices[2].z,
-                renderer->mesh[static_cast<size_t>(center_row)][static_cast<size_t>(center_col)]);
-        }
-    }
-    spdlog::trace("Generated {} quads from {}x{} mesh", renderer->quads.size(), renderer->rows,
-                  renderer->cols);
-}
-
-static void sort_quads_by_depth(std::vector<bed_mesh_quad_3d_t>& quads) {
-    std::sort(quads.begin(), quads.end(),
-              [](const bed_mesh_quad_3d_t& a, const bed_mesh_quad_3d_t& b) {
-                  // Descending order: furthest (largest depth) first
-                  return a.avg_depth > b.avg_depth;
-              });
 }
 
 // ============================================================================

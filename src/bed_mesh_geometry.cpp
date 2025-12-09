@@ -1,0 +1,206 @@
+// Copyright 2025 HelixScreen
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/*
+ * Copyright (C) 2025 356C LLC
+ * Author: Preston Brown <pbrown@brown-house.net>
+ *
+ * This file is part of HelixScreen.
+ *
+ * HelixScreen is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * HelixScreen is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with HelixScreen. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#include "bed_mesh_geometry.h"
+
+#include "bed_mesh_coordinate_transform.h"
+#include "bed_mesh_gradient.h"
+#include "bed_mesh_internal.h"
+
+#include <spdlog/spdlog.h>
+
+#include <algorithm>
+
+namespace helix {
+namespace mesh {
+
+void generate_mesh_quads(bed_mesh_renderer_t* renderer) {
+    if (!renderer || !renderer->has_mesh_data) {
+        return;
+    }
+
+    renderer->quads.clear();
+
+    // Pre-allocate capacity to avoid reallocations during generation
+    // Number of quads = (rows-1) × (cols-1)
+    int expected_quads = (renderer->rows - 1) * (renderer->cols - 1);
+    renderer->quads.reserve(static_cast<size_t>(expected_quads));
+
+    // Use cached z_center (computed once in compute_mesh_bounds)
+
+    // Generate quads for each mesh cell
+    for (int row = 0; row < renderer->rows - 1; row++) {
+        for (int col = 0; col < renderer->cols - 1; col++) {
+            bed_mesh_quad_3d_t quad;
+
+            // Compute base X,Y positions
+            double base_x_0, base_x_1, base_y_0, base_y_1;
+
+            if (renderer->geometry_computed) {
+                // Mainsail-style: Position mesh within bed using mesh_area bounds
+                // Interpolate printer coordinates from mesh indices
+                double cols_minus_1 = static_cast<double>(renderer->cols - 1);
+                double rows_minus_1 = static_cast<double>(renderer->rows - 1);
+
+                double printer_x0 =
+                    renderer->mesh_area_min_x +
+                    col / cols_minus_1 * (renderer->mesh_area_max_x - renderer->mesh_area_min_x);
+                double printer_x1 = renderer->mesh_area_min_x +
+                                    (col + 1) / cols_minus_1 *
+                                        (renderer->mesh_area_max_x - renderer->mesh_area_min_x);
+                double printer_y0 =
+                    renderer->mesh_area_min_y +
+                    row / rows_minus_1 * (renderer->mesh_area_max_y - renderer->mesh_area_min_y);
+                double printer_y1 = renderer->mesh_area_min_y +
+                                    (row + 1) / rows_minus_1 *
+                                        (renderer->mesh_area_max_y - renderer->mesh_area_min_y);
+
+                // Convert printer coordinates to world space
+                base_x_0 = helix::mesh::printer_x_to_world_x(printer_x0, renderer->bed_center_x,
+                                                             renderer->coord_scale);
+                base_x_1 = helix::mesh::printer_x_to_world_x(printer_x1, renderer->bed_center_x,
+                                                             renderer->coord_scale);
+                base_y_0 = helix::mesh::printer_y_to_world_y(printer_y0, renderer->bed_center_y,
+                                                             renderer->coord_scale);
+                base_y_1 = helix::mesh::printer_y_to_world_y(printer_y1, renderer->bed_center_y,
+                                                             renderer->coord_scale);
+            } else {
+                // Legacy: Index-based coordinates (centered around origin)
+                // Note: Y is inverted because mesh[0] = front edge
+                base_x_0 = helix::mesh::mesh_col_to_world_x(col, renderer->cols, BED_MESH_SCALE);
+                base_x_1 =
+                    helix::mesh::mesh_col_to_world_x(col + 1, renderer->cols, BED_MESH_SCALE);
+                base_y_0 = helix::mesh::mesh_row_to_world_y(row, renderer->rows, BED_MESH_SCALE);
+                base_y_1 =
+                    helix::mesh::mesh_row_to_world_y(row + 1, renderer->rows, BED_MESH_SCALE);
+            }
+
+            /**
+             * Quad vertex layout (view from above, looking down -Z axis):
+             *
+             *   mesh[row][col]         mesh[row][col+1]
+             *        [2]TL ──────────────── [3]TR
+             *         │                      │
+             *         │                      │
+             *         │       QUAD           │     ← One mesh cell
+             *         │     (row,col)        │
+             *         │                      │
+             *        [0]BL ──────────────── [1]BR
+             *   mesh[row+1][col]       mesh[row+1][col+1]
+             *
+             * Vertex indices: [0]=BL, [1]=BR, [2]=TL, [3]=TR
+             * Mesh mapping:   [0]=mesh[row+1][col], [1]=mesh[row+1][col+1],
+             *                 [2]=mesh[row][col],    [3]=mesh[row][col+1]
+             *
+             * Split into triangles for rasterization:
+             *   Triangle 1: [0]→[1]→[2] (BL→BR→TL, lower-right triangle)
+             *   Triangle 2: [1]→[3]→[2] (BR→TR→TL, upper-left triangle)
+             *
+             * Winding order: Counter-clockwise (CCW) for front-facing
+             */
+            quad.vertices[0].x = base_x_0;
+            quad.vertices[0].y = base_y_1;
+            quad.vertices[0].z = helix::mesh::mesh_z_to_world_z(
+                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col)],
+                renderer->cached_z_center, renderer->view_state.z_scale);
+            quad.vertices[0].color = bed_mesh_gradient_height_to_color(
+                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col)],
+                renderer->color_min_z, renderer->color_max_z);
+
+            quad.vertices[1].x = base_x_1;
+            quad.vertices[1].y = base_y_1;
+            quad.vertices[1].z = helix::mesh::mesh_z_to_world_z(
+                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col + 1)],
+                renderer->cached_z_center, renderer->view_state.z_scale);
+            quad.vertices[1].color = bed_mesh_gradient_height_to_color(
+                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col + 1)],
+                renderer->color_min_z, renderer->color_max_z);
+
+            quad.vertices[2].x = base_x_0;
+            quad.vertices[2].y = base_y_0;
+            quad.vertices[2].z = helix::mesh::mesh_z_to_world_z(
+                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col)],
+                renderer->cached_z_center, renderer->view_state.z_scale);
+            quad.vertices[2].color = bed_mesh_gradient_height_to_color(
+                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col)],
+                renderer->color_min_z, renderer->color_max_z);
+
+            quad.vertices[3].x = base_x_1;
+            quad.vertices[3].y = base_y_0;
+            quad.vertices[3].z = helix::mesh::mesh_z_to_world_z(
+                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col + 1)],
+                renderer->cached_z_center, renderer->view_state.z_scale);
+            quad.vertices[3].color = bed_mesh_gradient_height_to_color(
+                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col + 1)],
+                renderer->color_min_z, renderer->color_max_z);
+
+            // Compute center color for fast rendering
+            bed_mesh_rgb_t avg_color = {
+                static_cast<uint8_t>((quad.vertices[0].color.red + quad.vertices[1].color.red +
+                                      quad.vertices[2].color.red + quad.vertices[3].color.red) /
+                                     4),
+                static_cast<uint8_t>((quad.vertices[0].color.green + quad.vertices[1].color.green +
+                                      quad.vertices[2].color.green + quad.vertices[3].color.green) /
+                                     4),
+                static_cast<uint8_t>((quad.vertices[0].color.blue + quad.vertices[1].color.blue +
+                                      quad.vertices[2].color.blue + quad.vertices[3].color.blue) /
+                                     4)};
+            quad.center_color = lv_color_make(avg_color.r, avg_color.g, avg_color.b);
+
+            quad.avg_depth = 0.0; // Will be computed during projection
+
+            renderer->quads.push_back(quad);
+        }
+    }
+
+    // DEBUG: Log quad generation with z_scale used
+    spdlog::debug("[QUAD_GEN] Generated {} quads, z_scale={:.2f}, z_center={:.4f}",
+                  renderer->quads.size(), renderer->view_state.z_scale, renderer->cached_z_center);
+    // Log a sample quad to verify Z values
+    if (!renderer->quads.empty()) {
+        int center_row = (renderer->rows - 1) / 2;
+        int center_col = (renderer->cols - 1) / 2;
+        size_t center_quad_idx =
+            static_cast<size_t>(center_row * (renderer->cols - 1) + center_col);
+        if (center_quad_idx < renderer->quads.size()) {
+            const auto& q = renderer->quads[center_quad_idx];
+            spdlog::debug(
+                "[QUAD_GEN] Center quad[{}] TL world_z={:.2f}, from mesh_z={:.4f}", center_quad_idx,
+                q.vertices[2].z,
+                renderer->mesh[static_cast<size_t>(center_row)][static_cast<size_t>(center_col)]);
+        }
+    }
+    spdlog::trace("Generated {} quads from {}x{} mesh", renderer->quads.size(), renderer->rows,
+                  renderer->cols);
+}
+
+void sort_quads_by_depth(std::vector<bed_mesh_quad_3d_t>& quads) {
+    std::sort(quads.begin(), quads.end(),
+              [](const bed_mesh_quad_3d_t& a, const bed_mesh_quad_3d_t& b) {
+                  // Descending order: furthest (largest depth) first
+                  return a.avg_depth > b.avg_depth;
+              });
+}
+
+} // namespace mesh
+} // namespace helix
