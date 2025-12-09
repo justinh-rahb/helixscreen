@@ -334,6 +334,37 @@ class AmsBackend {
     virtual AmsError set_tool_mapping(int tool_number, int gate_index) = 0;
 
     // ========================================================================
+    // Bypass Mode Operations
+    // ========================================================================
+
+    /**
+     * @brief Enable bypass mode
+     *
+     * Activates bypass mode where an external spool feeds directly to the
+     * toolhead, bypassing the MMU/hub system. Sets current_gate to -2.
+     *
+     * Not all backends support bypass mode - check supports_bypass flag.
+     *
+     * @return AmsError indicating if bypass was enabled
+     */
+    virtual AmsError enable_bypass() = 0;
+
+    /**
+     * @brief Disable bypass mode
+     *
+     * Deactivates bypass mode. Filament should be unloaded from toolhead first.
+     *
+     * @return AmsError indicating if bypass was disabled
+     */
+    virtual AmsError disable_bypass() = 0;
+
+    /**
+     * @brief Check if bypass mode is currently active
+     * @return true if bypass is active (current_gate == -2)
+     */
+    [[nodiscard]] virtual bool is_bypass_active() const = 0;
+
+    // ========================================================================
     // Factory Method
     // ========================================================================
 

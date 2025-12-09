@@ -90,6 +90,11 @@ class AmsBackendMock : public AmsBackend {
     AmsError set_gate_info(int gate_index, const GateInfo& info) override;
     AmsError set_tool_mapping(int tool_number, int gate_index) override;
 
+    // Bypass mode
+    AmsError enable_bypass() override;
+    AmsError disable_bypass() override;
+    [[nodiscard]] bool is_bypass_active() const override;
+
     // ========================================================================
     // Mock-specific methods (for testing)
     // ========================================================================

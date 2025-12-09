@@ -75,6 +75,7 @@ void AmsState::init_subjects(bool register_xml) {
     lv_subject_init_int(&current_gate_, -1);
     lv_subject_init_int(&current_tool_, -1);
     lv_subject_init_int(&filament_loaded_, 0);
+    lv_subject_init_int(&bypass_active_, 0);
     lv_subject_init_int(&gate_count_, 0);
     lv_subject_init_int(&gates_version_, 0);
 
@@ -103,6 +104,7 @@ void AmsState::init_subjects(bool register_xml) {
         lv_xml_register_subject(NULL, "ams_current_gate", &current_gate_);
         lv_xml_register_subject(NULL, "ams_current_tool", &current_tool_);
         lv_xml_register_subject(NULL, "ams_filament_loaded", &filament_loaded_);
+        lv_xml_register_subject(NULL, "ams_bypass_active", &bypass_active_);
         lv_xml_register_subject(NULL, "ams_gate_count", &gate_count_);
         lv_xml_register_subject(NULL, "ams_gates_version", &gates_version_);
 
@@ -124,7 +126,7 @@ void AmsState::init_subjects(bool register_xml) {
         }
 
         spdlog::info(
-            "AmsState: Registered {} system subjects, {} path subjects, {} per-gate subjects", 8, 5,
+            "AmsState: Registered {} system subjects, {} path subjects, {} per-gate subjects", 9, 5,
             MAX_GATES * 2);
     }
 
@@ -196,6 +198,7 @@ void AmsState::sync_from_backend() {
     lv_subject_set_int(&current_gate_, info.current_gate);
     lv_subject_set_int(&current_tool_, info.current_tool);
     lv_subject_set_int(&filament_loaded_, info.filament_loaded ? 1 : 0);
+    lv_subject_set_int(&bypass_active_, info.current_gate == -2 ? 1 : 0);
     lv_subject_set_int(&gate_count_, info.total_gates);
 
     // Update action detail string

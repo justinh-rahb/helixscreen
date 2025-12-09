@@ -510,6 +510,63 @@ AmsError AmsBackendMock::set_tool_mapping(int tool_number, int gate_index) {
     return AmsErrorHelper::success();
 }
 
+AmsError AmsBackendMock::enable_bypass() {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (!running_) {
+            return AmsErrorHelper::not_connected("Mock backend not started");
+        }
+
+        if (!system_info_.supports_bypass) {
+            return AmsError(AmsResult::WRONG_STATE, "Bypass not supported",
+                            "This system does not support bypass mode", "");
+        }
+
+        if (system_info_.action != AmsAction::IDLE) {
+            return AmsErrorHelper::busy(ams_action_to_string(system_info_.action));
+        }
+
+        // Enable bypass mode: current_gate = -2 indicates bypass
+        system_info_.current_gate = -2;
+        system_info_.filament_loaded = true;
+        filament_segment_ = PathSegment::NOZZLE;
+        spdlog::info("AmsBackendMock: Bypass mode enabled");
+    }
+
+    emit_event(EVENT_STATE_CHANGED);
+    return AmsErrorHelper::success();
+}
+
+AmsError AmsBackendMock::disable_bypass() {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (!running_) {
+            return AmsErrorHelper::not_connected("Mock backend not started");
+        }
+
+        if (system_info_.current_gate != -2) {
+            return AmsError(AmsResult::WRONG_STATE, "Bypass not active",
+                            "Bypass mode is not currently active", "");
+        }
+
+        // Disable bypass mode
+        system_info_.current_gate = -1;
+        system_info_.filament_loaded = false;
+        filament_segment_ = PathSegment::NONE;
+        spdlog::info("AmsBackendMock: Bypass mode disabled");
+    }
+
+    emit_event(EVENT_STATE_CHANGED);
+    return AmsErrorHelper::success();
+}
+
+bool AmsBackendMock::is_bypass_active() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return system_info_.current_gate == -2;
+}
+
 void AmsBackendMock::simulate_error(AmsResult error) {
     {
         std::lock_guard<std::mutex> lock(mutex_);

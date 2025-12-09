@@ -1,0 +1,132 @@
+// Copyright 2025 HelixScreen
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/*
+ * Copyright (C) 2025 356C LLC
+ * Author: Preston Brown <pbrown@brown-house.net>
+ *
+ * This file is part of HelixScreen.
+ *
+ * HelixScreen is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * HelixScreen is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with HelixScreen. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#include "ams_backend_mock.h"
+
+#include "../catch_amalgamated.hpp"
+
+/**
+ * @file test_ams_backend_mock_bypass.cpp
+ * @brief Unit tests for AMS mock backend bypass mode functionality
+ *
+ * Tests the bypass mode feature which allows external spool feeding
+ * directly to the toolhead, bypassing the MMU/hub system.
+ */
+
+TEST_CASE("AmsBackendMock bypass mode", "[ams][mock][bypass]") {
+    AmsBackendMock backend(4);
+    backend.set_operation_delay(0); // Instant operations for tests
+    REQUIRE(backend.start());
+
+    SECTION("initially not in bypass mode") {
+        REQUIRE_FALSE(backend.is_bypass_active());
+        auto info = backend.get_system_info();
+        REQUIRE(info.current_gate != -2);
+    }
+
+    SECTION("enable bypass sets current_gate to -2") {
+        auto result = backend.enable_bypass();
+        REQUIRE(result);
+        REQUIRE(backend.is_bypass_active());
+
+        auto info = backend.get_system_info();
+        REQUIRE(info.current_gate == -2);
+        REQUIRE(info.filament_loaded == true);
+    }
+
+    SECTION("disable bypass clears current_gate") {
+        // First enable bypass
+        auto enable_result = backend.enable_bypass();
+        REQUIRE(enable_result);
+        REQUIRE(backend.is_bypass_active());
+
+        // Then disable
+        auto disable_result = backend.disable_bypass();
+        REQUIRE(disable_result);
+        REQUIRE_FALSE(backend.is_bypass_active());
+
+        auto info = backend.get_system_info();
+        REQUIRE(info.current_gate == -1);
+        REQUIRE(info.filament_loaded == false);
+    }
+
+    SECTION("disable bypass fails when not active") {
+        REQUIRE_FALSE(backend.is_bypass_active());
+        auto result = backend.disable_bypass();
+        REQUIRE_FALSE(result);
+    }
+
+    SECTION("enable bypass fails when busy") {
+        // Start a load operation
+        auto load_result = backend.load_filament(0);
+        REQUIRE(load_result);
+
+        // Try to enable bypass - should fail because busy
+        auto bypass_result = backend.enable_bypass();
+        REQUIRE_FALSE(bypass_result);
+
+        // Cancel operation
+        backend.cancel();
+    }
+
+    SECTION("get_filament_segment shows NOZZLE when bypass active") {
+        backend.enable_bypass();
+        REQUIRE(backend.get_filament_segment() == PathSegment::NOZZLE);
+    }
+
+    SECTION("supports_bypass flag is set") {
+        auto info = backend.get_system_info();
+        REQUIRE(info.supports_bypass == true);
+    }
+
+    backend.stop();
+}
+
+TEST_CASE("AmsBackendMock bypass events", "[ams][mock][bypass][events]") {
+    AmsBackendMock backend(4);
+    backend.set_operation_delay(0);
+
+    bool state_changed = false;
+    backend.set_event_callback([&](const std::string& event, const std::string&) {
+        if (event == AmsBackend::EVENT_STATE_CHANGED) {
+            state_changed = true;
+        }
+    });
+
+    REQUIRE(backend.start());
+    state_changed = false; // Reset after start event
+
+    SECTION("enable bypass emits state changed event") {
+        backend.enable_bypass();
+        REQUIRE(state_changed);
+    }
+
+    SECTION("disable bypass emits state changed event") {
+        backend.enable_bypass();
+        state_changed = false;
+        backend.disable_bypass();
+        REQUIRE(state_changed);
+    }
+
+    backend.stop();
+}

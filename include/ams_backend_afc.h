@@ -116,6 +116,11 @@ class AmsBackendAfc : public AmsBackend {
     AmsError set_gate_info(int gate_index, const GateInfo& info) override;
     AmsError set_tool_mapping(int tool_number, int gate_index) override;
 
+    // Bypass mode
+    AmsError enable_bypass() override;
+    AmsError disable_bypass() override;
+    [[nodiscard]] bool is_bypass_active() const override;
+
   protected:
     // Allow test helper access to private members
     friend class AmsBackendAfcTestHelper;
@@ -296,6 +301,7 @@ class AmsBackendAfc : public AmsBackend {
 
     // Global state
     bool error_state_{false};            ///< AFC error state
+    bool bypass_active_{false};          ///< Bypass mode active (external spool)
     std::string current_lane_name_;      ///< Currently active lane name
     std::vector<std::string> hub_names_; ///< Discovered hub names
 

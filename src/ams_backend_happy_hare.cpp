@@ -679,3 +679,52 @@ AmsError AmsBackendHappyHare::set_tool_mapping(int tool_number, int gate_index) 
     spdlog::info("[AMS HappyHare] Mapping T{} to gate {}", tool_number, gate_index);
     return execute_gcode(cmd.str());
 }
+
+// ============================================================================
+// Bypass Mode Operations
+// ============================================================================
+
+AmsError AmsBackendHappyHare::enable_bypass() {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        AmsError precondition = check_preconditions();
+        if (!precondition) {
+            return precondition;
+        }
+
+        if (!system_info_.supports_bypass) {
+            return AmsError(AmsResult::WRONG_STATE, "Bypass not supported",
+                            "This Happy Hare system does not support bypass mode", "");
+        }
+    }
+
+    // Happy Hare uses MMU_SELECT_BYPASS to select bypass
+    spdlog::info("[AMS HappyHare] Enabling bypass mode");
+    return execute_gcode("MMU_SELECT_BYPASS");
+}
+
+AmsError AmsBackendHappyHare::disable_bypass() {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (!running_) {
+            return AmsErrorHelper::not_connected("Happy Hare backend not started");
+        }
+
+        if (system_info_.current_gate != -2) {
+            return AmsError(AmsResult::WRONG_STATE, "Bypass not active",
+                            "Bypass mode is not currently active", "");
+        }
+    }
+
+    // To disable bypass, select a gate or unload
+    // MMU_SELECT GATE=0 or MMU_HOME will deselect bypass
+    spdlog::info("[AMS HappyHare] Disabling bypass mode (homing selector)");
+    return execute_gcode("MMU_HOME");
+}
+
+bool AmsBackendHappyHare::is_bypass_active() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return system_info_.current_gate == -2;
+}

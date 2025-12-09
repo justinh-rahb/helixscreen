@@ -49,7 +49,7 @@ AmsBackendAfc::AmsBackendAfc(MoonrakerAPI* api, MoonrakerClient* client)
     system_info_.supports_endless_spool = false;
     system_info_.supports_spoolman = true;
     system_info_.supports_tool_mapping = true;
-    system_info_.supports_bypass = false; // AFC typically doesn't have bypass
+    system_info_.supports_bypass = true; // AFC supports bypass via bypass_state
 
     spdlog::debug("[AMS AFC] Backend created");
 }
@@ -431,6 +431,17 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
             error_segment_ = compute_filament_segment_unlocked();
         } else {
             error_segment_ = PathSegment::NONE;
+        }
+    }
+
+    // Parse bypass state (AFC exposes this via printer.AFC.bypass_state)
+    // When bypass is active, current_gate = -2 (convention from Happy Hare)
+    if (afc_data.contains("bypass_state") && afc_data["bypass_state"].is_boolean()) {
+        bypass_active_ = afc_data["bypass_state"].get<bool>();
+        if (bypass_active_) {
+            system_info_.current_gate = -2; // -2 = bypass mode
+            system_info_.filament_loaded = true;
+            spdlog::trace("[AMS AFC] Bypass mode active");
         }
     }
 }
@@ -1104,4 +1115,53 @@ AmsError AmsBackendAfc::set_tool_mapping(int tool_number, int gate_index) {
     }
 
     return AmsErrorHelper::success();
+}
+
+// ============================================================================
+// Bypass Mode Operations
+// ============================================================================
+
+AmsError AmsBackendAfc::enable_bypass() {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        AmsError precondition = check_preconditions();
+        if (!precondition) {
+            return precondition;
+        }
+
+        if (!system_info_.supports_bypass) {
+            return AmsError(AmsResult::WRONG_STATE, "Bypass not supported",
+                            "This AFC system does not support bypass mode", "");
+        }
+    }
+
+    // AFC enables bypass via filament sensor control
+    // SET_FILAMENT_SENSOR SENSOR=bypass ENABLE=1
+    spdlog::info("[AMS AFC] Enabling bypass mode");
+    return execute_gcode("SET_FILAMENT_SENSOR SENSOR=bypass ENABLE=1");
+}
+
+AmsError AmsBackendAfc::disable_bypass() {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (!running_) {
+            return AmsErrorHelper::not_connected("AFC backend not started");
+        }
+
+        if (!bypass_active_) {
+            return AmsError(AmsResult::WRONG_STATE, "Bypass not active",
+                            "Bypass mode is not currently active", "");
+        }
+    }
+
+    // Disable bypass sensor
+    spdlog::info("[AMS AFC] Disabling bypass mode");
+    return execute_gcode("SET_FILAMENT_SENSOR SENSOR=bypass ENABLE=0");
+}
+
+bool AmsBackendAfc::is_bypass_active() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return bypass_active_;
 }

@@ -160,6 +160,18 @@ class AmsState {
     }
 
     /**
+     * @brief Get bypass active subject
+     *
+     * Bypass mode allows external spool to feed directly to toolhead,
+     * bypassing the MMU/hub system.
+     *
+     * @return Subject holding 0 (bypass inactive) or 1 (bypass active)
+     */
+    lv_subject_t* get_bypass_active_subject() {
+        return &bypass_active_;
+    }
+
+    /**
      * @brief Get gate count subject
      * @return Subject holding total number of gates
      */
@@ -303,6 +315,7 @@ class AmsState {
     lv_subject_t current_gate_;
     lv_subject_t current_tool_;
     lv_subject_t filament_loaded_;
+    lv_subject_t bypass_active_;
     lv_subject_t gate_count_;
     lv_subject_t gates_version_;
 
