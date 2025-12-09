@@ -38,7 +38,7 @@ These features ALL major competitors have. Required for feature parity.
 | Feature | Status | Files | Notes |
 |---------|--------|-------|-------|
 | **Temperature Presets** | ✅ | `nozzle_temp_panel.xml`, `bed_temp_panel.xml` | Off/PLA/PETG/ABS presets implemented |
-| **Macro Panel** | 🚧 | `ui_xml/macro_panel.xml` | Stub with Coming Soon overlay |
+| **Macro Panel** | ✅ | `ui_xml/macro_panel.xml`, `src/ui_panel_macros.cpp` | List & execute Klipper macros, prettified names, system macro filtering |
 | **Console Panel** | 🚧 | `ui_xml/console_panel.xml` | Stub with Coming Soon overlay |
 | **Screws Tilt Adjust** | 🚧 | `ui_xml/screws_tilt_panel.xml` | Stub with Coming Soon overlay |
 | **Camera/Webcam** | 🚧 | `ui_xml/camera_panel.xml` | Stub with Coming Soon overlay |
@@ -64,26 +64,27 @@ These features ALL major competitors have. Required for feature parity.
   - [ ] Persist in config (future enhancement)
 
 #### Macro Panel
-- **Status:** ⬜ Not Started
+- **Status:** ✅ Complete
 - **Priority:** CRITICAL
 - **Complexity:** MEDIUM
 - **Depends On:** None
-- **Files to Create:**
-  - [ ] `ui_xml/macro_panel.xml`
-  - [ ] `ui_xml/macro_card.xml`
-  - [ ] `include/ui_panel_macros.h`
-  - [ ] `src/ui_panel_macros.cpp`
-- **Files to Modify:**
-  - [ ] `ui_xml/navigation_bar.xml`
-  - [ ] `src/main.cpp`
-- **API:** `printer.objects.query` for `gcode_macro *`
+- **Files:**
+  - [x] `ui_xml/macro_panel.xml` - Panel layout with scrollable list, empty state
+  - [x] `ui_xml/macro_card.xml` - Reusable card component for each macro
+  - [x] `include/ui_panel_macros.h` - Panel class with prettify/danger detection
+  - [x] `src/ui_panel_macros.cpp` - Full implementation
+  - [x] `src/main.cpp` - Registration and CLI support
+- **API:** Uses `PrinterCapabilities::macros()` populated from `printer.objects.list`
 - **Checklist:**
-  - [ ] List all macros from Klipper
-  - [ ] Categorization (user, system, calibration)
-  - [ ] Execute macro (no params)
-  - [ ] Execute macro with params (on-screen keyboard)
-  - [ ] Favorites/quick access
-  - [ ] Hide system macros toggle
+  - [x] List all macros from Klipper (sorted alphabetically)
+  - [x] Prettify macro names (CLEAN_NOZZLE → "Clean Nozzle")
+  - [x] Execute macro via G-code (single tap)
+  - [x] Filter system macros (_* prefix) by default
+  - [x] Empty state when no macros available
+  - [ ] Show system macros toggle (future enhancement)
+  - [ ] Execute macro with params (future enhancement)
+  - [ ] Favorites/quick access (future enhancement)
+  - [ ] Dangerous macro confirmation dialog (future enhancement)
 
 #### Console Panel
 - **Status:** ⬜ Not Started
@@ -363,7 +364,7 @@ NO competitor does these well. Opportunity to lead.
 3. [ ] Power device control
 
 ### Core Features (Following Sessions)
-1. [ ] Macro panel - list and execute
+1. [x] Macro panel - list and execute
 2. [ ] Console panel - read-only history
 3. [ ] Camera panel - single MJPEG stream
 4. [ ] History panel - list past jobs
@@ -381,7 +382,6 @@ Nothing depends on these (can start immediately):
 └── Limits Panel
 
 These depend on "Coming Soon" component:
-├── Macro Panel (stub)
 ├── Console Panel (stub)
 ├── Camera Panel (stub)
 ├── History Panel (stub)

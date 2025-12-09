@@ -63,7 +63,8 @@ make -j
 | **Power Device Control** | ✅ Complete | Full panel with UI polish (4/6 stages) |
 | **Layer Display** | ✅ Complete | Already in `print_status_panel.xml` |
 | **Temperature Presets** | ✅ Complete | Already in temp panels (Off/PLA/PETG/ABS) |
-| Core Features | ⬜ Not Started | Macros, console, camera, history |
+| **Macro Panel** | ✅ Complete | List & execute Klipper macros with prettified names |
+| Core Features | 🟡 In Progress | Console, camera, history remaining |
 
 ---
 
@@ -130,7 +131,7 @@ docs/POWER_PANEL_POLISH_PLAN.md # UI polish plan (Stages 1-4 complete)
 | Feature | Complexity | Status |
 |---------|------------|--------|
 | **Temperature Presets** | MEDIUM | ✅ **COMPLETE** - Off/PLA/PETG/ABS in temp panels |
-| Macro Panel | MEDIUM | 🚧 Stub: `macro_panel.xml` |
+| Macro Panel | MEDIUM | ✅ Complete: List & execute with prettified names |
 | Console Panel | HIGH | 🚧 Stub: `console_panel.xml` |
 | Screws Tilt Adjust | HIGH | 🚧 Stub: `screws_tilt_panel.xml` |
 | Camera/Webcam | HIGH | 🚧 Stub: `camera_panel.xml` |
@@ -163,18 +164,11 @@ docs/POWER_PANEL_POLISH_PLAN.md # UI polish plan (Stages 1-4 complete)
 - **Layer Display** - Already in `print_status_panel.xml:45-46` (`bind_text="print_layer_text"`)
 - **Temperature Presets** - Already in temp panels (Off/PLA/PETG/ABS buttons)
 - **Power Device Control** - Completed in Session 4
+- **Macro Panel** - Completed in Session 5
 
 ### Phase 3: Core Features (Recommended Next)
 
-#### 1. Macro Panel (MEDIUM complexity)
-**Convert stub to functional panel:**
-- `ui_xml/macro_panel.xml` - Replace Coming Soon with macro list
-- `include/ui_panel_macros.h` - Panel class
-- `src/ui_panel_macros.cpp` - Fetch and execute macros
-
-**API:** `printer.objects.query` for `gcode_macro *`
-
-#### 2. Console Panel (HIGH complexity)
+#### 1. Console Panel (HIGH complexity)
 **Convert stub to functional panel:**
 - `ui_xml/console_panel.xml` - Scrollable output + input
 - `include/ui_panel_console.h` - Panel class
@@ -182,7 +176,7 @@ docs/POWER_PANEL_POLISH_PLAN.md # UI polish plan (Stages 1-4 complete)
 
 **API:** `/server/gcode_store`, `notify_gcode_response`
 
-#### 3. Firmware Retraction (LOW complexity - Quick Win)
+#### 2. Firmware Retraction (LOW complexity - Quick Win)
 **Files to create:**
 - Add to settings panel or create `ui_xml/retraction_panel.xml`
 
@@ -337,6 +331,27 @@ make -j
 ---
 
 ## Session Log
+
+### 2025-12-08 Session 5 - Macro Panel Complete
+- **Implemented:** Full Macro Panel for listing and executing Klipper macros
+- **Key Changes:**
+  - Created `ui_xml/macro_card.xml` - Reusable button card component
+  - Created `include/ui_panel_macros.h` - Panel class with MacroEntry struct
+  - Created `src/ui_panel_macros.cpp` - Full implementation
+  - Updated `ui_xml/macro_panel.xml` - Replaced Coming Soon with scrollable list
+  - Added mock macros to `moonraker_client_mock.cpp` for testing
+  - Added `populate_capabilities()` to mock for early initialization
+- **Features:**
+  - Lists all macros from `PrinterCapabilities::macros()`
+  - Prettifies names: CLEAN_NOZZLE → "Clean Nozzle"
+  - Filters system macros (_* prefix) by default
+  - Single-tap execution via `execute_gcode()`
+  - Empty state when no macros available
+  - Alphabetically sorted
+- **Icon Fix:** Used `code_tags` and `chevron_right` (underscores, not hyphens)
+- **Timing Fix:** Mock now populates capabilities in constructor (not just discover_printer)
+
+**Ready for:** Console Panel, Camera Panel, or History Panel
 
 ### 2025-12-08 Session 4 - Power Panel Complete
 - **Implemented:** Full Power Device Control panel with UI polish

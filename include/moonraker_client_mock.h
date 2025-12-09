@@ -354,6 +354,15 @@ class MoonrakerClientMock : public MoonrakerClient {
     void populate_hardware();
 
     /**
+     * @brief Populate capabilities from mock Klipper object list
+     *
+     * Creates mock objects including macros, probes, bed mesh config, etc.
+     * Called from constructor so capabilities are available immediately,
+     * and also from discover_printer() for consistency.
+     */
+    void populate_capabilities();
+
+    /**
      * @brief Generate synthetic bed mesh data for testing
      *
      * Creates a realistic dome-shaped mesh (7×7 points, 0-0.3mm Z range).

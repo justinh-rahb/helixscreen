@@ -188,6 +188,10 @@ MoonrakerClientMock::MoonrakerClientMock(PrinterType type) : printer_type_(type)
 
     // Generate synthetic bed mesh data
     generate_mock_bed_mesh();
+
+    // Pre-populate capabilities so they're available immediately for UI testing
+    // (without waiting for connect() -> discover_printer() to be called)
+    populate_capabilities();
 }
 
 MoonrakerClientMock::MoonrakerClientMock(PrinterType type, double speedup_factor)
@@ -206,6 +210,9 @@ MoonrakerClientMock::MoonrakerClientMock(PrinterType type, double speedup_factor
 
     // Generate synthetic bed mesh data
     generate_mock_bed_mesh();
+
+    // Pre-populate capabilities so they're available immediately for UI testing
+    populate_capabilities();
 }
 
 void MoonrakerClientMock::set_simulation_speedup(double factor) {
@@ -311,21 +318,8 @@ int MoonrakerClientMock::connect(const char* url, std::function<void()> on_conne
     return 0; // Success
 }
 
-void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
-    spdlog::info("[MoonrakerClientMock] Simulating hardware discovery");
-
-    // Populate hardware based on printer type
-    populate_hardware();
-
-    // Generate synthetic bed mesh data
-    generate_mock_bed_mesh();
-
-    // Set mock printer info (mimics server.info and printer.info responses)
-    hostname_ = "mock-printer";
-    software_version_ = "v0.12.0-mock";
-    moonraker_version_ = "v0.8.0-mock";
-
-    // Populate capabilities by creating mock Klipper object list
+void MoonrakerClientMock::populate_capabilities() {
+    // Create mock Klipper object list for capabilities parsing
     json mock_objects = json::array();
 
     // Add common objects
@@ -370,6 +364,27 @@ void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
     mock_objects.push_back("gcode_macro _SYSTEM_MACRO"); // System macro (hidden by default)
 
     capabilities_.parse_objects(mock_objects);
+
+    spdlog::debug("[MoonrakerClientMock] Capabilities populated: {} macros detected",
+                  capabilities_.macros().size());
+}
+
+void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
+    spdlog::info("[MoonrakerClientMock] Simulating hardware discovery");
+
+    // Populate hardware based on printer type (may have already been done in constructor)
+    populate_hardware();
+
+    // Generate synthetic bed mesh data (may have already been done in constructor)
+    generate_mock_bed_mesh();
+
+    // Set mock printer info (mimics server.info and printer.info responses)
+    hostname_ = "mock-printer";
+    software_version_ = "v0.12.0-mock";
+    moonraker_version_ = "v0.8.0-mock";
+
+    // Populate capabilities (may have already been done in constructor, but idempotent)
+    populate_capabilities();
 
     // Log discovered hardware
     spdlog::debug("[MoonrakerClientMock] Discovered: {} heaters, {} sensors, {} fans, {} LEDs",

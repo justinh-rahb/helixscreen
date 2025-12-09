@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<!-- Copyright 2025 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!--
+  Macro Card Component
+  A tappable card that displays a macro name and executes it on click.
+
+  Usage: <macro_card macro_name="CLEAN_NOZZLE" name="clean_nozzle_card"/>
+
+  Features:
+  - Full-width button with macro name
+  - Visual feedback on press
+  - Dangerous macros can be styled differently via C++
+
+  Styling follows the pattern of setting_toggle_row for consistency.
+-->
+<component>
+  <api>
+    <prop type="string" name="macro_name" default="MACRO"/>
+    <prop type="string" name="macro_description" default=""/>
+  </api>
+  <view extends="lv_button" name="macro_card"
+        width="100%" height="content"
+        style_radius="#border_radius"
+        style_bg_color="#card_bg"
+        style_bg_opa="255"
+        style_border_width="0"
+        style_pad_all="#space_md"
+        style_shadow_width="0">
+    <!-- Content container: icon + text -->
+    <lv_obj width="100%" height="content"
+            flex_flow="row"
+            style_flex_cross_place="center"
+            style_pad_gap="#space_sm"
+            style_bg_opa="0"
+            style_border_width="0"
+            scrollable="false"
+            clickable="false">
+      <!-- Code/script icon -->
+      <icon name="macro_icon" src="code_tags" size="sm" variant="primary"/>
+      <!-- Text container: name + optional description -->
+      <lv_obj flex_grow="1" height="content"
+              flex_flow="column"
+              style_pad_gap="#space_xs"
+              style_bg_opa="0"
+              style_border_width="0"
+              scrollable="false"
+              clickable="false">
+        <text_body name="macro_label" text="$macro_name" style_text_color="#text_primary"/>
+        <text_small name="macro_desc" text="$macro_description" style_text_color="#text_secondary" hidden="true"/>
+      </lv_obj>
+      <!-- Chevron indicating it's tappable -->
+      <icon name="chevron_icon" src="chevron_right" size="sm" variant="secondary"/>
+    </lv_obj>
+    <!-- Event callback for macro execution -->
+    <event_cb trigger="clicked" callback="on_macro_card_clicked"/>
+  </view>
+</component>
