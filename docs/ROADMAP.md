@@ -22,13 +22,18 @@ HelixScreen is a production-quality Klipper touchscreen UI with comprehensive fe
 ## Current Priorities
 
 ### 1. AMS/Multi-Material Support
-**Status:** Planning
+**Status:** In Progress (branch: `feature/ams`)
 
-Support for Automatic Material System (AMS) and multi-material printing:
-- [ ] Multi-extruder temperature display
-- [ ] Filament slot selection UI
-- [ ] Tool change status during prints
-- [ ] AMS error handling and recovery
+Support for Happy Hare and AFC-Klipper multi-filament systems with Bambu-inspired UI:
+- [x] Phase 0: Foundation - Detection, state management, mock backend
+- [x] Phase 1: Core UI - AMS panel with slot grid visualization
+- [x] Phase 2: Basic Operations - Load/unload/select with real backends
+- [x] Phase 2.5: Spool Visualization - Pseudo-3D spool canvas with gradients
+- [ ] Phase 2.6: Configurable visualization (in progress)
+- [ ] Phase 3: Spoolman integration for material/color info
+- [ ] Phase 4: Rich feedback - Filament path animations
+- [ ] Phase 5: Print integration - Color requirements display
+- [ ] Phase 6: Error recovery wizard
 
 See `docs/AMS_IMPLEMENTATION_PLAN.md` for detailed specification.
 
