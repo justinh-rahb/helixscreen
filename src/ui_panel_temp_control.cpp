@@ -98,12 +98,19 @@ void TempControlPanel::bed_target_observer_cb(lv_observer_t* observer, lv_subjec
 }
 
 void TempControlPanel::on_nozzle_temp_changed(int temp_centi) {
+    // Filter garbage data at the source: skip invalid temperature readings
+    // Valid nozzle temps: -10°C to 400°C (centidegrees: -100 to 4000)
+    // This prevents corrupt/uninitialized data from polluting the history buffer
+    if (temp_centi <= 0 || temp_centi > 4000) {
+        return; // Discard garbage/invalid temperature reading
+    }
+
     nozzle_current_ = temp_centi;
     update_nozzle_display();
     update_nozzle_status(); // Update status text and heating icon state
 
-    // Always store in history buffer (even before subjects initialized)
-    // This ensures we capture data from app start
+    // Always store in history buffer (even at 4Hz) for later replay with downsampling
+    // This ensures we capture ALL data from app start
     int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::system_clock::now().time_since_epoch())
                          .count();
@@ -112,27 +119,24 @@ void TempControlPanel::on_nozzle_temp_changed(int temp_centi) {
     nozzle_history_[write_idx] = {temp_centi, now_ms};
     nozzle_history_count_++;
 
-    // Guard: don't track graph points until subjects initialized
+    // Guard: don't update live graph until subjects initialized
     if (!subjects_initialized_) {
         return;
     }
 
-    // Track timestamp on first point (for X-axis labels)
-    if (nozzle_start_time_ms_ == 0) {
-        nozzle_start_time_ms_ = now_ms;
+    // Throttle live graph updates to 1 Hz (graph has 1200 points for 20 minutes at 1 sample/sec)
+    // Moonraker sends updates at ~4Hz, so skip updates that are too close together
+    if (now_ms - nozzle_last_graph_update_ms_ < GRAPH_SAMPLE_INTERVAL_MS) {
+        return; // Skip this update - too soon since last graph point
     }
-    nozzle_point_count_++;
-
-    // Update subject for reactive X-axis label visibility
-    lv_subject_set_int(&nozzle_graph_points_subject_, nozzle_point_count_);
+    nozzle_last_graph_update_ms_ = now_ms;
 
     // Push to graph if it exists (convert centidegrees to degrees with 0.1°C precision)
+    // X-axis labels are rendered by the graph widget using the timestamp
     if (nozzle_graph_ && nozzle_series_id_ >= 0) {
         float temp_deg = static_cast<float>(temp_centi) / 10.0f;
-        ui_temp_graph_update_series(nozzle_graph_, nozzle_series_id_, temp_deg);
-        update_x_axis_labels(nozzle_x_labels_, nozzle_start_time_ms_, nozzle_point_count_);
-        spdlog::trace("[TempPanel] Nozzle graph updated: {:.1f}°C (point #{})", temp_deg,
-                      nozzle_point_count_);
+        ui_temp_graph_update_series_with_time(nozzle_graph_, nozzle_series_id_, temp_deg, now_ms);
+        spdlog::trace("[TempPanel] Nozzle graph updated: {:.1f}°C", temp_deg);
     }
 }
 
@@ -152,12 +156,19 @@ void TempControlPanel::on_nozzle_target_changed(int target_centi) {
 }
 
 void TempControlPanel::on_bed_temp_changed(int temp_centi) {
+    // Filter garbage data at the source: skip invalid temperature readings
+    // Valid bed temps: -10°C to 200°C (centidegrees: -100 to 2000)
+    // This prevents corrupt/uninitialized data from polluting the history buffer
+    if (temp_centi <= 0 || temp_centi > 2000) {
+        return; // Discard garbage/invalid temperature reading
+    }
+
     bed_current_ = temp_centi;
     update_bed_display();
     update_bed_status(); // Update status text and heating icon state
 
-    // Always store in history buffer (even before subjects initialized)
-    // This ensures we capture data from app start
+    // Always store in history buffer (even at 4Hz) for later replay with downsampling
+    // This ensures we capture ALL data from app start
     int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::system_clock::now().time_since_epoch())
                          .count();
@@ -166,27 +177,24 @@ void TempControlPanel::on_bed_temp_changed(int temp_centi) {
     bed_history_[write_idx] = {temp_centi, now_ms};
     bed_history_count_++;
 
-    // Guard: don't track graph points until subjects initialized
+    // Guard: don't update live graph until subjects initialized
     if (!subjects_initialized_) {
         return;
     }
 
-    // Track timestamp on first point (for X-axis labels)
-    if (bed_start_time_ms_ == 0) {
-        bed_start_time_ms_ = now_ms;
+    // Throttle live graph updates to 1 Hz (graph has 1200 points for 20 minutes at 1 sample/sec)
+    // Moonraker sends updates at ~4Hz, so skip updates that are too close together
+    if (now_ms - bed_last_graph_update_ms_ < GRAPH_SAMPLE_INTERVAL_MS) {
+        return; // Skip this update - too soon since last graph point
     }
-    bed_point_count_++;
-
-    // Update subject for reactive X-axis label visibility
-    lv_subject_set_int(&bed_graph_points_subject_, bed_point_count_);
+    bed_last_graph_update_ms_ = now_ms;
 
     // Push to graph if it exists (convert centidegrees to degrees with 0.1°C precision)
+    // X-axis labels are rendered by the graph widget using the timestamp
     if (bed_graph_ && bed_series_id_ >= 0) {
         float temp_deg = static_cast<float>(temp_centi) / 10.0f;
-        ui_temp_graph_update_series(bed_graph_, bed_series_id_, temp_deg);
-        update_x_axis_labels(bed_x_labels_, bed_start_time_ms_, bed_point_count_);
-        spdlog::trace("[TempPanel] Bed graph updated: {:.1f}°C (point #{})", temp_deg,
-                      bed_point_count_);
+        ui_temp_graph_update_series_with_time(bed_graph_, bed_series_id_, temp_deg, now_ms);
+        spdlog::trace("[TempPanel] Bed graph updated: {:.1f}°C", temp_deg);
     }
 }
 
@@ -311,11 +319,6 @@ void TempControlPanel::init_subjects() {
                                           bed_display_buf_.size(), bed_display_buf_.data(),
                                           "bed_temp_display");
 
-    // Point count subjects for reactive X-axis label visibility
-    // Labels become visible when count >= 60 (bound in XML with bind_flag_if_lt)
-    UI_SUBJECT_INIT_AND_REGISTER_INT(nozzle_graph_points_subject_, 0, "nozzle_graph_points");
-    UI_SUBJECT_INIT_AND_REGISTER_INT(bed_graph_points_subject_, 0, "bed_graph_points");
-
     // Status text subjects (for reactive status messages like "Heating...", "Cooling down", "Idle")
     snprintf(nozzle_status_buf_.data(), nozzle_status_buf_.size(), "Idle");
     snprintf(bed_status_buf_.data(), bed_status_buf_.size(), "Idle");
@@ -368,98 +371,6 @@ ui_temp_graph_t* TempControlPanel::create_temp_graph(lv_obj_t* chart_area,
     }
 
     return graph;
-}
-
-void TempControlPanel::create_y_axis_labels(lv_obj_t* container, const heater_config_t* config) {
-    if (!container)
-        return;
-
-    int num_labels = static_cast<int>(config->temp_range_max / config->y_axis_increment) + 1;
-
-    // Create labels from top to bottom
-    for (int i = num_labels - 1; i >= 0; i--) {
-        int temp = i * config->y_axis_increment;
-        lv_obj_t* label = lv_label_create(container);
-        char buf[8];
-        snprintf(buf, sizeof(buf), "%d°", temp);
-        lv_label_set_text(label, buf);
-        lv_obj_set_style_text_font(label, UI_FONT_SMALL, 0);
-    }
-}
-
-void TempControlPanel::create_x_axis_labels(lv_obj_t* container,
-                                            std::array<lv_obj_t*, X_AXIS_LABEL_COUNT>& labels) {
-    if (!container)
-        return;
-
-    // Labels are now defined in XML with reactive visibility bindings.
-    // Find them by name instead of creating programmatically.
-    static const char* label_names[X_AXIS_LABEL_COUNT] = {"x_label_0", "x_label_1", "x_label_2",
-                                                          "x_label_3", "x_label_4", "x_label_5"};
-
-    for (size_t i = 0; i < X_AXIS_LABEL_COUNT; i++) {
-        labels[i] = lv_obj_find_by_name(container, label_names[i]);
-        if (!labels[i]) {
-            spdlog::warn("[TempPanel] X-axis label '{}' not found in container", label_names[i]);
-        }
-    }
-}
-
-void TempControlPanel::update_x_axis_labels(std::array<lv_obj_t*, X_AXIS_LABEL_COUNT>& labels,
-                                            int64_t start_time_ms, int point_count) {
-    // Minimum points needed before updating labels (visibility controlled reactively via XML
-    // binding)
-    constexpr int MIN_POINTS_FOR_LABELS = 60;
-
-    // Don't update text until we have enough data (visibility is handled by XML binding)
-    if (start_time_ms == 0 || point_count < MIN_POINTS_FOR_LABELS) {
-        return;
-    }
-
-    // Use real timestamps from the history buffer for accurate time display
-    // The start_time_ms is the timestamp of the oldest visible point
-    // Get current time for the rightmost point (most recent data)
-    int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         std::chrono::system_clock::now().time_since_epoch())
-                         .count();
-
-    // Calculate actual visible duration (real elapsed time, not assumed intervals)
-    int64_t visible_duration_ms = now_ms - start_time_ms;
-
-    // Clamp to reasonable bounds (at least 30 seconds, at most display period)
-    visible_duration_ms = std::max(visible_duration_ms, static_cast<int64_t>(30000));
-    visible_duration_ms = std::min(visible_duration_ms, static_cast<int64_t>(UI_TEMP_GRAPH_DISPLAY_MS));
-
-    // Oldest visible time (leftmost point)
-    int64_t oldest_ms = now_ms - visible_duration_ms;
-
-    // Interval between labels
-    int64_t label_interval_ms = visible_duration_ms / (X_AXIS_LABEL_COUNT - 1);
-
-    // Update label text (visibility controlled reactively by bind_flag_if_lt in XML)
-    // Track previous label to avoid showing duplicates
-    char prev_label[8] = "";
-
-    for (size_t i = 0; i < X_AXIS_LABEL_COUNT; i++) {
-        if (!labels[i])
-            continue;
-
-        int64_t label_time_ms = oldest_ms + (static_cast<int64_t>(i) * label_interval_ms);
-        time_t label_time = static_cast<time_t>(label_time_ms / 1000);
-
-        struct tm* tm_info = localtime(&label_time);
-        char buf[8];
-        strftime(buf, sizeof(buf), "%H:%M", tm_info);
-
-        // Skip duplicate labels (same HH:MM as previous)
-        if (strcmp(buf, prev_label) == 0) {
-            lv_label_set_text(labels[i], "");
-        } else {
-            lv_label_set_text(labels[i], buf);
-            strncpy(prev_label, buf, sizeof(prev_label) - 1);
-            prev_label[sizeof(prev_label) - 1] = '\0';
-        }
-    }
 }
 
 void TempControlPanel::nozzle_confirm_cb(lv_event_t* e) {
@@ -684,23 +595,17 @@ void TempControlPanel::setup_nozzle_panel(lv_obj_t* panel, lv_obj_t* parent_scre
 
     spdlog::debug("[TempPanel] Setting up nozzle panel...");
 
-    // Create Y-axis labels
-    lv_obj_t* y_axis_labels = lv_obj_find_by_name(overlay_content, "y_axis_labels");
-    if (y_axis_labels) {
-        create_y_axis_labels(y_axis_labels, &nozzle_config_);
-    }
-
     // Create temperature graph
     lv_obj_t* chart_area = lv_obj_find_by_name(overlay_content, "chart_area");
     if (chart_area) {
         nozzle_graph_ =
             create_temp_graph(chart_area, &nozzle_config_, nozzle_target_, &nozzle_series_id_);
-    }
 
-    // Create X-axis time labels
-    lv_obj_t* x_axis_labels = lv_obj_find_by_name(overlay_content, "x_axis_labels");
-    if (x_axis_labels) {
-        create_x_axis_labels(x_axis_labels, nozzle_x_labels_);
+        // Configure Y-axis labels (rendered directly on graph canvas)
+        if (nozzle_graph_) {
+            ui_temp_graph_set_y_axis(nozzle_graph_,
+                                     static_cast<float>(nozzle_config_.y_axis_increment), true);
+        }
     }
 
     // Replay buffered temperature history to graph (shows data from app start)
@@ -764,22 +669,16 @@ void TempControlPanel::setup_bed_panel(lv_obj_t* panel, lv_obj_t* parent_screen)
 
     spdlog::debug("[TempPanel] Setting up bed panel...");
 
-    // Create Y-axis labels
-    lv_obj_t* y_axis_labels = lv_obj_find_by_name(overlay_content, "y_axis_labels");
-    if (y_axis_labels) {
-        create_y_axis_labels(y_axis_labels, &bed_config_);
-    }
-
     // Create temperature graph
     lv_obj_t* chart_area = lv_obj_find_by_name(overlay_content, "chart_area");
     if (chart_area) {
         bed_graph_ = create_temp_graph(chart_area, &bed_config_, bed_target_, &bed_series_id_);
-    }
 
-    // Create X-axis time labels
-    lv_obj_t* x_axis_labels = lv_obj_find_by_name(overlay_content, "x_axis_labels");
-    if (x_axis_labels) {
-        create_x_axis_labels(x_axis_labels, bed_x_labels_);
+        // Configure Y-axis labels (rendered directly on graph canvas)
+        if (bed_graph_) {
+            ui_temp_graph_set_y_axis(bed_graph_, static_cast<float>(bed_config_.y_axis_increment),
+                                     true);
+        }
     }
 
     // Replay buffered temperature history to graph (shows data from app start)
@@ -927,8 +826,8 @@ void TempControlPanel::replay_nozzle_history_to_graph() {
         return;
     }
 
-    // Determine how many samples to replay (up to TEMP_HISTORY_SIZE)
-    int samples_to_replay = std::min(nozzle_history_count_, TEMP_HISTORY_SIZE);
+    // Determine how many samples are available (up to TEMP_HISTORY_SIZE)
+    int samples_available = std::min(nozzle_history_count_, TEMP_HISTORY_SIZE);
 
     // Find the oldest sample index
     int start_idx;
@@ -940,34 +839,36 @@ void TempControlPanel::replay_nozzle_history_to_graph() {
         start_idx = nozzle_history_count_ % TEMP_HISTORY_SIZE;
     }
 
-    // Get timestamp of first sample for X-axis reference
-    nozzle_start_time_ms_ = nozzle_history_[start_idx].timestamp_ms;
-    nozzle_point_count_ = samples_to_replay;
-
-    // Update point count subject for X-axis label visibility
-    lv_subject_set_int(&nozzle_graph_points_subject_, nozzle_point_count_);
-
-    // Replay all samples in chronological order
-    // Skip zero values (no valid data yet) to avoid graphing uninitialized entries
-    // Convert centidegrees to degrees for graph display
+    // Replay samples at 1Hz (downsample if data came in faster)
+    // History may have been stored at 4Hz during startup, but graph expects 1Hz
+    // Only graph samples that are at least GRAPH_SAMPLE_INTERVAL_MS apart
     int replayed = 0;
-    for (int i = 0; i < samples_to_replay; i++) {
+    int64_t last_graphed_time = 0;
+
+    for (int i = 0; i < samples_available; i++) {
         int idx = (start_idx + i) % TEMP_HISTORY_SIZE;
         int temp_centi = nozzle_history_[idx].temp;
+        int64_t sample_time = nozzle_history_[idx].timestamp_ms;
+
         if (temp_centi == 0) {
             continue; // Skip uninitialized/zero entries
         }
+
+        // Downsample: only graph if enough time has passed since last point
+        if (last_graphed_time > 0 && (sample_time - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
+            continue; // Skip - too close to previous point
+        }
+
         float temp_deg = static_cast<float>(temp_centi) / 10.0f;
-        ui_temp_graph_update_series(nozzle_graph_, nozzle_series_id_, temp_deg);
+        ui_temp_graph_update_series_with_time(nozzle_graph_, nozzle_series_id_, temp_deg,
+                                              sample_time);
+        last_graphed_time = sample_time;
         replayed++;
     }
 
-    // Update X-axis labels
-    update_x_axis_labels(nozzle_x_labels_, nozzle_start_time_ms_, nozzle_point_count_);
-
     if (replayed > 0) {
-        spdlog::info("[TempPanel] Replayed {} nozzle temp samples to graph (skipped {} zeros)",
-                     replayed, samples_to_replay - replayed);
+        spdlog::info("[TempPanel] Replayed {} nozzle temp samples to graph (from {} available)",
+                     replayed, samples_available);
     }
 }
 
@@ -976,8 +877,8 @@ void TempControlPanel::replay_bed_history_to_graph() {
         return;
     }
 
-    // Determine how many samples to replay (up to TEMP_HISTORY_SIZE)
-    int samples_to_replay = std::min(bed_history_count_, TEMP_HISTORY_SIZE);
+    // Determine how many samples are available (up to TEMP_HISTORY_SIZE)
+    int samples_available = std::min(bed_history_count_, TEMP_HISTORY_SIZE);
 
     // Find the oldest sample index
     int start_idx;
@@ -989,33 +890,34 @@ void TempControlPanel::replay_bed_history_to_graph() {
         start_idx = bed_history_count_ % TEMP_HISTORY_SIZE;
     }
 
-    // Get timestamp of first sample for X-axis reference
-    bed_start_time_ms_ = bed_history_[start_idx].timestamp_ms;
-    bed_point_count_ = samples_to_replay;
-
-    // Update point count subject for X-axis label visibility
-    lv_subject_set_int(&bed_graph_points_subject_, bed_point_count_);
-
-    // Replay all samples in chronological order
-    // Skip zero values (no valid data yet) to avoid graphing uninitialized entries
-    // Convert centidegrees to degrees for graph display
+    // Replay samples at 1Hz (downsample if data came in faster)
+    // History may have been stored at 4Hz during startup, but graph expects 1Hz
+    // Only graph samples that are at least GRAPH_SAMPLE_INTERVAL_MS apart
     int replayed = 0;
-    for (int i = 0; i < samples_to_replay; i++) {
+    int64_t last_graphed_time = 0;
+
+    for (int i = 0; i < samples_available; i++) {
         int idx = (start_idx + i) % TEMP_HISTORY_SIZE;
         int temp_centi = bed_history_[idx].temp;
+        int64_t sample_time = bed_history_[idx].timestamp_ms;
+
         if (temp_centi == 0) {
             continue; // Skip uninitialized/zero entries
         }
+
+        // Downsample: only graph if enough time has passed since last point
+        if (last_graphed_time > 0 && (sample_time - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
+            continue; // Skip - too close to previous point
+        }
+
         float temp_deg = static_cast<float>(temp_centi) / 10.0f;
-        ui_temp_graph_update_series(bed_graph_, bed_series_id_, temp_deg);
+        ui_temp_graph_update_series_with_time(bed_graph_, bed_series_id_, temp_deg, sample_time);
+        last_graphed_time = sample_time;
         replayed++;
     }
 
-    // Update X-axis labels
-    update_x_axis_labels(bed_x_labels_, bed_start_time_ms_, bed_point_count_);
-
     if (replayed > 0) {
-        spdlog::info("[TempPanel] Replayed {} bed temp samples to graph (skipped {} zeros)",
-                     replayed, samples_to_replay - replayed);
+        spdlog::info("[TempPanel] Replayed {} bed temp samples to graph (from {} available)",
+                     replayed, samples_available);
     }
 }

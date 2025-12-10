@@ -26,11 +26,12 @@
 #include "lvgl/lvgl.h"
 
 // Default configuration
-#define UI_TEMP_GRAPH_MAX_SERIES 8            // Maximum concurrent temperature series
-#define UI_TEMP_GRAPH_DISPLAY_MINUTES 20      // Display period in minutes (primary constant)
-#define UI_TEMP_GRAPH_SAMPLE_RATE_HZ 1        // Sample rate (1 sample per second)
-#define UI_TEMP_GRAPH_DEFAULT_POINTS (UI_TEMP_GRAPH_DISPLAY_MINUTES * 60 * UI_TEMP_GRAPH_SAMPLE_RATE_HZ)
-#define UI_TEMP_GRAPH_DISPLAY_MS (UI_TEMP_GRAPH_DISPLAY_MINUTES * 60 * 1000)  // Display period in ms
+#define UI_TEMP_GRAPH_MAX_SERIES 8       // Maximum concurrent temperature series
+#define UI_TEMP_GRAPH_DISPLAY_MINUTES 20 // Display period in minutes (primary constant)
+#define UI_TEMP_GRAPH_SAMPLE_RATE_HZ 1   // Sample rate (1 sample per second)
+#define UI_TEMP_GRAPH_DEFAULT_POINTS                                                               \
+    (UI_TEMP_GRAPH_DISPLAY_MINUTES * 60 * UI_TEMP_GRAPH_SAMPLE_RATE_HZ)
+#define UI_TEMP_GRAPH_DISPLAY_MS (UI_TEMP_GRAPH_DISPLAY_MINUTES * 60 * 1000) // Display period in ms
 #define UI_TEMP_GRAPH_DEFAULT_MIN_TEMP 0.0f   // Default Y-axis minimum
 #define UI_TEMP_GRAPH_DEFAULT_MAX_TEMP 100.0f // Default Y-axis maximum
 
@@ -67,6 +68,16 @@ struct ui_temp_graph_t {
     int point_count;                                             // Number of points per series
     float min_temp;                                              // Y-axis minimum temperature
     float max_temp;                                              // Y-axis maximum temperature
+
+    // X-axis time tracking for rendered labels
+    int64_t first_point_time_ms;  // Timestamp of oldest visible point (left edge)
+    int64_t latest_point_time_ms; // Timestamp of most recent point (right edge)
+    int visible_point_count;      // How many points have actual data
+
+    // Y-axis label configuration
+    float y_axis_increment; // Temperature increment between Y-axis labels (e.g., 80 for
+                            // 0°,80°,160°...)
+    bool show_y_axis;       // Whether to draw Y-axis labels
 };
 
 /**
@@ -140,6 +151,18 @@ void ui_temp_graph_show_series(ui_temp_graph_t* graph, int series_id, bool visib
  * @param temp Temperature value
  */
 void ui_temp_graph_update_series(ui_temp_graph_t* graph, int series_id, float temp);
+
+/**
+ * Add a single temperature point with timestamp (push mode)
+ * Uses circular buffer with shift update mode. Timestamp is used for X-axis labels.
+ *
+ * @param graph Graph instance
+ * @param series_id Series ID
+ * @param temp Temperature value
+ * @param timestamp_ms Unix timestamp in milliseconds
+ */
+void ui_temp_graph_update_series_with_time(ui_temp_graph_t* graph, int series_id, float temp,
+                                           int64_t timestamp_ms);
 
 /**
  * Replace all data points for a series (array mode)
@@ -220,3 +243,12 @@ void ui_temp_graph_set_point_count(ui_temp_graph_t* graph, int count);
  */
 void ui_temp_graph_set_series_gradient(ui_temp_graph_t* graph, int series_id, lv_opa_t bottom_opa,
                                        lv_opa_t top_opa);
+
+/**
+ * Set Y-axis label configuration
+ *
+ * @param graph Graph instance
+ * @param increment Temperature increment between labels (e.g., 80 for 0°, 80°, 160°, ...)
+ * @param show Whether to show Y-axis labels
+ */
+void ui_temp_graph_set_y_axis(ui_temp_graph_t* graph, float increment, bool show);

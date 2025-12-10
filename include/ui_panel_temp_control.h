@@ -85,16 +85,6 @@ class TempControlPanel {
     ui_temp_graph_t* create_temp_graph(lv_obj_t* chart_area, const heater_config_t* config,
                                        int target_temp, int* series_id_out);
 
-    // Y-axis label creation
-    void create_y_axis_labels(lv_obj_t* container, const heater_config_t* config);
-
-    // X-axis time label creation and update
-    static constexpr int X_AXIS_LABEL_COUNT = 6;
-    void create_x_axis_labels(lv_obj_t* container,
-                              std::array<lv_obj_t*, X_AXIS_LABEL_COUNT>& labels);
-    void update_x_axis_labels(std::array<lv_obj_t*, X_AXIS_LABEL_COUNT>& labels,
-                              int64_t start_time_ms, int point_count);
-
     // Button callback setup
     void setup_preset_buttons(lv_obj_t* panel, heater_type_t type);
     void setup_custom_button(lv_obj_t* panel, heater_type_t type);
@@ -142,10 +132,6 @@ class TempControlPanel {
     lv_subject_t nozzle_display_subject_;
     lv_subject_t bed_display_subject_;
 
-    // Graph point count subjects (for reactive X-axis label visibility)
-    lv_subject_t nozzle_graph_points_subject_;
-    lv_subject_t bed_graph_points_subject_;
-
     // Status text subjects (for reactive status messages)
     lv_subject_t nozzle_status_subject_;
     lv_subject_t bed_status_subject_;
@@ -178,15 +164,11 @@ class TempControlPanel {
     int nozzle_series_id_ = -1;
     int bed_series_id_ = -1;
 
-    // X-axis time label storage
-    std::array<lv_obj_t*, X_AXIS_LABEL_COUNT> nozzle_x_labels_{};
-    std::array<lv_obj_t*, X_AXIS_LABEL_COUNT> bed_x_labels_{};
-
-    // Timestamp tracking for X-axis labels
-    int64_t nozzle_start_time_ms_ = 0;
-    int64_t bed_start_time_ms_ = 0;
-    int nozzle_point_count_ = 0;
-    int bed_point_count_ = 0;
+    // Graph update throttling (1 sample per second max)
+    // Moonraker sends at ~4Hz, but we only graph at 1Hz to show 20 minutes
+    static constexpr int64_t GRAPH_SAMPLE_INTERVAL_MS = 1000; // 1 second
+    int64_t nozzle_last_graph_update_ms_ = 0;
+    int64_t bed_last_graph_update_ms_ = 0;
 
     heater_config_t nozzle_config_;
     heater_config_t bed_config_;
@@ -198,7 +180,8 @@ class TempControlPanel {
     // Background temperature history buffers
     // Store temperature readings from app start so graphs show data immediately
     // ─────────────────────────────────────────────────────────────────────────
-    static constexpr int TEMP_HISTORY_SIZE = UI_TEMP_GRAPH_DEFAULT_POINTS; // Match graph point count
+    static constexpr int TEMP_HISTORY_SIZE =
+        UI_TEMP_GRAPH_DEFAULT_POINTS; // Match graph point count
 
     // Circular buffer storage (temp values + timestamps)
     struct TempSample {

@@ -5,15 +5,17 @@
  * @file ui_component_keypad.cpp
  * @brief Numeric keypad overlay with reactive Subject-Observer pattern
  *
- * Uses standard overlay navigation (ui_nav_push_overlay/go_back) and reactive
- * bindings for the display. The XML binds to the keypad_display subject,
- * so updating the subject automatically updates the UI.
+ * The keypad is shown/hidden directly via LVGL flags (NOT through ui_nav) so it
+ * appears on top of the current overlay panel without hiding it. This allows
+ * users to see the temperature graph while entering a custom temperature value.
+ *
+ * The XML binds to the keypad_display subject, so updating the subject
+ * automatically updates the UI.
  */
 
 #include "ui_component_keypad.h"
 
 #include "ui_event_safety.h"
-#include "ui_nav.h"
 
 #include "lvgl/lvgl.h"
 #include "lvgl/src/xml/lv_xml.h"
@@ -133,8 +135,10 @@ void ui_keypad_show(const ui_keypad_config_t* config) {
         lv_label_set_text(title_label, config->title_label);
     }
 
-    // Show via standard overlay navigation
-    ui_nav_push_overlay(keypad_widget);
+    // Show directly (NOT via nav system) so underlying panel stays visible
+    // This allows users to see the temperature graph while entering custom temp
+    lv_obj_remove_flag(keypad_widget, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(keypad_widget);
 
     spdlog::info("Keypad: showing (initial={:.1f}, range={:.0f}-{:.0f})", config->initial_value,
                  config->min_value, config->max_value);
@@ -142,7 +146,8 @@ void ui_keypad_show(const ui_keypad_config_t* config) {
 
 void ui_keypad_hide() {
     if (keypad_widget && ui_keypad_is_visible()) {
-        ui_nav_go_back();
+        // Hide directly (NOT via nav system)
+        lv_obj_add_flag(keypad_widget, LV_OBJ_FLAG_HIDDEN);
     }
 }
 

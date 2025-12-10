@@ -18,37 +18,11 @@
     <lv_obj name="overlay_content" flex_grow="1" width="100%" style_bg_opa="0" style_pad_all="#space_lg" scrollable="false" style_border_width="0" style_border_opa="0" flex_flow="row" style_flex_main_place="space_between">
       <!-- Left Column (66%): Temperature Graph with Y-axis labels + X-axis time labels -->
       <lv_obj name="graph_outer_container" width="66%" height="100%" style_bg_opa="0" style_pad_all="0" scrollable="false" style_border_width="0" style_border_opa="0" flex_flow="column" style_pad_gap="0">
-        <!-- Graph area (Y-axis + chart) -->
-        <lv_obj name="graph_container" width="100%" flex_grow="1" style_bg_opa="0" style_pad_all="0" scrollable="false" style_border_width="0" style_border_opa="0" flex_flow="row" style_flex_main_place="start" style_flex_cross_place="start" style_pad_gap="#space_sm">
-          <!-- Y-axis labels (created programmatically in C++) -->
-          <lv_obj name="y_axis_labels" width="40" height="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false" flex_flow="column" style_flex_main_place="space_between" style_flex_cross_place="end">
-          </lv_obj>
-          <!-- Chart area -->
-          <lv_obj name="chart_area" flex_grow="1" height="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false">
-            <!-- Temperature graph widget created programmatically in C++ -->
-          </lv_obj>
+        <!-- Chart area (Y-axis labels and X-axis time labels rendered directly on canvas) -->
+        <lv_obj name="chart_area" width="100%" flex_grow="1" style_bg_opa="0" style_pad_all="0" scrollable="false" style_border_width="0" style_border_opa="0">
+          <!-- Temperature graph widget created programmatically in C++ -->
         </lv_obj>
-        <!-- X-axis time labels (hidden until 60+ data points via reactive binding) -->
-        <lv_obj name="x_axis_labels" width="100%" height="20" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_left="48" style_pad_right="8" scrollable="false" flex_flow="row" style_flex_main_place="space_between">
-          <text_small name="x_label_0" text="">
-            <lv_obj-bind_flag_if_lt subject="bed_graph_points" flag="hidden" ref_value="60"/>
-          </text_small>
-          <text_small name="x_label_1" text="">
-            <lv_obj-bind_flag_if_lt subject="bed_graph_points" flag="hidden" ref_value="60"/>
-          </text_small>
-          <text_small name="x_label_2" text="">
-            <lv_obj-bind_flag_if_lt subject="bed_graph_points" flag="hidden" ref_value="60"/>
-          </text_small>
-          <text_small name="x_label_3" text="">
-            <lv_obj-bind_flag_if_lt subject="bed_graph_points" flag="hidden" ref_value="60"/>
-          </text_small>
-          <text_small name="x_label_4" text="">
-            <lv_obj-bind_flag_if_lt subject="bed_graph_points" flag="hidden" ref_value="60"/>
-          </text_small>
-          <text_small name="x_label_5" text="">
-            <lv_obj-bind_flag_if_lt subject="bed_graph_points" flag="hidden" ref_value="60"/>
-          </text_small>
-        </lv_obj>
+        <!-- X-axis time labels are now rendered directly on the graph canvas via draw callback -->
       </lv_obj>
       <!-- Right Column (33%): Controls - simple top-to-bottom flow -->
       <lv_obj name="right_column" width="33%" height="100%" style_bg_opa="0" style_pad_all="0" scrollable="false" style_border_width="0" style_border_opa="0" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center" style_pad_gap="#space_sm">
@@ -71,16 +45,16 @@
         <!-- Buttons: all together at bottom -->
         <lv_obj name="preset_grid" width="100%" height="content" style_bg_opa="0" style_pad_all="0" style_border_width="0" scrollable="false" flex_flow="row_wrap" style_flex_main_place="space_between" style_pad_gap="#space_xs">
           <lv_button name="preset_off" width="48%" height="#button_height_small" style_radius="#border_radius_small" style_border_width="0">
-            <text_small text="Off (0&#xB0;C)" align="center"/>
+            <text_small text="Off" align="center"/>
           </lv_button>
           <lv_button name="preset_pla" width="48%" height="#button_height_small" style_radius="#border_radius_small" style_border_width="0">
-            <text_small text="PLA (60&#xB0;C)" align="center"/>
+            <text_small text="PLA" align="center"/>
           </lv_button>
           <lv_button name="preset_petg" width="48%" height="#button_height_small" style_radius="#border_radius_small" style_border_width="0">
-            <text_small text="PETG (80&#xB0;C)" align="center"/>
+            <text_small text="PETG" align="center"/>
           </lv_button>
           <lv_button name="preset_abs" width="48%" height="#button_height_small" style_radius="#border_radius_small" style_border_width="0">
-            <text_small text="ABS (100&#xB0;C)" align="center"/>
+            <text_small text="ABS" align="center"/>
           </lv_button>
         </lv_obj>
         <lv_button name="btn_custom" width="100%" height="#button_height_small" style_radius="#border_radius_small" style_border_width="0">

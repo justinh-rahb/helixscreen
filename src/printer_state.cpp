@@ -304,6 +304,8 @@ void PrinterState::update_from_status(const json& state) {
         if (extruder.contains("temperature")) {
             int temp_centi = static_cast<int>(extruder["temperature"].get<double>() * 10.0);
             lv_subject_set_int(&extruder_temp_, temp_centi);
+            // Always notify for temp graphing even when value unchanged
+            lv_subject_notify(&extruder_temp_);
         }
 
         if (extruder.contains("target")) {
@@ -319,6 +321,8 @@ void PrinterState::update_from_status(const json& state) {
         if (bed.contains("temperature")) {
             int temp_centi = static_cast<int>(bed["temperature"].get<double>() * 10.0);
             lv_subject_set_int(&bed_temp_, temp_centi);
+            // Always notify for temp graphing even when value unchanged
+            lv_subject_notify(&bed_temp_);
             spdlog::trace("[PrinterState] Bed temp: {}.{}°C", temp_centi / 10, temp_centi % 10);
         }
 
