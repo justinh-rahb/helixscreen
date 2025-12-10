@@ -133,10 +133,19 @@ Define `mycolor_light` + `mycolor_dark` in globals.xml → use as `#mycolor`:
 
 ### Adding Tokens
 
-Add all variants to globals.xml - no C++ changes needed:
-- **Colors:** `mycolor_light` + `mycolor_dark`
-- **Spacing:** `myspace_small` + `myspace_medium` + `myspace_large`
-- **Fonts:** `myfont_small` + `myfont_medium` + `myfont_large`
+Add all variants to globals.xml - theme system auto-discovers by suffix:
+- **Colors:** `mycolor_light` + `mycolor_dark` → use as `#mycolor`
+- **Spacing:** `mytoken_small` + `mytoken_medium` + `mytoken_large` → use as `#mytoken`
+
+```xml
+<!-- globals.xml -->
+<px name="keypad_btn_height_small" value="48"/>
+<px name="keypad_btn_height_medium" value="56"/>
+<px name="keypad_btn_height_large" value="72"/>
+
+<!-- Usage - auto-selects based on screen size -->
+<lv_button height="#keypad_btn_height"/>
+```
 
 ⚠️ Don't define base names (`space_lg`) in globals.xml - only variants.
 
@@ -219,6 +228,8 @@ style_flex_cross_place="center"
 | `flex_align="..."` | `style_flex_main_place` + `style_flex_cross_place` |
 | Register subjects after `lv_xml_create` | Register subjects BEFORE |
 | `style_img_recolor` | `style_image_recolor` (full word) |
+| `style_pad_row` + `style_flex_track_place="space_evenly"` | Use one or the other (track_place overrides pad_row) |
+| `<lv_label><lv_label-bind_text subject="x"/></lv_label>` | `<lv_label bind_text="x"/>` (attribute, not child) |
 
 ---
 
