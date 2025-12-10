@@ -17,6 +17,7 @@
 #include "printer_detector.h"
 #include "printer_state.h"
 #include "wifi_manager.h"
+#include "wifi_settings_overlay.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -391,12 +392,18 @@ void HomePanel::handle_printer_status_clicked() {
 }
 
 void HomePanel::handle_network_clicked() {
-    spdlog::info("[{}] Network icon clicked - navigating to settings panel", get_name());
+    spdlog::info("[{}] Network icon clicked - opening network settings directly", get_name());
 
-    // Navigate to settings panel (network settings is a sub-overlay there)
-    // For quick access, we navigate to settings first - user can tap Network row
-    // TODO: Add a dedicated NetworkSettingsPanel class to share overlay creation logic
-    ui_nav_set_active(UI_PANEL_SETTINGS);
+    // Open WiFi settings overlay directly (same as Settings panel's Network row)
+    auto& overlay = get_wifi_settings_overlay();
+
+    if (!overlay.is_created()) {
+        overlay.init_subjects();
+        overlay.register_callbacks();
+        overlay.create(parent_screen_);
+    }
+
+    overlay.show();
 }
 
 void HomePanel::on_led_state_changed(int state) {
