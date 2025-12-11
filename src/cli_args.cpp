@@ -116,6 +116,8 @@ static void print_help(const char* program_name) {
     printf("  -v, --verbose        Increase verbosity (-v=info, -vv=debug, -vvv=trace)\n");
     printf("  --log-dest <dest>    Log destination: auto, journal, syslog, file, console\n");
     printf("  --log-file <path>    Log file path (when --log-dest=file)\n");
+    printf("  -M, --memory-report  Log memory usage every 30 seconds (development)\n");
+    printf("  --show-memory        Show memory stats overlay (press M to toggle)\n");
     printf("  -h, --help           Show this help message\n");
     printf("\nTest Mode Options:\n");
     printf("  --test               Enable test mode (uses all mocks by default)\n");
@@ -477,6 +479,12 @@ bool parse_cli_args(int argc, char** argv, CliArgs& args, int& screen_width, int
             }
         } else if (strcmp(argv[i], "--verbose") == 0) {
             args.verbosity++;
+        }
+        // Memory profiling (development)
+        else if (strcmp(argv[i], "--memory-report") == 0 || strcmp(argv[i], "-M") == 0) {
+            args.memory_report = true;
+        } else if (strcmp(argv[i], "--show-memory") == 0) {
+            args.show_memory = true;
         }
         // Log destination
         else if (strcmp(argv[i], "--log-dest") == 0 || strncmp(argv[i], "--log-dest=", 11) == 0) {

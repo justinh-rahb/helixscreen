@@ -53,6 +53,7 @@
 #include "ui_panel_history_dashboard.h"
 #include "ui_panel_history_list.h"
 #include "ui_panel_home.h"
+#include "ui_panel_memory_stats.h"
 #include "ui_panel_motion.h"
 #include "ui_panel_notification_history.h"
 #include "ui_panel_print_select.h"
@@ -172,6 +173,90 @@ StepTestPanel& get_global_step_test_panel();
 TestPanel& get_global_test_panel();
 GlyphsPanel& get_global_glyphs_panel();
 GcodeTestPanel* get_gcode_test_panel(PrinterState& printer_state, MoonrakerAPI* api);
+
+// ============================================================================
+// Memory Profiling Support (development feature)
+// ============================================================================
+
+#include "memory_utils.h"
+
+#include <atomic>
+
+// Global flags for memory reporting
+static std::atomic<bool> g_memory_report_enabled{false};
+static std::atomic<bool> g_memory_snapshot_requested{false};
+static int64_t g_baseline_rss_kb = 0;
+
+/**
+ * @brief Log current memory usage
+ * @param label Optional label for the log entry
+ */
+static void log_memory_snapshot(const char* label = "periodic") {
+    int64_t rss_kb = 0, hwm_kb = 0, private_dirty_kb = 0;
+
+    if (helix::read_memory_stats(rss_kb, hwm_kb)) {
+        helix::read_private_dirty(private_dirty_kb);
+
+        int64_t delta = (g_baseline_rss_kb > 0) ? (rss_kb - g_baseline_rss_kb) : 0;
+
+        spdlog::info("MEMORY: {} RSS={}KB HWM={}KB Private={}KB Delta={:+}KB", label, rss_kb,
+                     hwm_kb, private_dirty_kb, delta);
+    } else {
+        spdlog::debug("MEMORY: stats not available (non-Linux platform)");
+    }
+}
+
+/**
+ * @brief SIGUSR1 signal handler for on-demand memory snapshots
+ */
+static void sigusr1_handler(int /*signum*/) {
+    // Signal-safe: just set a flag, don't call spdlog from signal handler
+    g_memory_snapshot_requested.store(true, std::memory_order_release);
+}
+
+/**
+ * @brief LVGL timer callback for periodic memory reporting
+ */
+static void memory_report_timer_cb(lv_timer_t* /*timer*/) {
+    // Check if signal requested a snapshot
+    if (g_memory_snapshot_requested.exchange(false, std::memory_order_acquire)) {
+        log_memory_snapshot("signal");
+    }
+
+    // Periodic report (if enabled)
+    if (g_memory_report_enabled.load(std::memory_order_acquire)) {
+        log_memory_snapshot("periodic");
+    }
+}
+
+/**
+ * @brief Initialize memory profiling
+ * @param enable_periodic Enable periodic logging every 30 seconds
+ */
+static void init_memory_profiling(bool enable_periodic) {
+    // Capture baseline RSS
+    int64_t rss_kb = 0, hwm_kb = 0;
+    if (helix::read_memory_stats(rss_kb, hwm_kb)) {
+        g_baseline_rss_kb = rss_kb;
+        spdlog::info("MEMORY: baseline RSS={}KB", rss_kb);
+    }
+
+    // Install SIGUSR1 handler for on-demand snapshots
+    struct sigaction sa;
+    sa.sa_handler = sigusr1_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    if (sigaction(SIGUSR1, &sa, nullptr) == 0) {
+        spdlog::info("MEMORY: SIGUSR1 handler installed (kill -USR1 {} for snapshot)", getpid());
+    }
+
+    g_memory_report_enabled.store(enable_periodic, std::memory_order_release);
+
+    // Create LVGL timer for periodic reporting (30 seconds)
+    lv_timer_create(memory_report_timer_cb, 30000, nullptr);
+}
+
+// ============================================================================
 
 // Ensure we're running from the project root directory.
 // If the executable is in build/bin/, change to the project root so relative paths work.
@@ -766,6 +851,11 @@ static bool parse_command_line_args(
             }
         } else if (strcmp(argv[i], "--verbose") == 0) {
             verbosity++;
+        } else if (strcmp(argv[i], "--memory-report") == 0 || strcmp(argv[i], "-M") == 0) {
+            g_memory_report_enabled.store(true, std::memory_order_release);
+        } else if (strcmp(argv[i], "--show-memory") == 0) {
+            // Will be used to show memory overlay (handled after UI init)
+            g_runtime_config.show_memory_overlay = true;
         } else if (strcmp(argv[i], "--log-dest") == 0 || strncmp(argv[i], "--log-dest=", 11) == 0) {
             const char* value = nullptr;
             if (strncmp(argv[i], "--log-dest=", 11) == 0) {
@@ -824,6 +914,8 @@ static bool parse_command_line_args(
             printf(
                 "  --log-dest <dest>    Log destination: auto, journal, syslog, file, console\n");
             printf("  --log-file <path>    Log file path (when --log-dest=file)\n");
+            printf("  -M, --memory-report  Log memory usage every 30 seconds (development)\n");
+            printf("  --show-memory        Show memory stats overlay (press M to toggle)\n");
             printf("  -h, --help           Show this help message\n");
             printf("\nTest Mode Options:\n");
             printf("  --test               Enable test mode (uses all mocks by default)\n");
@@ -1837,6 +1929,10 @@ int main(int argc, char** argv) {
     // Prevents race condition between display backend and LVGL 9 XML component registration
     helix_delay(100);
 
+    // Initialize memory profiling (development feature)
+    // SIGUSR1 handler allows on-demand snapshots: kill -USR1 $(pidof helix-screen)
+    init_memory_profiling(g_memory_report_enabled.load(std::memory_order_acquire));
+
     // Register remaining XML components (globals already registered for theme init)
     helix::register_xml_components();
 
@@ -1967,6 +2063,9 @@ int main(int argc, char** argv) {
     // Initialize global keyboard BEFORE wizard (required for textarea registration)
     // NOTE: Keyboard is created early but will appear on top due to being moved to top layer below
     ui_keyboard_init(screen);
+
+    // Initialize memory stats overlay (development tool, toggle with M key)
+    MemoryStatsOverlay::instance().init(screen, g_runtime_config.show_memory_overlay);
 
     // Check if first-run wizard is required (skip for special test panels and explicit panel
     // requests)
@@ -2282,6 +2381,22 @@ int main(int argc, char** argv) {
             break;
         }
 
+        // M key toggle for memory stats overlay (with debounce)
+        static bool m_key_was_pressed = false;
+        bool m_key_pressed = keyboard_state[SDL_SCANCODE_M] != 0;
+        if (m_key_pressed && !m_key_was_pressed) {
+            MemoryStatsOverlay::instance().toggle();
+        }
+        m_key_was_pressed = m_key_pressed;
+
+        // S key for screenshot (with debounce)
+        static bool s_key_was_pressed = false;
+        bool s_key_pressed = keyboard_state[SDL_SCANCODE_S] != 0;
+        if (s_key_pressed && !s_key_was_pressed) {
+            spdlog::info("S key pressed - taking screenshot...");
+            save_screenshot();
+        }
+        s_key_was_pressed = s_key_pressed;
 #endif
 
         // Auto-screenshot after configured delay (only if enabled)

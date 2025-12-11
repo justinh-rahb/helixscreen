@@ -85,6 +85,10 @@ struct CliArgs {
     // Logging
     int verbosity = 0;
 
+    // Memory profiling (development feature)
+    bool memory_report = false; // --memory-report: log memory every 30s
+    bool show_memory = false;   // --show-memory: display memory overlay (M key toggle)
+
     /** @brief Check if any panels/overlays requiring Moonraker are requested */
     bool needs_moonraker_data() const {
         return overlays.needs_moonraker() || initial_panel >= 0;

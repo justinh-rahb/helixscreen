@@ -92,6 +92,9 @@ struct RuntimeConfig {
     // Mock simulation options
     double sim_speedup = 1.0; ///< Simulation speedup factor (--sim-speed, requires --test)
 
+    // Development/debugging options
+    bool show_memory_overlay = false; ///< Show memory stats overlay (--show-memory, M key toggle)
+
     /**
      * @brief Check if WiFi should use mock implementation
      * @return true if test mode is enabled and real WiFi is not requested
