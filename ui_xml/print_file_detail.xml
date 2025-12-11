@@ -64,6 +64,10 @@
           <lv_checkbox name="nozzle_clean_checkbox" text="Clean Nozzle" width="100%">
             <lv_obj-bind_flag_if_eq subject="printer_has_nozzle_clean" flag="hidden" ref_value="0"/>
           </lv_checkbox>
+          <!-- Recording options (visibility controlled by plugin availability) -->
+          <lv_checkbox name="timelapse_checkbox" text="Record Timelapse" width="100%">
+            <lv_obj-bind_flag_if_eq subject="printer_has_timelapse" flag="hidden" ref_value="0"/>
+          </lv_checkbox>
         </ui_card>
         <!-- Button row - fixed height, not flex_grow since buttons don't expand -->
         <lv_obj name="button_row" width="100%" height="#button_height" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_gap="#button_padding" flex_flow="row">

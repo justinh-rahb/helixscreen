@@ -552,8 +552,8 @@ class PrinterState {
     lv_subject_t printer_has_accelerometer_; // Integer: 0=no, 1=yes (for input shaping)
     lv_subject_t printer_has_spoolman_;      // Integer: 0=no, 1=yes (for filament tracking)
     lv_subject_t printer_has_speaker_;       // Integer: 0=no, 1=yes (for M300 audio feedback)
-    lv_subject_t printer_has_timelapse_;     // Integer: 0=no, 1=yes (for Moonraker-Timelapse plugin)
-    lv_subject_t printer_bed_moves_;         // Integer: 0=no (gantry moves), 1=yes (bed moves on Z)
+    lv_subject_t printer_has_timelapse_; // Integer: 0=no, 1=yes (for Moonraker-Timelapse plugin)
+    lv_subject_t printer_bed_moves_;     // Integer: 0=no (gantry moves), 1=yes (bed moves on Z)
 
     // Version subjects (for About section)
     lv_subject_t klipper_version_;

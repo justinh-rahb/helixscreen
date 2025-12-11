@@ -1501,6 +1501,7 @@ void PrintSelectPanel::create_detail_view() {
     qgl_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "qgl_checkbox");
     z_tilt_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "z_tilt_checkbox");
     nozzle_clean_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "nozzle_clean_checkbox");
+    timelapse_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "timelapse_checkbox");
 
     spdlog::debug("[{}] Detail view created", get_name());
 }
@@ -1597,12 +1598,23 @@ void PrintSelectPanel::start_print() {
     bool do_qgl = is_option_enabled(qgl_checkbox_);
     bool do_z_tilt = is_option_enabled(z_tilt_checkbox_);
     bool do_nozzle_clean = is_option_enabled(nozzle_clean_checkbox_);
+    bool do_timelapse = is_option_enabled(timelapse_checkbox_);
 
     bool has_pre_print_ops = do_bed_leveling || do_qgl || do_z_tilt || do_nozzle_clean;
 
-    spdlog::info("[{}] Starting print: {} (pre-print: mesh={}, qgl={}, z_tilt={}, clean={})",
-                 get_name(), filename_to_print, do_bed_leveling, do_qgl, do_z_tilt,
-                 do_nozzle_clean);
+    spdlog::info(
+        "[{}] Starting print: {} (pre-print: mesh={}, qgl={}, z_tilt={}, clean={}, timelapse={})",
+        get_name(), filename_to_print, do_bed_leveling, do_qgl, do_z_tilt, do_nozzle_clean,
+        do_timelapse);
+
+    // Enable timelapse recording if requested (Moonraker-Timelapse plugin)
+    if (do_timelapse && api_) {
+        api_->set_timelapse_enabled(
+            true, []() { spdlog::info("[PrintSelect] Timelapse enabled for this print"); },
+            [](const MoonrakerError& err) {
+                spdlog::error("[PrintSelect] Failed to enable timelapse: {}", err.message);
+            });
+    }
 
     if (api_) {
         // Check if user disabled operations that are embedded in the G-code file.

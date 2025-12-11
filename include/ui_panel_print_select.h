@@ -361,6 +361,7 @@ class PrintSelectPanel : public PanelBase {
     lv_obj_t* qgl_checkbox_ = nullptr;
     lv_obj_t* z_tilt_checkbox_ = nullptr;
     lv_obj_t* nozzle_clean_checkbox_ = nullptr;
+    lv_obj_t* timelapse_checkbox_ = nullptr; ///< Record Timelapse option (Moonraker-Timelapse)
 
     // Source selector buttons (Printer/USB toggle)
     lv_obj_t* source_printer_btn_ = nullptr;

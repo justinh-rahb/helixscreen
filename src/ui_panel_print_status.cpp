@@ -144,6 +144,12 @@ void PrintStatusPanel::init_subjects() {
     UI_SUBJECT_INIT_AND_REGISTER_STRING(pause_button_subject_, pause_button_buf_,
                                         "\xF3\xB0\x8F\xA4", "pause_button_icon");
 
+    // Timelapse button icon (F0567=video, F0568=video-off)
+    // MDI icons in Plane 15 (U+F0xxx) use 4-byte UTF-8 encoding
+    // Default to video-off (timelapse disabled): U+F0568 = \xF3\xB0\x95\xA8
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(timelapse_button_subject_, timelapse_button_buf_,
+                                        "\xF3\xB0\x95\xA8", "timelapse_button_icon");
+
     // Preparing state subjects
     UI_SUBJECT_INIT_AND_REGISTER_INT(preparing_visible_subject_, 0, "preparing_visible");
     UI_SUBJECT_INIT_AND_REGISTER_STRING(preparing_operation_subject_, preparing_operation_buf_,
@@ -254,6 +260,16 @@ void PrintStatusPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
         spdlog::debug("[{}]   ✓ Light button", get_name());
     } else {
         spdlog::error("[{}]   ✗ Light button NOT FOUND", get_name());
+    }
+
+    // Timelapse button (only visible when Moonraker-Timelapse plugin is installed)
+    lv_obj_t* timelapse_btn = lv_obj_find_by_name(overlay_content, "btn_timelapse");
+    if (timelapse_btn) {
+        lv_obj_add_event_cb(timelapse_btn, on_timelapse_clicked, LV_EVENT_CLICKED, this);
+        spdlog::debug("[{}]   ✓ Timelapse button", get_name());
+    } else {
+        // Not an error - button may be hidden via XML if timelapse not available
+        spdlog::debug("[{}]   - Timelapse button not found (may be hidden)", get_name());
     }
 
     // Pause button
@@ -556,6 +572,44 @@ void PrintStatusPanel::handle_light_button() {
     }
 }
 
+void PrintStatusPanel::handle_timelapse_button() {
+    spdlog::info("[{}] Timelapse button clicked (current state: {})", get_name(),
+                 timelapse_enabled_ ? "enabled" : "disabled");
+
+    // Toggle to opposite of current state
+    bool new_state = !timelapse_enabled_;
+
+    if (api_) {
+        api_->set_timelapse_enabled(
+            new_state,
+            [this, new_state]() {
+                spdlog::info("[{}] Timelapse {} successfully", get_name(),
+                             new_state ? "enabled" : "disabled");
+
+                // Update local state
+                timelapse_enabled_ = new_state;
+
+                // Update icon: U+F0567 = video (enabled), U+F0568 = video-off (disabled)
+                // MDI Plane 15 icons use 4-byte UTF-8 encoding
+                if (timelapse_enabled_) {
+                    std::snprintf(timelapse_button_buf_, sizeof(timelapse_button_buf_),
+                                  "\xF3\xB0\x95\xA7"); // video
+                } else {
+                    std::snprintf(timelapse_button_buf_, sizeof(timelapse_button_buf_),
+                                  "\xF3\xB0\x95\xA8"); // video-off
+                }
+                lv_subject_copy_string(&timelapse_button_subject_, timelapse_button_buf_);
+            },
+            [this](const MoonrakerError& err) {
+                spdlog::error("[{}] Failed to toggle timelapse: {}", get_name(), err.message);
+                NOTIFY_ERROR("Failed to toggle timelapse: {}", err.user_message());
+            });
+    } else {
+        spdlog::warn("[{}] API not available - cannot control timelapse", get_name());
+        NOTIFY_ERROR("Cannot control timelapse: printer not connected");
+    }
+}
+
 void PrintStatusPanel::handle_pause_button() {
     if (current_state_ == PrintState::Printing) {
         spdlog::info("[{}] Pausing print...", get_name());
@@ -697,6 +751,15 @@ void PrintStatusPanel::on_light_clicked(lv_event_t* e) {
     auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
     if (self) {
         self->handle_light_button();
+    }
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PrintStatusPanel::on_timelapse_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_timelapse_clicked");
+    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
+    if (self) {
+        self->handle_timelapse_button();
     }
     LVGL_SAFE_EVENT_CB_END();
 }

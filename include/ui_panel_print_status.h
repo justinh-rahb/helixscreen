@@ -234,6 +234,7 @@ class PrintStatusPanel : public PanelBase {
     lv_subject_t speed_subject_;
     lv_subject_t flow_subject_;
     lv_subject_t pause_button_subject_;
+    lv_subject_t timelapse_button_subject_; ///< Timelapse icon (video/video-off)
 
     // Preparing state subjects
     lv_subject_t preparing_visible_subject_;   // int: 1 if preparing, 0 otherwise
@@ -255,11 +256,13 @@ class PrintStatusPanel : public PanelBase {
     char speed_buf_[32] = "100%";
     char flow_buf_[32] = "100%";
     char pause_button_buf_[32] = "\xF3\xB0\x8F\xA4"; // MDI pause icon (F03E4)
+    char timelapse_button_buf_[8] = ""; ///< MDI icon codepoint for timelapse state
 
     //
     // === Instance State ===
     //
 
+    bool timelapse_enabled_ = false; ///< Current timelapse recording state
     PrintState current_state_ = PrintState::Idle;
     int current_progress_ = 0;
     int current_layer_ = 0;
@@ -316,6 +319,7 @@ class PrintStatusPanel : public PanelBase {
     void handle_nozzle_card_click();
     void handle_bed_card_click();
     void handle_light_button();
+    void handle_timelapse_button();
     void handle_pause_button();
     void handle_tune_button();
     void handle_cancel_button();
@@ -328,6 +332,7 @@ class PrintStatusPanel : public PanelBase {
     static void on_nozzle_card_clicked(lv_event_t* e);
     static void on_bed_card_clicked(lv_event_t* e);
     static void on_light_clicked(lv_event_t* e);
+    static void on_timelapse_clicked(lv_event_t* e);
     static void on_pause_clicked(lv_event_t* e);
     static void on_tune_clicked(lv_event_t* e);
     static void on_cancel_clicked(lv_event_t* e);

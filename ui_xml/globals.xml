@@ -467,6 +467,10 @@
     <!-- U+F0026 alert (warning) -->
     <str name="icon_usb" value="&#xF05E0;"/>
     <!-- U+F05E0 usb -->
+    <str name="icon_video" value="&#xF0567;"/>
+    <!-- U+F0567 video (timelapse enabled) -->
+    <str name="icon_video_off" value="&#xF0568;"/>
+    <!-- U+F0568 video-off (timelapse disabled) -->
     <str name="icon_wifi" value="&#xF05A9;"/>
     <!-- U+F05A9 wifi -->
     <str name="icon_wifi_slash" value="&#xF05AA;"/>

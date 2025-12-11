@@ -133,6 +133,24 @@ struct FileMetadata {
 };
 
 /**
+ * @brief Moonraker-Timelapse plugin settings
+ *
+ * Represents the configurable options for the Moonraker-Timelapse plugin.
+ * Used by get_timelapse_settings() and set_timelapse_settings().
+ */
+struct TimelapseSettings {
+    bool enabled = false;             ///< Whether timelapse recording is enabled
+    std::string mode = "layermacro";  ///< "layermacro" (per-layer) or "hyperlapse" (time-based)
+    int output_framerate = 30;        ///< Output video framerate (15/24/30/60)
+    bool autorender = true;           ///< Auto-render video when print completes
+    int park_retract_distance = 1;    ///< Retract distance before parking (mm)
+    double park_extrude_speed = 15.0; ///< Extrude speed after unpark (mm/s)
+
+    // Hyperlapse-specific
+    int hyperlapse_cycle = 30; ///< Seconds between frames in hyperlapse mode
+};
+
+/**
  * @brief High-level Moonraker API facade
  *
  * Provides simplified, domain-specific operations on top of MoonrakerClient.
@@ -149,6 +167,7 @@ class MoonrakerAPI {
     using HistoryListCallback =
         std::function<void(const std::vector<PrintHistoryJob>&, uint64_t total_count)>;
     using HistoryTotalsCallback = std::function<void(const PrintHistoryTotals&)>;
+    using TimelapseSettingsCallback = std::function<void(const TimelapseSettings&)>;
 
     /**
      * @brief Constructor
@@ -666,6 +685,48 @@ class MoonrakerAPI {
      */
     void delete_history_job(const std::string& job_id, SuccessCallback on_success,
                             ErrorCallback on_error);
+
+    // ========================================================================
+    // Timelapse Operations (Moonraker-Timelapse Plugin)
+    // ========================================================================
+
+    /**
+     * @brief Get current timelapse settings
+     *
+     * Queries the Moonraker-Timelapse plugin for its current configuration.
+     * Only available if has_timelapse capability is detected.
+     *
+     * @param on_success Callback with current settings
+     * @param on_error Error callback
+     */
+    virtual void get_timelapse_settings(TimelapseSettingsCallback on_success,
+                                        ErrorCallback on_error);
+
+    /**
+     * @brief Update timelapse settings
+     *
+     * Configures the Moonraker-Timelapse plugin with new settings.
+     * Changes take effect for the next print.
+     *
+     * @param settings New settings to apply
+     * @param on_success Success callback
+     * @param on_error Error callback
+     */
+    virtual void set_timelapse_settings(const TimelapseSettings& settings,
+                                        SuccessCallback on_success, ErrorCallback on_error);
+
+    /**
+     * @brief Enable or disable timelapse for current/next print
+     *
+     * Convenience method to toggle just the enabled state without
+     * changing other settings.
+     *
+     * @param enabled true to enable, false to disable
+     * @param on_success Success callback
+     * @param on_error Error callback
+     */
+    virtual void set_timelapse_enabled(bool enabled, SuccessCallback on_success,
+                                       ErrorCallback on_error);
 
     // ========================================================================
     // Domain Service Operations (Bed Mesh, Object Exclusion)
