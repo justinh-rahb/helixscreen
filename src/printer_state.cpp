@@ -147,6 +147,8 @@ void PrinterState::reset_for_testing() {
     lv_subject_deinit(&printer_has_speaker_);
     lv_subject_deinit(&printer_has_timelapse_);
     lv_subject_deinit(&printer_bed_moves_);
+    lv_subject_deinit(&manual_probe_active_);
+    lv_subject_deinit(&manual_probe_z_position_);
     lv_subject_deinit(&klipper_version_);
     lv_subject_deinit(&moonraker_version_);
 
@@ -227,6 +229,10 @@ void PrinterState::init_subjects(bool register_xml) {
     lv_subject_init_int(&printer_has_timelapse_, 0);
     lv_subject_init_int(&printer_bed_moves_, 0); // 0=gantry moves, 1=bed moves (cartesian)
 
+    // Manual probe subjects (for Z-offset calibration)
+    lv_subject_init_int(&manual_probe_active_, 0);     // 0=inactive, 1=active
+    lv_subject_init_int(&manual_probe_z_position_, 0); // Z position in microns
+
     // Version subjects (for About section)
     lv_subject_init_string(&klipper_version_, klipper_version_buf_, nullptr,
                            sizeof(klipper_version_buf_), "—");
@@ -273,6 +279,8 @@ void PrinterState::init_subjects(bool register_xml) {
         lv_xml_register_subject(NULL, "printer_has_speaker", &printer_has_speaker_);
         lv_xml_register_subject(NULL, "printer_has_timelapse", &printer_has_timelapse_);
         lv_xml_register_subject(NULL, "printer_bed_moves", &printer_bed_moves_);
+        lv_xml_register_subject(NULL, "manual_probe_active", &manual_probe_active_);
+        lv_xml_register_subject(NULL, "manual_probe_z_position", &manual_probe_z_position_);
         lv_xml_register_subject(NULL, "klipper_version", &klipper_version_);
         lv_xml_register_subject(NULL, "moonraker_version", &moonraker_version_);
     } else {
@@ -524,6 +532,32 @@ void PrinterState::update_from_status(const json& state) {
 
             lv_subject_set_int(&klippy_state_, static_cast<int>(new_state));
             spdlog::debug("[PrinterState] Klippy state from webhooks: {}", klippy_state_str);
+        }
+    }
+
+    // Update manual probe state (for Z-offset calibration)
+    // Klipper's manual_probe object is active during PROBE_CALIBRATE and Z_ENDSTOP_CALIBRATE
+    if (state.contains("manual_probe")) {
+        const auto& mp = state["manual_probe"];
+
+        if (mp.contains("is_active")) {
+            bool is_active = mp["is_active"].get<bool>();
+            int old_active = lv_subject_get_int(&manual_probe_active_);
+            int new_active = is_active ? 1 : 0;
+
+            if (old_active != new_active) {
+                lv_subject_set_int(&manual_probe_active_, new_active);
+                spdlog::info("[PrinterState] Manual probe active: {} -> {}", old_active != 0,
+                             is_active);
+            }
+        }
+
+        if (mp.contains("z_position") && mp["z_position"].is_number()) {
+            // Store as microns (multiply by 1000) for integer subject with 0.001mm resolution
+            double z_mm = mp["z_position"].get<double>();
+            int z_microns = static_cast<int>(z_mm * 1000.0);
+            lv_subject_set_int(&manual_probe_z_position_, z_microns);
+            spdlog::trace("[PrinterState] Manual probe Z: {:.3f}mm", z_mm);
         }
     }
 

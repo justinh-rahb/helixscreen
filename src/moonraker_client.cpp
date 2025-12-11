@@ -1125,6 +1125,9 @@ void MoonrakerClient::complete_discovery_subscription(std::function<void()> on_c
     // Exclude object (for mid-print object exclusion)
     subscription_objects["exclude_object"] = nullptr;
 
+    // Manual probe (for Z-offset calibration - PROBE_CALIBRATE, Z_ENDSTOP_CALIBRATE)
+    subscription_objects["manual_probe"] = nullptr;
+
     json subscribe_params = {{"objects", subscription_objects}};
 
     send_jsonrpc(

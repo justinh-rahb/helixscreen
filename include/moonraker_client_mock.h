@@ -521,6 +521,11 @@ class MoonrakerClientMock : public MoonrakerClient {
     void dispatch_gcode_move_update();
 
     /**
+     * @brief Dispatch manual_probe status update (for Z-offset calibration)
+     */
+    void dispatch_manual_probe_update();
+
+    /**
      * @brief Generate next mock request ID
      * @return Valid request ID (always > 0)
      */
@@ -590,6 +595,10 @@ class MoonrakerClientMock : public MoonrakerClient {
 
     // G-code offset tracking
     std::atomic<double> gcode_offset_z_{0.0}; // Z offset from SET_GCODE_OFFSET
+
+    // Manual probe state (for Z-offset calibration: PROBE_CALIBRATE, TESTZ, ACCEPT, ABORT)
+    std::atomic<bool> manual_probe_active_{false}; // true when in probe mode
+    std::atomic<double> manual_probe_z_{0.0};      // Current Z position during calibration
 
     // Excluded objects tracking (for EXCLUDE_OBJECT command)
     std::set<std::string> excluded_objects_; // Object names excluded during print (local fallback)

@@ -226,6 +226,7 @@ MDI_ICONS+=",0xF0A46"    # engine-off (motor-off)
 MDI_ICONS+=",0xF0D55"    # axis-z-arrow
 MDI_ICONS+=",0xF0E4F"    # lightbulb-off
 MDI_ICONS+=",0xF0E5B"    # printer-3d-nozzle (extruder)
+MDI_ICONS+=",0xF0EC7"    # rotate-3d (orbit/3D view rotation)
 MDI_ICONS+=",0xF0F85"    # speedometer-medium (speed-up)
 MDI_ICONS+=",0xF0F86"    # speedometer-slow (speed-down)
 MDI_ICONS+=",0xF0F9C"    # home-import-outline (home-z)

@@ -138,6 +138,7 @@ static const IconMapping ICON_MAP[] = {
     {"redo",               "\xF3\xB0\x91\x8E"},  // F044E redo (clockwise arrow - tighten)
     {"refresh",            "\xF3\xB0\x91\x90"},  // F0450 refresh
     {"resume",             "\xF3\xB0\x90\x8C"},  // F040C play-circle (resume)
+    {"rotate_3d",          "\xF3\xB0\xBB\x87"},  // F0EC7 rotate-3d (orbit view)
     {"rotate_left",        "\xF3\xB0\x91\xA5"},  // F0465 rotate-left (CCW)
     {"rotate_right",       "\xF3\xB0\x91\xA7"},  // F0467 rotate-right (CW)
     {"router",             "\xF3\xB0\x91\xA9"},  // F0469 router-wireless

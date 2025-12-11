@@ -6,12 +6,31 @@
 #include "ui_event_safety.h"
 #include "ui_nav.h"
 
+#include "app_globals.h"
 #include "moonraker_client.h"
+#include "printer_state.h"
 
 #include <spdlog/spdlog.h>
 
 #include <cstdio>
 #include <memory>
+
+// ============================================================================
+// LIFECYCLE
+// ============================================================================
+
+ZOffsetCalibrationPanel::~ZOffsetCalibrationPanel() {
+    // Remove observers to prevent use-after-free if subjects outlive us
+    if (manual_probe_active_observer_) {
+        lv_observer_remove(manual_probe_active_observer_);
+        manual_probe_active_observer_ = nullptr;
+    }
+    if (manual_probe_z_observer_) {
+        lv_observer_remove(manual_probe_z_observer_);
+        manual_probe_z_observer_ = nullptr;
+    }
+    spdlog::debug("[ZOffsetCal] Destroyed, observers cleaned up");
+}
 
 // ============================================================================
 // SETUP
@@ -110,7 +129,17 @@ void ZOffsetCalibrationPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen,
     // Set initial state
     set_state(State::IDLE);
 
-    spdlog::info("[ZOffsetCal] Setup complete");
+    // Subscribe to manual_probe state changes from Klipper
+    // This replaces the fake timer with real state tracking
+    PrinterState& ps = get_printer_state();
+
+    manual_probe_active_observer_ = lv_subject_add_observer(ps.get_manual_probe_active_subject(),
+                                                            on_manual_probe_active_changed, this);
+
+    manual_probe_z_observer_ = lv_subject_add_observer(ps.get_manual_probe_z_position_subject(),
+                                                       on_manual_probe_z_changed, this);
+
+    spdlog::info("[ZOffsetCal] Setup complete, observing manual_probe subjects");
 }
 
 // ============================================================================
@@ -184,8 +213,8 @@ void ZOffsetCalibrationPanel::send_probe_calibrate() {
         spdlog::error("[ZOffsetCal] Failed to send PROBE_CALIBRATE");
         on_calibration_result(false, "Failed to start calibration");
     }
-    // Note: We transition to ADJUSTING state when we receive toolhead position updates
-    // For now, simulate the transition after a delay (would be event-driven in real implementation)
+    // State transition to ADJUSTING is handled by on_manual_probe_active_changed
+    // when Klipper reports manual_probe.is_active=true
 }
 
 void ZOffsetCalibrationPanel::send_testz(float delta) {
@@ -201,9 +230,8 @@ void ZOffsetCalibrationPanel::send_testz(float delta) {
         spdlog::warn("[ZOffsetCal] Failed to send TESTZ");
     }
 
-    // Update display optimistically
-    current_z_ += delta;
-    update_z_position(current_z_);
+    // Z position display is updated by the manual_probe_z_position observer
+    // when Klipper reports the new position after processing the TESTZ command
 }
 
 void ZOffsetCalibrationPanel::send_accept() {
@@ -254,20 +282,8 @@ void ZOffsetCalibrationPanel::handle_start_clicked() {
     set_state(State::PROBING);
     send_probe_calibrate();
 
-    // For demo purposes, transition to adjusting after a delay
-    // In real implementation, this would be triggered by toolhead state updates
-    // Simulating: After PROBE_CALIBRATE completes, it enters manual probe mode
-    lv_timer_t* timer = lv_timer_create(
-        [](lv_timer_t* t) {
-            auto* self = static_cast<ZOffsetCalibrationPanel*>(lv_timer_get_user_data(t));
-            if (self && self->get_state() == State::PROBING) {
-                self->set_state(State::ADJUSTING);
-                self->update_z_position(0.0f);
-            }
-            lv_timer_delete(t);
-        },
-        2000, this); // 2 second delay to simulate probing
-    lv_timer_set_repeat_count(timer, 1);
+    // State transition from PROBING -> ADJUSTING is now handled by the
+    // manual_probe_active observer when Klipper reports is_active=true
 }
 
 void ZOffsetCalibrationPanel::handle_z_adjust(float delta) {
@@ -433,6 +449,50 @@ void ZOffsetCalibrationPanel::on_retry_clicked(lv_event_t* e) {
     if (self)
         self->handle_retry_clicked();
     LVGL_SAFE_EVENT_CB_END();
+}
+
+// ============================================================================
+// OBSERVER CALLBACKS (for real Klipper manual_probe state)
+// ============================================================================
+
+void ZOffsetCalibrationPanel::on_manual_probe_active_changed(lv_observer_t* observer,
+                                                             lv_subject_t* subject) {
+    auto* self = static_cast<ZOffsetCalibrationPanel*>(lv_observer_get_user_data(observer));
+    if (!self)
+        return;
+
+    int is_active = lv_subject_get_int(subject);
+    spdlog::debug("[ZOffsetCal] manual_probe_active changed: {}", is_active);
+
+    if (is_active && self->state_ == State::PROBING) {
+        // Klipper has entered manual probe mode - transition to ADJUSTING
+        spdlog::info("[ZOffsetCal] PROBE_CALIBRATE complete, entering adjustment phase");
+        self->set_state(State::ADJUSTING);
+    } else if (!is_active && self->state_ == State::ADJUSTING) {
+        // Manual probe mode ended externally (G28 from console, printer error, ABORT from macros)
+        // The state should already have been changed by button handlers for user-initiated actions,
+        // but this catches cases where Klipper ends the session externally
+        spdlog::info("[ZOffsetCal] Manual probe ended externally, returning to IDLE");
+        self->set_state(State::IDLE);
+    }
+}
+
+void ZOffsetCalibrationPanel::on_manual_probe_z_changed(lv_observer_t* observer,
+                                                        lv_subject_t* subject) {
+    auto* self = static_cast<ZOffsetCalibrationPanel*>(lv_observer_get_user_data(observer));
+    if (!self)
+        return;
+
+    // Only update Z display when in ADJUSTING state
+    if (self->state_ != State::ADJUSTING)
+        return;
+
+    // Z position is stored in microns (multiply by 0.001 to get mm)
+    int z_microns = lv_subject_get_int(subject);
+    float z_mm = static_cast<float>(z_microns) * 0.001f;
+
+    spdlog::trace("[ZOffsetCal] Z position from Klipper: {:.3f}mm", z_mm);
+    self->update_z_position(z_mm);
 }
 
 // ============================================================================

@@ -8,6 +8,7 @@
 #include <string>
 
 class MoonrakerClient;
+class PrinterState;
 
 /**
  * @file ui_panel_calibration_zoffset.h
@@ -46,7 +47,7 @@ class ZOffsetCalibrationPanel {
     };
 
     ZOffsetCalibrationPanel() = default;
-    ~ZOffsetCalibrationPanel() = default;
+    ~ZOffsetCalibrationPanel();
 
     /**
      * @brief Setup the panel with event handlers
@@ -134,6 +135,14 @@ class ZOffsetCalibrationPanel {
     // Current Z position during calibration
     float current_z_ = 0.0f;
     float final_offset_ = 0.0f;
+
+    // Observer for manual_probe state changes (for real Klipper integration)
+    lv_observer_t* manual_probe_active_observer_ = nullptr;
+    lv_observer_t* manual_probe_z_observer_ = nullptr;
+
+    // Observer callbacks (static for LVGL)
+    static void on_manual_probe_active_changed(lv_observer_t* observer, lv_subject_t* subject);
+    static void on_manual_probe_z_changed(lv_observer_t* observer, lv_subject_t* subject);
 };
 
 // Global instance accessor

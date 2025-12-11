@@ -1245,7 +1245,18 @@ const char* ui_gcode_viewer_pick_object(lv_obj_t* obj, int x, int y) {
     if (!st || !st->gcode_file)
         return nullptr;
 
-    auto result = st->renderer_->pick_object(glm::vec2(x, y), *st->gcode_file, *st->camera_);
+    // Convert screen coordinates to widget-local coordinates
+    // The renderer expects coordinates relative to the widget's top-left corner
+    lv_area_t widget_coords;
+    lv_obj_get_coords(obj, &widget_coords);
+    int local_x = x - widget_coords.x1;
+    int local_y = y - widget_coords.y1;
+
+    spdlog::debug("GCodeViewer: pick_object screen=({}, {}), widget_pos=({}, {}), local=({}, {})",
+                  x, y, widget_coords.x1, widget_coords.y1, local_x, local_y);
+
+    auto result =
+        st->renderer_->pick_object(glm::vec2(local_x, local_y), *st->gcode_file, *st->camera_);
 
     if (result) {
         // Store in static buffer (safe for single-threaded LVGL)

@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include "ui_subscription_guard.h"
+
 #include "ams_backend.h"
 #include "moonraker_client.h"
 
@@ -182,10 +184,10 @@ class AmsBackendHappyHare : public AmsBackend {
     MoonrakerClient* client_; ///< For subscribing to updates
 
     // State
-    mutable std::mutex mutex_;          ///< Protects state access
-    std::atomic<bool> running_{false};  ///< Backend running state
-    EventCallback event_callback_;      ///< Registered event handler
-    SubscriptionId subscription_id_{0}; ///< Moonraker subscription ID
+    mutable std::mutex mutex_;         ///< Protects state access
+    std::atomic<bool> running_{false}; ///< Backend running state
+    EventCallback event_callback_;     ///< Registered event handler
+    SubscriptionGuard subscription_;   ///< RAII subscription (auto-unsubscribes)
 
     // Cached MMU state
     AmsSystemInfo system_info_;     ///< Current system state

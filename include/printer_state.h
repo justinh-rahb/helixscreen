@@ -492,6 +492,28 @@ class PrinterState {
         return &printer_bed_moves_;
     }
 
+    /**
+     * @brief Get manual probe active subject for Z-offset calibration
+     *
+     * Returns 1 when Klipper is in manual probe mode (PROBE_CALIBRATE,
+     * Z_ENDSTOP_CALIBRATE), 0 otherwise. Used by ZOffsetCalibrationPanel
+     * to transition from PROBING to ADJUSTING state.
+     */
+    lv_subject_t* get_manual_probe_active_subject() {
+        return &manual_probe_active_;
+    }
+
+    /**
+     * @brief Get manual probe Z position subject
+     *
+     * Returns current Z position during manual probe (in microns, multiply
+     * by 0.001 to get mm). Updated in real-time by Klipper as TESTZ
+     * commands are executed.
+     */
+    lv_subject_t* get_manual_probe_z_position_subject() {
+        return &manual_probe_z_position_;
+    }
+
   private:
     // Temperature subjects
     lv_subject_t extruder_temp_;
@@ -554,6 +576,10 @@ class PrinterState {
     lv_subject_t printer_has_speaker_;       // Integer: 0=no, 1=yes (for M300 audio feedback)
     lv_subject_t printer_has_timelapse_; // Integer: 0=no, 1=yes (for Moonraker-Timelapse plugin)
     lv_subject_t printer_bed_moves_;     // Integer: 0=no (gantry moves), 1=yes (bed moves on Z)
+
+    // Manual probe subjects (for Z-offset calibration)
+    lv_subject_t manual_probe_active_; // Integer: 0=inactive, 1=active (PROBE_CALIBRATE running)
+    lv_subject_t manual_probe_z_position_; // Integer: Z position * 1000 (for 0.001mm resolution)
 
     // Version subjects (for About section)
     lv_subject_t klipper_version_;

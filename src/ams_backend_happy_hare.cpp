@@ -82,16 +82,19 @@ AmsError AmsBackendHappyHare::start() {
 
     // Register for status update notifications from Moonraker
     // The MMU state comes via notify_status_update when printer.mmu.* changes
-    subscription_id_ = client_->register_notify_update(
+    SubscriptionId id = client_->register_notify_update(
         [this](const nlohmann::json& notification) { handle_status_update(notification); });
 
-    if (subscription_id_ == INVALID_SUBSCRIPTION_ID) {
+    if (id == INVALID_SUBSCRIPTION_ID) {
         spdlog::error("[AMS HappyHare] Failed to register for status updates");
         return AmsErrorHelper::not_connected("Failed to subscribe to Moonraker updates");
     }
 
+    // RAII guard - automatically unsubscribes when backend is destroyed or stop() called
+    subscription_ = SubscriptionGuard(client_, id);
+
     running_ = true;
-    spdlog::info("[AMS HappyHare] Backend started, subscription ID: {}", subscription_id_);
+    spdlog::info("[AMS HappyHare] Backend started, subscription ID: {}", id);
 
     // Emit initial state event (state may be empty until first Moonraker update)
     emit_event(EVENT_STATE_CHANGED);
@@ -106,11 +109,8 @@ void AmsBackendHappyHare::stop() {
         return;
     }
 
-    // Unsubscribe from Moonraker updates
-    if (client_ && subscription_id_ != INVALID_SUBSCRIPTION_ID) {
-        client_->unsubscribe_notify_update(subscription_id_);
-        subscription_id_ = INVALID_SUBSCRIPTION_ID;
-    }
+    // RAII guard handles unsubscription automatically
+    subscription_.reset();
 
     running_ = false;
     spdlog::info("[AMS HappyHare] Backend stopped");

@@ -2,8 +2,9 @@
 //
 // HelixScreen - Fatal Error Display Implementation
 //
-// Note: This is a bootstrap component that runs BEFORE the XML system is loaded.
-// Direct font references are acceptable here since we can't use the theme system.
+// Note: This is a bootstrap component that runs BEFORE the XML/theme system is loaded.
+// Direct font references and hardcoded colors are acceptable here since we can't use
+// ui_theme_parse_color() or design tokens - they require globals.xml to be loaded first.
 
 #include "ui_fatal_error.h"
 

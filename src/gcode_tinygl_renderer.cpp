@@ -310,55 +310,87 @@ void GCodeTinyGLRenderer::render_bounding_box(const ParsedGCodeFile& gcode) {
                       "max=({:.2f},{:.2f},{:.2f})",
                       bbox_min.x, bbox_min.y, bbox_min.z, bbox_max.x, bbox_max.y, bbox_max.z);
 
-        // Use material emission for bright white lines
-        glDisable(GL_DEPTH_TEST); // Draw on top
-        GLfloat white[] = {1.0f, 1.0f, 1.0f, 1.0f};
+        // Use material emission for subtle grey lines (matches theme_grey #808080)
+        glDisable(GL_DEPTH_TEST);                  // Draw on top
+        GLfloat grey[] = {0.5f, 0.5f, 0.5f, 1.0f}; // #808080 - subtle but visible
 
-        // Set bright white emission for visibility (glowing lines)
-        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, white);
-        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, white);
+        // Set grey emission for visibility without being too bright
+        glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, grey);
+        glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, grey);
 
-        // Draw complete wireframe cube using GL_LINES (12 edges total)
+        // Calculate corner bracket length (20% of shortest edge, capped)
+        float dx = bbox_max.x - bbox_min.x;
+        float dy = bbox_max.y - bbox_min.y;
+        float dz = bbox_max.z - bbox_min.z;
+        float min_edge = std::min({dx, dy, dz});
+        float bracket_len = std::min(min_edge * 0.2f, 5.0f); // 20% of shortest edge, max 5mm
+
+        // Draw corner brackets using GL_LINES (8 corners × 3 lines each = 24 lines)
         glBegin(GL_LINES);
 
-        // Bottom rectangle (4 edges at Z = min)
+        // Corner 0: (min, min, min) - bottom-front-left
         glVertex3f(bbox_min.x, bbox_min.y, bbox_min.z);
-        glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z);
-
-        glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z);
-        glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z);
-
-        glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z);
-        glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
-
-        glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
+        glVertex3f(bbox_min.x + bracket_len, bbox_min.y, bbox_min.z);
         glVertex3f(bbox_min.x, bbox_min.y, bbox_min.z);
-
-        // Top rectangle (4 edges at Z = max)
-        glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
-        glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
-
-        glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
-        glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
-
-        glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
-        glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
-
-        glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
-        glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
-
-        // Vertical edges (4 edges connecting bottom to top)
+        glVertex3f(bbox_min.x, bbox_min.y + bracket_len, bbox_min.z);
         glVertex3f(bbox_min.x, bbox_min.y, bbox_min.z);
-        glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_min.y, bbox_min.z + bracket_len);
 
+        // Corner 1: (max, min, min) - bottom-front-right
         glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z);
-        glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_max.x - bracket_len, bbox_min.y, bbox_min.z);
+        glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z);
+        glVertex3f(bbox_max.x, bbox_min.y + bracket_len, bbox_min.z);
+        glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z);
+        glVertex3f(bbox_max.x, bbox_min.y, bbox_min.z + bracket_len);
 
+        // Corner 2: (max, max, min) - bottom-back-right
         glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z);
-        glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_max.x - bracket_len, bbox_max.y, bbox_min.z);
+        glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z);
+        glVertex3f(bbox_max.x, bbox_max.y - bracket_len, bbox_min.z);
+        glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z);
+        glVertex3f(bbox_max.x, bbox_max.y, bbox_min.z + bracket_len);
 
+        // Corner 3: (min, max, min) - bottom-back-left
         glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
+        glVertex3f(bbox_min.x + bracket_len, bbox_max.y, bbox_min.z);
+        glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
+        glVertex3f(bbox_min.x, bbox_max.y - bracket_len, bbox_min.z);
+        glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z);
+        glVertex3f(bbox_min.x, bbox_max.y, bbox_min.z + bracket_len);
+
+        // Corner 4: (min, min, max) - top-front-left
+        glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_min.x + bracket_len, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_min.y + bracket_len, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_min.y, bbox_max.z - bracket_len);
+
+        // Corner 5: (max, min, max) - top-front-right
+        glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_max.x - bracket_len, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_max.x, bbox_min.y + bracket_len, bbox_max.z);
+        glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z);
+        glVertex3f(bbox_max.x, bbox_min.y, bbox_max.z - bracket_len);
+
+        // Corner 6: (max, max, max) - top-back-right
+        glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_max.x - bracket_len, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_max.x, bbox_max.y - bracket_len, bbox_max.z);
+        glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_max.x, bbox_max.y, bbox_max.z - bracket_len);
+
+        // Corner 7: (min, max, max) - top-back-left
         glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_min.x + bracket_len, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_max.y - bracket_len, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z);
+        glVertex3f(bbox_min.x, bbox_max.y, bbox_max.z - bracket_len);
 
         glEnd();
 

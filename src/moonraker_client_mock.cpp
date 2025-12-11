@@ -1632,6 +1632,113 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
         trigger_restart(/*is_firmware=*/false);
     }
 
+    // ========================================================================
+    // Z-OFFSET CALIBRATION COMMANDS (manual probe mode)
+    // ========================================================================
+
+    // PROBE_CALIBRATE - Start Z-offset calibration
+    // Enters manual probe mode, homes if needed, probes to find Z=0
+    if (gcode.find("PROBE_CALIBRATE") != std::string::npos) {
+        if (!manual_probe_active_.load()) {
+            // Ensure we're homed first
+            {
+                std::lock_guard<std::mutex> lock(homed_axes_mutex_);
+                if (homed_axes_.find("xyz") == std::string::npos) {
+                    // Auto-home like real Klipper would
+                    homed_axes_ = "xyz";
+                    pos_x_.store(0.0);
+                    pos_y_.store(0.0);
+                    pos_z_.store(0.0);
+                    spdlog::info("[MoonrakerClientMock] PROBE_CALIBRATE: Auto-homed all axes");
+                }
+            }
+
+            // Enter manual probe mode at a starting Z height
+            manual_probe_active_.store(true);
+            manual_probe_z_.store(5.0); // Start 5mm above bed
+            pos_z_.store(5.0);          // Sync toolhead Z
+
+            spdlog::info(
+                "[MoonrakerClientMock] PROBE_CALIBRATE: Entered manual probe mode, Z={:.3f}",
+                manual_probe_z_.load());
+
+            // Dispatch manual probe state change
+            dispatch_manual_probe_update();
+        } else {
+            spdlog::warn("[MoonrakerClientMock] PROBE_CALIBRATE: Already in manual probe mode");
+        }
+    }
+
+    // TESTZ Z=<value> - Adjust Z position during manual probe calibration
+    // Z can be absolute (Z=0.1) or relative (Z=+0.1 or Z=-0.05)
+    if (gcode.find("TESTZ") != std::string::npos) {
+        if (!manual_probe_active_.load()) {
+            spdlog::warn("[MoonrakerClientMock] TESTZ: Not in manual probe mode (ignored)");
+            return 0;
+        }
+        size_t z_pos = gcode.find("Z=");
+        if (z_pos != std::string::npos) {
+            std::string z_str = gcode.substr(z_pos + 2);
+            try {
+                // Check for relative move (+/- prefix)
+                bool is_relative = (z_str[0] == '+' || z_str[0] == '-');
+                double z_value = std::stod(z_str);
+
+                double new_z;
+                if (is_relative) {
+                    new_z = manual_probe_z_.load() + z_value;
+                } else {
+                    new_z = z_value;
+                }
+
+                // Clamp to reasonable range (0 to 10mm above bed)
+                new_z = std::clamp(new_z, -0.5, 10.0);
+
+                manual_probe_z_.store(new_z);
+                pos_z_.store(new_z); // Sync toolhead Z
+
+                spdlog::info("[MoonrakerClientMock] TESTZ: Z={:.3f} ({}) -> new Z={:.3f}", z_value,
+                             is_relative ? "relative" : "absolute", new_z);
+
+                // Dispatch Z position update
+                dispatch_manual_probe_update();
+            } catch (const std::exception& e) {
+                spdlog::warn("[MoonrakerClientMock] TESTZ: Failed to parse Z value: {}", e.what());
+            }
+        }
+    }
+
+    // ACCEPT - Accept current Z position as the calibrated offset
+    if (gcode == "ACCEPT" || gcode.find("ACCEPT ") == 0) {
+        if (manual_probe_active_.load()) {
+            double final_z = manual_probe_z_.load();
+            manual_probe_active_.store(false);
+
+            spdlog::info(
+                "[MoonrakerClientMock] ACCEPT: Z-offset calibration complete, offset={:.3f}mm",
+                final_z);
+
+            // In real Klipper, this would update probe z_offset in config
+            // User typically follows with SAVE_CONFIG to persist
+
+            // Dispatch manual probe state change (is_active=false)
+            dispatch_manual_probe_update();
+        } else {
+            spdlog::warn("[MoonrakerClientMock] ACCEPT: Not in manual probe mode");
+        }
+    }
+
+    // ABORT - Cancel manual probe calibration
+    if (gcode == "ABORT" || gcode.find("ABORT ") == 0) {
+        if (manual_probe_active_.load()) {
+            manual_probe_active_.store(false);
+            spdlog::info("[MoonrakerClientMock] ABORT: Manual probe cancelled");
+
+            // Dispatch manual probe state change (is_active=false)
+            dispatch_manual_probe_update();
+        }
+    }
+
     // EXCLUDE_OBJECT - Track excluded objects during print
     // EXCLUDE_OBJECT NAME=Part_1
     // EXCLUDE_OBJECT NAME="Part With Spaces"
@@ -2505,6 +2612,36 @@ void MoonrakerClientMock::dispatch_gcode_move_update() {
                          {"extrude_factor", flow / 100.0},
                          {"homing_origin", {0.0, 0.0, z_offset, 0.0}}}}};
     dispatch_status_update(gcode_move);
+}
+
+// ============================================================================
+// Manual Probe Helper Methods (Z-offset calibration)
+// ============================================================================
+
+void MoonrakerClientMock::dispatch_manual_probe_update() {
+    bool is_active = manual_probe_active_.load();
+    double z_position = manual_probe_z_.load();
+
+    // Build manual_probe status matching Klipper's format:
+    // {
+    //   "manual_probe": {
+    //     "is_active": true/false,
+    //     "z_position": float,
+    //     "z_position_lower": float (optional),
+    //     "z_position_upper": float (optional)
+    //   }
+    // }
+    json manual_probe_status = {
+        {"manual_probe",
+         {{"is_active", is_active},
+          {"z_position", z_position},
+          {"z_position_lower", nullptr}, // Not tracking bisection search in mock
+          {"z_position_upper", nullptr}}}};
+
+    dispatch_status_update(manual_probe_status);
+
+    spdlog::debug("[MoonrakerClientMock] Dispatched manual_probe update: is_active={}, z={:.3f}",
+                  is_active, z_position);
 }
 
 // ============================================================================

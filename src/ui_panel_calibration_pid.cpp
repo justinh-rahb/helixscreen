@@ -5,6 +5,7 @@
 
 #include "ui_event_safety.h"
 #include "ui_nav.h"
+#include "ui_theme.h"
 
 #include "moonraker_client.h"
 
@@ -151,13 +152,15 @@ void PIDCalibrationPanel::update_heater_selection() {
         return;
 
     // Use background color to indicate selection
+    lv_color_t selected_color = ui_theme_get_color("primary_color");
+    lv_color_t neutral_color = ui_theme_get_color("theme_grey");
+
     if (selected_heater_ == Heater::EXTRUDER) {
-        lv_obj_set_style_bg_color(btn_heater_extruder_, lv_color_hex(0xB71C1C),
-                                  LV_PART_MAIN); // primary_color
-        lv_obj_set_style_bg_color(btn_heater_bed_, lv_color_hex(0x424242), LV_PART_MAIN); // neutral
+        lv_obj_set_style_bg_color(btn_heater_extruder_, selected_color, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(btn_heater_bed_, neutral_color, LV_PART_MAIN);
     } else {
-        lv_obj_set_style_bg_color(btn_heater_extruder_, lv_color_hex(0x424242), LV_PART_MAIN);
-        lv_obj_set_style_bg_color(btn_heater_bed_, lv_color_hex(0xB71C1C), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(btn_heater_extruder_, neutral_color, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(btn_heater_bed_, selected_color, LV_PART_MAIN);
     }
 }
 

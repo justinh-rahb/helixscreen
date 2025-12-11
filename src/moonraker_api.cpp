@@ -2029,7 +2029,8 @@ class ScrewsTiltCollector : public std::enable_shared_from_this<ScrewsTiltCollec
         size_t name_end = line.find(" :");
         size_t base_pos = line.find(" (base)");
 
-        if (base_pos != std::string::npos && (name_end == std::string::npos || base_pos < name_end)) {
+        if (base_pos != std::string::npos &&
+            (name_end == std::string::npos || base_pos < name_end)) {
             // Reference screw with "(base)" marker
             result.screw_name = line.substr(name_start, base_pos - name_start);
             result.is_reference = true;
@@ -2131,8 +2132,8 @@ class ScrewsTiltCollector : public std::enable_shared_from_this<ScrewsTiltCollec
     ScrewTiltCallback on_success_;
     MoonrakerAPI::ErrorCallback on_error_;
     std::string handler_name_;
-    std::atomic<bool> registered_{false};  // Thread-safe: accessed from callback and destructor
-    std::atomic<bool> completed_{false};   // Thread-safe: prevents double-callback invocation
+    std::atomic<bool> registered_{false}; // Thread-safe: accessed from callback and destructor
+    std::atomic<bool> completed_{false};  // Thread-safe: prevents double-callback invocation
     std::vector<ScrewTiltResult> results_;
 };
 

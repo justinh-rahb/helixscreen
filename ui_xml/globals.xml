@@ -441,6 +441,8 @@
     <!-- U+F0467 rotate-right (clockwise - tighten) -->
     <str name="icon_rotate_left" value="&#xF0465;"/>
     <!-- U+F0465 rotate-left (counter-clockwise - loosen) -->
+    <str name="icon_rotate_3d" value="&#xF0EC7;"/>
+    <!-- U+F0EC7 rotate-3d (orbit/3D view rotation hint) -->
     <str name="icon_power_off" value="&#xF0425;"/>
     <!-- U+F0425 power -->
     <str name="icon_question_circle" value="&#xF02D7;"/>
