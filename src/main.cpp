@@ -160,6 +160,36 @@ TestPanel& get_global_test_panel();
 GlyphsPanel& get_global_glyphs_panel();
 GcodeTestPanel* get_gcode_test_panel(PrinterState& printer_state, MoonrakerAPI* api);
 
+// ============================================================================
+// Overlay Creation Helper
+// ============================================================================
+
+/**
+ * @brief Create an overlay panel from XML and optionally push to nav stack
+ *
+ * Handles the common pattern of:
+ * 1. Debug log announcing the overlay creation
+ * 2. Create the XML component
+ * 3. Error log if creation fails
+ *
+ * @param screen Parent screen for the overlay
+ * @param component_name XML component name (e.g., "bed_mesh_panel")
+ * @param display_name Human-readable name for logging (e.g., "bed mesh")
+ * @return Created object, or nullptr if creation failed
+ */
+static lv_obj_t* create_overlay_panel(lv_obj_t* screen, const char* component_name,
+                                      const char* display_name) {
+    spdlog::debug("Opening {} overlay as requested by command-line flag", display_name);
+    lv_obj_t* panel = (lv_obj_t*)lv_xml_create(screen, component_name, nullptr);
+    if (!panel) {
+        spdlog::error("Failed to create {} overlay from XML component '{}'", display_name,
+                      component_name);
+    }
+    return panel;
+}
+
+// ============================================================================
+
 // Ensure we're running from the project root directory.
 // If the executable is in build/bin/, change to the project root so relative paths work.
 static void ensure_project_root_cwd() {
@@ -1423,36 +1453,31 @@ int main(int argc, char** argv) {
     // Show requested overlay panels (motion, temp controls, etc.)
     if (!wizard_active) {
         if (args.overlays.motion) {
-            spdlog::debug("Opening motion overlay as requested by command-line flag");
-            overlay_panels.motion = (lv_obj_t*)lv_xml_create(screen, "motion_panel", nullptr);
-            if (overlay_panels.motion) {
-                get_global_motion_panel().setup(overlay_panels.motion, screen);
-                ui_nav_push_overlay(overlay_panels.motion);
+            if (auto* p = create_overlay_panel(screen, "motion_panel", "motion")) {
+                overlay_panels.motion = p;
+                get_global_motion_panel().setup(p, screen);
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.nozzle_temp) {
-            spdlog::debug("Opening nozzle temp overlay as requested by command-line flag");
-            overlay_panels.nozzle_temp =
-                (lv_obj_t*)lv_xml_create(screen, "nozzle_temp_panel", nullptr);
-            if (overlay_panels.nozzle_temp) {
-                temp_control_panel->setup_nozzle_panel(overlay_panels.nozzle_temp, screen);
-                ui_nav_push_overlay(overlay_panels.nozzle_temp);
+            if (auto* p = create_overlay_panel(screen, "nozzle_temp_panel", "nozzle temp")) {
+                overlay_panels.nozzle_temp = p;
+                temp_control_panel->setup_nozzle_panel(p, screen);
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.bed_temp) {
-            spdlog::debug("Opening bed temp overlay as requested by command-line flag");
-            overlay_panels.bed_temp = (lv_obj_t*)lv_xml_create(screen, "bed_temp_panel", nullptr);
-            if (overlay_panels.bed_temp) {
-                temp_control_panel->setup_bed_panel(overlay_panels.bed_temp, screen);
-                ui_nav_push_overlay(overlay_panels.bed_temp);
+            if (auto* p = create_overlay_panel(screen, "bed_temp_panel", "bed temp")) {
+                overlay_panels.bed_temp = p;
+                temp_control_panel->setup_bed_panel(p, screen);
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.extrusion) {
-            spdlog::debug("Opening extrusion overlay as requested by command-line flag");
-            overlay_panels.extrusion = (lv_obj_t*)lv_xml_create(screen, "extrusion_panel", nullptr);
-            if (overlay_panels.extrusion) {
-                get_global_extrusion_panel().setup(overlay_panels.extrusion, screen);
-                ui_nav_push_overlay(overlay_panels.extrusion);
+            if (auto* p = create_overlay_panel(screen, "extrusion_panel", "extrusion")) {
+                overlay_panels.extrusion = p;
+                get_global_extrusion_panel().setup(p, screen);
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.fan) {
@@ -1472,84 +1497,42 @@ int main(int argc, char** argv) {
             ui_nav_push_overlay(overlay_panels.print_status);
         }
         if (args.overlays.bed_mesh) {
-            spdlog::debug("Opening bed mesh overlay as requested by command-line flag");
-            lv_obj_t* bed_mesh = (lv_obj_t*)lv_xml_create(screen, "bed_mesh_panel", nullptr);
-            if (bed_mesh) {
-                spdlog::debug("Bed mesh overlay created successfully, calling setup");
-                get_global_bed_mesh_panel().setup(bed_mesh, screen);
-                ui_nav_push_overlay(bed_mesh);
-                spdlog::debug("Bed mesh overlay pushed to nav stack");
-            } else {
-                spdlog::error(
-                    "Failed to create bed mesh overlay from XML component 'bed_mesh_panel'");
+            if (auto* p = create_overlay_panel(screen, "bed_mesh_panel", "bed mesh")) {
+                get_global_bed_mesh_panel().setup(p, screen);
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.zoffset) {
-            spdlog::debug("Opening Z-offset calibration overlay as requested by command-line flag");
-            lv_obj_t* zoffset_panel =
-                (lv_obj_t*)lv_xml_create(screen, "calibration_zoffset_panel", nullptr);
-            if (zoffset_panel) {
-                spdlog::debug("Z-offset calibration overlay created successfully, calling setup");
-                get_global_zoffset_cal_panel().setup(zoffset_panel, screen, moonraker_client.get());
-                ui_nav_push_overlay(zoffset_panel);
-                spdlog::debug("Z-offset calibration overlay pushed to nav stack");
-            } else {
-                spdlog::error("Failed to create Z-offset calibration overlay from XML component "
-                              "'calibration_zoffset_panel'");
+            if (auto* p = create_overlay_panel(screen, "calibration_zoffset_panel", "Z-offset")) {
+                get_global_zoffset_cal_panel().setup(p, screen, moonraker_client.get());
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.pid) {
-            spdlog::debug("Opening PID tuning overlay as requested by command-line flag");
-            lv_obj_t* pid_panel =
-                (lv_obj_t*)lv_xml_create(screen, "calibration_pid_panel", nullptr);
-            if (pid_panel) {
-                get_global_pid_cal_panel().setup(pid_panel, screen, moonraker_client.get());
-                ui_nav_push_overlay(pid_panel);
-                spdlog::debug("PID tuning overlay pushed to nav stack");
-            } else {
-                spdlog::error("Failed to create PID tuning overlay from XML component "
-                              "'calibration_pid_panel'");
+            if (auto* p = create_overlay_panel(screen, "calibration_pid_panel", "PID tuning")) {
+                get_global_pid_cal_panel().setup(p, screen, moonraker_client.get());
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.screws_tilt) {
-            spdlog::debug("Opening screws tilt overlay as requested by command-line flag");
-            lv_obj_t* screws_panel = (lv_obj_t*)lv_xml_create(screen, "screws_tilt_panel", nullptr);
-            if (screws_panel) {
-                get_global_screws_tilt_panel().setup(screws_panel, screen, moonraker_client.get(),
+            if (auto* p = create_overlay_panel(screen, "screws_tilt_panel", "screws tilt")) {
+                get_global_screws_tilt_panel().setup(p, screen, moonraker_client.get(),
                                                      moonraker_api.get());
-                ui_nav_push_overlay(screws_panel);
-                spdlog::debug("Screws tilt overlay pushed to nav stack");
-            } else {
-                spdlog::error("Failed to create screws tilt overlay from XML component "
-                              "'screws_tilt_panel'");
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.input_shaper) {
-            spdlog::debug("Opening input shaper overlay as requested by command-line flag");
-            lv_obj_t* shaper_panel =
-                (lv_obj_t*)lv_xml_create(screen, "input_shaper_panel", nullptr);
-            if (shaper_panel) {
-                get_global_input_shaper_panel().setup(shaper_panel, screen, moonraker_client.get(),
+            if (auto* p = create_overlay_panel(screen, "input_shaper_panel", "input shaper")) {
+                get_global_input_shaper_panel().setup(p, screen, moonraker_client.get(),
                                                       moonraker_api.get());
-                ui_nav_push_overlay(shaper_panel);
-                spdlog::debug("Input shaper overlay pushed to nav stack");
-            } else {
-                spdlog::error("Failed to create input shaper overlay from XML component "
-                              "'input_shaper_panel'");
+                ui_nav_push_overlay(p);
             }
         }
         if (args.overlays.history_dashboard) {
-            spdlog::debug("Opening history dashboard overlay as requested by command-line flag");
-            lv_obj_t* history_panel =
-                (lv_obj_t*)lv_xml_create(screen, "history_dashboard_panel", nullptr);
-            if (history_panel) {
-                get_global_history_dashboard_panel().setup(history_panel, screen);
-                ui_nav_push_overlay(history_panel);
+            if (auto* p = create_overlay_panel(screen, "history_dashboard_panel", "history")) {
+                get_global_history_dashboard_panel().setup(p, screen);
+                ui_nav_push_overlay(p);
                 get_global_history_dashboard_panel().on_activate();
-                spdlog::debug("History dashboard overlay pushed to nav stack");
-            } else {
-                spdlog::error("Failed to create history dashboard overlay from XML component "
-                              "'history_dashboard_panel'");
             }
         }
         if (args.overlays.keypad) {
@@ -1570,17 +1553,13 @@ int main(int argc, char** argv) {
             ui_keyboard_show(nullptr);
         }
         if (args.overlays.step_test) {
-            spdlog::debug("Creating step progress test widget as requested by command-line flag");
-            lv_obj_t* step_test = (lv_obj_t*)lv_xml_create(screen, "step_progress_test", nullptr);
-            if (step_test) {
-                get_global_step_test_panel().setup(step_test, screen);
+            if (auto* p = create_overlay_panel(screen, "step_progress_test", "step progress")) {
+                get_global_step_test_panel().setup(p, screen);
             }
         }
         if (args.overlays.test_panel) {
-            spdlog::debug("Opening test panel as requested by command-line flag");
-            lv_obj_t* test_panel_obj = (lv_obj_t*)lv_xml_create(screen, "test_panel", nullptr);
-            if (test_panel_obj) {
-                get_global_test_panel().setup(test_panel_obj, screen);
+            if (auto* p = create_overlay_panel(screen, "test_panel", "test")) {
+                get_global_test_panel().setup(p, screen);
             }
         }
         if (args.overlays.file_detail) {
@@ -1626,13 +1605,7 @@ int main(int argc, char** argv) {
 
     // Create gradient test panel if requested (independent of wizard state)
     if (args.overlays.gradient_test) {
-        spdlog::debug("Creating gradient test panel");
-        lv_obj_t* gradient_panel = (lv_obj_t*)lv_xml_create(screen, "gradient_test_panel", nullptr);
-        if (gradient_panel) {
-            spdlog::debug("Gradient test panel created successfully");
-        } else {
-            spdlog::error("Failed to create gradient test panel");
-        }
+        create_overlay_panel(screen, "gradient_test_panel", "gradient test");
     }
 
     // Connect to Moonraker (only if not in wizard and we have saved config)
