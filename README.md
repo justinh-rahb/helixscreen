@@ -56,13 +56,14 @@ HelixScreen is a next-generation printer control interface built from the ground
 | **Embedded Target** | ✅ Optimized | ✅ Yes | ⚠️ Heavy |
 | **Touch Optimization** | ✅ Native | ✅ Yes | ⚠️ Desktop-first |
 | **Responsive Design** | ✅ Breakpoints | ⚠️ Limited | ⚠️ Fixed layouts |
-| **Development Status** | 🚧 Alpha | ✅ Stable | ✅ Mature |
+| **Development Status** | 🚧 Beta | ✅ Stable | ✅ Mature |
 | **Backend** | libhv WebSocket | libhv WebSocket | Python Websocket |
 | **Language** | C++17 | C++11 | Python 3 |
 | **Build Time** | ~30s clean | ~25s clean | N/A (interpreted) |
 | **First-Run Setup** | ✅ Auto-wizard | ⚠️ Manual config | ⚠️ Manual config |
 | **G-code Preview** | ✅ 3D viewer | ❌ Not yet | ✅ 2D layers |
 | **Bed Mesh Visual** | ✅ 3D gradient | ✅ 2D heatmap | ✅ 2D heatmap |
+| **Multi-Fan Control** | ✅ All fans | ⚠️ Part fan | ✅ All fans |
 
 **Legend:** ✅ Full support | ⚠️ Partial/Limited | ❌ Not available | 🚧 In development
 
@@ -71,53 +72,66 @@ HelixScreen is a next-generation printer control interface built from the ground
 ### Home Panel
 <img src="docs/images/screenshot-home-panel.png" alt="Home Panel" width="800"/>
 
-*Main dashboard showing printer status, temperatures, and quick actions*
+*Main dashboard showing printer status, AMS filament status, temperatures, and quick actions*
+
+### Controls Panel
+<img src="docs/images/screenshot-controls-panel.png" alt="Controls Panel" width="800"/>
+
+*Card-based control center with Quick Actions, Temperatures, Multi-Fan Cooling, Filament presets, and Calibration tools*
 
 ### Print File Browser
 <img src="docs/images/screenshot-print-select-card.png" alt="Print Select Panel" width="800"/>
 
-*Card view with thumbnails, metadata, and file information - also supports sortable list view*
+*File selection with 3D thumbnail preview, print time estimates, filament requirements, and pre-print options*
 
 ### Motion Controls
 <img src="docs/images/screenshot-motion-panel.png" alt="Motion Control Panel" width="800"/>
 
-*Manual printer control with jog pad, distance selector, and position display*
+*Manual printer control with jog pad, distance selector, and live position display*
 
-### Controls Launcher
-<img src="docs/images/screenshot-controls-panel.png" alt="Controls Panel" width="800"/>
+### Bed Mesh Visualization
+<img src="docs/images/screenshot-bed-mesh-panel.png" alt="Bed Mesh Panel" width="800"/>
 
-*Quick access to motion, temperature, extrusion, and other printer controls*
+*3D bed mesh visualization with gradient coloring, mesh profiles, and calibration controls*
+
+### Settings Panel
+<img src="docs/images/screenshot-settings-panel.png" alt="Settings Panel" width="800"/>
+
+*Comprehensive settings for appearance, input, printer configuration, and more*
 
 ### First-Run Wizard
 <img src="docs/images/screenshot-wizard-wifi.png" alt="Setup Wizard" width="800"/>
 
-*Guided setup with auto-discovery of printer components*
+*Guided 7-step setup with WiFi configuration and auto-discovery of printer components*
 
 ### G-Code Viewer
 <img src="docs/images/screenshot-gcode-viewer.png" alt="G-Code Viewer" width="800"/>
 
-*3D preview of G-code files with touch rotation (pending content loading)*
+*3D G-code preview with layer slider, view presets, ghost modes, and touch rotation*
 
-> 📸 **Note:** Screenshots auto-generated with `make screenshots` - regenerate after UI changes
+> 📸 **Note:** Screenshots auto-generated with `./scripts/screenshot.sh` - regenerate after UI changes
 
 ## Key Features
 
 ### ✅ Complete & Production-Ready
-- **14 Production Panels** - Home, Controls, Motion, Temps, Extrusion, Filament, Print Select, Print Status, Settings, Advanced, and more
+- **15+ Production Panels** - Home, Controls, Motion, Temps, Extrusion, Filament, Print Select, Print Status, Bed Mesh, Settings, Advanced, and more
 - **18 Settings** - Theme, display, sound, network, safety, calibration options
 - **First-Run Wizard** - 7-step guided setup with auto-discovery
 - **Full Moonraker Integration** - 30+ API methods with WebSocket auto-reconnect
-- **Print Job Control** - Start, pause, resume, cancel with live progress
+- **Print Job Control** - Start, pause, resume, cancel with live progress and Z-offset baby stepping
 - **Motion Controls** - XYZ jog pad, homing, bed leveling with safety checks
 - **Temperature Controls** - Presets, custom temps, live graphs, animated heating indicator
+- **Multi-Fan Cooling** - Support for part fan, hotend fan, controller fan, and auxiliary fans
+- **AMS Status Widget** - Visual filament slot status display on home panel
 - **3D Visualizations** - G-code preview and bed mesh analysis with touch rotation
 - **Connection-Aware UI** - Graceful handling of disconnects with auto-recovery toasts
 - **Declarative XML UI** - Complete UI defined in XML with reactive data binding
 - **Responsive Design** - Multiple screen sizes (480×320 to 1024×800+)
 - **Light/Dark Themes** - Runtime theme switching with global color system
+- **Reusable UI Components** - temp_display widget, card layouts, and modular panels
 
 ### 🚧 In Development
-- **AMS/Multi-Material Support** - Happy Hare and AFC-Klipper integration (see `feature/ams` branch)
+- **AMS/Multi-Material Support** - Happy Hare and AFC-Klipper integration (AMS status widget complete, full control WIP)
 - See [ROADMAP.md](docs/ROADMAP.md) for complete feature timeline
 
 ## Target Hardware
@@ -236,7 +250,7 @@ The prototype includes a comprehensive test mode for development without hardwar
 
 Test mode displays a banner showing which components are mocked vs real. This makes it easy to develop and test UI features without needing a physical 3D printer.
 
-## Key Features
+## Technical Highlights
 
 ### Declarative XML UI System
 
@@ -281,15 +295,18 @@ Change the entire UI appearance by editing one file (`ui_xml/globals.xml`):
 **Current Development Phase:** Beta
 
 **What's Complete:**
-- ✅ 14 production panels covering all core printer operations
+- ✅ 15+ production panels covering all core printer operations
 - ✅ 18 settings across 8 categories
 - ✅ 7-step first-run wizard with auto-discovery
 - ✅ Full Moonraker API integration (30+ methods)
 - ✅ Connection-aware navigation with graceful error recovery
 - ✅ Cross-platform builds (macOS, Linux, Pi, Adventurer 5M)
+- ✅ Multi-fan cooling support with live controls
+- ✅ Z-offset baby stepping during prints
+- ✅ AMS status widget on home panel
 
 **In Active Development:**
-- 🚧 AMS/Multi-Material support (Happy Hare, AFC-Klipper)
+- 🚧 AMS/Multi-Material full control (Happy Hare, AFC-Klipper integration)
 - 🚧 Production hardening (structured logging, edge case testing)
 
 **What This Means:**
