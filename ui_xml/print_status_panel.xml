@@ -80,12 +80,16 @@
         <!-- Nozzle Temperature Card -->
         <ui_card name="nozzle_temp_card" width="100%" height="80" style_radius="#border_radius" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="start" style_pad_left="#space_md" style_pad_gap="#space_xxs">
           <text_small text="Nozzle"/>
-          <lv_label name="nozzle_temp_display" bind_text="nozzle_temp_text" style_text_font="montserrat_28"/>
+          <temp_display name="nozzle_temp_display" size="lg"
+                        bind_current="extruder_temp"
+                        bind_target="extruder_target"/>
         </ui_card>
         <!-- Bed Temperature Card -->
         <ui_card name="bed_temp_card" width="100%" height="80" style_radius="#border_radius" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="start" style_pad_left="#space_md" style_pad_gap="#space_xxs">
           <text_small text="Bed"/>
-          <lv_label name="bed_temp_display" bind_text="bed_temp_text" style_text_font="montserrat_28"/>
+          <temp_display name="bed_temp_display" size="lg"
+                        bind_current="bed_temp"
+                        bind_target="bed_target"/>
         </ui_card>
         <!-- Spacer (pushes buttons to bottom) -->
         <lv_obj flex_grow="1" style_bg_opa="0" style_border_width="0"/>

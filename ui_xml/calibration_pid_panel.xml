@@ -35,13 +35,13 @@
           <text_body text="Target Temperature"/>
           <lv_obj width="100%" height="56" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_md" scrollable="false">
             <lv_button name="btn_temp_down" width="56" height="56" style_radius="#border_radius">
-              <lv_label text="-" align="center" style_text_font="montserrat_28"/>
+              <lv_label text="-" align="center" style_text_font="#font_heading"/>
             </lv_button>
             <lv_obj width="120" height="56" style_bg_opa="0" style_border_width="0" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center" scrollable="false">
-              <lv_label name="temp_display" text="200&#xB0;C" style_text_font="montserrat_28"/>
+              <lv_label name="temp_display" text="200&#xB0;C" style_text_font="#font_heading"/>
             </lv_obj>
             <lv_button name="btn_temp_up" width="56" height="56" style_radius="#border_radius">
-              <lv_label text="+" align="center" style_text_font="montserrat_28"/>
+              <lv_label text="+" align="center" style_text_font="#font_heading"/>
             </lv_button>
           </lv_obj>
           <text_small name="temp_hint" text="Recommended: 200&#xB0;C for extruder" style_text_color="#text_secondary" width="100%" style_text_align="center"/>
@@ -66,7 +66,7 @@
         <!-- Temperature Display -->
         <lv_obj width="80%" height="content" style_bg_color="#card_bg_dark" style_radius="#border_radius" style_pad_all="#space_lg" style_border_width="0" flex_flow="column" style_flex_cross_place="center" style_pad_gap="#space_xs">
           <text_small text="Current Temperature" style_text_color="#text_secondary"/>
-          <lv_label name="current_temp_display" text="25&#xB0;C / 200&#xB0;C" style_text_font="montserrat_28"/>
+          <lv_label name="current_temp_display" text="25&#xB0;C / 200&#xB0;C" style_text_font="#font_heading"/>
         </lv_obj>
         <text_small text="The heater will cycle on and off several times." width="80%" style_text_align="center" style_text_color="#text_secondary"/>
         <!-- Abort Button -->

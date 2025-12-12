@@ -14,27 +14,36 @@
  *
  * ## XML Usage
  *
- * Basic usage with reactive binding:
+ * Basic usage with reactive binding (uses PrinterState subjects):
  * @code{.xml}
  * <temp_display name="nozzle_temp" size="lg"
- *               bind_current="nozzle_current_temp"
- *               bind_target="nozzle_target_temp"/>
+ *               bind_current="extruder_temp"
+ *               bind_target="extruder_target"/>
+ *
+ * <temp_display name="bed_temp" size="lg"
+ *               bind_current="bed_temp"
+ *               bind_target="bed_target"/>
  * @endcode
  *
  * Current-only display (hide target):
  * @code{.xml}
- * <temp_display name="ambient_temp" size="sm" show_target="false"
- *               bind_current="ambient_temp"/>
+ * <temp_display name="chamber_temp" size="sm" show_target="false"
+ *               bind_current="chamber_temp"/>
  * @endcode
  *
  * ## XML Properties (API)
  *
- * | Property       | Type    | Default | Description                           |
- * |----------------|---------|---------|---------------------------------------|
- * | size           | string  | "md"    | Font size: "sm", "md", or "lg"        |
- * | show_target    | bool    | "true"  | Show "/ target" portion               |
- * | bind_current   | subject | -       | Subject name for current temp (int)   |
- * | bind_target    | subject | -       | Subject name for target temp (int)    |
+ * | Property       | Type    | Default | Description                                      |
+ * |----------------|---------|---------|--------------------------------------------------|
+ * | size           | string  | "md"    | Font size: "sm", "md", or "lg"                   |
+ * | show_target    | bool    | "true"  | Show "/ target" portion                          |
+ * | bind_current   | subject | -       | Subject name for current temp (centidegrees×10) |
+ * | bind_target    | subject | -       | Subject name for target temp (centidegrees×10)  |
+ *
+ * @note The widget expects temperature subjects in **centidegrees** (value×10),
+ *       which matches PrinterState's format. The widget converts internally:
+ *       - Subject value 2050 → displays as "205°C"
+ *       - Subject value 600  → displays as "60°C"
  *
  * ## Size Mapping
  *

@@ -144,13 +144,18 @@ static void current_temp_observer_cb(lv_observer_t* observer, lv_subject_t* subj
     // Get the parent container and its data
     lv_obj_t* container = lv_obj_get_parent(label);
     auto* data = get_data(container);
+
+    // PrinterState stores temps in centidegrees (×10), convert to degrees for display
+    int temp_centi = lv_subject_get_int(subject);
+    int temp_deg = temp_centi / 10;
+
     if (data) {
-        data->current_temp = lv_subject_get_int(subject);
+        data->current_temp = temp_deg;
     }
 
     // Update just this label
     char buf[16];
-    snprintf(buf, sizeof(buf), "%d", lv_subject_get_int(subject));
+    snprintf(buf, sizeof(buf), "%d", temp_deg);
     lv_label_set_text(label, buf);
 }
 
@@ -163,13 +168,18 @@ static void target_temp_observer_cb(lv_observer_t* observer, lv_subject_t* subje
     // Get the parent container and its data
     lv_obj_t* container = lv_obj_get_parent(label);
     auto* data = get_data(container);
+
+    // PrinterState stores temps in centidegrees (×10), convert to degrees for display
+    int temp_centi = lv_subject_get_int(subject);
+    int temp_deg = temp_centi / 10;
+
     if (data) {
-        data->target_temp = lv_subject_get_int(subject);
+        data->target_temp = temp_deg;
     }
 
     // Update just this label
     char buf[16];
-    snprintf(buf, sizeof(buf), "%d", lv_subject_get_int(subject));
+    snprintf(buf, sizeof(buf), "%d", temp_deg);
     lv_label_set_text(label, buf);
 }
 
@@ -273,12 +283,14 @@ static void ui_temp_display_apply_cb(lv_xml_parser_state_t* state, const char** 
             if (subject && data && data->current_label) {
                 lv_subject_add_observer_obj(subject, current_temp_observer_cb, data->current_label,
                                             nullptr);
-                // Set initial value
-                data->current_temp = lv_subject_get_int(subject);
+                // Set initial value (convert centidegrees to degrees)
+                int temp_centi = lv_subject_get_int(subject);
+                data->current_temp = temp_centi / 10;
                 char buf[16];
                 snprintf(buf, sizeof(buf), "%d", data->current_temp);
                 lv_label_set_text(data->current_label, buf);
-                spdlog::debug("[temp_display] Bound current to subject '{}'", value);
+                spdlog::debug("[temp_display] Bound current to subject '{}' ({}°C)", value,
+                              data->current_temp);
             } else if (!subject) {
                 spdlog::warn("[temp_display] Subject '{}' not found for bind_current", value);
             }
@@ -288,12 +300,14 @@ static void ui_temp_display_apply_cb(lv_xml_parser_state_t* state, const char** 
             if (subject && data && data->target_label) {
                 lv_subject_add_observer_obj(subject, target_temp_observer_cb, data->target_label,
                                             nullptr);
-                // Set initial value
-                data->target_temp = lv_subject_get_int(subject);
+                // Set initial value (convert centidegrees to degrees)
+                int temp_centi = lv_subject_get_int(subject);
+                data->target_temp = temp_centi / 10;
                 char buf[16];
                 snprintf(buf, sizeof(buf), "%d", data->target_temp);
                 lv_label_set_text(data->target_label, buf);
-                spdlog::debug("[temp_display] Bound target to subject '{}'", value);
+                spdlog::debug("[temp_display] Bound target to subject '{}' ({}°C)", value,
+                              data->target_temp);
             } else if (!subject) {
                 spdlog::warn("[temp_display] Subject '{}' not found for bind_target", value);
             }
