@@ -15,7 +15,7 @@
             style_pad_top="#space_lg" style_pad_bottom="#space_lg" style_border_width="0" flex_flow="column"
             style_pad_gap="#space_lg" scrollable="false">
       <!-- ================================================================== -->
-      <!-- STATE: IDLE - Instructions and Start Button -->
+      <!-- STATE: IDLE (0) - Instructions and Start Button -->
       <!-- ================================================================== -->
       <lv_obj name="state_idle"
               width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
@@ -47,10 +47,11 @@
         <lv_button name="btn_start"
                    width="200" height="56" style_radius="#border_radius" style_bg_color="#primary_color">
           <text_body text="Start Calibration" align="center"/>
+          <event_cb trigger="clicked" callback="on_zoffset_start_clicked"/>
         </lv_button>
       </lv_obj>
       <!-- ================================================================== -->
-      <!-- STATE: PROBING - Waiting for probe to complete -->
+      <!-- STATE: PROBING (1) - Waiting for probe to complete -->
       <!-- ================================================================== -->
       <lv_obj name="state_probing"
               width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
@@ -64,10 +65,11 @@
         <lv_button name="btn_abort_probing"
                    width="120" height="48" style_radius="#border_radius" style_bg_color="#error_color">
           <text_body text="Abort" align="center"/>
+          <event_cb trigger="clicked" callback="on_zoffset_abort_clicked"/>
         </lv_button>
       </lv_obj>
       <!-- ================================================================== -->
-      <!-- STATE: ADJUSTING - Interactive Z adjustment -->
+      <!-- STATE: ADJUSTING (2) - Interactive Z adjustment -->
       <!-- ================================================================== -->
       <lv_obj name="state_adjusting"
               width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
@@ -95,15 +97,19 @@
                   style_flex_main_place="center" style_pad_gap="#space_md" scrollable="false">
             <lv_button name="btn_z_down_1" width="100" height="56" style_radius="#border_radius">
               <text_body text="-1mm" align="center"/>
+              <event_cb trigger="clicked" callback="on_zoffset_z_down_1"/>
             </lv_button>
             <lv_button name="btn_z_down_01" width="100" height="56" style_radius="#border_radius">
               <text_body text="-0.1mm" align="center"/>
+              <event_cb trigger="clicked" callback="on_zoffset_z_down_01"/>
             </lv_button>
             <lv_button name="btn_z_up_01" width="100" height="56" style_radius="#border_radius">
               <text_body text="+0.1mm" align="center"/>
+              <event_cb trigger="clicked" callback="on_zoffset_z_up_01"/>
             </lv_button>
             <lv_button name="btn_z_up_1" width="100" height="56" style_radius="#border_radius">
               <text_body text="+1mm" align="center"/>
+              <event_cb trigger="clicked" callback="on_zoffset_z_up_1"/>
             </lv_button>
           </lv_obj>
           <!-- Row 2: Fine adjustments -->
@@ -112,15 +118,19 @@
                   style_flex_main_place="center" style_pad_gap="#space_md" scrollable="false">
             <lv_button name="btn_z_down_001" width="100" height="56" style_radius="#border_radius">
               <text_small text="-0.01mm" align="center"/>
+              <event_cb trigger="clicked" callback="on_zoffset_z_down_001"/>
             </lv_button>
             <lv_button name="btn_z_down_005" width="100" height="56" style_radius="#border_radius">
               <text_small text="-0.05mm" align="center"/>
+              <event_cb trigger="clicked" callback="on_zoffset_z_down_005"/>
             </lv_button>
             <lv_button name="btn_z_up_005" width="100" height="56" style_radius="#border_radius">
               <text_small text="+0.05mm" align="center"/>
+              <event_cb trigger="clicked" callback="on_zoffset_z_up_005"/>
             </lv_button>
             <lv_button name="btn_z_up_001" width="100" height="56" style_radius="#border_radius">
               <text_small text="+0.01mm" align="center"/>
+              <event_cb trigger="clicked" callback="on_zoffset_z_up_001"/>
             </lv_button>
           </lv_obj>
         </lv_obj>
@@ -133,15 +143,17 @@
           <lv_button name="btn_abort"
                      width="140" height="56" style_radius="#border_radius" style_bg_color="#error_color">
             <text_body text="Abort" align="center"/>
+            <event_cb trigger="clicked" callback="on_zoffset_abort_clicked"/>
           </lv_button>
           <lv_button name="btn_accept"
                      width="200" height="56" style_radius="#border_radius" style_bg_color="#success_color">
             <text_body text="Accept" align="center"/>
+            <event_cb trigger="clicked" callback="on_zoffset_accept_clicked"/>
           </lv_button>
         </lv_obj>
       </lv_obj>
       <!-- ================================================================== -->
-      <!-- STATE: SAVING - Saving configuration -->
+      <!-- STATE: SAVING (3) - Saving configuration -->
       <!-- ================================================================== -->
       <lv_obj name="state_saving"
               width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
@@ -155,7 +167,7 @@
                     style_text_color="#text_secondary"/>
       </lv_obj>
       <!-- ================================================================== -->
-      <!-- STATE: COMPLETE - Calibration finished -->
+      <!-- STATE: COMPLETE (4) - Calibration finished -->
       <!-- ================================================================== -->
       <lv_obj name="state_complete"
               width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
@@ -167,10 +179,11 @@
         <text_body name="final_offset_label" text="New Z-Offset: 0.000" style_text_color="#text_secondary"/>
         <lv_button name="btn_done" width="140" height="56" style_radius="#border_radius">
           <text_body text="Done" align="center"/>
+          <event_cb trigger="clicked" callback="on_zoffset_done_clicked"/>
         </lv_button>
       </lv_obj>
       <!-- ================================================================== -->
-      <!-- STATE: ERROR - Something went wrong -->
+      <!-- STATE: ERROR (5) - Something went wrong -->
       <!-- ================================================================== -->
       <lv_obj name="state_error"
               width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
@@ -187,10 +200,12 @@
                 style_flex_main_place="center" style_pad_gap="#space_md" scrollable="false">
           <lv_button name="btn_close_error" width="140" height="56" style_radius="#border_radius">
             <text_body text="Close" align="center"/>
+            <event_cb trigger="clicked" callback="on_zoffset_done_clicked"/>
           </lv_button>
           <lv_button name="btn_retry"
                      width="140" height="56" style_radius="#border_radius" style_bg_color="#primary_color">
             <text_body text="Retry" align="center"/>
+            <event_cb trigger="clicked" callback="on_zoffset_retry_clicked"/>
           </lv_button>
         </lv_obj>
       </lv_obj>

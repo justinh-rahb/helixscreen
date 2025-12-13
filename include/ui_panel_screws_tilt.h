@@ -102,6 +102,7 @@ class ScrewsTiltPanel {
 
   private:
     bool subjects_initialized_ = false;
+
     // State management
     State state_ = State::IDLE;
     void set_state(State new_state);

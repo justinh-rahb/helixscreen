@@ -101,12 +101,39 @@ void WizardFanSelectStep::init_subjects() {
 }
 
 // ============================================================================
+// Static Callbacks (XML event_cb pattern)
+// ============================================================================
+
+static void on_hotend_fan_dropdown_changed(lv_event_t* e) {
+    auto* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
+    auto* step = get_wizard_fan_select_step();
+    if (step) {
+        lv_subject_set_int(step->get_hotend_fan_subject(), index);
+        spdlog::debug("[WizardFanSelectStep] Hotend fan selection changed to index {}", index);
+    }
+}
+
+static void on_part_fan_dropdown_changed(lv_event_t* e) {
+    auto* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
+    auto* step = get_wizard_fan_select_step();
+    if (step) {
+        lv_subject_set_int(step->get_part_fan_subject(), index);
+        spdlog::debug("[WizardFanSelectStep] Part fan selection changed to index {}", index);
+    }
+}
+
+// ============================================================================
 // Callback Registration
 // ============================================================================
 
 void WizardFanSelectStep::register_callbacks() {
-    // No XML callbacks needed - dropdowns attached programmatically in create()
-    spdlog::debug("[{}] Callback registration (none needed for hardware selectors)", get_name());
+    // Register XML event callbacks for dropdown value changes
+    lv_xml_register_event_cb(nullptr, "on_hotend_fan_dropdown_changed",
+                             on_hotend_fan_dropdown_changed);
+    lv_xml_register_event_cb(nullptr, "on_part_fan_dropdown_changed", on_part_fan_dropdown_changed);
+    spdlog::debug("[{}] Registered dropdown callbacks", get_name());
 }
 
 // ============================================================================
@@ -181,25 +208,23 @@ lv_obj_t* WizardFanSelectStep::create(lv_obj_t* parent) {
     }
 
     // Find and configure hotend fan dropdown
+    // Event handler is wired via XML <event_cb>
     lv_obj_t* hotend_dropdown = lv_obj_find_by_name(screen_root_, "hotend_fan_dropdown");
     if (hotend_dropdown) {
         lv_dropdown_set_options(hotend_dropdown, hotend_options_str.c_str());
         helix::ui::wizard::restore_dropdown_selection(hotend_dropdown, &hotend_fan_selected_,
                                                       hotend_fan_items_, helix::wizard::HOTEND_FAN,
                                                       hw.get(), nullptr, "[Wizard Fan]");
-        lv_obj_add_event_cb(hotend_dropdown, wizard_hardware_dropdown_changed_cb,
-                            LV_EVENT_VALUE_CHANGED, &hotend_fan_selected_);
     }
 
     // Find and configure part fan dropdown
+    // Event handler is wired via XML <event_cb>
     lv_obj_t* part_dropdown = lv_obj_find_by_name(screen_root_, "part_cooling_fan_dropdown");
     if (part_dropdown) {
         lv_dropdown_set_options(part_dropdown, part_options_str.c_str());
         helix::ui::wizard::restore_dropdown_selection(
             part_dropdown, &part_fan_selected_, part_fan_items_, helix::wizard::PART_FAN, hw.get(),
             [](const PrinterHardware& h) { return h.guess_part_cooling_fan(); }, "[Wizard Fan]");
-        lv_obj_add_event_cb(part_dropdown, wizard_hardware_dropdown_changed_cb,
-                            LV_EVENT_VALUE_CHANGED, &part_fan_selected_);
     }
 
     spdlog::debug("[{}] Screen created successfully", get_name());

@@ -89,12 +89,30 @@ void SettingsPanel::init_subjects() {
     // Initialize SettingsManager subjects (for reactive binding)
     SettingsManager::instance().init_subjects();
 
-    // Register XML event callbacks
+    // Register XML event callbacks for dropdowns (already in XML)
     lv_xml_register_event_cb(nullptr, "on_completion_alert_changed",
                              on_completion_alert_dropdown_changed);
     lv_xml_register_event_cb(nullptr, "on_display_sleep_changed",
                              on_display_sleep_dropdown_changed);
     lv_xml_register_event_cb(nullptr, "on_version_long_pressed", on_version_long_pressed);
+
+    // Register XML event callbacks for toggle switches
+    lv_xml_register_event_cb(nullptr, "on_dark_mode_changed", on_dark_mode_changed);
+    lv_xml_register_event_cb(nullptr, "on_led_light_changed", on_led_light_changed);
+    lv_xml_register_event_cb(nullptr, "on_sounds_changed", on_sounds_changed);
+    lv_xml_register_event_cb(nullptr, "on_estop_confirm_changed", on_estop_confirm_changed);
+
+    // Register XML event callbacks for sliders
+    lv_xml_register_event_cb(nullptr, "on_scroll_throw_changed", on_scroll_throw_changed);
+    lv_xml_register_event_cb(nullptr, "on_scroll_limit_changed", on_scroll_limit_changed);
+
+    // Register XML event callbacks for action rows
+    lv_xml_register_event_cb(nullptr, "on_display_settings_clicked", on_display_settings_clicked);
+    lv_xml_register_event_cb(nullptr, "on_bed_mesh_clicked", on_bed_mesh_clicked);
+    lv_xml_register_event_cb(nullptr, "on_z_offset_clicked", on_z_offset_clicked);
+    lv_xml_register_event_cb(nullptr, "on_pid_tuning_clicked", on_pid_tuning_clicked);
+    lv_xml_register_event_cb(nullptr, "on_network_clicked", on_network_clicked);
+    lv_xml_register_event_cb(nullptr, "on_factory_reset_clicked", on_factory_reset_clicked);
 
     // Note: BedMeshPanel subjects are initialized in main.cpp during startup
 
@@ -128,6 +146,7 @@ void SettingsPanel::setup_toggle_handlers() {
     auto& settings = SettingsManager::instance();
 
     // === Dark Mode Toggle ===
+    // Event handler wired via XML <event_cb>, just set initial state here
     lv_obj_t* dark_mode_row = lv_obj_find_by_name(panel_, "row_dark_mode");
     if (dark_mode_row) {
         dark_mode_switch_ = lv_obj_find_by_name(dark_mode_row, "toggle");
@@ -138,13 +157,12 @@ void SettingsPanel::setup_toggle_handlers() {
             } else {
                 lv_obj_remove_state(dark_mode_switch_, LV_STATE_CHECKED);
             }
-            lv_obj_add_event_cb(dark_mode_switch_, on_dark_mode_changed, LV_EVENT_VALUE_CHANGED,
-                                this);
             spdlog::debug("[{}]   ✓ Dark mode toggle", get_name());
         }
     }
 
     // === LED Light Toggle ===
+    // Event handler wired via XML <event_cb>, just set initial state here
     lv_obj_t* led_light_row = lv_obj_find_by_name(panel_, "row_led_light");
     if (led_light_row) {
         led_light_switch_ = lv_obj_find_by_name(led_light_row, "toggle");
@@ -153,13 +171,12 @@ void SettingsPanel::setup_toggle_handlers() {
             if (settings.get_led_enabled()) {
                 lv_obj_add_state(led_light_switch_, LV_STATE_CHECKED);
             }
-            lv_obj_add_event_cb(led_light_switch_, on_led_light_changed, LV_EVENT_VALUE_CHANGED,
-                                this);
             spdlog::debug("[{}]   ✓ LED light toggle", get_name());
         }
     }
 
-    // === Sounds Toggle (placeholder) ===
+    // === Sounds Toggle ===
+    // Event handler wired via XML <event_cb>, just set initial state here
     lv_obj_t* sounds_row = lv_obj_find_by_name(panel_, "row_sounds");
     if (sounds_row) {
         sounds_switch_ = lv_obj_find_by_name(sounds_row, "toggle");
@@ -167,13 +184,12 @@ void SettingsPanel::setup_toggle_handlers() {
             if (settings.get_sounds_enabled()) {
                 lv_obj_add_state(sounds_switch_, LV_STATE_CHECKED);
             }
-            lv_obj_add_event_cb(sounds_switch_, on_sounds_changed, LV_EVENT_VALUE_CHANGED, this);
             spdlog::debug("[{}]   ✓ Sounds toggle", get_name());
         }
     }
 
     // === Completion Alert Dropdown ===
-    // Event handler is wired via XML <event_cb>, just set initial value here
+    // Event handler wired via XML <event_cb>, just set initial value here
     lv_obj_t* completion_row = lv_obj_find_by_name(panel_, "row_completion_alert");
     if (completion_row) {
         completion_alert_dropdown_ =
@@ -187,6 +203,7 @@ void SettingsPanel::setup_toggle_handlers() {
     }
 
     // === E-Stop Confirmation Toggle ===
+    // Event handler wired via XML <event_cb>, just set initial state here
     lv_obj_t* estop_confirm_row = lv_obj_find_by_name(panel_, "row_estop_confirm");
     if (estop_confirm_row) {
         estop_confirm_switch_ = lv_obj_find_by_name(estop_confirm_row, "toggle");
@@ -194,8 +211,6 @@ void SettingsPanel::setup_toggle_handlers() {
             if (settings.get_estop_require_confirmation()) {
                 lv_obj_add_state(estop_confirm_switch_, LV_STATE_CHECKED);
             }
-            lv_obj_add_event_cb(estop_confirm_switch_, on_estop_confirm_changed,
-                                LV_EVENT_VALUE_CHANGED, this);
             spdlog::debug("[{}]   ✓ E-Stop confirmation toggle", get_name());
         }
     }
@@ -205,6 +220,7 @@ void SettingsPanel::setup_scroll_sliders() {
     auto& settings = SettingsManager::instance();
 
     // === Scroll Throw (Momentum) Slider ===
+    // Event handler wired via XML <event_cb>, just set initial state here
     lv_obj_t* scroll_throw_row = lv_obj_find_by_name(panel_, "row_scroll_throw");
     if (scroll_throw_row) {
         scroll_throw_slider_ = lv_obj_find_by_name(scroll_throw_row, "slider");
@@ -217,31 +233,12 @@ void SettingsPanel::setup_scroll_sliders() {
             if (scroll_throw_value_label_) {
                 lv_label_set_text_fmt(scroll_throw_value_label_, "%d", value);
             }
-
-            // Store value label pointer for callback
-            lv_obj_set_user_data(scroll_throw_slider_, scroll_throw_value_label_);
-
-            // Wire up value change with lambda
-            lv_obj_add_event_cb(
-                scroll_throw_slider_,
-                [](lv_event_t* e) {
-                    auto* panel = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-                    auto* slider = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-                    int value = lv_slider_get_value(slider);
-                    panel->handle_scroll_throw_changed(value);
-
-                    // Update label
-                    auto* label = static_cast<lv_obj_t*>(lv_obj_get_user_data(slider));
-                    if (label) {
-                        lv_label_set_text_fmt(label, "%d", value);
-                    }
-                },
-                LV_EVENT_VALUE_CHANGED, this);
             spdlog::debug("[{}]   ✓ Scroll throw slider", get_name());
         }
     }
 
     // === Scroll Limit (Sensitivity) Slider ===
+    // Event handler wired via XML <event_cb>, just set initial state here
     lv_obj_t* scroll_limit_row = lv_obj_find_by_name(panel_, "row_scroll_limit");
     if (scroll_limit_row) {
         scroll_limit_slider_ = lv_obj_find_by_name(scroll_limit_row, "slider");
@@ -254,72 +251,48 @@ void SettingsPanel::setup_scroll_sliders() {
             if (scroll_limit_value_label_) {
                 lv_label_set_text_fmt(scroll_limit_value_label_, "%d", value);
             }
-
-            // Store value label pointer for callback
-            lv_obj_set_user_data(scroll_limit_slider_, scroll_limit_value_label_);
-
-            // Wire up value change with lambda
-            lv_obj_add_event_cb(
-                scroll_limit_slider_,
-                [](lv_event_t* e) {
-                    auto* panel = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-                    auto* slider = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-                    int value = lv_slider_get_value(slider);
-                    panel->handle_scroll_limit_changed(value);
-
-                    // Update label
-                    auto* label = static_cast<lv_obj_t*>(lv_obj_get_user_data(slider));
-                    if (label) {
-                        lv_label_set_text_fmt(label, "%d", value);
-                    }
-                },
-                LV_EVENT_VALUE_CHANGED, this);
             spdlog::debug("[{}]   ✓ Scroll limit slider", get_name());
         }
     }
 }
 
 void SettingsPanel::setup_action_handlers() {
+    // All action row event handlers are wired via XML <event_cb>
+    // Just cache the row references for potential future use
+
     // === Display Settings Row ===
     display_settings_row_ = lv_obj_find_by_name(panel_, "row_display_settings");
     if (display_settings_row_) {
-        lv_obj_add_event_cb(display_settings_row_, on_display_settings_clicked, LV_EVENT_CLICKED,
-                            this);
         spdlog::debug("[{}]   ✓ Display settings action row", get_name());
     }
 
     // === Bed Mesh Row ===
     bed_mesh_row_ = lv_obj_find_by_name(panel_, "row_bed_mesh");
     if (bed_mesh_row_) {
-        lv_obj_add_event_cb(bed_mesh_row_, on_bed_mesh_clicked, LV_EVENT_CLICKED, this);
         spdlog::debug("[{}]   ✓ Bed mesh action row", get_name());
     }
 
     // === Z-Offset Row ===
     z_offset_row_ = lv_obj_find_by_name(panel_, "row_z_offset");
     if (z_offset_row_) {
-        lv_obj_add_event_cb(z_offset_row_, on_z_offset_clicked, LV_EVENT_CLICKED, this);
         spdlog::debug("[{}]   ✓ Z-offset action row", get_name());
     }
 
     // === PID Tuning Row ===
     pid_tuning_row_ = lv_obj_find_by_name(panel_, "row_pid_tuning");
     if (pid_tuning_row_) {
-        lv_obj_add_event_cb(pid_tuning_row_, on_pid_tuning_clicked, LV_EVENT_CLICKED, this);
         spdlog::debug("[{}]   ✓ PID tuning action row", get_name());
     }
 
     // === Network Row ===
     network_row_ = lv_obj_find_by_name(panel_, "row_network");
     if (network_row_) {
-        lv_obj_add_event_cb(network_row_, on_network_clicked, LV_EVENT_CLICKED, this);
         spdlog::debug("[{}]   ✓ Network action row", get_name());
     }
 
     // === Factory Reset Row ===
     factory_reset_row_ = lv_obj_find_by_name(panel_, "row_factory_reset");
     if (factory_reset_row_) {
-        lv_obj_add_event_cb(factory_reset_row_, on_factory_reset_clicked, LV_EVENT_CLICKED, this);
         spdlog::debug("[{}]   ✓ Factory reset action row", get_name());
     }
 }
@@ -828,110 +801,108 @@ void SettingsPanel::handle_factory_reset_clicked() {
 }
 
 // ============================================================================
-// STATIC TRAMPOLINES
+// STATIC TRAMPOLINES (XML event_cb pattern - use global singleton)
 // ============================================================================
 
 void SettingsPanel::on_dark_mode_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_dark_mode_changed");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self && self->dark_mode_switch_) {
-        bool enabled = lv_obj_has_state(self->dark_mode_switch_, LV_STATE_CHECKED);
-        self->handle_dark_mode_changed(enabled);
-    }
+    auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    get_global_settings_panel().handle_dark_mode_changed(enabled);
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void SettingsPanel::on_display_sleep_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_display_sleep_changed");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self && self->display_sleep_dropdown_) {
-        int index = static_cast<int>(lv_dropdown_get_selected(self->display_sleep_dropdown_));
-        self->handle_display_sleep_changed(index);
-    }
+    auto* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
+    get_global_settings_panel().handle_display_sleep_changed(index);
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void SettingsPanel::on_led_light_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_led_light_changed");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self && self->led_light_switch_) {
-        bool enabled = lv_obj_has_state(self->led_light_switch_, LV_STATE_CHECKED);
-        self->handle_led_light_changed(enabled);
-    }
+    auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    get_global_settings_panel().handle_led_light_changed(enabled);
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void SettingsPanel::on_sounds_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_sounds_changed");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self && self->sounds_switch_) {
-        bool enabled = lv_obj_has_state(self->sounds_switch_, LV_STATE_CHECKED);
-        self->handle_sounds_changed(enabled);
-    }
+    auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    get_global_settings_panel().handle_sounds_changed(enabled);
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void SettingsPanel::on_estop_confirm_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_estop_confirm_changed");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self && self->estop_confirm_switch_) {
-        bool enabled = lv_obj_has_state(self->estop_confirm_switch_, LV_STATE_CHECKED);
-        self->handle_estop_confirm_changed(enabled);
+    auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    get_global_settings_panel().handle_estop_confirm_changed(enabled);
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void SettingsPanel::on_scroll_throw_changed(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_scroll_throw_changed");
+    auto* slider = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int value = lv_slider_get_value(slider);
+    auto& panel = get_global_settings_panel();
+    panel.handle_scroll_throw_changed(value);
+    // Update the value label
+    if (panel.scroll_throw_value_label_) {
+        lv_label_set_text_fmt(panel.scroll_throw_value_label_, "%d", value);
     }
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void SettingsPanel::on_display_settings_clicked(lv_event_t* e) {
+void SettingsPanel::on_scroll_limit_changed(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_scroll_limit_changed");
+    auto* slider = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int value = lv_slider_get_value(slider);
+    auto& panel = get_global_settings_panel();
+    panel.handle_scroll_limit_changed(value);
+    // Update the value label
+    if (panel.scroll_limit_value_label_) {
+        lv_label_set_text_fmt(panel.scroll_limit_value_label_, "%d", value);
+    }
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void SettingsPanel::on_display_settings_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_display_settings_clicked");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_display_settings_clicked();
-    }
+    get_global_settings_panel().handle_display_settings_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void SettingsPanel::on_bed_mesh_clicked(lv_event_t* e) {
+void SettingsPanel::on_bed_mesh_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_bed_mesh_clicked");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_bed_mesh_clicked();
-    }
+    get_global_settings_panel().handle_bed_mesh_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void SettingsPanel::on_z_offset_clicked(lv_event_t* e) {
+void SettingsPanel::on_z_offset_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_z_offset_clicked");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_z_offset_clicked();
-    }
+    get_global_settings_panel().handle_z_offset_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void SettingsPanel::on_pid_tuning_clicked(lv_event_t* e) {
+void SettingsPanel::on_pid_tuning_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_pid_tuning_clicked");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_pid_tuning_clicked();
-    }
+    get_global_settings_panel().handle_pid_tuning_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void SettingsPanel::on_network_clicked(lv_event_t* e) {
+void SettingsPanel::on_network_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_network_clicked");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_network_clicked();
-    }
+    get_global_settings_panel().handle_network_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void SettingsPanel::on_factory_reset_clicked(lv_event_t* e) {
+void SettingsPanel::on_factory_reset_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_factory_reset_clicked");
-    auto* self = static_cast<SettingsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_factory_reset_clicked();
-    }
+    get_global_settings_panel().handle_factory_reset_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 

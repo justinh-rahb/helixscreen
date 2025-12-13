@@ -35,17 +35,20 @@
         <lv_button name="source_printer_btn"
                    width="content" height="22" style_radius="4" style_border_width="0" style_shadow_width="0"
                    style_pad_left="12" style_pad_right="12" style_pad_top="2" style_pad_bottom="2" scrollable="false">
+          <event_cb trigger="clicked" callback="on_print_select_source_printer"/>
           <text_body text="Printer" scrollable="false"/>
         </lv_button>
         <lv_button name="source_usb_btn"
                    width="content" height="22" style_radius="4" style_border_width="0" style_shadow_width="0"
                    style_pad_left="12" style_pad_right="12" style_pad_top="2" style_pad_bottom="2" scrollable="false">
+          <event_cb trigger="clicked" callback="on_print_select_source_usb"/>
           <text_body text="USB" scrollable="false"/>
         </lv_button>
       </lv_obj>
       <!-- View toggle button (icon-only, compact) -->
       <lv_button name="view_toggle_btn"
                  height="content" style_bg_opa="0" style_border_width="0" style_shadow_width="0" style_pad_all="0">
+        <event_cb trigger="clicked" callback="on_print_select_view_toggle"/>
         <icon name="view_toggle_icon" src="list" size="sm" variant="primary"/>
       </lv_button>
     </lv_obj>

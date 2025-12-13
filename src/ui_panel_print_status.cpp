@@ -189,6 +189,15 @@ void PrintStatusPanel::init_subjects() {
     lv_xml_register_event_cb(nullptr, "on_tune_z_offset", on_tune_z_offset_cb);
     lv_xml_register_event_cb(nullptr, "on_tune_save_z_offset", on_tune_save_z_offset_cb);
 
+    // Register XML event callbacks for print status panel buttons
+    lv_xml_register_event_cb(nullptr, "on_print_status_light", on_light_clicked);
+    lv_xml_register_event_cb(nullptr, "on_print_status_timelapse", on_timelapse_clicked);
+    lv_xml_register_event_cb(nullptr, "on_print_status_pause", on_pause_clicked);
+    lv_xml_register_event_cb(nullptr, "on_print_status_tune", on_tune_clicked);
+    lv_xml_register_event_cb(nullptr, "on_print_status_cancel", on_cancel_clicked);
+    lv_xml_register_event_cb(nullptr, "on_print_status_nozzle_clicked", on_nozzle_card_clicked);
+    lv_xml_register_event_cb(nullptr, "on_print_status_bed_clicked", on_bed_card_clicked);
+
     subjects_initialized_ = true;
     spdlog::debug("[{}] Subjects initialized (17 subjects)", get_name());
 }
@@ -249,72 +258,11 @@ void PrintStatusPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     ui_resize_handler_register(on_resize_static);
     resize_registered_ = true;
 
-    // Wire up event handlers
-    spdlog::debug("[{}] Wiring event handlers...", get_name());
-
-    // Nozzle temperature card
-    lv_obj_t* nozzle_card = lv_obj_find_by_name(overlay_content, "nozzle_temp_card");
-    if (nozzle_card) {
-        lv_obj_add_event_cb(nozzle_card, on_nozzle_card_clicked, LV_EVENT_CLICKED, this);
-        spdlog::debug("[{}]   ✓ Nozzle temp card", get_name());
-    } else {
-        spdlog::error("[{}]   ✗ Nozzle temp card NOT FOUND", get_name());
-    }
-
-    // Bed temperature card
-    lv_obj_t* bed_card = lv_obj_find_by_name(overlay_content, "bed_temp_card");
-    if (bed_card) {
-        lv_obj_add_event_cb(bed_card, on_bed_card_clicked, LV_EVENT_CLICKED, this);
-        spdlog::debug("[{}]   ✓ Bed temp card", get_name());
-    } else {
-        spdlog::error("[{}]   ✗ Bed temp card NOT FOUND", get_name());
-    }
-
-    // Light button
-    lv_obj_t* light_btn = lv_obj_find_by_name(overlay_content, "btn_light");
-    if (light_btn) {
-        lv_obj_add_event_cb(light_btn, on_light_clicked, LV_EVENT_CLICKED, this);
-        spdlog::debug("[{}]   ✓ Light button", get_name());
-    } else {
-        spdlog::error("[{}]   ✗ Light button NOT FOUND", get_name());
-    }
-
-    // Timelapse button (only visible when Moonraker-Timelapse plugin is installed)
+    // Store button references for potential state queries (not event wiring - that's in XML)
     btn_timelapse_ = lv_obj_find_by_name(overlay_content, "btn_timelapse");
-    if (btn_timelapse_) {
-        lv_obj_add_event_cb(btn_timelapse_, on_timelapse_clicked, LV_EVENT_CLICKED, this);
-        spdlog::debug("[{}]   ✓ Timelapse button", get_name());
-    } else {
-        // Not an error - button may be hidden via XML if timelapse not available
-        spdlog::debug("[{}]   - Timelapse button not found (may be hidden)", get_name());
-    }
-
-    // Pause button
     btn_pause_ = lv_obj_find_by_name(overlay_content, "btn_pause");
-    if (btn_pause_) {
-        lv_obj_add_event_cb(btn_pause_, on_pause_clicked, LV_EVENT_CLICKED, this);
-        spdlog::debug("[{}]   ✓ Pause button", get_name());
-    } else {
-        spdlog::error("[{}]   ✗ Pause button NOT FOUND", get_name());
-    }
-
-    // Tune button
     btn_tune_ = lv_obj_find_by_name(overlay_content, "btn_tune");
-    if (btn_tune_) {
-        lv_obj_add_event_cb(btn_tune_, on_tune_clicked, LV_EVENT_CLICKED, this);
-        spdlog::debug("[{}]   ✓ Tune button", get_name());
-    } else {
-        spdlog::error("[{}]   ✗ Tune button NOT FOUND", get_name());
-    }
-
-    // Cancel button
     btn_cancel_ = lv_obj_find_by_name(overlay_content, "btn_cancel");
-    if (btn_cancel_) {
-        lv_obj_add_event_cb(btn_cancel_, on_cancel_clicked, LV_EVENT_CLICKED, this);
-        spdlog::debug("[{}]   ✓ Cancel button", get_name());
-    } else {
-        spdlog::error("[{}]   ✗ Cancel button NOT FOUND", get_name());
-    }
 
     // Progress bar widget
     progress_bar_ = lv_obj_find_by_name(overlay_content, "print_progress");
@@ -776,64 +724,50 @@ void PrintStatusPanel::handle_resize() {
 
 void PrintStatusPanel::on_nozzle_card_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_nozzle_card_clicked");
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_nozzle_card_click();
-    }
+    (void)e;
+    get_global_print_status_panel().handle_nozzle_card_click();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PrintStatusPanel::on_bed_card_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_bed_card_clicked");
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_bed_card_click();
-    }
+    (void)e;
+    get_global_print_status_panel().handle_bed_card_click();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PrintStatusPanel::on_light_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_light_clicked");
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_light_button();
-    }
+    (void)e;
+    get_global_print_status_panel().handle_light_button();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PrintStatusPanel::on_timelapse_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_timelapse_clicked");
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_timelapse_button();
-    }
+    (void)e;
+    get_global_print_status_panel().handle_timelapse_button();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PrintStatusPanel::on_pause_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_pause_clicked");
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_pause_button();
-    }
+    (void)e;
+    get_global_print_status_panel().handle_pause_button();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PrintStatusPanel::on_tune_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_tune_clicked");
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_tune_button();
-    }
+    (void)e;
+    get_global_print_status_panel().handle_tune_button();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PrintStatusPanel::on_cancel_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_cancel_clicked");
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_cancel_button();
-    }
+    (void)e;
+    get_global_print_status_panel().handle_cancel_button();
     LVGL_SAFE_EVENT_CB_END();
 }
 

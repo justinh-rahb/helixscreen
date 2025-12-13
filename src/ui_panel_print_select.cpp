@@ -47,6 +47,33 @@ PrintSelectPanel* get_print_select_panel(PrinterState& printer_state, MoonrakerA
     return g_print_select_panel.get();
 }
 
+PrintSelectPanel& get_global_print_select_panel() {
+    if (!g_print_select_panel) {
+        spdlog::error(
+            "[PrintSelectPanel] get_global_print_select_panel() called before panel created");
+    }
+    return *g_print_select_panel;
+}
+
+// ============================================================================
+// Static XML Event Callbacks (registered via lv_xml_register_event_cb)
+// ============================================================================
+
+static void on_print_select_view_toggle(lv_event_t* e) {
+    (void)e;
+    get_global_print_select_panel().toggle_view();
+}
+
+static void on_print_select_source_printer(lv_event_t* e) {
+    (void)e;
+    get_global_print_select_panel().on_source_printer_clicked();
+}
+
+static void on_print_select_source_usb(lv_event_t* e) {
+    (void)e;
+    get_global_print_select_panel().on_source_usb_clicked();
+}
+
 // ============================================================================
 // Constructor / Destructor
 // ============================================================================
@@ -143,6 +170,12 @@ void PrintSelectPanel::init_subjects() {
     UI_SUBJECT_INIT_AND_REGISTER_INT(can_print_subject_, can_print ? 1 : 0,
                                      "print_select_can_print");
 
+    // Register XML event callbacks (must be done BEFORE XML is created)
+    lv_xml_register_event_cb(nullptr, "on_print_select_view_toggle", on_print_select_view_toggle);
+    lv_xml_register_event_cb(nullptr, "on_print_select_source_printer",
+                             on_print_select_source_printer);
+    lv_xml_register_event_cb(nullptr, "on_print_select_source_usb", on_print_select_source_usb);
+
     subjects_initialized_ = true;
     spdlog::debug("[{}] Subjects initialized", get_name());
 }
@@ -173,8 +206,7 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     lv_obj_add_event_cb(card_view_container_, on_scroll_static, LV_EVENT_SCROLL, this);
     lv_obj_add_event_cb(list_rows_container_, on_scroll_static, LV_EVENT_SCROLL, this);
 
-    // Wire up view toggle button
-    lv_obj_add_event_cb(view_toggle_btn_, on_view_toggle_clicked_static, LV_EVENT_CLICKED, this);
+    // Note: view_toggle_btn click handler is now in XML via <event_cb>
 
     // Setup source selector buttons (Printer/USB)
     setup_source_buttons();
@@ -2121,10 +2153,7 @@ void PrintSelectPanel::setup_source_buttons() {
         return;
     }
 
-    // Wire up click handlers
-    lv_obj_add_event_cb(source_printer_btn_, on_source_button_clicked_static, LV_EVENT_CLICKED,
-                        this);
-    lv_obj_add_event_cb(source_usb_btn_, on_source_button_clicked_static, LV_EVENT_CLICKED, this);
+    // Note: click handlers are now in XML via <event_cb>
 
     // Hide USB tab by default - will be shown when USB drive is inserted
     lv_obj_add_flag(source_usb_btn_, LV_OBJ_FLAG_HIDDEN);

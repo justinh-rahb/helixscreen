@@ -35,6 +35,7 @@
       <ui_card name="card_quick_actions"
                height="100%" flex_grow="1" flex_flow="column" flex_main_place="center" flex_cross_place="center"
                style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
+        <event_cb trigger="clicked" callback="on_controls_quick_actions"/>
         <icon src="home" size="md" variant="secondary"/>
         <text_small text="Quick Actions" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
         <!-- Home buttons row -->
@@ -86,6 +87,7 @@
       <ui_card name="card_temperatures"
                height="100%" flex_grow="1" flex_flow="column" flex_main_place="center" flex_cross_place="center"
                style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
+        <event_cb trigger="clicked" callback="on_controls_temperatures"/>
         <icon src="heater" size="md" variant="secondary"/>
         <text_small text="Temperatures" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
         <!-- Nozzle section -->
@@ -115,6 +117,7 @@
       <ui_card name="card_cooling"
                height="100%" flex_grow="1" flex_flow="column" flex_main_place="center" flex_cross_place="center"
                style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
+        <event_cb trigger="clicked" callback="on_controls_cooling"/>
         <icon name="fan_icon" src="fan" size="md" variant="secondary"/>
         <text_small text="Cooling" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
         <!-- Part cooling hero section -->
@@ -141,6 +144,7 @@
       <ui_card name="card_filament"
                height="100%" flex_grow="2" flex_flow="column" flex_main_place="center" flex_cross_place="center"
                style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
+        <event_cb trigger="clicked" callback="on_controls_filament"/>
         <icon src="filament" size="md" variant="secondary"/>
         <text_small text="Filament" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
         <!-- Preheat preset buttons -->
@@ -208,6 +212,7 @@
       <ui_card name="card_calibration"
                height="100%" flex_grow="1" flex_flow="column" flex_main_place="center" flex_cross_place="center"
                style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
+        <event_cb trigger="clicked" callback="on_controls_calibration"/>
         <lv_obj width="content"
                 height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
                 flex_flow="row" flex_cross_place="center" style_pad_column="#space_sm">

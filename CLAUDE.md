@@ -76,6 +76,10 @@
 | 10 | Clang-format | Inconsistent formatting | Let pre-commit hook fix it |
 | 11 | **Icon font sync** | Add icon, forget `make regen-fonts` | Add to codepoints.h + regen_mdi_fonts.sh, run `make regen-fonts`, rebuild |
 | 12 | **XML event_cb** | `lv_obj_add_event_cb()` in C++ | `<event_cb trigger="clicked" callback="..."/>` in XML |
+| 13 | **NO lv_obj_add_event_cb()** | `lv_obj_add_event_cb(btn, cb, ...)` | XML `<event_cb trigger="clicked" callback="name"/>` + `lv_xml_register_event_cb()` |
+| 14 | **NO imperative visibility** | `lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN)` | XML `<bind_flag_if_eq subject="state" flag="hidden" ref_value="0"/>` |
+| 15 | **NO lv_label_set_text for data** | `lv_label_set_text(lbl, "value")` | Subject binding: `<text_body bind_text="my_subject"/>` |
+| 16 | **NO inline styling** | `lv_obj_set_style_bg_color(obj, ...)` | XML design tokens: `style_bg_color="#card_bg"` |
 
 **Rule 1 - Design Tokens (MANDATORY):**
 
@@ -105,6 +109,23 @@ lv_font_t* font = UI_FONT_SMALL;           // Responsive small font
 **Reference:** See `ui_icon.cpp` for semantic color usage pattern.
 
 **Rule 12 - XML event_cb:** Events ALWAYS in XML `<event_cb trigger="clicked" callback="name"/>`, register in C++ with `lv_xml_register_event_cb(nullptr, "name", func)`. **NEVER** `lv_obj_add_event_cb()`. See `hidden_network_modal.xml` + `ui_toast.cpp`.
+
+---
+
+## 🎯 Declarative UI Pattern (MANDATORY)
+
+**DATA lives in C++. APPEARANCE lives in XML. Subjects connect them.**
+
+| ❌ BANNED | ✅ USE INSTEAD |
+|-----------|----------------|
+| `lv_obj_add_event_cb()` | XML `<event_cb>` + `lv_xml_register_event_cb()` |
+| `lv_label_set_text()` | `bind_text` subject |
+| `lv_obj_add_flag(HIDDEN)` | `<bind_flag_if_eq>` |
+| `lv_obj_set_style_*()` | XML design tokens |
+
+**Exceptions**: DELETE cleanup, widget pool recycling, chart data points, animations.
+
+**Reference**: `ui_panel_bed_mesh.cpp` (gold standard), `docs/LVGL9_XML_GUIDE.md` (full examples)
 
 ---
 

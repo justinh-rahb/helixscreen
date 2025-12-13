@@ -163,6 +163,13 @@ void ControlsPanel::init_subjects() {
     // Z-Offset banner: Save button
     lv_xml_register_event_cb(nullptr, "on_controls_save_z_offset", on_save_z_offset);
 
+    // Card click handlers (navigation to full overlay panels)
+    lv_xml_register_event_cb(nullptr, "on_controls_quick_actions", on_quick_actions_clicked);
+    lv_xml_register_event_cb(nullptr, "on_controls_temperatures", on_temperatures_clicked);
+    lv_xml_register_event_cb(nullptr, "on_controls_cooling", on_cooling_clicked);
+    lv_xml_register_event_cb(nullptr, "on_controls_filament", on_filament_clicked);
+    lv_xml_register_event_cb(nullptr, "on_controls_calibration", on_calibration_clicked);
+
     subjects_initialized_ = true;
     spdlog::debug("[{}] Dashboard subjects initialized", get_name());
 }
@@ -199,9 +206,8 @@ void ControlsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 // ============================================================================
 
 void ControlsPanel::setup_card_handlers() {
-    // Card background clicks for navigation to full panels require manual wiring
-    // because they need to pass 'this' for lazy panel creation context.
-    // All button event handlers are wired via XML event_cb - see init_subjects().
+    // All card click handlers are now wired via XML event_cb - see init_subjects().
+    // This function is retained for validation and debugging purposes.
 
     lv_obj_t* card_quick_actions = lv_obj_find_by_name(panel_, "card_quick_actions");
     lv_obj_t* card_temperatures = lv_obj_find_by_name(panel_, "card_temperatures");
@@ -215,14 +221,8 @@ void ControlsPanel::setup_card_handlers() {
         return;
     }
 
-    // Wire card background clicks (navigation to full overlay panels)
-    lv_obj_add_event_cb(card_quick_actions, on_quick_actions_clicked, LV_EVENT_CLICKED, this);
-    lv_obj_add_event_cb(card_temperatures, on_temperatures_clicked, LV_EVENT_CLICKED, this);
-    lv_obj_add_event_cb(card_cooling, on_cooling_clicked, LV_EVENT_CLICKED, this);
-    lv_obj_add_event_cb(card_filament, on_filament_clicked, LV_EVENT_CLICKED, this);
-    lv_obj_add_event_cb(card_calibration, on_calibration_clicked, LV_EVENT_CLICKED, this);
-
-    spdlog::debug("[{}] V2 card navigation handlers wired", get_name());
+    spdlog::debug("[{}] V2 card navigation handlers validated (wired via XML event_cb)",
+                  get_name());
 }
 
 void ControlsPanel::register_observers() {
@@ -951,51 +951,41 @@ void ControlsPanel::handle_calibration_motors() {
 }
 
 // ============================================================================
-// V2 CARD CLICK TRAMPOLINES (manual wiring with user_data)
+// V2 CARD CLICK TRAMPOLINES (XML event_cb - use global accessor)
 // ============================================================================
 
 void ControlsPanel::on_quick_actions_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_quick_actions_clicked");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_quick_actions_clicked();
-    }
+    (void)e;
+    get_global_controls_panel().handle_quick_actions_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void ControlsPanel::on_temperatures_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_temperatures_clicked");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_temperatures_clicked();
-    }
+    (void)e;
+    get_global_controls_panel().handle_temperatures_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void ControlsPanel::on_cooling_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_cooling_clicked");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_cooling_clicked();
-    }
+    (void)e;
+    get_global_controls_panel().handle_cooling_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void ControlsPanel::on_filament_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_filament_clicked");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_filament_clicked();
-    }
+    (void)e;
+    get_global_controls_panel().handle_filament_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void ControlsPanel::on_calibration_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_calibration_clicked");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_calibration_clicked();
-    }
+    (void)e;
+    get_global_controls_panel().handle_calibration_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 

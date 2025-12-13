@@ -2711,6 +2711,182 @@ Unlike web browsers, there's no inspect tool. Use temporary background colors:
 
 ---
 
+## Event Callbacks (MANDATORY PATTERN)
+
+Events MUST be declared in XML and registered in C++. **NEVER use `lv_obj_add_event_cb()`**.
+
+### The Pattern
+
+**Step 1: Declare in XML**
+```xml
+<lv_button name="my_button">
+  <event_cb trigger="clicked" callback="on_my_button_clicked"/>
+  <text_body text="Click Me"/>
+</lv_button>
+
+<!-- Multiple events on same widget -->
+<lv_slider name="my_slider">
+  <event_cb trigger="value_changed" callback="on_slider_changed"/>
+  <event_cb trigger="released" callback="on_slider_released"/>
+</lv_slider>
+```
+
+**Step 2: Register in `init_subjects()` (BEFORE XML creation)**
+```cpp
+void MyPanel::init_subjects() {
+    // Register callbacks BEFORE XML is created
+    lv_xml_register_event_cb(nullptr, "on_my_button_clicked", on_button_clicked_cb);
+    lv_xml_register_event_cb(nullptr, "on_slider_changed", on_slider_changed_cb);
+    lv_xml_register_event_cb(nullptr, "on_slider_released", on_slider_released_cb);
+}
+```
+
+**Step 3: Implement callback (static function or lambda)**
+```cpp
+// Static function approach
+static void on_button_clicked_cb(lv_event_t* e) {
+    spdlog::info("Button clicked!");
+    // Update subjects, call APIs, etc.
+}
+
+// Lambda approach (inline in init_subjects)
+lv_xml_register_event_cb(nullptr, "on_slider_changed", [](lv_event_t* e) {
+    lv_obj_t* slider = lv_event_get_current_target(e);
+    int value = lv_slider_get_value(slider);
+    spdlog::info("Slider value: {}", value);
+});
+```
+
+### Common Triggers
+
+| Trigger | When Fired |
+|---------|------------|
+| `clicked` | Button/object clicked |
+| `value_changed` | Slider, dropdown, switch value changed |
+| `pressed` | Object pressed down |
+| `released` | Object released |
+| `focused` | Object gains focus |
+| `defocused` | Object loses focus |
+| `ready` | Text area input complete |
+
+### ❌ WRONG vs ✅ RIGHT
+
+```cpp
+// ❌ WRONG - Imperative event wiring (DO NOT DO THIS)
+void MyPanel::setup(lv_obj_t* panel, lv_obj_t* screen) {
+    lv_obj_t* btn = lv_obj_find_by_name(panel, "my_button");
+    lv_obj_add_event_cb(btn, on_click, LV_EVENT_CLICKED, this);  // BAD!
+}
+
+// ✅ RIGHT - Declarative event binding
+void MyPanel::init_subjects() {
+    lv_xml_register_event_cb(nullptr, "on_my_button_clicked", on_click_cb);
+}
+// Plus <event_cb> in XML
+```
+
+### Reference Implementation
+
+See `ui_panel_bed_mesh.cpp` for 35+ event callbacks using this pattern correctly.
+
+---
+
+## Mandatory Patterns Summary
+
+This section summarizes the architectural patterns that **MUST** be followed.
+
+### DATA ↔ APPEARANCE Separation
+
+| Responsibility | C++ | XML |
+|----------------|-----|-----|
+| Business logic | ✅ | ❌ |
+| API calls | ✅ | ❌ |
+| State machines | ✅ | ❌ |
+| Subject updates | ✅ | ❌ |
+| Layout structure | ❌ | ✅ |
+| Colors/styling | ❌ | ✅ |
+| Visibility states | ❌ | ✅ |
+| Text display | ❌ | ✅ |
+
+### Banned Patterns
+
+| Pattern | Why It's Banned | Correct Alternative |
+|---------|-----------------|---------------------|
+| `lv_obj_add_event_cb()` | Creates tight coupling | XML `<event_cb>` |
+| `lv_label_set_text()` | Bypasses reactive binding | `bind_text` subject |
+| `lv_obj_add_flag(HIDDEN)` | Visibility is UI state | `<bind_flag_if_eq>` |
+| `lv_obj_set_style_*()` | Styling belongs in XML | Design tokens in XML |
+
+### Acceptable Exceptions
+
+These specific cases MAY use imperative LVGL calls:
+
+1. **`LV_EVENT_DELETE` cleanup** - Lifecycle management
+2. **Widget pool recycling** - Virtual scroll card content
+3. **Chart data points** - Dynamic data series
+4. **Animations** - Programmatic keyframes
+5. **One-time `setup()`** - Finding widgets, storing pointers
+
+### Complete Example
+
+**XML (`example_panel.xml`):**
+```xml
+<component>
+  <view extends="lv_obj" width="100%" height="100%">
+    <!-- Text bound to subject -->
+    <text_body bind_text="status_text"/>
+
+    <!-- Visibility bound to state -->
+    <lv_obj name="loading_view">
+      <bind_flag_if_eq subject="panel_state" flag="hidden" ref_value="1"/>
+      <text_body text="Loading..."/>
+    </lv_obj>
+
+    <lv_obj name="content_view">
+      <bind_flag_if_eq subject="panel_state" flag="hidden" ref_value="0"/>
+
+      <!-- Event declared in XML -->
+      <lv_button name="action_btn">
+        <event_cb trigger="clicked" callback="on_action_clicked"/>
+        <text_body text="Do Action"/>
+      </lv_button>
+    </lv_obj>
+  </view>
+</component>
+```
+
+**C++ (`example_panel.cpp`):**
+```cpp
+void ExamplePanel::init_subjects() {
+    // 1. Initialize subjects
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(status_subject_, status_buffer_,
+                                        "Ready", "status_text");
+    UI_SUBJECT_INIT_AND_REGISTER_INT(state_subject_, 0, "panel_state");
+
+    // 2. Register event callbacks
+    lv_xml_register_event_cb(nullptr, "on_action_clicked", [](lv_event_t* e) {
+        spdlog::info("Action clicked!");
+        // Call APIs, update subjects, etc.
+    });
+}
+
+void ExamplePanel::show_loading() {
+    lv_subject_set_int(&state_subject_, 0);  // Shows loading_view
+}
+
+void ExamplePanel::show_content() {
+    lv_subject_set_int(&state_subject_, 1);  // Shows content_view
+}
+
+void ExamplePanel::update_status(const std::string& msg) {
+    snprintf(status_buffer_, sizeof(status_buffer_), "%s", msg.c_str());
+    lv_subject_copy_string(&status_subject_, status_buffer_);
+    // XML binding automatically updates the label
+}
+```
+
+---
+
 ## Resources
 
 ### Official Documentation
@@ -2736,6 +2912,11 @@ Unlike web browsers, there's no inspect tool. Use temporary background colors:
 ---
 
 ## Document History
+
+**2025-12-12:** Added mandatory pattern enforcement:
+- Event Callbacks section - Complete pattern for declarative event handling
+- Mandatory Patterns Summary - Banned patterns and acceptable exceptions
+- Complete example showing Subject bindings + event_cb pattern
 
 **2025-01-29:** Added verified LVGL 9.4 API patterns:
 - Section 3: Runtime Constants & Dynamic Configuration - Complete API reference with responsive design pattern

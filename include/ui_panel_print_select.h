@@ -179,6 +179,22 @@ class PrintSelectPanel : public PanelBase {
     void toggle_view();
 
     /**
+     * @brief Handle Printer source button click
+     *
+     * Switches to Printer (Moonraker) file source and refreshes file list.
+     * Called from XML event_cb handler.
+     */
+    void on_source_printer_clicked();
+
+    /**
+     * @brief Handle USB source button click
+     *
+     * Switches to USB file source and refreshes file list.
+     * Called from XML event_cb handler.
+     */
+    void on_source_usb_clicked();
+
+    /**
      * @brief Sort files by specified column
      *
      * Toggles direction if same column, otherwise sorts ascending.
@@ -671,16 +687,6 @@ class PrintSelectPanel : public PanelBase {
     void update_source_buttons();
 
     /**
-     * @brief Handle Printer source button click
-     */
-    void on_source_printer_clicked();
-
-    /**
-     * @brief Handle USB source button click
-     */
-    void on_source_usb_clicked();
-
-    /**
      * @brief Refresh USB file list
      *
      * Scans USB drives for G-code files and populates the view.
@@ -732,3 +738,11 @@ class PrintSelectPanel : public PanelBase {
  * @return Pointer to the global instance
  */
 PrintSelectPanel* get_print_select_panel(PrinterState& printer_state, MoonrakerAPI* api);
+
+/**
+ * @brief Get reference to the global PrintSelectPanel instance
+ *
+ * @note Must be called after get_print_select_panel() has been called at least once
+ * @return Reference to the global instance
+ */
+PrintSelectPanel& get_global_print_select_panel();

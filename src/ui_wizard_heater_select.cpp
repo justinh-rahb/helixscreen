@@ -100,12 +100,41 @@ void WizardHeaterSelectStep::init_subjects() {
 }
 
 // ============================================================================
+// Static Callbacks (XML event_cb pattern)
+// ============================================================================
+
+static void on_bed_heater_dropdown_changed(lv_event_t* e) {
+    auto* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
+    auto* step = get_wizard_heater_select_step();
+    if (step) {
+        lv_subject_set_int(step->get_bed_heater_subject(), index);
+        spdlog::debug("[WizardHeaterSelectStep] Bed heater selection changed to index {}", index);
+    }
+}
+
+static void on_hotend_heater_dropdown_changed(lv_event_t* e) {
+    auto* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
+    auto* step = get_wizard_heater_select_step();
+    if (step) {
+        lv_subject_set_int(step->get_hotend_heater_subject(), index);
+        spdlog::debug("[WizardHeaterSelectStep] Hotend heater selection changed to index {}",
+                      index);
+    }
+}
+
+// ============================================================================
 // Callback Registration
 // ============================================================================
 
 void WizardHeaterSelectStep::register_callbacks() {
-    // No XML callbacks needed - dropdowns attached programmatically in create()
-    spdlog::debug("[{}] Callback registration (none needed for hardware selectors)", get_name());
+    // Register XML event callbacks for dropdown value changes
+    lv_xml_register_event_cb(nullptr, "on_bed_heater_dropdown_changed",
+                             on_bed_heater_dropdown_changed);
+    lv_xml_register_event_cb(nullptr, "on_hotend_heater_dropdown_changed",
+                             on_hotend_heater_dropdown_changed);
+    spdlog::debug("[{}] Registered dropdown callbacks", get_name());
 }
 
 // ============================================================================
@@ -133,6 +162,7 @@ lv_obj_t* WizardHeaterSelectStep::create(lv_obj_t* parent) {
     }
 
     // Populate bed heater dropdown (discover + filter + populate + restore)
+    // Event handler is wired via XML <event_cb>
     wizard_populate_hardware_dropdown(
         screen_root_, "bed_heater_dropdown", &bed_heater_selected_, bed_heater_items_,
         [](MoonrakerClient* c) -> const auto& { return c->get_heaters(); },
@@ -141,14 +171,8 @@ lv_obj_t* WizardHeaterSelectStep::create(lv_obj_t* parent) {
         helix::wizard::BED_HEATER, [](const PrinterHardware& hw) { return hw.guess_bed_heater(); },
         "[Wizard Heater]");
 
-    // Attach bed heater dropdown callback programmatically
-    lv_obj_t* bed_heater_dropdown = lv_obj_find_by_name(screen_root_, "bed_heater_dropdown");
-    if (bed_heater_dropdown) {
-        lv_obj_add_event_cb(bed_heater_dropdown, wizard_hardware_dropdown_changed_cb,
-                            LV_EVENT_VALUE_CHANGED, &bed_heater_selected_);
-    }
-
     // Populate hotend heater dropdown (discover + filter + populate + restore)
+    // Event handler is wired via XML <event_cb>
     wizard_populate_hardware_dropdown(
         screen_root_, "hotend_heater_dropdown", &hotend_heater_selected_, hotend_heater_items_,
         [](MoonrakerClient* c) -> const auto& { return c->get_heaters(); },
@@ -156,13 +180,6 @@ lv_obj_t* WizardHeaterSelectStep::create(lv_obj_t* parent) {
         true,       // Allow "None" option
         helix::wizard::HOTEND_HEATER,
         [](const PrinterHardware& hw) { return hw.guess_hotend_heater(); }, "[Wizard Heater]");
-
-    // Attach hotend heater dropdown callback programmatically
-    lv_obj_t* hotend_heater_dropdown = lv_obj_find_by_name(screen_root_, "hotend_heater_dropdown");
-    if (hotend_heater_dropdown) {
-        lv_obj_add_event_cb(hotend_heater_dropdown, wizard_hardware_dropdown_changed_cb,
-                            LV_EVENT_VALUE_CHANGED, &hotend_heater_selected_);
-    }
 
     spdlog::debug("[{}] Screen created successfully", get_name());
     return screen_root_;

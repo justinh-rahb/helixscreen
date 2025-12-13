@@ -154,6 +154,8 @@ class SettingsPanel : public PanelBase {
     static void on_led_light_changed(lv_event_t* e);
     static void on_sounds_changed(lv_event_t* e);
     static void on_estop_confirm_changed(lv_event_t* e);
+    static void on_scroll_throw_changed(lv_event_t* e);
+    static void on_scroll_limit_changed(lv_event_t* e);
 
     static void on_display_settings_clicked(lv_event_t* e);
     static void on_bed_mesh_clicked(lv_event_t* e);
