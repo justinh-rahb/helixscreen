@@ -110,10 +110,13 @@ void MoonrakerClientMock::set_mock_state(std::shared_ptr<MockPrinterState> state
 }
 
 MoonrakerClientMock::~MoonrakerClientMock() {
-    // Signal restart thread to stop and wait for it
-    restart_pending_.store(false);
-    if (restart_thread_.joinable()) {
-        restart_thread_.join();
+    // Signal restart thread to stop and wait for it (under lock to prevent race)
+    {
+        std::lock_guard<std::mutex> lock(restart_mutex_);
+        restart_pending_.store(false);
+        if (restart_thread_.joinable()) {
+            restart_thread_.join();
+        }
     }
 
     // Pass true to skip logging during destruction - spdlog may already be destroyed
@@ -1780,21 +1783,22 @@ void MoonrakerClientMock::set_bed_target(double target) {
 }
 
 void MoonrakerClientMock::start_temperature_simulation() {
-    if (simulation_running_.load()) {
-        return; // Already running
+    // Use exchange for atomic check-and-set - prevents race condition if called concurrently
+    if (simulation_running_.exchange(true)) {
+        return; // Was already running
     }
 
-    simulation_running_.store(true);
     simulation_thread_ = std::thread(&MoonrakerClientMock::temperature_simulation_loop, this);
     spdlog::info("[MoonrakerClientMock] Temperature simulation started");
 }
 
 void MoonrakerClientMock::stop_temperature_simulation(bool during_destruction) {
-    if (!simulation_running_.load()) {
-        return; // Not running
+    // Use exchange for atomic check-and-clear - prevents double-join race condition
+    // This ensures only one caller proceeds to join the thread
+    if (!simulation_running_.exchange(false)) {
+        return; // Was already stopped (or never started)
     }
 
-    simulation_running_.store(false);
     if (simulation_thread_.joinable()) {
         simulation_thread_.join();
     }
@@ -2324,41 +2328,44 @@ void MoonrakerClientMock::trigger_restart(bool is_firmware) {
     // Apply speedup factor to delay
     double effective_delay = delay_sec / speedup_factor_.load();
 
-    // Cancel and wait for any existing restart thread
-    restart_pending_.store(false);
-    if (restart_thread_.joinable()) {
-        restart_thread_.join();
-    }
-
-    // Launch new restart thread
-    restart_pending_.store(true);
-    restart_thread_ = std::thread([this, effective_delay, is_firmware]() {
-        // Sleep in small increments to allow early exit on destruction
-        int total_ms = static_cast<int>(effective_delay * 1000);
-        int elapsed_ms = 0;
-        constexpr int SLEEP_INTERVAL_MS = 100;
-
-        while (elapsed_ms < total_ms && restart_pending_.load()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_INTERVAL_MS));
-            elapsed_ms += SLEEP_INTERVAL_MS;
-        }
-
-        // Check if we were cancelled
-        if (!restart_pending_.load()) {
-            return;
-        }
-
-        // Return to ready state
-        klippy_state_.store(KlippyState::READY);
-
-        // Dispatch ready notification
-        json ready_status = {
-            {"webhooks", {{"state", "ready"}, {"state_message", "Printer is ready"}}}};
-        dispatch_status_update(ready_status);
-
-        spdlog::info("[MoonrakerClientMock] {} complete - klippy_state='ready'",
-                     is_firmware ? "FIRMWARE_RESTART" : "RESTART");
-
+    // Cancel and wait for any existing restart thread (under lock to prevent race with destructor)
+    {
+        std::lock_guard<std::mutex> lock(restart_mutex_);
         restart_pending_.store(false);
-    });
+        if (restart_thread_.joinable()) {
+            restart_thread_.join();
+        }
+
+        // Launch new restart thread (still under lock to prevent race on assignment)
+        restart_pending_.store(true);
+        restart_thread_ = std::thread([this, effective_delay, is_firmware]() {
+            // Sleep in small increments to allow early exit on destruction
+            int total_ms = static_cast<int>(effective_delay * 1000);
+            int elapsed_ms = 0;
+            constexpr int SLEEP_INTERVAL_MS = 100;
+
+            while (elapsed_ms < total_ms && restart_pending_.load()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_INTERVAL_MS));
+                elapsed_ms += SLEEP_INTERVAL_MS;
+            }
+
+            // Check if we were cancelled
+            if (!restart_pending_.load()) {
+                return;
+            }
+
+            // Return to ready state
+            klippy_state_.store(KlippyState::READY);
+
+            // Dispatch ready notification
+            json ready_status = {
+                {"webhooks", {{"state", "ready"}, {"state_message", "Printer is ready"}}}};
+            dispatch_status_update(ready_status);
+
+            spdlog::info("[MoonrakerClientMock] {} complete - klippy_state='ready'",
+                         is_firmware ? "FIRMWARE_RESTART" : "RESTART");
+
+            restart_pending_.store(false);
+        });
+    } // End of restart_mutex_ lock scope
 }

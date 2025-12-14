@@ -1,3 +1,6 @@
+// Copyright 2025 HelixScreen
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 /*
  * Copyright (C) 2025 356C LLC
  * Author: Preston Brown <pbrown@brown-house.net>
@@ -18,14 +21,16 @@
  * along with HelixScreen. If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "../catch_amalgamated.hpp"
 #include "../../include/moonraker_client.h"
 #include "hv/EventLoopThread.h"
+
+#include <atomic>
 #include <chrono>
+#include <mutex>
 #include <thread>
 #include <vector>
-#include <atomic>
-#include <mutex>
+
+#include "../catch_amalgamated.hpp"
 
 using namespace std::chrono;
 
@@ -46,15 +51,15 @@ using namespace std::chrono;
  */
 
 // Test constants
-static constexpr uint32_t TEST_TIMEOUT_MS = 1000;  // 1 second for fast tests
-static constexpr const char* INVALID_URL = "ws://192.0.2.1:7125/websocket";  // RFC 5737 TEST-NET-1
+static constexpr uint32_t TEST_TIMEOUT_MS = 1000; // 1 second for fast tests
+static constexpr const char* INVALID_URL = "ws://192.0.2.1:7125/websocket"; // RFC 5737 TEST-NET-1
 
 /**
  * Test fixture for connection retry scenarios
  * Uses EventLoopThread to run the event loop in a separate thread
  */
 class MoonrakerConnectionRetryFixture {
-public:
+  public:
     MoonrakerConnectionRetryFixture() {
         loop_thread_ = std::make_shared<hv::EventLoopThread>();
         loop_thread_->start();
@@ -70,12 +75,16 @@ public:
     }
 
     ~MoonrakerConnectionRetryFixture() {
+        // IMPORTANT: Stop event loop FIRST to prevent callbacks firing
+        // on destroyed objects
+        loop_thread_->stop();
+        loop_thread_->join();
+
+        // Now safe to destroy client - no more callbacks can fire
         if (client_) {
             client_->disconnect();
         }
         client_.reset();
-        loop_thread_->stop();
-        loop_thread_->join();
     }
 
     std::shared_ptr<hv::EventLoopThread> loop_thread_;
@@ -94,10 +103,7 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
                 // Should never connect to invalid address
                 FAIL("Connection succeeded to invalid address");
             },
-            [&]() {
-                disconnected = true;
-            }
-        );
+            [&]() { disconnected = true; });
 
         // Wait for disconnect callback (with timeout)
         for (int i = 0; i < 30 && !disconnected; i++) {
@@ -107,8 +113,8 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
         auto duration = duration_cast<milliseconds>(steady_clock::now() - start).count();
 
         REQUIRE(disconnected);
-        CHECK(duration >= TEST_TIMEOUT_MS - 500);  // Within 500ms tolerance
-        CHECK(duration < TEST_TIMEOUT_MS * 2);     // Should not exceed 2x configured value
+        CHECK(duration >= TEST_TIMEOUT_MS - 500); // Within 500ms tolerance
+        CHECK(duration < TEST_TIMEOUT_MS * 2);    // Should not exceed 2x configured value
     }
 
     SECTION("Second connection attempt also respects timeout (not instant failure)") {
@@ -141,8 +147,7 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
                     } else {
                         all_done = true;
                     }
-                }
-            );
+                });
         };
 
         do_attempt();
@@ -156,8 +161,8 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
         REQUIRE(durations.size() == 3);
 
         for (size_t i = 0; i < durations.size(); i++) {
-            INFO("Attempt " << (i+1) << " took " << durations[i].count() << "ms");
-            CHECK(durations[i].count() >= 100);  // Should NOT fail instantly
+            INFO("Attempt " << (i + 1) << " took " << durations[i].count() << "ms");
+            CHECK(durations[i].count() >= 100); // Should NOT fail instantly
             CHECK(durations[i].count() < TEST_TIMEOUT_MS * 2);
         }
     }
@@ -192,8 +197,7 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
                     } else {
                         all_done = true;
                     }
-                }
-            );
+                });
         };
 
         do_attempt();
@@ -208,8 +212,8 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
 
         // All attempts should take approximately the timeout duration
         for (size_t i = 0; i < durations.size(); i++) {
-            INFO("Attempt " << (i+1) << " took " << durations[i].count() << "ms");
-            CHECK(durations[i].count() >= 100);  // Should NOT fail instantly
+            INFO("Attempt " << (i + 1) << " took " << durations[i].count() << "ms");
+            CHECK(durations[i].count() >= 100); // Should NOT fail instantly
         }
     }
 
@@ -218,14 +222,8 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
         std::atomic<int> disconnect_count{0};
 
         fixture.client_->connect(
-            INVALID_URL,
-            []() {
-                FAIL("Connection succeeded to invalid address");
-            },
-            [&]() {
-                disconnect_count++;
-            }
-        );
+            INVALID_URL, []() { FAIL("Connection succeeded to invalid address"); },
+            [&]() { disconnect_count++; });
 
         // Wait for first disconnect, then wait more to ensure no auto-reconnect
         for (int i = 0; i < 10 && disconnect_count == 0; i++) {
@@ -254,8 +252,7 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
         std::function<void()> do_attempt = [&]() {
             int current_attempt = ++attempt;
             fixture.client_->connect(
-                INVALID_URL,
-                []() {},
+                INVALID_URL, []() {},
                 [&, current_attempt]() {
                     if (current_attempt < 2) {
                         std::this_thread::sleep_for(milliseconds(100));
@@ -263,8 +260,7 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
                     } else {
                         all_done = true;
                     }
-                }
-            );
+                });
         };
 
         do_attempt();
@@ -300,10 +296,7 @@ TEST_CASE("Moonraker connection retries work correctly", "[moonraker][retry]") {
         std::atomic<bool> disconnected{false};
 
         fixture.client_->connect(
-            INVALID_URL,
-            [&]() { connected = true; },
-            [&]() { disconnected = true; }
-        );
+            INVALID_URL, [&]() { connected = true; }, [&]() { disconnected = true; });
 
         // Wait a bit then disconnect
         std::this_thread::sleep_for(milliseconds(200));

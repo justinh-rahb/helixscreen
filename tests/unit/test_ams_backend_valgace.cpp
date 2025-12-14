@@ -4,7 +4,7 @@
 #include "ams_backend_valgace.h"
 #include "ams_types.h"
 
-#include <json.hpp>  // nlohmann/json from libhv
+#include <json.hpp> // nlohmann/json from libhv
 
 #include "../catch_amalgamated.hpp"
 
@@ -52,10 +52,10 @@ TEST_CASE("ValgACE returns correct type", "[valgace][type]") {
     REQUIRE(helper.get_type() == AmsType::VALGACE);
 }
 
-TEST_CASE("ValgACE uses linear topology", "[valgace][topology]") {
-    // ValgACE is a single-unit system with linear path
+TEST_CASE("ValgACE uses hub topology", "[valgace][topology]") {
+    // ValgACE uses hub topology (4 slots merge to single output)
     AmsBackendValgACETestHelper helper;
-    REQUIRE(helper.get_topology() == PathTopology::LINEAR);
+    REQUIRE(helper.get_topology() == PathTopology::HUB);
 }
 
 TEST_CASE("ValgACE bypass not supported", "[valgace][bypass]") {
@@ -81,7 +81,7 @@ TEST_CASE("ValgACE dryer defaults", "[valgace][dryer]") {
 
     // ValgACE always reports dryer as supported
     REQUIRE(dryer.supported == true);
-    REQUIRE(dryer.allows_during_print == true);
+    REQUIRE(dryer.allows_during_print == false); // Safe default: block during print
 
     // Default state should be inactive
     REQUIRE(dryer.active == false);
@@ -289,12 +289,13 @@ TEST_CASE("ValgACE parse_slots_response: valid slots", "[valgace][parse]") {
     json info = {{"slot_count", 4}};
     helper.test_parse_info_response(info);
 
+    // Colors must be strings - ValgACE API returns hex strings like "#FF0000"
     json data = {
         {"slots",
-         {{{"index", 0}, {"color", 0xFF0000}, {"material", "PLA"}, {"status", "available"}},
-          {{"index", 1}, {"color", 0x00FF00}, {"material", "PETG"}, {"status", "empty"}},
-          {{"index", 2}, {"color", 0x0000FF}, {"material", "ABS"}, {"status", "loaded"}},
-          {{"index", 3}, {"color", 0xFFFFFF}, {"material", ""}, {"status", "unknown"}}}}};
+         {{{"index", 0}, {"color", "#FF0000"}, {"material", "PLA"}, {"status", "available"}},
+          {{"index", 1}, {"color", "#00FF00"}, {"material", "PETG"}, {"status", "empty"}},
+          {{"index", 2}, {"color", "#0000FF"}, {"material", "ABS"}, {"status", "loaded"}},
+          {{"index", 3}, {"color", "#FFFFFF"}, {"material", ""}, {"status", "unknown"}}}}};
 
     bool changed = helper.test_parse_slots_response(data);
     REQUIRE(changed == true);
@@ -309,9 +310,10 @@ TEST_CASE("ValgACE parse_slots_response: valid slots", "[valgace][parse]") {
     auto slot1 = helper.get_slot_info(1);
     REQUIRE(slot1.status == SlotStatus::EMPTY);
 
-    // Verify loaded slot
+    // Verify "loaded" status - ValgACE maps both "available" and "loaded" to AVAILABLE
+    // (LOADED enum is for when filament is actively in the extruder path)
     auto slot2 = helper.get_slot_info(2);
-    REQUIRE(slot2.status == SlotStatus::LOADED);
+    REQUIRE(slot2.status == SlotStatus::AVAILABLE);
 }
 
 TEST_CASE("ValgACE parse_slots_response: missing slots array", "[valgace][parse]") {

@@ -643,6 +643,7 @@ class MoonrakerClientMock : public MoonrakerClient {
     // Restart simulation thread (for RESTART/FIRMWARE_RESTART commands)
     std::thread restart_thread_;
     std::atomic<bool> restart_pending_{false};
+    mutable std::mutex restart_mutex_; // Protects restart_thread_ lifecycle
 
     // Method handler registry (populated at construction)
     std::unordered_map<std::string, mock_internal::MethodHandler> method_handlers_;

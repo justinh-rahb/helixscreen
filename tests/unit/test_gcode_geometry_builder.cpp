@@ -126,9 +126,9 @@ TEST_CASE("Geometry Builder: SimplificationOptions - validate clamps values",
     }
 
     SECTION("Tolerance too large") {
-        options.tolerance_mm = 1.0f;
+        options.tolerance_mm = 10.0f;
         options.validate();
-        REQUIRE(options.tolerance_mm == Approx(0.2f)); // Clamped to max
+        REQUIRE(options.tolerance_mm == Approx(5.0f)); // Clamped to max (5.0mm)
     }
 
     SECTION("Valid tolerance") {

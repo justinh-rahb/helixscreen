@@ -311,13 +311,19 @@ TEST_CASE_METHOD(ExcludeObjectTestFixture,
 
 TEST_CASE_METHOD(ExcludeObjectTestFixture, "exclude_object accepts valid object names",
                  "[moonraker][security][valid][exclude_object]") {
+    // Note: These tests use a disconnected client. Validation errors are caught
+    // synchronously, but network errors occur when trying to send. We verify
+    // validation passed by checking error type is NOT VALIDATION_ERROR.
+
     SECTION("Simple object name with underscore") {
         api->exclude_object(
             "Part_1", [this]() { this->success_callback(); },
             [this](const MoonrakerError& err) { this->error_callback(err); });
 
-        // No error should occur - validation passes
-        REQUIRE_FALSE(error_called);
+        // Validation should pass - if error, it's network related
+        if (error_called) {
+            REQUIRE(captured_error.type != MoonrakerErrorType::VALIDATION_ERROR);
+        }
     }
 
     SECTION("Object name with numbers") {
@@ -326,7 +332,9 @@ TEST_CASE_METHOD(ExcludeObjectTestFixture, "exclude_object accepts valid object 
             "Object123", [this]() { this->success_callback(); },
             [this](const MoonrakerError& err) { this->error_callback(err); });
 
-        REQUIRE_FALSE(error_called);
+        if (error_called) {
+            REQUIRE(captured_error.type != MoonrakerErrorType::VALIDATION_ERROR);
+        }
     }
 
     // Note: Hyphens and periods are NOT allowed by is_safe_identifier() for security.
@@ -339,7 +347,9 @@ TEST_CASE_METHOD(ExcludeObjectTestFixture, "exclude_object accepts valid object 
             "Benchy_3DBenchy_copy_2", [this]() { this->success_callback(); },
             [this](const MoonrakerError& err) { this->error_callback(err); });
 
-        REQUIRE_FALSE(error_called);
+        if (error_called) {
+            REQUIRE(captured_error.type != MoonrakerErrorType::VALIDATION_ERROR);
+        }
     }
 
     SECTION("Name with spaces (valid in some slicers)") {
@@ -349,7 +359,9 @@ TEST_CASE_METHOD(ExcludeObjectTestFixture, "exclude_object accepts valid object 
             [this](const MoonrakerError& err) { this->error_callback(err); });
 
         // Spaces are allowed in identifiers per is_safe_identifier()
-        REQUIRE_FALSE(error_called);
+        if (error_called) {
+            REQUIRE(captured_error.type != MoonrakerErrorType::VALIDATION_ERROR);
+        }
     }
 }
 
@@ -387,7 +399,10 @@ TEST_CASE_METHOD(ExcludeObjectTestFixture, "exclude_object handles edge cases",
             "A", [this]() { this->success_callback(); },
             [this](const MoonrakerError& err) { this->error_callback(err); });
 
-        REQUIRE_FALSE(error_called);
+        // Validation should pass - if error called, it should be network error, not validation
+        if (error_called) {
+            REQUIRE(captured_error.type != MoonrakerErrorType::VALIDATION_ERROR);
+        }
     }
 
     SECTION("Long object name accepted") {
@@ -397,7 +412,10 @@ TEST_CASE_METHOD(ExcludeObjectTestFixture, "exclude_object handles edge cases",
             long_name, [this]() { this->success_callback(); },
             [this](const MoonrakerError& err) { this->error_callback(err); });
 
-        REQUIRE_FALSE(error_called);
+        // Validation should pass - if error called, it should be network error, not validation
+        if (error_called) {
+            REQUIRE(captured_error.type != MoonrakerErrorType::VALIDATION_ERROR);
+        }
     }
 }
 
@@ -486,7 +504,10 @@ TEST_CASE_METHOD(ExcludeObjectTestFixture,
             "Part_1", [this]() { this->success_callback(); },
             [this](const MoonrakerError& err) { this->error_callback(err); });
 
-        REQUIRE_FALSE(error_called);
+        // Validation should pass - if error, it should be network error not validation
+        if (error_called) {
+            REQUIRE(captured_error.type != MoonrakerErrorType::VALIDATION_ERROR);
+        }
         // The actual G-code sent would be: "EXCLUDE_OBJECT NAME=Part_1"
     }
 
@@ -496,7 +517,10 @@ TEST_CASE_METHOD(ExcludeObjectTestFixture,
             "MyObject", [this]() { this->success_callback(); },
             [this](const MoonrakerError& err) { this->error_callback(err); });
 
-        REQUIRE_FALSE(error_called);
+        // Validation should pass - if error, it should be network error not validation
+        if (error_called) {
+            REQUIRE(captured_error.type != MoonrakerErrorType::VALIDATION_ERROR);
+        }
         // The actual G-code sent would be: "EXCLUDE_OBJECT NAME=MyObject"
     }
 }

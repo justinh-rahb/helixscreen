@@ -2610,6 +2610,14 @@ TEST_CASE("MoonrakerClientMock parses EXCLUDE_OBJECT command", "[mock][gcode][ex
     MoonrakerClientMock mock(MoonrakerClientMock::PrinterType::VORON_24);
     mock.connect("ws://test", []() {}, []() {});
 
+    // Catch2 RAII cleanup - disconnect before mock is destroyed
+    struct Cleanup {
+        MoonrakerClientMock& m;
+        ~Cleanup() {
+            m.disconnect();
+        }
+    } cleanup{mock};
+
     SECTION("EXCLUDE_OBJECT NAME=Part_1 adds object to excluded set") {
         mock.gcode_script("EXCLUDE_OBJECT NAME=Part_1");
 
