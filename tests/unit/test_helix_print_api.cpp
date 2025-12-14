@@ -71,7 +71,7 @@ class HelixPrintAPITestFixture {
     std::atomic<bool> error_called{false};
     std::atomic<bool> bool_result{false};
     std::string error_message;
-    MoonrakerAPI::ModifiedPrintResult modified_print_result;
+    ModifiedPrintResult modified_print_result;
 };
 
 // ============================================================================
@@ -120,7 +120,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
         api->start_modified_print(
             "../../../etc/passwd", // Malicious path
             "G28\n", {"test_mod"},
-            [this](const MoonrakerAPI::ModifiedPrintResult&) { success_called = true; },
+            [this](const ModifiedPrintResult&) { success_called = true; },
             [this](const MoonrakerError& err) {
                 error_message = err.message;
                 error_called = true;
@@ -137,7 +137,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
         api->start_modified_print(
             "test\nfile.gcode", // Newline injection
             "G28\n", {"test_mod"},
-            [this](const MoonrakerAPI::ModifiedPrintResult&) { success_called = true; },
+            [this](const ModifiedPrintResult&) { success_called = true; },
             [this](const MoonrakerError& err) {
                 error_message = err.message;
                 error_called = true;
@@ -153,7 +153,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
         // This will fail due to disconnected client, but should pass validation
         api->start_modified_print(
             "benchy.gcode", "G28\nG1 X0 Y0\n", {"bed_leveling_disabled"},
-            [this](const MoonrakerAPI::ModifiedPrintResult& result) {
+            [this](const ModifiedPrintResult& result) {
                 modified_print_result = result;
                 success_called = true;
             },
@@ -176,7 +176,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
         api->start_modified_print(
             "prints/2024/benchy.gcode", // Valid subdirectory path
             "G28\n", {"test_mod"},
-            [this](const MoonrakerAPI::ModifiedPrintResult&) { success_called = true; },
+            [this](const ModifiedPrintResult&) { success_called = true; },
             [this](const MoonrakerError& err) {
                 error_message = err.message;
                 error_called = true;
@@ -196,7 +196,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
 // ============================================================================
 
 TEST_CASE("HelixPrint API - ModifiedPrintResult structure", "[helix_print][api]") {
-    MoonrakerAPI::ModifiedPrintResult result;
+    ModifiedPrintResult result;
 
     SECTION("Default values are empty") {
         REQUIRE(result.original_filename.empty());
@@ -227,7 +227,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture, "HelixPrint API - handles empty modif
     // Empty modifications list should be valid
     api->start_modified_print(
         "benchy.gcode", "G28\n", {}, // Empty modifications
-        [this](const MoonrakerAPI::ModifiedPrintResult&) { success_called = true; },
+        [this](const ModifiedPrintResult&) { success_called = true; },
         [this](const MoonrakerError& err) {
             error_message = err.message;
             error_called = true;
@@ -248,7 +248,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture, "HelixPrint API - handles multiple mo
 
     api->start_modified_print(
         "benchy.gcode", "G28\n", mods,
-        [this](const MoonrakerAPI::ModifiedPrintResult&) { success_called = true; },
+        [this](const ModifiedPrintResult&) { success_called = true; },
         [this](const MoonrakerError& err) {
             error_message = err.message;
             error_called = true;
@@ -277,7 +277,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture, "HelixPrint API - handles large G-cod
 
     api->start_modified_print(
         "large_print.gcode", large_content, {"bed_leveling_disabled"},
-        [this](const MoonrakerAPI::ModifiedPrintResult&) { success_called = true; },
+        [this](const ModifiedPrintResult&) { success_called = true; },
         [this](const MoonrakerError& err) {
             error_message = err.message;
             error_called = true;
