@@ -32,9 +32,9 @@
  * ```
  *
  * ## Reactive Bindings:
- * - Gate colors: `ams_gate_N_color` (int, RGB packed)
- * - Gate status: `ams_gate_N_status` (int, GateStatus enum)
- * - Current gate: `ams_current_gate` (int, -1 if none)
+ * - Slot colors: `ams_slot_N_color` (int, RGB packed)
+ * - Slot status: `ams_slot_N_status` (int, SlotStatus enum)
+ * - Current slot: `ams_current_slot` (int, -1 if none)
  * - Action: `ams_action` (int, AmsAction enum)
  * - Action detail: `ams_action_detail` (string)
  *
@@ -106,10 +106,10 @@ class AmsPanel : public PanelBase {
 
     // === Observers (RAII cleanup via ObserverGuard) ===
 
-    ObserverGuard gates_version_observer_;
+    ObserverGuard slots_version_observer_;
     ObserverGuard action_observer_;
-    ObserverGuard current_gate_observer_;
-    ObserverGuard gate_count_observer_;
+    ObserverGuard current_slot_observer_;
+    ObserverGuard slot_count_observer_;
     ObserverGuard path_segment_observer_;
     ObserverGuard path_topology_observer_;
 
@@ -132,7 +132,7 @@ class AmsPanel : public PanelBase {
     void update_path_canvas_from_backend();
 
     /**
-     * @brief Create slot widgets dynamically based on gate count
+     * @brief Create slot widgets dynamically based on slot count
      * @param count Number of slots to create (0 to max 8)
      *
      * Deletes existing slots and creates new ones. Uses lv_xml_create()
@@ -140,24 +140,18 @@ class AmsPanel : public PanelBase {
      */
     void create_slots(int count);
 
-    /**
-     * @brief Update the visual tray height to 1/3 of slot height
-     *
-     * Called after slots are created to size the tray "holder" effect.
-     */
-    void update_tray_size();
+    // === Slot Count Observer ===
 
-    // === Gate Count Observer ===
-
-    static void on_gate_count_changed(lv_observer_t* observer, lv_subject_t* subject);
+    static void on_slot_count_changed(lv_observer_t* observer, lv_subject_t* subject);
 
     // === UI Update Handlers ===
 
     void update_slot_colors();
-    void update_slot_status(int gate_index);
+    void update_slot_status(int slot_index);
     void update_action_display(AmsAction action);
-    void update_current_gate_highlight(int gate_index);
-    void update_current_loaded_display(int gate_index);
+    void update_current_slot_highlight(int slot_index);
+    void update_current_loaded_display(int slot_index);
+    void update_tray_size();
 
     // === Event Callbacks (static trampolines) ===
 
@@ -167,14 +161,14 @@ class AmsPanel : public PanelBase {
 
     // === Observer Callbacks ===
 
-    static void on_gates_version_changed(lv_observer_t* observer, lv_subject_t* subject);
+    static void on_slots_version_changed(lv_observer_t* observer, lv_subject_t* subject);
     static void on_action_changed(lv_observer_t* observer, lv_subject_t* subject);
-    static void on_current_gate_changed(lv_observer_t* observer, lv_subject_t* subject);
+    static void on_current_slot_changed(lv_observer_t* observer, lv_subject_t* subject);
     static void on_path_state_changed(lv_observer_t* observer, lv_subject_t* subject);
 
     // === Path Canvas Callback ===
 
-    static void on_path_gate_clicked(int gate_index, void* user_data);
+    static void on_path_slot_clicked(int slot_index, void* user_data);
 
     // === Context Menu Callbacks (static trampolines) ===
 

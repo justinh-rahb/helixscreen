@@ -21,10 +21,10 @@ AmsBackendAfc::AmsBackendAfc(MoonrakerAPI* api, MoonrakerClient* client)
     system_info_.type_name = "AFC";
     system_info_.version = "unknown";
     system_info_.current_tool = -1;
-    system_info_.current_gate = -1;
+    system_info_.current_slot = -1;
     system_info_.filament_loaded = false;
     system_info_.action = AmsAction::IDLE;
-    system_info_.total_gates = 0;
+    system_info_.total_slots = 0;
     // AFC capabilities - may vary by configuration
     system_info_.supports_endless_spool = false;
     system_info_.supports_spoolman = true;
@@ -181,17 +181,17 @@ AmsType AmsBackendAfc::get_type() const {
     return AmsType::AFC;
 }
 
-GateInfo AmsBackendAfc::get_gate_info(int global_index) const {
+SlotInfo AmsBackendAfc::get_slot_info(int slot_index) const {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
 
-    const auto* gate = system_info_.get_gate_global(global_index);
-    if (gate) {
-        return *gate;
+    const auto* slot = system_info_.get_slot_global(slot_index);
+    if (slot) {
+        return *slot;
     }
 
-    // Return empty gate info for invalid index
-    GateInfo empty;
-    empty.gate_index = -1;
+    // Return empty slot info for invalid index
+    SlotInfo empty;
+    empty.slot_index = -1;
     empty.global_index = -1;
     return empty;
 }
@@ -206,9 +206,9 @@ int AmsBackendAfc::get_current_tool() const {
     return system_info_.current_tool;
 }
 
-int AmsBackendAfc::get_current_gate() const {
+int AmsBackendAfc::get_current_slot() const {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
-    return system_info_.current_gate;
+    return system_info_.current_slot;
 }
 
 bool AmsBackendAfc::is_filament_loaded() const {
@@ -226,20 +226,20 @@ PathSegment AmsBackendAfc::get_filament_segment() const {
     return compute_filament_segment_unlocked();
 }
 
-PathSegment AmsBackendAfc::get_gate_filament_segment(int gate_index) const {
+PathSegment AmsBackendAfc::get_slot_filament_segment(int slot_index) const {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
 
-    // Check if this is the active gate - return the current filament segment
-    if (gate_index == system_info_.current_gate && system_info_.filament_loaded) {
+    // Check if this is the active slot - return the current filament segment
+    if (slot_index == system_info_.current_slot && system_info_.filament_loaded) {
         return compute_filament_segment_unlocked();
     }
 
-    // For non-active gates, check lane sensors to determine filament position
-    if (gate_index < 0 || gate_index >= static_cast<int>(lane_sensors_.size())) {
+    // For non-active slots, check lane sensors to determine filament position
+    if (slot_index < 0 || slot_index >= static_cast<int>(lane_sensors_.size())) {
         return PathSegment::NONE;
     }
 
-    const LaneSensors& sensors = lane_sensors_[gate_index];
+    const LaneSensors& sensors = lane_sensors_[slot_index];
 
     // Check sensors from furthest to nearest
     if (sensors.loaded_to_hub) {
@@ -252,10 +252,10 @@ PathSegment AmsBackendAfc::get_gate_filament_segment(int gate_index) const {
         return PathSegment::PREP; // Filament at prep sensor
     }
 
-    // Check gate status - if available, assume filament at spool
-    const GateInfo* gate = system_info_.get_gate_global(gate_index);
-    if (gate &&
-        (gate->status == GateStatus::AVAILABLE || gate->status == GateStatus::FROM_BUFFER)) {
+    // Check slot status - if available, assume filament at spool
+    const SlotInfo* slot = system_info_.get_slot_global(slot_index);
+    if (slot &&
+        (slot->status == SlotStatus::AVAILABLE || slot->status == SlotStatus::FROM_BUFFER)) {
         return PathSegment::SPOOL;
     }
 
@@ -343,7 +343,7 @@ PathSegment AmsBackendAfc::compute_filament_segment_unlocked() const {
 
     // No sensors triggered - filament either at spool or absent
     // If we know filament is loaded somewhere, assume SPOOL
-    if (system_info_.filament_loaded || system_info_.current_gate >= 0) {
+    if (system_info_.filament_loaded || system_info_.current_slot >= 0) {
         return PathSegment::SPOOL;
     }
 
@@ -418,14 +418,14 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
 }
 
 void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
-    // Parse current lane/gate (AFC may report this as "current_lane" or similar)
+    // Parse current lane (AFC reports this as "current_lane")
     if (afc_data.contains("current_lane") && afc_data["current_lane"].is_string()) {
         std::string lane_name = afc_data["current_lane"].get<std::string>();
         auto it = lane_name_to_index_.find(lane_name);
         if (it != lane_name_to_index_.end()) {
-            system_info_.current_gate = it->second;
-            spdlog::trace("[AMS AFC] Current lane: {} (gate {})", lane_name,
-                          system_info_.current_gate);
+            system_info_.current_slot = it->second;
+            spdlog::trace("[AMS AFC] Current lane: {} (slot {})", lane_name,
+                          system_info_.current_slot);
         }
     }
 
@@ -499,7 +499,7 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
     if (afc_data.contains("bypass_state") && afc_data["bypass_state"].is_boolean()) {
         bypass_active_ = afc_data["bypass_state"].get<bool>();
         if (bypass_active_) {
-            system_info_.current_gate = -2; // -2 = bypass mode
+            system_info_.current_slot = -2; // -2 = bypass mode
             system_info_.filament_loaded = true;
             spdlog::trace("[AMS AFC] Bypass mode active");
         }
@@ -529,14 +529,14 @@ void AmsBackendAfc::parse_afc_stepper(const std::string& lane_name, const nlohma
         spdlog::trace("[AMS AFC] Unknown lane name: {}", lane_name);
         return;
     }
-    int gate_index = it->second;
+    int slot_index = it->second;
 
-    if (gate_index < 0 || gate_index >= static_cast<int>(lane_sensors_.size())) {
+    if (slot_index < 0 || slot_index >= static_cast<int>(lane_sensors_.size())) {
         return;
     }
 
     // Update sensor state for this lane
-    LaneSensors& sensors = lane_sensors_[gate_index];
+    LaneSensors& sensors = lane_sensors_[slot_index];
     if (data.contains("prep") && data["prep"].is_boolean()) {
         sensors.prep = data["prep"].get<bool>();
     }
@@ -547,9 +547,9 @@ void AmsBackendAfc::parse_afc_stepper(const std::string& lane_name, const nlohma
         sensors.loaded_to_hub = data["loaded_to_hub"].get<bool>();
     }
 
-    // Get gate info for filament data update
-    GateInfo* gate = system_info_.get_gate_global(gate_index);
-    if (!gate)
+    // Get slot info for filament data update
+    SlotInfo* slot = system_info_.get_slot_global(slot_index);
+    if (!slot)
         return;
 
     // Parse color
@@ -560,7 +560,7 @@ void AmsBackendAfc::parse_afc_stepper(const std::string& lane_name, const nlohma
             color_str = color_str.substr(1);
         }
         try {
-            gate->color_rgb = std::stoul(color_str, nullptr, 16);
+            slot->color_rgb = std::stoul(color_str, nullptr, 16);
         } catch (...) {
             // Keep existing color on parse failure
         }
@@ -568,20 +568,20 @@ void AmsBackendAfc::parse_afc_stepper(const std::string& lane_name, const nlohma
 
     // Parse material
     if (data.contains("material") && data["material"].is_string()) {
-        gate->material = data["material"].get<std::string>();
+        slot->material = data["material"].get<std::string>();
     }
 
     // Parse Spoolman ID
     if (data.contains("spool_id") && data["spool_id"].is_number_integer()) {
-        gate->spoolman_id = data["spool_id"].get<int>();
+        slot->spoolman_id = data["spool_id"].get<int>();
     }
 
     // Parse weight
     if (data.contains("weight") && data["weight"].is_number()) {
-        gate->remaining_weight_g = data["weight"].get<float>();
+        slot->remaining_weight_g = data["weight"].get<float>();
     }
 
-    // Derive gate status from sensors and status string
+    // Derive slot status from sensors and status string
     bool tool_loaded = false;
     if (data.contains("tool_loaded") && data["tool_loaded"].is_boolean()) {
         tool_loaded = data["tool_loaded"].get<bool>();
@@ -593,18 +593,18 @@ void AmsBackendAfc::parse_afc_stepper(const std::string& lane_name, const nlohma
     }
 
     if (status_str == "Loaded" || tool_loaded) {
-        gate->status = GateStatus::LOADED;
+        slot->status = SlotStatus::LOADED;
     } else if (sensors.prep || sensors.load) {
-        gate->status = GateStatus::AVAILABLE;
+        slot->status = SlotStatus::AVAILABLE;
     } else if (status_str == "None" || status_str.empty()) {
-        gate->status = GateStatus::EMPTY;
+        slot->status = SlotStatus::EMPTY;
     } else {
-        gate->status = GateStatus::AVAILABLE; // Default for other states like "Ready"
+        slot->status = SlotStatus::AVAILABLE; // Default for other states like "Ready"
     }
 
-    spdlog::trace("[AMS AFC] Lane {} (gate {}): prep={} load={} hub={} status={}", lane_name,
-                  gate_index, sensors.prep, sensors.load, sensors.loaded_to_hub,
-                  gate_status_to_string(gate->status));
+    spdlog::trace("[AMS AFC] Lane {} (slot {}): prep={} load={} hub={} status={}", lane_name,
+                  slot_index, sensors.prep, sensors.load, sensors.loaded_to_hub,
+                  slot_status_to_string(slot->status));
 }
 
 void AmsBackendAfc::parse_afc_hub(const nlohmann::json& data) {
@@ -639,7 +639,7 @@ void AmsBackendAfc::parse_afc_extruder(const nlohmann::json& data) {
             // Update current_gate from lane name
             auto it = lane_name_to_index_.find(current_lane_name_);
             if (it != lane_name_to_index_.end()) {
-                system_info_.current_gate = it->second;
+                system_info_.current_slot = it->second;
             }
         }
     }
@@ -844,60 +844,60 @@ void AmsBackendAfc::parse_lane_data(const nlohmann::json& lane_data) {
         }
 
         const auto& lane = lane_data[lane_name];
-        auto& gate = system_info_.units[0].gates[i];
+        auto& slot = system_info_.units[0].slots[i];
 
         // Parse color (AFC uses hex string without 0x prefix)
         if (lane.contains("color") && lane["color"].is_string()) {
             std::string color_str = lane["color"].get<std::string>();
             try {
-                gate.color_rgb = static_cast<uint32_t>(std::stoul(color_str, nullptr, 16));
+                slot.color_rgb = static_cast<uint32_t>(std::stoul(color_str, nullptr, 16));
             } catch (...) {
-                gate.color_rgb = AMS_DEFAULT_GATE_COLOR;
+                slot.color_rgb = AMS_DEFAULT_SLOT_COLOR;
             }
         }
 
         // Parse material
         if (lane.contains("material") && lane["material"].is_string()) {
-            gate.material = lane["material"].get<std::string>();
+            slot.material = lane["material"].get<std::string>();
         }
 
         // Parse loaded state
         if (lane.contains("loaded") && lane["loaded"].is_boolean()) {
             bool loaded = lane["loaded"].get<bool>();
             if (loaded) {
-                gate.status = GateStatus::LOADED;
-                system_info_.current_gate = static_cast<int>(i);
+                slot.status = SlotStatus::LOADED;
+                system_info_.current_slot = static_cast<int>(i);
                 system_info_.filament_loaded = true;
             } else {
                 // Check if filament is available (not loaded but present)
                 if (lane.contains("available") && lane["available"].is_boolean() &&
                     lane["available"].get<bool>()) {
-                    gate.status = GateStatus::AVAILABLE;
+                    slot.status = SlotStatus::AVAILABLE;
                 } else if (lane.contains("empty") && lane["empty"].is_boolean() &&
                            lane["empty"].get<bool>()) {
-                    gate.status = GateStatus::EMPTY;
+                    slot.status = SlotStatus::EMPTY;
                 } else {
                     // Default to available if not explicitly empty
-                    gate.status = GateStatus::AVAILABLE;
+                    slot.status = SlotStatus::AVAILABLE;
                 }
             }
         }
 
         // Parse spool information if available
         if (lane.contains("spool_id") && lane["spool_id"].is_number_integer()) {
-            gate.spoolman_id = lane["spool_id"].get<int>();
+            slot.spoolman_id = lane["spool_id"].get<int>();
         }
 
         if (lane.contains("brand") && lane["brand"].is_string()) {
-            gate.brand = lane["brand"].get<std::string>();
+            slot.brand = lane["brand"].get<std::string>();
         }
 
         if (lane.contains("remaining_weight") && lane["remaining_weight"].is_number()) {
-            gate.remaining_weight_g = lane["remaining_weight"].get<float>();
+            slot.remaining_weight_g = lane["remaining_weight"].get<float>();
         }
 
         if (lane.contains("total_weight") && lane["total_weight"].is_number()) {
-            gate.total_weight_g = lane["total_weight"].get<float>();
+            slot.total_weight_g = lane["total_weight"].get<float>();
         }
     }
 }
@@ -916,41 +916,41 @@ void AmsBackendAfc::initialize_lanes(const std::vector<std::string>& lane_names)
     AmsUnit unit;
     unit.unit_index = 0;
     unit.name = "AFC Box Turtle";
-    unit.gate_count = lane_count;
-    unit.first_gate_global_index = 0;
+    unit.slot_count = lane_count;
+    unit.first_slot_global_index = 0;
     unit.connected = true;
     unit.has_encoder = false;        // AFC typically uses optical sensors, not encoders
     unit.has_toolhead_sensor = true; // Most AFC setups have toolhead sensor
-    unit.has_gate_sensors = true;    // AFC has per-lane sensors
+    unit.has_slot_sensors = true;    // AFC has per-lane sensors
 
     // Initialize gates with defaults
     for (int i = 0; i < lane_count; ++i) {
-        GateInfo gate;
-        gate.gate_index = i;
-        gate.global_index = i;
-        gate.status = GateStatus::UNKNOWN;
-        gate.mapped_tool = i; // Default 1:1 mapping
-        gate.color_rgb = AMS_DEFAULT_GATE_COLOR;
-        unit.gates.push_back(gate);
+        SlotInfo slot;
+        slot.slot_index = i;
+        slot.global_index = i;
+        slot.status = SlotStatus::UNKNOWN;
+        slot.mapped_tool = i; // Default 1:1 mapping
+        slot.color_rgb = AMS_DEFAULT_SLOT_COLOR;
+        unit.slots.push_back(slot);
     }
 
     system_info_.units.clear();
     system_info_.units.push_back(unit);
-    system_info_.total_gates = lane_count;
+    system_info_.total_slots = lane_count;
 
-    // Initialize tool-to-gate mapping (1:1 default)
-    system_info_.tool_to_gate_map.clear();
-    system_info_.tool_to_gate_map.reserve(lane_count);
+    // Initialize tool-to-lane mapping (1:1 default)
+    system_info_.tool_to_slot_map.clear();
+    system_info_.tool_to_slot_map.reserve(lane_count);
     for (int i = 0; i < lane_count; ++i) {
-        system_info_.tool_to_gate_map.push_back(i);
+        system_info_.tool_to_slot_map.push_back(i);
     }
 
     lanes_initialized_ = true;
 }
 
-std::string AmsBackendAfc::get_lane_name(int gate_index) const {
-    if (gate_index >= 0 && gate_index < static_cast<int>(lane_names_.size())) {
-        return lane_names_[gate_index];
+std::string AmsBackendAfc::get_lane_name(int slot_index) const {
+    if (slot_index >= 0 && slot_index < static_cast<int>(lane_names_.size())) {
+        return lane_names_[slot_index];
     }
     return "";
 }
@@ -971,9 +971,9 @@ AmsError AmsBackendAfc::check_preconditions() const {
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendAfc::validate_gate_index(int gate_index) const {
-    if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-        return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+AmsError AmsBackendAfc::validate_slot_index(int slot_index) const {
+    if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+        return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
     }
     return AmsErrorHelper::success();
 }
@@ -995,7 +995,7 @@ AmsError AmsBackendAfc::execute_gcode(const std::string& gcode) {
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendAfc::load_filament(int gate_index) {
+AmsError AmsBackendAfc::load_filament(int slot_index) {
     std::string lane_name;
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
@@ -1005,20 +1005,20 @@ AmsError AmsBackendAfc::load_filament(int gate_index) {
             return precondition;
         }
 
-        AmsError gate_valid = validate_gate_index(gate_index);
+        AmsError gate_valid = validate_slot_index(slot_index);
         if (!gate_valid) {
             return gate_valid;
         }
 
         // Check if lane has filament available
-        const auto* gate = system_info_.get_gate_global(gate_index);
-        if (gate && gate->status == GateStatus::EMPTY) {
-            return AmsErrorHelper::gate_not_available(gate_index);
+        const auto* slot = system_info_.get_slot_global(slot_index);
+        if (slot && slot->status == SlotStatus::EMPTY) {
+            return AmsErrorHelper::slot_not_available(slot_index);
         }
 
-        lane_name = get_lane_name(gate_index);
+        lane_name = get_lane_name(slot_index);
         if (lane_name.empty()) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
     }
 
@@ -1026,7 +1026,7 @@ AmsError AmsBackendAfc::load_filament(int gate_index) {
     std::ostringstream cmd;
     cmd << "AFC_LOAD LANE=" << lane_name;
 
-    spdlog::info("[AMS AFC] Loading from lane {} (gate {})", lane_name, gate_index);
+    spdlog::info("[AMS AFC] Loading from lane {} (slot {})", lane_name, slot_index);
     return execute_gcode(cmd.str());
 }
 
@@ -1049,7 +1049,7 @@ AmsError AmsBackendAfc::unload_filament() {
     return execute_gcode("AFC_UNLOAD");
 }
 
-AmsError AmsBackendAfc::select_gate(int gate_index) {
+AmsError AmsBackendAfc::select_slot(int slot_index) {
     std::string lane_name;
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
@@ -1059,14 +1059,14 @@ AmsError AmsBackendAfc::select_gate(int gate_index) {
             return precondition;
         }
 
-        AmsError gate_valid = validate_gate_index(gate_index);
+        AmsError gate_valid = validate_slot_index(slot_index);
         if (!gate_valid) {
             return gate_valid;
         }
 
-        lane_name = get_lane_name(gate_index);
+        lane_name = get_lane_name(slot_index);
         if (lane_name.empty()) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
     }
 
@@ -1075,7 +1075,7 @@ AmsError AmsBackendAfc::select_gate(int gate_index) {
     std::ostringstream cmd;
     cmd << "AFC_SELECT LANE=" << lane_name;
 
-    spdlog::info("[AMS AFC] Selecting lane {} (gate {})", lane_name, gate_index);
+    spdlog::info("[AMS AFC] Selecting lane {} (slot {})", lane_name, slot_index);
     return execute_gcode(cmd.str());
 }
 
@@ -1089,7 +1089,7 @@ AmsError AmsBackendAfc::change_tool(int tool_number) {
         }
 
         if (tool_number < 0 ||
-            tool_number >= static_cast<int>(system_info_.tool_to_gate_map.size())) {
+            tool_number >= static_cast<int>(system_info_.tool_to_slot_map.size())) {
             return AmsError(AmsResult::INVALID_TOOL,
                             "Tool " + std::to_string(tool_number) + " out of range",
                             "Invalid tool number", "Select a valid tool");
@@ -1158,38 +1158,38 @@ AmsError AmsBackendAfc::cancel() {
 // Configuration Operations
 // ============================================================================
 
-AmsError AmsBackendAfc::set_gate_info(int gate_index, const GateInfo& info) {
+AmsError AmsBackendAfc::set_slot_info(int slot_index, const SlotInfo& info) {
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
 
-        if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
-        auto* gate = system_info_.get_gate_global(gate_index);
-        if (!gate) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        auto* slot = system_info_.get_slot_global(slot_index);
+        if (!slot) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
         // Update local state
-        gate->color_name = info.color_name;
-        gate->color_rgb = info.color_rgb;
-        gate->material = info.material;
-        gate->brand = info.brand;
-        gate->spoolman_id = info.spoolman_id;
-        gate->spool_name = info.spool_name;
-        gate->remaining_weight_g = info.remaining_weight_g;
-        gate->total_weight_g = info.total_weight_g;
-        gate->nozzle_temp_min = info.nozzle_temp_min;
-        gate->nozzle_temp_max = info.nozzle_temp_max;
-        gate->bed_temp = info.bed_temp;
+        slot->color_name = info.color_name;
+        slot->color_rgb = info.color_rgb;
+        slot->material = info.material;
+        slot->brand = info.brand;
+        slot->spoolman_id = info.spoolman_id;
+        slot->spool_name = info.spool_name;
+        slot->remaining_weight_g = info.remaining_weight_g;
+        slot->total_weight_g = info.total_weight_g;
+        slot->nozzle_temp_min = info.nozzle_temp_min;
+        slot->nozzle_temp_max = info.nozzle_temp_max;
+        slot->bed_temp = info.bed_temp;
 
-        spdlog::info("[AMS AFC] Updated gate {} info: {} {}", gate_index, info.material,
+        spdlog::info("[AMS AFC] Updated slot {} info: {} {}", slot_index, info.material,
                      info.color_name);
     }
 
     // Emit OUTSIDE the lock to avoid deadlock with callbacks
-    emit_event(EVENT_GATE_CHANGED, std::to_string(gate_index));
+    emit_event(EVENT_SLOT_CHANGED, std::to_string(slot_index));
 
     // AFC stores lane info in Moonraker database
     // This could be extended to persist changes via server.database.post_item
@@ -1198,46 +1198,46 @@ AmsError AmsBackendAfc::set_gate_info(int gate_index, const GateInfo& info) {
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendAfc::set_tool_mapping(int tool_number, int gate_index) {
+AmsError AmsBackendAfc::set_tool_mapping(int tool_number, int slot_index) {
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
 
         if (tool_number < 0 ||
-            tool_number >= static_cast<int>(system_info_.tool_to_gate_map.size())) {
+            tool_number >= static_cast<int>(system_info_.tool_to_slot_map.size())) {
             return AmsError(AmsResult::INVALID_TOOL,
                             "Tool " + std::to_string(tool_number) + " out of range",
                             "Invalid tool number", "");
         }
 
-        if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
         // Update local mapping
-        system_info_.tool_to_gate_map[tool_number] = gate_index;
+        system_info_.tool_to_slot_map[tool_number] = slot_index;
 
-        // Update gate's mapped_tool reference
+        // Update lane's mapped_tool reference
         for (auto& unit : system_info_.units) {
-            for (auto& gate : unit.gates) {
-                if (gate.mapped_tool == tool_number) {
-                    gate.mapped_tool = -1; // Clear old mapping
+            for (auto& slot : unit.slots) {
+                if (slot.mapped_tool == tool_number) {
+                    slot.mapped_tool = -1; // Clear old mapping
                 }
             }
         }
-        auto* gate = system_info_.get_gate_global(gate_index);
-        if (gate) {
-            gate->mapped_tool = tool_number;
+        auto* slot = system_info_.get_slot_global(slot_index);
+        if (slot) {
+            slot->mapped_tool = tool_number;
         }
     }
 
     // AFC may use a G-code command to set tool mapping
     // This varies by AFC version/configuration
-    std::string lane_name = get_lane_name(gate_index);
+    std::string lane_name = get_lane_name(slot_index);
     if (!lane_name.empty()) {
         std::ostringstream cmd;
         cmd << "AFC_MAP TOOL=" << tool_number << " LANE=" << lane_name;
-        spdlog::info("[AMS AFC] Mapping T{} to lane {} (gate {})", tool_number, lane_name,
-                     gate_index);
+        spdlog::info("[AMS AFC] Mapping T{} to lane {} (slot {})", tool_number, lane_name,
+                     slot_index);
         return execute_gcode(cmd.str());
     }
 

@@ -50,7 +50,7 @@ struct AmsSlotData {
     // RAII observer handles - automatically removed when this struct is destroyed
     ObserverGuard color_observer;
     ObserverGuard status_observer;
-    ObserverGuard current_gate_observer;
+    ObserverGuard current_slot_observer;
     ObserverGuard filament_loaded_observer;
 
     // Skeuomorphic spool visualization layers (flat style)
@@ -108,7 +108,7 @@ static void unregister_slot_data(lv_obj_t* obj) {
             // from calling lv_observer_remove() on destroyed subjects
             data->color_observer.release();
             data->status_observer.release();
-            data->current_gate_observer.release();
+            data->current_slot_observer.release();
             data->filament_loaded_observer.release();
             delete data;
         }
@@ -183,7 +183,7 @@ static void update_filament_ring_size(AmsSlotData* data) {
 // ============================================================================
 
 /**
- * @brief Observer callback for gate color changes
+ * @brief Observer callback for slot color changes
  *
  * Updates the spool visualization color based on current style:
  * - 3D style: Updates spool_canvas widget color
@@ -218,7 +218,7 @@ static void on_color_changed(lv_observer_t* observer, lv_subject_t* subject) {
 }
 
 /**
- * @brief Observer callback for gate status changes
+ * @brief Observer callback for slot status changes
  *
  * Updates the slot badge with status-colored background.
  * Badge shows slot number and is hidden for EMPTY slots (faded spool is enough).
@@ -230,7 +230,7 @@ static void on_status_changed(lv_observer_t* observer, lv_subject_t* subject) {
     }
 
     int status_int = lv_subject_get_int(subject);
-    auto status = static_cast<GateStatus>(status_int);
+    auto status = static_cast<SlotStatus>(status_int);
 
     // Status-to-color mapping:
     // - Green (success_color): AVAILABLE, LOADED, FROM_BUFFER - filament ready/in use
@@ -240,19 +240,19 @@ static void on_status_changed(lv_observer_t* observer, lv_subject_t* subject) {
     bool show_badge = true;
 
     switch (status) {
-    case GateStatus::AVAILABLE:
-    case GateStatus::LOADED:
-    case GateStatus::FROM_BUFFER:
+    case SlotStatus::AVAILABLE:
+    case SlotStatus::LOADED:
+    case SlotStatus::FROM_BUFFER:
         badge_bg = ui_theme_get_color("success_color");
         break;
-    case GateStatus::BLOCKED:
+    case SlotStatus::BLOCKED:
         badge_bg = ui_theme_get_color("error_color");
         break;
-    case GateStatus::EMPTY:
+    case SlotStatus::EMPTY:
         // Hide badge for empty slots - faded spool is enough visual indication
         show_badge = false;
         break;
-    case GateStatus::UNKNOWN:
+    case SlotStatus::UNKNOWN:
     default:
         badge_bg = ui_theme_get_color("ams_badge_bg");
         break;
@@ -267,7 +267,7 @@ static void on_status_changed(lv_observer_t* observer, lv_subject_t* subject) {
     }
 
     // Handle empty slot visual treatment - fade the spool
-    lv_opa_t empty_opa = (status == GateStatus::EMPTY) ? LV_OPA_40 : LV_OPA_COVER;
+    lv_opa_t empty_opa = (status == SlotStatus::EMPTY) ? LV_OPA_40 : LV_OPA_COVER;
 
     // Flat style widgets
     if (data->color_swatch) {
@@ -282,27 +282,27 @@ static void on_status_changed(lv_observer_t* observer, lv_subject_t* subject) {
     }
 
     spdlog::trace("[AmsSlot] Slot {} status={} badge={}", data->slot_index,
-                  gate_status_to_string(status), show_badge ? "visible" : "hidden");
+                  slot_status_to_string(status), show_badge ? "visible" : "hidden");
 }
 
 /**
- * @brief Observer callback for current gate changes (highlight active slot)
+ * @brief Observer callback for current slot changes (highlight active slot)
  *
  * Active slots get a glowing border effect using shadows for visual emphasis.
  */
-static void on_current_gate_changed(lv_observer_t* observer, lv_subject_t* subject) {
+static void on_current_slot_changed(lv_observer_t* observer, lv_subject_t* subject) {
     auto* data = static_cast<AmsSlotData*>(lv_observer_get_user_data(observer));
     if (!data || !data->container) {
         return;
     }
 
-    int current_gate = lv_subject_get_int(subject);
+    int current_slot = lv_subject_get_int(subject);
 
     // Also check filament_loaded to only highlight when actually loaded
     lv_subject_t* loaded_subject = AmsState::instance().get_filament_loaded_subject();
     bool filament_loaded = loaded_subject ? (lv_subject_get_int(loaded_subject) != 0) : false;
 
-    bool is_active = (current_gate == data->slot_index) && filament_loaded;
+    bool is_active = (current_slot == data->slot_index) && filament_loaded;
 
     if (is_active) {
         // Active slot: glowing border effect
@@ -326,26 +326,26 @@ static void on_current_gate_changed(lv_observer_t* observer, lv_subject_t* subje
         lv_obj_set_style_shadow_opa(data->container, LV_OPA_TRANSP, LV_PART_MAIN);
     }
 
-    spdlog::trace("[AmsSlot] Slot {} active={} (current_gate={}, loaded={})", data->slot_index,
-                  is_active, current_gate, filament_loaded);
+    spdlog::trace("[AmsSlot] Slot {} active={} (current_slot={}, loaded={})", data->slot_index,
+                  is_active, current_slot, filament_loaded);
 }
 
 /**
  * @brief Observer callback for filament loaded changes (affects highlight)
  */
 static void on_filament_loaded_changed(lv_observer_t* observer, lv_subject_t* subject) {
-    LV_UNUSED(subject); // We re-evaluate using current_gate, not the loaded value directly
+    LV_UNUSED(subject); // We re-evaluate using current_slot, not the loaded value directly
 
     auto* data = static_cast<AmsSlotData*>(lv_observer_get_user_data(observer));
     if (!data || !data->container) {
         return;
     }
 
-    // Re-evaluate highlight - delegate to current_gate logic
-    lv_subject_t* gate_subject = AmsState::instance().get_current_gate_subject();
-    if (gate_subject) {
-        // Trigger the same logic as current_gate observer
-        on_current_gate_changed(data->current_gate_observer.get(), gate_subject);
+    // Re-evaluate highlight - delegate to current_slot logic
+    lv_subject_t* slot_subject = AmsState::instance().get_current_slot_subject();
+    if (slot_subject) {
+        // Trigger the same logic as current_slot observer
+        on_current_slot_changed(data->current_slot_observer.get(), slot_subject);
     }
 }
 
@@ -388,7 +388,7 @@ static void create_slot_children(lv_obj_t* container, AmsSlotData* data) {
     int32_t space_xs = ui_theme_get_spacing("space_xs");
 
     // Responsive sizing: use flex_grow so slots share space equally
-    // This ensures 4 slots fit in one row and align with path canvas gates
+    // This ensures 4 slots fit in one row and align with path canvas slots
     // The parent slot_grid uses flex_flow="row" - slots expand to fill their portion
     lv_obj_set_flex_grow(container, 1); // Share horizontal space equally
     lv_obj_set_height(container, LV_SIZE_CONTENT);
@@ -459,7 +459,7 @@ static void create_slot_children(lv_obj_t* container, AmsSlotData* data) {
             lv_obj_set_style_min_height(canvas, spool_size, LV_PART_MAIN);
             lv_obj_set_style_max_width(canvas, spool_size, LV_PART_MAIN);
             lv_obj_set_style_max_height(canvas, spool_size, LV_PART_MAIN);
-            ui_spool_canvas_set_color(canvas, lv_color_hex(AMS_DEFAULT_GATE_COLOR));
+            ui_spool_canvas_set_color(canvas, lv_color_hex(AMS_DEFAULT_SLOT_COLOR));
             ui_spool_canvas_set_fill_level(canvas, data->fill_level);
             lv_obj_add_flag(canvas, LV_OBJ_FLAG_EVENT_BUBBLE); // Propagate clicks to slot
             data->spool_canvas = canvas;
@@ -494,7 +494,7 @@ static void create_slot_children(lv_obj_t* container, AmsSlotData* data) {
         lv_obj_set_size(outer_ring, spool_size, spool_size);
         lv_obj_align(outer_ring, LV_ALIGN_CENTER, 0, 0);
         lv_obj_set_style_radius(outer_ring, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-        lv_color_t default_darker = darken_color(lv_color_hex(AMS_DEFAULT_GATE_COLOR), 50);
+        lv_color_t default_darker = darken_color(lv_color_hex(AMS_DEFAULT_SLOT_COLOR), 50);
         lv_obj_set_style_bg_color(outer_ring, default_darker, LV_PART_MAIN);
         lv_obj_set_style_bg_opa(outer_ring, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_width(outer_ring, 2, LV_PART_MAIN);
@@ -509,7 +509,7 @@ static void create_slot_children(lv_obj_t* container, AmsSlotData* data) {
         lv_obj_set_size(filament_ring, filament_ring_size, filament_ring_size);
         lv_obj_align(filament_ring, LV_ALIGN_CENTER, 0, 0);
         lv_obj_set_style_radius(filament_ring, LV_RADIUS_CIRCLE, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(filament_ring, lv_color_hex(AMS_DEFAULT_GATE_COLOR),
+        lv_obj_set_style_bg_color(filament_ring, lv_color_hex(AMS_DEFAULT_SLOT_COLOR),
                                   LV_PART_MAIN);
         lv_obj_set_style_bg_opa(filament_ring, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_border_width(filament_ring, 0, LV_PART_MAIN);
@@ -573,17 +573,17 @@ static void create_slot_children(lv_obj_t* container, AmsSlotData* data) {
  * @brief Setup observers for a given slot index
  */
 static void setup_slot_observers(AmsSlotData* data) {
-    if (data->slot_index < 0 || data->slot_index >= AmsState::MAX_GATES) {
+    if (data->slot_index < 0 || data->slot_index >= AmsState::MAX_SLOTS) {
         spdlog::warn("[AmsSlot] Invalid slot index {}, skipping observers", data->slot_index);
         return;
     }
 
     AmsState& state = AmsState::instance();
 
-    // Get per-gate subjects
-    lv_subject_t* color_subject = state.get_gate_color_subject(data->slot_index);
-    lv_subject_t* status_subject = state.get_gate_status_subject(data->slot_index);
-    lv_subject_t* current_gate_subject = state.get_current_gate_subject();
+    // Get per-slot subjects
+    lv_subject_t* color_subject = state.get_slot_color_subject(data->slot_index);
+    lv_subject_t* status_subject = state.get_slot_status_subject(data->slot_index);
+    lv_subject_t* current_slot_subject = state.get_current_slot_subject();
     lv_subject_t* filament_loaded_subject = state.get_filament_loaded_subject();
 
     // Create observers with ObserverGuard (RAII cleanup)
@@ -593,9 +593,9 @@ static void setup_slot_observers(AmsSlotData* data) {
     if (status_subject) {
         data->status_observer = ObserverGuard(status_subject, on_status_changed, data);
     }
-    if (current_gate_subject) {
-        data->current_gate_observer =
-            ObserverGuard(current_gate_subject, on_current_gate_changed, data);
+    if (current_slot_subject) {
+        data->current_slot_observer =
+            ObserverGuard(current_slot_subject, on_current_slot_changed, data);
     }
     if (filament_loaded_subject) {
         data->filament_loaded_observer =
@@ -616,16 +616,16 @@ static void setup_slot_observers(AmsSlotData* data) {
     if (status_subject && data->status_observer) {
         on_status_changed(data->status_observer.get(), status_subject);
     }
-    if (current_gate_subject && data->current_gate_observer) {
-        on_current_gate_changed(data->current_gate_observer.get(), current_gate_subject);
+    if (current_slot_subject && data->current_slot_observer) {
+        on_current_slot_changed(data->current_slot_observer.get(), current_slot_subject);
     }
 
     // Update material label from backend if available
     AmsBackend* backend = state.get_backend();
     if (backend) {
-        GateInfo gate = backend->get_gate_info(data->slot_index);
-        if (!gate.material.empty()) {
-            lv_label_set_text(data->material_label, gate.material.c_str());
+        SlotInfo slot = backend->get_slot_info(data->slot_index);
+        if (!slot.material.empty()) {
+            lv_label_set_text(data->material_label, slot.material.c_str());
         }
     }
 
@@ -699,7 +699,7 @@ static void ams_slot_xml_apply(lv_xml_parser_state_t* state, const char** attrs)
                 // Clear existing observers
                 data->color_observer.reset();
                 data->status_observer.reset();
-                data->current_gate_observer.reset();
+                data->current_slot_observer.reset();
                 data->filament_loaded_observer.reset();
 
                 data->slot_index = new_index;
@@ -762,7 +762,7 @@ void ui_ams_slot_set_index(lv_obj_t* obj, int slot_index) {
     // Clear existing observers
     data->color_observer.reset();
     data->status_observer.reset();
-    data->current_gate_observer.reset();
+    data->current_slot_observer.reset();
     data->filament_loaded_observer.reset();
 
     data->slot_index = slot_index;
@@ -784,27 +784,27 @@ void ui_ams_slot_refresh(lv_obj_t* obj) {
     AmsState& state = AmsState::instance();
 
     // Trigger observer callbacks with current values
-    lv_subject_t* color_subject = state.get_gate_color_subject(data->slot_index);
+    lv_subject_t* color_subject = state.get_slot_color_subject(data->slot_index);
     if (color_subject && data->color_observer) {
         on_color_changed(data->color_observer.get(), color_subject);
     }
 
-    lv_subject_t* status_subject = state.get_gate_status_subject(data->slot_index);
+    lv_subject_t* status_subject = state.get_slot_status_subject(data->slot_index);
     if (status_subject && data->status_observer) {
         on_status_changed(data->status_observer.get(), status_subject);
     }
 
-    lv_subject_t* current_gate_subject = state.get_current_gate_subject();
-    if (current_gate_subject && data->current_gate_observer) {
-        on_current_gate_changed(data->current_gate_observer.get(), current_gate_subject);
+    lv_subject_t* current_slot_subject = state.get_current_slot_subject();
+    if (current_slot_subject && data->current_slot_observer) {
+        on_current_slot_changed(data->current_slot_observer.get(), current_slot_subject);
     }
 
     // Update material from backend
     AmsBackend* backend = state.get_backend();
     if (backend && data->material_label) {
-        GateInfo gate = backend->get_gate_info(data->slot_index);
-        if (!gate.material.empty()) {
-            lv_label_set_text(data->material_label, gate.material.c_str());
+        SlotInfo slot = backend->get_slot_info(data->slot_index);
+        if (!slot.material.empty()) {
+            lv_label_set_text(data->material_label, slot.material.c_str());
         } else {
             lv_label_set_text(data->material_label, "--");
         }

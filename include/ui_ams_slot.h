@@ -13,8 +13,8 @@ extern "C" {
  * @file ui_ams_slot.h
  * @brief Custom LVGL XML widget for AMS filament slot display
  *
- * The ams_slot widget encapsulates a single AMS gate/lane slot with:
- * - Color swatch showing filament color (bound to ams_gate_N_color subject)
+ * The ams_slot widget encapsulates a single AMS slot with:
+ * - Color swatch showing filament color (bound to ams_slot_N_color subject)
  * - Status icon (available, loaded, blocked, etc.)
  * - Material label (PLA, PETG, etc.)
  * - Slot number badge

@@ -29,7 +29,7 @@
 // Default dimensions
 static constexpr int32_t DEFAULT_WIDTH = 300;
 static constexpr int32_t DEFAULT_HEIGHT = 200;
-static constexpr int DEFAULT_GATE_COUNT = 4;
+static constexpr int DEFAULT_SLOT_COUNT = 4;
 
 // Layout ratios (as fraction of widget height)
 // Entry points at very top to connect visually with slot grid above
@@ -73,24 +73,24 @@ enum class AnimDirection {
     UNLOADING = 2 // Animating away from nozzle
 };
 
-// Per-gate filament state for visualizing all installed filaments
-struct GateFilamentState {
+// Per-slot filament state for visualizing all installed filaments
+struct SlotFilamentState {
     PathSegment segment = PathSegment::NONE; // How far filament extends
     uint32_t color = 0x808080;               // Filament color (gray default)
 };
 
 struct FilamentPathData {
     int topology = 1;                    // 0=LINEAR, 1=HUB
-    int gate_count = DEFAULT_GATE_COUNT; // Number of gates
-    int active_gate = -1;                // Currently active gate (-1=none)
+    int slot_count = DEFAULT_SLOT_COUNT; // Number of slots
+    int active_slot = -1;                // Currently active slot (-1=none)
     int filament_segment = 0;            // PathSegment enum value (target)
     int error_segment = 0;               // Error location (0=none)
     int anim_progress = 0;               // Animation progress 0-100 (for segment transition)
     uint32_t filament_color = DEFAULT_FILAMENT_COLOR;
 
-    // Per-gate filament state (for showing all installed filaments, not just active)
-    static constexpr int MAX_GATES = 16;
-    GateFilamentState gate_filament_states[MAX_GATES] = {};
+    // Per-slot filament state (for showing all installed filaments, not just active)
+    static constexpr int MAX_SLOTS = 16;
+    SlotFilamentState slot_filament_states[MAX_SLOTS] = {};
 
     // Animation state
     int prev_segment = 0; // Previous segment (for smooth transition)
@@ -107,8 +107,8 @@ struct FilamentPathData {
     bool use_faceted_toolhead = false; // false = Bambu-style, true = faceted red style
 
     // Callbacks
-    filament_path_gate_cb_t gate_callback = nullptr;
-    void* gate_user_data = nullptr;
+    filament_path_slot_cb_t slot_callback = nullptr;
+    void* slot_user_data = nullptr;
     filament_path_bypass_cb_t bypass_callback = nullptr;
     void* bypass_user_data = nullptr;
 
@@ -178,19 +178,19 @@ static FilamentPathData* get_data(lv_obj_t* obj) {
 // Helper Functions
 // ============================================================================
 
-// Calculate X position for a gate's entry point (distributed across width)
-static int32_t get_gate_x(int gate_index, int gate_count, int32_t width) {
-    if (gate_count <= 1)
+// Calculate X position for a slot's entry point (distributed across width)
+static int32_t get_slot_x(int slot_index, int slot_count, int32_t width) {
+    if (slot_count <= 1)
         return width / 2;
 
     // Match the slot_grid layout: flex_grow=1 slots in a container inset by card_padding
     // slot_grid is inside ams_unit_card with style_pad_all="#space_sm" (8px)
-    // Gate centers align with slot centers: card_padding + (2*i + 1) * effective_width /
-    // (2*gate_count)
+    // Slot centers align with slot centers: card_padding + (2*i + 1) * effective_width /
+    // (2*slot_count)
     constexpr int32_t card_padding = 8; // space_sm
     int32_t effective_width = width - 2 * card_padding;
-    int32_t segment_width = effective_width / gate_count;
-    return card_padding + segment_width / 2 + gate_index * segment_width;
+    int32_t segment_width = effective_width / slot_count;
+    return card_padding + segment_width / 2 + slot_index * segment_width;
 }
 
 // Check if a segment should be drawn as "active" (filament present at or past it)
@@ -537,68 +537,68 @@ static void filament_path_draw_cb(lv_event_t* e) {
     bool is_loading = (data->anim_direction == AnimDirection::LOADING);
 
     // ========================================================================
-    // Draw lane lines (one per gate, from entry to merge point)
-    // Shows all installed filaments' colors, not just the active gate
+    // Draw lane lines (one per slot, from entry to merge point)
+    // Shows all installed filaments' colors, not just the active slot
     // ========================================================================
-    for (int i = 0; i < data->gate_count; i++) {
-        int32_t gate_x = x_off + get_gate_x(i, data->gate_count, width);
-        bool is_active_gate = (i == data->active_gate);
+    for (int i = 0; i < data->slot_count; i++) {
+        int32_t slot_x = x_off + get_slot_x(i, data->slot_count, width);
+        bool is_active_slot = (i == data->active_slot);
 
-        // Determine line color and width for this gate's lane
-        // Priority: active gate > per-gate filament state > idle
+        // Determine line color and width for this slot's lane
+        // Priority: active slot > per-slot filament state > idle
         lv_color_t lane_color = idle_color;
         int32_t lane_width = line_idle;
         bool has_filament = false;
-        PathSegment gate_segment = PathSegment::NONE;
+        PathSegment slot_segment = PathSegment::NONE;
 
-        if (is_active_gate && data->filament_segment > 0) {
-            // Active gate - use active filament color
+        if (is_active_slot && data->filament_segment > 0) {
+            // Active slot - use active filament color
             has_filament = true;
             lane_color = active_color;
             lane_width = line_active;
-            gate_segment = fil_seg;
+            slot_segment = fil_seg;
 
             // Check for error in lane segments
             if (has_error && (error_seg == PathSegment::PREP || error_seg == PathSegment::LANE)) {
                 lane_color = error_color;
             }
-        } else if (i < FilamentPathData::MAX_GATES &&
-                   data->gate_filament_states[i].segment != PathSegment::NONE) {
-            // Non-active gate with installed filament - show its color to its sensor position
+        } else if (i < FilamentPathData::MAX_SLOTS &&
+                   data->slot_filament_states[i].segment != PathSegment::NONE) {
+            // Non-active slot with installed filament - show its color to its sensor position
             has_filament = true;
-            lane_color = lv_color_hex(data->gate_filament_states[i].color);
+            lane_color = lv_color_hex(data->slot_filament_states[i].color);
             lane_width = line_active;
-            gate_segment = data->gate_filament_states[i].segment;
+            slot_segment = data->slot_filament_states[i].segment;
         }
 
-        // For non-active gates with filament:
+        // For non-active slots with filament:
         // - Color the line FROM spool TO sensor (we know filament is here)
         // - Color the sensor dot (filament detected)
         // - Gray the line PAST sensor to merge (we don't know extent beyond sensor)
-        bool is_non_active_with_filament = !is_active_gate && has_filament;
+        bool is_non_active_with_filament = !is_active_slot && has_filament;
 
         // Line from entry to prep sensor: colored if filament present
         lv_color_t entry_line_color = has_filament ? lane_color : idle_color;
         int32_t entry_line_width = has_filament ? lane_width : line_idle;
-        draw_vertical_line(layer, gate_x, entry_y, prep_y - sensor_r, entry_line_color,
+        draw_vertical_line(layer, slot_x, entry_y, prep_y - sensor_r, entry_line_color,
                            entry_line_width);
 
         // Draw prep sensor dot (AFC topology shows these prominently)
         if (data->topology == 1) { // HUB topology
-            bool prep_active = has_filament && is_segment_active(PathSegment::PREP, gate_segment);
-            draw_sensor_dot(layer, gate_x, prep_y, prep_active ? lane_color : idle_color,
+            bool prep_active = has_filament && is_segment_active(PathSegment::PREP, slot_segment);
+            draw_sensor_dot(layer, slot_x, prep_y, prep_active ? lane_color : idle_color,
                             prep_active, sensor_r);
         }
 
-        // Line from prep to merge: gray for non-active gates (don't imply extent past sensor)
+        // Line from prep to merge: gray for non-active slots (don't imply extent past sensor)
         lv_color_t merge_line_color = is_non_active_with_filament ? idle_color : lane_color;
         int32_t merge_line_width = is_non_active_with_filament ? line_idle : lane_width;
-        // For gates with no filament, use idle color
+        // For slots with no filament, use idle color
         if (!has_filament) {
             merge_line_color = idle_color;
             merge_line_width = line_idle;
         }
-        draw_line(layer, gate_x, prep_y + sensor_r, center_x, merge_y, merge_line_color,
+        draw_line(layer, slot_x, prep_y + sensor_r, center_x, merge_y, merge_line_color,
                   merge_line_width);
     }
 
@@ -656,7 +656,7 @@ static void filament_path_draw_cb(lv_event_t* e) {
         int32_t hub_line_width = line_idle;
         bool hub_has_filament = false;
 
-        if (data->active_gate >= 0 && is_segment_active(PathSegment::HUB, fil_seg)) {
+        if (data->active_slot >= 0 && is_segment_active(PathSegment::HUB, fil_seg)) {
             hub_line_color = active_color;
             hub_line_width = line_active;
             hub_has_filament = true;
@@ -687,14 +687,14 @@ static void filament_path_draw_cb(lv_event_t* e) {
         lv_color_t output_color = idle_color;
         int32_t output_width = line_idle;
 
-        // Bypass or normal gate active?
+        // Bypass or normal slot active?
         bool output_active = false;
         if (data->bypass_active) {
             // Bypass active - use bypass color for output path
             output_color = lv_color_hex(data->bypass_color);
             output_width = line_active;
             output_active = true;
-        } else if (data->active_gate >= 0 && is_segment_active(PathSegment::OUTPUT, fil_seg)) {
+        } else if (data->active_slot >= 0 && is_segment_active(PathSegment::OUTPUT, fil_seg)) {
             output_color = active_color;
             output_width = line_active;
             output_active = true;
@@ -719,14 +719,14 @@ static void filament_path_draw_cb(lv_event_t* e) {
         lv_color_t toolhead_color = idle_color;
         int32_t toolhead_width = line_idle;
 
-        // Bypass or normal gate active?
+        // Bypass or normal slot active?
         bool toolhead_active = false;
         if (data->bypass_active) {
             // Bypass active - use bypass color for toolhead path
             toolhead_color = lv_color_hex(data->bypass_color);
             toolhead_width = line_active;
             toolhead_active = true;
-        } else if (data->active_gate >= 0 && is_segment_active(PathSegment::TOOLHEAD, fil_seg)) {
+        } else if (data->active_slot >= 0 && is_segment_active(PathSegment::TOOLHEAD, fil_seg)) {
             toolhead_color = active_color;
             toolhead_width = line_active;
             toolhead_active = true;
@@ -750,11 +750,11 @@ static void filament_path_draw_cb(lv_event_t* e) {
     {
         lv_color_t noz_color = nozzle_color;
 
-        // Bypass or normal gate active?
+        // Bypass or normal slot active?
         if (data->bypass_active) {
             // Bypass active - use bypass color for nozzle
             noz_color = lv_color_hex(data->bypass_color);
-        } else if (data->active_gate >= 0 && is_segment_active(PathSegment::NOZZLE, fil_seg)) {
+        } else if (data->active_slot >= 0 && is_segment_active(PathSegment::NOZZLE, fil_seg)) {
             noz_color = active_color;
             if (has_error && error_seg == PathSegment::NOZZLE) {
                 noz_color = error_color;
@@ -777,7 +777,7 @@ static void filament_path_draw_cb(lv_event_t* e) {
     // ========================================================================
     // Draw animated filament tip (during segment transitions)
     // ========================================================================
-    if (is_animating && data->active_gate >= 0) {
+    if (is_animating && data->active_slot >= 0) {
         // Calculate Y positions for each segment (same as above)
         // Map segment to Y position on the path
         auto get_segment_y = [&](PathSegment seg) -> int32_t {
@@ -809,25 +809,25 @@ static void filament_path_draw_cb(lv_event_t* e) {
         float progress_factor = anim_progress / 100.0f;
         int32_t tip_y = from_y + (int32_t)((to_y - from_y) * progress_factor);
 
-        // Calculate X position - for lanes, interpolate from gate to center
+        // Calculate X position - for lanes, interpolate from slot to center
         int32_t tip_x = center_x;
         if ((prev_seg <= PathSegment::PREP || fil_seg <= PathSegment::PREP) &&
-            data->active_gate >= 0) {
-            int32_t gate_x = x_off + get_gate_x(data->active_gate, data->gate_count, width);
+            data->active_slot >= 0) {
+            int32_t slot_x = x_off + get_slot_x(data->active_slot, data->slot_count, width);
             if (is_loading) {
-                // Moving from gate toward center
+                // Moving from slot toward center
                 if (prev_seg <= PathSegment::PREP && fil_seg > PathSegment::PREP) {
                     // Transitioning from lane to hub area - interpolate X
-                    tip_x = gate_x + (int32_t)((center_x - gate_x) * progress_factor);
+                    tip_x = slot_x + (int32_t)((center_x - slot_x) * progress_factor);
                 } else if (prev_seg <= PathSegment::PREP) {
-                    tip_x = gate_x;
+                    tip_x = slot_x;
                 }
             } else {
-                // Unloading - moving from center toward gate
+                // Unloading - moving from center toward slot
                 if (fil_seg <= PathSegment::PREP && prev_seg > PathSegment::PREP) {
-                    tip_x = center_x + (int32_t)((gate_x - center_x) * progress_factor);
+                    tip_x = center_x + (int32_t)((slot_x - center_x) * progress_factor);
                 } else if (fil_seg <= PathSegment::PREP) {
-                    tip_x = gate_x;
+                    tip_x = slot_x;
                 }
             }
         }
@@ -836,8 +836,8 @@ static void filament_path_draw_cb(lv_event_t* e) {
         draw_filament_tip(layer, tip_x, tip_y, active_color, sensor_r);
     }
 
-    spdlog::trace("[FilamentPath] Draw: gates={}, active={}, segment={}, anim={}", data->gate_count,
-                  data->active_gate, data->filament_segment, is_animating ? anim_progress : -1);
+    spdlog::trace("[FilamentPath] Draw: slots={}, active={}, segment={}, anim={}", data->slot_count,
+                  data->active_slot, data->filament_segment, is_animating ? anim_progress : -1);
 }
 
 // ============================================================================
@@ -879,13 +879,13 @@ static void filament_path_click_cb(lv_event_t* e) {
         }
     }
 
-    // Find which gate was clicked
-    if (data->gate_callback) {
-        for (int i = 0; i < data->gate_count; i++) {
-            int32_t gate_x = x_off + get_gate_x(i, data->gate_count, width);
-            if (abs(point.x - gate_x) < 20) {
-                spdlog::debug("[FilamentPath] Gate {} clicked", i);
-                data->gate_callback(i, data->gate_user_data);
+    // Find which slot was clicked
+    if (data->slot_callback) {
+        for (int i = 0; i < data->slot_count; i++) {
+            int32_t slot_x = x_off + get_slot_x(i, data->slot_count, width);
+            if (abs(point.x - slot_x) < 20) {
+                spdlog::debug("[FilamentPath] Slot {} clicked", i);
+                data->slot_callback(i, data->slot_user_data);
                 return;
             }
         }
@@ -967,11 +967,11 @@ static void filament_path_xml_apply(lv_xml_parser_state_t* state, const char** a
                 data->topology = 1; // default to hub
             }
             needs_redraw = true;
-        } else if (strcmp(name, "gate_count") == 0) {
-            data->gate_count = LV_CLAMP(atoi(value), 1, 16);
+        } else if (strcmp(name, "slot_count") == 0) {
+            data->slot_count = LV_CLAMP(atoi(value), 1, 16);
             needs_redraw = true;
-        } else if (strcmp(name, "active_gate") == 0) {
-            data->active_gate = atoi(value);
+        } else if (strcmp(name, "active_slot") == 0) {
+            data->active_slot = atoi(value);
             needs_redraw = true;
         } else if (strcmp(name, "filament_segment") == 0) {
             data->filament_segment = LV_CLAMP(atoi(value), 0, PATH_SEGMENT_COUNT - 1);
@@ -1052,18 +1052,18 @@ void ui_filament_path_canvas_set_topology(lv_obj_t* obj, int topology) {
     }
 }
 
-void ui_filament_path_canvas_set_gate_count(lv_obj_t* obj, int count) {
+void ui_filament_path_canvas_set_slot_count(lv_obj_t* obj, int count) {
     auto* data = get_data(obj);
     if (data) {
-        data->gate_count = LV_CLAMP(count, 1, 16);
+        data->slot_count = LV_CLAMP(count, 1, 16);
         lv_obj_invalidate(obj);
     }
 }
 
-void ui_filament_path_canvas_set_active_gate(lv_obj_t* obj, int gate) {
+void ui_filament_path_canvas_set_active_slot(lv_obj_t* obj, int slot) {
     auto* data = get_data(obj);
     if (data) {
-        data->active_gate = gate;
+        data->active_slot = slot;
         lv_obj_invalidate(obj);
     }
 }
@@ -1131,12 +1131,12 @@ void ui_filament_path_canvas_refresh(lv_obj_t* obj) {
     lv_obj_invalidate(obj);
 }
 
-void ui_filament_path_canvas_set_gate_callback(lv_obj_t* obj, filament_path_gate_cb_t cb,
+void ui_filament_path_canvas_set_slot_callback(lv_obj_t* obj, filament_path_slot_cb_t cb,
                                                void* user_data) {
     auto* data = get_data(obj);
     if (data) {
-        data->gate_callback = cb;
-        data->gate_user_data = user_data;
+        data->slot_callback = cb;
+        data->slot_user_data = user_data;
     }
 }
 
@@ -1172,40 +1172,40 @@ void ui_filament_path_canvas_stop_animations(lv_obj_t* obj) {
     lv_obj_invalidate(obj);
 }
 
-void ui_filament_path_canvas_set_gate_filament(lv_obj_t* obj, int gate_index, int segment,
+void ui_filament_path_canvas_set_slot_filament(lv_obj_t* obj, int slot_index, int segment,
                                                uint32_t color) {
     auto* data = get_data(obj);
-    if (!data || gate_index < 0 || gate_index >= FilamentPathData::MAX_GATES)
+    if (!data || slot_index < 0 || slot_index >= FilamentPathData::MAX_SLOTS)
         return;
 
-    auto& state = data->gate_filament_states[gate_index];
+    auto& state = data->slot_filament_states[slot_index];
     PathSegment new_segment = static_cast<PathSegment>(segment);
 
     if (state.segment != new_segment || state.color != color) {
         state.segment = new_segment;
         state.color = color;
-        spdlog::trace("[FilamentPath] Gate {} filament: segment={}, color=0x{:06X}", gate_index,
+        spdlog::trace("[FilamentPath] Slot {} filament: segment={}, color=0x{:06X}", slot_index,
                       segment, color);
         lv_obj_invalidate(obj);
     }
 }
 
-void ui_filament_path_canvas_clear_gate_filaments(lv_obj_t* obj) {
+void ui_filament_path_canvas_clear_slot_filaments(lv_obj_t* obj) {
     auto* data = get_data(obj);
     if (!data)
         return;
 
     bool changed = false;
-    for (int i = 0; i < FilamentPathData::MAX_GATES; i++) {
-        if (data->gate_filament_states[i].segment != PathSegment::NONE) {
-            data->gate_filament_states[i].segment = PathSegment::NONE;
-            data->gate_filament_states[i].color = 0x808080;
+    for (int i = 0; i < FilamentPathData::MAX_SLOTS; i++) {
+        if (data->slot_filament_states[i].segment != PathSegment::NONE) {
+            data->slot_filament_states[i].segment = PathSegment::NONE;
+            data->slot_filament_states[i].color = 0x808080;
             changed = true;
         }
     }
 
     if (changed) {
-        spdlog::trace("[FilamentPath] Cleared all gate filament states");
+        spdlog::trace("[FilamentPath] Cleared all slot filament states");
         lv_obj_invalidate(obj);
     }
 }

@@ -72,22 +72,22 @@ class AmsBackendAfc : public AmsBackend {
     // State queries
     [[nodiscard]] AmsSystemInfo get_system_info() const override;
     [[nodiscard]] AmsType get_type() const override;
-    [[nodiscard]] GateInfo get_gate_info(int global_index) const override;
+    [[nodiscard]] SlotInfo get_slot_info(int slot_index) const override;
     [[nodiscard]] AmsAction get_current_action() const override;
     [[nodiscard]] int get_current_tool() const override;
-    [[nodiscard]] int get_current_gate() const override;
+    [[nodiscard]] int get_current_slot() const override;
     [[nodiscard]] bool is_filament_loaded() const override;
 
     // Path visualization
     [[nodiscard]] PathTopology get_topology() const override;
     [[nodiscard]] PathSegment get_filament_segment() const override;
-    [[nodiscard]] PathSegment get_gate_filament_segment(int gate_index) const override;
+    [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
 
     // Operations
-    AmsError load_filament(int gate_index) override;
+    AmsError load_filament(int slot_index) override;
     AmsError unload_filament() override;
-    AmsError select_gate(int gate_index) override;
+    AmsError select_slot(int slot_index) override;
     AmsError change_tool(int tool_number) override;
 
     // Recovery
@@ -96,8 +96,8 @@ class AmsBackendAfc : public AmsBackend {
     AmsError cancel() override;
 
     // Configuration
-    AmsError set_gate_info(int gate_index, const GateInfo& info) override;
-    AmsError set_tool_mapping(int tool_number, int gate_index) override;
+    AmsError set_slot_info(int slot_index, const SlotInfo& info) override;
+    AmsError set_tool_mapping(int tool_number, int slot_index) override;
 
     // Bypass mode
     AmsError enable_bypass() override;
@@ -214,21 +214,21 @@ class AmsBackendAfc : public AmsBackend {
      * @brief Initialize lane structures based on discovered lanes
      *
      * Called when we first receive lane data to create the correct
-     * number of GateInfo entries.
+     * number of SlotInfo entries.
      *
      * @param lane_names Vector of lane name strings
      */
     void initialize_lanes(const std::vector<std::string>& lane_names);
 
     /**
-     * @brief Get lane name for a gate index
+     * @brief Get lane name for a slot index
      *
      * AFC uses lane names (e.g., "lane1", "lane2") instead of numeric indices.
      *
-     * @param gate_index Gate/lane index (0-based)
+     * @param slot_index Slot/lane index (0-based)
      * @return Lane name or empty string if invalid
      */
-    std::string get_lane_name(int gate_index) const;
+    std::string get_lane_name(int slot_index) const;
 
     /**
      * @brief Compute filament segment from sensor states (no locking)
@@ -267,12 +267,12 @@ class AmsBackendAfc : public AmsBackend {
     AmsError check_preconditions() const;
 
     /**
-     * @brief Validate gate index is within range
+     * @brief Validate slot index is within range
      *
-     * @param gate_index Gate index to validate
-     * @return AmsError (SUCCESS if valid, INVALID_GATE otherwise)
+     * @param slot_index Slot index to validate
+     * @return AmsError (SUCCESS if valid, INVALID_SLOT otherwise)
      */
-    AmsError validate_gate_index(int gate_index) const;
+    AmsError validate_slot_index(int slot_index) const;
 
     // Dependencies
     MoonrakerAPI* api_;       ///< For sending G-code commands
@@ -289,7 +289,7 @@ class AmsBackendAfc : public AmsBackend {
     bool lanes_initialized_{false};       ///< Have we received lane data yet?
     std::vector<std::string> lane_names_; ///< Ordered list of lane names
 
-    // Lane name to gate index mapping
+    // Lane name to slot index mapping
     std::unordered_map<std::string, int> lane_name_to_index_;
 
     // Version detection

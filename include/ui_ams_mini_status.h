@@ -20,14 +20,14 @@ extern "C" {
  * 3. **Fill level**: Bar fills from bottom based on remaining filament %
  *
  * Layout:
- * - Up to 8 vertical bars representing gates/lanes
- * - "+N" overflow indicator when more than max_visible gates exist
- * - Auto-hides when gate_count == 0
+ * - Up to 8 vertical bars representing slots/lanes
+ * - "+N" overflow indicator when more than max_visible slots exist
+ * - Auto-hides when slot_count == 0
  *
  * Programmatic usage:
  * @code{.cpp}
  * lv_obj_t* indicator = ui_ams_mini_status_create(parent, 32);  // 32px height
- * ui_ams_mini_status_set_gate_count(indicator, 4);
+ * ui_ams_mini_status_set_slot_count(indicator, 4);
  * ui_ams_mini_status_set_slot(indicator, 0, 0xFF5722, 75, true);  // Orange, 75% full, present
  * ui_ams_mini_status_set_slot(indicator, 1, 0x2196F3, 50, true);  // Blue, 50% full
  * ui_ams_mini_status_set_slot(indicator, 2, 0x000000, 0, false);  // Empty slot
@@ -47,15 +47,15 @@ extern "C" {
 lv_obj_t* ui_ams_mini_status_create(lv_obj_t* parent, int32_t height);
 
 /**
- * @brief Set the total number of gates/slots
+ * @brief Set the total number of slots
  *
- * If gate_count > max_visible, a "+N" overflow indicator is shown.
- * If gate_count == 0, the widget is hidden.
+ * If slot_count > max_visible, a "+N" overflow indicator is shown.
+ * If slot_count == 0, the widget is hidden.
  *
  * @param obj The ams_mini_status widget
- * @param gate_count Total number of gates in the AMS system
+ * @param slot_count Total number of slots in the AMS system
  */
-void ui_ams_mini_status_set_gate_count(lv_obj_t* obj, int gate_count);
+void ui_ams_mini_status_set_slot_count(lv_obj_t* obj, int slot_count);
 
 /**
  * @brief Set the maximum number of visible slots

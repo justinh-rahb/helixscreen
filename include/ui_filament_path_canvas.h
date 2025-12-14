@@ -18,9 +18,9 @@ extern "C" {
  * and AFC (hub/merger) topologies.
  *
  * Visual layout (vertical, top to bottom):
- *   - Entry points at top (one per gate, connecting to ams_slot widgets)
- *   - Prep sensors (AFC) or gate markers
- *   - Lane/gate lines converging to center
+ *   - Entry points at top (one per slot, connecting to ams_slot widgets)
+ *   - Prep sensors (AFC) or slot markers
+ *   - Lane/slot lines converging to center
  *   - Hub/Selector box
  *   - Output tube
  *   - Toolhead sensor
@@ -42,14 +42,14 @@ extern "C" {
  * <filament_path_canvas name="path_view"
  *                       width="100%" height="200"
  *                       topology="hub"
- *                       gate_count="4"
- *                       active_gate="2"/>
+ *                       slot_count="4"
+ *                       active_slot="2"/>
  * @endcode
  *
  * XML attributes:
  *   - topology: "linear" (Happy Hare) or "hub" (AFC) - default "hub"
- *   - gate_count: Number of gates (1-16) - default 4
- *   - active_gate: Currently active gate (-1 = none) - default -1
+ *   - slot_count: Number of slots (1-16) - default 4
+ *   - active_slot: Currently active slot (-1 = none) - default -1
  *   - filament_segment: Current position (0-7, PathSegment enum)
  *   - error_segment: Error location (0-7, PathSegment enum, 0=none)
  *   - anim_progress: Animation progress 0-100
@@ -82,20 +82,20 @@ lv_obj_t* ui_filament_path_canvas_create(lv_obj_t* parent);
 void ui_filament_path_canvas_set_topology(lv_obj_t* obj, int topology);
 
 /**
- * @brief Set the number of gates
+ * @brief Set the number of slots
  *
  * @param obj The filament_path_canvas widget
- * @param count Number of gates (1-16)
+ * @param count Number of slots (1-16)
  */
-void ui_filament_path_canvas_set_gate_count(lv_obj_t* obj, int count);
+void ui_filament_path_canvas_set_slot_count(lv_obj_t* obj, int count);
 
 /**
- * @brief Set the active gate (whose path is highlighted)
+ * @brief Set the active slot (whose path is highlighted)
  *
  * @param obj The filament_path_canvas widget
- * @param gate Gate index (0+), or -1 for none
+ * @param slot Slot index (0+), or -1 for none
  */
-void ui_filament_path_canvas_set_active_gate(lv_obj_t* obj, int gate);
+void ui_filament_path_canvas_set_active_slot(lv_obj_t* obj, int slot);
 
 /**
  * @brief Set the current filament segment position
@@ -137,16 +137,16 @@ void ui_filament_path_canvas_set_filament_color(lv_obj_t* obj, uint32_t color);
 void ui_filament_path_canvas_refresh(lv_obj_t* obj);
 
 /**
- * @brief Set click callback for gate selection
+ * @brief Set click callback for slot selection
  *
- * When user taps on a gate's entry point, this callback is invoked.
+ * When user taps on a slot's entry point, this callback is invoked.
  *
  * @param obj The filament_path_canvas widget
- * @param cb Callback function (gate_index, user_data)
+ * @param cb Callback function (slot_index, user_data)
  * @param user_data User data passed to callback
  */
-typedef void (*filament_path_gate_cb_t)(int gate_index, void* user_data);
-void ui_filament_path_canvas_set_gate_callback(lv_obj_t* obj, filament_path_gate_cb_t cb,
+typedef void (*filament_path_slot_cb_t)(int slot_index, void* user_data);
+void ui_filament_path_canvas_set_slot_callback(lv_obj_t* obj, filament_path_slot_cb_t cb,
                                                void* user_data);
 
 /**
@@ -177,33 +177,33 @@ bool ui_filament_path_canvas_is_animating(lv_obj_t* obj);
 void ui_filament_path_canvas_stop_animations(lv_obj_t* obj);
 
 /**
- * @brief Set per-gate filament state for multi-filament visualization
+ * @brief Set per-slot filament state for multi-filament visualization
  *
- * Shows filament color from spool to the specified sensor position for gates
- * that have filament installed, even when not the active gate.
+ * Shows filament color from spool to the specified sensor position for slots
+ * that have filament installed, even when not the active slot.
  *
  * @param obj The filament_path_canvas widget
- * @param gate_index Gate index (0-15)
+ * @param slot_index Slot index (0-15)
  * @param segment PathSegment enum value indicating how far filament extends
  * @param color RGB color (0xRRGGBB) of the filament
  */
-void ui_filament_path_canvas_set_gate_filament(lv_obj_t* obj, int gate_index, int segment,
+void ui_filament_path_canvas_set_slot_filament(lv_obj_t* obj, int slot_index, int segment,
                                                uint32_t color);
 
 /**
- * @brief Clear all per-gate filament states
+ * @brief Clear all per-slot filament states
  *
- * Resets all gates to show as idle (no filament installed).
+ * Resets all slots to show as idle (no filament installed).
  *
  * @param obj The filament_path_canvas widget
  */
-void ui_filament_path_canvas_clear_gate_filaments(lv_obj_t* obj);
+void ui_filament_path_canvas_clear_slot_filaments(lv_obj_t* obj);
 
 /**
  * @brief Set bypass mode active state
  *
  * When bypass is active, shows an alternate filament path from the bypass
- * entry point directly to the toolhead, skipping the MMU gates and hub.
+ * entry point directly to the toolhead, skipping the MMU slots and hub.
  * Used for external spool feeding.
  *
  * @param obj The filament_path_canvas widget

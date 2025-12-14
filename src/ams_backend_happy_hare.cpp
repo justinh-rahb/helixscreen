@@ -20,10 +20,10 @@ AmsBackendHappyHare::AmsBackendHappyHare(MoonrakerAPI* api, MoonrakerClient* cli
     system_info_.type_name = "Happy Hare";
     system_info_.version = "unknown";
     system_info_.current_tool = -1;
-    system_info_.current_gate = -1;
+    system_info_.current_slot = -1;
     system_info_.filament_loaded = false;
     system_info_.action = AmsAction::IDLE;
-    system_info_.total_gates = 0;
+    system_info_.total_slots = 0;
     system_info_.supports_endless_spool = true;
     system_info_.supports_spoolman = true;
     system_info_.supports_tool_mapping = true;
@@ -137,17 +137,17 @@ AmsType AmsBackendHappyHare::get_type() const {
     return AmsType::HAPPY_HARE;
 }
 
-GateInfo AmsBackendHappyHare::get_gate_info(int global_index) const {
+SlotInfo AmsBackendHappyHare::get_slot_info(int slot_index) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    const auto* gate = system_info_.get_gate_global(global_index);
-    if (gate) {
-        return *gate;
+    const auto* slot = system_info_.get_slot_global(slot_index);
+    if (slot) {
+        return *slot;
     }
 
-    // Return empty gate info for invalid index
-    GateInfo empty;
-    empty.gate_index = -1;
+    // Return empty slot info for invalid index
+    SlotInfo empty;
+    empty.slot_index = -1;
     empty.global_index = -1;
     return empty;
 }
@@ -162,9 +162,9 @@ int AmsBackendHappyHare::get_current_tool() const {
     return system_info_.current_tool;
 }
 
-int AmsBackendHappyHare::get_current_gate() const {
+int AmsBackendHappyHare::get_current_slot() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return system_info_.current_gate;
+    return system_info_.current_slot;
 }
 
 bool AmsBackendHappyHare::is_filament_loaded() const {
@@ -183,19 +183,19 @@ PathSegment AmsBackendHappyHare::get_filament_segment() const {
     return path_segment_from_happy_hare_pos(filament_pos_);
 }
 
-PathSegment AmsBackendHappyHare::get_gate_filament_segment(int gate_index) const {
+PathSegment AmsBackendHappyHare::get_slot_filament_segment(int slot_index) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Check if this is the active gate - return the current filament segment
-    if (gate_index == system_info_.current_gate && system_info_.filament_loaded) {
+    // Check if this is the active slot - return the current filament segment
+    if (slot_index == system_info_.current_slot && system_info_.filament_loaded) {
         return path_segment_from_happy_hare_pos(filament_pos_);
     }
 
-    // For non-active gates in Happy Hare (linear topology), check gate status
-    // Gates with available filament are assumed to have filament ready at the selector
-    const GateInfo* gate = system_info_.get_gate_global(gate_index);
-    if (gate &&
-        (gate->status == GateStatus::AVAILABLE || gate->status == GateStatus::FROM_BUFFER)) {
+    // For non-active slots in Happy Hare (linear topology), check slot status
+    // Slots with available filament are assumed to have filament ready at the selector
+    const SlotInfo* slot = system_info_.get_slot_global(slot_index);
+    if (slot &&
+        (slot->status == SlotStatus::AVAILABLE || slot->status == SlotStatus::FROM_BUFFER)) {
         return PathSegment::SPOOL; // Filament at spool ready position
     }
 
@@ -248,8 +248,8 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
     // Parse current gate: printer.mmu.gate
     // -1 = no gate selected, -2 = bypass
     if (mmu_data.contains("gate") && mmu_data["gate"].is_number_integer()) {
-        system_info_.current_gate = mmu_data["gate"].get<int>();
-        spdlog::trace("[AMS HappyHare] Current gate: {}", system_info_.current_gate);
+        system_info_.current_slot = mmu_data["gate"].get<int>();
+        spdlog::trace("[AMS HappyHare] Current slot: {}", system_info_.current_slot);
     }
 
     // Parse current tool: printer.mmu.tool
@@ -307,19 +307,19 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         }
 
         // Update gate status values
-        for (size_t i = 0; i < gate_status.size() && i < system_info_.units[0].gates.size(); ++i) {
+        for (size_t i = 0; i < gate_status.size() && i < system_info_.units[0].slots.size(); ++i) {
             if (gate_status[i].is_number_integer()) {
                 int hh_status = gate_status[i].get<int>();
-                GateStatus status = gate_status_from_happy_hare(hh_status);
+                SlotStatus status = slot_status_from_happy_hare(hh_status);
 
-                // Mark the currently loaded gate as LOADED instead of AVAILABLE
+                // Mark the currently loaded slot as LOADED instead of AVAILABLE
                 if (system_info_.filament_loaded &&
-                    static_cast<int>(i) == system_info_.current_gate &&
-                    status == GateStatus::AVAILABLE) {
-                    status = GateStatus::LOADED;
+                    static_cast<int>(i) == system_info_.current_slot &&
+                    status == SlotStatus::AVAILABLE) {
+                    status = SlotStatus::LOADED;
                 }
 
-                system_info_.units[0].gates[i].status = status;
+                system_info_.units[0].slots[i].status = status;
             }
         }
     }
@@ -329,10 +329,10 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
     if (mmu_data.contains("gate_color_rgb") && mmu_data["gate_color_rgb"].is_array()) {
         const auto& colors = mmu_data["gate_color_rgb"];
         for (size_t i = 0; i < colors.size() && !system_info_.units.empty() &&
-                           i < system_info_.units[0].gates.size();
+                           i < system_info_.units[0].slots.size();
              ++i) {
             if (colors[i].is_number_integer()) {
-                system_info_.units[0].gates[i].color_rgb =
+                system_info_.units[0].slots[i].color_rgb =
                     static_cast<uint32_t>(colors[i].get<int>());
             }
         }
@@ -343,10 +343,10 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
     if (mmu_data.contains("gate_material") && mmu_data["gate_material"].is_array()) {
         const auto& materials = mmu_data["gate_material"];
         for (size_t i = 0; i < materials.size() && !system_info_.units.empty() &&
-                           i < system_info_.units[0].gates.size();
+                           i < system_info_.units[0].slots.size();
              ++i) {
             if (materials[i].is_string()) {
-                system_info_.units[0].gates[i].material = materials[i].get<std::string>();
+                system_info_.units[0].slots[i].material = materials[i].get<std::string>();
             }
         }
     }
@@ -354,25 +354,25 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
     // Parse ttg_map (tool-to-gate mapping) if available
     if (mmu_data.contains("ttg_map") && mmu_data["ttg_map"].is_array()) {
         const auto& ttg_map = mmu_data["ttg_map"];
-        system_info_.tool_to_gate_map.clear();
-        system_info_.tool_to_gate_map.reserve(ttg_map.size());
+        system_info_.tool_to_slot_map.clear();
+        system_info_.tool_to_slot_map.reserve(ttg_map.size());
 
         for (const auto& mapping : ttg_map) {
             if (mapping.is_number_integer()) {
-                system_info_.tool_to_gate_map.push_back(mapping.get<int>());
+                system_info_.tool_to_slot_map.push_back(mapping.get<int>());
             }
         }
 
         // Update gate mapped_tool references
         if (!system_info_.units.empty()) {
-            for (auto& gate : system_info_.units[0].gates) {
-                gate.mapped_tool = -1; // Reset
+            for (auto& slot : system_info_.units[0].slots) {
+                slot.mapped_tool = -1; // Reset
             }
-            for (size_t tool = 0; tool < system_info_.tool_to_gate_map.size(); ++tool) {
-                int gate_idx = system_info_.tool_to_gate_map[tool];
-                if (gate_idx >= 0 &&
-                    gate_idx < static_cast<int>(system_info_.units[0].gates.size())) {
-                    system_info_.units[0].gates[gate_idx].mapped_tool = static_cast<int>(tool);
+            for (size_t tool = 0; tool < system_info_.tool_to_slot_map.size(); ++tool) {
+                int slot_idx = system_info_.tool_to_slot_map[tool];
+                if (slot_idx >= 0 &&
+                    slot_idx < static_cast<int>(system_info_.units[0].slots.size())) {
+                    system_info_.units[0].slots[slot_idx].mapped_tool = static_cast<int>(tool);
                 }
             }
         }
@@ -382,10 +382,10 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
     if (mmu_data.contains("endless_spool_groups") && mmu_data["endless_spool_groups"].is_array()) {
         const auto& es_groups = mmu_data["endless_spool_groups"];
         for (size_t i = 0; i < es_groups.size() && !system_info_.units.empty() &&
-                           i < system_info_.units[0].gates.size();
+                           i < system_info_.units[0].slots.size();
              ++i) {
             if (es_groups[i].is_number_integer()) {
-                system_info_.units[0].gates[i].endless_spool_group = es_groups[i].get<int>();
+                system_info_.units[0].slots[i].endless_spool_group = es_groups[i].get<int>();
             }
         }
     }
@@ -398,33 +398,33 @@ void AmsBackendHappyHare::initialize_gates(int gate_count) {
     AmsUnit unit;
     unit.unit_index = 0;
     unit.name = "Happy Hare MMU";
-    unit.gate_count = gate_count;
-    unit.first_gate_global_index = 0;
+    unit.slot_count = gate_count;
+    unit.first_slot_global_index = 0;
     unit.connected = true;
     unit.has_encoder = true; // Happy Hare typically has encoder
     unit.has_toolhead_sensor = true;
-    unit.has_gate_sensors = true;
+    unit.has_slot_sensors = true;
 
-    // Initialize gates with defaults
+    // Initialize slots with defaults
     for (int i = 0; i < gate_count; ++i) {
-        GateInfo gate;
-        gate.gate_index = i;
-        gate.global_index = i;
-        gate.status = GateStatus::UNKNOWN;
-        gate.mapped_tool = i; // Default 1:1 mapping
-        gate.color_rgb = AMS_DEFAULT_GATE_COLOR;
-        unit.gates.push_back(gate);
+        SlotInfo slot;
+        slot.slot_index = i;
+        slot.global_index = i;
+        slot.status = SlotStatus::UNKNOWN;
+        slot.mapped_tool = i; // Default 1:1 mapping
+        slot.color_rgb = AMS_DEFAULT_SLOT_COLOR;
+        unit.slots.push_back(slot);
     }
 
     system_info_.units.clear();
     system_info_.units.push_back(unit);
-    system_info_.total_gates = gate_count;
+    system_info_.total_slots = gate_count;
 
     // Initialize tool-to-gate mapping (1:1 default)
-    system_info_.tool_to_gate_map.clear();
-    system_info_.tool_to_gate_map.reserve(gate_count);
+    system_info_.tool_to_slot_map.clear();
+    system_info_.tool_to_slot_map.reserve(gate_count);
     for (int i = 0; i < gate_count; ++i) {
-        system_info_.tool_to_gate_map.push_back(i);
+        system_info_.tool_to_slot_map.push_back(i);
     }
 
     gates_initialized_ = true;
@@ -446,9 +446,9 @@ AmsError AmsBackendHappyHare::check_preconditions() const {
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendHappyHare::validate_gate_index(int gate_index) const {
-    if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-        return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+AmsError AmsBackendHappyHare::validate_slot_index(int gate_index) const {
+    if (gate_index < 0 || gate_index >= system_info_.total_slots) {
+        return AmsErrorHelper::invalid_slot(gate_index, system_info_.total_slots - 1);
     }
     return AmsErrorHelper::success();
 }
@@ -471,7 +471,7 @@ AmsError AmsBackendHappyHare::execute_gcode(const std::string& gcode) {
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendHappyHare::load_filament(int gate_index) {
+AmsError AmsBackendHappyHare::load_filament(int slot_index) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -480,23 +480,23 @@ AmsError AmsBackendHappyHare::load_filament(int gate_index) {
             return precondition;
         }
 
-        AmsError gate_valid = validate_gate_index(gate_index);
+        AmsError gate_valid = validate_slot_index(slot_index);
         if (!gate_valid) {
             return gate_valid;
         }
 
-        // Check if gate has filament available
-        const auto* gate = system_info_.get_gate_global(gate_index);
-        if (gate && gate->status == GateStatus::EMPTY) {
-            return AmsErrorHelper::gate_not_available(gate_index);
+        // Check if slot has filament available
+        const auto* slot = system_info_.get_slot_global(slot_index);
+        if (slot && slot->status == SlotStatus::EMPTY) {
+            return AmsErrorHelper::slot_not_available(slot_index);
         }
     }
 
-    // Send MMU_LOAD GATE={n} command
+    // Send MMU_LOAD GATE={n} command (Happy Hare uses "gate" in its API)
     std::ostringstream cmd;
-    cmd << "MMU_LOAD GATE=" << gate_index;
+    cmd << "MMU_LOAD GATE=" << slot_index;
 
-    spdlog::info("[AMS HappyHare] Loading from gate {}", gate_index);
+    spdlog::info("[AMS HappyHare] Loading from slot {}", slot_index);
     return execute_gcode(cmd.str());
 }
 
@@ -519,7 +519,7 @@ AmsError AmsBackendHappyHare::unload_filament() {
     return execute_gcode("MMU_UNLOAD");
 }
 
-AmsError AmsBackendHappyHare::select_gate(int gate_index) {
+AmsError AmsBackendHappyHare::select_slot(int slot_index) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -528,17 +528,17 @@ AmsError AmsBackendHappyHare::select_gate(int gate_index) {
             return precondition;
         }
 
-        AmsError gate_valid = validate_gate_index(gate_index);
+        AmsError gate_valid = validate_slot_index(slot_index);
         if (!gate_valid) {
             return gate_valid;
         }
     }
 
-    // Send MMU_SELECT GATE={n} command
+    // Send MMU_SELECT GATE={n} command (Happy Hare uses "gate" in its API)
     std::ostringstream cmd;
-    cmd << "MMU_SELECT GATE=" << gate_index;
+    cmd << "MMU_SELECT GATE=" << slot_index;
 
-    spdlog::info("[AMS HappyHare] Selecting gate {}", gate_index);
+    spdlog::info("[AMS HappyHare] Selecting slot {}", slot_index);
     return execute_gcode(cmd.str());
 }
 
@@ -552,7 +552,7 @@ AmsError AmsBackendHappyHare::change_tool(int tool_number) {
         }
 
         if (tool_number < 0 ||
-            tool_number >= static_cast<int>(system_info_.tool_to_gate_map.size())) {
+            tool_number >= static_cast<int>(system_info_.tool_to_slot_map.size())) {
             return AmsError(AmsResult::INVALID_TOOL,
                             "Tool " + std::to_string(tool_number) + " out of range",
                             "Invalid tool number", "Select a valid tool");
@@ -621,38 +621,38 @@ AmsError AmsBackendHappyHare::cancel() {
 // Configuration Operations
 // ============================================================================
 
-AmsError AmsBackendHappyHare::set_gate_info(int gate_index, const GateInfo& info) {
+AmsError AmsBackendHappyHare::set_slot_info(int slot_index, const SlotInfo& info) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
-        auto* gate = system_info_.get_gate_global(gate_index);
-        if (!gate) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        auto* slot = system_info_.get_slot_global(slot_index);
+        if (!slot) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
         // Update local state
-        gate->color_name = info.color_name;
-        gate->color_rgb = info.color_rgb;
-        gate->material = info.material;
-        gate->brand = info.brand;
-        gate->spoolman_id = info.spoolman_id;
-        gate->spool_name = info.spool_name;
-        gate->remaining_weight_g = info.remaining_weight_g;
-        gate->total_weight_g = info.total_weight_g;
-        gate->nozzle_temp_min = info.nozzle_temp_min;
-        gate->nozzle_temp_max = info.nozzle_temp_max;
-        gate->bed_temp = info.bed_temp;
+        slot->color_name = info.color_name;
+        slot->color_rgb = info.color_rgb;
+        slot->material = info.material;
+        slot->brand = info.brand;
+        slot->spoolman_id = info.spoolman_id;
+        slot->spool_name = info.spool_name;
+        slot->remaining_weight_g = info.remaining_weight_g;
+        slot->total_weight_g = info.total_weight_g;
+        slot->nozzle_temp_min = info.nozzle_temp_min;
+        slot->nozzle_temp_max = info.nozzle_temp_max;
+        slot->bed_temp = info.bed_temp;
 
-        spdlog::info("[AMS HappyHare] Updated gate {} info: {} {}", gate_index, info.material,
+        spdlog::info("[AMS HappyHare] Updated slot {} info: {} {}", slot_index, info.material,
                      info.color_name);
     }
 
     // Emit OUTSIDE the lock to avoid deadlock with callbacks
-    emit_event(EVENT_GATE_CHANGED, std::to_string(gate_index));
+    emit_event(EVENT_SLOT_CHANGED, std::to_string(slot_index));
 
     // Happy Hare stores gate info via MMU_GATE_MAP command
     // This could be extended to persist changes, but for now we just update local state
@@ -661,27 +661,27 @@ AmsError AmsBackendHappyHare::set_gate_info(int gate_index, const GateInfo& info
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendHappyHare::set_tool_mapping(int tool_number, int gate_index) {
+AmsError AmsBackendHappyHare::set_tool_mapping(int tool_number, int slot_index) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
         if (tool_number < 0 ||
-            tool_number >= static_cast<int>(system_info_.tool_to_gate_map.size())) {
+            tool_number >= static_cast<int>(system_info_.tool_to_slot_map.size())) {
             return AmsError(AmsResult::INVALID_TOOL,
                             "Tool " + std::to_string(tool_number) + " out of range",
                             "Invalid tool number", "");
         }
 
-        if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
     }
 
-    // Send MMU_TTG_MAP command to update tool-to-gate mapping
+    // Send MMU_TTG_MAP command to update tool-to-gate mapping (Happy Hare uses "gate" in its API)
     std::ostringstream cmd;
-    cmd << "MMU_TTG_MAP TOOL=" << tool_number << " GATE=" << gate_index;
+    cmd << "MMU_TTG_MAP TOOL=" << tool_number << " GATE=" << slot_index;
 
-    spdlog::info("[AMS HappyHare] Mapping T{} to gate {}", tool_number, gate_index);
+    spdlog::info("[AMS HappyHare] Mapping T{} to slot {}", tool_number, slot_index);
     return execute_gcode(cmd.str());
 }
 
@@ -717,7 +717,7 @@ AmsError AmsBackendHappyHare::disable_bypass() {
             return AmsErrorHelper::not_connected("Happy Hare backend not started");
         }
 
-        if (system_info_.current_gate != -2) {
+        if (system_info_.current_slot != -2) {
             return AmsError(AmsResult::WRONG_STATE, "Bypass not active",
                             "Bypass mode is not currently active", "");
         }
@@ -731,5 +731,5 @@ AmsError AmsBackendHappyHare::disable_bypass() {
 
 bool AmsBackendHappyHare::is_bypass_active() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return system_info_.current_gate == -2;
+    return system_info_.current_slot == -2;
 }

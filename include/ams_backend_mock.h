@@ -14,11 +14,11 @@
  * @file ams_backend_mock.h
  * @brief Mock AMS backend for development and testing
  *
- * Provides a simulated multi-filament system with configurable gates,
+ * Provides a simulated multi-filament system with configurable slots,
  * fake operation timing, and predictable state for UI development.
  *
  * Features:
- * - Configurable gate count (default 4)
+ * - Configurable slot count (default 4)
  * - Simulated load/unload timing
  * - Pre-populated filament colors and materials
  * - Responds to all AmsBackend operations
@@ -26,10 +26,10 @@
 class AmsBackendMock : public AmsBackend {
   public:
     /**
-     * @brief Construct mock backend with specified gate count
-     * @param gate_count Number of simulated gates (1-16, default 4)
+     * @brief Construct mock backend with specified slot count
+     * @param slot_count Number of simulated slots (1-16, default 4)
      */
-    explicit AmsBackendMock(int gate_count = 4);
+    explicit AmsBackendMock(int slot_count = 4);
 
     ~AmsBackendMock() override;
 
@@ -44,22 +44,22 @@ class AmsBackendMock : public AmsBackend {
     // State queries
     [[nodiscard]] AmsSystemInfo get_system_info() const override;
     [[nodiscard]] AmsType get_type() const override;
-    [[nodiscard]] GateInfo get_gate_info(int global_index) const override;
+    [[nodiscard]] SlotInfo get_slot_info(int slot_index) const override;
     [[nodiscard]] AmsAction get_current_action() const override;
     [[nodiscard]] int get_current_tool() const override;
-    [[nodiscard]] int get_current_gate() const override;
+    [[nodiscard]] int get_current_slot() const override;
     [[nodiscard]] bool is_filament_loaded() const override;
 
     // Path visualization
     [[nodiscard]] PathTopology get_topology() const override;
     [[nodiscard]] PathSegment get_filament_segment() const override;
-    [[nodiscard]] PathSegment get_gate_filament_segment(int gate_index) const override;
+    [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
 
     // Operations
-    AmsError load_filament(int gate_index) override;
+    AmsError load_filament(int slot_index) override;
     AmsError unload_filament() override;
-    AmsError select_gate(int gate_index) override;
+    AmsError select_slot(int slot_index) override;
     AmsError change_tool(int tool_number) override;
 
     // Recovery
@@ -68,8 +68,8 @@ class AmsBackendMock : public AmsBackend {
     AmsError cancel() override;
 
     // Configuration
-    AmsError set_gate_info(int gate_index, const GateInfo& info) override;
-    AmsError set_tool_mapping(int tool_number, int gate_index) override;
+    AmsError set_slot_info(int slot_index, const SlotInfo& info) override;
+    AmsError set_tool_mapping(int tool_number, int slot_index) override;
 
     // Bypass mode
     AmsError enable_bypass() override;
@@ -93,11 +93,11 @@ class AmsBackendMock : public AmsBackend {
     void set_operation_delay(int delay_ms);
 
     /**
-     * @brief Force a specific gate status (for testing)
-     * @param gate_index Gate to modify
+     * @brief Force a specific slot status (for testing)
+     * @param slot_index Slot to modify
      * @param status New status
      */
-    void force_gate_status(int gate_index, GateStatus status);
+    void force_slot_status(int slot_index, SlotStatus status);
 
     /**
      * @brief Set whether this mock simulates a hardware bypass sensor
@@ -126,10 +126,10 @@ class AmsBackendMock : public AmsBackend {
      * @brief Simulate async operation completion
      * @param action Action being performed
      * @param complete_event Event to emit on completion
-     * @param gate_index Gate involved (-1 if N/A)
+     * @param slot_index Slot involved (-1 if N/A)
      */
     void schedule_completion(AmsAction action, const std::string& complete_event,
-                             int gate_index = -1);
+                             int slot_index = -1);
 
     /**
      * @brief Wait for any active operation thread to complete

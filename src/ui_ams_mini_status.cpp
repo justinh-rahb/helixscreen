@@ -51,7 +51,7 @@ struct SlotBarData {
     int fill_pct = 100;
     bool present = false;   // Filament present in slot
     bool loaded = false;    // Filament loaded to toolhead
-    bool has_error = false; // Gate is in error/blocked state
+    bool has_error = false; // Slot is in error/blocked state
 };
 
 /**
@@ -60,7 +60,7 @@ struct SlotBarData {
 struct AmsMiniStatusData {
     uint32_t magic = AMS_MINI_STATUS_MAGIC;
     int32_t height = 32;
-    int gate_count = 0;
+    int slot_count = 0;
     int max_visible = AMS_MINI_STATUS_MAX_VISIBLE;
 
     // Child objects
@@ -73,8 +73,8 @@ struct AmsMiniStatusData {
 
     // Auto-binding observers (observe AmsState subjects)
     // Uses ObserverGuard for RAII lifecycle management
-    ObserverGuard gate_count_observer;    // Triggers when number of gates changes
-    ObserverGuard gates_version_observer; // Triggers when gate status/color changes
+    ObserverGuard slot_count_observer;    // Triggers when number of slots changes
+    ObserverGuard slots_version_observer; // Triggers when slot status/color changes
 };
 
 // Static registry for safe cleanup
@@ -88,8 +88,8 @@ static AmsMiniStatusData* get_data(lv_obj_t* obj) {
 // Forward declarations for internal functions
 static void rebuild_bars(AmsMiniStatusData* data);
 static void sync_from_ams_state(AmsMiniStatusData* data);
-static void on_ams_gate_count_changed(lv_observer_t* observer, lv_subject_t* subject);
-static void on_ams_gates_version_changed(lv_observer_t* observer, lv_subject_t* subject);
+static void on_ams_slot_count_changed(lv_observer_t* observer, lv_subject_t* subject);
+static void on_ams_slots_version_changed(lv_observer_t* observer, lv_subject_t* subject);
 
 // ============================================================================
 // Internal helpers
@@ -138,7 +138,7 @@ static void update_slot_bar(SlotBarData* slot, int32_t bar_height) {
     // Empty slots get NO status line (just ghosted outline)
     if (slot->status_line) {
         if (slot->has_error) {
-            // Red - gate is in error/blocked state
+            // Red - slot is in error/blocked state
             lv_obj_set_style_bg_color(slot->status_line, ui_theme_get_color("error_color"),
                                       LV_PART_MAIN);
             lv_obj_set_style_bg_opa(slot->status_line, LV_OPA_COVER, LV_PART_MAIN);
@@ -156,13 +156,13 @@ static void update_slot_bar(SlotBarData* slot, int32_t bar_height) {
     }
 }
 
-/** Rebuild the bars based on gate_count and max_visible */
+/** Rebuild the bars based on slot_count and max_visible */
 static void rebuild_bars(AmsMiniStatusData* data) {
     if (!data || !data->bars_container)
         return;
 
-    int visible_count = std::min(data->gate_count, data->max_visible);
-    int overflow_count = data->gate_count - visible_count;
+    int visible_count = std::min(data->slot_count, data->max_visible);
+    int overflow_count = data->slot_count - visible_count;
 
     // Calculate bar width to fit within parent, leaving room for centering
     // Get parent dimensions first
@@ -265,8 +265,8 @@ static void rebuild_bars(AmsMiniStatusData* data) {
     }
     lv_obj_center(data->container);
 
-    // Hide entire widget if no gates
-    if (data->gate_count <= 0) {
+    // Hide entire widget if no slots
+    if (data->slot_count <= 0) {
         lv_obj_add_flag(data->container, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_remove_flag(data->container, LV_OBJ_FLAG_HIDDEN);
@@ -282,8 +282,8 @@ static void on_delete(lv_event_t* e) {
         if (data) {
             // Release observers before delete to prevent destructor from calling
             // lv_observer_remove() on potentially destroyed subjects during shutdown
-            data->gate_count_observer.release();
-            data->gates_version_observer.release();
+            data->slot_count_observer.release();
+            data->slots_version_observer.release();
         }
         delete data;
         s_registry.erase(it);
@@ -365,49 +365,49 @@ lv_obj_t* ui_ams_mini_status_create(lv_obj_t* parent, int32_t height) {
     lv_obj_add_flag(container, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(container, on_click, LV_EVENT_CLICKED, nullptr);
 
-    // Initially hidden (no gates)
+    // Initially hidden (no slots)
     lv_obj_add_flag(container, LV_OBJ_FLAG_HIDDEN);
 
-    // Auto-bind to AmsState: observe gate_count and gates_version changes
+    // Auto-bind to AmsState: observe slot_count and slots_version changes
     // This makes the widget self-updating - no external wiring needed
-    lv_subject_t* gate_count_subject = AmsState::instance().get_gate_count_subject();
-    if (gate_count_subject) {
-        data->gate_count_observer =
-            ObserverGuard(gate_count_subject, on_ams_gate_count_changed, container);
-        spdlog::debug("[AmsMiniStatus] Auto-bound to AmsState gate_count subject");
+    lv_subject_t* slot_count_subject = AmsState::instance().get_slot_count_subject();
+    if (slot_count_subject) {
+        data->slot_count_observer =
+            ObserverGuard(slot_count_subject, on_ams_slot_count_changed, container);
+        spdlog::debug("[AmsMiniStatus] Auto-bound to AmsState slot_count subject");
 
         // Sync initial state if AMS already has data
-        int current_gate_count = lv_subject_get_int(gate_count_subject);
-        if (current_gate_count > 0) {
+        int current_slot_count = lv_subject_get_int(slot_count_subject);
+        if (current_slot_count > 0) {
             sync_from_ams_state(data);
         }
     }
 
-    // Also observe gates_version for status/color changes (not just count changes)
-    lv_subject_t* gates_version_subject = AmsState::instance().get_gates_version_subject();
-    if (gates_version_subject) {
-        data->gates_version_observer =
-            ObserverGuard(gates_version_subject, on_ams_gates_version_changed, container);
-        spdlog::debug("[AmsMiniStatus] Auto-bound to AmsState gates_version subject");
+    // Also observe slots_version for status/color changes (not just count changes)
+    lv_subject_t* slots_version_subject = AmsState::instance().get_slots_version_subject();
+    if (slots_version_subject) {
+        data->slots_version_observer =
+            ObserverGuard(slots_version_subject, on_ams_slots_version_changed, container);
+        spdlog::debug("[AmsMiniStatus] Auto-bound to AmsState slots_version subject");
     }
 
     spdlog::debug("[AmsMiniStatus] Created (height={})", height);
     return container;
 }
 
-void ui_ams_mini_status_set_gate_count(lv_obj_t* obj, int gate_count) {
+void ui_ams_mini_status_set_slot_count(lv_obj_t* obj, int slot_count) {
     auto* data = get_data(obj);
     if (!data)
         return;
 
-    gate_count = std::max(0, gate_count);
-    if (data->gate_count == gate_count)
+    slot_count = std::max(0, slot_count);
+    if (data->slot_count == slot_count)
         return;
 
-    data->gate_count = gate_count;
+    data->slot_count = slot_count;
     rebuild_bars(data);
 
-    spdlog::debug("[AmsMiniStatus] gate_count={}", gate_count);
+    spdlog::debug("[AmsMiniStatus] slot_count={}", slot_count);
 }
 
 void ui_ams_mini_status_set_max_visible(lv_obj_t* obj, int max_visible) {
@@ -486,8 +486,8 @@ bool ui_ams_mini_status_is_valid(lv_obj_t* obj) {
 /**
  * @brief Sync widget state from AmsState backend
  *
- * Reads gate count and per-gate info from AmsState and updates the widget.
- * Called on initial creation and when gate_count changes.
+ * Reads slot count and per-slot info from AmsState and updates the widget.
+ * Called on initial creation and when slot_count changes.
  */
 static void sync_from_ams_state(AmsMiniStatusData* data) {
     if (!data)
@@ -496,47 +496,47 @@ static void sync_from_ams_state(AmsMiniStatusData* data) {
     AmsBackend* backend = AmsState::instance().get_backend();
     if (!backend) {
         // No backend - hide widget
-        data->gate_count = 0;
+        data->slot_count = 0;
         rebuild_bars(data);
         return;
     }
 
-    int gate_count = lv_subject_get_int(AmsState::instance().get_gate_count_subject());
-    data->gate_count = gate_count;
+    int slot_count = lv_subject_get_int(AmsState::instance().get_slot_count_subject());
+    data->slot_count = slot_count;
 
-    // Populate each slot from backend gate info
-    for (int i = 0; i < gate_count && i < AMS_MINI_STATUS_MAX_VISIBLE; ++i) {
-        GateInfo gate = backend->get_gate_info(i);
+    // Populate each slot from backend slot info
+    for (int i = 0; i < slot_count && i < AMS_MINI_STATUS_MAX_VISIBLE; ++i) {
+        SlotInfo slot = backend->get_slot_info(i);
 
         // Calculate fill percentage from weight data
         int fill_pct = 100;
-        if (gate.total_weight_g > 0) {
-            fill_pct = static_cast<int>((gate.remaining_weight_g / gate.total_weight_g) * 100.0f);
+        if (slot.total_weight_g > 0) {
+            fill_pct = static_cast<int>((slot.remaining_weight_g / slot.total_weight_g) * 100.0f);
             fill_pct = std::clamp(fill_pct, 0, 100);
         }
 
-        bool present = (gate.status != GateStatus::EMPTY && gate.status != GateStatus::UNKNOWN);
-        bool loaded = (gate.status == GateStatus::LOADED);
-        bool has_error = (gate.status == GateStatus::BLOCKED);
+        bool present = (slot.status != SlotStatus::EMPTY && slot.status != SlotStatus::UNKNOWN);
+        bool loaded = (slot.status == SlotStatus::LOADED);
+        bool has_error = (slot.status == SlotStatus::BLOCKED);
 
-        SlotBarData* slot = &data->slots[i];
-        slot->color_rgb = gate.color_rgb;
-        slot->fill_pct = fill_pct;
-        slot->present = present;
-        slot->loaded = loaded;
-        slot->has_error = has_error;
+        SlotBarData* slot_bar = &data->slots[i];
+        slot_bar->color_rgb = slot.color_rgb;
+        slot_bar->fill_pct = fill_pct;
+        slot_bar->present = present;
+        slot_bar->loaded = loaded;
+        slot_bar->has_error = has_error;
     }
 
     rebuild_bars(data);
-    spdlog::debug("[AmsMiniStatus] Synced from AmsState: {} gates", gate_count);
+    spdlog::debug("[AmsMiniStatus] Synced from AmsState: {} slots", slot_count);
 }
 
 /**
- * @brief Observer callback for AmsState gate_count changes
+ * @brief Observer callback for AmsState slot_count changes
  *
- * Automatically updates the widget when AMS backend reports gate count changes.
+ * Automatically updates the widget when AMS backend reports slot count changes.
  */
-static void on_ams_gate_count_changed(lv_observer_t* observer, lv_subject_t* subject) {
+static void on_ams_slot_count_changed(lv_observer_t* observer, lv_subject_t* subject) {
     (void)subject;
     lv_obj_t* container = static_cast<lv_obj_t*>(lv_observer_get_user_data(observer));
     if (!container)
@@ -550,12 +550,12 @@ static void on_ams_gate_count_changed(lv_observer_t* observer, lv_subject_t* sub
 }
 
 /**
- * @brief Observer callback for AmsState gates_version changes
+ * @brief Observer callback for AmsState slots_version changes
  *
- * Automatically updates the widget when gate status or color changes.
- * This is separate from gate_count because status changes don't change the count.
+ * Automatically updates the widget when slot status or color changes.
+ * This is separate from slot_count because status changes don't change the count.
  */
-static void on_ams_gates_version_changed(lv_observer_t* observer, lv_subject_t* subject) {
+static void on_ams_slots_version_changed(lv_observer_t* observer, lv_subject_t* subject) {
     (void)subject;
     lv_obj_t* container = static_cast<lv_obj_t*>(lv_observer_get_user_data(observer));
     if (!container)

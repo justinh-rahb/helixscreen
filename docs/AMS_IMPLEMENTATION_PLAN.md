@@ -54,13 +54,13 @@ AmsState (singleton, reactive subjects)
 | `ams_type` | int | 0=none, 1=happy_hare, 2=afc |
 | `ams_action` | int | AmsAction enum |
 | `ams_action_detail` | string | Human-readable status |
-| `ams_current_gate` | int | -1 if none |
+| `ams_current_slot` | int | -1 if none |
 | `ams_current_tool` | int | Tool number |
 | `ams_filament_loaded` | int | 0/1 boolean |
-| `ams_gate_count` | int | Number of gates |
-| `ams_gates_version` | int | Bump on any gate change |
-| `ams_gate_N_color` | int | RGB packed (N=0-15) |
-| `ams_gate_N_status` | int | GateStatus enum (N=0-15) |
+| `ams_slot_count` | int | Number of slots |
+| `ams_slots_version` | int | Bump on any slot change |
+| `ams_slot_N_color` | int | RGB packed (N=0-15) |
+| `ams_slot_N_status` | int | SlotStatus enum (N=0-15) |
 
 ### UI Component Hierarchy
 
@@ -97,7 +97,7 @@ Future Modals (Phase 3+):
 
 **Files Created:**
 - [x] `include/ams_types.h` - Core data structures
-  - AmsType, GateStatus, GateInfo, AmsUnit, AmsSystemInfo enums/structs
+  - AmsType, SlotStatus, SlotInfo, AmsUnit, AmsSystemInfo enums/structs
   - Conversion functions for Happy Hare values
   - String conversion helpers
 - [x] `include/ams_error.h` - Error handling
@@ -118,7 +118,7 @@ Future Modals (Phase 3+):
 - [x] `include/ams_state.h` - Reactive state header
 - [x] `src/ams_state.cpp` - Reactive state implementation
   - Singleton with LVGL subjects
-  - Per-gate subjects (16 max)
+  - Per-slot subjects (16 max)
   - Observer callback routing
 
 **Files Modified:**
@@ -170,7 +170,7 @@ Future Modals (Phase 3+):
 
 **Critical Fixes Applied:**
 - [x] Observer callbacks check `panel_ != nullptr`
-- [x] `handle_slot_tap()` validates against gate_count
+- [x] `handle_slot_tap()` validates against slot_count
 
 **Verification:**
 - [x] Build succeeds
@@ -273,7 +273,7 @@ printer.mmu.endless_spool_groups
 ```
 
 **Additional Fixes (2025-12-08):**
-- [x] **Deadlock in mock backend** - `start()` and `set_gate_info()` were calling
+- [x] **Deadlock in mock backend** - `start()` and `set_slot_info()` were calling
       `emit_event()` while holding the mutex. Since `emit_event()` also locks the
       mutex and `std::mutex` is non-recursive, this caused deadlock. Fixed by
       releasing the lock before emitting.
@@ -324,7 +324,7 @@ printer.mmu.endless_spool_groups
   - `path_segment_from_afc_sensors()` - infers PathSegment from sensor states
 - [x] `include/ams_state.h` / `src/ams_state.cpp` - Added path subjects:
   - `ams_path_topology` (int) - PathTopology enum
-  - `ams_path_active_gate` (int) - Currently loaded gate
+  - `ams_path_active_slot` (int) - Currently loaded slot
   - `ams_path_filament_segment` (int) - PathSegment where filament is
   - `ams_path_error_segment` (int) - PathSegment with error for highlighting
   - `ams_path_anim_progress` (int) - Animation progress 0-100
@@ -373,7 +373,7 @@ printer.mmu.endless_spool_groups
 
 **Files to Modify:**
 - [ ] `src/moonraker_client.cpp` - Spoolman detection
-- [ ] `include/ams_state.h` - Spoolman fields per gate
+- [ ] `include/ams_state.h` - Spoolman fields per slot
 
 **Verification:**
 - [ ] Edit modal opens from context menu
@@ -393,8 +393,8 @@ printer.mmu.endless_spool_groups
 - [x] `src/ui_filament_path_canvas.cpp` - Custom LVGL XML widget
   - Theme-aware schematic path drawing
   - Supports HUB (AFC) and LINEAR (Happy Hare) topologies
-  - Gates at top → prep sensors → hub/selector → output → toolhead → nozzle
-  - Click callback for gate selection
+  - Slots at top → prep sensors → hub/selector → output → toolhead → nozzle
+  - Click callback for slot selection
 - [x] Bambu-style isometric 3D extruder visualization
 
 **Animation Features:**
@@ -459,13 +459,13 @@ the AMS runs out of a color.
 **Part A: Backend Fixes**
 - [x] AFC backend: `supports_bypass = true`
 - [x] AFC backend: Subscribe to `AFC` object, parse `bypass_state`
-- [x] AFC backend: Set `current_gate = -2` when `bypass_state == true`
+- [x] AFC backend: Set `current_slot = -2` when `bypass_state == true`
 - [x] Added `bypass_active_` member to AFC backend
 - [x] Added `enable_bypass()` / `disable_bypass()` / `is_bypass_active()` to all backends
 
 **Part B: State Layer**
 - [x] Added `ams_bypass_active` subject (int, 0/1) to AmsState
-- [x] Sync from `current_gate == -2` in `sync_from_backend()`
+- [x] Sync from `current_slot == -2` in `sync_from_backend()`
 
 **Part C: Path Canvas Bypass Visualization**
 - [x] Added `set_bypass_active(bool)` and `set_bypass_callback()` APIs
@@ -477,7 +477,7 @@ the AMS runs out of a color.
 - [x] Added "Enable Bypass" button to `ams_panel.xml`
 - [x] Button visibility controlled by `supports_bypass` capability
 - [x] Button text toggles between "Enable Bypass" / "Disable Bypass"
-- [x] "Currently Loaded" shows "External" / "Bypass" when gate is -2
+- [x] "Currently Loaded" shows "External" / "Bypass" when slot is -2
 - [x] Simplified button styling (removed flex, using `align="center"`)
 
 **Part E: All Backends**
@@ -585,9 +585,9 @@ the AMS runs out of a color.
 - [ ] `ui_xml/ams_advanced_panel.xml`
 
 **Features:**
-- [ ] Tool-to-gate mapping UI
+- [ ] Tool-to-slot mapping UI
 - [ ] Endless spool group configuration
-- [ ] Calibration shortcuts (gate calibration, encoder calibration)
+- [ ] Calibration shortcuts (slot calibration, encoder calibration)
 - [ ] Multi-unit selector (if applicable)
 
 **Verification:**
@@ -616,7 +616,7 @@ the AMS runs out of a color.
 // ams_types.h
 enum class AmsType { NONE = 0, HAPPY_HARE = 1, AFC = 2 };
 
-enum class GateStatus {
+enum class SlotStatus {
     UNKNOWN = 0,   // Not yet queried
     EMPTY = 1,     // No filament detected
     AVAILABLE = 2, // Filament present, ready to load
@@ -630,9 +630,9 @@ enum class AmsAction {
     FORMING_TIP, CUTTING, PAUSED, ERROR
 };
 
-struct GateInfo {
-    int gate_index = -1;
-    GateStatus status = GateStatus::UNKNOWN;
+struct SlotInfo {
+    int slot_index = -1;
+    SlotStatus status = SlotStatus::UNKNOWN;
     std::string color_name;
     uint32_t color_rgb = 0x808080;
     std::string material;
@@ -645,12 +645,12 @@ struct AmsSystemInfo {
     AmsType type = AmsType::NONE;
     AmsAction action = AmsAction::IDLE;
     std::string operation_detail;
-    int current_gate = -1;
+    int current_slot = -1;  // -2 = bypass mode
     int current_tool = -1;
     bool filament_loaded = false;
-    int total_gates = 0;
+    int total_slots = 0;
     std::vector<AmsUnit> units;
-    // Helper: get_gate_global(index) for flat access
+    // Helper: get_slot_global(index) for flat access
 };
 ```
 

@@ -37,7 +37,7 @@ enum class AmsResult {
 
     // Hardware/mechanical errors
     FILAMENT_JAM,  ///< Filament jammed in path
-    GATE_BLOCKED,  ///< Gate/lane blocked or inaccessible
+    SLOT_BLOCKED,  ///< Slot/lane blocked or inaccessible
     SENSOR_ERROR,  ///< Filament sensor malfunction
     ENCODER_ERROR, ///< Filament encoder malfunction
     HOMING_FAILED, ///< Selector homing failed
@@ -48,12 +48,12 @@ enum class AmsResult {
     UNLOAD_FAILED,      ///< Failed to unload filament from extruder
     TOOL_CHANGE_FAILED, ///< Tool change operation failed
     TIP_FORMING_FAILED, ///< Filament tip forming failed
-    GATE_NOT_AVAILABLE, ///< Requested gate has no filament
+    SLOT_NOT_AVAILABLE, ///< Requested slot has no filament
 
     // Configuration errors
-    INVALID_GATE,  ///< Gate index out of range
+    INVALID_SLOT,  ///< Slot index out of range
     INVALID_TOOL,  ///< Tool index out of range
-    MAPPING_ERROR, ///< Tool-to-gate mapping invalid
+    MAPPING_ERROR, ///< Tool-to-slot mapping invalid
 
     // Spoolman errors
     SPOOLMAN_NOT_AVAILABLE, ///< Spoolman service not reachable
@@ -90,8 +90,8 @@ inline const char* ams_result_to_string(AmsResult result) {
         return "Busy";
     case AmsResult::FILAMENT_JAM:
         return "Filament Jam";
-    case AmsResult::GATE_BLOCKED:
-        return "Gate Blocked";
+    case AmsResult::SLOT_BLOCKED:
+        return "Slot Blocked";
     case AmsResult::SENSOR_ERROR:
         return "Sensor Error";
     case AmsResult::ENCODER_ERROR:
@@ -108,10 +108,10 @@ inline const char* ams_result_to_string(AmsResult result) {
         return "Tool Change Failed";
     case AmsResult::TIP_FORMING_FAILED:
         return "Tip Forming Failed";
-    case AmsResult::GATE_NOT_AVAILABLE:
-        return "Gate Not Available";
-    case AmsResult::INVALID_GATE:
-        return "Invalid Gate";
+    case AmsResult::SLOT_NOT_AVAILABLE:
+        return "Slot Not Available";
+    case AmsResult::INVALID_SLOT:
+        return "Invalid Slot";
     case AmsResult::INVALID_TOOL:
         return "Invalid Tool";
     case AmsResult::MAPPING_ERROR:
@@ -137,7 +137,7 @@ inline const char* ams_result_to_string(AmsResult result) {
 [[nodiscard]] inline bool ams_result_is_recoverable(AmsResult result) {
     switch (result) {
     case AmsResult::FILAMENT_JAM:
-    case AmsResult::GATE_BLOCKED:
+    case AmsResult::SLOT_BLOCKED:
     case AmsResult::EXTRUDER_COLD:
     case AmsResult::LOAD_FAILED:
     case AmsResult::UNLOAD_FAILED:
@@ -160,7 +160,7 @@ struct AmsError {
     std::string technical_msg; ///< Technical details for logging/debugging
     std::string user_msg;      ///< User-friendly message for UI display
     std::string suggestion;    ///< Suggested recovery action (optional)
-    int gate_index = -1;       ///< Gate involved in error (-1 if N/A)
+    int slot_index = -1;       ///< Slot involved in error (-1 if N/A)
 
     /**
      * @brief Construct an AmsError
@@ -168,11 +168,11 @@ struct AmsError {
      * @param tech Technical message for logging
      * @param user User-friendly message for UI
      * @param suggest Suggested action for recovery
-     * @param gate Gate index if applicable
+     * @param slot Slot index if applicable
      */
     AmsError(AmsResult r = AmsResult::SUCCESS, const std::string& tech = "",
-             const std::string& user = "", const std::string& suggest = "", int gate = -1)
-        : result(r), technical_msg(tech), user_msg(user), suggestion(suggest), gate_index(gate) {}
+             const std::string& user = "", const std::string& suggest = "", int slot = -1)
+        : result(r), technical_msg(tech), user_msg(user), suggestion(suggest), slot_index(slot) {}
 
     /**
      * @brief Check if operation succeeded
@@ -260,27 +260,27 @@ class AmsErrorHelper {
 
     /**
      * @brief Create a filament jam error
-     * @param gate Gate index where jam occurred
+     * @param slot Slot index where jam occurred
      * @param location Description of jam location (e.g., "bowden tube", "extruder")
      * @return AmsError configured for UI display
      */
-    static AmsError filament_jam(int gate, const std::string& location = "") {
+    static AmsError filament_jam(int slot, const std::string& location = "") {
         std::string loc_detail = location.empty() ? "" : " at " + location;
         return AmsError(AmsResult::FILAMENT_JAM, "Filament jam detected" + loc_detail,
                         "Filament jam detected", "Manually clear the jam and retry the operation",
-                        gate);
+                        slot);
     }
 
     /**
-     * @brief Create a gate blocked error
-     * @param gate Gate index that is blocked
+     * @brief Create a slot blocked error
+     * @param slot Slot index that is blocked
      * @return AmsError configured for UI display
      */
-    static AmsError gate_blocked(int gate) {
-        return AmsError(AmsResult::GATE_BLOCKED,
-                        "Gate " + std::to_string(gate) + " is blocked or inaccessible",
-                        "Gate " + std::to_string(gate) + " blocked",
-                        "Check the gate for obstructions or misaligned filament", gate);
+    static AmsError slot_blocked(int slot) {
+        return AmsError(AmsResult::SLOT_BLOCKED,
+                        "Slot " + std::to_string(slot) + " is blocked or inaccessible",
+                        "Slot " + std::to_string(slot) + " blocked",
+                        "Check the slot for obstructions or misaligned filament", slot);
     }
 
     /**
@@ -300,14 +300,14 @@ class AmsErrorHelper {
 
     /**
      * @brief Create a load failed error
-     * @param gate Gate that failed to load
+     * @param slot Slot that failed to load
      * @param detail Technical detail about the failure
      * @return AmsError configured for UI display
      */
-    static AmsError load_failed(int gate, const std::string& detail = "") {
+    static AmsError load_failed(int slot, const std::string& detail = "") {
         return AmsError(AmsResult::LOAD_FAILED, detail.empty() ? "Load operation failed" : detail,
-                        "Failed to load filament from gate " + std::to_string(gate),
-                        "Check filament path and try again", gate);
+                        "Failed to load filament from slot " + std::to_string(slot),
+                        "Check filament path and try again", slot);
     }
 
     /**
@@ -323,29 +323,29 @@ class AmsErrorHelper {
     }
 
     /**
-     * @brief Create a gate not available error
-     * @param gate Gate index that has no filament
+     * @brief Create a slot not available error
+     * @param slot Slot index that has no filament
      * @return AmsError configured for UI display
      */
-    static AmsError gate_not_available(int gate) {
-        return AmsError(AmsResult::GATE_NOT_AVAILABLE,
-                        "Gate " + std::to_string(gate) + " has no filament loaded",
-                        "Gate " + std::to_string(gate) + " is empty",
-                        "Load filament into the gate before selecting it", gate);
+    static AmsError slot_not_available(int slot) {
+        return AmsError(AmsResult::SLOT_NOT_AVAILABLE,
+                        "Slot " + std::to_string(slot) + " has no filament loaded",
+                        "Slot " + std::to_string(slot) + " is empty",
+                        "Load filament into the slot before selecting it", slot);
     }
 
     /**
-     * @brief Create an invalid gate error
-     * @param gate Invalid gate index
-     * @param max_gate Maximum valid gate index
+     * @brief Create an invalid slot error
+     * @param slot Invalid slot index
+     * @param max_slot Maximum valid slot index
      * @return AmsError configured for UI display
      */
-    static AmsError invalid_gate(int gate, int max_gate) {
-        return AmsError(AmsResult::INVALID_GATE,
-                        "Gate " + std::to_string(gate) + " out of range (0-" +
-                            std::to_string(max_gate) + ")",
-                        "Invalid gate number",
-                        "Select a valid gate (0-" + std::to_string(max_gate) + ")", gate);
+    static AmsError invalid_slot(int slot, int max_slot) {
+        return AmsError(AmsResult::INVALID_SLOT,
+                        "Slot " + std::to_string(slot) + " out of range (0-" +
+                            std::to_string(max_slot) + ")",
+                        "Invalid slot number",
+                        "Select a valid slot (0-" + std::to_string(max_slot) + ")", slot);
     }
 
     /**

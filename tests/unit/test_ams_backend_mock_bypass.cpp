@@ -41,20 +41,20 @@ TEST_CASE("AmsBackendMock bypass mode", "[ams][mock][bypass]") {
     SECTION("initially not in bypass mode") {
         REQUIRE_FALSE(backend.is_bypass_active());
         auto info = backend.get_system_info();
-        REQUIRE(info.current_gate != -2);
+        REQUIRE(info.current_slot != -2);
     }
 
-    SECTION("enable bypass sets current_gate to -2") {
+    SECTION("enable bypass sets current_slot to -2") {
         auto result = backend.enable_bypass();
         REQUIRE(result);
         REQUIRE(backend.is_bypass_active());
 
         auto info = backend.get_system_info();
-        REQUIRE(info.current_gate == -2);
+        REQUIRE(info.current_slot == -2);
         REQUIRE(info.filament_loaded == true);
     }
 
-    SECTION("disable bypass clears current_gate") {
+    SECTION("disable bypass clears current_slot") {
         // First enable bypass
         auto enable_result = backend.enable_bypass();
         REQUIRE(enable_result);
@@ -66,7 +66,7 @@ TEST_CASE("AmsBackendMock bypass mode", "[ams][mock][bypass]") {
         REQUIRE_FALSE(backend.is_bypass_active());
 
         auto info = backend.get_system_info();
-        REQUIRE(info.current_gate == -1);
+        REQUIRE(info.current_slot == -1);
         REQUIRE(info.filament_loaded == false);
     }
 

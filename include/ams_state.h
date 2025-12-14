@@ -34,12 +34,12 @@ class MoonrakerClient;
 class AmsState {
   public:
     /**
-     * @brief Maximum number of gates supported for per-gate subjects
+     * @brief Maximum number of slots supported for per-slot subjects
      *
-     * Per-gate subjects (color, status) are allocated statically.
-     * Systems with more gates will only have subjects for the first MAX_GATES.
+     * Per-slot subjects (color, status) are allocated statically.
+     * Systems with more slots will only have subjects for the first MAX_SLOTS.
      */
-    static constexpr int MAX_GATES = 16;
+    static constexpr int MAX_SLOTS = 16;
 
     /**
      * @brief Get the singleton instance
@@ -143,11 +143,11 @@ class AmsState {
     }
 
     /**
-     * @brief Get current gate subject
-     * @return Subject holding current gate index (-1 if none)
+     * @brief Get current slot subject
+     * @return Subject holding current slot index (-1 if none)
      */
-    lv_subject_t* get_current_gate_subject() {
-        return &current_gate_;
+    lv_subject_t* get_current_slot_subject() {
+        return &current_slot_;
     }
 
     /**
@@ -179,23 +179,23 @@ class AmsState {
     }
 
     /**
-     * @brief Get gate count subject
-     * @return Subject holding total number of gates
+     * @brief Get slot count subject
+     * @return Subject holding total number of slots
      */
-    lv_subject_t* get_gate_count_subject() {
-        return &gate_count_;
+    lv_subject_t* get_slot_count_subject() {
+        return &slot_count_;
     }
 
     /**
-     * @brief Get gates version subject
+     * @brief Get slots version subject
      *
-     * Incremented whenever gate data changes. UI can observe this
-     * to know when to refresh gate displays.
+     * Incremented whenever slot data changes. UI can observe this
+     * to know when to refresh slot displays.
      *
      * @return Subject holding version counter
      */
-    lv_subject_t* get_gates_version_subject() {
-        return &gates_version_;
+    lv_subject_t* get_slots_version_subject() {
+        return &slots_version_;
     }
 
     // ========================================================================
@@ -211,11 +211,11 @@ class AmsState {
     }
 
     /**
-     * @brief Get path active gate subject
-     * @return Subject holding gate index whose path is being shown (-1=none)
+     * @brief Get path active slot subject
+     * @return Subject holding slot index whose path is being shown (-1=none)
      */
-    lv_subject_t* get_path_active_gate_subject() {
-        return &path_active_gate_;
+    lv_subject_t* get_path_active_slot_subject() {
+        return &path_active_slot_;
     }
 
     /**
@@ -252,28 +252,28 @@ class AmsState {
     }
 
     // ========================================================================
-    // Per-Gate Subject Accessors
+    // Per-Slot Subject Accessors
     // ========================================================================
 
     /**
-     * @brief Get gate color subject for a specific gate
+     * @brief Get slot color subject for a specific slot
      *
      * Holds 0xRRGGBB color value for UI display.
      *
-     * @param gate_index Gate index (0 to MAX_GATES-1)
+     * @param slot_index Slot index (0 to MAX_SLOTS-1)
      * @return Subject pointer or nullptr if out of range
      */
-    [[nodiscard]] lv_subject_t* get_gate_color_subject(int gate_index);
+    [[nodiscard]] lv_subject_t* get_slot_color_subject(int slot_index);
 
     /**
-     * @brief Get gate status subject for a specific gate
+     * @brief Get slot status subject for a specific slot
      *
-     * Holds GateStatus enum as int.
+     * Holds SlotStatus enum as int.
      *
-     * @param gate_index Gate index (0 to MAX_GATES-1)
+     * @param slot_index Slot index (0 to MAX_SLOTS-1)
      * @return Subject pointer or nullptr if out of range
      */
-    [[nodiscard]] lv_subject_t* get_gate_status_subject(int gate_index);
+    [[nodiscard]] lv_subject_t* get_slot_status_subject(int slot_index);
 
     // ========================================================================
     // Direct State Update (called by backend event handler)
@@ -288,13 +288,13 @@ class AmsState {
     void sync_from_backend();
 
     /**
-     * @brief Update a single gate's subjects
+     * @brief Update a single slot's subjects
      *
-     * Called when backend emits GATE_CHANGED event.
+     * Called when backend emits SLOT_CHANGED event.
      *
-     * @param gate_index Gate that changed
+     * @param slot_index Slot that changed
      */
-    void update_gate(int gate_index);
+    void update_slot(int slot_index);
 
   private:
     AmsState();
@@ -308,9 +308,9 @@ class AmsState {
     void on_backend_event(const std::string& event, const std::string& data);
 
     /**
-     * @brief Bump the gates version counter
+     * @brief Bump the slots version counter
      */
-    void bump_gates_version();
+    void bump_slots_version();
 
     mutable std::recursive_mutex mutex_;
     std::unique_ptr<AmsBackend> backend_;
@@ -319,12 +319,12 @@ class AmsState {
     // System-level subjects
     lv_subject_t ams_type_;
     lv_subject_t ams_action_;
-    lv_subject_t current_gate_;
+    lv_subject_t current_slot_;
     lv_subject_t current_tool_;
     lv_subject_t filament_loaded_;
     lv_subject_t bypass_active_;
-    lv_subject_t gate_count_;
-    lv_subject_t gates_version_;
+    lv_subject_t slot_count_;
+    lv_subject_t slots_version_;
 
     // String subjects (need buffers)
     lv_subject_t ams_action_detail_;
@@ -334,12 +334,12 @@ class AmsState {
 
     // Filament path visualization subjects
     lv_subject_t path_topology_;
-    lv_subject_t path_active_gate_;
+    lv_subject_t path_active_slot_;
     lv_subject_t path_filament_segment_;
     lv_subject_t path_error_segment_;
     lv_subject_t path_anim_progress_;
 
-    // Per-gate subjects (color and status)
-    lv_subject_t gate_colors_[MAX_GATES];
-    lv_subject_t gate_statuses_[MAX_GATES];
+    // Per-slot subjects (color and status)
+    lv_subject_t slot_colors_[MAX_SLOTS];
+    lv_subject_t slot_statuses_[MAX_SLOTS];
 };

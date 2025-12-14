@@ -64,22 +64,22 @@ class AmsBackendHappyHare : public AmsBackend {
     // State queries
     [[nodiscard]] AmsSystemInfo get_system_info() const override;
     [[nodiscard]] AmsType get_type() const override;
-    [[nodiscard]] GateInfo get_gate_info(int global_index) const override;
+    [[nodiscard]] SlotInfo get_slot_info(int slot_index) const override;
     [[nodiscard]] AmsAction get_current_action() const override;
     [[nodiscard]] int get_current_tool() const override;
-    [[nodiscard]] int get_current_gate() const override;
+    [[nodiscard]] int get_current_slot() const override;
     [[nodiscard]] bool is_filament_loaded() const override;
 
     // Path visualization
     [[nodiscard]] PathTopology get_topology() const override;
     [[nodiscard]] PathSegment get_filament_segment() const override;
-    [[nodiscard]] PathSegment get_gate_filament_segment(int gate_index) const override;
+    [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
 
     // Operations
-    AmsError load_filament(int gate_index) override;
+    AmsError load_filament(int slot_index) override;
     AmsError unload_filament() override;
-    AmsError select_gate(int gate_index) override;
+    AmsError select_slot(int slot_index) override;
     AmsError change_tool(int tool_number) override;
 
     // Recovery
@@ -88,8 +88,8 @@ class AmsBackendHappyHare : public AmsBackend {
     AmsError cancel() override;
 
     // Configuration
-    AmsError set_gate_info(int gate_index, const GateInfo& info) override;
-    AmsError set_tool_mapping(int tool_number, int gate_index) override;
+    AmsError set_slot_info(int slot_index, const SlotInfo& info) override;
+    AmsError set_tool_mapping(int tool_number, int slot_index) override;
 
     // Bypass mode
     AmsError enable_bypass() override;
@@ -120,7 +120,7 @@ class AmsBackendHappyHare : public AmsBackend {
      * @brief Initialize gate structures based on gate_status array size
      *
      * Called when we first receive gate_status to create the correct
-     * number of GateInfo entries.
+     * number of SlotInfo entries.
      *
      * @param gate_count Number of gates detected
      */
@@ -155,10 +155,10 @@ class AmsBackendHappyHare : public AmsBackend {
     /**
      * @brief Validate gate index is within range
      *
-     * @param gate_index Gate index to validate
+     * @param gate_index Slot index to validate
      * @return AmsError (SUCCESS if valid, INVALID_GATE otherwise)
      */
-    AmsError validate_gate_index(int gate_index) const;
+    AmsError validate_slot_index(int gate_index) const;
 
     // Dependencies
     MoonrakerAPI* api_;       ///< For sending G-code commands

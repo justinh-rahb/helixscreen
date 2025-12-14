@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <thread>
 
-// Sample filament colors for mock gates
+// Sample filament colors for mock slots
 namespace {
 struct MockFilament {
     uint32_t color;
@@ -20,133 +20,133 @@ struct MockFilament {
 // Predefined sample filaments for visual testing
 // Covers common material types: PLA, PETG, ABS, ASA, PA, TPU, and CF/GF variants
 constexpr MockFilament SAMPLE_FILAMENTS[] = {
-    {0xE53935, "Red", "PLA", "Polymaker"},      // Gate 0: Red PLA
-    {0x1E88E5, "Blue", "PETG", "eSUN"},         // Gate 1: Blue PETG
-    {0x43A047, "Green", "ABS", "Bambu"},        // Gate 2: Green ABS
-    {0xFDD835, "Yellow", "ASA", "Polymaker"},   // Gate 3: Yellow ASA
-    {0x424242, "Carbon", "PLA-CF", "Overture"}, // Gate 4: Carbon PLA-CF
-    {0x8E24AA, "Purple", "PA-CF", "Bambu"},     // Gate 5: Purple PA-CF (Nylon)
-    {0xFF6F00, "Orange", "TPU", "eSUN"},        // Gate 6: Orange TPU (Flexible)
-    {0x90CAF9, "Sky Blue", "PETG-GF", "Prusa"}, // Gate 7: PETG-GF (Glass Filled)
+    {0xE53935, "Red", "PLA", "Polymaker"},      // Slot 0: Red PLA
+    {0x1E88E5, "Blue", "PETG", "eSUN"},         // Slot 1: Blue PETG
+    {0x43A047, "Green", "ABS", "Bambu"},        // Slot 2: Green ABS
+    {0xFDD835, "Yellow", "ASA", "Polymaker"},   // Slot 3: Yellow ASA
+    {0x424242, "Carbon", "PLA-CF", "Overture"}, // Slot 4: Carbon PLA-CF
+    {0x8E24AA, "Purple", "PA-CF", "Bambu"},     // Slot 5: Purple PA-CF (Nylon)
+    {0xFF6F00, "Orange", "TPU", "eSUN"},        // Slot 6: Orange TPU (Flexible)
+    {0x90CAF9, "Sky Blue", "PETG-GF", "Prusa"}, // Slot 7: PETG-GF (Glass Filled)
 };
 constexpr int NUM_SAMPLE_FILAMENTS = sizeof(SAMPLE_FILAMENTS) / sizeof(SAMPLE_FILAMENTS[0]);
 } // namespace
 
-AmsBackendMock::AmsBackendMock(int gate_count) {
-    // Clamp gate count to reasonable range
-    gate_count = std::clamp(gate_count, 1, 16);
+AmsBackendMock::AmsBackendMock(int slot_count) {
+    // Clamp slot count to reasonable range
+    slot_count = std::clamp(slot_count, 1, 16);
 
     // Initialize system info
     system_info_.type = AmsType::HAPPY_HARE; // Mock as Happy Hare
     system_info_.type_name = "Happy Hare (Mock)";
     system_info_.version = "2.7.0-mock";
     system_info_.current_tool = -1;
-    system_info_.current_gate = -1;
+    system_info_.current_slot = -1;
     system_info_.filament_loaded = false;
     system_info_.action = AmsAction::IDLE;
-    system_info_.total_gates = gate_count;
+    system_info_.total_slots = slot_count;
     system_info_.supports_endless_spool = true;
     system_info_.supports_spoolman = true;
     system_info_.supports_tool_mapping = true;
     system_info_.supports_bypass = true;
     system_info_.has_hardware_bypass_sensor = false; // Default: virtual (manual toggle)
 
-    // Create single unit with all gates
+    // Create single unit with all slots
     AmsUnit unit;
     unit.unit_index = 0;
     unit.name = "Mock MMU";
-    unit.gate_count = gate_count;
-    unit.first_gate_global_index = 0;
+    unit.slot_count = slot_count;
+    unit.first_slot_global_index = 0;
     unit.connected = true;
     unit.firmware_version = "mock-1.0";
     unit.has_encoder = true;
     unit.has_toolhead_sensor = true;
-    unit.has_gate_sensors = true;
+    unit.has_slot_sensors = true;
 
-    // Initialize gates with sample filament data
-    for (int i = 0; i < gate_count; ++i) {
-        GateInfo gate;
-        gate.gate_index = i;
-        gate.global_index = i;
-        gate.status = GateStatus::AVAILABLE;
-        gate.mapped_tool = i; // Direct 1:1 mapping
+    // Initialize slots with sample filament data
+    for (int i = 0; i < slot_count; ++i) {
+        SlotInfo slot;
+        slot.slot_index = i;
+        slot.global_index = i;
+        slot.status = SlotStatus::AVAILABLE;
+        slot.mapped_tool = i; // Direct 1:1 mapping
 
         // Assign sample filament data (cycle through samples)
         const auto& sample = SAMPLE_FILAMENTS[i % NUM_SAMPLE_FILAMENTS];
-        gate.color_rgb = sample.color;
-        gate.color_name = sample.color_name;
-        gate.material = sample.material;
-        gate.brand = sample.brand;
+        slot.color_rgb = sample.color;
+        slot.color_name = sample.color_name;
+        slot.material = sample.material;
+        slot.brand = sample.brand;
 
         // Mock Spoolman data with dramatic fill level differences for demo
-        gate.spoolman_id = 1000 + i;
-        gate.spool_name = std::string(sample.color_name) + " " + sample.material;
-        gate.total_weight_g = 1000.0f;
+        slot.spoolman_id = 1000 + i;
+        slot.spool_name = std::string(sample.color_name) + " " + sample.material;
+        slot.total_weight_g = 1000.0f;
         // Vary fill levels dramatically: 100%, 75%, 40%, 10% for clear visual difference
         static const float fill_levels[] = {1.0f, 0.75f, 0.40f, 0.10f, 0.90f, 0.50f, 0.25f, 0.05f};
-        gate.remaining_weight_g = gate.total_weight_g * fill_levels[i % 8];
+        slot.remaining_weight_g = slot.total_weight_g * fill_levels[i % 8];
 
         // Temperature recommendations based on material type
         std::string mat(sample.material);
         if (mat == "PLA" || mat == "PLA-CF") {
-            gate.nozzle_temp_min = 190;
-            gate.nozzle_temp_max = 220;
-            gate.bed_temp = 60;
+            slot.nozzle_temp_min = 190;
+            slot.nozzle_temp_max = 220;
+            slot.bed_temp = 60;
         } else if (mat == "PETG" || mat == "PETG-GF") {
-            gate.nozzle_temp_min = 230;
-            gate.nozzle_temp_max = 250;
-            gate.bed_temp = 80;
+            slot.nozzle_temp_min = 230;
+            slot.nozzle_temp_max = 250;
+            slot.bed_temp = 80;
         } else if (mat == "ABS") {
-            gate.nozzle_temp_min = 240;
-            gate.nozzle_temp_max = 260;
-            gate.bed_temp = 100;
+            slot.nozzle_temp_min = 240;
+            slot.nozzle_temp_max = 260;
+            slot.bed_temp = 100;
         } else if (mat == "ASA") {
-            gate.nozzle_temp_min = 240;
-            gate.nozzle_temp_max = 270;
-            gate.bed_temp = 90;
+            slot.nozzle_temp_min = 240;
+            slot.nozzle_temp_max = 270;
+            slot.bed_temp = 90;
         } else if (mat == "PA-CF" || mat == "PA" || mat == "PA-GF") {
             // Nylon-based materials need high temps
-            gate.nozzle_temp_min = 260;
-            gate.nozzle_temp_max = 290;
-            gate.bed_temp = 85;
+            slot.nozzle_temp_min = 260;
+            slot.nozzle_temp_max = 290;
+            slot.bed_temp = 85;
         } else if (mat == "TPU") {
-            gate.nozzle_temp_min = 220;
-            gate.nozzle_temp_max = 250;
-            gate.bed_temp = 50;
+            slot.nozzle_temp_min = 220;
+            slot.nozzle_temp_max = 250;
+            slot.bed_temp = 50;
         }
 
-        unit.gates.push_back(gate);
+        unit.slots.push_back(slot);
     }
 
     system_info_.units.push_back(unit);
 
-    // Initialize tool-to-gate mapping (1:1)
-    system_info_.tool_to_gate_map.resize(gate_count);
-    for (int i = 0; i < gate_count; ++i) {
-        system_info_.tool_to_gate_map[i] = i;
+    // Initialize tool-to-slot mapping (1:1)
+    system_info_.tool_to_slot_map.resize(slot_count);
+    for (int i = 0; i < slot_count; ++i) {
+        system_info_.tool_to_slot_map[i] = i;
     }
 
-    // Start with gate 0 loaded for realistic demo appearance
-    if (gate_count > 0) {
-        auto* gate = system_info_.get_gate_global(0);
-        if (gate) {
-            gate->status = GateStatus::LOADED;
+    // Start with slot 0 loaded for realistic demo appearance
+    if (slot_count > 0) {
+        auto* slot = system_info_.get_slot_global(0);
+        if (slot) {
+            slot->status = SlotStatus::LOADED;
         }
-        system_info_.current_gate = 0;
+        system_info_.current_slot = 0;
         system_info_.current_tool = 0;
         system_info_.filament_loaded = true;
         filament_segment_ = PathSegment::NOZZLE; // Filament is fully loaded to nozzle
     }
 
-    // Make gate index 3 (4th slot) empty for realistic demo
-    if (gate_count > 3) {
-        auto* gate = system_info_.get_gate_global(3);
-        if (gate) {
-            gate->status = GateStatus::EMPTY;
+    // Make slot index 3 (4th slot) empty for realistic demo
+    if (slot_count > 3) {
+        auto* slot = system_info_.get_slot_global(3);
+        if (slot) {
+            slot->status = SlotStatus::EMPTY;
         }
     }
 
-    spdlog::debug("[AmsBackendMock] Created with {} gates", gate_count);
+    spdlog::debug("[AmsBackendMock] Created with {} slots", slot_count);
 }
 
 AmsBackendMock::~AmsBackendMock() {
@@ -218,17 +218,17 @@ AmsType AmsBackendMock::get_type() const {
     return AmsType::HAPPY_HARE; // Mock identifies as Happy Hare
 }
 
-GateInfo AmsBackendMock::get_gate_info(int global_index) const {
+SlotInfo AmsBackendMock::get_slot_info(int slot_index) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    const auto* gate = system_info_.get_gate_global(global_index);
-    if (gate) {
-        return *gate;
+    const auto* slot = system_info_.get_slot_global(slot_index);
+    if (slot) {
+        return *slot;
     }
 
-    // Return empty gate info for invalid index
-    GateInfo empty;
-    empty.gate_index = -1;
+    // Return empty slot info for invalid index
+    SlotInfo empty;
+    empty.slot_index = -1;
     empty.global_index = -1;
     return empty;
 }
@@ -243,9 +243,9 @@ int AmsBackendMock::get_current_tool() const {
     return system_info_.current_tool;
 }
 
-int AmsBackendMock::get_current_gate() const {
+int AmsBackendMock::get_current_slot() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return system_info_.current_gate;
+    return system_info_.current_slot;
 }
 
 bool AmsBackendMock::is_filament_loaded() const {
@@ -263,23 +263,23 @@ PathSegment AmsBackendMock::get_filament_segment() const {
     return filament_segment_;
 }
 
-PathSegment AmsBackendMock::get_gate_filament_segment(int gate_index) const {
+PathSegment AmsBackendMock::get_slot_filament_segment(int slot_index) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Check if this is the active gate - return the current filament segment
-    if (gate_index == system_info_.current_gate && system_info_.filament_loaded) {
+    // Check if this is the active slot - return the current filament segment
+    if (slot_index == system_info_.current_slot && system_info_.filament_loaded) {
         return filament_segment_;
     }
 
-    // For non-active gates, check if filament is installed at the gate
+    // For non-active slots, check if filament is installed at the slot
     // and return PREP segment (filament sitting at prep sensor)
-    const GateInfo* gate = system_info_.get_gate_global(gate_index);
-    if (!gate) {
+    const SlotInfo* slot = system_info_.get_slot_global(slot_index);
+    if (!slot) {
         return PathSegment::NONE;
     }
 
-    // Gates with available filament show filament up to prep sensor
-    if (gate->status == GateStatus::AVAILABLE || gate->status == GateStatus::FROM_BUFFER) {
+    // Slots with available filament show filament up to prep sensor
+    if (slot->status == SlotStatus::AVAILABLE || slot->status == SlotStatus::FROM_BUFFER) {
         return PathSegment::PREP;
     }
 
@@ -291,7 +291,7 @@ PathSegment AmsBackendMock::infer_error_segment() const {
     return error_segment_;
 }
 
-AmsError AmsBackendMock::load_filament(int gate_index) {
+AmsError AmsBackendMock::load_filament(int slot_index) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -303,24 +303,24 @@ AmsError AmsBackendMock::load_filament(int gate_index) {
             return AmsErrorHelper::busy(ams_action_to_string(system_info_.action));
         }
 
-        if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
-        auto* gate = system_info_.get_gate_global(gate_index);
-        if (!gate || gate->status == GateStatus::EMPTY) {
-            return AmsErrorHelper::gate_not_available(gate_index);
+        auto* slot = system_info_.get_slot_global(slot_index);
+        if (!slot || slot->status == SlotStatus::EMPTY) {
+            return AmsErrorHelper::slot_not_available(slot_index);
         }
 
         // Start loading
         system_info_.action = AmsAction::LOADING;
-        system_info_.operation_detail = "Loading from gate " + std::to_string(gate_index);
+        system_info_.operation_detail = "Loading from slot " + std::to_string(slot_index);
         filament_segment_ = PathSegment::SPOOL; // Start at spool
-        spdlog::info("[AmsBackendMock] Loading from gate {}", gate_index);
+        spdlog::info("[AmsBackendMock] Loading from slot {}", slot_index);
     }
 
     emit_event(EVENT_STATE_CHANGED);
-    schedule_completion(AmsAction::LOADING, EVENT_LOAD_COMPLETE, gate_index);
+    schedule_completion(AmsAction::LOADING, EVENT_LOAD_COMPLETE, slot_index);
 
     return AmsErrorHelper::success();
 }
@@ -355,7 +355,7 @@ AmsError AmsBackendMock::unload_filament() {
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendMock::select_gate(int gate_index) {
+AmsError AmsBackendMock::select_slot(int slot_index) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -367,13 +367,13 @@ AmsError AmsBackendMock::select_gate(int gate_index) {
             return AmsErrorHelper::busy(ams_action_to_string(system_info_.action));
         }
 
-        if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
         // Immediate selection (no filament movement)
-        system_info_.current_gate = gate_index;
-        spdlog::info("[AmsBackendMock] Selected gate {}", gate_index);
+        system_info_.current_slot = slot_index;
+        spdlog::info("[AmsBackendMock] Selected slot {}", slot_index);
     }
 
     emit_event(EVENT_STATE_CHANGED);
@@ -393,7 +393,7 @@ AmsError AmsBackendMock::change_tool(int tool_number) {
         }
 
         if (tool_number < 0 ||
-            tool_number >= static_cast<int>(system_info_.tool_to_gate_map.size())) {
+            tool_number >= static_cast<int>(system_info_.tool_to_slot_map.size())) {
             return AmsError(AmsResult::INVALID_TOOL,
                             "Tool " + std::to_string(tool_number) + " out of range",
                             "Invalid tool number", "Select a valid tool");
@@ -407,7 +407,7 @@ AmsError AmsBackendMock::change_tool(int tool_number) {
 
     emit_event(EVENT_STATE_CHANGED);
     schedule_completion(AmsAction::LOADING, EVENT_TOOL_CHANGED,
-                        system_info_.tool_to_gate_map[tool_number]);
+                        system_info_.tool_to_slot_map[tool_number]);
 
     return AmsErrorHelper::success();
 }
@@ -474,65 +474,65 @@ AmsError AmsBackendMock::cancel() {
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendMock::set_gate_info(int gate_index, const GateInfo& info) {
+AmsError AmsBackendMock::set_slot_info(int slot_index, const SlotInfo& info) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
-        auto* gate = system_info_.get_gate_global(gate_index);
-        if (!gate) {
-            return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+        auto* slot = system_info_.get_slot_global(slot_index);
+        if (!slot) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
         }
 
         // Update filament info
-        gate->color_name = info.color_name;
-        gate->color_rgb = info.color_rgb;
-        gate->material = info.material;
-        gate->brand = info.brand;
-        gate->spoolman_id = info.spoolman_id;
-        gate->spool_name = info.spool_name;
-        gate->remaining_weight_g = info.remaining_weight_g;
-        gate->total_weight_g = info.total_weight_g;
-        gate->nozzle_temp_min = info.nozzle_temp_min;
-        gate->nozzle_temp_max = info.nozzle_temp_max;
-        gate->bed_temp = info.bed_temp;
+        slot->color_name = info.color_name;
+        slot->color_rgb = info.color_rgb;
+        slot->material = info.material;
+        slot->brand = info.brand;
+        slot->spoolman_id = info.spoolman_id;
+        slot->spool_name = info.spool_name;
+        slot->remaining_weight_g = info.remaining_weight_g;
+        slot->total_weight_g = info.total_weight_g;
+        slot->nozzle_temp_min = info.nozzle_temp_min;
+        slot->nozzle_temp_max = info.nozzle_temp_max;
+        slot->bed_temp = info.bed_temp;
 
-        spdlog::info("[AmsBackendMock] Updated gate {} info", gate_index);
+        spdlog::info("[AmsBackendMock] Updated slot {} info", slot_index);
     }
 
     // Emit event OUTSIDE the lock to avoid deadlock
-    emit_event(EVENT_GATE_CHANGED, std::to_string(gate_index));
+    emit_event(EVENT_SLOT_CHANGED, std::to_string(slot_index));
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendMock::set_tool_mapping(int tool_number, int gate_index) {
+AmsError AmsBackendMock::set_tool_mapping(int tool_number, int slot_index) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (tool_number < 0 || tool_number >= static_cast<int>(system_info_.tool_to_gate_map.size())) {
+    if (tool_number < 0 || tool_number >= static_cast<int>(system_info_.tool_to_slot_map.size())) {
         return AmsError(AmsResult::INVALID_TOOL,
                         "Tool " + std::to_string(tool_number) + " out of range",
                         "Invalid tool number", "");
     }
 
-    if (gate_index < 0 || gate_index >= system_info_.total_gates) {
-        return AmsErrorHelper::invalid_gate(gate_index, system_info_.total_gates - 1);
+    if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+        return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
     }
 
-    system_info_.tool_to_gate_map[tool_number] = gate_index;
+    system_info_.tool_to_slot_map[tool_number] = slot_index;
 
-    // Update gate's mapped_tool
+    // Update slot's mapped_tool
     for (auto& unit : system_info_.units) {
-        for (auto& gate : unit.gates) {
-            if (gate.global_index == gate_index) {
-                gate.mapped_tool = tool_number;
+        for (auto& slot : unit.slots) {
+            if (slot.global_index == slot_index) {
+                slot.mapped_tool = tool_number;
             }
         }
     }
 
-    spdlog::info("[AmsBackendMock] Mapped T{} to gate {}", tool_number, gate_index);
+    spdlog::info("[AmsBackendMock] Mapped T{} to slot {}", tool_number, slot_index);
     return AmsErrorHelper::success();
 }
 
@@ -553,8 +553,8 @@ AmsError AmsBackendMock::enable_bypass() {
             return AmsErrorHelper::busy(ams_action_to_string(system_info_.action));
         }
 
-        // Enable bypass mode: current_gate = -2 indicates bypass
-        system_info_.current_gate = -2;
+        // Enable bypass mode: current_slot = -2 indicates bypass
+        system_info_.current_slot = -2;
         system_info_.filament_loaded = true;
         filament_segment_ = PathSegment::NOZZLE;
         spdlog::info("[AmsBackendMock] Bypass mode enabled");
@@ -572,13 +572,13 @@ AmsError AmsBackendMock::disable_bypass() {
             return AmsErrorHelper::not_connected("Mock backend not started");
         }
 
-        if (system_info_.current_gate != -2) {
+        if (system_info_.current_slot != -2) {
             return AmsError(AmsResult::WRONG_STATE, "Bypass not active",
                             "Bypass mode is not currently active", "");
         }
 
         // Disable bypass mode
-        system_info_.current_gate = -1;
+        system_info_.current_slot = -1;
         system_info_.filament_loaded = false;
         filament_segment_ = PathSegment::NONE;
         spdlog::info("[AmsBackendMock] Bypass mode disabled");
@@ -590,7 +590,7 @@ AmsError AmsBackendMock::disable_bypass() {
 
 bool AmsBackendMock::is_bypass_active() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return system_info_.current_gate == -2;
+    return system_info_.current_slot == -2;
 }
 
 void AmsBackendMock::simulate_error(AmsResult error) {
@@ -604,8 +604,8 @@ void AmsBackendMock::simulate_error(AmsResult error) {
             error_segment_ = PathSegment::HUB; // Jam typically in selector/hub
         } else if (error == AmsResult::SENSOR_ERROR || error == AmsResult::LOAD_FAILED) {
             error_segment_ = PathSegment::TOOLHEAD; // Detection issues at toolhead
-        } else if (error == AmsResult::GATE_BLOCKED || error == AmsResult::GATE_NOT_AVAILABLE) {
-            error_segment_ = PathSegment::PREP; // Gate issues at prep/entry
+        } else if (error == AmsResult::SLOT_BLOCKED || error == AmsResult::SLOT_NOT_AVAILABLE) {
+            error_segment_ = PathSegment::PREP; // Slot issues at prep/entry
         } else {
             error_segment_ = filament_segment_; // Error at current position
         }
@@ -619,14 +619,14 @@ void AmsBackendMock::set_operation_delay(int delay_ms) {
     operation_delay_ms_ = std::max(0, delay_ms);
 }
 
-void AmsBackendMock::force_gate_status(int gate_index, GateStatus status) {
+void AmsBackendMock::force_slot_status(int slot_index, SlotStatus status) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    auto* gate = system_info_.get_gate_global(gate_index);
-    if (gate) {
-        gate->status = status;
-        spdlog::debug("[AmsBackendMock] Forced gate {} status to {}", gate_index,
-                      gate_status_to_string(status));
+    auto* slot = system_info_.get_slot_global(slot_index);
+    if (slot) {
+        slot->status = status;
+        spdlog::debug("[AmsBackendMock] Forced slot {} status to {}", slot_index,
+                      slot_status_to_string(status));
     }
 }
 
@@ -649,7 +649,7 @@ void AmsBackendMock::emit_event(const std::string& event, const std::string& dat
 }
 
 void AmsBackendMock::schedule_completion(AmsAction action, const std::string& complete_event,
-                                         int gate_index) {
+                                         int slot_index) {
     // Wait for any previous operation to complete first
     wait_for_operation_thread();
 
@@ -657,7 +657,7 @@ void AmsBackendMock::schedule_completion(AmsAction action, const std::string& co
     shutdown_requested_ = false;
 
     // Simulate operation delay in background thread with path segment progression
-    operation_thread_ = std::thread([this, action, complete_event, gate_index]() {
+    operation_thread_ = std::thread([this, action, complete_event, slot_index]() {
         // Helper lambda for interruptible sleep
         auto interruptible_sleep = [this](int ms) -> bool {
             std::unique_lock<std::mutex> lock(shutdown_mutex_);
@@ -681,8 +681,8 @@ void AmsBackendMock::schedule_completion(AmsAction action, const std::string& co
                 {
                     std::lock_guard<std::mutex> lock(mutex_);
                     filament_segment_ = seg;
-                    system_info_.current_gate =
-                        gate_index; // Set active gate early for visualization
+                    system_info_.current_slot =
+                        slot_index; // Set active slot early for visualization
                 }
                 emit_event(EVENT_STATE_CHANGED);
                 if (!interruptible_sleep(segment_delay))
@@ -694,12 +694,12 @@ void AmsBackendMock::schedule_completion(AmsAction action, const std::string& co
                 std::lock_guard<std::mutex> lock(mutex_);
                 system_info_.filament_loaded = true;
                 filament_segment_ = PathSegment::NOZZLE;
-                if (gate_index >= 0) {
-                    system_info_.current_gate = gate_index;
-                    system_info_.current_tool = gate_index;
-                    auto* gate = system_info_.get_gate_global(gate_index);
-                    if (gate) {
-                        gate->status = GateStatus::LOADED;
+                if (slot_index >= 0) {
+                    system_info_.current_slot = slot_index;
+                    system_info_.current_tool = slot_index;
+                    auto* slot = system_info_.get_slot_global(slot_index);
+                    if (slot) {
+                        slot->status = SlotStatus::LOADED;
                     }
                 }
                 system_info_.action = AmsAction::IDLE;
@@ -728,14 +728,14 @@ void AmsBackendMock::schedule_completion(AmsAction action, const std::string& co
             // Final state
             {
                 std::lock_guard<std::mutex> lock(mutex_);
-                if (system_info_.current_gate >= 0) {
-                    auto* gate = system_info_.get_gate_global(system_info_.current_gate);
-                    if (gate) {
-                        gate->status = GateStatus::AVAILABLE;
+                if (system_info_.current_slot >= 0) {
+                    auto* slot = system_info_.get_slot_global(system_info_.current_slot);
+                    if (slot) {
+                        slot->status = SlotStatus::AVAILABLE;
                     }
                 }
                 system_info_.filament_loaded = false;
-                system_info_.current_gate = -1;
+                system_info_.current_slot = -1;
                 filament_segment_ = PathSegment::NONE;
                 system_info_.action = AmsAction::IDLE;
                 system_info_.operation_detail.clear();
@@ -754,7 +754,7 @@ void AmsBackendMock::schedule_completion(AmsAction action, const std::string& co
         if (shutdown_requested_)
             return; // Final check before emitting
 
-        emit_event(complete_event, gate_index >= 0 ? std::to_string(gate_index) : "");
+        emit_event(complete_event, slot_index >= 0 ? std::to_string(slot_index) : "");
         emit_event(EVENT_STATE_CHANGED);
     });
 }
@@ -763,6 +763,6 @@ void AmsBackendMock::schedule_completion(AmsAction action, const std::string& co
 // Factory method implementations (in ams_backend.cpp, but included here for mock)
 // ============================================================================
 
-std::unique_ptr<AmsBackend> AmsBackend::create_mock(int gate_count) {
-    return std::make_unique<AmsBackendMock>(gate_count);
+std::unique_ptr<AmsBackend> AmsBackend::create_mock(int slot_count) {
+    return std::make_unique<AmsBackendMock>(slot_count);
 }

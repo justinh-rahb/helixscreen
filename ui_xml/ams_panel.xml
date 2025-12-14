@@ -49,14 +49,14 @@
                   scrollable="false">
             <!-- Slot Grid Container (drawn first = behind)
                  Uses flex_grow=1 on slots to divide space equally.
-                 Slot centers align with path canvas gate entry points:
-                 gate_x = card_padding + segment/2 + i*segment (where segment = effective_width/gate_count)
-                 Slots are created dynamically by C++ based on gate_count subject. -->
+                 Slot centers align with path canvas slot entry points:
+                 slot_x = card_padding + segment/2 + i*segment (where segment = effective_width/slot_count)
+                 Slots are created dynamically by C++ based on slot_count subject. -->
             <lv_obj name="slot_grid"
                     width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0"
                     style_pad_row="0" style_pad_column="0" flex_flow="row" style_flex_main_place="space_between"
                     style_flex_cross_place="start" scrollable="false">
-              <!-- Slots created dynamically by AmsPanel::create_slots() based on gate_count -->
+              <!-- Slots created dynamically by AmsPanel::create_slots() based on slot_count -->
             </lv_obj>
             <!-- Tray - visual "holder" in front of spools, positioned at bottom
                  Height set dynamically by C++ to 1/3 of slot height -->
@@ -66,22 +66,22 @@
                     style_radius="#border_radius" scrollable="false" clickable="false"/>
           </lv_obj>
         </ui_card>
-        <!-- Path Canvas - shows routing from gates to nozzle (no card border)
+        <!-- Path Canvas - shows routing from slots to nozzle (no card border)
              Uses flex_grow="1" to fill remaining vertical space in left column -->
         <lv_obj name="path_container"
                 width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
                 style_flex_main_place="start" style_flex_cross_place="center" scrollable="false">
           <!-- Filament Path Canvas
                Shows schematic view of filament routing:
-               - Gates at top (entry points)
+               - Slots at top (entry points)
                - Prep sensors (for AFC/hub topology)
                - Hub/Selector in center
                - Output to toolhead sensor
                - Nozzle at bottom
 
-               All configuration (gate_count, topology, active_gate, etc.)
+               All configuration (slot_count, topology, active_slot, etc.)
                set programmatically by C++ from AmsState/backend data.
-               Click on gate entry points to trigger filament load.
+               Click on slot entry points to trigger filament load.
 
                Uses flex_grow="1" so canvas height scales with screen size.
                All vertical segments scale proportionally via Y ratios. -->

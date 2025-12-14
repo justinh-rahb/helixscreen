@@ -41,7 +41,7 @@ class AmsBackend {
      * Event names are strings to allow backend-specific extensions.
      */
     static constexpr const char* EVENT_STATE_CHANGED = "STATE_CHANGED"; ///< System state updated
-    static constexpr const char* EVENT_GATE_CHANGED = "GATE_CHANGED";   ///< Gate info updated
+    static constexpr const char* EVENT_SLOT_CHANGED = "SLOT_CHANGED";   ///< Slot info updated
     static constexpr const char* EVENT_LOAD_COMPLETE = "LOAD_COMPLETE"; ///< Load operation finished
     static constexpr const char* EVENT_UNLOAD_COMPLETE =
         "UNLOAD_COMPLETE";                                            ///< Unload operation finished
@@ -111,8 +111,8 @@ class AmsBackend {
      *
      * Returns a snapshot of the current system state including:
      * - System type and version
-     * - Current tool/gate selection
-     * - All unit and gate information
+     * - Current tool/slot selection
+     * - All unit and slot information
      * - Capability flags
      *
      * @return Current AmsSystemInfo (copy, safe for caller to hold)
@@ -126,11 +126,11 @@ class AmsBackend {
     [[nodiscard]] virtual AmsType get_type() const = 0;
 
     /**
-     * @brief Get information about a specific gate
-     * @param global_index Gate index (0 to total_gates-1)
-     * @return GateInfo struct (copy, safe for caller to hold)
+     * @brief Get information about a specific slot
+     * @param slot_index Slot index (0 to total_slots-1)
+     * @return SlotInfo struct (copy, safe for caller to hold)
      */
-    [[nodiscard]] virtual GateInfo get_gate_info(int global_index) const = 0;
+    [[nodiscard]] virtual SlotInfo get_slot_info(int slot_index) const = 0;
 
     /**
      * @brief Get current action/operation status
@@ -145,10 +145,10 @@ class AmsBackend {
     [[nodiscard]] virtual int get_current_tool() const = 0;
 
     /**
-     * @brief Get currently selected gate number
-     * @return Gate number (-1 if none, -2 for bypass on Happy Hare)
+     * @brief Get currently selected slot number
+     * @return Slot number (-1 if none, -2 for bypass on Happy Hare)
      */
-    [[nodiscard]] virtual int get_current_gate() const = 0;
+    [[nodiscard]] virtual int get_current_slot() const = 0;
 
     /**
      * @brief Check if filament is currently loaded in extruder
@@ -182,16 +182,16 @@ class AmsBackend {
     [[nodiscard]] virtual PathSegment get_filament_segment() const = 0;
 
     /**
-     * @brief Get filament position for a specific gate
+     * @brief Get filament position for a specific slot
      *
-     * Returns how far filament from a specific gate extends into the path.
+     * Returns how far filament from a specific slot extends into the path.
      * Used for visualizing all installed filaments, not just the active one.
-     * For non-active gates, this typically shows filament up to the prep sensor.
+     * For non-active slots, this typically shows filament up to the prep sensor.
      *
-     * @param gate_index Gate index (0 to total_gates-1)
-     * @return PathSegment enum value (NONE if no filament installed at gate)
+     * @param slot_index Slot index (0 to total_slots-1)
+     * @return PathSegment enum value (NONE if no filament installed at slot)
      */
-    [[nodiscard]] virtual PathSegment get_gate_filament_segment(int gate_index) const = 0;
+    [[nodiscard]] virtual PathSegment get_slot_filament_segment(int slot_index) const = 0;
 
     /**
      * @brief Infer which segment has an error
@@ -209,25 +209,25 @@ class AmsBackend {
     // ========================================================================
 
     /**
-     * @brief Load filament from specified gate (async)
+     * @brief Load filament from specified slot (async)
      *
-     * Initiates filament load from the specified gate to the extruder.
+     * Initiates filament load from the specified slot to the extruder.
      * Results delivered via EVENT_LOAD_COMPLETE or EVENT_ERROR.
      *
      * Requires:
      * - System not busy with another operation
-     * - Gate has filament available
+     * - Slot has filament available
      * - Extruder at appropriate temperature
      *
-     * @param gate_index Gate to load from (0-based)
+     * @param slot_index Slot to load from (0-based)
      * @return AmsError indicating if operation was started successfully
      */
-    virtual AmsError load_filament(int gate_index) = 0;
+    virtual AmsError load_filament(int slot_index) = 0;
 
     /**
      * @brief Unload current filament (async)
      *
-     * Initiates filament unload from extruder back to current gate.
+     * Initiates filament unload from extruder back to current slot.
      * Results delivered via EVENT_UNLOAD_COMPLETE or EVENT_ERROR.
      *
      * Requires:
@@ -240,15 +240,15 @@ class AmsBackend {
     virtual AmsError unload_filament() = 0;
 
     /**
-     * @brief Select tool/gate without loading (async)
+     * @brief Select tool/slot without loading (async)
      *
-     * Moves the selector to the specified gate without loading filament.
+     * Moves the selector to the specified slot without loading filament.
      * Used for preparation or manual operations.
      *
-     * @param gate_index Gate to select (0-based)
+     * @param slot_index Slot to select (0-based)
      * @return AmsError indicating if operation was started successfully
      */
-    virtual AmsError select_gate(int gate_index) = 0;
+    virtual AmsError select_slot(int slot_index) = 0;
 
     /**
      * @brief Perform tool change (async)
@@ -302,28 +302,28 @@ class AmsBackend {
     // ========================================================================
 
     /**
-     * @brief Update gate filament information
+     * @brief Update slot filament information
      *
-     * Sets the color, material, and other filament info for a gate.
+     * Sets the color, material, and other filament info for a slot.
      * Changes are persisted via Moonraker/Spoolman as appropriate.
      *
-     * @param gate_index Gate to update (0-based)
-     * @param info New gate information (only filament fields used)
+     * @param slot_index Slot to update (0-based)
+     * @param info New slot information (only filament fields used)
      * @return AmsError indicating if update succeeded
      */
-    virtual AmsError set_gate_info(int gate_index, const GateInfo& info) = 0;
+    virtual AmsError set_slot_info(int slot_index, const SlotInfo& info) = 0;
 
     /**
-     * @brief Set tool-to-gate mapping
+     * @brief Set tool-to-slot mapping
      *
-     * Configures which gate a tool number maps to.
+     * Configures which slot a tool number maps to.
      * Happy Hare specific - may not be supported on all backends.
      *
      * @param tool_number Tool number (0-based)
-     * @param gate_index Gate to map to (0-based)
+     * @param slot_index Slot to map to (0-based)
      * @return AmsError indicating if mapping was set
      */
-    virtual AmsError set_tool_mapping(int tool_number, int gate_index) = 0;
+    virtual AmsError set_tool_mapping(int tool_number, int slot_index) = 0;
 
     // ========================================================================
     // Bypass Mode Operations
@@ -333,7 +333,7 @@ class AmsBackend {
      * @brief Enable bypass mode
      *
      * Activates bypass mode where an external spool feeds directly to the
-     * toolhead, bypassing the MMU/hub system. Sets current_gate to -2.
+     * toolhead, bypassing the MMU/hub system. Sets current_slot to -2.
      *
      * Not all backends support bypass mode - check supports_bypass flag.
      *
@@ -352,7 +352,7 @@ class AmsBackend {
 
     /**
      * @brief Check if bypass mode is currently active
-     * @return true if bypass is active (current_gate == -2)
+     * @return true if bypass is active (current_slot == -2)
      */
     [[nodiscard]] virtual bool is_bypass_active() const = 0;
 
@@ -398,8 +398,8 @@ class AmsBackend {
      * Creates a mock backend regardless of actual printer state.
      * Used when --test flag is passed or for development.
      *
-     * @param gate_count Number of simulated gates (default 4)
+     * @param slot_count Number of simulated slots (default 4)
      * @return Unique pointer to mock backend instance
      */
-    static std::unique_ptr<AmsBackend> create_mock(int gate_count = 4);
+    static std::unique_ptr<AmsBackend> create_mock(int slot_count = 4);
 };

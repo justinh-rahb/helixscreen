@@ -102,8 +102,8 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
         system_info_.filament_loaded = state;
     }
 
-    void set_current_gate(int gate) {
-        system_info_.current_gate = gate;
+    void set_current_slot(int slot) {
+        system_info_.current_slot = slot;
     }
 
     PathSegment test_compute_filament_segment() const {
@@ -219,7 +219,7 @@ TEST_CASE("AFC segment: no sensors triggered returns NONE", "[afc][segment]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes(4);
 
-    // No sensors triggered, no filament loaded, no current gate
+    // No sensors triggered, no filament loaded, no current slot
     REQUIRE(helper.test_compute_filament_segment() == PathSegment::NONE);
 }
 
@@ -232,12 +232,12 @@ TEST_CASE("AFC segment: filament loaded flag returns SPOOL when no sensors", "[a
     REQUIRE(helper.test_compute_filament_segment() == PathSegment::SPOOL);
 }
 
-TEST_CASE("AFC segment: current gate set returns SPOOL when no sensors", "[afc][segment]") {
+TEST_CASE("AFC segment: current slot set returns SPOOL when no sensors", "[afc][segment]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes(4);
-    helper.set_current_gate(0);
+    helper.set_current_slot(0);
 
-    // A gate is selected but no sensors - filament at spool area
+    // A slot is selected but no sensors - filament at spool area
     REQUIRE(helper.test_compute_filament_segment() == PathSegment::SPOOL);
 }
 

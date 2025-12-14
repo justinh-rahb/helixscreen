@@ -131,10 +131,10 @@ void HomePanel::init_subjects() {
     lv_xml_register_event_cb(nullptr, "network_clicked_cb", network_clicked_cb);
     lv_xml_register_event_cb(nullptr, "ams_clicked_cb", ams_clicked_cb);
 
-    // Subscribe to AmsState gate_count to show/hide AMS indicator
+    // Subscribe to AmsState slot_count to show/hide AMS indicator
     // AmsState::init_subjects() is called in main.cpp before us
-    ams_gate_count_observer_ = ObserverGuard(AmsState::instance().get_gate_count_subject(),
-                                             ams_gate_count_observer_cb, this);
+    ams_slot_count_observer_ = ObserverGuard(AmsState::instance().get_slot_count_subject(),
+                                             ams_slot_count_observer_cb, this);
 
     subjects_initialized_ = true;
     spdlog::debug("[{}] Registered subjects and event callbacks", get_name());
@@ -228,9 +228,9 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 
     // Check initial AMS state and show indicator if AMS is already available
     // (The observer may have fired before panel_ was set during init_subjects)
-    int gate_count = lv_subject_get_int(AmsState::instance().get_gate_count_subject());
-    if (gate_count > 0) {
-        update_ams_indicator(gate_count);
+    int slot_count = lv_subject_get_int(AmsState::instance().get_slot_count_subject());
+    if (slot_count > 0) {
+        update_ams_indicator(slot_count);
     }
 
     // Look up print card widgets for dynamic updates during printing
@@ -876,14 +876,14 @@ void HomePanel::set_light(bool is_on) {
     spdlog::debug("[{}] Local light state: {}", get_name(), is_on ? "ON" : "OFF");
 }
 
-void HomePanel::ams_gate_count_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
+void HomePanel::ams_slot_count_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
     auto* self = static_cast<HomePanel*>(lv_observer_get_user_data(observer));
     if (self) {
         self->update_ams_indicator(lv_subject_get_int(subject));
     }
 }
 
-void HomePanel::update_ams_indicator(int gate_count) {
+void HomePanel::update_ams_indicator(int slot_count) {
     if (!panel_) {
         return; // Panel not yet set up
     }
@@ -893,18 +893,18 @@ void HomePanel::update_ams_indicator(int gate_count) {
     lv_obj_t* ams_button = lv_obj_find_by_name(panel_, "ams_button");
     lv_obj_t* ams_divider = lv_obj_find_by_name(panel_, "ams_divider");
 
-    if (gate_count > 0) {
+    if (slot_count > 0) {
         // Show AMS button and divider
         if (ams_button) {
             lv_obj_remove_flag(ams_button, LV_OBJ_FLAG_HIDDEN);
-            spdlog::debug("[{}] AMS button unhidden (gate_count={})", get_name(), gate_count);
+            spdlog::debug("[{}] AMS button unhidden (slot_count={})", get_name(), slot_count);
         }
         if (ams_divider) {
             lv_obj_remove_flag(ams_divider, LV_OBJ_FLAG_HIDDEN);
         }
         if (ams_indicator_) {
             ui_ams_mini_status_refresh(ams_indicator_);
-            spdlog::debug("[{}] AMS indicator refreshed ({} gates)", get_name(), gate_count);
+            spdlog::debug("[{}] AMS indicator refreshed ({} slots)", get_name(), slot_count);
         }
     } else {
         // Hide AMS button and divider

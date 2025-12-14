@@ -178,18 +178,18 @@ void AmsPanel::init_subjects() {
     // Panel should NOT create backends - it just observes the existing one.
 
     // Register observers for state changes
-    gates_version_observer_ = ObserverGuard(AmsState::instance().get_gates_version_subject(),
-                                            on_gates_version_changed, this);
+    slots_version_observer_ = ObserverGuard(AmsState::instance().get_slots_version_subject(),
+                                            on_slots_version_changed, this);
 
     action_observer_ =
         ObserverGuard(AmsState::instance().get_ams_action_subject(), on_action_changed, this);
 
-    current_gate_observer_ = ObserverGuard(AmsState::instance().get_current_gate_subject(),
-                                           on_current_gate_changed, this);
+    current_slot_observer_ = ObserverGuard(AmsState::instance().get_current_slot_subject(),
+                                           on_current_slot_changed, this);
 
-    // Gate count observer for dynamic slot creation
-    gate_count_observer_ =
-        ObserverGuard(AmsState::instance().get_gate_count_subject(), on_gate_count_changed, this);
+    // Slot count observer for dynamic slot creation
+    slot_count_observer_ =
+        ObserverGuard(AmsState::instance().get_slot_count_subject(), on_slot_count_changed, this);
 
     // Path state observers for filament path visualization
     path_segment_observer_ = ObserverGuard(AmsState::instance().get_path_filament_segment_subject(),
@@ -257,10 +257,10 @@ void AmsPanel::clear_panel_reference() {
     }
 
     // Clear observer guards (they reference deleted widgets)
-    gates_version_observer_.reset();
+    slots_version_observer_.reset();
     action_observer_.reset();
-    current_gate_observer_.reset();
-    gate_count_observer_.reset();
+    current_slot_observer_.reset();
+    slot_count_observer_.reset();
     path_segment_observer_.reset();
     path_topology_observer_.reset();
 
@@ -320,9 +320,9 @@ void AmsPanel::setup_slots() {
         return;
     }
 
-    // Get initial gate count and create slots
-    int gate_count = lv_subject_get_int(AmsState::instance().get_gate_count_subject());
-    create_slots(gate_count);
+    // Get initial slot count and create slots
+    int slot_count = lv_subject_get_int(AmsState::instance().get_slot_count_subject());
+    create_slots(slot_count);
 }
 
 void AmsPanel::create_slots(int count) {
@@ -335,7 +335,7 @@ void AmsPanel::create_slots(int count) {
         count = 0;
     }
     if (count > MAX_VISIBLE_SLOTS) {
-        spdlog::warn("[{}] Clamping gate_count {} to max {}", get_name(), count, MAX_VISIBLE_SLOTS);
+        spdlog::warn("[{}] Clamping slot_count {} to max {}", get_name(), count, MAX_VISIBLE_SLOTS);
         count = MAX_VISIBLE_SLOTS;
     }
 
@@ -411,14 +411,14 @@ void AmsPanel::update_tray_size() {
                   grid_height);
 }
 
-void AmsPanel::on_gate_count_changed(lv_observer_t* observer, lv_subject_t* subject) {
+void AmsPanel::on_slot_count_changed(lv_observer_t* observer, lv_subject_t* subject) {
     auto* self = static_cast<AmsPanel*>(lv_observer_get_user_data(observer));
     if (!self || !self->panel_) {
         return;
     }
 
     int new_count = lv_subject_get_int(subject);
-    spdlog::debug("[AmsPanel] Gate count changed to {}", new_count);
+    spdlog::debug("[AmsPanel] Slot count changed to {}", new_count);
     self->create_slots(new_count);
 }
 
@@ -454,8 +454,8 @@ void AmsPanel::setup_path_canvas() {
         return;
     }
 
-    // Set gate click callback to trigger filament load
-    ui_filament_path_canvas_set_gate_callback(path_canvas_, on_path_gate_clicked, this);
+    // Set slot click callback to trigger filament load
+    ui_filament_path_canvas_set_slot_callback(path_canvas_, on_path_slot_clicked, this);
 
     // Initial configuration from backend
     update_path_canvas_from_backend();
@@ -473,18 +473,18 @@ void AmsPanel::update_path_canvas_from_backend() {
         return;
     }
 
-    // Get system info for gate count and topology
+    // Get system info for slot count and topology
     AmsSystemInfo info = backend->get_system_info();
 
-    // Set gate count from backend
-    ui_filament_path_canvas_set_gate_count(path_canvas_, info.total_gates);
+    // Set slot count from backend
+    ui_filament_path_canvas_set_slot_count(path_canvas_, info.total_slots);
 
     // Set topology from backend
     PathTopology topology = backend->get_topology();
     ui_filament_path_canvas_set_topology(path_canvas_, static_cast<int>(topology));
 
-    // Set active gate
-    ui_filament_path_canvas_set_active_gate(path_canvas_, info.current_gate);
+    // Set active slot
+    ui_filament_path_canvas_set_active_slot(path_canvas_, info.current_slot);
 
     // Set filament segment position
     PathSegment segment = backend->get_filament_segment();
@@ -494,26 +494,26 @@ void AmsPanel::update_path_canvas_from_backend() {
     PathSegment error_seg = backend->infer_error_segment();
     ui_filament_path_canvas_set_error_segment(path_canvas_, static_cast<int>(error_seg));
 
-    // Set filament color from current gate's filament
-    if (info.current_gate >= 0) {
-        GateInfo gate_info = backend->get_gate_info(info.current_gate);
-        ui_filament_path_canvas_set_filament_color(path_canvas_, gate_info.color_rgb);
+    // Set filament color from current slot's filament
+    if (info.current_slot >= 0) {
+        SlotInfo slot_info = backend->get_slot_info(info.current_slot);
+        ui_filament_path_canvas_set_filament_color(path_canvas_, slot_info.color_rgb);
     }
 
-    // Set per-gate filament states for all gates with filament
-    // This allows non-active gates to show their filament color/position
-    ui_filament_path_canvas_clear_gate_filaments(path_canvas_);
-    for (int i = 0; i < info.total_gates; ++i) {
-        PathSegment gate_seg = backend->get_gate_filament_segment(i);
-        if (gate_seg != PathSegment::NONE) {
-            GateInfo gate_info = backend->get_gate_info(i);
-            ui_filament_path_canvas_set_gate_filament(path_canvas_, i, static_cast<int>(gate_seg),
-                                                      gate_info.color_rgb);
+    // Set per-slot filament states for all slots with filament
+    // This allows non-active slots to show their filament color/position
+    ui_filament_path_canvas_clear_slot_filaments(path_canvas_);
+    for (int i = 0; i < info.total_slots; ++i) {
+        PathSegment slot_seg = backend->get_slot_filament_segment(i);
+        if (slot_seg != PathSegment::NONE) {
+            SlotInfo slot_info = backend->get_slot_info(i);
+            ui_filament_path_canvas_set_slot_filament(path_canvas_, i, static_cast<int>(slot_seg),
+                                                      slot_info.color_rgb);
         }
     }
 
-    spdlog::trace("[{}] Path canvas updated: gates={}, topology={}, active={}, segment={}",
-                  get_name(), info.total_gates, static_cast<int>(topology), info.current_gate,
+    spdlog::trace("[{}] Path canvas updated: slots={}, topology={}, active={}, segment={}",
+                  get_name(), info.total_slots, static_cast<int>(topology), info.current_slot,
                   static_cast<int>(segment));
 }
 
@@ -528,9 +528,9 @@ void AmsPanel::refresh_slots() {
 
     update_slot_colors();
 
-    // Update current gate highlight
-    int current_gate = lv_subject_get_int(AmsState::instance().get_current_gate_subject());
-    update_current_gate_highlight(current_gate);
+    // Update current slot highlight
+    int current_slot = lv_subject_get_int(AmsState::instance().get_current_slot_subject());
+    update_current_slot_highlight(current_slot);
 }
 
 // ============================================================================
@@ -538,7 +538,7 @@ void AmsPanel::refresh_slots() {
 // ============================================================================
 
 void AmsPanel::update_slot_colors() {
-    int gate_count = lv_subject_get_int(AmsState::instance().get_gate_count_subject());
+    int slot_count = lv_subject_get_int(AmsState::instance().get_slot_count_subject());
     AmsBackend* backend = AmsState::instance().get_backend();
 
     for (int i = 0; i < MAX_VISIBLE_SLOTS; ++i) {
@@ -546,7 +546,7 @@ void AmsPanel::update_slot_colors() {
             continue;
         }
 
-        if (i >= gate_count) {
+        if (i >= slot_count) {
             // Hide slots beyond configured count
             lv_obj_add_flag(slot_widgets_[i], LV_OBJ_FLAG_HIDDEN);
             continue;
@@ -554,8 +554,8 @@ void AmsPanel::update_slot_colors() {
 
         lv_obj_remove_flag(slot_widgets_[i], LV_OBJ_FLAG_HIDDEN);
 
-        // Get gate color from AmsState subject
-        lv_subject_t* color_subject = AmsState::instance().get_gate_color_subject(i);
+        // Get slot color from AmsState subject
+        lv_subject_t* color_subject = AmsState::instance().get_slot_color_subject(i);
         if (color_subject) {
             uint32_t rgb = static_cast<uint32_t>(lv_subject_get_int(color_subject));
             lv_color_t color = lv_color_hex(rgb);
@@ -567,21 +567,21 @@ void AmsPanel::update_slot_colors() {
             }
         }
 
-        // Update material label and fill level from backend gate info
+        // Update material label and fill level from backend slot info
         if (backend) {
-            GateInfo gate_info = backend->get_gate_info(i);
+            SlotInfo slot_info = backend->get_slot_info(i);
             lv_obj_t* material_label = lv_obj_find_by_name(slot_widgets_[i], "material_label");
             if (material_label) {
-                if (!gate_info.material.empty()) {
-                    lv_label_set_text(material_label, gate_info.material.c_str());
+                if (!slot_info.material.empty()) {
+                    lv_label_set_text(material_label, slot_info.material.c_str());
                 } else {
                     lv_label_set_text(material_label, "---");
                 }
             }
 
             // Set fill level from Spoolman weight data
-            if (gate_info.total_weight_g > 0.0f) {
-                float fill_level = gate_info.remaining_weight_g / gate_info.total_weight_g;
+            if (slot_info.total_weight_g > 0.0f) {
+                float fill_level = slot_info.remaining_weight_g / slot_info.total_weight_g;
                 ui_ams_slot_set_fill_level(slot_widgets_[i], fill_level);
             }
         }
@@ -591,52 +591,52 @@ void AmsPanel::update_slot_colors() {
     }
 }
 
-void AmsPanel::update_slot_status(int gate_index) {
-    if (gate_index < 0 || gate_index >= MAX_VISIBLE_SLOTS || !slot_widgets_[gate_index]) {
+void AmsPanel::update_slot_status(int slot_index) {
+    if (slot_index < 0 || slot_index >= MAX_VISIBLE_SLOTS || !slot_widgets_[slot_index]) {
         return;
     }
 
-    lv_subject_t* status_subject = AmsState::instance().get_gate_status_subject(gate_index);
+    lv_subject_t* status_subject = AmsState::instance().get_slot_status_subject(slot_index);
     if (!status_subject) {
         return;
     }
 
-    auto status = static_cast<GateStatus>(lv_subject_get_int(status_subject));
+    auto status = static_cast<SlotStatus>(lv_subject_get_int(status_subject));
 
     // Find status indicator icon within slot
-    lv_obj_t* status_icon = lv_obj_find_by_name(slot_widgets_[gate_index], "status_icon");
+    lv_obj_t* status_icon = lv_obj_find_by_name(slot_widgets_[slot_index], "status_icon");
     if (!status_icon) {
         return;
     }
 
     // Update icon based on status
     switch (status) {
-    case GateStatus::EMPTY:
+    case SlotStatus::EMPTY:
         // Show empty indicator
         lv_obj_remove_flag(status_icon, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_opa(status_icon, LV_OPA_30, 0);
         break;
 
-    case GateStatus::AVAILABLE:
-    case GateStatus::FROM_BUFFER:
+    case SlotStatus::AVAILABLE:
+    case SlotStatus::FROM_BUFFER:
         // Show filament available
         lv_obj_remove_flag(status_icon, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_opa(status_icon, LV_OPA_100, 0);
         break;
 
-    case GateStatus::LOADED:
+    case SlotStatus::LOADED:
         // Show loaded (highlighted)
         lv_obj_remove_flag(status_icon, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_opa(status_icon, LV_OPA_100, 0);
         break;
 
-    case GateStatus::BLOCKED:
+    case SlotStatus::BLOCKED:
         // Show error state
         lv_obj_remove_flag(status_icon, LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_opa(status_icon, LV_OPA_100, 0);
         break;
 
-    case GateStatus::UNKNOWN:
+    case SlotStatus::UNKNOWN:
     default:
         lv_obj_add_flag(status_icon, LV_OBJ_FLAG_HIDDEN);
         break;
@@ -662,7 +662,7 @@ void AmsPanel::update_action_display(AmsAction action) {
     }
 }
 
-void AmsPanel::update_current_gate_highlight(int gate_index) {
+void AmsPanel::update_current_slot_highlight(int slot_index) {
     // Remove highlight from all slots (set border opacity to 0)
     for (int i = 0; i < MAX_VISIBLE_SLOTS; ++i) {
         if (slot_widgets_[i]) {
@@ -671,17 +671,17 @@ void AmsPanel::update_current_gate_highlight(int gate_index) {
         }
     }
 
-    // Add highlight to current gate (show border)
-    if (gate_index >= 0 && gate_index < MAX_VISIBLE_SLOTS && slot_widgets_[gate_index]) {
-        lv_obj_add_state(slot_widgets_[gate_index], LV_STATE_CHECKED);
-        lv_obj_set_style_border_opa(slot_widgets_[gate_index], LV_OPA_100, 0);
+    // Add highlight to current slot (show border)
+    if (slot_index >= 0 && slot_index < MAX_VISIBLE_SLOTS && slot_widgets_[slot_index]) {
+        lv_obj_add_state(slot_widgets_[slot_index], LV_STATE_CHECKED);
+        lv_obj_set_style_border_opa(slot_widgets_[slot_index], LV_OPA_100, 0);
     }
 
     // Update the "Currently Loaded" card in the right column
-    update_current_loaded_display(gate_index);
+    update_current_loaded_display(slot_index);
 }
 
-void AmsPanel::update_current_loaded_display(int gate_index) {
+void AmsPanel::update_current_loaded_display(int slot_index) {
     if (!panel_) {
         return;
     }
@@ -695,8 +695,8 @@ void AmsPanel::update_current_loaded_display(int gate_index) {
     bool filament_loaded =
         lv_subject_get_int(AmsState::instance().get_filament_loaded_subject()) != 0;
 
-    // Check for bypass mode (gate_index == -2)
-    if (gate_index == -2 && backend && backend->is_bypass_active()) {
+    // Check for bypass mode (slot_index == -2)
+    if (slot_index == -2 && backend && backend->is_bypass_active()) {
         // Bypass mode active - show bypass state
         if (current_swatch) {
             lv_obj_set_style_bg_color(current_swatch, lv_color_hex(0x888888), 0);
@@ -718,21 +718,21 @@ void AmsPanel::update_current_loaded_display(int gate_index) {
         if (path_canvas_) {
             ui_filament_path_canvas_set_bypass_active(path_canvas_, true);
         }
-    } else if (gate_index >= 0 && filament_loaded && backend) {
-        // Filament is loaded - show the loaded gate info
-        GateInfo gate_info = backend->get_gate_info(gate_index);
+    } else if (slot_index >= 0 && filament_loaded && backend) {
+        // Filament is loaded - show the loaded slot info
+        SlotInfo slot_info = backend->get_slot_info(slot_index);
 
         // Set swatch color
         if (current_swatch) {
-            lv_color_t color = lv_color_hex(gate_info.color_rgb);
+            lv_color_t color = lv_color_hex(slot_info.color_rgb);
             lv_obj_set_style_bg_color(current_swatch, color, 0);
             lv_obj_set_style_border_color(current_swatch, color, 0);
         }
 
         // Set material name
         if (current_material) {
-            if (!gate_info.material.empty()) {
-                lv_label_set_text(current_material, gate_info.material.c_str());
+            if (!slot_info.material.empty()) {
+                lv_label_set_text(current_material, slot_info.material.c_str());
             } else {
                 lv_label_set_text(current_material, "Filament");
             }
@@ -741,7 +741,7 @@ void AmsPanel::update_current_loaded_display(int gate_index) {
         // Set slot label (1-based for user display)
         if (current_slot_label) {
             char buf[16];
-            snprintf(buf, sizeof(buf), "Slot %d", gate_index + 1);
+            snprintf(buf, sizeof(buf), "Slot %d", slot_index + 1);
             lv_label_set_text(current_slot_label, buf);
         }
 
@@ -775,15 +775,15 @@ void AmsPanel::update_current_loaded_display(int gate_index) {
 // Event Callbacks
 // ============================================================================
 
-void AmsPanel::on_path_gate_clicked(int gate_index, void* user_data) {
+void AmsPanel::on_path_slot_clicked(int slot_index, void* user_data) {
     auto* self = static_cast<AmsPanel*>(user_data);
     if (!self) {
         return;
     }
 
-    spdlog::info("[AmsPanel] Path gate {} clicked - triggering load", gate_index);
+    spdlog::info("[AmsPanel] Path slot {} clicked - triggering load", slot_index);
 
-    // Trigger filament load for the clicked gate
+    // Trigger filament load for the clicked slot
     AmsBackend* backend = AmsState::instance().get_backend();
     if (!backend) {
         NOTIFY_WARNING("AMS not available");
@@ -797,7 +797,7 @@ void AmsPanel::on_path_gate_clicked(int gate_index, void* user_data) {
         return;
     }
 
-    AmsError error = backend->load_filament(gate_index);
+    AmsError error = backend->load_filament(slot_index);
     if (error.result != AmsResult::SUCCESS) {
         NOTIFY_ERROR("Load failed: {}", error.user_msg);
     }
@@ -836,7 +836,7 @@ void AmsPanel::on_reset_clicked(lv_event_t* e) {
 // Observer Callbacks
 // ============================================================================
 
-void AmsPanel::on_gates_version_changed(lv_observer_t* observer, lv_subject_t* /*subject*/) {
+void AmsPanel::on_slots_version_changed(lv_observer_t* observer, lv_subject_t* /*subject*/) {
     auto* self = static_cast<AmsPanel*>(lv_observer_get_user_data(observer));
     if (!self) {
         return;
@@ -861,7 +861,7 @@ void AmsPanel::on_action_changed(lv_observer_t* observer, lv_subject_t* subject)
     self->update_action_display(action);
 }
 
-void AmsPanel::on_current_gate_changed(lv_observer_t* observer, lv_subject_t* subject) {
+void AmsPanel::on_current_slot_changed(lv_observer_t* observer, lv_subject_t* subject) {
     auto* self = static_cast<AmsPanel*>(lv_observer_get_user_data(observer));
     if (!self) {
         return;
@@ -869,11 +869,11 @@ void AmsPanel::on_current_gate_changed(lv_observer_t* observer, lv_subject_t* su
     if (!self->subjects_initialized_ || !self->panel_) {
         return; // Not yet ready
     }
-    int gate = lv_subject_get_int(subject);
-    spdlog::debug("[AmsPanel] Current gate changed: {}", gate);
-    self->update_current_gate_highlight(gate);
+    int slot = lv_subject_get_int(subject);
+    spdlog::debug("[AmsPanel] Current slot changed: {}", slot);
+    self->update_current_slot_highlight(slot);
 
-    // Also update path canvas when current gate changes
+    // Also update path canvas when current slot changes
     self->update_path_canvas_from_backend();
 }
 
@@ -896,11 +896,11 @@ void AmsPanel::on_path_state_changed(lv_observer_t* observer, lv_subject_t* /*su
 void AmsPanel::handle_slot_tap(int slot_index) {
     spdlog::info("[{}] Slot {} tapped", get_name(), slot_index);
 
-    // Validate slot index against configured gate count
-    int gate_count = lv_subject_get_int(AmsState::instance().get_gate_count_subject());
-    if (slot_index < 0 || slot_index >= gate_count) {
-        spdlog::warn("[{}] Invalid slot index {} (gate_count={})", get_name(), slot_index,
-                     gate_count);
+    // Validate slot index against configured slot count
+    int slot_count = lv_subject_get_int(AmsState::instance().get_slot_count_subject());
+    if (slot_index < 0 || slot_index >= slot_count) {
+        spdlog::warn("[{}] Invalid slot index {} (slot_count={})", get_name(), slot_index,
+                     slot_count);
         return;
     }
 

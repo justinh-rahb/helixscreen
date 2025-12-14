@@ -21,8 +21,8 @@
  * of these structures should only occur in the backend layer.
  */
 
-/// Default color for gates without filament info (medium gray)
-constexpr uint32_t AMS_DEFAULT_GATE_COLOR = 0x808080;
+/// Default color for slots without filament info (medium gray)
+constexpr uint32_t AMS_DEFAULT_SLOT_COLOR = 0x808080;
 
 /**
  * @brief Type of AMS system detected
@@ -66,36 +66,36 @@ inline AmsType ams_type_from_string(std::string_view str) {
 }
 
 /**
- * @brief Gate/Lane status
+ * @brief Slot/Lane status
  *
  * Our internal status representation. Use conversion functions to
  * translate from Happy Hare's gate_status values (-1, 0, 1, 2).
  */
-enum class GateStatus {
+enum class SlotStatus {
     UNKNOWN = 0,     ///< Status not known
-    EMPTY = 1,       ///< No filament in gate
+    EMPTY = 1,       ///< No filament in slot
     AVAILABLE = 2,   ///< Filament available, not loaded
     LOADED = 3,      ///< Filament loaded to extruder
     FROM_BUFFER = 4, ///< Filament available from buffer
-    BLOCKED = 5      ///< Gate blocked/jammed
+    BLOCKED = 5      ///< Slot blocked/jammed
 };
 
 /**
- * @brief Get string name for gate status
- * @param status The gate status enum value
+ * @brief Get string name for slot status
+ * @param status The slot status enum value
  * @return Human-readable string for the status
  */
-inline const char* gate_status_to_string(GateStatus status) {
+inline const char* slot_status_to_string(SlotStatus status) {
     switch (status) {
-    case GateStatus::EMPTY:
+    case SlotStatus::EMPTY:
         return "Empty";
-    case GateStatus::AVAILABLE:
+    case SlotStatus::AVAILABLE:
         return "Available";
-    case GateStatus::LOADED:
+    case SlotStatus::LOADED:
         return "Loaded";
-    case GateStatus::FROM_BUFFER:
+    case SlotStatus::FROM_BUFFER:
         return "From Buffer";
-    case GateStatus::BLOCKED:
+    case SlotStatus::BLOCKED:
         return "Blocked";
     default:
         return "Unknown";
@@ -103,49 +103,49 @@ inline const char* gate_status_to_string(GateStatus status) {
 }
 
 /**
- * @brief Convert Happy Hare gate_status integer to GateStatus enum
+ * @brief Convert Happy Hare gate_status integer to SlotStatus enum
  *
  * Happy Hare uses: -1 = unknown, 0 = empty, 1 = available, 2 = from buffer
- * The "loaded" state is determined by comparing with current_gate, not from
+ * The "loaded" state is determined by comparing with current_slot, not from
  * gate_status directly.
  *
  * @param hh_status Happy Hare gate_status value (-1, 0, 1, or 2)
- * @return Corresponding GateStatus enum value
+ * @return Corresponding SlotStatus enum value
  */
-inline GateStatus gate_status_from_happy_hare(int hh_status) {
+inline SlotStatus slot_status_from_happy_hare(int hh_status) {
     switch (hh_status) {
     case -1:
-        return GateStatus::UNKNOWN;
+        return SlotStatus::UNKNOWN;
     case 0:
-        return GateStatus::EMPTY;
+        return SlotStatus::EMPTY;
     case 1:
-        return GateStatus::AVAILABLE;
+        return SlotStatus::AVAILABLE;
     case 2:
-        return GateStatus::FROM_BUFFER;
+        return SlotStatus::FROM_BUFFER;
     default:
-        return GateStatus::UNKNOWN;
+        return SlotStatus::UNKNOWN;
     }
 }
 
 /**
- * @brief Convert GateStatus enum to Happy Hare gate_status integer
- * @param status Our GateStatus enum value
+ * @brief Convert SlotStatus enum to Happy Hare gate_status integer
+ * @param status Our SlotStatus enum value
  * @return Happy Hare gate_status value (-1, 0, 1, or 2)
  */
-inline int gate_status_to_happy_hare(GateStatus status) {
+inline int slot_status_to_happy_hare(SlotStatus status) {
     switch (status) {
-    case GateStatus::UNKNOWN:
+    case SlotStatus::UNKNOWN:
         return -1;
-    case GateStatus::EMPTY:
+    case SlotStatus::EMPTY:
         return 0;
-    case GateStatus::AVAILABLE:
+    case SlotStatus::AVAILABLE:
         return 1;
-    case GateStatus::FROM_BUFFER:
+    case SlotStatus::FROM_BUFFER:
         return 2;
     // LOADED and BLOCKED don't have direct HH equivalents
-    case GateStatus::LOADED:
+    case SlotStatus::LOADED:
         return 1; // Treat as available
-    case GateStatus::BLOCKED:
+    case SlotStatus::BLOCKED:
         return -1; // Treat as unknown
     default:
         return -1;
@@ -162,11 +162,11 @@ enum class AmsAction {
     IDLE = 0,        ///< No operation in progress
     LOADING = 1,     ///< Loading filament to extruder
     UNLOADING = 2,   ///< Unloading filament from extruder
-    SELECTING = 3,   ///< Selecting tool/gate
+    SELECTING = 3,   ///< Selecting tool/slot
     RESETTING = 4,   ///< Resetting system (MMU_HOME for HH, AFC_RESET for AFC)
     FORMING_TIP = 5, ///< Forming filament tip for retraction
     HEATING = 6,     ///< Heating for operation
-    CHECKING = 7,    ///< Checking gates
+    CHECKING = 7,    ///< Checking slots
     PAUSED = 8,      ///< Operation paused (requires attention)
     ERROR = 9        ///< Error state
 };
@@ -388,19 +388,19 @@ inline PathSegment path_segment_from_afc_sensors(bool prep_sensor, bool hub_sens
 }
 
 /**
- * @brief Information about a single gate/lane
+ * @brief Information about a single slot/lane
  *
  * This represents one filament slot in an AMS unit.
- * Happy Hare calls these "gates", AFC calls them "lanes".
+ * Happy Hare calls these "gates" internally, AFC calls them "lanes".
  */
-struct GateInfo {
-    int gate_index = -1;   ///< Gate/lane number (0-based within unit)
+struct SlotInfo {
+    int slot_index = -1;   ///< Slot/lane number (0-based within unit)
     int global_index = -1; ///< Global index across all units
-    GateStatus status = GateStatus::UNKNOWN;
+    SlotStatus status = SlotStatus::UNKNOWN;
 
     // Filament information
     std::string color_name;                      ///< Named color (e.g., "Red", "Blue")
-    uint32_t color_rgb = AMS_DEFAULT_GATE_COLOR; ///< RGB color for UI (0xRRGGBB)
+    uint32_t color_rgb = AMS_DEFAULT_SLOT_COLOR; ///< RGB color for UI (0xRRGGBB)
     std::string material;                        ///< Material type (e.g., "PLA", "PETG", "ABS")
     std::string brand;                           ///< Brand name (e.g., "Polymaker", "eSUN")
 
@@ -410,7 +410,7 @@ struct GateInfo {
     int bed_temp = 0;        ///< Recommended bed temp (°C)
 
     // Tool mapping
-    int mapped_tool = -1; ///< Which tool this gate maps to (-1=none)
+    int mapped_tool = -1; ///< Which tool this slot maps to (-1=none)
 
     // Spoolman integration
     int spoolman_id = 0;           ///< Spoolman spool ID (0=not tracked)
@@ -432,11 +432,11 @@ struct GateInfo {
     }
 
     /**
-     * @brief Check if this gate has filament data configured
+     * @brief Check if this slot has filament data configured
      * @return true if material or custom color is set
      */
     [[nodiscard]] bool has_filament_info() const {
-        return !material.empty() || color_rgb != AMS_DEFAULT_GATE_COLOR;
+        return !material.empty() || color_rgb != AMS_DEFAULT_SLOT_COLOR;
     }
 };
 
@@ -444,15 +444,15 @@ struct GateInfo {
  * @brief Information about an AMS unit
  *
  * Supports multi-unit configurations (e.g., 2x Box Turtles = 16 slots).
- * Most setups have a single unit with 4-8 gates.
+ * Most setups have a single unit with 4-8 slots.
  */
 struct AmsUnit {
     int unit_index = 0;              ///< Unit number (0-based)
     std::string name;                ///< Unit name/identifier (e.g., "MMU", "Box Turtle 1")
-    int gate_count = 0;              ///< Number of gates on this unit
-    int first_gate_global_index = 0; ///< Global index of first gate
+    int slot_count = 0;              ///< Number of slots on this unit
+    int first_slot_global_index = 0; ///< Global index of first slot
 
-    std::vector<GateInfo> gates; ///< Gate information
+    std::vector<SlotInfo> slots; ///< Slot information
 
     // Unit-level status
     bool connected = false;       ///< Unit communication status
@@ -461,30 +461,30 @@ struct AmsUnit {
     // Sensors (Happy Hare)
     bool has_encoder = false;         ///< Has filament encoder
     bool has_toolhead_sensor = false; ///< Has toolhead filament sensor
-    bool has_gate_sensors = false;    ///< Has per-gate sensors
+    bool has_slot_sensors = false;    ///< Has per-slot sensors
 
     /**
-     * @brief Get gate by local index (within this unit)
-     * @param local_index Index within this unit (0 to gate_count-1)
-     * @return Pointer to gate info or nullptr if out of range
+     * @brief Get slot by local index (within this unit)
+     * @param local_index Index within this unit (0 to slot_count-1)
+     * @return Pointer to slot info or nullptr if out of range
      */
-    [[nodiscard]] const GateInfo* get_gate(int local_index) const {
-        if (local_index < 0 || local_index >= static_cast<int>(gates.size())) {
+    [[nodiscard]] const SlotInfo* get_slot(int local_index) const {
+        if (local_index < 0 || local_index >= static_cast<int>(slots.size())) {
             return nullptr;
         }
-        return &gates[local_index];
+        return &slots[local_index];
     }
 
     /**
-     * @brief Get mutable gate by local index (within this unit)
-     * @param local_index Index within this unit (0 to gate_count-1)
-     * @return Pointer to gate info or nullptr if out of range
+     * @brief Get mutable slot by local index (within this unit)
+     * @param local_index Index within this unit (0 to slot_count-1)
+     * @return Pointer to slot info or nullptr if out of range
      */
-    [[nodiscard]] GateInfo* get_gate(int local_index) {
-        if (local_index < 0 || local_index >= static_cast<int>(gates.size())) {
+    [[nodiscard]] SlotInfo* get_slot(int local_index) {
+        if (local_index < 0 || local_index >= static_cast<int>(slots.size())) {
             return nullptr;
         }
-        return &gates[local_index];
+        return &slots[local_index];
     }
 };
 
@@ -500,14 +500,14 @@ struct AmsSystemInfo {
 
     // Current state
     int current_tool = -1;              ///< Active tool (-1=none, -2=bypass for HH)
-    int current_gate = -1;              ///< Active gate (-1=none, -2=bypass for HH)
+    int current_slot = -1;              ///< Active slot (-1=none, -2=bypass for HH)
     bool filament_loaded = false;       ///< Filament at extruder
     AmsAction action = AmsAction::IDLE; ///< Current operation
     std::string operation_detail;       ///< Detailed operation string
 
     // Units
     std::vector<AmsUnit> units; ///< All AMS units
-    int total_gates = 0;        ///< Sum of all gates across units
+    int total_slots = 0;        ///< Sum of all slots across units
 
     // Capability flags
     bool supports_endless_spool = false;
@@ -516,49 +516,49 @@ struct AmsSystemInfo {
     bool supports_bypass = false;            ///< Has bypass selector position
     bool has_hardware_bypass_sensor = false; ///< true=auto-detect sensor, false=virtual/manual
 
-    // Tool-to-gate mapping (Happy Hare)
-    std::vector<int> tool_to_gate_map; ///< tool_to_gate_map[tool] = gate
+    // Tool-to-slot mapping (Happy Hare uses "gate" internally)
+    std::vector<int> tool_to_slot_map; ///< tool_to_slot_map[tool] = slot
 
     /**
-     * @brief Get gate by global index (across all units)
-     * @param global_index Global gate index (0 to total_gates-1)
-     * @return Pointer to gate info or nullptr if out of range
+     * @brief Get slot by global index (across all units)
+     * @param global_index Global slot index (0 to total_slots-1)
+     * @return Pointer to slot info or nullptr if out of range
      */
-    [[nodiscard]] const GateInfo* get_gate_global(int global_index) const {
+    [[nodiscard]] const SlotInfo* get_slot_global(int global_index) const {
         for (const auto& unit : units) {
-            if (global_index >= unit.first_gate_global_index &&
-                global_index < unit.first_gate_global_index + unit.gate_count) {
-                int local_idx = global_index - unit.first_gate_global_index;
-                return unit.get_gate(local_idx);
+            if (global_index >= unit.first_slot_global_index &&
+                global_index < unit.first_slot_global_index + unit.slot_count) {
+                int local_idx = global_index - unit.first_slot_global_index;
+                return unit.get_slot(local_idx);
             }
         }
         return nullptr;
     }
 
     /**
-     * @brief Get mutable gate by global index (across all units)
-     * @param global_index Global gate index (0 to total_gates-1)
-     * @return Pointer to gate info or nullptr if out of range
+     * @brief Get mutable slot by global index (across all units)
+     * @param global_index Global slot index (0 to total_slots-1)
+     * @return Pointer to slot info or nullptr if out of range
      */
-    [[nodiscard]] GateInfo* get_gate_global(int global_index) {
+    [[nodiscard]] SlotInfo* get_slot_global(int global_index) {
         for (auto& unit : units) {
-            if (global_index >= unit.first_gate_global_index &&
-                global_index < unit.first_gate_global_index + unit.gate_count) {
-                int local_idx = global_index - unit.first_gate_global_index;
-                return unit.get_gate(local_idx);
+            if (global_index >= unit.first_slot_global_index &&
+                global_index < unit.first_slot_global_index + unit.slot_count) {
+                int local_idx = global_index - unit.first_slot_global_index;
+                return unit.get_slot(local_idx);
             }
         }
         return nullptr;
     }
 
     /**
-     * @brief Get the currently active gate info
-     * @return Pointer to active gate or nullptr if none selected
+     * @brief Get the currently active slot info
+     * @return Pointer to active slot or nullptr if none selected
      */
-    [[nodiscard]] const GateInfo* get_active_gate() const {
-        if (current_gate < 0)
+    [[nodiscard]] const SlotInfo* get_active_slot() const {
+        if (current_slot < 0)
             return nullptr;
-        return get_gate_global(current_gate);
+        return get_slot_global(current_slot);
     }
 
     /**
@@ -585,16 +585,16 @@ struct AmsSystemInfo {
  */
 struct FilamentRequirement {
     int tool_index = -1;                         ///< Tool number from G-code (T0, T1, etc.)
-    uint32_t color_rgb = AMS_DEFAULT_GATE_COLOR; ///< Color hint from slicer
+    uint32_t color_rgb = AMS_DEFAULT_SLOT_COLOR; ///< Color hint from slicer
     std::string material;                        ///< Material hint from slicer (if available)
-    int mapped_gate = -1;                        ///< Which gate is mapped to this tool
+    int mapped_slot = -1;                        ///< Which slot is mapped to this tool
 
     /**
-     * @brief Check if this requirement is satisfied by a gate
-     * @return true if a gate is mapped to this tool
+     * @brief Check if this requirement is satisfied by a slot
+     * @return true if a slot is mapped to this tool
      */
     [[nodiscard]] bool is_satisfied() const {
-        return mapped_gate >= 0;
+        return mapped_slot >= 0;
     }
 };
 
@@ -604,5 +604,5 @@ struct FilamentRequirement {
 struct PrintColorInfo {
     std::vector<FilamentRequirement> requirements;
     int initial_tool = 0;       ///< First tool used in print
-    bool all_satisfied = false; ///< All requirements have mapped gates
+    bool all_satisfied = false; ///< All requirements have mapped slots
 };
