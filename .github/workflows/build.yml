@@ -47,12 +47,10 @@ jobs:
       id: cache-deps
       with:
         path: |
-          build/lib/
           lib/libhv/lib/
           lib/libhv/include/hv/
           lib/tinygl/lib/
-          lib/wpa_supplicant/wpa_supplicant/libwpa_client.a
-        key: deps-ubuntu-22.04-${{ hashFiles('lib/libhv/**/*.c', 'lib/libhv/**/*.cpp', 'lib/libhv/**/*.h', 'lib/tinygl/src/*.c', 'lib/tinygl/include/**/*.h', 'lib/wpa_supplicant/src/**/*.c', 'lib/wpa_supplicant/src/**/*.h') }}
+        key: deps-ubuntu-22.04-${{ hashFiles('lib/libhv/**/*.c', 'lib/libhv/**/*.cpp', 'lib/libhv/**/*.h', 'lib/tinygl/src/*.c', 'lib/tinygl/include/**/*.h') }}
         restore-keys: |
           deps-ubuntu-22.04-
 
