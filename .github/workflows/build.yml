@@ -10,7 +10,7 @@ jobs:
   build-ubuntu:
     name: Build (Ubuntu 22.04)
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 35
 
     steps:
     - name: Checkout repository
@@ -102,7 +102,7 @@ jobs:
   build-macos:
     name: Build (macOS 14)
     runs-on: macos-14
-    timeout-minutes: 20
+    timeout-minutes: 35
 
     steps:
     - name: Checkout repository
