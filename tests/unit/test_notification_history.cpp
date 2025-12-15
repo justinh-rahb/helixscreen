@@ -6,13 +6,15 @@
  * @brief Unit tests for NotificationHistory circular buffer
  */
 
-#include "../catch_amalgamated.hpp"
 #include "ui_notification_history.h"
 #include "ui_toast.h"
 
+#include <atomic>
+#include <cstring>
 #include <thread>
 #include <vector>
-#include <cstring>
+
+#include "../catch_amalgamated.hpp"
 
 // Helper to create a test entry
 static NotificationHistoryEntry make_entry(ToastSeverity severity, const char* message,
@@ -74,9 +76,9 @@ TEST_CASE("NotificationHistory: Get all returns entries newest first", "[notific
 
     auto entries = history.get_all();
     REQUIRE(entries.size() == 3);
-    REQUIRE(std::string(entries[0].message) == "Third");  // Newest first
+    REQUIRE(std::string(entries[0].message) == "Third"); // Newest first
     REQUIRE(std::string(entries[1].message) == "Second");
-    REQUIRE(std::string(entries[2].message) == "First");  // Oldest last
+    REQUIRE(std::string(entries[2].message) == "First"); // Oldest last
 }
 
 // ============================================================================
@@ -98,7 +100,8 @@ TEST_CASE("NotificationHistory: Circular buffer caps at MAX_ENTRIES", "[notifica
     REQUIRE(history.count() == NotificationHistory::MAX_ENTRIES);
 }
 
-TEST_CASE("NotificationHistory: Circular buffer overwrites oldest entries", "[notification][circular]") {
+TEST_CASE("NotificationHistory: Circular buffer overwrites oldest entries",
+          "[notification][circular]") {
     NotificationHistory& history = NotificationHistory::instance();
     history.clear();
 
@@ -156,7 +159,8 @@ TEST_CASE("NotificationHistory: Mark all read clears unread count", "[notificati
     REQUIRE(history.get_unread_count() == 0);
 }
 
-TEST_CASE("NotificationHistory: New entries after mark_all_read are unread", "[notification][unread]") {
+TEST_CASE("NotificationHistory: New entries after mark_all_read are unread",
+          "[notification][unread]") {
     NotificationHistory& history = NotificationHistory::instance();
     history.clear();
 
@@ -193,7 +197,7 @@ TEST_CASE("NotificationHistory: Get highest unread severity", "[notification][se
 
     // Mark all as read
     history.mark_all_read();
-    REQUIRE(history.get_highest_unread_severity() == ToastSeverity::INFO);  // No unread = INFO
+    REQUIRE(history.get_highest_unread_severity() == ToastSeverity::INFO); // No unread = INFO
 
     // Add just WARNING
     history.add(make_entry(ToastSeverity::WARNING, "New warning"));

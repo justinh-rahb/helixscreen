@@ -1,8 +1,4 @@
 
-### [L001] [*****/+----] Test lesson
-- **Uses**: 11 | **Learned**: 2025-12-14 | **Last**: 2025-12-14 | **Category**: pattern
-> This is a test lesson content
-
 
 ### [L002] [+----/-----] Verbose flags required
 - **Uses**: 1 | **Learned**: 2025-12-14 | **Last**: 2025-12-14 | **Category**: gotcha
