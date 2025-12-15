@@ -28,6 +28,8 @@
 #include <ctime>
 #include <memory>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // Forward declaration for class-based API
@@ -436,9 +438,6 @@ void PrintSelectPanel::refresh_files() {
         return;
     }
 
-    // Record refresh start time (for on_activate dedup - prevents flash on first navigation)
-    last_refresh_tick_ = lv_tick_get();
-
     spdlog::debug("[{}] Refreshing file list from Moonraker (path: '{}')...", get_name(),
                   current_path_.empty() ? "/" : current_path_);
 
@@ -452,7 +451,19 @@ void PrintSelectPanel::refresh_files() {
         [self](const std::vector<FileInfo>& files) {
             spdlog::debug("[{}] Received {} items from Moonraker", self->get_name(), files.size());
 
-            // Clear existing file list and metadata tracking
+            // Build map of existing file data to preserve thumbnails/metadata
+            // Also track which files had metadata already fetched
+            std::unordered_map<std::string, PrintFileData> existing_data;
+            std::unordered_set<std::string> already_fetched;
+            for (size_t i = 0; i < self->file_list_.size(); ++i) {
+                const auto& file = self->file_list_[i];
+                existing_data[file.filename] = file;
+                if (i < self->metadata_fetched_.size() && self->metadata_fetched_[i]) {
+                    already_fetched.insert(file.filename);
+                }
+            }
+
+            // Clear and rebuild file list
             self->file_list_.clear();
             self->metadata_fetched_.clear();
 
@@ -469,8 +480,17 @@ void PrintSelectPanel::refresh_files() {
                 self->file_list_.push_back(parent_dir);
             }
 
-            // Convert FileInfo to PrintFileData (include directories)
+            // Convert FileInfo to PrintFileData, preserving existing data where available
             for (const auto& file : files) {
+                // Check if we have existing data for this file
+                auto it = existing_data.find(file.filename);
+                if (it != existing_data.end()) {
+                    // Preserve existing data (thumbnail, metadata already loaded)
+                    self->file_list_.push_back(it->second);
+                    continue;
+                }
+
+                // New file - create with placeholder data
                 PrintFileData data;
                 data.filename = file.filename;
                 data.is_dir = file.is_dir;
@@ -502,6 +522,14 @@ void PrintSelectPanel::refresh_files() {
 
                 data.modified_str = format_modified_date(data.modified_timestamp);
                 self->file_list_.push_back(data);
+            }
+
+            // Restore metadata_fetched_ state for preserved files
+            self->metadata_fetched_.resize(self->file_list_.size(), false);
+            for (size_t i = 0; i < self->file_list_.size(); ++i) {
+                if (already_fetched.count(self->file_list_[i].filename)) {
+                    self->metadata_fetched_[i] = true;
+                }
             }
 
             // Count files vs directories (can be done on any thread)
@@ -791,26 +819,26 @@ void PrintSelectPanel::set_api(MoonrakerAPI* api) {
 }
 
 void PrintSelectPanel::on_activate() {
-    // Refresh when panel becomes visible to pick up external changes
-    // (e.g., files uploaded via web UI, deleted from another client)
-    // Skip if we just refreshed recently (prevents flash on first navigation)
-    constexpr uint32_t REFRESH_SKIP_THRESHOLD_MS = 2000;
-    uint32_t elapsed = lv_tick_get() - last_refresh_tick_;
-
+    // On first activation: skip refresh if files already loaded (connection observer did it)
+    // On subsequent activations: refresh to pick up external changes
     if (current_source_ == FileSource::PRINTER && api_) {
-        if (!file_list_.empty() && elapsed < REFRESH_SKIP_THRESHOLD_MS) {
-            spdlog::debug("[{}] Panel activated - skipping refresh ({}ms since last)", get_name(),
-                          elapsed);
+        if (first_activation_ && !file_list_.empty()) {
+            first_activation_ = false;
+            spdlog::debug("[{}] First activation, files already loaded - skipping refresh",
+                          get_name());
             return;
         }
+        first_activation_ = false;
         spdlog::info("[{}] Panel activated, refreshing file list", get_name());
         refresh_files();
     } else if (current_source_ == FileSource::USB) {
-        if (!file_list_.empty() && elapsed < REFRESH_SKIP_THRESHOLD_MS) {
-            spdlog::debug("[{}] Panel activated - skipping refresh ({}ms since last)", get_name(),
-                          elapsed);
+        if (first_activation_ && !file_list_.empty()) {
+            first_activation_ = false;
+            spdlog::debug("[{}] First activation, files already loaded - skipping refresh",
+                          get_name());
             return;
         }
+        first_activation_ = false;
         spdlog::info("[{}] Panel activated, refreshing USB file list", get_name());
         refresh_usb_files();
     }
@@ -2600,9 +2628,6 @@ void PrintSelectPanel::refresh_usb_files() {
 
         file_list_.push_back(std::move(file_data));
     }
-
-    // Record refresh completion time (for on_activate dedup)
-    last_refresh_tick_ = lv_tick_get();
 
     // Apply sort and update view
     apply_sort();

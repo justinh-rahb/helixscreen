@@ -15,6 +15,7 @@
 
 #include "app_globals.h"
 #include "config.h"
+#include "memory_utils.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
 #include "runtime_config.h"
@@ -1674,35 +1675,69 @@ void PrintStatusPanel::load_gcode_for_viewing(const std::string& filename) {
         return;
     }
 
-    // Download the G-code file using the API
-    // For mock mode, this reads from test_gcodes/ directory
-    // For real mode, this downloads from Moonraker
-    api_->download_file(
-        "gcodes", filename,
-        [this, filename](const std::string& content) {
-            // Save to a temp file for the viewer to load
-            std::string temp_path = "/tmp/helix_print_view_" +
-                                    std::to_string(std::hash<std::string>{}(filename)) + ".gcode";
+    // Check config option to disable 3D rendering entirely
+    auto* cfg = Config::get_instance();
+    bool gcode_3d_enabled = cfg->get<bool>("/display/gcode_3d_enabled", true);
+    if (!gcode_3d_enabled) {
+        spdlog::info("[{}] G-code 3D rendering disabled via config - using thumbnail only",
+                     get_name());
+        return;
+    }
 
-            std::ofstream file(temp_path, std::ios::binary);
-            if (!file) {
-                spdlog::error("[{}] Failed to create temp file for G-code viewing: {}", get_name(),
-                              temp_path);
+    // Get file metadata first to check size before downloading
+    // This prevents OOM on memory-constrained devices like AD5M
+    std::string metadata_filename = resolve_gcode_filename(filename);
+    api_->get_file_metadata(
+        metadata_filename,
+        [this, filename](const FileMetadata& metadata) {
+            // Check if 3D rendering is safe for this file size + available RAM
+            if (!helix::is_gcode_3d_render_safe(metadata.size)) {
+                auto mem = helix::get_system_memory_info();
+                spdlog::warn(
+                    "[{}] G-code too large for 3D rendering: file={} bytes, available RAM={}MB "
+                    "- using thumbnail only",
+                    get_name(), metadata.size, mem.available_mb());
                 return;
             }
 
-            file.write(content.data(), static_cast<std::streamsize>(content.size()));
-            file.close();
+            spdlog::debug("[{}] G-code size {} bytes - safe to render, downloading...", get_name(),
+                          metadata.size);
 
-            spdlog::info("[{}] Downloaded G-code ({} bytes), loading into viewer: {}", get_name(),
-                         content.size(), temp_path);
+            // Download the G-code file using the API
+            // For mock mode, this reads from test_gcodes/ directory
+            // For real mode, this downloads from Moonraker
+            api_->download_file(
+                "gcodes", filename,
+                [this, filename](const std::string& content) {
+                    // Save to a temp file for the viewer to load
+                    std::string temp_path = "/tmp/helix_print_view_" +
+                                            std::to_string(std::hash<std::string>{}(filename)) +
+                                            ".gcode";
 
-            // Load into the viewer widget
-            load_gcode_file(temp_path.c_str());
+                    std::ofstream file(temp_path, std::ios::binary);
+                    if (!file) {
+                        spdlog::error("[{}] Failed to create temp file for G-code viewing: {}",
+                                      get_name(), temp_path);
+                        return;
+                    }
+
+                    file.write(content.data(), static_cast<std::streamsize>(content.size()));
+                    file.close();
+
+                    spdlog::info("[{}] Downloaded G-code ({} bytes), loading into viewer: {}",
+                                 get_name(), content.size(), temp_path);
+
+                    // Load into the viewer widget
+                    load_gcode_file(temp_path.c_str());
+                },
+                [this, filename](const MoonrakerError& err) {
+                    spdlog::warn("[{}] Failed to download G-code for viewing '{}': {}", get_name(),
+                                 filename, err.message);
+                });
         },
         [this, filename](const MoonrakerError& err) {
-            spdlog::warn("[{}] Failed to download G-code for viewing '{}': {}", get_name(),
-                         filename, err.message);
+            spdlog::debug("[{}] Failed to get G-code metadata for '{}': {} - skipping 3D render",
+                          get_name(), filename, err.message);
         });
 }
 

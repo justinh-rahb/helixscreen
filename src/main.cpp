@@ -72,6 +72,7 @@
 #include "lvgl/src/libs/svg/lv_svg_decoder.h"
 #include "lvgl/src/xml/lv_xml.h"
 #include "memory_profiling.h"
+#include "memory_utils.h"
 #include "moonraker_api.h"
 #include "moonraker_api_mock.h"
 #include "moonraker_client.h"
@@ -1247,6 +1248,27 @@ int main(int argc, char** argv) {
     // Initialize memory profiling (development feature)
     // SIGUSR1 handler allows on-demand snapshots: kill -USR1 $(pidof helix-screen)
     helix::MemoryProfiler::init(args.memory_report);
+
+    // Log system memory info at startup (helps debug memory-constrained devices)
+    {
+        auto mem = helix::get_system_memory_info();
+        spdlog::info("[main] System memory: total={}MB, available={}MB, free={}MB{}",
+                     mem.total_kb / 1024, mem.available_mb(), mem.free_kb / 1024,
+                     mem.is_constrained() ? " [CONSTRAINED]" : "");
+
+        // Log G-code 3D rendering capability
+        bool gcode_3d_enabled =
+            Config::get_instance()->get<bool>("/display/gcode_3d_enabled", true);
+        if (!gcode_3d_enabled) {
+            spdlog::info("[main] G-code 3D rendering: DISABLED (config)");
+        } else if (mem.available_kb < helix::GCodeMemoryLimits::MIN_AVAILABLE_KB) {
+            spdlog::warn("[main] G-code 3D rendering: DISABLED (insufficient RAM: {}MB < {}MB)",
+                         mem.available_mb(), helix::GCodeMemoryLimits::MIN_AVAILABLE_KB / 1024);
+        } else {
+            spdlog::info("[main] G-code 3D rendering: ENABLED ({}MB available)",
+                         mem.available_mb());
+        }
+    }
 
     // Register remaining XML components (globals already registered for theme init)
     helix::register_xml_components();
