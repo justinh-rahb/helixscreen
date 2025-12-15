@@ -12,10 +12,6 @@
     <!-- APPEARANCE SECTION -->
     <!-- ================================================================== -->
     <setting_section_header title="APPEARANCE" icon="light"/>
-    <!-- Dark Mode Toggle -->
-    <setting_toggle_row name="row_dark_mode"
-                        label="Dark Mode" icon="light_off" description="Switch between light and dark themes"
-                        callback="on_dark_mode_changed"/>
     <!-- Animations Toggle -->
     <setting_toggle_row name="row_animations"
                         label="Animations" icon="animation" description="Enable UI motion effects"
