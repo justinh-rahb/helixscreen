@@ -4,6 +4,7 @@
 #include "printer_state.h"
 
 #include "capability_overrides.h"
+#include "filament_sensor_manager.h"
 #include "printer_capabilities.h"
 #include "runtime_config.h"
 
@@ -590,6 +591,10 @@ void PrinterState::update_from_status(const json& state) {
             spdlog::trace("[PrinterState] Manual probe Z: {:.3f}mm", z_mm);
         }
     }
+
+    // Forward filament sensor updates to FilamentSensorManager
+    // The manager handles all sensor types: filament_switch_sensor and filament_motion_sensor
+    helix::FilamentSensorManager::instance().update_from_status(state);
 
     // Cache full state for complex queries
     json_state_.merge_patch(state);

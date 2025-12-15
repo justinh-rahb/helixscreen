@@ -196,6 +196,29 @@ class PrinterCapabilities {
     }
 
     /**
+     * @brief Check if printer has any filament sensors
+     *
+     * Detects filament_switch_sensor or filament_motion_sensor objects.
+     * Used to show sensor configuration UI and enable sensor-based features.
+     *
+     * @return true if any filament sensor was detected
+     */
+    [[nodiscard]] bool has_filament_sensors() const {
+        return !filament_sensor_names_.empty();
+    }
+
+    /**
+     * @brief Get discovered filament sensor names
+     *
+     * Returns full Klipper object names like "filament_switch_sensor fsensor".
+     *
+     * @return Vector of sensor object names
+     */
+    [[nodiscard]] const std::vector<std::string>& get_filament_sensor_names() const {
+        return filament_sensor_names_;
+    }
+
+    /**
      * @brief Get the detected MMU/AMS type
      * @return AmsType enum (NONE, HAPPY_HARE, or AFC)
      */
@@ -380,6 +403,10 @@ class PrinterCapabilities {
     // AFC-specific discovery (from printer.objects.list, works for ALL AFC versions)
     std::vector<std::string> afc_lane_names_; ///< Lane names from "AFC_stepper lane*"
     std::vector<std::string> afc_hub_names_;  ///< Hub names from "AFC_hub *"
+
+    // Filament sensor discovery
+    std::vector<std::string>
+        filament_sensor_names_; ///< Full Klipper names like "filament_switch_sensor fsensor"
 
     /**
      * @brief Convert string to uppercase for comparison

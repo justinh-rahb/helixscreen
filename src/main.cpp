@@ -66,6 +66,7 @@
 #include "cli_args.h"
 #include "config.h"
 #include "display_backend.h"
+#include "filament_sensor_manager.h"
 #include "gcode_file_modifier.h"
 #include "logging_init.h"
 #include "lvgl/lvgl.h"
@@ -1657,6 +1658,17 @@ int main(int argc, char** argv) {
             // from the printer.objects.subscribe response
             AmsState::instance().init_backend_from_capabilities(caps, moonraker_api.get(),
                                                                 moonraker_client.get());
+
+            // Initialize FilamentSensorManager if sensors detected
+            // Must happen EARLY so it's ready to receive initial state from subscription
+            if (caps.has_filament_sensors()) {
+                auto& fsm = helix::FilamentSensorManager::instance();
+                fsm.init_subjects();
+                fsm.discover_sensors(caps.get_filament_sensor_names());
+                fsm.load_config();
+                spdlog::info("[Main] FilamentSensorManager initialized: {} sensors",
+                             caps.get_filament_sensor_names().size());
+            }
         });
 
         // Register LATE discovery callback - fires after subscription response is processed

@@ -12,6 +12,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <map>
 
 MoonrakerClientMock::MoonrakerClientMock(PrinterType type) : printer_type_(type) {
     spdlog::info("[MoonrakerClientMock] Created with printer type: {}", static_cast<int>(type));
@@ -221,10 +223,57 @@ void MoonrakerClientMock::populate_capabilities() {
     // Moonraker plugins
     mock_objects.push_back("timelapse"); // Moonraker-Timelapse plugin
 
+    // Filament sensors (common setup: runout sensor at spool holder)
+    // Check HELIX_MOCK_FILAMENT_SENSORS env var for custom sensor names
+    // Default: single switch sensor named "fsensor"
+    const char* sensor_env = std::getenv("HELIX_MOCK_FILAMENT_SENSORS");
+    if (sensor_env && std::string(sensor_env) == "none") {
+        // Explicitly disabled
+        spdlog::debug("[MoonrakerClientMock] Filament sensors disabled via env var");
+    } else if (sensor_env) {
+        // Custom sensor list (comma-separated, e.g., "switch:fsensor,motion:encoder")
+        std::string sensors_str(sensor_env);
+        size_t pos = 0;
+        while ((pos = sensors_str.find(',')) != std::string::npos || !sensors_str.empty()) {
+            std::string token =
+                (pos != std::string::npos) ? sensors_str.substr(0, pos) : sensors_str;
+            size_t colon = token.find(':');
+            if (colon != std::string::npos) {
+                std::string type = token.substr(0, colon);
+                std::string name = token.substr(colon + 1);
+                if (type == "switch") {
+                    mock_objects.push_back("filament_switch_sensor " + name);
+                } else if (type == "motion") {
+                    mock_objects.push_back("filament_motion_sensor " + name);
+                }
+            }
+            if (pos == std::string::npos)
+                break;
+            sensors_str.erase(0, pos + 1);
+        }
+        spdlog::debug("[MoonrakerClientMock] Custom filament sensors from env: {}", sensor_env);
+    } else {
+        // Default: one switch sensor (typical Voron setup)
+        mock_objects.push_back("filament_switch_sensor fsensor");
+        spdlog::debug(
+            "[MoonrakerClientMock] Default filament sensor: filament_switch_sensor fsensor");
+    }
+
+    // Parse objects into capabilities (for PrinterCapabilities queries)
     capabilities_.parse_objects(mock_objects);
 
-    spdlog::debug("[MoonrakerClientMock] Capabilities populated: {} macros detected",
-                  capabilities_.macros().size());
+    // Also populate filament_sensors_ member for subscription (same as real parse_objects)
+    filament_sensors_.clear();
+    for (const auto& obj : mock_objects) {
+        std::string name = obj.get<std::string>();
+        if (name.rfind("filament_switch_sensor ", 0) == 0 ||
+            name.rfind("filament_motion_sensor ", 0) == 0) {
+            filament_sensors_.push_back(name);
+        }
+    }
+
+    spdlog::debug("[MoonrakerClientMock] Capabilities populated: {} macros, {} filament sensors",
+                  capabilities_.macros().size(), filament_sensors_.size());
 }
 
 void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
@@ -1647,9 +1696,51 @@ void MoonrakerClientMock::dispatch_initial_state() {
         }
     }
 
+    // Add filament sensor states
+    // Check HELIX_MOCK_FILAMENT_STATE env var for initial state (default: detected)
+    // Format: "sensor:state,sensor:state" e.g., "fsensor:empty" or "fsensor:detected,encoder:empty"
+    bool default_detected = true;
+    const char* state_env = std::getenv("HELIX_MOCK_FILAMENT_STATE");
+    std::map<std::string, bool> sensor_states;
+
+    if (state_env) {
+        // Parse state overrides
+        std::string states_str(state_env);
+        size_t pos = 0;
+        while ((pos = states_str.find(',')) != std::string::npos || !states_str.empty()) {
+            std::string token = (pos != std::string::npos) ? states_str.substr(0, pos) : states_str;
+            size_t colon = token.find(':');
+            if (colon != std::string::npos) {
+                std::string name = token.substr(0, colon);
+                std::string state = token.substr(colon + 1);
+                sensor_states[name] = (state != "empty" && state != "0" && state != "false");
+            }
+            if (pos == std::string::npos)
+                break;
+            states_str.erase(0, pos + 1);
+        }
+    }
+
+    // Add state for each discovered filament sensor
+    for (const auto& sensor : filament_sensors_) {
+        // Extract sensor name from "filament_switch_sensor fsensor" -> "fsensor"
+        size_t space = sensor.rfind(' ');
+        std::string short_name = (space != std::string::npos) ? sensor.substr(space + 1) : sensor;
+
+        bool detected = default_detected;
+        auto it = sensor_states.find(short_name);
+        if (it != sensor_states.end()) {
+            detected = it->second;
+        }
+
+        // Filament sensor state format from Klipper
+        initial_status[sensor] = {{"filament_detected", detected}, {"enabled", true}};
+    }
+
     spdlog::info("[MoonrakerClientMock] Dispatching initial state: extruder={}/{}°C, bed={}/{}°C, "
-                 "homed_axes='{}', leds={}",
-                 ext_temp, ext_target, bed_temp_val, bed_target_val, homed, led_json.size());
+                 "homed_axes='{}', leds={}, filament_sensors={}",
+                 ext_temp, ext_target, bed_temp_val, bed_target_val, homed, led_json.size(),
+                 filament_sensors_.size());
 
     // Use the base class dispatch method (same as real client)
     dispatch_status_update(initial_status);

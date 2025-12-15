@@ -658,12 +658,14 @@ class MoonrakerClient : public hv::WebSocketClient {
 
   protected:
     // Auto-discovered printer objects (protected to allow mock access)
-    std::vector<std::string> heaters_;         // Controllable heaters (extruders, bed, etc.)
-    std::vector<std::string> sensors_;         // Read-only temperature sensors
-    std::vector<std::string> fans_;            // All fan types
-    std::vector<std::string> leds_;            // LED outputs
-    std::vector<std::string> steppers_;        // Stepper motors (stepper_x, stepper_z, etc.)
-    std::vector<std::string> afc_objects_;     // AFC MMU objects (AFC, AFC_stepper, AFC_hub, etc.)
+    std::vector<std::string> heaters_;     // Controllable heaters (extruders, bed, etc.)
+    std::vector<std::string> sensors_;     // Read-only temperature sensors
+    std::vector<std::string> fans_;        // All fan types
+    std::vector<std::string> leds_;        // LED outputs
+    std::vector<std::string> steppers_;    // Stepper motors (stepper_x, stepper_z, etc.)
+    std::vector<std::string> afc_objects_; // AFC MMU objects (AFC, AFC_stepper, AFC_hub, etc.)
+    std::vector<std::string>
+        filament_sensors_; // Filament sensors (filament_switch_sensor, filament_motion_sensor)
     std::vector<std::string> printer_objects_; // All Klipper objects (for detection)
     std::string hostname_;                     // Printer hostname from printer.info
     std::string software_version_;             // Klipper software version from printer.info

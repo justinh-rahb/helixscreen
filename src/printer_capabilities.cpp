@@ -125,6 +125,12 @@ void PrinterCapabilities::parse_objects(const json& objects) {
             has_timelapse_ = true;
             spdlog::debug("[PrinterCapabilities] Detected Moonraker-Timelapse plugin");
         }
+        // Filament sensor detection
+        else if (name.rfind("filament_switch_sensor ", 0) == 0 ||
+                 name.rfind("filament_motion_sensor ", 0) == 0) {
+            filament_sensor_names_.push_back(name);
+            spdlog::debug("[PrinterCapabilities] Detected filament sensor: {}", name);
+        }
         // Macro detection
         else if (name.rfind("gcode_macro ", 0) == 0) {
             std::string macro_name = name.substr(12); // Remove "gcode_macro " prefix
@@ -218,6 +224,7 @@ void PrinterCapabilities::clear() {
     heat_soak_macro_.clear();
     afc_lane_names_.clear();
     afc_hub_names_.clear();
+    filament_sensor_names_.clear();
 }
 
 // ============================================================================
@@ -296,6 +303,8 @@ std::string PrinterCapabilities::summary() const {
         caps.push_back(mmu_type_ == AmsType::HAPPY_HARE ? "Happy Hare" : "AFC");
     if (has_timelapse_)
         caps.push_back("timelapse");
+    if (!filament_sensor_names_.empty())
+        caps.push_back("filament_sensors(" + std::to_string(filament_sensor_names_.size()) + ")");
 
     if (caps.empty()) {
         ss << "none";

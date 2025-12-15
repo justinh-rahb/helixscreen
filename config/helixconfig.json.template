@@ -93,5 +93,11 @@
   "ams": {
     "spool_style": "3d",
     "_spool_style_comment": "Filament spool visualization style. Options: '3d' (Bambu-style pseudo-3D canvas with gradients), 'flat' (concentric rings). Default is '3d'."
+  },
+  "filament_sensors": {
+    "master_enabled": true,
+    "_master_enabled_comment": "Global toggle to enable/disable all filament sensor monitoring. When false, sensor states are ignored.",
+    "sensors": [],
+    "_sensors_comment": "Array of sensor configurations. Each sensor has: klipper_name (full Klipper object name like 'filament_switch_sensor fsensor'), role ('none', 'runout', 'toolhead', 'entry'), enabled (boolean). Sensors are auto-discovered from Moonraker."
   }
 }
