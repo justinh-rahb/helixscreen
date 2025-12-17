@@ -5,6 +5,7 @@
 
 #include "bed_mesh_renderer.h"
 
+#include <array>
 #include <vector>
 
 /**
@@ -91,4 +92,21 @@ struct bed_mesh_renderer {
     // Memory savings: 80% reduction (16 KB → 3.2 KB for 20×20 mesh)
     std::vector<std::vector<int>> projected_screen_x; // [row][col] → screen X coordinate
     std::vector<std::vector<int>> projected_screen_y; // [row][col] → screen Y coordinate
+
+    // ===== Adaptive Render Mode (Phase 4) =====
+
+    // Render mode control
+    bed_mesh_render_mode_t render_mode = BED_MESH_RENDER_MODE_AUTO;
+    bool using_2d_fallback = false; // True if currently rendering as 2D heatmap
+
+    // FPS tracking (rolling window average)
+    std::array<float, BED_MESH_FPS_WINDOW_SIZE> frame_times{}; // Frame times in ms
+    size_t fps_write_idx = 0;                                  // Next write position
+    size_t fps_sample_count = 0;                               // Number of valid samples
+
+    // Touch state for 2D mode tooltip
+    bool touch_valid = false; // True if touched_* fields are valid
+    int touched_row = 0;      // Mesh row of touched cell
+    int touched_col = 0;      // Mesh column of touched cell
+    float touched_z = 0.0f;   // Z value of touched cell
 };

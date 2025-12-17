@@ -177,6 +177,10 @@ OBJ_DIR ?= $(BUILD_DIR)/obj
 LVGL_DIR := lib/lvgl
 # Use -isystem to suppress warnings from third-party headers in strict mode
 LVGL_INC := -isystem $(LVGL_DIR) -isystem $(LVGL_DIR)/src
+# Add GLAD include path only when OpenGL ES is enabled (provides KHR/khrplatform.h, EGL headers)
+ifeq ($(ENABLE_OPENGLES),yes)
+    LVGL_INC += -isystem $(LVGL_DIR)/src/drivers/opengles/glad/include
+endif
 LVGL_SRCS := $(shell find $(LVGL_DIR)/src -name "*.c" 2>/dev/null)
 LVGL_OBJS := $(patsubst $(LVGL_DIR)/%.c,$(OBJ_DIR)/lvgl/%.o,$(LVGL_SRCS))
 

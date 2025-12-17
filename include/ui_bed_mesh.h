@@ -94,6 +94,33 @@ void ui_bed_mesh_set_rotation(lv_obj_t* canvas, int angle_x, int angle_z);
  */
 void ui_bed_mesh_redraw(lv_obj_t* canvas);
 
+/**
+ * @brief Evaluate render mode based on FPS history
+ *
+ * Should be called when the bed mesh panel becomes visible (panel entry).
+ * Mode evaluation only happens on panel entry, never during viewing,
+ * to prevent jarring mode switches while the user is interacting.
+ *
+ * @param canvas The bed_mesh canvas widget
+ */
+void ui_bed_mesh_evaluate_render_mode(lv_obj_t* canvas);
+
+/**
+ * @brief Get current render mode
+ *
+ * @param canvas The bed_mesh canvas widget
+ * @return Current render mode (AUTO, FORCE_3D, or FORCE_2D)
+ */
+bed_mesh_render_mode_t ui_bed_mesh_get_render_mode(lv_obj_t* canvas);
+
+/**
+ * @brief Set render mode
+ *
+ * @param canvas The bed_mesh canvas widget
+ * @param mode Render mode to use (AUTO, FORCE_3D, or FORCE_2D)
+ */
+void ui_bed_mesh_set_render_mode(lv_obj_t* canvas, bed_mesh_render_mode_t mode);
+
 #ifdef __cplusplus
 }
 #endif

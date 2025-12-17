@@ -90,6 +90,21 @@ extern "C" {
 #define BED_MESH_GRADIENT_SEGMENTS 6       // Max gradient segments per scanline
 #define BED_MESH_GRADIENT_MIN_LINE_WIDTH 3 // Use solid color for lines narrower than this
 
+// FPS threshold for auto-degrading to 2D mode
+#define BED_MESH_FPS_THRESHOLD 15.0 // Switch to 2D if FPS drops below this
+#define BED_MESH_FPS_WINDOW_SIZE 10 // Rolling window for FPS averaging
+
+/**
+ * @brief Render mode for bed mesh visualization
+ *
+ * Controls whether 3D perspective or 2D heatmap rendering is used.
+ */
+typedef enum {
+    BED_MESH_RENDER_MODE_AUTO,     ///< Automatically choose based on measured FPS
+    BED_MESH_RENDER_MODE_FORCE_3D, ///< Always use 3D perspective (may be slow)
+    BED_MESH_RENDER_MODE_FORCE_2D  ///< Always use 2D heatmap (fast)
+} bed_mesh_render_mode_t;
+
 // 3D point in world space after perspective projection
 struct bed_mesh_point_3d_t {
     double x, y, z;         // 3D world coordinates
@@ -293,6 +308,98 @@ void bed_mesh_renderer_auto_color_range(bed_mesh_renderer_t* renderer);
  */
 bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer, int canvas_width,
                               int canvas_height);
+
+/**
+ * @brief Set render mode (auto, force 3D, or force 2D)
+ *
+ * In AUTO mode, the renderer tracks FPS and automatically switches to 2D
+ * heatmap mode if frame rate drops below BED_MESH_FPS_THRESHOLD.
+ *
+ * @param renderer Renderer instance
+ * @param mode Desired render mode
+ */
+void bed_mesh_renderer_set_render_mode(bed_mesh_renderer_t* renderer, bed_mesh_render_mode_t mode);
+
+/**
+ * @brief Get current render mode setting
+ *
+ * @param renderer Renderer instance
+ * @return Current render mode (AUTO, FORCE_3D, or FORCE_2D)
+ */
+bed_mesh_render_mode_t bed_mesh_renderer_get_render_mode(bed_mesh_renderer_t* renderer);
+
+/**
+ * @brief Check if currently using 2D fallback mode
+ *
+ * Returns true if the renderer is currently using 2D heatmap mode, either
+ * because it auto-degraded due to low FPS or because FORCE_2D is set.
+ *
+ * @param renderer Renderer instance
+ * @return true if rendering in 2D mode, false if rendering in 3D mode
+ */
+bool bed_mesh_renderer_is_using_2d(bed_mesh_renderer_t* renderer);
+
+/**
+ * @brief Evaluate render mode based on measured FPS
+ *
+ * Call this ONCE when the bed mesh panel is opened (not during viewing).
+ * In AUTO mode, checks if FPS is below threshold and sets 2D fallback flag.
+ * Mode is then locked for the duration of panel viewing.
+ *
+ * @param renderer Renderer instance
+ */
+void bed_mesh_renderer_evaluate_render_mode(bed_mesh_renderer_t* renderer);
+
+/**
+ * @brief Handle touch event in 2D mode
+ *
+ * When in 2D heatmap mode, converts touch coordinates to mesh cell and
+ * stores the cell info for tooltip display. Call this on touch/press events.
+ *
+ * @param renderer Renderer instance
+ * @param touch_x Touch X coordinate (screen space, relative to canvas)
+ * @param touch_y Touch Y coordinate (screen space, relative to canvas)
+ * @param canvas_width Current canvas width
+ * @param canvas_height Current canvas height
+ * @return true if touch hit a valid cell, false otherwise
+ */
+bool bed_mesh_renderer_handle_touch(bed_mesh_renderer_t* renderer, int touch_x, int touch_y,
+                                    int canvas_width, int canvas_height);
+
+/**
+ * @brief Get touched cell info for tooltip display
+ *
+ * After a successful handle_touch() call, returns info about the touched cell.
+ * Only valid when is_using_2d() returns true.
+ *
+ * @param renderer Renderer instance
+ * @param out_row Output: mesh row of touched cell (can be NULL)
+ * @param out_col Output: mesh column of touched cell (can be NULL)
+ * @param out_z Output: Z value of touched cell (can be NULL)
+ * @return true if there's a valid touched cell, false otherwise
+ */
+bool bed_mesh_renderer_get_touched_cell(bed_mesh_renderer_t* renderer, int* out_row, int* out_col,
+                                        float* out_z);
+
+/**
+ * @brief Clear touched cell state
+ *
+ * Call this on touch release to clear the tooltip.
+ *
+ * @param renderer Renderer instance
+ */
+void bed_mesh_renderer_clear_touch(bed_mesh_renderer_t* renderer);
+
+/**
+ * @brief Get average FPS from recent renders
+ *
+ * Returns the rolling average FPS calculated from recent frame times.
+ * Useful for debugging and settings display.
+ *
+ * @param renderer Renderer instance
+ * @return Average FPS (60.0 if no samples yet)
+ */
+float bed_mesh_renderer_get_average_fps(bed_mesh_renderer_t* renderer);
 
 #ifdef __cplusplus
 }

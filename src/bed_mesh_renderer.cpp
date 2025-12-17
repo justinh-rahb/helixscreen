@@ -67,6 +67,14 @@ static void render_mesh_surface(lv_layer_t* layer, bed_mesh_renderer_t* renderer
 static void render_decorations(lv_layer_t* layer, bed_mesh_renderer_t* renderer, int canvas_width,
                                int canvas_height);
 
+// Phase 4: Adaptive render mode helpers (forward declarations)
+static void record_frame_time(bed_mesh_renderer_t* renderer, float frame_ms);
+static float calculate_average_fps(const bed_mesh_renderer_t* renderer);
+static bool is_fps_below_threshold(const bed_mesh_renderer_t* renderer, float min_fps);
+static lv_color_t z_to_heatmap_color(float z, float z_min, float z_max);
+static void render_2d_heatmap(lv_layer_t* layer, bed_mesh_renderer_t* renderer, int canvas_width,
+                              int canvas_height, int offset_x, int offset_y);
+
 // ============================================================================
 // Public API Implementation
 // ============================================================================
@@ -482,37 +490,64 @@ bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer, 
     // Performance tracking for complete render pipeline
     auto t_frame_start = std::chrono::high_resolution_clock::now();
 
-    // Phase 1: Prepare rendering frame (projection parameters, view state)
-    prepare_render_frame(renderer, canvas_width, canvas_height, layer_offset_x, layer_offset_y);
-    auto t_prepare = std::chrono::high_resolution_clock::now();
+    // Check render mode and dispatch to 3D or 2D rendering
+    bool use_2d = bed_mesh_renderer_is_using_2d(renderer);
 
-    // Phase 2: Render mesh surface (quads with gradient/solid colors)
-    render_mesh_surface(layer, renderer);
-    auto t_surface = std::chrono::high_resolution_clock::now();
+    if (use_2d) {
+        // Fast 2D heatmap rendering (for slow hardware)
+        render_2d_heatmap(layer, renderer, canvas_width, canvas_height, layer_offset_x,
+                          layer_offset_y);
 
-    // Phase 3: Render decorations (grids, labels, ticks)
-    render_decorations(layer, renderer, canvas_width, canvas_height);
-    auto t_decorations = std::chrono::high_resolution_clock::now();
+        auto t_frame_end = std::chrono::high_resolution_clock::now();
+        auto ms_total =
+            std::chrono::duration<double, std::milli>(t_frame_end - t_frame_start).count();
 
-    // PERF: Log overall render performance breakdown
-    auto ms_prepare = std::chrono::duration<double, std::milli>(t_prepare - t_frame_start).count();
-    auto ms_surface = std::chrono::duration<double, std::milli>(t_surface - t_prepare).count();
-    auto ms_decorations =
-        std::chrono::duration<double, std::milli>(t_decorations - t_surface).count();
-    auto ms_total =
-        std::chrono::duration<double, std::milli>(t_decorations - t_frame_start).count();
+        // Record frame time for FPS tracking
+        record_frame_time(renderer, static_cast<float>(ms_total));
 
-    spdlog::trace("[Bed Mesh Renderer] [PERF] Total: {:.2f}ms | Prepare: {:.2f}ms ({:.0f}%) | "
-                  "Surface: {:.2f}ms ({:.0f}%) | "
-                  "Decorations: {:.2f}ms ({:.0f}%)",
-                  ms_total, ms_prepare, 100.0 * ms_prepare / ms_total, ms_surface,
-                  100.0 * ms_surface / ms_total, ms_decorations, 100.0 * ms_decorations / ms_total);
+        spdlog::trace("[Bed Mesh Renderer] [2D] Heatmap render: {:.2f}ms (FPS: {:.1f})", ms_total,
+                      calculate_average_fps(renderer));
+    } else {
+        // Full 3D perspective rendering
 
-    // Output canvas dimensions and view coordinates
-    spdlog::trace("[Bed Mesh Renderer] [CANVAS_SIZE] Widget dimensions: {}x{} | Alt: {:.1f}° | Az: "
-                  "{:.1f}° | Zoom: {:.2f}x",
-                  canvas_width, canvas_height, renderer->view_state.angle_x,
-                  renderer->view_state.angle_z, renderer->view_state.fov_scale / INITIAL_FOV_SCALE);
+        // Phase 1: Prepare rendering frame (projection parameters, view state)
+        prepare_render_frame(renderer, canvas_width, canvas_height, layer_offset_x, layer_offset_y);
+        auto t_prepare = std::chrono::high_resolution_clock::now();
+
+        // Phase 2: Render mesh surface (quads with gradient/solid colors)
+        render_mesh_surface(layer, renderer);
+        auto t_surface = std::chrono::high_resolution_clock::now();
+
+        // Phase 3: Render decorations (grids, labels, ticks)
+        render_decorations(layer, renderer, canvas_width, canvas_height);
+        auto t_decorations = std::chrono::high_resolution_clock::now();
+
+        // PERF: Log overall render performance breakdown
+        auto ms_prepare =
+            std::chrono::duration<double, std::milli>(t_prepare - t_frame_start).count();
+        auto ms_surface = std::chrono::duration<double, std::milli>(t_surface - t_prepare).count();
+        auto ms_decorations =
+            std::chrono::duration<double, std::milli>(t_decorations - t_surface).count();
+        auto ms_total =
+            std::chrono::duration<double, std::milli>(t_decorations - t_frame_start).count();
+
+        // Record frame time for FPS tracking
+        record_frame_time(renderer, static_cast<float>(ms_total));
+
+        spdlog::trace("[Bed Mesh Renderer] [PERF] Total: {:.2f}ms | Prepare: {:.2f}ms ({:.0f}%) | "
+                      "Surface: {:.2f}ms ({:.0f}%) | "
+                      "Decorations: {:.2f}ms ({:.0f}%) | FPS: {:.1f}",
+                      ms_total, ms_prepare, 100.0 * ms_prepare / ms_total, ms_surface,
+                      100.0 * ms_surface / ms_total, ms_decorations,
+                      100.0 * ms_decorations / ms_total, calculate_average_fps(renderer));
+
+        // Output canvas dimensions and view coordinates
+        spdlog::trace(
+            "[Bed Mesh Renderer] [CANVAS_SIZE] Widget dimensions: {}x{} | Alt: {:.1f}° | Az: "
+            "{:.1f}° | Zoom: {:.2f}x",
+            canvas_width, canvas_height, renderer->view_state.angle_x, renderer->view_state.angle_z,
+            renderer->view_state.fov_scale / INITIAL_FOV_SCALE);
+    }
 
     // State transition: MESH_LOADED → READY_TO_RENDER (successful render with cached projections)
     if (renderer->state == RendererState::MESH_LOADED) {
@@ -1118,4 +1153,421 @@ static void render_quad(lv_layer_t* layer, const bed_mesh_quad_3d_t& quad, bool 
                                          quad.screen_x[2], quad.screen_y[2], quad.screen_x[3],
                                          quad.screen_y[3], quad.center_color);
     }
+}
+
+// ============================================================================
+// Phase 4: Adaptive Render Mode (FPS-based 3D/2D switching)
+// ============================================================================
+
+/**
+ * @brief Record frame time for FPS tracking
+ */
+static void record_frame_time(bed_mesh_renderer_t* renderer, float frame_ms) {
+    renderer->frame_times[renderer->fps_write_idx] = frame_ms;
+    renderer->fps_write_idx = (renderer->fps_write_idx + 1) % BED_MESH_FPS_WINDOW_SIZE;
+    if (renderer->fps_sample_count < BED_MESH_FPS_WINDOW_SIZE) {
+        renderer->fps_sample_count++;
+    }
+}
+
+/**
+ * @brief Calculate average FPS from recorded frame times
+ */
+static float calculate_average_fps(const bed_mesh_renderer_t* renderer) {
+    if (renderer->fps_sample_count == 0) {
+        return 60.0f; // Assume good until measured
+    }
+
+    float total_ms = 0.0f;
+    for (size_t i = 0; i < renderer->fps_sample_count; i++) {
+        total_ms += renderer->frame_times[i];
+    }
+    float avg_ms = total_ms / static_cast<float>(renderer->fps_sample_count);
+    return avg_ms > 0.0f ? 1000.0f / avg_ms : 60.0f;
+}
+
+/**
+ * @brief Check if FPS is below threshold (requires full sample window)
+ */
+static bool is_fps_below_threshold(const bed_mesh_renderer_t* renderer, float min_fps) {
+    return renderer->fps_sample_count >= BED_MESH_FPS_WINDOW_SIZE &&
+           calculate_average_fps(renderer) < min_fps;
+}
+
+/**
+ * @brief Map Z value to heatmap color (purple → green → red)
+ *
+ * Uses the same color gradient as 3D mode for visual consistency.
+ */
+static lv_color_t z_to_heatmap_color(float z, float z_min, float z_max) {
+    // Use the shared bed mesh gradient function (handles normalization internally)
+    return bed_mesh_gradient_height_to_color(static_cast<double>(z), static_cast<double>(z_min),
+                                             static_cast<double>(z_max));
+}
+
+/**
+ * @brief Render mesh as 2D heatmap with triangle-based color blending
+ *
+ * Each cell is rendered as 4 triangles meeting at center, with colors
+ * averaged from the corner Z values. This provides smooth color transitions
+ * while maintaining honest probe resolution (N-1 cells for N probe points).
+ */
+static void render_2d_heatmap(lv_layer_t* layer, bed_mesh_renderer_t* renderer, int canvas_width,
+                              int canvas_height, int offset_x, int offset_y) {
+    if (!renderer->has_mesh_data) {
+        return;
+    }
+
+    // Layout parameters
+    int padding = 8;
+    int grid_width = canvas_width - 2 * padding;
+    int grid_height = canvas_height - 2 * padding;
+
+    // Calculate cell dimensions at actual mesh resolution
+    // Grid shows honest probe resolution (N-1 cells for N probe points)
+    int num_cells_x = renderer->cols - 1;
+    int num_cells_y = renderer->rows - 1;
+
+    // Guard against 1x1 mesh (no cells to render)
+    if (num_cells_x <= 0 || num_cells_y <= 0) {
+        spdlog::warn("[Bed Mesh] 2D heatmap requires at least 2x2 mesh (got {}x{})", renderer->cols,
+                     renderer->rows);
+        return;
+    }
+
+    int cell_w = grid_width / num_cells_x;
+    int cell_h = grid_height / num_cells_y;
+    if (cell_w < 1)
+        cell_w = 1;
+    if (cell_h < 1)
+        cell_h = 1;
+
+    // Center the grid
+    int grid_x = offset_x + padding + (grid_width - cell_w * num_cells_x) / 2;
+    int grid_y = offset_y + padding + (grid_height - cell_h * num_cells_y) / 2;
+
+    // Z range for coloring
+    float z_min = static_cast<float>(renderer->auto_color_range ? renderer->mesh_min_z
+                                                                : renderer->color_min_z);
+    float z_max = static_cast<float>(renderer->auto_color_range ? renderer->mesh_max_z
+                                                                : renderer->color_max_z);
+    float z_range = z_max - z_min;
+    if (z_range < 0.001f)
+        z_range = 0.001f;
+
+    // Contour interval (in mm) - adaptive based on range
+    float contour_interval = 0.05f; // 50 microns
+    if (z_range > 0.5f)
+        contour_interval = 0.1f;
+    if (z_range < 0.1f)
+        contour_interval = 0.02f;
+
+    // Triangle-based rendering: each cell is 4 triangles meeting at center
+    // Vertex colors come from actual mesh Z values - smooth blending without fake resolution
+    lv_draw_triangle_dsc_t tri_dsc;
+    lv_draw_triangle_dsc_init(&tri_dsc);
+    tri_dsc.opa = LV_OPA_COVER;
+
+    // Helper to blend colors (average RGB)
+    auto blend_colors = [](lv_color_t c1, lv_color_t c2, lv_color_t c3) -> lv_color_t {
+        return lv_color_make((c1.red + c2.red + c3.red) / 3, (c1.green + c2.green + c3.green) / 3,
+                             (c1.blue + c2.blue + c3.blue) / 3);
+    };
+
+    // Render each cell as 4 triangles
+    for (int row = 0; row < num_cells_y; row++) {
+        for (int col = 0; col < num_cells_x; col++) {
+            // Get Z values at the 4 corners of this cell
+            float z_tl = static_cast<float>(
+                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col)]);
+            float z_tr = static_cast<float>(
+                renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col + 1)]);
+            float z_bl = static_cast<float>(
+                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col)]);
+            float z_br = static_cast<float>(
+                renderer->mesh[static_cast<size_t>(row + 1)][static_cast<size_t>(col + 1)]);
+            float z_center = (z_tl + z_tr + z_bl + z_br) / 4.0f;
+
+            // Convert Z values to colors
+            lv_color_t c_tl = z_to_heatmap_color(z_tl, z_min, z_max);
+            lv_color_t c_tr = z_to_heatmap_color(z_tr, z_min, z_max);
+            lv_color_t c_bl = z_to_heatmap_color(z_bl, z_min, z_max);
+            lv_color_t c_br = z_to_heatmap_color(z_br, z_min, z_max);
+            lv_color_t c_center = z_to_heatmap_color(z_center, z_min, z_max);
+
+            // Screen coordinates for corners and center
+            int x_left = grid_x + col * cell_w;
+            int x_right = grid_x + (col + 1) * cell_w;
+            int y_top = grid_y + row * cell_h;
+            int y_bottom = grid_y + (row + 1) * cell_h;
+            int x_mid = (x_left + x_right) / 2;
+            int y_mid = (y_top + y_bottom) / 2;
+
+            // Top triangle (TL - TR - Center)
+            tri_dsc.color = blend_colors(c_tl, c_tr, c_center);
+            tri_dsc.p[0].x = x_left;
+            tri_dsc.p[0].y = y_top;
+            tri_dsc.p[1].x = x_right;
+            tri_dsc.p[1].y = y_top;
+            tri_dsc.p[2].x = x_mid;
+            tri_dsc.p[2].y = y_mid;
+            lv_draw_triangle(layer, &tri_dsc);
+
+            // Right triangle (TR - BR - Center)
+            tri_dsc.color = blend_colors(c_tr, c_br, c_center);
+            tri_dsc.p[0].x = x_right;
+            tri_dsc.p[0].y = y_top;
+            tri_dsc.p[1].x = x_right;
+            tri_dsc.p[1].y = y_bottom;
+            tri_dsc.p[2].x = x_mid;
+            tri_dsc.p[2].y = y_mid;
+            lv_draw_triangle(layer, &tri_dsc);
+
+            // Bottom triangle (BR - BL - Center)
+            tri_dsc.color = blend_colors(c_br, c_bl, c_center);
+            tri_dsc.p[0].x = x_right;
+            tri_dsc.p[0].y = y_bottom;
+            tri_dsc.p[1].x = x_left;
+            tri_dsc.p[1].y = y_bottom;
+            tri_dsc.p[2].x = x_mid;
+            tri_dsc.p[2].y = y_mid;
+            lv_draw_triangle(layer, &tri_dsc);
+
+            // Left triangle (BL - TL - Center)
+            tri_dsc.color = blend_colors(c_bl, c_tl, c_center);
+            tri_dsc.p[0].x = x_left;
+            tri_dsc.p[0].y = y_bottom;
+            tri_dsc.p[1].x = x_left;
+            tri_dsc.p[1].y = y_top;
+            tri_dsc.p[2].x = x_mid;
+            tri_dsc.p[2].y = y_mid;
+            lv_draw_triangle(layer, &tri_dsc);
+        }
+    }
+
+    // NOTE: Contour lines disabled - the smooth gradient + hillshade provides
+    // sufficient depth perception without the visual noise of disconnected segments.
+    // A proper marching squares algorithm would be needed for smooth contour curves.
+    (void)contour_interval; // Suppress unused warning
+
+    // Draw subtle border around the entire grid
+    lv_draw_rect_dsc_t border_dsc;
+    lv_draw_rect_dsc_init(&border_dsc);
+    border_dsc.bg_opa = LV_OPA_TRANSP;
+    border_dsc.border_color = lv_color_make(60, 60, 60);
+    border_dsc.border_width = 1;
+    border_dsc.border_opa = LV_OPA_60;
+    border_dsc.radius = 2;
+
+    lv_area_t border_area;
+    border_area.x1 = static_cast<int16_t>(grid_x - 1);
+    border_area.y1 = static_cast<int16_t>(grid_y - 1);
+    border_area.x2 = static_cast<int16_t>(grid_x + num_cells_x * cell_w + 1);
+    border_area.y2 = static_cast<int16_t>(grid_y + num_cells_y * cell_h + 1);
+    lv_draw_rect(layer, &border_dsc, &border_area);
+
+    // Draw tooltip for touched cell
+    if (renderer->touch_valid) {
+        // cell_w and cell_h already calculated above at mesh resolution
+        // Highlight the touched mesh cell
+        lv_draw_rect_dsc_t highlight_dsc;
+        lv_draw_rect_dsc_init(&highlight_dsc);
+        highlight_dsc.bg_opa = LV_OPA_20;
+        highlight_dsc.bg_color = lv_color_white();
+        highlight_dsc.border_color = lv_color_white();
+        highlight_dsc.border_width = 2;
+        highlight_dsc.border_opa = LV_OPA_COVER;
+        highlight_dsc.radius = 2;
+
+        lv_area_t highlight_area;
+        highlight_area.x1 = static_cast<int16_t>(grid_x + renderer->touched_col * cell_w);
+        highlight_area.y1 = static_cast<int16_t>(grid_y + renderer->touched_row * cell_h);
+        highlight_area.x2 = static_cast<int16_t>(highlight_area.x1 + cell_w - 1);
+        highlight_area.y2 = static_cast<int16_t>(highlight_area.y1 + cell_h - 1);
+        lv_draw_rect(layer, &highlight_dsc, &highlight_area);
+
+        // Draw Z value tooltip
+        char z_text[32];
+        snprintf(z_text, sizeof(z_text), "%.3f mm", static_cast<double>(renderer->touched_z));
+
+        // Position tooltip above the cell (or below if near top)
+        int tooltip_x = highlight_area.x1 + cell_w / 2 - 30;
+        int tooltip_y = highlight_area.y1 - 24;
+        if (tooltip_y < offset_y + 5) {
+            tooltip_y = highlight_area.y2 + 5;
+        }
+
+        // Draw tooltip background with shadow effect
+        lv_draw_rect_dsc_t tooltip_bg;
+        lv_draw_rect_dsc_init(&tooltip_bg);
+        tooltip_bg.bg_color = lv_color_make(30, 30, 30);
+        tooltip_bg.bg_opa = LV_OPA_90;
+        tooltip_bg.radius = 6;
+        tooltip_bg.border_color = lv_color_make(80, 80, 80);
+        tooltip_bg.border_width = 1;
+        tooltip_bg.border_opa = LV_OPA_60;
+
+        lv_area_t tooltip_area = {.x1 = static_cast<int16_t>(tooltip_x - 8),
+                                  .y1 = static_cast<int16_t>(tooltip_y - 4),
+                                  .x2 = static_cast<int16_t>(tooltip_x + 68),
+                                  .y2 = static_cast<int16_t>(tooltip_y + 18)};
+        lv_draw_rect(layer, &tooltip_bg, &tooltip_area);
+
+        // Draw tooltip text
+        lv_draw_label_dsc_t label_dsc;
+        lv_draw_label_dsc_init(&label_dsc);
+        label_dsc.color = lv_color_white();
+        label_dsc.font = &noto_sans_14;
+        label_dsc.text = z_text;
+        label_dsc.align = LV_TEXT_ALIGN_CENTER;
+
+        lv_area_t label_area = {.x1 = static_cast<int16_t>(tooltip_x),
+                                .y1 = static_cast<int16_t>(tooltip_y),
+                                .x2 = static_cast<int16_t>(tooltip_x + 60),
+                                .y2 = static_cast<int16_t>(tooltip_y + 14)};
+        lv_draw_label(layer, &label_dsc, &label_area);
+    }
+}
+
+// ============================================================================
+// Public API: Render Mode Control
+// ============================================================================
+
+void bed_mesh_renderer_set_render_mode(bed_mesh_renderer_t* renderer, bed_mesh_render_mode_t mode) {
+    if (!renderer)
+        return;
+    renderer->render_mode = mode;
+
+    // If forcing a mode, update the fallback flag immediately
+    if (mode == BED_MESH_RENDER_MODE_FORCE_2D) {
+        renderer->using_2d_fallback = true;
+    } else if (mode == BED_MESH_RENDER_MODE_FORCE_3D) {
+        renderer->using_2d_fallback = false;
+    }
+    // AUTO mode: fallback flag is controlled by evaluate_render_mode()
+}
+
+bed_mesh_render_mode_t bed_mesh_renderer_get_render_mode(bed_mesh_renderer_t* renderer) {
+    if (!renderer)
+        return BED_MESH_RENDER_MODE_AUTO;
+    return renderer->render_mode;
+}
+
+bool bed_mesh_renderer_is_using_2d(bed_mesh_renderer_t* renderer) {
+    if (!renderer)
+        return false;
+
+    switch (renderer->render_mode) {
+    case BED_MESH_RENDER_MODE_FORCE_2D:
+        return true;
+    case BED_MESH_RENDER_MODE_FORCE_3D:
+        return false;
+    case BED_MESH_RENDER_MODE_AUTO:
+    default:
+        return renderer->using_2d_fallback;
+    }
+}
+
+void bed_mesh_renderer_evaluate_render_mode(bed_mesh_renderer_t* renderer) {
+    if (!renderer)
+        return;
+    if (renderer->render_mode != BED_MESH_RENDER_MODE_AUTO) {
+        spdlog::debug("[Bed Mesh Renderer] Mode evaluation skipped (mode={}, not AUTO)",
+                      static_cast<int>(renderer->render_mode));
+        return;
+    }
+
+    spdlog::debug("[Bed Mesh Renderer] Evaluating render mode: {} FPS samples, avg={:.1f} FPS",
+                  renderer->fps_sample_count, calculate_average_fps(renderer));
+
+    // Check if we have enough samples and FPS is below threshold
+    if (is_fps_below_threshold(renderer, BED_MESH_FPS_THRESHOLD)) {
+        if (!renderer->using_2d_fallback) {
+            renderer->using_2d_fallback = true;
+            spdlog::info("[Bed Mesh Renderer] Switching to 2D heatmap (FPS: {:.1f} < {:.0f})",
+                         calculate_average_fps(renderer), BED_MESH_FPS_THRESHOLD);
+        }
+    }
+    // Note: We don't auto-upgrade back to 3D (user must explicitly request via settings)
+}
+
+float bed_mesh_renderer_get_average_fps(bed_mesh_renderer_t* renderer) {
+    if (!renderer)
+        return 60.0f;
+    return calculate_average_fps(renderer);
+}
+
+// ============================================================================
+// Public API: Touch Handling for 2D Mode
+// ============================================================================
+
+bool bed_mesh_renderer_handle_touch(bed_mesh_renderer_t* renderer, int touch_x, int touch_y,
+                                    int canvas_width, int canvas_height) {
+    if (!renderer || !renderer->has_mesh_data)
+        return false;
+
+    // Only handle touch in 2D mode
+    if (!bed_mesh_renderer_is_using_2d(renderer))
+        return false;
+
+    // Calculate grid dimensions (must match render_2d_heatmap)
+    // N probe points = N-1 cells
+    int padding = 8;
+    int grid_width = canvas_width - 2 * padding;
+    int grid_height = canvas_height - 2 * padding;
+    int num_cells_x = renderer->cols - 1;
+    int num_cells_y = renderer->rows - 1;
+
+    // Guard against 1x1 mesh (no cells)
+    if (num_cells_x <= 0 || num_cells_y <= 0) {
+        renderer->touch_valid = false;
+        return false;
+    }
+
+    int cell_w = grid_width / num_cells_x;
+    int cell_h = grid_height / num_cells_y;
+    int grid_x = padding + (grid_width - cell_w * num_cells_x) / 2;
+    int grid_y = padding + (grid_height - cell_h * num_cells_y) / 2;
+
+    // Convert touch to cell coordinates
+    int col = (touch_x - grid_x) / cell_w;
+    int row = (touch_y - grid_y) / cell_h;
+
+    // Check bounds (N-1 cells)
+    if (col < 0 || col >= num_cells_x || row < 0 || row >= num_cells_y) {
+        renderer->touch_valid = false;
+        return false;
+    }
+
+    // Store touched cell info
+    // Cell (row, col) has its top-left corner at mesh point (row, col),
+    // so cell indices directly map to mesh array indices for the corner Z value
+    renderer->touched_row = row;
+    renderer->touched_col = col;
+    renderer->touched_z =
+        static_cast<float>(renderer->mesh[static_cast<size_t>(row)][static_cast<size_t>(col)]);
+    renderer->touch_valid = true;
+
+    return true;
+}
+
+bool bed_mesh_renderer_get_touched_cell(bed_mesh_renderer_t* renderer, int* out_row, int* out_col,
+                                        float* out_z) {
+    if (!renderer || !renderer->touch_valid)
+        return false;
+
+    if (out_row)
+        *out_row = renderer->touched_row;
+    if (out_col)
+        *out_col = renderer->touched_col;
+    if (out_z)
+        *out_z = renderer->touched_z;
+
+    return true;
+}
+
+void bed_mesh_renderer_clear_touch(bed_mesh_renderer_t* renderer) {
+    if (!renderer)
+        return;
+    renderer->touch_valid = false;
 }

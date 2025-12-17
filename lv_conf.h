@@ -246,8 +246,20 @@
 /* Use Renesas Dave2D on RA  platforms. */
 #define LV_USE_DRAW_DAVE2D 0
 
-/* Draw using cached SDL textures*/
+/* Draw using cached SDL textures - GPU-accelerated on desktop (Metal/OpenGL).
+ * Currently disabled: causes rendering corruption (strobing/blank panels).
+ * TODO: Investigate SDL draw backend compatibility with LVGL 9.4 */
 #define LV_USE_DRAW_SDL 0
+
+/* Draw using OpenGL ES textures - GPU-accelerated on Pi via DRM+EGL.
+ * Uses LVGL's bundled GLAD loader for OpenGL ES function loading.
+ * Currently disabled: LVGL's implementation uses C++11 raw strings in .c files. */
+#ifdef HELIX_ENABLE_OPENGLES
+    #define LV_USE_DRAW_OPENGLES 1
+    #define LV_DRAW_OPENGLES_TEXTURE_CACHE_COUNT 64
+#else
+    #define LV_USE_DRAW_OPENGLES 0
+#endif
 
 /* Use VG-Lite GPU. */
 #define LV_USE_DRAW_VG_LITE 0
@@ -1089,6 +1101,15 @@
 /*Driver for /dev/dri/card*/
 #ifdef HELIX_DISPLAY_DRM
     #define LV_USE_LINUX_DRM        1
+
+    /* Enable EGL/GBM for GPU-accelerated rendering on Pi */
+    #ifdef HELIX_ENABLE_OPENGLES
+        #define LV_USE_LINUX_DRM_GBM_BUFFERS 1
+        #define LV_LINUX_DRM_USE_EGL         1
+    #else
+        #define LV_USE_LINUX_DRM_GBM_BUFFERS 0
+        #define LV_LINUX_DRM_USE_EGL         0
+    #endif
 #else
     #define LV_USE_LINUX_DRM        0
 #endif
@@ -1135,11 +1156,10 @@
 /* LVGL Windows backend */
 #define LV_USE_WINDOWS    0
 
-/* Use OpenGL to open window on PC and handle mouse and keyboard */
+/* Use OpenGL ES display driver (GLAD-based).
+ * Disabled: LVGL's implementation uses C++11 raw strings in .c files and
+ * has tight coupling between draw backend and display driver. */
 #define LV_USE_OPENGLES   0
-#if LV_USE_OPENGLES
-    #define LV_USE_OPENGLES_DEBUG        1    /* Enable or disable debug for opengles */
-#endif
 
 /* QNX Screen display and input drivers */
 #define LV_USE_QNX              0

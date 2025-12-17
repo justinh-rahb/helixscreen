@@ -545,13 +545,18 @@ done
 | `docker/Dockerfile.pi` | Add EGL/GLES/GBM packages |
 | `Makefile` | Add -lGLESv2 -lEGL -lgbm for Pi |
 
-### Phase 4 (2D Bed Mesh)
+### Phase 4 (2D Bed Mesh with FPS Detection)
 | File | Change |
 |------|--------|
-| `include/platform_capabilities.h` | New - runtime GPU detection |
-| `src/platform_capabilities.cpp` | New - detection implementation |
-| `src/bed_mesh_renderer.cpp` | Add `render_2d_heatmap()` |
-| `src/ui_bed_mesh.cpp` | Conditional rotation handlers |
+| `include/bed_mesh_renderer.h` | Add FpsTracker, RenderMode enum, mode state |
+| `src/bed_mesh_renderer.cpp` | Add render_2d_heatmap(), touch handler, FPS tracking |
+| `src/ui_panel_bed_mesh.cpp` | Call evaluate_render_mode() on panel entry, wire touch |
+
+**Approach**: Runtime FPS detection (not platform detection). Mode locked during panel viewing.
+- Rolling 10-frame FPS average
+- Auto-degrade to 2D if FPS < 15
+- Touch cell in 2D mode shows Z value tooltip
+- Settings toggle (hidden): Auto/3D/2D
 
 ### Phase 5 (2D G-code Layer)
 | File | Change |
@@ -603,9 +608,9 @@ Update this section after each phase:
 | Phase | Status | Started | Completed | Notes |
 |-------|--------|---------|-----------|-------|
 | 1 | ✅ Complete | 2025-12-15 | 2025-12-15 | TinyGL disabled, NEON enabled, 2D renderer API compatibility |
-| 2 | ⬜ Not Started | - | - | Pi OpenGL ES integration |
-| 3 | 🔄 Partial | 2025-12-15 | - | Native/SDL ✅, AD5M ✅, Pi ⬜ (blocked on Phase 2) |
-| 4 | ⬜ Not Started | - | - | 2D Bed Mesh Heatmap for AD5M |
+| 2 | ⚠️ Partial | 2025-12-16 | 2025-12-16 | DRM ✅, SDL GPU ❌ (rendering corruption), OpenGL ES ❌ (LVGL C++11 issue) |
+| 3 | ✅ Complete | 2025-12-16 | 2025-12-16 | Native + Pi builds verified |
+| 4 | ✅ Complete | 2025-12-16 | 2025-12-16 | 2D Bed Mesh Heatmap for AD5M + FPS auto-detection + settings UI |
 | 5 | ⬜ Not Started | - | - | 2D G-code Layer View for AD5M |
 | 6 | ✅ Complete | 2025-12-16 | 2025-12-16 | Pre-rendered splash images (~2 FPS → ~116 FPS). See docs/PRE_RENDERED_IMAGES.md |
 
@@ -614,6 +619,17 @@ Update this section after each phase:
 ### Session Log
 
 Record progress across sessions:
+
+### Session 2025-12-16 (Phase 4 Complete)
+- Phase 4: ✅ Complete (Adaptive 2D/3D Bed Mesh Rendering)
+- Implementation:
+  - FPS-based mode switching: 10-frame rolling average, auto-degrade below 15 FPS
+  - 2D heatmap: Triangle-based rendering with corner Z-value color blending
+  - Touch support: Tap/drag shows Z value tooltip in 2D mode
+  - Settings UI: Dropdown in Display Settings (Auto/3D View/2D Heatmap)
+  - Persistence: Saved to helixconfig.json via SettingsManager
+- Key files: `bed_mesh_renderer.cpp`, `ui_bed_mesh.cpp`, `settings_manager.cpp`, `display_settings_overlay.xml`
+- Mode evaluation happens on panel entry (not during viewing) to prevent jarring switches
 
 ### Session 2025-12-16
 - Phase 6: ✅ Complete (Image Asset Optimization)
@@ -654,3 +670,20 @@ Record progress across sessions:
   - `AsyncBuildResult` struct needed conditional geometry members
   - `color_count` variable scope issue (fixed)
 - Next steps: Phase 2 (Pi OpenGL ES integration)
+
+### Session 2025-12-16
+- Phase 2: ⚠️ Partial
+  - **SDL GPU draw backend** (`LV_USE_DRAW_SDL`): Causes rendering corruption (strobing, blank panels) - disabled
+  - **DRM display driver**: Working for Pi (software rendering)
+  - **OpenGL ES draw backend**: Abandoned - LVGL uses C++11 raw string literals in `.c` shader files
+  - Added OpenGL ES dev libs to Dockerfile.pi for future use
+  - Made GLAD include path conditional on `ENABLE_OPENGLES`
+- Phase 3: ✅ Complete
+  - Native build verified: TinyGL 3D preview working, software rendering
+  - Pi cross-compile verified: DRM backend, aarch64 binary
+  - G-code test panel renders correctly with OrcaCube model
+- Code review findings addressed:
+  - Re-enabled TinyGL for G-code preview (was accidentally disabled)
+  - Simplified nested preprocessor logic in lv_conf.h
+  - Updated install.sh to only install needed deps (libdrm2, libinput10)
+- **Key discovery**: LVGL 9.4's SDL GPU draw backend is broken/incompatible

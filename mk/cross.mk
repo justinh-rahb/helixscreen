@@ -31,6 +31,11 @@ ifeq ($(PLATFORM_TARGET),pi)
     TARGET_CFLAGS := -march=armv8-a -I/usr/aarch64-linux-gnu/include -I/usr/include/libdrm -Wno-error=conversion -Wno-error=sign-conversion
     DISPLAY_BACKEND := drm
     ENABLE_SDL := no
+    # OpenGL ES disabled for LVGL UI - their implementation has C++11 raw strings
+    # in .c files and tightly couples draw backend with display driver. Software
+    # rendering via DRM is reliable and performant for UI. Can revisit GPU later.
+    ENABLE_OPENGLES := no
+    # TinyGL enabled for 3D G-code preview (separate from LVGL UI rendering)
     ENABLE_TINYGL_3D := yes
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := pi
@@ -184,6 +189,16 @@ ifdef FB_COLOR_DEPTH
     CXXFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
     SUBMODULE_CFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
     SUBMODULE_CXXFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
+endif
+
+# OpenGL ES support for GPU-accelerated rendering (Pi with VideoCore GPU)
+ifeq ($(ENABLE_OPENGLES),yes)
+    CFLAGS += -DHELIX_ENABLE_OPENGLES
+    CXXFLAGS += -DHELIX_ENABLE_OPENGLES
+    SUBMODULE_CFLAGS += -DHELIX_ENABLE_OPENGLES
+    SUBMODULE_CXXFLAGS += -DHELIX_ENABLE_OPENGLES
+    # Linker flags for OpenGL ES / EGL / GBM
+    LDFLAGS += -lGLESv2 -lEGL -lgbm
 endif
 
 # =============================================================================

@@ -199,6 +199,41 @@ check_requirements() {
     fi
 }
 
+# Install runtime dependencies for Pi platform
+# Required for DRM display and evdev input handling
+install_runtime_deps() {
+    local platform=$1
+
+    # Only needed for Pi - AD5M uses framebuffer with static linking
+    if [ "$platform" != "pi" ]; then
+        return 0
+    fi
+
+    log_info "Checking runtime dependencies for display/input..."
+
+    # Required libraries for DRM display and libinput
+    # Note: GPU libs (libgles2, libegl1, libgbm1) not needed - using software rendering
+    local deps="libdrm2 libinput10"
+    local missing=""
+
+    for dep in $deps; do
+        # Check if package is installed (dpkg-query returns 0 if installed)
+        if ! dpkg-query -W -f='${Status}' "$dep" 2>/dev/null | grep -q "install ok installed"; then
+            missing="${missing:+$missing }$dep"
+        fi
+    done
+
+    if [ -n "$missing" ]; then
+        log_info "Installing missing libraries: $missing"
+        $SUDO apt-get update -qq
+        # shellcheck disable=SC2086
+        $SUDO apt-get install -y --no-install-recommends $missing
+        log_success "Runtime libraries installed"
+    else
+        log_success "All runtime libraries already installed"
+    fi
+}
+
 # Check available disk space
 check_disk_space() {
     local platform=$1
@@ -691,6 +726,7 @@ main() {
     # Pre-flight checks
     log_info "Running pre-flight checks..."
     check_requirements
+    install_runtime_deps "$platform"
     check_disk_space "$platform"
     detect_init_system
 
