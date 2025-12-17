@@ -6,6 +6,7 @@
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_gcode_viewer.h"
+#include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_panel_common.h"
 #include "ui_panel_temp_control.h"
@@ -15,6 +16,7 @@
 
 #include "app_globals.h"
 #include "config.h"
+#include "filament_sensor_manager.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
 #include "runtime_config.h"
@@ -109,14 +111,24 @@ PrintStatusPanel::~PrintStatusPanel() {
     // ObserverGuard handles observer cleanup automatically
     resize_registered_ = false;
 
-    // Clean up exclude object resources
-    if (exclude_undo_timer_) {
-        lv_timer_delete(exclude_undo_timer_);
-        exclude_undo_timer_ = nullptr;
-    }
-    if (exclude_confirm_dialog_) {
-        lv_obj_delete(exclude_confirm_dialog_);
-        exclude_confirm_dialog_ = nullptr;
+    // CRITICAL: Check if LVGL is still initialized before calling LVGL functions.
+    // During static destruction, LVGL may already be torn down.
+    if (lv_is_initialized()) {
+        // Clean up exclude object resources
+        if (exclude_undo_timer_) {
+            lv_timer_delete(exclude_undo_timer_);
+            exclude_undo_timer_ = nullptr;
+        }
+        if (exclude_confirm_dialog_) {
+            lv_obj_delete(exclude_confirm_dialog_);
+            exclude_confirm_dialog_ = nullptr;
+        }
+        // Clean up runout guidance modal if open
+        // See docs/QUICK_REFERENCE.md "Modal Dialog Lifecycle"
+        if (runout_guidance_modal_) {
+            ui_modal_hide(runout_guidance_modal_);
+            runout_guidance_modal_ = nullptr;
+        }
     }
 }
 
@@ -320,6 +332,9 @@ void PrintStatusPanel::on_deactivate() {
     if (gcode_viewer_) {
         ui_gcode_viewer_set_paused(gcode_viewer_, true);
     }
+
+    // Hide runout guidance modal if panel is deactivated (e.g., navbar navigation)
+    hide_runout_guidance_modal();
 }
 
 // ============================================================================
@@ -1033,6 +1048,17 @@ void PrintStatusPanel::on_print_state_changed(PrintJobState job_state) {
         // On completion, show thumbnail with gradient background instead (more polished look)
         bool show_viewer = (new_state == PrintState::Printing || new_state == PrintState::Paused);
         show_gcode_viewer(show_viewer);
+
+        // Check for runout condition when entering Paused state
+        if (new_state == PrintState::Paused) {
+            check_and_show_runout_guidance();
+        }
+
+        // Reset runout modal flag when resuming print
+        if (new_state == PrintState::Printing) {
+            runout_modal_shown_for_pause_ = false;
+            hide_runout_guidance_modal();
+        }
 
         // Show print complete overlay when entering Complete state
         if (new_state == PrintState::Complete) {
@@ -2080,5 +2106,142 @@ void PrintStatusPanel::exclude_undo_timer_cb(lv_timer_t* timer) {
     } else {
         spdlog::warn("[PrintStatusPanel] No API available - simulating exclusion");
         self->excluded_objects_.insert(object_name);
+    }
+}
+
+// ============================================================================
+// Runout Guidance Modal
+// ============================================================================
+
+void PrintStatusPanel::check_and_show_runout_guidance() {
+    // Only show once per pause event
+    if (runout_modal_shown_for_pause_) {
+        return;
+    }
+
+    auto& sensor_mgr = helix::FilamentSensorManager::instance();
+
+    // Check if any runout sensor shows no filament
+    if (sensor_mgr.has_any_runout()) {
+        spdlog::info("[{}] Runout detected during pause - showing guidance modal", get_name());
+        show_runout_guidance_modal();
+        runout_modal_shown_for_pause_ = true;
+    }
+}
+
+void PrintStatusPanel::show_runout_guidance_modal() {
+    if (runout_guidance_modal_) {
+        // Already showing
+        return;
+    }
+
+    spdlog::info("[{}] Showing runout guidance modal", get_name());
+
+    // Configure modal with centered position
+    ui_modal_config_t config = {};
+    config.position.use_alignment = true;
+    config.position.alignment = LV_ALIGN_CENTER;
+    config.backdrop_opa = 200;
+    config.persistent = false;
+
+    runout_guidance_modal_ = ui_modal_show("runout_guidance_modal", &config, nullptr);
+    if (!runout_guidance_modal_) {
+        spdlog::error("[{}] Failed to create runout guidance modal", get_name());
+        return;
+    }
+
+    // Store reference to this panel for callbacks
+    lv_obj_set_user_data(runout_guidance_modal_, this);
+
+    // Wire up button callbacks
+    lv_obj_t* btn_load = lv_obj_find_by_name(runout_guidance_modal_, "btn_load_filament");
+    lv_obj_t* btn_resume = lv_obj_find_by_name(runout_guidance_modal_, "btn_resume");
+    lv_obj_t* btn_cancel = lv_obj_find_by_name(runout_guidance_modal_, "btn_cancel_print");
+
+    if (btn_load) {
+        lv_obj_add_event_cb(btn_load, on_runout_load_filament_clicked, LV_EVENT_CLICKED, this);
+    }
+    if (btn_resume) {
+        lv_obj_add_event_cb(btn_resume, on_runout_resume_clicked, LV_EVENT_CLICKED, this);
+    }
+    if (btn_cancel) {
+        lv_obj_add_event_cb(btn_cancel, on_runout_cancel_print_clicked, LV_EVENT_CLICKED, this);
+    }
+}
+
+void PrintStatusPanel::hide_runout_guidance_modal() {
+    if (!runout_guidance_modal_) {
+        return;
+    }
+
+    spdlog::debug("[{}] Hiding runout guidance modal", get_name());
+
+    // Clear user_data BEFORE hiding to prevent use-after-free in pending callbacks
+    // (ui_modal_hide uses async deletion)
+    lv_obj_set_user_data(runout_guidance_modal_, nullptr);
+
+    ui_modal_hide(runout_guidance_modal_);
+    runout_guidance_modal_ = nullptr;
+}
+
+void PrintStatusPanel::on_runout_load_filament_clicked(lv_event_t* e) {
+    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
+    if (!self) {
+        return;
+    }
+
+    spdlog::info("[PrintStatusPanel] User chose to load filament after runout");
+    self->hide_runout_guidance_modal();
+
+    // Navigate to filament panel for loading
+    // This closes overlay stack and switches to the main filament panel
+    ui_nav_set_active(UI_PANEL_FILAMENT);
+}
+
+void PrintStatusPanel::on_runout_resume_clicked(lv_event_t* e) {
+    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
+    if (!self) {
+        return;
+    }
+
+    // Check if filament is now present before allowing resume
+    auto& sensor_mgr = helix::FilamentSensorManager::instance();
+    if (sensor_mgr.has_any_runout()) {
+        spdlog::warn("[PrintStatusPanel] User attempted resume but filament still not detected");
+        NOTIFY_WARNING("Insert filament before resuming");
+        return; // Don't hide modal - user needs to load filament first
+    }
+
+    spdlog::info("[PrintStatusPanel] User chose to resume print after runout");
+    self->hide_runout_guidance_modal();
+
+    // Resume the print
+    if (self->api_) {
+        self->api_->resume_print(
+            []() { spdlog::info("[PrintStatusPanel] Print resumed after runout"); },
+            [](const MoonrakerError& err) {
+                spdlog::error("[PrintStatusPanel] Failed to resume print: {}", err.message);
+                NOTIFY_ERROR("Failed to resume: {}", err.user_message());
+            });
+    }
+}
+
+void PrintStatusPanel::on_runout_cancel_print_clicked(lv_event_t* e) {
+    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
+    if (!self) {
+        return;
+    }
+
+    spdlog::info("[PrintStatusPanel] User chose to cancel print after runout");
+    self->hide_runout_guidance_modal();
+
+    // Cancel the print
+    if (self->api_) {
+        self->api_->cancel_print(
+            []() { spdlog::info("[PrintStatusPanel] Print cancelled after runout"); },
+            [](const MoonrakerError& err) {
+                spdlog::error("[PrintStatusPanel] Failed to cancel print: {}", err.message);
+                NOTIFY_ERROR("Failed to cancel: {}", err.user_message());
+            });
     }
 }

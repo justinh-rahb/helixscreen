@@ -574,6 +574,13 @@ class PrintStatusPanel : public PanelBase {
     /// Print cancel confirmation modal (RAII - auto-hides when destroyed)
     PrintCancelModal cancel_modal_;
 
+    /// Runout guidance modal (shown when print pauses + no filament detected)
+    lv_obj_t* runout_guidance_modal_ = nullptr;
+
+    /// Flag to track if runout modal was shown for current pause
+    /// Reset when print resumes or ends, prevents repeated modal popups
+    bool runout_modal_shown_for_pause_ = false;
+
     //
     // === Exclude Object Handlers ===
     //
@@ -612,6 +619,36 @@ class PrintStatusPanel : public PanelBase {
     static void on_object_long_pressed(lv_obj_t* viewer, const char* object_name, void* user_data);
     static void on_exclude_confirm_clicked(lv_event_t* e);
     static void on_exclude_cancel_clicked(lv_event_t* e);
+
+    //
+    // === Runout Guidance Modal ===
+    //
+
+    /**
+     * @brief Show the runout guidance modal
+     *
+     * Called when print pauses and runout sensor shows no filament.
+     * Shows three options: Load Filament, Resume Print, Cancel Print.
+     */
+    void show_runout_guidance_modal();
+
+    /**
+     * @brief Hide and cleanup the runout guidance modal
+     */
+    void hide_runout_guidance_modal();
+
+    /**
+     * @brief Check if runout condition exists and show guidance modal if appropriate
+     *
+     * Called when print transitions to Paused state. Checks if runout sensor
+     * is available and shows no filament - if so, displays guidance modal.
+     */
+    void check_and_show_runout_guidance();
+
+    // Runout modal button callbacks
+    static void on_runout_load_filament_clicked(lv_event_t* e);
+    static void on_runout_resume_clicked(lv_event_t* e);
+    static void on_runout_cancel_print_clicked(lv_event_t* e);
 };
 
 // Global instance accessor (needed by main.cpp)
