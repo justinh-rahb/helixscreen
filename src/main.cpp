@@ -292,6 +292,37 @@ static std::mutex notification_mutex;
 // if called during LVGL rendering. We use lv_async_call() to defer all LVGL
 // subject updates to the main thread at a safe point in the event loop.
 
+// Context for deferring hardware discovered callback work to main thread
+// This fires EARLY (right after printer.objects.list) to initialize backends
+struct HardwareDiscoveredContext {
+    PrinterCapabilities caps;
+};
+
+// Async callback that runs on main thread (safe for LVGL subject updates)
+// Initializes AMS/MMU backends and FilamentSensorManager early in discovery
+static void async_hardware_discovered_callback(void* user_data) {
+    auto* ctx = static_cast<HardwareDiscoveredContext*>(user_data);
+    if (!ctx)
+        return;
+
+    // Now safe to update LVGL subjects - we're on the main thread
+    // Initialize AMS/MMU backend if detected (AFC/Box Turtle, Happy Hare, etc.)
+    AmsState::instance().init_backend_from_capabilities(ctx->caps, moonraker_api.get(),
+                                                        moonraker_client.get());
+
+    // Initialize FilamentSensorManager if sensors detected
+    if (ctx->caps.has_filament_sensors()) {
+        auto& fsm = helix::FilamentSensorManager::instance();
+        fsm.init_subjects();
+        fsm.discover_sensors(ctx->caps.get_filament_sensor_names());
+        fsm.load_config();
+        spdlog::info("[Main] FilamentSensorManager initialized: {} sensors",
+                     ctx->caps.get_filament_sensor_names().size());
+    }
+
+    delete ctx;
+}
+
 // Context for deferring discovery complete callback work to main thread
 struct DiscoveryCompleteContext {
     PrinterCapabilities caps;
@@ -1642,22 +1673,11 @@ int main(int argc, char** argv) {
         // This allows AMS/MMU backends to initialize BEFORE the subscription response arrives,
         // so they can receive initial state naturally without needing a separate query
         moonraker_client->set_on_hardware_discovered([](const PrinterCapabilities& caps) {
-            // Initialize AMS/MMU backend if detected (AFC/Box Turtle, Happy Hare, etc.)
-            // This must happen EARLY so the backend is ready to receive initial state
-            // from the printer.objects.subscribe response
-            AmsState::instance().init_backend_from_capabilities(caps, moonraker_api.get(),
-                                                                moonraker_client.get());
-
-            // Initialize FilamentSensorManager if sensors detected
-            // Must happen EARLY so it's ready to receive initial state from subscription
-            if (caps.has_filament_sensors()) {
-                auto& fsm = helix::FilamentSensorManager::instance();
-                fsm.init_subjects();
-                fsm.discover_sensors(caps.get_filament_sensor_names());
-                fsm.load_config();
-                spdlog::info("[Main] FilamentSensorManager initialized: {} sensors",
-                             caps.get_filament_sensor_names().size());
-            }
+            // CRITICAL: This callback runs on the WebSocket thread (libhv event loop).
+            // LVGL subject updates trigger lv_obj_invalidate() which asserts if called
+            // during LVGL rendering on the main thread. Defer all work via lv_async_call.
+            auto* ctx = new HardwareDiscoveredContext{caps};
+            lv_async_call(async_hardware_discovered_callback, ctx);
         });
 
         // Register LATE discovery callback - fires after subscription response is processed

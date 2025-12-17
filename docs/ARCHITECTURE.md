@@ -584,18 +584,54 @@ MyManager::~MyManager() {
 
 **LVGL is NOT thread-safe.** All widget creation and modification MUST happen on the main thread.
 
-### Safe Operations from Any Thread
+### ⚠️ Subject Updates Are NOT Thread-Safe
 
-**Subject updates are thread-safe:**
+**CRITICAL MISCONCEPTION:** You might assume `lv_subject_set_*()` is thread-safe because it's just updating a value. **THIS IS WRONG.**
+
 ```cpp
-// Safe from any thread
-void update_temperature_from_background(int temp) {
-    lv_subject_set_int(temp_current_subject, temp);
-    // UI updates will happen on next LVGL timer cycle
+// ❌ DANGEROUS - looks safe but isn't!
+void update_from_websocket_thread(int temp) {
+    lv_subject_set_int(temp_subject, temp);  // Triggers observers!
+    // If LVGL is rendering → assertion failure → infinite loop
 }
 ```
 
-**Why this works:** Subjects use internal locking and defer UI updates to the main thread.
+**Why this fails:** Subject updates trigger bound observers. Those observers often:
+1. Call `lv_label_set_text()` → triggers `lv_obj_invalidate()`
+2. Call `lv_obj_add_flag()` → triggers `lv_obj_invalidate()`
+3. Any widget modification during `lv_timer_handler()` rendering → **ASSERTION FAILURE**
+
+The LVGL assertion `!disp->rendering_in_progress` will fire, and on embedded targets this causes an infinite `while(1)` loop.
+
+**Real-world example:** WebSocket callback calls `FilamentSensorManager::discover_sensors()` which calls `lv_subject_set_int()`. If LVGL happens to be rendering, the app hangs and stops responding to pings.
+
+### Safe Pattern: Defer to Main Thread
+
+**Always use `lv_async_call()` for subject updates from background threads:**
+
+```cpp
+// ✅ CORRECT - defers to main thread
+struct TempUpdateContext {
+    PrinterState* state;
+    int temperature;
+};
+
+void async_temp_callback(void* user_data) {
+    auto* ctx = static_cast<TempUpdateContext*>(user_data);
+    lv_subject_set_int(ctx->state->temp_subject(), ctx->temperature);  // Now safe!
+    delete ctx;
+}
+
+void update_from_websocket_thread(int temp) {
+    auto* ctx = new TempUpdateContext{&get_printer_state(), temp};
+    lv_async_call(async_temp_callback, ctx);  // Queued for main thread
+}
+```
+
+**Reference Implementation:** See `printer_state.cpp` for the `set_*_internal()` pattern used by:
+- `set_printer_capabilities()` → `set_printer_capabilities_internal()`
+- `set_klipper_version()` → `set_klipper_version_internal()`
+- `set_klippy_state()` → `set_klippy_state_internal()`
 
 ### Unsafe Operations (Main Thread Only)
 
@@ -651,15 +687,19 @@ void WiFiManager::handle_scan_complete(const std::string& data) {
 
 ### When to Use lv_async_call()
 
-✅ **Use when:**
-- Background thread needs to create widgets
-- Backend callback needs to call `lv_obj_*()` functions
-- Network/file operations complete and need to update UI
+✅ **ALWAYS use when on a background thread and:**
+- Need to create/modify widgets (`lv_obj_*()` functions)
+- Need to update subjects (`lv_subject_set_*()`) - **subjects trigger observers!**
+- WebSocket callbacks (libhv event loop thread)
+- Network/file I/O completion handlers
+- Timer callbacks from non-LVGL timers
 
 ❌ **Don't need when:**
-- Already on main thread (event handlers, timers)
-- Only updating subjects (they're thread-safe)
-- No LVGL API calls in the callback
+- Already on main thread (LVGL event handlers, `lv_timer_create()` callbacks)
+- Pure computation with no LVGL calls at all
+- Just logging or updating non-LVGL state
+
+**Key insight:** If you're in a callback from libhv, std::thread, or any networking library, assume you're on a background thread and use `lv_async_call()`.
 
 ## LVGL Configuration
 

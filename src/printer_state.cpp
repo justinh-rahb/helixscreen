@@ -79,6 +79,19 @@ void async_moonraker_version_callback(void* user_data) {
     delete ctx;
 }
 
+struct AsyncKlippyStateContext {
+    PrinterState* printer_state;
+    KlippyState state;
+};
+
+void async_klippy_state_callback(void* user_data) {
+    auto* ctx = static_cast<AsyncKlippyStateContext*>(user_data);
+    if (ctx && ctx->printer_state) {
+        ctx->printer_state->set_klippy_state_internal(ctx->state);
+    }
+    delete ctx;
+}
+
 // ============================================================================
 // PrintJobState Free Functions
 // ============================================================================
@@ -814,6 +827,12 @@ void PrinterState::set_network_status(int status) {
 }
 
 void PrinterState::set_klippy_state(KlippyState state) {
+    // Thread-safe wrapper: defer LVGL subject updates to main thread
+    auto* ctx = new AsyncKlippyStateContext{this, state};
+    lv_async_call(async_klippy_state_callback, ctx);
+}
+
+void PrinterState::set_klippy_state_internal(KlippyState state) {
     const char* state_names[] = {"READY", "STARTUP", "SHUTDOWN", "ERROR"};
     int state_int = static_cast<int>(state);
     spdlog::info("[PrinterState] Klippy state changed: {} ({})", state_names[state_int], state_int);

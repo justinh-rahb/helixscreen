@@ -823,8 +823,10 @@ class PrinterState {
     friend void async_capabilities_callback(void* user_data);
     friend void async_klipper_version_callback(void* user_data);
     friend void async_moonraker_version_callback(void* user_data);
+    friend void async_klippy_state_callback(void* user_data);
 
     void set_printer_capabilities_internal(const PrinterCapabilities& caps);
     void set_klipper_version_internal(const std::string& version);
     void set_moonraker_version_internal(const std::string& version);
+    void set_klippy_state_internal(KlippyState state);
 };
