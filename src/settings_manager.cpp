@@ -58,16 +58,23 @@ void SettingsManager::init_subjects() {
 
     // Brightness: Read from hardware first, fall back to config
     // This ensures UI reflects actual display state on startup
+    // NOTE: If hardware reports 0 (screen off), use config value - we always want to turn ON
     int brightness = backlight_backend_->get_brightness();
-    bool brightness_from_hardware = (brightness >= 0);
+    bool brightness_from_hardware = (brightness > 0); // 0 means "off", treat as no value
     if (!brightness_from_hardware) {
-        // Fall back to config value
+        // Fall back to config value (or default 50%)
         brightness = config->get<int>("/brightness", 50);
-        brightness = std::clamp(brightness, 10, 100);
     }
+    brightness = std::clamp(brightness, 10, 100); // Always ensure minimum 10%
     lv_subject_init_int(&brightness_subject_, brightness);
     spdlog::info("[SettingsManager] Brightness initialized to {}% (from {})", brightness,
                  brightness_from_hardware ? "hardware" : "config");
+
+    // Ensure backlight is ON at startup (may have been off from sleep or crash)
+    if (backlight_backend_->is_available()) {
+        backlight_backend_->set_brightness(brightness);
+        spdlog::info("[SettingsManager] Backlight ON at {}%", brightness);
+    }
 
     // Has backlight control subject (for UI visibility)
     lv_subject_init_int(&has_backlight_subject_, backlight_backend_->is_available() ? 1 : 0);

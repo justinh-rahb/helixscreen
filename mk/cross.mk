@@ -54,9 +54,12 @@ else ifeq ($(PLATFORM_TARGET),ad5m)
     # -flto: Link-Time Optimization for dead code elimination
     # -ffunction-sections/-fdata-sections: Allow linker to remove unused sections
     # -Wno-error=conversion: LVGL headers have int32_t->float conversions that GCC flags
+    # NOTE: AD5M framebuffer is fixed at 32bpp (ARGB8888) - sysfs lies about supporting 16bpp
     TARGET_CFLAGS := -march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard -mtune=cortex-a7 \
         -Os -flto -ffunction-sections -fdata-sections \
         -Wno-error=conversion -Wno-error=sign-conversion
+    # Force 32-bit color depth to match AD5M's actual framebuffer format
+    FB_COLOR_DEPTH := 32
     # -Wl,--gc-sections: Remove unused sections during linking (works with -ffunction-sections)
     # -flto: Must match compiler flag for LTO to work
     # -static: Fully static binary - no runtime dependencies on system libs
@@ -66,7 +69,9 @@ else ifeq ($(PLATFORM_TARGET),ad5m)
     ENABLE_SSL := no
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
-    ENABLE_TINYGL_3D := yes
+    # Disable TinyGL for AD5M - CPU too weak for software 3D (3-4 FPS)
+    # Uses 2D layer preview fallback instead
+    ENABLE_TINYGL_3D := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := ad5m
     # Strip binary for size on memory-constrained device
@@ -171,6 +176,14 @@ ifeq ($(ENABLE_EVDEV),yes)
     CXXFLAGS += -DHELIX_INPUT_EVDEV
     SUBMODULE_CFLAGS += -DHELIX_INPUT_EVDEV
     SUBMODULE_CXXFLAGS += -DHELIX_INPUT_EVDEV
+endif
+
+# Framebuffer color depth (32-bit for AD5M XRGB8888, default 16-bit RGB565)
+ifdef FB_COLOR_DEPTH
+    CFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
+    CXXFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
+    SUBMODULE_CFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
+    SUBMODULE_CXXFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
 endif
 
 # =============================================================================
@@ -324,10 +337,20 @@ help-cross:
 	echo "  $${G}pi-test$${X}              - Full cycle: build + deploy + run (fg)"; \
 	echo "  $${G}pi-ssh$${X}               - SSH into the Pi"; \
 	echo ""; \
+	echo "$${C}AD5M Deployment:$${X}"; \
+	echo "  $${G}deploy-ad5m$${X}          - Deploy and restart in background"; \
+	echo "  $${G}deploy-ad5m-fg$${X}       - Deploy and run in foreground (debug)"; \
+	echo "  $${G}deploy-ad5m-bin$${X}      - Deploy binaries only (fast iteration)"; \
+	echo "  $${G}ad5m-test$${X}            - Full cycle: remote build + deploy + run (fg)"; \
+	echo "  $${G}ad5m-ssh$${X}             - SSH into the AD5M"; \
+	echo ""; \
 	echo "$${C}Deployment Options:$${X}"; \
 	echo "  $${Y}PI_HOST$${X}=hostname     - Pi hostname (default: helixpi.local)"; \
 	echo "  $${Y}PI_USER$${X}=user         - Pi username (default: from SSH config)"; \
 	echo "  $${Y}PI_DEPLOY_DIR$${X}=path   - Deployment directory (default: ~/helixscreen)"; \
+	echo "  $${Y}AD5M_HOST$${X}=hostname   - AD5M hostname/IP (default: ad5m.local)"; \
+	echo "  $${Y}AD5M_USER$${X}=user       - AD5M username (default: root)"; \
+	echo "  $${Y}AD5M_DEPLOY_DIR$${X}=path - AD5M deploy directory (default: /opt/helixscreen)"; \
 	echo ""; \
 	echo "$${C}Current Configuration:$${X}"; \
 	echo "  Platform target: $(PLATFORM_TARGET)"; \
@@ -420,6 +443,75 @@ pi-ssh:
 
 # Full cycle: build + deploy + run in foreground
 pi-test: pi-docker deploy-pi-fg
+
+# =============================================================================
+# AD5M Deployment Configuration
+# =============================================================================
+
+# AD5M deployment settings (can override via environment or command line)
+# Example: make deploy-ad5m AD5M_HOST=192.168.1.100
+# Note: AD5M uses BusyBox and only has scp (no rsync), so we use scp -O for compatibility
+AD5M_HOST ?= ad5m.local
+AD5M_USER ?= root
+AD5M_DEPLOY_DIR ?= /opt/helixscreen
+
+# Build SSH target for AD5M
+AD5M_SSH_TARGET := $(AD5M_USER)@$(AD5M_HOST)
+
+# =============================================================================
+# AD5M Deployment Targets
+# =============================================================================
+
+.PHONY: deploy-ad5m deploy-ad5m-fg deploy-ad5m-bin ad5m-ssh ad5m-test
+
+# Deploy full application to AD5M and restart
+# Uses tar over SSH since scp doesn't support exclusions and AD5M has limited storage
+# Excludes test_gcodes/ and gcode/ (~170MB of dev files)
+deploy-ad5m:
+	@test -f build/ad5m/bin/helix-screen || { echo "$(RED)Error: build/ad5m/bin/helix-screen not found. Run 'make remote-ad5m' first.$(RESET)"; exit 1; }
+	@test -f build/ad5m/bin/helix-splash || { echo "$(RED)Error: build/ad5m/bin/helix-splash not found. Run 'make remote-ad5m' first.$(RESET)"; exit 1; }
+	@echo "$(CYAN)Deploying HelixScreen to $(AD5M_SSH_TARGET):$(AD5M_DEPLOY_DIR)...$(RESET)"
+	@echo "  Binaries: helix-screen, helix-splash"
+	@echo "  Assets: ui_xml/, assets/ (excl. test files), config/"
+	ssh $(AD5M_SSH_TARGET) "killall helix-screen helix-splash 2>/dev/null || true; mkdir -p $(AD5M_DEPLOY_DIR)"
+	scp -O build/ad5m/bin/helix-screen build/ad5m/bin/helix-splash $(AD5M_SSH_TARGET):$(AD5M_DEPLOY_DIR)/
+	@echo "$(DIM)Transferring assets (excluding test files)...$(RESET)"
+	tar -cf - --exclude='test_gcodes' --exclude='gcode' --exclude='.DS_Store' ui_xml assets config | ssh $(AD5M_SSH_TARGET) "cd $(AD5M_DEPLOY_DIR) && tar -xf -"
+	@echo "$(GREEN)✓ Deployed to $(AD5M_HOST):$(AD5M_DEPLOY_DIR)$(RESET)"
+	@echo "$(CYAN)Restarting helix-screen on $(AD5M_HOST)...$(RESET)"
+	ssh $(AD5M_SSH_TARGET) "killall helix-screen helix-splash 2>/dev/null || true; sleep 1; cd $(AD5M_DEPLOY_DIR) && ./helix-screen -vv > /tmp/helix.log 2>&1 &"
+	@echo "$(GREEN)✓ helix-screen restarted in background$(RESET)"
+	@echo "$(DIM)Logs: ssh $(AD5M_SSH_TARGET) 'tail -f /tmp/helix.log'$(RESET)"
+
+# Deploy and run in foreground with verbose logging (for interactive debugging)
+deploy-ad5m-fg:
+	@test -f build/ad5m/bin/helix-screen || { echo "$(RED)Error: build/ad5m/bin/helix-screen not found. Run 'make remote-ad5m' first.$(RESET)"; exit 1; }
+	@test -f build/ad5m/bin/helix-splash || { echo "$(RED)Error: build/ad5m/bin/helix-splash not found. Run 'make remote-ad5m' first.$(RESET)"; exit 1; }
+	@echo "$(CYAN)Deploying HelixScreen to $(AD5M_SSH_TARGET):$(AD5M_DEPLOY_DIR)...$(RESET)"
+	ssh $(AD5M_SSH_TARGET) "killall helix-screen helix-splash 2>/dev/null || true; mkdir -p $(AD5M_DEPLOY_DIR)"
+	scp -O build/ad5m/bin/helix-screen build/ad5m/bin/helix-splash $(AD5M_SSH_TARGET):$(AD5M_DEPLOY_DIR)/
+	@echo "$(DIM)Transferring assets (excluding test files)...$(RESET)"
+	tar -cf - --exclude='test_gcodes' --exclude='gcode' --exclude='.DS_Store' ui_xml assets config | ssh $(AD5M_SSH_TARGET) "cd $(AD5M_DEPLOY_DIR) && tar -xf -"
+	@echo "$(CYAN)Starting helix-screen on $(AD5M_HOST) (foreground, verbose)...$(RESET)"
+	ssh -t $(AD5M_SSH_TARGET) "killall helix-screen helix-splash 2>/dev/null || true; sleep 1; cd $(AD5M_DEPLOY_DIR) && ./helix-screen -vv"
+
+# Deploy binaries only (fast, for quick iteration)
+deploy-ad5m-bin:
+	@test -f build/ad5m/bin/helix-screen || { echo "$(RED)Error: build/ad5m/bin/helix-screen not found. Run 'make remote-ad5m' first.$(RESET)"; exit 1; }
+	@echo "$(CYAN)Deploying binaries only to $(AD5M_SSH_TARGET):$(AD5M_DEPLOY_DIR)...$(RESET)"
+	ssh $(AD5M_SSH_TARGET) "killall helix-screen helix-splash 2>/dev/null || true"
+	scp -O build/ad5m/bin/helix-screen build/ad5m/bin/helix-splash $(AD5M_SSH_TARGET):$(AD5M_DEPLOY_DIR)/
+	@echo "$(GREEN)✓ Binaries deployed$(RESET)"
+	@echo "$(CYAN)Restarting helix-screen on $(AD5M_HOST)...$(RESET)"
+	ssh $(AD5M_SSH_TARGET) "killall helix-screen helix-splash 2>/dev/null || true; sleep 1; cd $(AD5M_DEPLOY_DIR) && ./helix-screen -vv > /tmp/helix.log 2>&1 &"
+	@echo "$(GREEN)✓ helix-screen restarted$(RESET)"
+
+# Convenience: SSH into the AD5M
+ad5m-ssh:
+	ssh $(AD5M_SSH_TARGET)
+
+# Full cycle: remote build + deploy + run in foreground
+ad5m-test: remote-ad5m deploy-ad5m-fg
 
 # =============================================================================
 # Release Packaging

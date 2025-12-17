@@ -18,12 +18,14 @@
  * This binary is only built and used on embedded Linux targets.
  */
 
+#include "backlight_backend.h"
 #include "display_backend.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <lvgl.h>
+#include <memory>
 #include <signal.h>
 #include <unistd.h>
 
@@ -152,6 +154,13 @@ int main(int argc, char** argv) {
     if (!display) {
         fprintf(stderr, "helix-splash: Failed to create display\n");
         return 1;
+    }
+
+    // Turn on backlight immediately (may have been off from sleep or crash)
+    auto backlight = BacklightBackend::create();
+    if (backlight && backlight->is_available()) {
+        backlight->set_brightness(100); // Full brightness for splash
+        fprintf(stderr, "helix-splash: Backlight ON\n");
     }
 
     // Create splash UI

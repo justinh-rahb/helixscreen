@@ -57,6 +57,13 @@ lv_display_t* DisplayBackendFbdev::create_display(int width, int height) {
     // Set the framebuffer device path
     lv_linux_fbdev_set_file(display_, fb_device_.c_str());
 
+    // CRITICAL: AD5M's LCD controller interprets XRGB8888's X byte as alpha.
+    // By default, LVGL uses XRGB8888 for 32bpp and sets X=0x00 (transparent).
+    // We must use ARGB8888 format so LVGL sets alpha=0xFF (fully opaque).
+    // Without this, the display shows pink/magenta ghost overlay.
+    lv_display_set_color_format(display_, LV_COLOR_FORMAT_ARGB8888);
+    spdlog::info("[Fbdev Backend] Set color format to ARGB8888 (AD5M alpha fix)");
+
     spdlog::info("[Fbdev Backend] Framebuffer display created: {}x{} on {}", width, height,
                  fb_device_);
     return display_;

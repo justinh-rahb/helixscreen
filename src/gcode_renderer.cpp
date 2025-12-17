@@ -56,6 +56,17 @@ void GCodeRenderer::set_show_extrusions(bool show) {
 
 void GCodeRenderer::set_highlighted_object(const std::string& name) {
     options_.highlighted_object = name;
+    // Also update the multi-select set for consistency
+    options_.highlighted_objects.clear();
+    if (!name.empty()) {
+        options_.highlighted_objects.insert(name);
+    }
+}
+
+void GCodeRenderer::set_highlighted_objects(const std::unordered_set<std::string>& names) {
+    options_.highlighted_objects = names;
+    // Update legacy single-object field for compatibility
+    options_.highlighted_object = names.empty() ? "" : *names.begin();
 }
 
 void GCodeRenderer::set_excluded_objects(const std::unordered_set<std::string>& names) {
@@ -100,7 +111,10 @@ void GCodeRenderer::reset_colors() {
 }
 
 void GCodeRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode,
-                           const GCodeCamera& camera) {
+                           const GCodeCamera& camera, const lv_area_t* widget_coords) {
+    // widget_coords parameter is for API compatibility with TinyGL renderer
+    // In the 2D renderer, we use LVGL layer directly and don't need widget offset
+    (void)widget_coords;
     if (!layer) {
         spdlog::error("[GCode Renderer] Cannot render: null layer");
         return;
@@ -327,8 +341,11 @@ lv_draw_line_dsc_t GCodeRenderer::get_line_style(const ToolpathSegment& segment,
     lv_draw_line_dsc_init(&dsc);
 
     // Determine line width and base opacity
-    bool is_highlighted =
-        !options_.highlighted_object.empty() && segment.object_name == options_.highlighted_object;
+    // Check both legacy single-object and multi-select highlighting
+    bool is_highlighted = !segment.object_name.empty() &&
+                          (options_.highlighted_objects.count(segment.object_name) > 0 ||
+                           (!options_.highlighted_object.empty() &&
+                            segment.object_name == options_.highlighted_object));
     bool is_excluded =
         !segment.object_name.empty() && options_.excluded_objects.count(segment.object_name) > 0;
 

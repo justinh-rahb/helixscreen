@@ -9,7 +9,8 @@ LVGL_PATCHED_FILES := \
 	src/drivers/sdl/lv_sdl_window.c \
 	src/themes/default/lv_theme_default.c \
 	src/xml/parsers/lv_xml_image_parser.c \
-	src/xml/lv_xml_style.c
+	src/xml/lv_xml_style.c \
+	src/drivers/display/fb/lv_linux_fbdev.c
 
 # Reset all patched files in LVGL submodule to upstream state
 reset-patches:
@@ -74,4 +75,15 @@ apply-patches:
 		fi \
 	else \
 		echo "$(GREEN)✓ LVGL translate percentage patch already applied$(RESET)"; \
+	fi
+	$(Q)if git -C $(LVGL_DIR) diff --quiet src/drivers/display/fb/lv_linux_fbdev.c 2>/dev/null; then \
+		echo "$(YELLOW)→ Applying LVGL fbdev stride bpp detection patch...$(RESET)"; \
+		if git -C $(LVGL_DIR) apply --check ../../patches/lvgl_fbdev_stride_bpp.patch 2>/dev/null; then \
+			git -C $(LVGL_DIR) apply ../../patches/lvgl_fbdev_stride_bpp.patch && \
+			echo "$(GREEN)✓ Fbdev stride bpp detection patch applied$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠ Cannot apply patch (already applied or conflicts)$(RESET)"; \
+		fi \
+	else \
+		echo "$(GREEN)✓ LVGL fbdev stride bpp detection patch already applied$(RESET)"; \
 	fi

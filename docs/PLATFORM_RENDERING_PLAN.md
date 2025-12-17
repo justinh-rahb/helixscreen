@@ -58,6 +58,15 @@ After completing each phase:
 3. Add any learnings or adjustments
 4. Commit the updated plan
 
+### Code Review Requirements
+
+**CRITICAL**: Run DETAILED, COMPREHENSIVE code reviews at each stage:
+- Check for project-specific patterns (see CLAUDE.md rules)
+- Verify modularity and maintainability
+- Ensure new code follows existing backend patterns (Manager → Interface → Implementation)
+- Use `critical-reviewer` agent for significant new code
+- Document any deviations from existing patterns with justification
+
 ---
 
 ## Phase 1: AD5M - Disable TinyGL (Simple)
@@ -377,6 +386,151 @@ if (helix::has_gpu_support()) {
 
 ---
 
+## Phase 6: Image Asset Optimization
+
+### Background
+
+**Critical Discovery**: Benchmark testing revealed that PNG decoding is the primary performance bottleneck on AD5M:
+- Controls panel (no images): **116 FPS**
+- Home panel (large images): **2 FPS**
+
+The ~500ms per frame is spent decoding and scaling large PNG files at runtime, not rendering UI or pushing pixels to the framebuffer.
+
+### 6.1 Supported Screen Sizes
+
+| Size | Dimensions | Typical Hardware |
+|------|------------|------------------|
+| TINY | 480×320 | Small SPI displays |
+| SMALL | 800×480 | AD5M, budget screens |
+| MEDIUM | 1024×600 | Standard touch panels |
+| LARGE | 1280×720 | Pi official display, larger screens |
+
+### 6.2 Images Requiring Optimization
+
+**Priority 1 - Splash Screen**:
+| Current Image | Current Size | Target Sizes |
+|---------------|--------------|--------------|
+| `helixscreen-logo.png` | 1.5MB (1024×1024?) | 4 sizes matching screen widths |
+| `helixscreen-logo-transparent.png` | 1.5MB | Same |
+
+**Priority 2 - 3D Benchy Placeholder**:
+| Current Image | Current Size | Target Sizes |
+|---------------|--------------|--------------|
+| `thumbnail-placeholder.png` | 192KB | 4 sizes for thumbnail areas |
+| `benchy_thumbnail_white.png` | 9.4KB | Already small, may be fine |
+
+**Priority 3 - Printer Images** (when home panel layout is finalized):
+| Current Image | Current Size | Notes |
+|---------------|--------------|-------|
+| `printer.png` | 2.3MB | Full resolution master |
+| `printer_400.png` | 107KB | Existing 400px version |
+| `printer_200.png` | 36KB | Existing 200px version |
+
+### 6.3 Theme System Auto-Selection
+
+**Goal**: Load appropriately-sized image based on current screen size without code changes.
+
+**Proposed API**:
+```cpp
+// In ui_theme.h / ui_theme.cpp
+std::string ui_theme_get_image_path(const std::string& base_name);
+
+// Usage:
+// ui_theme_get_image_path("splash-logo")
+// Returns: "assets/images/splash-logo-small.png" (on 800x480)
+//          "assets/images/splash-logo-large.png" (on 1280x720)
+```
+
+**File Naming Convention**:
+```
+assets/images/
+├── splash-logo-tiny.png     # 480px wide
+├── splash-logo-small.png    # 800px wide
+├── splash-logo-medium.png   # 1024px wide
+├── splash-logo-large.png    # 1280px wide
+├── benchy-placeholder-tiny.png
+├── benchy-placeholder-small.png
+├── benchy-placeholder-medium.png
+├── benchy-placeholder-large.png
+└── ... (originals kept for reference)
+```
+
+**Implementation**:
+```cpp
+std::string ui_theme_get_image_path(const std::string& base_name) {
+    // Get current screen size suffix
+    const char* suffix = nullptr;
+    switch (g_screen_size) {
+        case ScreenSize::TINY:   suffix = "-tiny";   break;
+        case ScreenSize::SMALL:  suffix = "-small";  break;
+        case ScreenSize::MEDIUM: suffix = "-medium"; break;
+        case ScreenSize::LARGE:  suffix = "-large";  break;
+    }
+
+    std::string sized_path = "assets/images/" + base_name + suffix + ".png";
+
+    // Fallback to base name if sized version doesn't exist
+    if (access(sized_path.c_str(), R_OK) == 0) {
+        return sized_path;
+    }
+    return "assets/images/" + base_name + ".png";
+}
+```
+
+### 6.4 Build-Time Image Generation
+
+**Script**: `scripts/generate-sized-images.sh`
+```bash
+#!/bin/bash
+# Generate screen-size-specific images from high-res originals
+
+SIZES="tiny:480 small:800 medium:1024 large:1280"
+
+for img in splash-logo benchy-placeholder; do
+    for size_spec in $SIZES; do
+        name="${size_spec%%:*}"
+        width="${size_spec##*:}"
+
+        magick "assets/images/${img}-original.png" \
+            -resize "${width}x" \
+            -strip \
+            "assets/images/${img}-${name}.png"
+    done
+done
+```
+
+### 6.5 Additional Considerations
+
+**G-code Thumbnails**:
+- Same principle applies - decode at target size, not full resolution
+- Moonraker provides thumbnail URLs with size parameters
+- Consider caching decoded thumbnails to avoid repeated decodes
+
+**Print History Thumbnails**:
+- Gallery views need small thumbnails (64×64 or 128×128)
+- Detail views may need larger versions
+- Lazy loading with placeholders improves perceived performance
+
+**Pre-decoded Formats** (future optimization):
+- For splash screen (shown during startup), consider raw RGB565 `.bin` format
+- Eliminates PNG decode entirely for critical path
+- Trade-off: larger files but instant display
+
+### 6.6 Files to Create/Modify
+
+| File | Change |
+|------|--------|
+| `include/ui_theme.h` | Add `ui_theme_get_image_path()` declaration |
+| `src/ui_theme.cpp` | Implement auto-selection logic |
+| `scripts/generate-sized-images.sh` | New - build-time image generation |
+| `src/splash_screen.cpp` | Use `ui_theme_get_image_path()` |
+| `ui_xml/home_panel.xml` | Use generic image names |
+| `Makefile` | Add `make regen-images` target |
+
+**Estimated effort**: 1 day
+
+---
+
 ## Critical Files Summary
 
 ### Phase 1-3 (Build/Config)
@@ -406,6 +560,16 @@ if (helix::has_gpu_support()) {
 | `src/gcode_layer_renderer.cpp` | New - implementation |
 | `src/ui_gcode_viewer.cpp` | Runtime mode selection |
 
+### Phase 6 (Image Asset Optimization)
+| File | Change |
+|------|--------|
+| `include/ui_theme.h` | Add `ui_theme_get_image_path()` |
+| `src/ui_theme.cpp` | Screen-size-based image selection |
+| `scripts/generate-sized-images.sh` | New - build-time image generation |
+| `src/splash_screen.cpp` | Use themed image paths |
+| `Makefile` | Add `make regen-images` target |
+| `assets/images/*-{tiny,small,medium,large}.png` | Pre-sized image variants |
+
 ---
 
 ## Rollback Plan
@@ -424,10 +588,11 @@ If issues discovered:
 | 3 | Testing & validation | 1-2 hours | Low |
 | 4 | 2D Bed Mesh Heatmap | 1-2 days | Low |
 | 5 | 2D G-code Layer View | 2-3 days | Medium |
+| 6 | Image Asset Optimization | 1 day | Low |
 
-**Total estimated effort**: ~1 week
+**Total estimated effort**: ~1.5 weeks
 
-**Recommended approach**: Complete Phases 1-3 first, verify builds work, then proceed to Phases 4-5.
+**Recommended approach**: Complete Phases 1-3 first, verify builds work, then proceed to Phases 4-5. Phase 6 (image optimization) can be done in parallel with 4-5 and provides the biggest AD5M performance improvement.
 
 ---
 
@@ -437,11 +602,12 @@ Update this section after each phase:
 
 | Phase | Status | Started | Completed | Notes |
 |-------|--------|---------|-----------|-------|
-| 1 | ⬜ Not Started | - | - | |
+| 1 | ✅ Complete | 2025-12-15 | 2025-12-15 | TinyGL disabled, NEON enabled, 2D renderer API compatibility |
 | 2 | ⬜ Not Started | - | - | |
 | 3 | ⬜ Not Started | - | - | |
 | 4 | ⬜ Not Started | - | - | |
 | 5 | ⬜ Not Started | - | - | |
+| 6 | ⬜ Not Started | - | - | Image optimization - critical for AD5M perf (PNG decode bottleneck) |
 
 **Status Legend**: ⬜ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
 
@@ -449,12 +615,25 @@ Update this section after each phase:
 
 Record progress across sessions:
 
-```
-<!-- Template:
-### Session YYYY-MM-DD
-- Phase X: [status]
-- Changes made: [list]
-- Issues encountered: [list]
-- Next steps: [list]
--->
-```
+### Session 2025-12-15 (continued)
+- **Image Performance Discovery**: Benchmark proved PNG decoding is the bottleneck
+  - Controls panel (no images): **116 FPS** (8.6ms per frame)
+  - Home panel (large images): **2 FPS** (500ms per frame)
+  - **58x performance difference** - NOT memory bandwidth, NOT LVGL rendering
+  - 16bpp vs 32bpp showed no improvement (bottleneck is upstream)
+- NEON enabled but showed no benefit (PNG decode is not SIMD-optimized)
+- Added automatic framebuffer depth configuration in `display_backend_fbdev.cpp`
+
+### Session 2025-12-15
+- Phase 1: ✅ Complete
+- Changes made:
+  - `mk/cross.mk:69`: Changed `ENABLE_TINYGL_3D := yes` to `no` for AD5M
+  - `lv_conf.h:184`: Added conditional NEON ASM (`LV_DRAW_SW_ASM_NEON` when `__ARM_NEON` defined)
+  - `include/gcode_renderer.h`: Added `GhostRenderMode` enum, `set_highlighted_objects()`, stub methods for ghost layer API
+  - `src/gcode_renderer.cpp`: Updated `render()` signature, added `set_highlighted_objects()` implementation
+  - `src/ui_gcode_viewer.cpp`: Wrapped TinyGL-specific code (`RibbonGeometry`, `GeometryBuilder`) in `#ifdef ENABLE_TINYGL_3D`
+- Issues encountered:
+  - `GhostRenderMode` enum needed to be defined in 2D renderer header for API compatibility
+  - `AsyncBuildResult` struct needed conditional geometry members
+  - `color_count` variable scope issue (fixed)
+- Next steps: Phase 2 (Pi OpenGL ES integration)

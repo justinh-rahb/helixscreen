@@ -239,15 +239,54 @@ install-deps:
 # Output: $(BUILD_DIR)/lib/libhv.a for architecture isolation
 # Note: libhv builds in-tree, so we must clean before cross-compilation
 # to avoid mixing object files from different architectures
+
+# =============================================================================
+# Library Clean Targets
+# =============================================================================
+# Individual clean targets for forcing rebuilds after flag changes or
+# architecture switches. The main 'clean' target calls these automatically,
+# but they're useful for targeted rebuilds without full clean.
+
+# Clean libhv build artifacts
+libhv-clean:
+	$(ECHO) "$(CYAN)Cleaning libhv build artifacts...$(RESET)"
+	$(Q)find $(LIBHV_DIR) -type f \( -name '*.o' -o -name '*.a' -o -name '*.so' -o -name '*.dylib' \) -delete 2>/dev/null || true
+	$(Q)rm -f $(BUILD_DIR)/lib/libhv.a 2>/dev/null || true
+	$(ECHO) "$(GREEN)✓ libhv cleaned$(RESET)"
+
+# Clean SDL2 build artifacts (CMake build directory)
+# Note: SDL2_BUILD_DIR is only set when building SDL from submodule
+sdl2-clean:
+	$(ECHO) "$(CYAN)Cleaning SDL2 build artifacts...$(RESET)"
+ifdef SDL2_BUILD_DIR
+	$(Q)rm -rf $(SDL2_BUILD_DIR) 2>/dev/null || true
+else
+	$(Q)rm -rf lib/sdl2/build 2>/dev/null || true
+endif
+	$(ECHO) "$(GREEN)✓ SDL2 cleaned$(RESET)"
+
+# Clean LVGL compiled objects (forces full recompile)
+lvgl-clean:
+	$(ECHO) "$(CYAN)Cleaning LVGL build artifacts...$(RESET)"
+	$(Q)rm -rf $(OBJ_DIR)/lvgl 2>/dev/null || true
+	$(ECHO) "$(GREEN)✓ LVGL cleaned$(RESET)"
+
+# Clean all submodule libraries
+libs-clean: libhv-clean sdl2-clean lvgl-clean
+	$(ECHO) "$(GREEN)✓ All library artifacts cleaned$(RESET)"
+
+# =============================================================================
+# Library Build Targets
+# =============================================================================
+
 libhv-build:
 	$(ECHO) "$(CYAN)Building libhv...$(RESET)"
 	$(Q)mkdir -p $(BUILD_DIR)/lib
 ifneq ($(CROSS_COMPILE),)
-	# Cross-compilation mode - clean in-tree artifacts first to avoid mixing architectures
-	$(Q)if [ -n "$$(find $(LIBHV_DIR) -name '*.o' 2>/dev/null | head -1)" ]; then \
-		echo "$(YELLOW)→ Cleaning libhv in-tree artifacts for cross-compilation...$(RESET)"; \
-		find $(LIBHV_DIR) -type f \( -name '*.o' -o -name '*.a' -o -name '*.so' -o -name '*.dylib' \) -delete; \
-	fi
+	# Cross-compilation mode - ALWAYS clean first to avoid architecture mixing and stale artifacts
+	# This is critical: mixing native and cross-compiled objects causes subtle runtime bugs
+	$(Q)echo "$(YELLOW)→ Cleaning libhv for cross-compilation...$(RESET)"
+	$(Q)find $(LIBHV_DIR) -type f \( -name '*.o' -o -name '*.a' -o -name '*.so' -o -name '*.dylib' \) -delete 2>/dev/null || true
 	# Pass cross-compiler to configure and make
 	$(Q)cd $(LIBHV_DIR) && \
 		CC=$(CC) CXX=$(CXX) AR=$(AR) \
@@ -416,7 +455,7 @@ setup-hooks:
 # Build/Dependency Help
 # ============================================================================
 
-.PHONY: help-build
+.PHONY: libhv-clean sdl2-clean lvgl-clean libs-clean help-build
 help-build:
 	@if [ -t 1 ] && [ -n "$(TERM)" ] && [ "$(TERM)" != "dumb" ]; then \
 		B='$(BOLD)'; G='$(GREEN)'; Y='$(YELLOW)'; C='$(CYAN)'; X='$(RESET)'; \
@@ -436,6 +475,10 @@ help-build:
 	echo "  $${G}install-deps$${X}        - Auto-install missing dependencies"; \
 	echo "  $${G}libhv-build$${X}         - Build libhv WebSocket library"; \
 	echo "  $${G}sdl2-build$${X}          - Build SDL2 from submodule"; \
+	echo "  $${G}libhv-clean$${X}         - Clean libhv artifacts (force rebuild)"; \
+	echo "  $${G}sdl2-clean$${X}          - Clean SDL2 build directory"; \
+	echo "  $${G}lvgl-clean$${X}          - Clean LVGL compiled objects"; \
+	echo "  $${G}libs-clean$${X}          - Clean all library artifacts"; \
 	echo "  $${G}venv-setup$${X}          - Set up Python virtual environment"; \
 	echo "  $${G}setup-hooks$${X}         - Enable git pre-commit hooks (clang-format)"; \
 	echo ""; \

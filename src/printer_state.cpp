@@ -4,12 +4,79 @@
 #include "printer_state.h"
 
 #include "capability_overrides.h"
+#include "lvgl.h"
 #include "printer_capabilities.h"
 #include "runtime_config.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+
+// ============================================================================
+// Thread-safe async update context
+// ============================================================================
+// CRITICAL: Subject updates trigger lv_obj_invalidate() which asserts if called
+// during LVGL rendering. WebSocket callbacks run on libhv's event loop thread,
+// not the main LVGL thread. We must defer subject updates to the main thread
+// via lv_async_call to avoid the "Invalidate area not allowed during rendering"
+// assertion which causes while(1) infinite loop in LV_ASSERT_HANDLER.
+
+namespace {
+
+struct AsyncStatusUpdateContext {
+    PrinterState* printer_state;
+    nlohmann::json state; // Copy of the status JSON
+};
+
+void async_status_update_callback(void* user_data) {
+    auto* ctx = static_cast<AsyncStatusUpdateContext*>(user_data);
+    if (ctx && ctx->printer_state) {
+        ctx->printer_state->update_from_status(ctx->state);
+    }
+    delete ctx;
+}
+
+} // anonymous namespace
+
+// ============================================================================
+// Thread-safe async callbacks for PrinterState methods
+// ============================================================================
+// These callbacks are declared as friends in PrinterState to access _internal methods.
+// They must be outside the anonymous namespace for friend declarations to work.
+
+struct AsyncCapabilitiesContext {
+    PrinterState* printer_state;
+    PrinterCapabilities caps;
+};
+
+void async_capabilities_callback(void* user_data) {
+    auto* ctx = static_cast<AsyncCapabilitiesContext*>(user_data);
+    if (ctx && ctx->printer_state) {
+        ctx->printer_state->set_printer_capabilities_internal(ctx->caps);
+    }
+    delete ctx;
+}
+
+struct AsyncStringContext {
+    PrinterState* printer_state;
+    std::string value;
+};
+
+void async_klipper_version_callback(void* user_data) {
+    auto* ctx = static_cast<AsyncStringContext*>(user_data);
+    if (ctx && ctx->printer_state) {
+        ctx->printer_state->set_klipper_version_internal(ctx->value);
+    }
+    delete ctx;
+}
+
+void async_moonraker_version_callback(void* user_data) {
+    auto* ctx = static_cast<AsyncStringContext*>(user_data);
+    if (ctx && ctx->printer_state) {
+        ctx->printer_state->set_moonraker_version_internal(ctx->value);
+    }
+    delete ctx;
+}
 
 // ============================================================================
 // PrintJobState Free Functions
@@ -309,9 +376,12 @@ void PrinterState::update_from_notification(const json& notification) {
     }
 
     // Extract printer state from params[0] and delegate to update_from_status
+    // CRITICAL: Defer to main thread via lv_async_call to avoid LVGL assertion
+    // when subject updates trigger lv_obj_invalidate() during rendering
     auto params = notification["params"];
     if (params.is_array() && !params.empty()) {
-        update_from_status(params[0]);
+        auto* ctx = new AsyncStatusUpdateContext{this, params[0]};
+        lv_async_call(async_status_update_callback, ctx);
     }
 }
 
@@ -755,6 +825,12 @@ void PrinterState::set_tracked_led(const std::string& led_name) {
 }
 
 void PrinterState::set_printer_capabilities(const PrinterCapabilities& caps) {
+    // Thread-safe wrapper: defer LVGL subject updates to main thread
+    auto* ctx = new AsyncCapabilitiesContext{this, caps};
+    lv_async_call(async_capabilities_callback, ctx);
+}
+
+void PrinterState::set_printer_capabilities_internal(const PrinterCapabilities& caps) {
     // Pass auto-detected capabilities to the override layer
     capability_overrides_.set_printer_capabilities(caps);
 
@@ -793,11 +869,23 @@ void PrinterState::set_printer_capabilities(const PrinterCapabilities& caps) {
 }
 
 void PrinterState::set_klipper_version(const std::string& version) {
+    // Thread-safe wrapper: defer LVGL subject updates to main thread
+    auto* ctx = new AsyncStringContext{this, version};
+    lv_async_call(async_klipper_version_callback, ctx);
+}
+
+void PrinterState::set_klipper_version_internal(const std::string& version) {
     lv_subject_copy_string(&klipper_version_, version.c_str());
     spdlog::debug("[PrinterState] Klipper version set: {}", version);
 }
 
 void PrinterState::set_moonraker_version(const std::string& version) {
+    // Thread-safe wrapper: defer LVGL subject updates to main thread
+    auto* ctx = new AsyncStringContext{this, version};
+    lv_async_call(async_moonraker_version_callback, ctx);
+}
+
+void PrinterState::set_moonraker_version_internal(const std::string& version) {
     lv_subject_copy_string(&moonraker_version_, version.c_str());
     spdlog::debug("[PrinterState] Moonraker version set: {}", version);
 }

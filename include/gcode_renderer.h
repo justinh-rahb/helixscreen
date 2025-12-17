@@ -53,17 +53,29 @@ enum class LODLevel {
 };
 
 /**
+ * @brief Ghost layer rendering mode (for print progress visualization)
+ *
+ * Note: Ghost rendering is primarily a TinyGL 3D feature. The 2D renderer
+ * provides these stubs for API compatibility but doesn't render ghost layers.
+ */
+enum class GhostRenderMode : uint8_t {
+    Dimmed = 0, ///< Reduce opacity of unprinted layers
+    Stipple = 1 ///< Use stipple pattern for unprinted layers
+};
+
+/**
  * @brief Rendering options and filters
  */
 struct RenderOptions {
-    bool show_extrusions{true};                       ///< Render extrusion moves
-    bool show_travels{false};                         ///< Render travel moves (hidden by default)
-    bool show_object_bounds{false};                   ///< Render object boundary polygons
-    std::string highlighted_object;                   ///< Object to highlight (empty = none)
-    LODLevel lod{LODLevel::FULL};                     ///< Level of detail
-    int layer_start{0};                               ///< First layer to render (inclusive)
-    int layer_end{-1};                                ///< Last layer to render (-1 = all)
-    std::unordered_set<std::string> excluded_objects; ///< Objects excluded from print
+    bool show_extrusions{true};     ///< Render extrusion moves
+    bool show_travels{false};       ///< Render travel moves (hidden by default)
+    bool show_object_bounds{false}; ///< Render object boundary polygons
+    std::string highlighted_object; ///< Object to highlight (legacy single-object)
+    std::unordered_set<std::string> highlighted_objects; ///< Objects to highlight (multi-select)
+    LODLevel lod{LODLevel::FULL};                        ///< Level of detail
+    int layer_start{0};                                  ///< First layer to render (inclusive)
+    int layer_end{-1};                                   ///< Last layer to render (-1 = all)
+    std::unordered_set<std::string> excluded_objects;    ///< Objects excluded from print
 };
 
 /**
@@ -96,11 +108,25 @@ class GCodeRenderer {
      * @param layer LVGL draw layer (from draw event callback)
      * @param gcode Parsed G-code file
      * @param camera Camera with view/projection matrices
+     * @param widget_coords Optional widget coordinates (ignored in 2D renderer)
      *
      * Main rendering function. Call from LVGL draw event callback.
      * Renders according to current RenderOptions.
+     * The widget_coords parameter is for API compatibility with TinyGL renderer.
      */
-    void render(lv_layer_t* layer, const ParsedGCodeFile& gcode, const GCodeCamera& camera);
+    void render(lv_layer_t* layer, const ParsedGCodeFile& gcode, const GCodeCamera& camera,
+                const lv_area_t* widget_coords = nullptr);
+
+    /**
+     * @brief Set interaction mode (stub for API compatibility)
+     * @param interacting true if user is dragging/interacting
+     *
+     * In TinyGL renderer, this enables reduced quality during interaction.
+     * In 2D renderer, this is a no-op.
+     */
+    void set_interaction_mode(bool interacting) {
+        (void)interacting; // No-op in 2D renderer
+    }
 
     // ==============================================
     // Configuration
@@ -144,10 +170,16 @@ class GCodeRenderer {
     void set_show_extrusions(bool show);
 
     /**
-     * @brief Set highlighted object
+     * @brief Set highlighted object (legacy single-object API)
      * @param name Object name to highlight (empty string to clear)
      */
     void set_highlighted_object(const std::string& name);
+
+    /**
+     * @brief Set highlighted objects (multi-select API)
+     * @param names Set of object names to highlight (empty set to clear)
+     */
+    void set_highlighted_objects(const std::unordered_set<std::string>& names);
 
     /**
      * @brief Set excluded objects
@@ -170,6 +202,54 @@ class GCodeRenderer {
      * @param end Last layer (inclusive, -1 for all)
      */
     void set_layer_range(int start, int end);
+
+    // ==============================================
+    // Print Progress / Ghost Layer (Stubs for API Compatibility)
+    // ==============================================
+
+    /**
+     * @brief Set current print progress layer (stub)
+     * @param layer Current layer being printed
+     *
+     * In TinyGL renderer, this enables ghost rendering of unprinted layers.
+     * In 2D renderer, this is a no-op (ghost rendering not supported).
+     */
+    void set_print_progress_layer(int layer) {
+        (void)layer; // No-op in 2D renderer
+    }
+
+    /**
+     * @brief Set ghost layer opacity (stub)
+     * @param opacity Opacity for ghost layers (0-255)
+     *
+     * In TinyGL renderer, this controls ghost layer visibility.
+     * In 2D renderer, this is a no-op.
+     */
+    void set_ghost_opacity(lv_opa_t opacity) {
+        (void)opacity; // No-op in 2D renderer
+    }
+
+    /**
+     * @brief Set ghost layer render mode (stub)
+     * @param mode Ghost rendering style
+     *
+     * In TinyGL renderer, this selects dimmed vs stipple rendering.
+     * In 2D renderer, this is a no-op.
+     */
+    void set_ghost_render_mode(GhostRenderMode mode) {
+        (void)mode; // No-op in 2D renderer
+    }
+
+    /**
+     * @brief Get maximum layer index
+     * @return Number of layers - 1, or -1 if no data
+     *
+     * Note: This returns -1 for the 2D renderer since it doesn't track
+     * geometry internally. Use ui_gcode_viewer_get_layer_count() instead.
+     */
+    int get_max_layer_index() const {
+        return -1; // 2D renderer doesn't track geometry
+    }
 
     // ==============================================
     // Color & Rendering Control

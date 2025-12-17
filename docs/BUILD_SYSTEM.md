@@ -408,6 +408,22 @@ This **interactively installs** missing dependencies:
 
 **Automatic Builds**: Git submodules (libhv, wpa_supplicant, spdlog) are built automatically by the main build system when missing - no manual intervention needed.
 
+### Library Clean Targets
+
+Individual clean targets are available for forcing rebuilds of specific libraries without a full `make clean`. This is useful when:
+- Switching between native and cross-compilation
+- Build flags have changed
+- Debugging library-specific issues
+
+```bash
+make libhv-clean    # Clean libhv WebSocket library artifacts
+make sdl2-clean     # Clean SDL2 CMake build directory
+make lvgl-clean     # Clean LVGL compiled objects
+make libs-clean     # Clean all library artifacts at once
+```
+
+**Cross-Compilation Note**: When cross-compiling (e.g., `make ad5m-docker`), libhv is **automatically cleaned** before each build to prevent architecture mixing. This adds ~5 seconds but ensures correct builds.
+
 ### Test Harness
 
 The dependency system includes a comprehensive test suite:

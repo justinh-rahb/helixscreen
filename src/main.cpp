@@ -281,6 +281,37 @@ std::string g_log_file_cli; // CLI override for log file path
 static std::queue<json> notification_queue;
 static std::mutex notification_mutex;
 
+// ============================================================================
+// Thread-safe async callback contexts for WebSocket-to-LVGL thread handoff
+// ============================================================================
+// CRITICAL: WebSocket callbacks run on libhv's event loop thread, but LVGL is
+// single-threaded. Subject updates trigger lv_obj_invalidate() which asserts
+// if called during LVGL rendering. We use lv_async_call() to defer all LVGL
+// subject updates to the main thread at a safe point in the event loop.
+
+// Context for deferring discovery complete callback work to main thread
+struct DiscoveryCompleteContext {
+    PrinterCapabilities caps;
+    std::vector<std::string> fans;
+    std::string klipper_version;
+    std::string moonraker_version;
+};
+
+// Async callback that runs on main thread (safe for LVGL subject updates)
+static void async_discovery_complete_callback(void* user_data) {
+    auto* ctx = static_cast<DiscoveryCompleteContext*>(user_data);
+    if (!ctx)
+        return;
+
+    // Now safe to update LVGL subjects - we're on the main thread
+    get_printer_state().set_printer_capabilities(ctx->caps);
+    get_printer_state().init_fans(ctx->fans);
+    get_printer_state().set_klipper_version(ctx->klipper_version);
+    get_printer_state().set_moonraker_version(ctx->moonraker_version);
+
+    delete ctx;
+}
+
 // Overlay panel tracking for proper lifecycle management
 struct OverlayPanels {
     lv_obj_t* motion = nullptr;
@@ -1639,10 +1670,12 @@ int main(int argc, char** argv) {
 
     // Connect to Moonraker (only if not in wizard and we have saved config OR CLI override)
     // Wizard will handle its own connection test
+    // In test mode, always connect (uses mock client regardless of wizard state)
     std::string saved_host = config->get<std::string>(config->df() + "moonraker_host", "");
     bool has_cli_url = !args.moonraker_url.empty();
-    if (!args.force_wizard &&
-        (has_cli_url || (!config->is_wizard_required() && !saved_host.empty()))) {
+    bool should_connect = has_cli_url || g_runtime_config.test_mode ||
+                          (!config->is_wizard_required() && !saved_host.empty());
+    if (!args.force_wizard && should_connect) {
         std::string moonraker_url;
         std::string http_base_url;
 
@@ -1684,15 +1717,13 @@ int main(int argc, char** argv) {
         // Register LATE discovery callback - fires after subscription response is processed
         // Use this for state updates that depend on initial subscription data
         moonraker_client->set_on_discovery_complete([](const PrinterCapabilities& caps) {
-            // Update PrinterState with discovered capabilities for reactive UI bindings
-            get_printer_state().set_printer_capabilities(caps);
-
-            // Initialize multi-fan tracking from discovered fan objects
-            get_printer_state().init_fans(moonraker_client->get_fans());
-
-            // Update version info from client (for Settings About section)
-            get_printer_state().set_klipper_version(moonraker_client->get_software_version());
-            get_printer_state().set_moonraker_version(moonraker_client->get_moonraker_version());
+            // CRITICAL: This callback runs on the WebSocket thread (libhv event loop).
+            // LVGL subject updates trigger lv_obj_invalidate() which asserts if called
+            // during LVGL rendering on the main thread. Defer all work via lv_async_call.
+            auto* ctx = new DiscoveryCompleteContext{caps, moonraker_client->get_fans(),
+                                                     moonraker_client->get_software_version(),
+                                                     moonraker_client->get_moonraker_version()};
+            lv_async_call(async_discovery_complete_callback, ctx);
         });
 
         // Connect to Moonraker
@@ -1732,6 +1763,15 @@ int main(int argc, char** argv) {
     uint32_t last_timeout_check = helix_get_ticks();
     uint32_t timeout_check_interval = static_cast<uint32_t>(
         config->get<int>(config->df() + "moonraker_timeout_check_interval_ms", 2000));
+
+    // Benchmark mode: HELIX_BENCHMARK=1 enables frame counting and FPS reporting
+    const bool benchmark_mode = (std::getenv("HELIX_BENCHMARK") != nullptr);
+    uint32_t benchmark_frame_count = 0;
+    uint32_t benchmark_start_time = helix_get_ticks();
+    uint32_t benchmark_last_report = benchmark_start_time;
+    if (benchmark_mode) {
+        spdlog::info("[Benchmark] Mode enabled - will report FPS every 5 seconds");
+    }
 
     // Main event loop - LVGL handles display events internally via lv_timer_handler()
     // Loop continues while display exists and quit not requested
@@ -1815,9 +1855,38 @@ int main(int argc, char** argv) {
         SettingsManager::instance().check_display_sleep();
 
         // Run LVGL tasks - handles display events and processes input
+        uint32_t render_start = benchmark_mode ? helix_get_ticks() : 0;
         lv_timer_handler();
         fflush(stdout);
+
+        // Benchmark: force full-screen invalidation and measure actual render time
+        if (benchmark_mode) {
+            uint32_t render_time = helix_get_ticks() - render_start;
+
+            // Force full screen redraw to measure actual rendering performance
+            lv_obj_invalidate(lv_screen_active());
+
+            benchmark_frame_count++;
+            uint32_t now = helix_get_ticks();
+            if (now - benchmark_last_report >= 5000) {
+                float elapsed_sec = (now - benchmark_last_report) / 1000.0f;
+                float fps = benchmark_frame_count / elapsed_sec;
+                // Note: This now measures forced full-screen render FPS
+                spdlog::info("[Benchmark] FPS: {:.1f} ({} full redraws in {:.1f}s)", fps,
+                             benchmark_frame_count, elapsed_sec);
+                benchmark_frame_count = 0;
+                benchmark_last_report = now;
+            }
+        }
+
         helix_delay(5); // Small delay to prevent 100% CPU usage
+    }
+
+    // Benchmark: final summary
+    if (benchmark_mode) {
+        uint32_t total_time = helix_get_ticks() - benchmark_start_time;
+        spdlog::info("[Benchmark] === Final Summary ===");
+        spdlog::info("[Benchmark] Total runtime: {:.1f} seconds", total_time / 1000.0f);
     }
 
     // Cleanup
@@ -1839,6 +1908,9 @@ int main(int argc, char** argv) {
     // This owns WiFiManager and EthernetManager which have background threads.
     // If destroyed during static destruction, those threads may access destroyed mutexes.
     destroy_wizard_wifi_step();
+
+    // Restore display backlight before exiting so next app doesn't start with black screen
+    SettingsManager::instance().restore_display_on_shutdown();
 
     lv_deinit(); // LVGL handles SDL cleanup internally
 

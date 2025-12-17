@@ -26,8 +26,14 @@
    COLOR SETTINGS
  *====================*/
 
-/*Color depth: 1 (I1), 8 (L8), 16 (RGB565), 24 (RGB888), 32 (XRGB8888)*/
-#define LV_COLOR_DEPTH 16
+/*Color depth: 1 (I1), 8 (L8), 16 (RGB565), 24 (RGB888), 32 (XRGB8888)
+ * Can be overridden by build system with -DLV_COLOR_DEPTH_OVERRIDE=32
+ * (AD5M uses 32-bit XRGB8888 framebuffer) */
+#ifdef LV_COLOR_DEPTH_OVERRIDE
+    #define LV_COLOR_DEPTH LV_COLOR_DEPTH_OVERRIDE
+#else
+    #define LV_COLOR_DEPTH 16
+#endif
 
 /*=========================
    STDLIB WRAPPER SETTINGS
@@ -181,7 +187,13 @@
         #define LV_DRAW_SW_CIRCLE_CACHE_SIZE 4
     #endif
 
-    #define  LV_USE_DRAW_SW_ASM     LV_DRAW_SW_ASM_NONE
+    /* Enable NEON SIMD for ARM platforms with NEON support (AD5M Cortex-A7, Pi ARMv8)
+     * This accelerates pixel blending operations significantly */
+    #if defined(__ARM_NEON) || defined(__ARM_NEON__)
+        #define  LV_USE_DRAW_SW_ASM     LV_DRAW_SW_ASM_NEON
+    #else
+        #define  LV_USE_DRAW_SW_ASM     LV_DRAW_SW_ASM_NONE
+    #endif
 
     #if LV_USE_DRAW_SW_ASM == LV_DRAW_SW_ASM_CUSTOM
         #define  LV_DRAW_SW_ASM_CUSTOM_INCLUDE ""

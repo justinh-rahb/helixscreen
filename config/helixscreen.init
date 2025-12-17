@@ -56,9 +56,11 @@ stop_competing_uis() {
 }
 
 # Start splash screen (if available)
+# Returns the --splash-pid argument on stdout (for capture by caller)
+# Status messages go to stderr to avoid polluting the return value
 start_splash() {
     if [ -x "$SPLASH" ]; then
-        echo "Starting splash screen..."
+        echo "Starting splash screen..." >&2
         "$SPLASH" -w "$SCREEN_WIDTH" -h "$SCREEN_HEIGHT" &
         SPLASH_PID=$!
         echo "$SPLASH_PID" > /var/run/helix-splash.pid
@@ -97,12 +99,14 @@ start() {
     SPLASH_ARGS=$(start_splash)
 
     # Start main daemon
-    # BusyBox start-stop-daemon has limited options
+    # BusyBox start-stop-daemon doesn't preserve working directory,
+    # so we use sh -c with cd to ensure the daemon runs from the correct directory
+    # (required for ui_xml/ and assets/ paths to resolve correctly)
     if command -v start-stop-daemon >/dev/null 2>&1; then
-        start-stop-daemon -S -b -m -p "$PIDFILE" -x "$DAEMON" -- $SPLASH_ARGS
+        start-stop-daemon -S -b -m -p "$PIDFILE" -x /bin/sh -- -c "cd $DAEMON_DIR && exec $DAEMON $SPLASH_ARGS"
     else
         # Fallback for systems without start-stop-daemon
-        "$DAEMON" $SPLASH_ARGS >> "$LOGFILE" 2>&1 &
+        (cd "$DAEMON_DIR" && "$DAEMON" $SPLASH_ARGS >> "$LOGFILE" 2>&1) &
         echo $! > "$PIDFILE"
     fi
 

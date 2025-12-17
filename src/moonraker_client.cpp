@@ -245,6 +245,9 @@ int MoonrakerClient::connect(const char* url, std::function<void()> on_connected
     // Message received callback
     // Wrap entire callback body in try-catch to prevent any exception from escaping to libhv
     onmessage = [this, on_connected, on_disconnected](const std::string& msg) {
+        // DEBUG: Log every raw message received to diagnose AD5M WebSocket issue
+        spdlog::trace("[Moonraker Client] onmessage received {} bytes", msg.size());
+
         try {
             // Prevent callback execution if client is being destroyed (avoid use-after-free)
             if (is_destroying_.load()) {
@@ -630,10 +633,15 @@ void MoonrakerClient::emit_event(MoonrakerEventType type, const std::string& mes
 }
 
 void MoonrakerClient::dispatch_status_update(const json& status) {
+    fprintf(stderr, "[DEBUG] dispatch_status_update called, status keys: %zu\n", status.size());
+    fflush(stderr);
+
     // Parse bed mesh data before dispatching (mirrors WebSocket handler behavior)
     // This ensures bed mesh is populated on initial subscription response,
     // not just on subsequent notify_status_update messages
     if (status.contains("bed_mesh") && status["bed_mesh"].is_object()) {
+        fprintf(stderr, "[DEBUG] parsing bed_mesh\n");
+        fflush(stderr);
         parse_bed_mesh(status["bed_mesh"]);
 
         // Also extract build volume from bed_mesh bounds for printer detection
@@ -680,10 +688,18 @@ void MoonrakerClient::dispatch_status_update(const json& status) {
         }
     }
 
+    fprintf(stderr, "[DEBUG] invoking %zu callbacks\n", callbacks_copy.size());
+    fflush(stderr);
+    int cb_idx = 0;
     for (const auto& cb : callbacks_copy) {
         if (cb) {
+            fprintf(stderr, "[DEBUG] calling callback %d\n", cb_idx);
+            fflush(stderr);
             cb(notification);
+            fprintf(stderr, "[DEBUG] callback %d returned\n", cb_idx);
+            fflush(stderr);
         }
+        cb_idx++;
     }
 
     spdlog::debug("[Moonraker Client] Dispatched status update to {} callbacks",

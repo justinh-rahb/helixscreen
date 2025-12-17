@@ -146,7 +146,10 @@ struct FanInfo {
  * - LVGL subjects for UI-bound data (automatic reactive updates)
  * - JSON cache for complex data (file lists, capabilities, metadata)
  *
- * All subjects are thread-safe and automatically update bound UI widgets.
+ * @note Thread Safety: Public setters that update LVGL subjects (set_printer_capabilities,
+ *       set_klipper_version, etc.) use lv_async_call internally to defer updates to the
+ *       main thread. This allows safe calls from WebSocket callbacks without risking
+ *       "Invalidate area not allowed during rendering" assertions.
  */
 class PrinterState {
   public:
@@ -809,4 +812,19 @@ class PrinterState {
 
     // Capability override layer (user config overrides for auto-detected capabilities)
     CapabilityOverrides capability_overrides_;
+
+    // ============================================================================
+    // Thread-safe internal methods (called via lv_async_call from main thread)
+    // ============================================================================
+    // These methods contain the actual LVGL subject updates and must only be called
+    // from the main thread. The public methods (set_printer_capabilities, etc.) use
+    // lv_async_call to defer to these internal methods, ensuring thread safety.
+
+    friend void async_capabilities_callback(void* user_data);
+    friend void async_klipper_version_callback(void* user_data);
+    friend void async_moonraker_version_callback(void* user_data);
+
+    void set_printer_capabilities_internal(const PrinterCapabilities& caps);
+    void set_klipper_version_internal(const std::string& version);
+    void set_moonraker_version_internal(const std::string& version);
 };

@@ -59,20 +59,23 @@ sudo systemctl enable --now helixscreen
 
 ```bash
 # From your computer, copy to printer
-scp helixscreen-ad5m-*.tar.gz root@<printer-ip>:/tmp/
+# Note: AD5M requires scp -O (legacy protocol) since BusyBox lacks sftp-server
+scp -O helixscreen-ad5m-*.tar.gz root@<printer-ip>:/tmp/helixscreen.tar.gz
 
 # SSH into printer and install
 ssh root@<printer-ip>
-cd /opt && gunzip -c /tmp/helixscreen-ad5m-*.tar.gz | tar xf -
+cd /opt && gunzip -c /tmp/helixscreen.tar.gz | tar xf -
 cp /opt/helixscreen/config/helixscreen.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now helixscreen
 
 # Clean up
-rm /tmp/helixscreen-ad5m-*.tar.gz
+rm /tmp/helixscreen.tar.gz
 ```
 
-> **Note:** AD5M uses BusyBox utilities. Use `gunzip -c | tar xf -` instead of `tar -xzf`.
+> **Note:** AD5M uses BusyBox utilities with some limitations:
+> - Use `scp -O` (legacy protocol) instead of plain `scp` - BusyBox lacks sftp-server
+> - Use `gunzip -c | tar xf -` instead of `tar -xzf` - BusyBox tar lacks `-z` flag
 </details>
 
 After installation, the setup wizard will guide you through initial configuration.
@@ -197,12 +200,14 @@ wget https://github.com/prestonbrown/helixscreen/releases/latest/download/helixs
 Transfer the package to your Adventurer 5M:
 
 ```bash
-scp helixscreen-ad5m.tar.gz root@<printer-ip>:/tmp/
+# AD5M requires scp -O (legacy protocol) since BusyBox lacks sftp-server
+scp -O helixscreen-ad5m.tar.gz root@<printer-ip>:/tmp/
 ```
 
 Replace `<printer-ip>` with your printer's IP address (check your router or printer settings).
 
 > **Note:** We copy to `/tmp/` first because `/opt/` may not have enough space for both the tarball and extracted files.
+> AD5M requires `scp -O` (OpenSSH legacy protocol) since BusyBox lacks the sftp-server that modern scp uses by default.
 
 ### Step 3: Install on the Printer
 
@@ -213,7 +218,7 @@ ssh root@<printer-ip>
 
 cd /opt
 # Note: AD5M uses BusyBox tar which doesn't support -z flag
-gunzip -c /tmp/helixscreen-ad5m.tar.gz | tar xf -
+gunzip -c /tmp/helixscreen.tar.gz | tar xf -
 
 # Stop existing screen UI (GuppyScreen, FeatherScreen, etc.)
 # The init script will do this automatically, but you can do it manually:
@@ -227,7 +232,7 @@ chmod +x /etc/init.d/S90helixscreen
 /etc/init.d/S90helixscreen start
 
 # Clean up the tarball to free /tmp space
-rm /tmp/helixscreen-ad5m.tar.gz
+rm /tmp/helixscreen.tar.gz
 ```
 
 > **Note:** AD5M runs as root, so `sudo` is not needed.

@@ -13,7 +13,8 @@ SPLASH_BIN := $(BUILD_DIR)/bin/helix-splash
 # Splash needs LVGL, display library, project includes, and libhv (for config.h -> json.hpp)
 SPLASH_CXXFLAGS := $(CXXFLAGS) -I$(INC_DIR) $(LVGL_INC) $(SPDLOG_INC) $(LIBHV_INC) -DHELIX_SPLASH_ONLY
 # Note: LVGL is compiled as objects, not a library - link directly against LVGL_OBJS
-SPLASH_LDFLAGS := -lm -lpthread
+# Include TARGET_LDFLAGS to inherit -static flag for AD5M (glibc 2.25 compatibility)
+SPLASH_LDFLAGS := $(TARGET_LDFLAGS) -lm -lpthread
 
 # Strip binary for embedded targets (matches main binary behavior)
 ifeq ($(STRIP_BINARY),yes)
@@ -46,9 +47,16 @@ $(BUILD_DIR)/splash/%.o: src/%.cpp | $(BUILD_DIR)/splash
 	@echo "[CXX] $< (splash)"
 	$(Q)$(CXX) $(SPLASH_CXXFLAGS) $(DEPFLAGS) -c $< -o $@
 
-# Splash needs config.o (display_backend_drm.cpp uses Config) and a UI notification stub
-# (config.cpp calls ui_notification_error on save failures)
-SPLASH_EXTRA_OBJS := $(OBJ_DIR)/config.o $(BUILD_DIR)/splash/ui_notification_stub.o
+# Splash needs config.o (display_backend_drm.cpp uses Config), backlight_backend.o (for turning
+# on backlight at startup), and a UI notification stub (config.cpp calls ui_notification_error
+# on save failures). Note: backlight_backend needs to be compiled separately with HELIX_SPLASH_ONLY
+# to skip test mode check (which requires runtime_config from main.cpp).
+SPLASH_EXTRA_OBJS := $(OBJ_DIR)/config.o $(BUILD_DIR)/splash/backlight_backend.o $(BUILD_DIR)/splash/ui_notification_stub.o
+
+# Compile backlight backend for splash (with HELIX_SPLASH_ONLY to skip runtime_config dependency)
+$(BUILD_DIR)/splash/backlight_backend.o: src/backlight_backend.cpp | $(BUILD_DIR)/splash
+	@echo "[CXX] $< (splash)"
+	$(Q)$(CXX) $(SPLASH_CXXFLAGS) $(DEPFLAGS) -c $< -o $@
 
 # Compile notification stub for splash (with dependency tracking)
 $(BUILD_DIR)/splash/ui_notification_stub.o: tools/ui_notification_stub.cpp | $(BUILD_DIR)/splash

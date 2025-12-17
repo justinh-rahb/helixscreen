@@ -626,8 +626,10 @@ lv_obj_t* ui_gcode_viewer_create(lv_obj_t* parent) {
 // Result structure for async geometry building
 struct AsyncBuildResult {
     std::unique_ptr<helix::gcode::ParsedGCodeFile> gcode_file;
+#ifdef ENABLE_TINYGL_3D
     std::unique_ptr<helix::gcode::RibbonGeometry> geometry;        ///< Full detail geometry
     std::unique_ptr<helix::gcode::RibbonGeometry> coarse_geometry; ///< Coarse LOD for interaction
+#endif
     std::string error_msg;
     bool success{true};
 };
@@ -715,8 +717,11 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                 spdlog::info("[GCode Viewer] Parsed {} layers, {} segments",
                              result->gcode_file->layers.size(), result->gcode_file->total_segments);
 
+#ifdef ENABLE_TINYGL_3D
                 // PHASE 2: Build geometry (slow, 1-5s for large files)
                 // This is thread-safe - no OpenGL calls, just CPU work
+                // NOTE: Only needed for TinyGL 3D renderer - 2D renderer uses ParsedGCodeFile
+                // directly
 
                 // Check if system is memory-constrained (< 64MB available)
                 // On constrained systems, ONLY build coarse geometry to save ~50MB
@@ -797,6 +802,11 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                 size_t freed = result->gcode_file->clear_segments();
                 spdlog::info("[GCode Viewer] Freed {} MB of parsed segment data",
                              freed / (1024 * 1024));
+#else
+                // 2D renderer: No geometry building needed
+                // The renderer uses ParsedGCodeFile directly for 2D line drawing
+                spdlog::debug("[GCode Viewer] 2D renderer - skipping geometry build");
+#endif
             }
         } catch (const std::exception& ex) {
             result->success = false;
@@ -862,7 +872,8 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                 size_t color_count = st->renderer_->get_geometry_color_count();
                 bool is_multicolor = (color_count > 1); // >1 means multiple tool colors
 #else
-                    bool is_multicolor = false; // 2D renderer doesn't have color palette
+                size_t color_count = 1; // 2D renderer doesn't track color palette
+                bool is_multicolor = false; // 2D renderer doesn't have color palette
 #endif
 
                 if (st->use_filament_color && !is_multicolor &&
