@@ -1,8 +1,14 @@
 # AMS Mock Backend: Phase 2 & 3 Implementation Plan
 
+**Status:** NOT STARTED (lower priority polish work)
+**Related:** `docs/AMS_MOCK_REALISM_PLAN.md` (overlapping content)
+**Last Updated:** 2025-12-16
+
 ## Overview
 
 This document captures the remaining work for AMS mock backend realism improvements. Phase 1 (multi-phase operations + timing) is complete. This plan covers error injection, recovery UI, and advanced features.
+
+> **Note:** This work is lower priority. The core AMS functionality (Phases 0-4.6) is complete and working. These mock enhancements would improve automated testing and demo scenarios but are not blocking any user-facing features.
 
 ---
 

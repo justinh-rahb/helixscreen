@@ -184,16 +184,18 @@ AmsError AmsBackendMock::resume_operation();
 
 ## Implementation Priority
 
-### Phase 1: Core Realism (High Impact)
-1. **Multi-phase operations** - Shows realistic action sequences
-2. **Timing with speedup** - Integrate with `--sim-speed`
-3. **Timing variance** - ±20% makes it feel real
+### Phase 1: Core Realism (High Impact) ✅ COMPLETE
+1. **Multi-phase operations** - Shows realistic action sequences ✅
+2. **Timing with speedup** - Integrate with `--sim-speed` ✅
+3. **Timing variance** - ±20% makes it feel real ✅
 
-### Phase 2: Error Testing (Medium Impact)
+*Implemented as part of AMS Phase 4 (Rich Feedback) work.*
+
+### Phase 2: Error Testing (Medium Impact) - NOT STARTED
 4. **Random failure injection** - Test error recovery UI
 5. **Pause/resume** - Test intervention flows
 
-### Phase 3: Advanced Features (Lower Priority)
+### Phase 3: Advanced Features (Lower Priority) - NOT STARTED
 6. **Multi-unit support** - For power users with multiple AMS
 7. **Enhanced dryer** - Humidity, power stats
 8. **Filament runout** - Mid-print scenarios
