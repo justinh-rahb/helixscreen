@@ -559,16 +559,15 @@ void TempControlPanel::on_nozzle_custom_clicked(lv_event_t* e) {
 
     nozzle_keypad_data = {self, HEATER_NOZZLE};
 
-    ui_keypad_config_t keypad_config = {
-        .initial_value = static_cast<float>(self->nozzle_target_),
-        .min_value = self->nozzle_config_.keypad_range.min,
-        .max_value = self->nozzle_config_.keypad_range.max,
-        .title_label = "Nozzle Temp",
-        .unit_label = "°C",
-        .allow_decimal = false,
-        .allow_negative = false,
-        .callback = keypad_value_cb,
-        .user_data = &nozzle_keypad_data};
+    ui_keypad_config_t keypad_config = {.initial_value = static_cast<float>(self->nozzle_target_),
+                                        .min_value = self->nozzle_config_.keypad_range.min,
+                                        .max_value = self->nozzle_config_.keypad_range.max,
+                                        .title_label = "Nozzle Temp",
+                                        .unit_label = "°C",
+                                        .allow_decimal = false,
+                                        .allow_negative = false,
+                                        .callback = keypad_value_cb,
+                                        .user_data = &nozzle_keypad_data};
 
     ui_keypad_show(&keypad_config);
 }
@@ -580,20 +579,18 @@ void TempControlPanel::on_bed_custom_clicked(lv_event_t* e) {
 
     bed_keypad_data = {self, HEATER_BED};
 
-    ui_keypad_config_t keypad_config = {
-        .initial_value = static_cast<float>(self->bed_target_),
-        .min_value = self->bed_config_.keypad_range.min,
-        .max_value = self->bed_config_.keypad_range.max,
-        .title_label = "Heat Bed Temp",
-        .unit_label = "°C",
-        .allow_decimal = false,
-        .allow_negative = false,
-        .callback = keypad_value_cb,
-        .user_data = &bed_keypad_data};
+    ui_keypad_config_t keypad_config = {.initial_value = static_cast<float>(self->bed_target_),
+                                        .min_value = self->bed_config_.keypad_range.min,
+                                        .max_value = self->bed_config_.keypad_range.max,
+                                        .title_label = "Heat Bed Temp",
+                                        .unit_label = "°C",
+                                        .allow_decimal = false,
+                                        .allow_negative = false,
+                                        .callback = keypad_value_cb,
+                                        .user_data = &bed_keypad_data};
 
     ui_keypad_show(&keypad_config);
 }
-
 
 void TempControlPanel::setup_nozzle_panel(lv_obj_t* panel, lv_obj_t* parent_screen) {
     nozzle_panel_ = panel;

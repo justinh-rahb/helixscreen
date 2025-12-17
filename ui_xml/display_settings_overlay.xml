@@ -58,7 +58,8 @@
             <text_body text="Brightness" style_text_color="#text_primary"/>
           </lv_obj>
           <!-- Current brightness value display -->
-          <text_body name="brightness_value_label" text="50%" style_text_color="#text_secondary"/>
+          <text_body name="brightness_value_label" bind_text="brightness_value"
+                     style_text_color="#text_secondary"/>
         </lv_obj>
         <!-- Brightness Slider -->
         <lv_obj width="100%"

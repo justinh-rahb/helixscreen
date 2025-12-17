@@ -29,7 +29,7 @@
         <icon name="row_icon" src="$icon" size="sm" variant="secondary"/>
         <text_body name="label" text="$label" style_text_color="#text_primary"/>
       </lv_obj>
-      <!-- Right side: Current value -->
+      <!-- Right side: Current value (bind to subject when available) -->
       <text_body name="value_label" text="$value" style_text_color="#text_secondary"/>
     </lv_obj>
     <!-- Description (if provided) -->

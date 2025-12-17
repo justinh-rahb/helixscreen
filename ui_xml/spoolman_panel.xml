@@ -40,7 +40,7 @@
             scrollable="false"
             flex_flow="column">
 
-      <!-- Spool List (scrollable) -->
+      <!-- Spool List (scrollable) - visible when state = SPOOLS (2) -->
       <lv_obj name="spool_list"
               width="100%"
               flex_grow="1"
@@ -50,9 +50,12 @@
               scrollable="true"
               scroll_dir="ver"
               flex_flow="column"
-              style_pad_gap="#space_sm"/>
+              style_pad_gap="#space_sm"
+              hidden="true">
+        <bind_flag_if_not_eq subject="spoolman_panel_state" flag="hidden" ref_value="2"/>
+      </lv_obj>
 
-      <!-- Empty State (shown when no spools) -->
+      <!-- Empty State - visible when state = EMPTY (1) -->
       <lv_obj name="empty_state"
               width="100%"
               flex_grow="1"
@@ -66,6 +69,7 @@
               style_flex_track_place="center"
               style_pad_gap="#space_md"
               hidden="true">
+        <bind_flag_if_not_eq subject="spoolman_panel_state" flag="hidden" ref_value="1"/>
 
         <!-- Empty inbox icon -->
         <icon name="empty_icon"
@@ -85,7 +89,7 @@
                     style_text_color="#text_secondary"/>
       </lv_obj>
 
-      <!-- Loading indicator (shown during fetch) -->
+      <!-- Loading indicator - visible when state = LOADING (0) -->
       <lv_obj name="loading_state"
               width="100%"
               flex_grow="1"
@@ -99,6 +103,7 @@
               style_flex_track_place="center"
               style_pad_gap="#space_md"
               hidden="true">
+        <bind_flag_if_not_eq subject="spoolman_panel_state" flag="hidden" ref_value="0"/>
 
         <spinner name="loading_spinner" size="lg"/>
 
@@ -123,6 +128,7 @@
         <!-- Spool count -->
         <text_small name="spool_count_text"
                     text=""
+                    bind_text="spoolman_spool_count"
                     style_text_color="#text_secondary"/>
 
         <!-- Refresh button -->

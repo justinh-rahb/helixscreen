@@ -31,11 +31,17 @@
     <!-- Scroll Momentum slider -->
     <setting_slider_row name="row_scroll_throw"
                         label="Scroll Momentum" icon="fine_tune" description="Higher = faster deceleration" min="5"
-                        max="50" value="25" callback="on_scroll_throw_changed"/>
+                        max="50" value="25" callback="on_scroll_throw_changed">
+      <!-- Bind value label to subject for reactive updates -->
+      <text_body name="value_label" bind_text="scroll_throw_value" style_text_color="#text_secondary"/>
+    </setting_slider_row>
     <!-- Scroll Sensitivity slider -->
     <setting_slider_row name="row_scroll_limit"
                         label="Scroll Sensitivity" icon="fine_tune" description="Lower = more responsive" min="1"
-                        max="20" value="5" callback="on_scroll_limit_changed"/>
+                        max="20" value="5" callback="on_scroll_limit_changed">
+      <!-- Bind value label to subject for reactive updates -->
+      <text_body name="value_label" bind_text="scroll_limit_value" style_text_color="#text_secondary"/>
+    </setting_slider_row>
     <!-- ================================================================== -->
     <!-- PRINTER SECTION -->
     <!-- ================================================================== -->
@@ -127,9 +133,15 @@
     <!-- ================================================================== -->
     <setting_section_header title="ABOUT" icon="info"/>
     <!-- Version Info -->
-    <setting_info_row name="row_version" label="Version" icon="info" value="1.0.0"/>
+    <setting_info_row name="row_version" label="Version" icon="info">
+      <!-- Bind value to subject for reactive updates -->
+      <text_body name="value" bind_text="version_value" style_text_color="#text_secondary"/>
+    </setting_info_row>
     <!-- Printer Name -->
-    <setting_info_row name="row_printer" label="Printer" icon="printer_3d" value="—"/>
+    <setting_info_row name="row_printer" label="Printer" icon="printer_3d">
+      <!-- Bind value to subject for reactive updates -->
+      <text_body name="value" bind_text="printer_value" style_text_color="#text_secondary"/>
+    </setting_info_row>
     <!-- Klipper Version -->
     <setting_info_row name="row_klipper" label="Klipper" icon="sysinfo" value="—"/>
     <!-- Moonraker Version -->

@@ -107,6 +107,26 @@ class SettingsPanel : public PanelBase {
     lv_obj_t* klipper_value_ = nullptr;
     lv_obj_t* moonraker_value_ = nullptr;
 
+    //
+    // === Reactive Subjects ===
+    //
+
+    // Slider value subjects
+    lv_subject_t scroll_throw_value_subject_;
+    lv_subject_t scroll_limit_value_subject_;
+    lv_subject_t brightness_value_subject_;
+
+    // Info row subjects
+    lv_subject_t version_value_subject_;
+    lv_subject_t printer_value_subject_;
+
+    // Static buffers for string subjects (required for lv_subject_init_string)
+    char scroll_throw_value_buf_[8];   // e.g., "50"
+    char scroll_limit_value_buf_[8];   // e.g., "15"
+    char brightness_value_buf_[8];     // e.g., "75%"
+    char version_value_buf_[32];       // e.g., "1.2.3"
+    char printer_value_buf_[64];       // e.g., "Voron 2.4"
+
     // Lazily-created overlay panels
     lv_obj_t* display_settings_overlay_ = nullptr;
     lv_obj_t* bed_mesh_panel_ = nullptr;

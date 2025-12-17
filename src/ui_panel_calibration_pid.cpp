@@ -35,35 +35,36 @@ void PIDCalibrationPanel::init_subjects() {
 
     // Initialize string subjects with initial values
     lv_subject_init_string(&panel.subj_temp_display_, panel.buf_temp_display_, nullptr,
-                          sizeof(panel.buf_temp_display_), "200°C");
+                           sizeof(panel.buf_temp_display_), "200°C");
     lv_xml_register_subject(nullptr, "pid_temp_display", &panel.subj_temp_display_);
 
     lv_subject_init_string(&panel.subj_temp_hint_, panel.buf_temp_hint_, nullptr,
-                          sizeof(panel.buf_temp_hint_), "Recommended: 200°C for extruder");
+                           sizeof(panel.buf_temp_hint_), "Recommended: 200°C for extruder");
     lv_xml_register_subject(nullptr, "pid_temp_hint", &panel.subj_temp_hint_);
 
     lv_subject_init_string(&panel.subj_current_temp_display_, panel.buf_current_temp_display_,
-                          nullptr, sizeof(panel.buf_current_temp_display_), "0.0°C / 0°C");
+                           nullptr, sizeof(panel.buf_current_temp_display_), "0.0°C / 0°C");
     lv_xml_register_subject(nullptr, "pid_current_temp", &panel.subj_current_temp_display_);
 
     lv_subject_init_string(&panel.subj_calibrating_heater_, panel.buf_calibrating_heater_, nullptr,
-                          sizeof(panel.buf_calibrating_heater_), "Extruder PID Tuning");
+                           sizeof(panel.buf_calibrating_heater_), "Extruder PID Tuning");
     lv_xml_register_subject(nullptr, "pid_calibrating_heater", &panel.subj_calibrating_heater_);
 
     lv_subject_init_string(&panel.subj_pid_kp_, panel.buf_pid_kp_, nullptr,
-                          sizeof(panel.buf_pid_kp_), "0.000");
+                           sizeof(panel.buf_pid_kp_), "0.000");
     lv_xml_register_subject(nullptr, "pid_kp", &panel.subj_pid_kp_);
 
     lv_subject_init_string(&panel.subj_pid_ki_, panel.buf_pid_ki_, nullptr,
-                          sizeof(panel.buf_pid_ki_), "0.000");
+                           sizeof(panel.buf_pid_ki_), "0.000");
     lv_xml_register_subject(nullptr, "pid_ki", &panel.subj_pid_ki_);
 
     lv_subject_init_string(&panel.subj_pid_kd_, panel.buf_pid_kd_, nullptr,
-                          sizeof(panel.buf_pid_kd_), "0.000");
+                           sizeof(panel.buf_pid_kd_), "0.000");
     lv_xml_register_subject(nullptr, "pid_kd", &panel.subj_pid_kd_);
 
     lv_subject_init_string(&panel.subj_error_message_, panel.buf_error_message_, nullptr,
-                          sizeof(panel.buf_error_message_), "An error occurred during calibration.");
+                           sizeof(panel.buf_error_message_),
+                           "An error occurred during calibration.");
     lv_xml_register_subject(nullptr, "pid_error_message", &panel.subj_error_message_);
 
     // Register XML event callbacks using global accessor
@@ -152,7 +153,7 @@ void PIDCalibrationPanel::update_temp_display() {
 
 void PIDCalibrationPanel::update_temp_hint() {
     const char* hint = (selected_heater_ == Heater::EXTRUDER) ? "Recommended: 200°C for extruder"
-                                                               : "Recommended: 60°C for heated bed";
+                                                              : "Recommended: 60°C for heated bed";
     lv_subject_copy_string(&subj_temp_hint_, hint);
 }
 
@@ -186,8 +187,8 @@ void PIDCalibrationPanel::send_pid_calibrate() {
     }
 
     // Update calibrating state label
-    const char* label = (selected_heater_ == Heater::EXTRUDER) ? "Extruder PID Tuning"
-                                                               : "Heated Bed PID Tuning";
+    const char* label =
+        (selected_heater_ == Heater::EXTRUDER) ? "Extruder PID Tuning" : "Heated Bed PID Tuning";
     lv_subject_copy_string(&subj_calibrating_heater_, label);
 
     // For demo purposes, simulate completion after a delay

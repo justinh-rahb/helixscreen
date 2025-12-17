@@ -155,29 +155,29 @@ class AmsPanel : public PanelBase {
 
     // === Edit Modal Subjects ===
 
-    lv_subject_t edit_slot_indicator_subject_;     ///< Subject for "Slot X" text
-    lv_subject_t edit_color_name_subject_;         ///< Subject for color name text
-    lv_subject_t edit_temp_nozzle_subject_;        ///< Subject for nozzle temp text
-    lv_subject_t edit_temp_bed_subject_;           ///< Subject for bed temp text
-    lv_subject_t edit_remaining_pct_subject_;      ///< Subject for remaining % text
+    lv_subject_t edit_slot_indicator_subject_; ///< Subject for "Slot X" text
+    lv_subject_t edit_color_name_subject_;     ///< Subject for color name text
+    lv_subject_t edit_temp_nozzle_subject_;    ///< Subject for nozzle temp text
+    lv_subject_t edit_temp_bed_subject_;       ///< Subject for bed temp text
+    lv_subject_t edit_remaining_pct_subject_;  ///< Subject for remaining % text
 
-    char edit_slot_indicator_buf_[32];             ///< Buffer for slot indicator text
-    char edit_color_name_buf_[32];                 ///< Buffer for color name text
-    char edit_temp_nozzle_buf_[16];                ///< Buffer for nozzle temp text
-    char edit_temp_bed_buf_[16];                   ///< Buffer for bed temp text
-    char edit_remaining_pct_buf_[16];              ///< Buffer for remaining % text
+    char edit_slot_indicator_buf_[32]; ///< Buffer for slot indicator text
+    char edit_color_name_buf_[32];     ///< Buffer for color name text
+    char edit_temp_nozzle_buf_[16];    ///< Buffer for nozzle temp text
+    char edit_temp_bed_buf_[16];       ///< Buffer for bed temp text
+    char edit_remaining_pct_buf_[16];  ///< Buffer for remaining % text
 
     // === Spoolman Picker Subjects ===
 
-    lv_subject_t picker_slot_indicator_subject_;   ///< Subject for "Assigning to Slot X" text
-    char picker_slot_indicator_buf_[48];           ///< Buffer for picker slot indicator text
+    lv_subject_t picker_slot_indicator_subject_; ///< Subject for "Assigning to Slot X" text
+    char picker_slot_indicator_buf_[48];         ///< Buffer for picker slot indicator text
 
     // === Color Picker Subjects ===
 
-    lv_subject_t color_hex_subject_;               ///< Subject for hex color text
-    lv_subject_t color_name_subject_;              ///< Subject for color name text
-    char color_hex_buf_[16];                       ///< Buffer for hex color text
-    char color_name_buf_[32];                      ///< Buffer for color name text
+    lv_subject_t color_hex_subject_;  ///< Subject for hex color text
+    lv_subject_t color_name_subject_; ///< Subject for color name text
+    char color_hex_buf_[16];          ///< Buffer for hex color text
+    char color_name_buf_[32];         ///< Buffer for color name text
 
     // === Setup Helpers ===
 

@@ -6,6 +6,7 @@
 #include "ui_nav.h"
 #include "ui_panel_common.h"
 #include "ui_spool_canvas.h"
+#include "ui_subject_registry.h"
 #include "ui_toast.h"
 
 #include "moonraker_api.h"
@@ -13,6 +14,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdio>
+#include <cstring>
 
 // ============================================================================
 // Global Instance
@@ -39,6 +41,9 @@ void init_global_spoolman_panel(PrinterState& printer_state, MoonrakerAPI* api) 
 SpoolmanPanel::SpoolmanPanel(PrinterState& printer_state, MoonrakerAPI* api)
     : PanelBase(printer_state, api) {
     spdlog::trace("[{}] Constructor", get_name());
+
+    // Initialize buffer
+    std::memset(spool_count_buf_, 0, sizeof(spool_count_buf_));
 }
 
 // ============================================================================
@@ -51,12 +56,21 @@ void SpoolmanPanel::init_subjects() {
         return;
     }
 
+    // Initialize panel state subject (starts in LOADING state)
+    UI_SUBJECT_INIT_AND_REGISTER_INT(panel_state_subject_,
+                                     static_cast<int32_t>(SpoolmanPanelState::LOADING),
+                                     "spoolman_panel_state");
+
+    // Initialize spool count subject
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(spool_count_subject_, spool_count_buf_, "",
+                                        "spoolman_spool_count");
+
     // Register event callbacks BEFORE XML creation
     lv_xml_register_event_cb(nullptr, "on_spoolman_spool_row_clicked", on_spool_row_clicked);
     lv_xml_register_event_cb(nullptr, "on_spoolman_refresh_clicked", on_refresh_clicked);
 
     subjects_initialized_ = true;
-    spdlog::debug("[{}] Event callbacks registered", get_name());
+    spdlog::debug("[{}] Subjects initialized and event callbacks registered", get_name());
 }
 
 // ============================================================================
@@ -78,13 +92,6 @@ void SpoolmanPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     lv_obj_t* content = lv_obj_find_by_name(panel_, "overlay_content");
     if (content) {
         spool_list_ = lv_obj_find_by_name(content, "spool_list");
-        empty_state_ = lv_obj_find_by_name(content, "empty_state");
-        loading_state_ = lv_obj_find_by_name(content, "loading_state");
-
-        lv_obj_t* status_bar = lv_obj_find_by_name(content, "status_bar");
-        if (status_bar) {
-            spool_count_text_ = lv_obj_find_by_name(status_bar, "spool_count_text");
-        }
     }
 
     if (!spool_list_) {
@@ -142,47 +149,27 @@ void SpoolmanPanel::refresh_spools() {
 // ============================================================================
 
 void SpoolmanPanel::show_loading_state() {
-    if (spool_list_)
-        lv_obj_add_flag(spool_list_, LV_OBJ_FLAG_HIDDEN);
-    if (empty_state_)
-        lv_obj_add_flag(empty_state_, LV_OBJ_FLAG_HIDDEN);
-    if (loading_state_)
-        lv_obj_remove_flag(loading_state_, LV_OBJ_FLAG_HIDDEN);
+    lv_subject_set_int(&panel_state_subject_, static_cast<int32_t>(SpoolmanPanelState::LOADING));
 }
 
 void SpoolmanPanel::show_empty_state() {
-    if (spool_list_)
-        lv_obj_add_flag(spool_list_, LV_OBJ_FLAG_HIDDEN);
-    if (loading_state_)
-        lv_obj_add_flag(loading_state_, LV_OBJ_FLAG_HIDDEN);
-    if (empty_state_)
-        lv_obj_remove_flag(empty_state_, LV_OBJ_FLAG_HIDDEN);
-
+    lv_subject_set_int(&panel_state_subject_, static_cast<int32_t>(SpoolmanPanelState::EMPTY));
     update_spool_count();
 }
 
 void SpoolmanPanel::show_spool_list() {
-    if (empty_state_)
-        lv_obj_add_flag(empty_state_, LV_OBJ_FLAG_HIDDEN);
-    if (loading_state_)
-        lv_obj_add_flag(loading_state_, LV_OBJ_FLAG_HIDDEN);
-    if (spool_list_)
-        lv_obj_remove_flag(spool_list_, LV_OBJ_FLAG_HIDDEN);
-
+    lv_subject_set_int(&panel_state_subject_, static_cast<int32_t>(SpoolmanPanelState::SPOOLS));
     update_spool_count();
 }
 
 void SpoolmanPanel::update_spool_count() {
-    if (!spool_count_text_)
-        return;
-
     if (cached_spools_.empty()) {
-        lv_label_set_text(spool_count_text_, "");
+        lv_subject_copy_string(&spool_count_subject_, "");
     } else {
         char buf[32];
         snprintf(buf, sizeof(buf), "%zu spool%s", cached_spools_.size(),
                  cached_spools_.size() == 1 ? "" : "s");
-        lv_label_set_text(spool_count_text_, buf);
+        lv_subject_copy_string(&spool_count_subject_, buf);
     }
 }
 

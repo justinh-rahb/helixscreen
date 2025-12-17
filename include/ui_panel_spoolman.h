@@ -10,6 +10,15 @@
 #include <vector>
 
 /**
+ * @brief Panel display state for reactive visibility binding
+ */
+enum class SpoolmanPanelState : int32_t {
+    LOADING = 0, ///< Showing loading spinner
+    EMPTY = 1,   ///< Showing empty state (no spools)
+    SPOOLS = 2   ///< Showing spool list
+};
+
+/**
  * @brief Spoolman filament inventory panel
  *
  * Displays all spools from Spoolman server with 3D visualization,
@@ -50,14 +59,16 @@ class SpoolmanPanel : public PanelBase {
 
   private:
     // ========== UI Widget Pointers ==========
-    lv_obj_t* spool_list_ = nullptr;
-    lv_obj_t* empty_state_ = nullptr;
-    lv_obj_t* loading_state_ = nullptr;
-    lv_obj_t* spool_count_text_ = nullptr;
+    lv_obj_t* spool_list_ = nullptr; // Still needed for populate_spool_list()
 
     // ========== State ==========
     std::vector<SpoolInfo> cached_spools_;
     int active_spool_id_ = -1;
+
+    // ========== Subjects ==========
+    lv_subject_t panel_state_subject_; ///< Panel display state (loading/empty/spools)
+    lv_subject_t spool_count_subject_;
+    char spool_count_buf_[32];
 
     // ========== Private Methods ==========
     void populate_spool_list();

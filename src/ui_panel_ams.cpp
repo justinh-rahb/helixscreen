@@ -645,10 +645,10 @@ void AmsPanel::init_subjects() {
                            sizeof(picker_slot_indicator_buf_), "Assigning to Slot 1");
 
     // Initialize string subjects for color picker
-    lv_subject_init_string(&color_hex_subject_, color_hex_buf_, nullptr,
-                           sizeof(color_hex_buf_), "#808080");
-    lv_subject_init_string(&color_name_subject_, color_name_buf_, nullptr,
-                           sizeof(color_name_buf_), "Gray");
+    lv_subject_init_string(&color_hex_subject_, color_hex_buf_, nullptr, sizeof(color_hex_buf_),
+                           "#808080");
+    lv_subject_init_string(&color_name_subject_, color_name_buf_, nullptr, sizeof(color_name_buf_),
+                           "Gray");
 
     subjects_initialized_ = true;
     spdlog::debug("[{}] Subjects initialized via AmsState + observers registered", get_name());
@@ -1875,8 +1875,8 @@ void AmsPanel::show_spoolman_picker(int slot_index) {
     }
 
     // Update slot indicator text via subject
-    snprintf(picker_slot_indicator_buf_, sizeof(picker_slot_indicator_buf_),
-             "Assigning to Slot %d", slot_index + 1);
+    snprintf(picker_slot_indicator_buf_, sizeof(picker_slot_indicator_buf_), "Assigning to Slot %d",
+             slot_index + 1);
     lv_subject_copy_string(&picker_slot_indicator_subject_, picker_slot_indicator_buf_);
 
     // Bind slot indicator label to subject

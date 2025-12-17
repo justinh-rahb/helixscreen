@@ -85,6 +85,28 @@ void SettingsPanel::init_subjects() {
     // Initialize SettingsManager subjects (for reactive binding)
     SettingsManager::instance().init_subjects();
 
+    // Initialize slider value subjects (for reactive binding)
+    lv_subject_init_string(&scroll_throw_value_subject_, scroll_throw_value_buf_, nullptr,
+                           sizeof(scroll_throw_value_buf_), "25");
+    lv_xml_register_subject(nullptr, "scroll_throw_value", &scroll_throw_value_subject_);
+
+    lv_subject_init_string(&scroll_limit_value_subject_, scroll_limit_value_buf_, nullptr,
+                           sizeof(scroll_limit_value_buf_), "5");
+    lv_xml_register_subject(nullptr, "scroll_limit_value", &scroll_limit_value_subject_);
+
+    lv_subject_init_string(&brightness_value_subject_, brightness_value_buf_, nullptr,
+                           sizeof(brightness_value_buf_), "100%");
+    lv_xml_register_subject(nullptr, "brightness_value", &brightness_value_subject_);
+
+    // Initialize info row subjects (for reactive binding)
+    lv_subject_init_string(&version_value_subject_, version_value_buf_, nullptr,
+                           sizeof(version_value_buf_), "—");
+    lv_xml_register_subject(nullptr, "version_value", &version_value_subject_);
+
+    lv_subject_init_string(&printer_value_subject_, printer_value_buf_, nullptr,
+                           sizeof(printer_value_buf_), "—");
+    lv_xml_register_subject(nullptr, "printer_value", &printer_value_subject_);
+
     // Register XML event callbacks for dropdowns (already in XML)
     lv_xml_register_event_cb(nullptr, "on_completion_alert_changed",
                              on_completion_alert_dropdown_changed);
@@ -253,9 +275,9 @@ void SettingsPanel::setup_scroll_sliders() {
             // Set initial value from SettingsManager
             int value = settings.get_scroll_throw();
             lv_slider_set_value(scroll_throw_slider_, value, LV_ANIM_OFF);
-            if (scroll_throw_value_label_) {
-                lv_label_set_text_fmt(scroll_throw_value_label_, "%d", value);
-            }
+            // Update subject (label binding happens in XML)
+            snprintf(scroll_throw_value_buf_, sizeof(scroll_throw_value_buf_), "%d", value);
+            lv_subject_copy_string(&scroll_throw_value_subject_, scroll_throw_value_buf_);
             spdlog::debug("[{}]   ✓ Scroll throw slider", get_name());
         }
     }
@@ -271,9 +293,9 @@ void SettingsPanel::setup_scroll_sliders() {
             // Set initial value from SettingsManager
             int value = settings.get_scroll_limit();
             lv_slider_set_value(scroll_limit_slider_, value, LV_ANIM_OFF);
-            if (scroll_limit_value_label_) {
-                lv_label_set_text_fmt(scroll_limit_value_label_, "%d", value);
-            }
+            // Update subject (label binding happens in XML)
+            snprintf(scroll_limit_value_buf_, sizeof(scroll_limit_value_buf_), "%d", value);
+            lv_subject_copy_string(&scroll_limit_value_subject_, scroll_limit_value_buf_);
             spdlog::debug("[{}]   ✓ Scroll limit slider", get_name());
         }
     }
@@ -326,7 +348,8 @@ void SettingsPanel::populate_info_rows() {
     if (version_row) {
         version_value_ = lv_obj_find_by_name(version_row, "value");
         if (version_value_) {
-            lv_label_set_text(version_value_, helix_version());
+            // Update subject (label binding happens in XML)
+            lv_subject_copy_string(&version_value_subject_, helix_version());
             spdlog::debug("[{}]   ✓ Version: {}", get_name(), helix_version());
         }
     }
@@ -340,7 +363,8 @@ void SettingsPanel::populate_info_rows() {
             Config* config = Config::get_instance();
             std::string printer_name =
                 config->get<std::string>(config->df() + "printer_name", "Unknown");
-            lv_label_set_text(printer_value_, printer_name.c_str());
+            // Update subject (label binding happens in XML)
+            lv_subject_copy_string(&printer_value_subject_, printer_name.c_str());
             spdlog::debug("[{}]   ✓ Printer: {}", get_name(), printer_name);
         }
     }
@@ -536,7 +560,9 @@ void SettingsPanel::handle_display_settings_clicked() {
                 // Set initial value from settings
                 int brightness = SettingsManager::instance().get_brightness();
                 lv_slider_set_value(brightness_slider, brightness, LV_ANIM_OFF);
-                lv_label_set_text_fmt(brightness_label, "%d%%", brightness);
+                // Update subject (label binding happens in XML)
+                snprintf(brightness_value_buf_, sizeof(brightness_value_buf_), "%d%%", brightness);
+                lv_subject_copy_string(&brightness_value_subject_, brightness_value_buf_);
                 // Event handler already wired via XML event_cb
             }
 
@@ -778,10 +804,9 @@ void SettingsPanel::on_scroll_throw_changed(lv_event_t* e) {
     int value = lv_slider_get_value(slider);
     auto& panel = get_global_settings_panel();
     panel.handle_scroll_throw_changed(value);
-    // Update the value label
-    if (panel.scroll_throw_value_label_) {
-        lv_label_set_text_fmt(panel.scroll_throw_value_label_, "%d", value);
-    }
+    // Update subject (label binding happens in XML)
+    snprintf(panel.scroll_throw_value_buf_, sizeof(panel.scroll_throw_value_buf_), "%d", value);
+    lv_subject_copy_string(&panel.scroll_throw_value_subject_, panel.scroll_throw_value_buf_);
     LVGL_SAFE_EVENT_CB_END();
 }
 
@@ -791,10 +816,9 @@ void SettingsPanel::on_scroll_limit_changed(lv_event_t* e) {
     int value = lv_slider_get_value(slider);
     auto& panel = get_global_settings_panel();
     panel.handle_scroll_limit_changed(value);
-    // Update the value label
-    if (panel.scroll_limit_value_label_) {
-        lv_label_set_text_fmt(panel.scroll_limit_value_label_, "%d", value);
-    }
+    // Update subject (label binding happens in XML)
+    snprintf(panel.scroll_limit_value_buf_, sizeof(panel.scroll_limit_value_buf_), "%d", value);
+    lv_subject_copy_string(&panel.scroll_limit_value_subject_, panel.scroll_limit_value_buf_);
     LVGL_SAFE_EVENT_CB_END();
 }
 
@@ -945,14 +969,11 @@ void SettingsPanel::on_brightness_changed(lv_event_t* e) {
     int value = lv_slider_get_value(slider);
     SettingsManager::instance().set_brightness(value);
 
-    // Update label - find the label in the same container
-    auto* panel = get_global_settings_panel().display_settings_overlay_;
-    if (panel) {
-        lv_obj_t* label = lv_obj_find_by_name(panel, "brightness_value_label");
-        if (label) {
-            lv_label_set_text_fmt(label, "%d%%", value);
-        }
-    }
+    // Update subject (label binding happens in XML)
+    auto& panel_ref = get_global_settings_panel();
+    snprintf(panel_ref.brightness_value_buf_, sizeof(panel_ref.brightness_value_buf_), "%d%%",
+             value);
+    lv_subject_copy_string(&panel_ref.brightness_value_subject_, panel_ref.brightness_value_buf_);
     LVGL_SAFE_EVENT_CB_END();
 }
 
