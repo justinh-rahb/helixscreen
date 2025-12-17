@@ -26,6 +26,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -240,15 +241,30 @@ void PrintStatusPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     if (gcode_viewer_) {
         spdlog::debug("[{}]   ✓ G-code viewer widget found", get_name());
 
-        // Apply render mode from RuntimeConfig (command-line) or SettingsManager (persisted)
+        // Apply render mode - priority: cmdline > env var > settings
+        // Note: HELIX_GCODE_MODE env var is handled at widget creation, so we only
+        // override if there's an explicit command-line option or if no env var was set
         const auto& config = get_runtime_config();
-        int render_mode_val = config.gcode_render_mode >= 0
-                                  ? config.gcode_render_mode
-                                  : SettingsManager::instance().get_gcode_render_mode();
-        auto render_mode = static_cast<gcode_viewer_render_mode_t>(render_mode_val);
-        ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
-        spdlog::info("[{}]   ✓ Set G-code render mode: {} ({})", get_name(), render_mode_val,
-                     config.gcode_render_mode >= 0 ? "cmdline" : "settings");
+        const char* env_mode = std::getenv("HELIX_GCODE_MODE");
+
+        if (config.gcode_render_mode >= 0) {
+            // Command line takes highest priority
+            auto render_mode = static_cast<gcode_viewer_render_mode_t>(config.gcode_render_mode);
+            ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
+            spdlog::info("[{}]   ✓ Set G-code render mode: {} (cmdline)", get_name(),
+                         config.gcode_render_mode);
+        } else if (env_mode) {
+            // Env var already applied at widget creation - just log
+            spdlog::info("[{}]   ✓ G-code render mode: {} (env var)", get_name(),
+                         ui_gcode_viewer_is_using_2d_mode(gcode_viewer_) ? "2D" : "3D");
+        } else {
+            // No cmdline or env var - apply saved settings
+            int render_mode_val = SettingsManager::instance().get_gcode_render_mode();
+            auto render_mode = static_cast<gcode_viewer_render_mode_t>(render_mode_val);
+            ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
+            spdlog::info("[{}]   ✓ Set G-code render mode: {} (settings)", get_name(),
+                         render_mode_val);
+        }
 
         // Register long-press callback for exclude object feature
         ui_gcode_viewer_set_object_long_press_callback(gcode_viewer_, on_object_long_pressed, this);

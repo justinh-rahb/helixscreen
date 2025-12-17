@@ -601,6 +601,58 @@ If issues discovered:
 
 ---
 
+## Future Work: GPU Detection for 3D Mode
+
+### Problem
+
+Currently, G-code render mode defaults to 2D everywhere because TinyGL (software rasterization) is too slow (~3 FPS on desktop). However, this means hardware with real GPU acceleration (Pi with working OpenGL ES, future hardware) would also default to 2D unnecessarily.
+
+### Current Behavior (2025-12-17)
+
+| Source | Priority | Behavior |
+|--------|----------|----------|
+| `--gcode-render-mode` CLI | 1 (highest) | Explicit mode selection |
+| `HELIX_GCODE_MODE` env var | 2 | `3D` or `2D` override |
+| Settings | 3 (lowest) | Saved preference (default: 2D) |
+
+### Desired Behavior
+
+```cpp
+// At startup, detect actual rendering capability
+if (has_real_opengl_es()) {
+    // Pi with working GPU, future hardware with real GL
+    default_mode = GCODE_VIEWER_RENDER_3D;
+} else if (has_tinygl_only()) {
+    // Software rasterization - always too slow (~3 FPS)
+    default_mode = GCODE_VIEWER_RENDER_2D_LAYER;
+} else {
+    // No 3D capability at all (AD5M)
+    default_mode = GCODE_VIEWER_RENDER_2D_LAYER;
+}
+```
+
+### Detection Options
+
+1. **Compile-time flag**: `HELIX_ENABLE_OPENGLES` indicates real GPU support was built in
+2. **Runtime GL query**: Check `glGetString(GL_RENDERER)` for "TinyGL" vs real driver name
+3. **Startup benchmark**: Render test frames, measure actual FPS, cache result
+
+### Blocked By
+
+- Phase 2 partial: LVGL's OpenGL ES draw backend has C++11 raw string literal issues in shader `.c` files
+- Need working OpenGL ES on Pi before GPU detection is useful
+
+### Benchmark Reference (Desktop, OrcaCube 1.1M triangles)
+
+| Mode | Performance | Notes |
+|------|-------------|-------|
+| 3D TinyGL | 3.2 FPS (310ms/frame) | Software rasterization, always slow |
+| 2D Layer (cache build) | ~2 FPS | Temporary, during progressive cache |
+| 2D Layer (steady state) | 60+ FPS | Just canvas blit after cache built |
+| 2D Ghost (background) | 7ms total | All 151 layers, non-blocking |
+
+---
+
 ## Status Tracking
 
 Update this section after each phase:
@@ -610,8 +662,8 @@ Update this section after each phase:
 | 1 | ✅ Complete | 2025-12-15 | 2025-12-15 | TinyGL disabled, NEON enabled, 2D renderer API compatibility |
 | 2 | ⚠️ Partial | 2025-12-16 | 2025-12-16 | DRM ✅, SDL GPU ❌ (rendering corruption), OpenGL ES ❌ (LVGL C++11 issue) |
 | 3 | ✅ Complete | 2025-12-16 | 2025-12-16 | Native + Pi builds verified |
-| 4 | ⬜ Not Started | - | - | |
-| 5 | ⬜ Not Started | - | - | |
+| 4 | ✅ Complete | 2025-12-16 | 2025-12-16 | 2D heatmap with FPS-based auto-detection, triangle blending, touch support |
+| 5 | ✅ Complete | 2025-12-16 | 2025-12-17 | 2D layer renderer with progressive caching, background thread ghost (6ms for 63K segments!) |
 | 6 | ⬜ Not Started | - | - | Image optimization - critical for AD5M perf (PNG decode bottleneck) |
 
 **Status Legend**: ⬜ Not Started | 🔄 In Progress | ✅ Complete | ⚠️ Blocked
@@ -642,6 +694,29 @@ Record progress across sessions:
   - `AsyncBuildResult` struct needed conditional geometry members
   - `color_count` variable scope issue (fixed)
 - Next steps: Phase 2 (Pi OpenGL ES integration)
+
+### Session 2025-12-17 (continued)
+- **Render mode refactor**: Changed default from AUTO (FPS-based) to 2D (always)
+  - TinyGL is ~3 FPS on ALL platforms (software rasterization) - never usable
+  - Removed FPS-based auto-detection (was measuring cache-build phase incorrectly)
+  - Added `HELIX_GCODE_MODE` env var override (3D/2D) for dev/testing
+  - Priority: cmdline > env var > settings
+  - Updated `helixconfig.json.template` with `gcode_render_mode` option
+  - Documented future GPU detection work for when real OpenGL ES is available
+
+### Session 2025-12-17
+- Phase 5: ✅ Complete
+  - **Background thread ghost rendering**: Moved ghost layer rendering from progressive main-thread to background thread
+  - Performance: 241 layers, 63,773 segments rendered in **6ms** (non-blocking)
+  - Thread safety: Used `std::chrono::steady_clock` instead of `lv_tick_get()`, captured all shared state at thread start
+  - Software Bresenham line drawing to raw ARGB8888 buffer (LVGL not thread-safe)
+  - Critical review agent found 5 issues, all fixed:
+    1. `lv_tick_get()` from background thread → `std::chrono`
+    2. Data race on visibility flags → captured at thread start
+    3. Data race on colors → captured at thread start
+    4. Thread lifecycle bug → always join regardless of running flag
+    5. Buffer stride mismatch → dimension validation + row-by-row fallback
+  - Commit: `f3afdb2`
 
 ### Session 2025-12-16
 - Phase 2: ⚠️ Partial

@@ -3,7 +3,6 @@
 
 #include "ui_panel_gcode_test.h"
 
-#include "settings_manager.h"
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_gcode_viewer.h"
@@ -11,10 +10,12 @@
 
 #include "printer_state.h"
 #include "runtime_config.h"
+#include "settings_manager.h"
 
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <dirent.h>
 #include <memory>
 #include <string>
@@ -100,16 +101,31 @@ void GcodeTestPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     // Apply runtime config camera settings
     apply_runtime_config();
 
-    // Apply render mode from RuntimeConfig (command-line) or SettingsManager (persisted)
+    // Apply render mode - priority: cmdline > env var > settings
+    // Note: HELIX_GCODE_MODE env var is handled at widget creation
     const RuntimeConfig& rt_config = get_runtime_config();
-    int render_mode_val = rt_config.gcode_render_mode >= 0
-                              ? rt_config.gcode_render_mode
-                              : SettingsManager::instance().get_gcode_render_mode();
-    auto render_mode = static_cast<gcode_viewer_render_mode_t>(render_mode_val);
-    ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
-    spdlog::info("[{}] Render mode: {} ({}) [{}]", get_name(), render_mode_val,
-                 render_mode_val == 0 ? "Auto" : (render_mode_val == 1 ? "3D" : "2D Layers"),
-                 rt_config.gcode_render_mode >= 0 ? "cmdline" : "settings");
+    const char* env_mode = std::getenv("HELIX_GCODE_MODE");
+
+    if (rt_config.gcode_render_mode >= 0) {
+        // Command line takes highest priority
+        auto render_mode = static_cast<gcode_viewer_render_mode_t>(rt_config.gcode_render_mode);
+        ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
+        spdlog::info("[{}] Render mode: {} ({}) [cmdline]", get_name(), rt_config.gcode_render_mode,
+                     rt_config.gcode_render_mode == 0   ? "Auto"
+                     : rt_config.gcode_render_mode == 1 ? "3D"
+                                                        : "2D Layers");
+    } else if (env_mode) {
+        // Env var already applied at widget creation - just log
+        spdlog::info("[{}] Render mode: {} [env var HELIX_GCODE_MODE]", get_name(),
+                     ui_gcode_viewer_is_using_2d_mode(gcode_viewer_) ? "2D" : "3D");
+    } else {
+        // No cmdline or env var - apply saved settings
+        int render_mode_val = SettingsManager::instance().get_gcode_render_mode();
+        auto render_mode = static_cast<gcode_viewer_render_mode_t>(render_mode_val);
+        ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
+        spdlog::info("[{}] Render mode: {} ({}) [settings]", get_name(), render_mode_val,
+                     render_mode_val == 0 ? "Auto" : (render_mode_val == 1 ? "3D" : "2D Layers"));
+    }
 
     // Register callback for async load completion
     ui_gcode_viewer_set_load_callback(gcode_viewer_, on_gcode_load_complete_static, this);

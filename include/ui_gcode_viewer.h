@@ -57,18 +57,23 @@ typedef enum {
  * @brief Render mode for G-code visualization
  *
  * Controls which renderer is used for displaying G-code:
- * - AUTO: Automatically detects based on FPS performance. Falls back to 2D layer view
- *         if rendering becomes too slow (< 15 FPS average).
- * - 3D: Forces 3D TinyGL renderer (isometric ribbon view with full camera control)
- * - 2D_LAYER: Forces 2D orthographic layer view (top-down, single layer at a time)
+ * - AUTO: Uses 2D layer view by default. Can be overridden via HELIX_GCODE_MODE env var.
+ * - 3D: Forces 3D TinyGL renderer (isometric ribbon view with full camera control).
+ *       Only useful for development/testing - TinyGL is too slow for production use.
+ * - 2D_LAYER: Forces 2D orthographic layer view (front/top view, single layer at a time)
  *
- * The 2D layer view is optimized for low-power hardware (AD5M) that can't maintain
- * smooth framerates with 3D rendering.
+ * The 2D layer view is the default because TinyGL software rasterization is too slow
+ * for smooth interaction (~3-4 FPS) on ALL platforms, not just low-power hardware.
+ *
+ * Environment variable override (checked at widget creation):
+ * - HELIX_GCODE_MODE=3D  → Use 3D TinyGL (for development/testing)
+ * - HELIX_GCODE_MODE=2D  → Use 2D layer view (explicit)
+ * - Not set              → Use 2D layer view (default)
  */
 typedef enum {
-    GCODE_VIEWER_RENDER_AUTO,     ///< Auto-detect based on FPS (default)
-    GCODE_VIEWER_RENDER_3D,       ///< Force 3D TinyGL renderer
-    GCODE_VIEWER_RENDER_2D_LAYER  ///< Force 2D orthographic layer view
+    GCODE_VIEWER_RENDER_AUTO,    ///< Auto-select (2D default, env var override)
+    GCODE_VIEWER_RENDER_3D,      ///< Force 3D TinyGL renderer (dev/testing only)
+    GCODE_VIEWER_RENDER_2D_LAYER ///< Force 2D orthographic layer view (default)
 } gcode_viewer_render_mode_t;
 
 /**

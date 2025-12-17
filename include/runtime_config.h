@@ -68,7 +68,8 @@ struct RuntimeConfig {
     bool gcode_camera_zoom_set = false;      ///< Whether zoom was set via command line
     float gcode_camera_zoom = 1.0f;          ///< Camera zoom level (--gcode-zoom)
     bool gcode_debug_colors = false; ///< Enable per-face debug coloring (--gcode-debug-colors)
-    int gcode_render_mode = -1; ///< G-code render mode override (-1=use settings, 0=auto, 1=3D, 2=2D)
+    int gcode_render_mode =
+        -1; ///< G-code render mode override (-1=use settings, 0=auto, 1=3D, 2=2D)
 
     // Mock simulation options
     double sim_speedup = 1.0;    ///< Simulation speedup factor (--sim-speed, requires --test)

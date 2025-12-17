@@ -26,15 +26,15 @@
 #include "gcode_renderer.h"
 #endif
 
-// FPS tracking constants (same pattern as bed mesh renderer)
+// FPS tracking constants (for diagnostic logging, not mode selection)
 constexpr size_t GCODE_FPS_WINDOW_SIZE = 10; // Rolling window of frame times
-constexpr float GCODE_FPS_THRESHOLD = 15.0f; // Fall back to 2D if below this FPS
 
 #include <lvgl/src/xml/lv_xml_parser.h>
 #include <lvgl/src/xml/parsers/lv_xml_obj_parser.h>
 #include <spdlog/spdlog.h>
 
 #include <atomic>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <memory>
@@ -54,11 +54,36 @@ class GCodeViewerState {
         camera_ = std::make_unique<helix::gcode::GCodeCamera>();
 #ifdef ENABLE_TINYGL_3D
         renderer_ = std::make_unique<helix::gcode::GCodeTinyGLRenderer>();
-        spdlog::debug("[GCode Viewer] Using TinyGL 3D renderer");
+        spdlog::debug("[GCode Viewer] TinyGL 3D renderer available");
 #else
         renderer_ = std::make_unique<helix::gcode::GCodeRenderer>();
-        spdlog::debug("[GCode Viewer] Using LVGL 2D renderer");
+        spdlog::debug("[GCode Viewer] Using LVGL 2D renderer (TinyGL disabled)");
 #endif
+
+        // Check HELIX_GCODE_MODE env var for render mode override
+        // Default is 2D (TinyGL is too slow for production on ALL platforms)
+        const char* mode_env = std::getenv("HELIX_GCODE_MODE");
+        if (mode_env) {
+            if (std::strcmp(mode_env, "3D") == 0) {
+#ifdef ENABLE_TINYGL_3D
+                render_mode_ = GCODE_VIEWER_RENDER_3D;
+                spdlog::info("[GCode Viewer] HELIX_GCODE_MODE=3D: forcing 3D TinyGL renderer");
+#else
+                spdlog::warn("[GCode Viewer] HELIX_GCODE_MODE=3D ignored: TinyGL not available");
+                render_mode_ = GCODE_VIEWER_RENDER_2D_LAYER;
+#endif
+            } else if (std::strcmp(mode_env, "2D") == 0) {
+                render_mode_ = GCODE_VIEWER_RENDER_2D_LAYER;
+                spdlog::info("[GCode Viewer] HELIX_GCODE_MODE=2D: using 2D layer renderer");
+            } else {
+                spdlog::warn("[GCode Viewer] Unknown HELIX_GCODE_MODE='{}', using 2D", mode_env);
+                render_mode_ = GCODE_VIEWER_RENDER_2D_LAYER;
+            }
+        } else {
+            // Default: 2D layer renderer (TinyGL is ~3-4 FPS everywhere)
+            render_mode_ = GCODE_VIEWER_RENDER_2D_LAYER;
+            spdlog::debug("[GCode Viewer] Default render mode: 2D layer");
+        }
     }
 
     ~GCodeViewerState() {
@@ -178,37 +203,34 @@ class GCodeViewerState {
     lv_obj_t* loading_label{nullptr};
 
     // ========================================================================
-    // Render Mode & FPS Tracking (Phase 5: 2D Layer View)
+    // Render Mode (Phase 5: 2D Layer View)
     // ========================================================================
 
-    /// 2D orthographic layer renderer (for AD5M / low-power hardware)
+    /// 2D orthographic layer renderer (default for all platforms)
     std::unique_ptr<helix::gcode::GCodeLayerRenderer> layer_renderer_2d_;
 
     /// Print progress layer (set via ui_gcode_viewer_set_print_progress)
     /// -1 means "show all layers" (preview mode), >= 0 means "show up to this layer"
     int print_progress_layer_{-1};
 
-    /// Render mode setting (AUTO/3D/2D_LAYER)
-    gcode_viewer_render_mode_t render_mode_{GCODE_VIEWER_RENDER_AUTO};
+    /// Render mode setting - set by constructor based on HELIX_GCODE_MODE env var
+    /// Default is 2D_LAYER (TinyGL is too slow for production use everywhere)
+    gcode_viewer_render_mode_t render_mode_{GCODE_VIEWER_RENDER_2D_LAYER};
 
-    /// In AUTO mode, true if we've fallen back to 2D due to low FPS
-    bool auto_fallback_to_2d_{false};
+    /// Helper to check if currently using 2D layer renderer
+    /// AUTO mode now defaults to 2D (no FPS-based detection)
+    bool is_using_2d_mode() const {
+        // Only GCODE_VIEWER_RENDER_3D uses 3D renderer
+        // AUTO and 2D_LAYER both use 2D layer renderer
+        return render_mode_ != GCODE_VIEWER_RENDER_3D;
+    }
 
-    /// FPS sample buffer for AUTO mode evaluation
+    // FPS tracking kept for debugging/diagnostics but not used for mode selection
     float fps_samples_[GCODE_FPS_WINDOW_SIZE]{0};
     size_t fps_sample_index_{0};
     size_t fps_sample_count_{0};
 
-    /// Helper to check if currently using 2D layer renderer
-    bool is_using_2d_mode() const {
-        if (render_mode_ == GCODE_VIEWER_RENDER_2D_LAYER)
-            return true;
-        if (render_mode_ == GCODE_VIEWER_RENDER_AUTO && auto_fallback_to_2d_)
-            return true;
-        return false;
-    }
-
-    /// Record a frame time for FPS tracking (for AUTO mode evaluation)
+    /// Record a frame time for FPS tracking (diagnostic only)
     void record_frame_time(float ms) {
         fps_samples_[fps_sample_index_] = ms;
         fps_sample_index_ = (fps_sample_index_ + 1) % GCODE_FPS_WINDOW_SIZE;
@@ -217,7 +239,7 @@ class GCodeViewerState {
         }
     }
 
-    /// Calculate average FPS from sample buffer
+    /// Calculate average FPS from sample buffer (diagnostic only)
     float get_average_fps() const {
         if (fps_sample_count_ == 0)
             return 0.0f;
@@ -229,7 +251,7 @@ class GCodeViewerState {
         return (avg_ms > 0.0f) ? (1000.0f / avg_ms) : 0.0f;
     }
 
-    /// Check if we have enough FPS data to evaluate mode
+    /// Check if we have enough FPS data (diagnostic only)
     bool has_enough_fps_data() const {
         return fps_sample_count_ >= GCODE_FPS_WINDOW_SIZE;
     }
@@ -1152,18 +1174,15 @@ void ui_gcode_viewer_set_render_mode(lv_obj_t* obj, gcode_viewer_render_mode_t m
 
     st->render_mode_ = mode;
 
-    // Reset auto-fallback flag when mode changes
-    st->auto_fallback_to_2d_ = false;
-
-    // Reset FPS samples when switching modes
+    // Reset FPS samples when switching modes (diagnostic tracking)
     st->fps_sample_count_ = 0;
     st->fps_sample_index_ = 0;
 
-    const char* mode_names[] = {"AUTO", "3D", "2D_LAYER"};
+    const char* mode_names[] = {"AUTO (2D)", "3D", "2D_LAYER"};
     spdlog::info("[GCode Viewer] Render mode set to {}", mode_names[static_cast<int>(mode)]);
 
-    // If forcing 2D mode, ensure the 2D renderer is initialized
-    if (mode == GCODE_VIEWER_RENDER_2D_LAYER && st->gcode_file && !st->layer_renderer_2d_) {
+    // If using 2D mode (AUTO or 2D_LAYER), ensure the 2D renderer is initialized
+    if (st->is_using_2d_mode() && st->gcode_file && !st->layer_renderer_2d_) {
         st->layer_renderer_2d_ = std::make_unique<helix::gcode::GCodeLayerRenderer>();
         st->layer_renderer_2d_->set_gcode(st->gcode_file.get());
 
@@ -1188,33 +1207,14 @@ void ui_gcode_viewer_evaluate_render_mode(lv_obj_t* obj) {
     if (!st)
         return;
 
-    // Only evaluate in AUTO mode
-    if (st->render_mode_ != GCODE_VIEWER_RENDER_AUTO)
-        return;
+    // No-op: AUTO mode now defaults to 2D without FPS-based detection
+    // This function is kept for API compatibility but does nothing
+    // Render mode is determined at widget creation based on HELIX_GCODE_MODE env var
 
-    // Need enough samples to make a decision
-    if (!st->has_enough_fps_data()) {
-        spdlog::debug("[GCode Viewer] Not enough FPS data for mode evaluation ({} samples)",
-                      st->fps_sample_count_);
-        return;
-    }
-
-    float avg_fps = st->get_average_fps();
-    spdlog::debug("[GCode Viewer] Evaluating render mode: avg FPS = {:.1f} (threshold: {:.1f})",
-                  avg_fps, GCODE_FPS_THRESHOLD);
-
-    // If FPS is below threshold and not already in fallback mode, switch to 2D
-    if (avg_fps < GCODE_FPS_THRESHOLD && !st->auto_fallback_to_2d_) {
-        st->auto_fallback_to_2d_ = true;
-        spdlog::info("[GCode Viewer] AUTO mode: falling back to 2D layer view (avg FPS {:.1f} < "
-                     "{:.1f} threshold)",
-                     avg_fps, GCODE_FPS_THRESHOLD);
-
-        // Reset FPS samples for the new renderer
-        st->fps_sample_count_ = 0;
-        st->fps_sample_index_ = 0;
-
-        lv_obj_invalidate(obj);
+    if (st->has_enough_fps_data()) {
+        float avg_fps = st->get_average_fps();
+        spdlog::debug("[GCode Viewer] FPS diagnostic: avg {:.1f} (mode: {})",
+                      avg_fps, st->is_using_2d_mode() ? "2D" : "3D");
     }
 }
 

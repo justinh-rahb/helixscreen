@@ -676,11 +676,9 @@ void SettingsPanel::handle_display_settings_clicked() {
                 // Set initial selection based on current setting
                 int current_mode = SettingsManager::instance().get_gcode_render_mode();
                 lv_dropdown_set_selected(gcode_dropdown, current_mode);
-                spdlog::debug("[{}] G-code mode dropdown initialized to {} ({})", get_name(),
-                              current_mode,
-                              current_mode == 0   ? "Auto"
-                              : (current_mode == 1 ? "3D"
-                                                   : "2D Layers"));
+                spdlog::debug(
+                    "[{}] G-code mode dropdown initialized to {} ({})", get_name(), current_mode,
+                    current_mode == 0 ? "Auto" : (current_mode == 1 ? "3D" : "2D Layers"));
             }
 
             // Initially hidden
