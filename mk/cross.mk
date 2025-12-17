@@ -31,7 +31,11 @@ ifeq ($(PLATFORM_TARGET),pi)
     TARGET_CFLAGS := -march=armv8-a -I/usr/aarch64-linux-gnu/include -I/usr/include/libdrm -Wno-error=conversion -Wno-error=sign-conversion
     DISPLAY_BACKEND := drm
     ENABLE_SDL := no
-    ENABLE_TINYGL_3D := yes
+    # OpenGL ES draw backend disabled - LVGL's implementation requires GLAD loader
+    # infrastructure which adds complexity. DRM + software rendering is efficient
+    # enough for UI with proper page flipping. TinyGL disabled for now (G-code preview).
+    ENABLE_OPENGLES := no
+    ENABLE_TINYGL_3D := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := pi
     # Strip binary for size - embedded targets don't need debug symbols
@@ -184,6 +188,16 @@ ifdef FB_COLOR_DEPTH
     CXXFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
     SUBMODULE_CFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
     SUBMODULE_CXXFLAGS += -DLV_COLOR_DEPTH_OVERRIDE=$(FB_COLOR_DEPTH)
+endif
+
+# OpenGL ES support for GPU-accelerated rendering (Pi with VideoCore GPU)
+ifeq ($(ENABLE_OPENGLES),yes)
+    CFLAGS += -DHELIX_ENABLE_OPENGLES
+    CXXFLAGS += -DHELIX_ENABLE_OPENGLES
+    SUBMODULE_CFLAGS += -DHELIX_ENABLE_OPENGLES
+    SUBMODULE_CXXFLAGS += -DHELIX_ENABLE_OPENGLES
+    # Linker flags for OpenGL ES / EGL / GBM
+    LDFLAGS += -lGLESv2 -lEGL -lgbm
 endif
 
 # =============================================================================

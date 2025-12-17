@@ -177,7 +177,9 @@ OBJ_DIR ?= $(BUILD_DIR)/obj
 LVGL_DIR := lib/lvgl
 # Use -isystem to suppress warnings from third-party headers in strict mode
 LVGL_INC := -isystem $(LVGL_DIR) -isystem $(LVGL_DIR)/src
-LVGL_SRCS := $(shell find $(LVGL_DIR)/src -name "*.c" 2>/dev/null)
+# Exclude the standalone OpenGL ES display driver (uses GLAD, requires external headers)
+# We use DRM for display + the draw backend in src/draw/opengles/ (via LV_USE_DRAW_OPENGLES)
+LVGL_SRCS := $(shell find $(LVGL_DIR)/src -name "*.c" -not -path "*/drivers/opengles/*" 2>/dev/null)
 LVGL_OBJS := $(patsubst $(LVGL_DIR)/%.c,$(OBJ_DIR)/lvgl/%.o,$(LVGL_SRCS))
 
 # ThorVG sources (.cpp files for SVG support)

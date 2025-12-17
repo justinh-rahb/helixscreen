@@ -246,8 +246,18 @@
 /* Use Renesas Dave2D on RA  platforms. */
 #define LV_USE_DRAW_DAVE2D 0
 
-/* Draw using cached SDL textures*/
-#define LV_USE_DRAW_SDL 0
+/* Draw using cached SDL textures - GPU-accelerated on desktop (Metal/OpenGL) */
+#ifdef HELIX_DISPLAY_SDL
+    #define LV_USE_DRAW_SDL 1
+#else
+    #define LV_USE_DRAW_SDL 0
+#endif
+
+/* Draw using OpenGL ES textures.
+ * NOTE: LVGL's OpenGL ES draw backend requires the GLAD-based display driver
+ * infrastructure, which adds complexity. For Pi we use DRM display with
+ * software rendering - still efficient via page flipping. */
+#define LV_USE_DRAW_OPENGLES 0
 
 /* Use VG-Lite GPU. */
 #define LV_USE_DRAW_VG_LITE 0
@@ -1089,6 +1099,15 @@
 /*Driver for /dev/dri/card*/
 #ifdef HELIX_DISPLAY_DRM
     #define LV_USE_LINUX_DRM        1
+
+    /* Enable EGL/GBM for GPU-accelerated rendering on Pi */
+    #ifdef HELIX_ENABLE_OPENGLES
+        #define LV_USE_LINUX_DRM_GBM_BUFFERS 1
+        #define LV_LINUX_DRM_USE_EGL         1
+    #else
+        #define LV_USE_LINUX_DRM_GBM_BUFFERS 0
+        #define LV_LINUX_DRM_USE_EGL         0
+    #endif
 #else
     #define LV_USE_LINUX_DRM        0
 #endif
