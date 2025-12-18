@@ -54,6 +54,7 @@
 #include "ui_text.h"
 #include "ui_text_input.h"
 #include "ui_theme.h"
+#include "ui_retraction_settings.h"
 #include "ui_timelapse_settings.h"
 #include "ui_toast.h"
 #include "ui_utils.h"
@@ -508,6 +509,9 @@ static void initialize_subjects() {
     init_global_timelapse_settings(get_printer_state(),
                                    nullptr);         // Initialize timelapse settings overlay
     get_global_timelapse_settings().init_subjects(); // Timelapse settings callbacks
+    init_global_retraction_settings(get_printer_state(),
+                                    nullptr);          // Initialize retraction settings overlay
+    get_global_retraction_settings().init_subjects(); // Retraction settings callbacks
     init_global_console_panel(get_printer_state(),
                               nullptr);         // Initialize console panel
     get_global_console_panel().init_subjects(); // Console panel callbacks
@@ -569,14 +573,14 @@ static void initialize_subjects() {
         usb_manager->set_drive_callback([](UsbEvent event, const UsbDrive& drive) {
             (void)drive; // Currently not using drive info in messages
             if (event == UsbEvent::DRIVE_INSERTED) {
-                ui_notification_success("USB drive connected");
+                NOTIFY_SUCCESS("USB drive connected");
 
                 // Show USB tab in PrintSelectPanel
                 if (print_select_panel) {
                     print_select_panel->on_usb_drive_inserted();
                 }
             } else if (event == UsbEvent::DRIVE_REMOVED) {
-                ui_notification_info("USB drive removed");
+                NOTIFY_INFO("USB drive removed");
 
                 // Hide USB tab and switch to Printer source if viewing USB
                 if (print_select_panel) {
@@ -817,11 +821,15 @@ static void initialize_moonraker_client(Config* config) {
         }
 
         if (evt.is_error) {
-            ui_notification_error(title, evt.message.c_str(),
-                                  evt.type == MoonrakerEventType::CONNECTION_FAILED ||
-                                      evt.type == MoonrakerEventType::KLIPPY_DISCONNECTED);
+            bool is_critical = (evt.type == MoonrakerEventType::CONNECTION_FAILED ||
+                                evt.type == MoonrakerEventType::KLIPPY_DISCONNECTED);
+            if (is_critical) {
+                NOTIFY_ERROR_MODAL(title, "{}", evt.message);
+            } else {
+                NOTIFY_ERROR_T(title, "{}", evt.message);
+            }
         } else {
-            ui_notification_warning(evt.message.c_str());
+            NOTIFY_WARNING("{}", evt.message);
         }
     });
 

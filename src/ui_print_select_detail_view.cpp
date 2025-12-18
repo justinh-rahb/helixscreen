@@ -86,6 +86,10 @@ bool PrintSelectDetailView::create(lv_obj_t* parent_screen) {
     nozzle_clean_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "nozzle_clean_checkbox");
     timelapse_checkbox_ = lv_obj_find_by_name(detail_view_widget_, "timelapse_checkbox");
 
+    // Look up color requirements display
+    color_requirements_card_ = lv_obj_find_by_name(detail_view_widget_, "color_requirements_card");
+    color_swatches_row_ = lv_obj_find_by_name(detail_view_widget_, "color_swatches_row");
+
     // Initialize print preparation manager
     prep_manager_ = std::make_unique<PrintPreparationManager>();
 
@@ -109,7 +113,8 @@ void PrintSelectDetailView::set_dependencies(MoonrakerAPI* api, PrinterState* pr
 // ============================================================================
 
 void PrintSelectDetailView::show(const std::string& filename, const std::string& current_path,
-                                 const std::string& filament_type) {
+                                 const std::string& filament_type,
+                                 const std::vector<std::string>& filament_colors) {
     if (!detail_view_widget_) {
         spdlog::warn("[DetailView] Cannot show: widget not created");
         return;
@@ -128,6 +133,9 @@ void PrintSelectDetailView::show(const std::string& filename, const std::string&
         spdlog::debug("[DetailView] Set filament dropdown to {} (index {})", filament_type, index);
     }
 
+    // Update color requirements display
+    update_color_swatches(filament_colors);
+
     // Use nav system for consistent backdrop and z-order management
     ui_nav_push_overlay(detail_view_widget_);
 
@@ -135,7 +143,8 @@ void PrintSelectDetailView::show(const std::string& filename, const std::string&
         lv_subject_set_int(visible_subject_, 1);
     }
 
-    spdlog::debug("[DetailView] Showing detail view for: {}", filename);
+    spdlog::debug("[DetailView] Showing detail view for: {} ({} colors)", filename,
+                  filament_colors.size());
 }
 
 void PrintSelectDetailView::hide() {
@@ -265,6 +274,76 @@ void PrintSelectDetailView::on_cancel_delete_static(lv_event_t* e) {
     if (self) {
         self->hide_delete_confirmation();
     }
+}
+
+void PrintSelectDetailView::update_color_swatches(const std::vector<std::string>& colors) {
+    if (!color_requirements_card_ || !color_swatches_row_) {
+        return;
+    }
+
+    // Hide card if no colors or single color (single-color prints don't need this display)
+    if (colors.size() <= 1) {
+        lv_obj_add_flag(color_requirements_card_, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    // Clear existing swatches
+    lv_obj_clean(color_swatches_row_);
+
+    // Create swatches for each color
+    for (size_t i = 0; i < colors.size(); ++i) {
+        const std::string& hex_color = colors[i];
+
+        // Create swatch container with tool number label
+        lv_obj_t* swatch = lv_obj_create(color_swatches_row_);
+        lv_obj_remove_style_all(swatch);
+        lv_obj_set_flex_grow(swatch, 1);
+        lv_obj_set_height(swatch, LV_PCT(100));
+        lv_obj_set_style_radius(swatch, 4, 0);
+        lv_obj_set_style_border_width(swatch, 1, 0);
+        lv_obj_set_style_border_color(swatch, lv_color_white(), 0);
+        lv_obj_set_style_border_opa(swatch, 30, 0);
+        lv_obj_remove_flag(swatch, LV_OBJ_FLAG_SCROLLABLE);
+
+        // Parse and set background color
+        if (!hex_color.empty()) {
+            lv_color_t color = ui_theme_parse_color(hex_color.c_str());
+            lv_obj_set_style_bg_color(swatch, color, 0);
+            lv_obj_set_style_bg_opa(swatch, LV_OPA_COVER, 0);
+        } else {
+            // Empty color - show gray placeholder
+            lv_obj_set_style_bg_color(swatch, lv_color_hex(0x808080), 0);
+            lv_obj_set_style_bg_opa(swatch, LV_OPA_COVER, 0);
+        }
+
+        // Add tool number label (T0, T1, etc.)
+        lv_obj_t* label = lv_label_create(swatch);
+        char tool_str[8];
+        snprintf(tool_str, sizeof(tool_str), "T%zu", i);
+        lv_label_set_text(label, tool_str);
+        lv_obj_center(label);
+        lv_obj_set_style_text_font(label, UI_FONT_SMALL, 0);
+
+        // Use contrasting text color based on background brightness
+        if (!hex_color.empty()) {
+            // Simple brightness check: if hex value is > 0x808080, use dark text
+            uint32_t rgb = 0;
+            if (hex_color[0] == '#' && hex_color.length() >= 7) {
+                rgb = static_cast<uint32_t>(std::stoul(hex_color.substr(1, 6), nullptr, 16));
+            }
+            int r = (rgb >> 16) & 0xFF;
+            int g = (rgb >> 8) & 0xFF;
+            int b = rgb & 0xFF;
+            int brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            lv_color_t text_color = brightness > 128 ? lv_color_black() : lv_color_white();
+            lv_obj_set_style_text_color(label, text_color, 0);
+        }
+    }
+
+    // Show the card
+    lv_obj_remove_flag(color_requirements_card_, LV_OBJ_FLAG_HIDDEN);
+
+    spdlog::debug("[DetailView] Updated color swatches: {} colors", colors.size());
 }
 
 } // namespace helix::ui

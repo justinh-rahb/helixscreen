@@ -483,7 +483,7 @@ void ControlsPanel::handle_save_z_offset() {
     spdlog::info("[{}] Saving Z-offset adjustment: {:+.3f}mm", get_name(), delta_mm);
 
     if (!api_) {
-        ui_notification_error("Error", "No printer connection");
+        NOTIFY_ERROR("No printer connection");
         return;
     }
 
@@ -492,17 +492,13 @@ void ControlsPanel::handle_save_z_offset() {
     api_->execute_gcode(
         "Z_OFFSET_APPLY_ENDSTOP",
         [this, delta_mm]() {
-            char msg[64];
-            std::snprintf(msg, sizeof(msg), "Z-offset saved (%+.3fmm)", delta_mm);
-            ui_notification_success(msg);
-            spdlog::info("[ControlsPanel] Z-offset saved successfully");
+            NOTIFY_SUCCESS("Z-offset saved ({:+.3f}mm)", delta_mm);
 
             // Clear the pending delta since it's now saved
             printer_state_.clear_pending_z_offset_delta();
         },
         [](const MoonrakerError& err) {
-            spdlog::error("[ControlsPanel] Failed to save Z-offset: {}", err.user_message());
-            ui_notification_error("Save failed", err.user_message().c_str());
+            NOTIFY_ERROR("Save failed: {}", err.user_message());
         });
 }
 
@@ -614,9 +610,9 @@ void ControlsPanel::handle_home_all() {
     spdlog::debug("[{}] Home All clicked", get_name());
     if (api_) {
         api_->home_axes(
-            "XYZ", []() { ui_notification_success("Homing started"); },
+            "XYZ", []() { NOTIFY_SUCCESS("Homing started"); },
             [](const MoonrakerError& err) {
-                ui_notification_error("Homing failed", err.user_message().c_str());
+                NOTIFY_ERROR("Homing failed: {}", err.user_message());
             });
     }
 }
@@ -625,9 +621,9 @@ void ControlsPanel::handle_home_xy() {
     spdlog::debug("[{}] Home XY clicked", get_name());
     if (api_) {
         api_->home_axes(
-            "XY", []() { ui_notification_success("Homing XY started"); },
+            "XY", []() { NOTIFY_SUCCESS("Homing XY started"); },
             [](const MoonrakerError& err) {
-                ui_notification_error("Homing failed", err.user_message().c_str());
+                NOTIFY_ERROR("Homing failed: {}", err.user_message());
             });
     }
 }
@@ -636,9 +632,9 @@ void ControlsPanel::handle_home_z() {
     spdlog::debug("[{}] Home Z clicked", get_name());
     if (api_) {
         api_->home_axes(
-            "Z", []() { ui_notification_success("Homing Z started"); },
+            "Z", []() { NOTIFY_SUCCESS("Homing Z started"); },
             [](const MoonrakerError& err) {
-                ui_notification_error("Homing failed", err.user_message().c_str());
+                NOTIFY_ERROR("Homing failed: {}", err.user_message());
             });
     }
 }
@@ -648,9 +644,9 @@ void ControlsPanel::handle_macro_1() {
     // TODO: Read from config - for now use HELIX_CLEAN_NOZZLE
     if (api_) {
         api_->execute_gcode(
-            "HELIX_CLEAN_NOZZLE", []() { ui_notification_success("Macro started"); },
+            "HELIX_CLEAN_NOZZLE", []() { NOTIFY_SUCCESS("Macro started"); },
             [](const MoonrakerError& err) {
-                ui_notification_error("Macro failed", err.user_message().c_str());
+                NOTIFY_ERROR("Macro failed: {}", err.user_message());
             });
     }
 }
@@ -660,9 +656,9 @@ void ControlsPanel::handle_macro_2() {
     // TODO: Read from config - for now use HELIX_BED_LEVEL_IF_NEEDED
     if (api_) {
         api_->execute_gcode(
-            "HELIX_BED_LEVEL_IF_NEEDED", []() { ui_notification_success("Macro started"); },
+            "HELIX_BED_LEVEL_IF_NEEDED", []() { NOTIFY_SUCCESS("Macro started"); },
             [](const MoonrakerError& err) {
-                ui_notification_error("Macro failed", err.user_message().c_str());
+                NOTIFY_ERROR("Macro failed: {}", err.user_message());
             });
     }
 }
@@ -684,7 +680,7 @@ void ControlsPanel::handle_preheat(int nozzle_temp, int bed_temp, const char* ma
                              nozzle_temp);
             },
             [](const MoonrakerError& err) {
-                ui_notification_error("Preheat failed", err.user_message().c_str());
+                NOTIFY_ERROR("Preheat failed: {}", err.user_message());
             });
 
         // Set bed temperature
@@ -695,15 +691,13 @@ void ControlsPanel::handle_preheat(int nozzle_temp, int bed_temp, const char* ma
                              bed_temp);
             },
             [](const MoonrakerError& err) {
-                ui_notification_error("Preheat failed", err.user_message().c_str());
+                NOTIFY_ERROR("Preheat failed: {}", err.user_message());
             });
 
         if (nozzle_temp > 0 || bed_temp > 0) {
-            char msg[64];
-            std::snprintf(msg, sizeof(msg), "Preheating for %s", material_name);
-            ui_notification_info(msg);
+            NOTIFY_INFO("Preheating for {}", material_name);
         } else {
-            ui_notification_info("Heaters off");
+            NOTIFY_INFO("Heaters off");
         }
     }
 }
@@ -719,9 +713,9 @@ void ControlsPanel::handle_extrude() {
         // G1 E10 F300 - Extrude 10mm at 5mm/s (300mm/min)
         api_->execute_gcode(
             "M83\nG1 E10 F300", // Set relative extrusion, extrude 10mm
-            []() { ui_notification_success("Extruding 10mm"); },
+            []() { NOTIFY_SUCCESS("Extruding 10mm"); },
             [](const MoonrakerError& err) {
-                ui_notification_error("Extrude failed", err.user_message().c_str());
+                NOTIFY_ERROR("Extrude failed: {}", err.user_message());
             });
     }
 }
@@ -733,9 +727,9 @@ void ControlsPanel::handle_retract() {
         // G1 E-10 F300 - Retract 10mm at 5mm/s (300mm/min)
         api_->execute_gcode(
             "M83\nG1 E-10 F300", // Set relative extrusion, retract 10mm
-            []() { ui_notification_success("Retracting 10mm"); },
+            []() { NOTIFY_SUCCESS("Retracting 10mm"); },
             [](const MoonrakerError& err) {
-                ui_notification_error("Retract failed", err.user_message().c_str());
+                NOTIFY_ERROR("Retract failed: {}", err.user_message());
             });
     }
 }
@@ -752,7 +746,7 @@ void ControlsPanel::handle_fan_slider_changed(int value) {
         api_->set_fan_speed(
             "fan", static_cast<double>(value), []() { /* Silent success */ },
             [](const MoonrakerError& err) {
-                ui_notification_error("Fan control failed", err.user_message().c_str());
+                NOTIFY_ERROR("Fan control failed: {}", err.user_message());
             });
     }
 }
@@ -784,7 +778,7 @@ void ControlsPanel::handle_motors_clicked() {
 
     if (!motors_confirmation_dialog_) {
         LOG_ERROR_INTERNAL("Failed to create motors confirmation dialog");
-        ui_notification_error("Error", "Failed to show confirmation dialog");
+        NOTIFY_ERROR("Failed to show confirmation dialog");
         return;
     }
 
@@ -817,12 +811,10 @@ void ControlsPanel::handle_motors_confirm() {
         api_->execute_gcode(
             "M84", // Klipper command to disable steppers
             []() {
-                spdlog::info("[ControlsPanel] Motors disabled successfully");
-                ui_notification_success("Motors disabled");
+                NOTIFY_SUCCESS("Motors disabled");
             },
             [](const MoonrakerError& err) {
-                spdlog::error("[ControlsPanel] Motors disable failed: {}", err.user_message());
-                ui_notification_error("Error", "Motors disable failed");
+                NOTIFY_ERROR("Motors disable failed");
             });
     }
 }

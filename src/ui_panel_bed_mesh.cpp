@@ -4,6 +4,7 @@
 #include "ui_panel_bed_mesh.h"
 
 #include "ui_bed_mesh.h"
+#include "ui_error_reporting.h"
 #include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_panel_common.h"
@@ -513,7 +514,7 @@ void BedMeshPanel::load_profile(int index) {
             cmd, [this, name]() { spdlog::debug("[{}] Profile loaded: {}", get_name(), name); },
             [this](const MoonrakerError& err) {
                 spdlog::error("[{}] Failed to load profile: {}", get_name(), err.message);
-                ui_toast_show(ToastSeverity::ERROR, "Failed to load profile", 3000);
+                NOTIFY_ERROR("Failed to load profile");
             });
     }
 }
@@ -661,13 +662,13 @@ void BedMeshPanel::execute_delete_profile(const std::string& name) {
         cmd,
         [this, name]() {
             spdlog::info("[{}] Profile deleted: {}", get_name(), name);
-            ui_toast_show(ToastSeverity::SUCCESS, "Profile deleted", 3000);
+            NOTIFY_SUCCESS("Profile deleted");
             pending_operation_ = PendingOperation::Delete;
             show_save_config_modal();
         },
         [this](const MoonrakerError& err) {
             spdlog::error("[{}] Failed to delete profile: {}", get_name(), err.message);
-            ui_toast_show(ToastSeverity::ERROR, "Failed to delete profile", 3000);
+            NOTIFY_ERROR("Failed to delete profile");
         });
 }
 
@@ -695,25 +696,24 @@ void BedMeshPanel::execute_rename_profile(const std::string& old_name,
                         [this, old_name, new_name]() {
                             spdlog::info("[{}] Profile renamed: {} -> {}", get_name(), old_name,
                                          new_name);
-                            ui_toast_show(ToastSeverity::SUCCESS, "Profile renamed", 3000);
+                            NOTIFY_SUCCESS("Profile renamed");
                             pending_operation_ = PendingOperation::Rename;
                             show_save_config_modal();
                         },
                         [this](const MoonrakerError& err) {
                             spdlog::error("[{}] Failed to remove old profile: {}", get_name(),
                                           err.message);
-                            ui_toast_show(ToastSeverity::ERROR, "Rename failed at remove step",
-                                          3000);
+                            NOTIFY_ERROR("Rename failed at remove step");
                         });
                 },
                 [this](const MoonrakerError& err) {
                     spdlog::error("[{}] Failed to save new profile: {}", get_name(), err.message);
-                    ui_toast_show(ToastSeverity::ERROR, "Rename failed at save step", 3000);
+                    NOTIFY_ERROR("Rename failed at save step");
                 });
         },
         [this](const MoonrakerError& err) {
             spdlog::error("[{}] Failed to load profile for rename: {}", get_name(), err.message);
-            ui_toast_show(ToastSeverity::ERROR, "Rename failed at load step", 3000);
+            NOTIFY_ERROR("Rename failed at load step");
         });
 }
 
@@ -729,12 +729,12 @@ void BedMeshPanel::execute_calibration(const std::string& profile_name) {
         cmd,
         [this, profile_name]() {
             spdlog::info("[{}] Calibration started for: {}", get_name(), profile_name);
-            ui_toast_show(ToastSeverity::INFO, "Calibration started", 3000);
+            NOTIFY_INFO("Calibration started");
             // Modal will close when mesh update notification arrives
         },
         [this](const MoonrakerError& err) {
             spdlog::error("[{}] Failed to start calibration: {}", get_name(), err.message);
-            ui_toast_show(ToastSeverity::ERROR, "Failed to start calibration", 3000);
+            NOTIFY_ERROR("Failed to start calibration");
             lv_subject_set_int(&bed_mesh_calibrating_, 0);
         });
 }
@@ -749,11 +749,11 @@ void BedMeshPanel::execute_save_config() {
         "SAVE_CONFIG",
         [this]() {
             spdlog::info("[{}] SAVE_CONFIG sent - Klipper will restart", get_name());
-            ui_toast_show(ToastSeverity::INFO, "Configuration saved - restarting", 4000);
+            NOTIFY_INFO("Configuration saved - restarting");
         },
         [this](const MoonrakerError& err) {
             spdlog::error("[{}] Failed to save config: {}", get_name(), err.message);
-            ui_toast_show(ToastSeverity::ERROR, "Failed to save configuration", 3000);
+            NOTIFY_ERROR("Failed to save configuration");
         });
 }
 
