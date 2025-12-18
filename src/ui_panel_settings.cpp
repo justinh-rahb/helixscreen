@@ -150,6 +150,8 @@ void SettingsPanel::init_subjects() {
     lv_xml_register_event_cb(nullptr, "on_animations_changed", on_animations_changed);
     lv_xml_register_event_cb(nullptr, "on_gcode_3d_changed", on_gcode_3d_changed);
     lv_xml_register_event_cb(nullptr, "on_led_light_changed", on_led_light_changed);
+    lv_xml_register_event_cb(nullptr, "on_firmware_retraction_changed",
+                             on_firmware_retraction_changed);
     lv_xml_register_event_cb(nullptr, "on_sounds_changed", on_sounds_changed);
     lv_xml_register_event_cb(nullptr, "on_estop_confirm_changed", on_estop_confirm_changed);
 
@@ -510,6 +512,25 @@ void SettingsPanel::handle_display_sleep_changed(int index) {
 void SettingsPanel::handle_led_light_changed(bool enabled) {
     spdlog::info("[{}] LED light toggled: {}", get_name(), enabled ? "ON" : "OFF");
     SettingsManager::instance().set_led_enabled(enabled);
+}
+
+void SettingsPanel::handle_firmware_retraction_changed(bool enabled) {
+    spdlog::info("[{}] Firmware retraction toggled: {}", get_name(), enabled ? "ON" : "OFF");
+
+    // Send G-code to enable/disable firmware retraction
+    // When enabled: Use sensible default (0.8mm is common for direct drive, 4-6mm for bowden)
+    // When disabled: Set retract length to 0
+    MoonrakerClient* client = get_moonraker_client();
+    if (client) {
+        if (enabled) {
+            // Enable with reasonable defaults - user can fine-tune via Klipper config
+            client->gcode_script("SET_RETRACTION RETRACT_LENGTH=0.8 RETRACT_SPEED=35 "
+                                 "UNRETRACT_EXTRA_LENGTH=0 UNRETRACT_SPEED=35");
+        } else {
+            // Disable by setting retract length to 0
+            client->gcode_script("SET_RETRACTION RETRACT_LENGTH=0");
+        }
+    }
 }
 
 void SettingsPanel::handle_sounds_changed(bool enabled) {
@@ -1024,6 +1045,14 @@ void SettingsPanel::on_led_light_changed(lv_event_t* e) {
     auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
     bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
     get_global_settings_panel().handle_led_light_changed(enabled);
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void SettingsPanel::on_firmware_retraction_changed(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_firmware_retraction_changed");
+    auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    get_global_settings_panel().handle_firmware_retraction_changed(enabled);
     LVGL_SAFE_EVENT_CB_END();
 }
 

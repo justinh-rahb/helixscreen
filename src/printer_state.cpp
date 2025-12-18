@@ -216,6 +216,7 @@ void PrinterState::reset_for_testing() {
     lv_subject_deinit(&printer_has_spoolman_);
     lv_subject_deinit(&printer_has_speaker_);
     lv_subject_deinit(&printer_has_timelapse_);
+    lv_subject_deinit(&printer_has_firmware_retraction_);
     lv_subject_deinit(&printer_bed_moves_);
     lv_subject_deinit(&manual_probe_active_);
     lv_subject_deinit(&manual_probe_z_position_);
@@ -306,6 +307,7 @@ void PrinterState::init_subjects(bool register_xml) {
     lv_subject_init_int(&printer_has_spoolman_, 0);
     lv_subject_init_int(&printer_has_speaker_, 0);
     lv_subject_init_int(&printer_has_timelapse_, 0);
+    lv_subject_init_int(&printer_has_firmware_retraction_, 0);
     lv_subject_init_int(&printer_bed_moves_, 0); // 0=gantry moves, 1=bed moves (cartesian)
 
     // Manual probe subjects (for Z-offset calibration)
@@ -363,6 +365,8 @@ void PrinterState::init_subjects(bool register_xml) {
         lv_xml_register_subject(NULL, "printer_has_spoolman", &printer_has_spoolman_);
         lv_xml_register_subject(NULL, "printer_has_speaker", &printer_has_speaker_);
         lv_xml_register_subject(NULL, "printer_has_timelapse", &printer_has_timelapse_);
+        lv_xml_register_subject(NULL, "printer_has_firmware_retraction",
+                                &printer_has_firmware_retraction_);
         lv_xml_register_subject(NULL, "printer_bed_moves", &printer_bed_moves_);
         lv_xml_register_subject(NULL, "manual_probe_active", &manual_probe_active_);
         lv_xml_register_subject(NULL, "manual_probe_z_position", &manual_probe_z_position_);
@@ -881,13 +885,16 @@ void PrinterState::set_printer_capabilities_internal(const PrinterCapabilities& 
     // Timelapse capability (Moonraker-Timelapse plugin)
     lv_subject_set_int(&printer_has_timelapse_, caps.has_timelapse() ? 1 : 0);
 
+    // Firmware retraction capability (with test mode override for UI testing)
+    bool has_fw_retraction = caps.has_firmware_retraction() || get_runtime_config().is_test_mode();
+    lv_subject_set_int(&printer_has_firmware_retraction_, has_fw_retraction ? 1 : 0);
+
     // Spoolman requires async check - default to 0, updated separately
-    // TODO: Add set_spoolman_available() method when Spoolman API is implemented
 
     spdlog::info("[PrinterState] Capabilities set: probe={}, heater_bed={}, LED={}, "
-                 "accelerometer={}, speaker={}, timelapse={}",
+                 "accelerometer={}, speaker={}, timelapse={}, fw_retraction={}",
                  caps.has_probe(), caps.has_heater_bed(), caps.has_led(), caps.has_accelerometer(),
-                 has_speaker, caps.has_timelapse());
+                 has_speaker, caps.has_timelapse(), has_fw_retraction);
     spdlog::info("[PrinterState] Capabilities set (with overrides): {}",
                  capability_overrides_.summary());
 }
@@ -912,6 +919,23 @@ void PrinterState::set_moonraker_version(const std::string& version) {
 void PrinterState::set_moonraker_version_internal(const std::string& version) {
     lv_subject_copy_string(&moonraker_version_, version.c_str());
     spdlog::debug("[PrinterState] Moonraker version set: {}", version);
+}
+
+// Context struct for async Spoolman availability update
+struct SpoolmanAvailContext {
+    PrinterState* state;
+    bool available;
+};
+
+void PrinterState::set_spoolman_available(bool available) {
+    // Thread-safe: Use lv_async_call to update LVGL subject from any thread
+    auto callback = [](void* user_data) {
+        auto* ctx = static_cast<SpoolmanAvailContext*>(user_data);
+        lv_subject_set_int(&ctx->state->printer_has_spoolman_, ctx->available ? 1 : 0);
+        spdlog::info("[PrinterState] Spoolman availability set: {}", ctx->available);
+        delete ctx;
+    };
+    lv_async_call(callback, new SpoolmanAvailContext{this, available});
 }
 
 void PrinterState::set_excluded_objects(const std::unordered_set<std::string>& objects) {

@@ -125,6 +125,11 @@ void PrinterCapabilities::parse_objects(const json& objects) {
             has_timelapse_ = true;
             spdlog::debug("[PrinterCapabilities] Detected Moonraker-Timelapse plugin");
         }
+        // Firmware retraction detection
+        else if (name == "firmware_retraction") {
+            has_firmware_retraction_ = true;
+            spdlog::debug("[PrinterCapabilities] Detected firmware_retraction");
+        }
         // Tool changer detection (viesturz/klipper-toolchanger)
         else if (name == "toolchanger") {
             has_tool_changer_ = true;
@@ -255,6 +260,7 @@ void PrinterCapabilities::clear() {
     has_mmu_ = false;
     has_tool_changer_ = false;
     has_timelapse_ = false;
+    has_firmware_retraction_ = false;
     mmu_type_ = AmsType::NONE;
     macros_.clear();
     helix_macros_.clear();

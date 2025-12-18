@@ -62,6 +62,14 @@
                           label="LED Light" icon="light" description="Toggle printer LED strip"
                           callback="on_led_light_changed"/>
     </lv_obj>
+    <!-- Firmware Retraction Toggle (hidden if no firmware_retraction capability) -->
+    <lv_obj name="container_firmware_retraction"
+            width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false">
+      <lv_obj-bind_flag_if_eq subject="printer_has_firmware_retraction" flag="hidden" ref_value="0"/>
+      <setting_toggle_row name="row_firmware_retraction"
+                          label="Firmware Retraction" icon="arrow_undo" description="Enable G10/G11 retraction commands"
+                          callback="on_firmware_retraction_changed"/>
+    </lv_obj>
     <!-- ================================================================== -->
     <!-- NOTIFICATIONS SECTION -->
     <!-- ================================================================== -->

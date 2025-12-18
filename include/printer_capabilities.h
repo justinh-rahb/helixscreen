@@ -209,6 +209,19 @@ class PrinterCapabilities {
     }
 
     /**
+     * @brief Check if printer has firmware retraction configured
+     *
+     * Detects the firmware_retraction object in Klipper config.
+     * When present, G10/G11 commands are enabled and retraction
+     * parameters can be adjusted via SET_RETRACTION.
+     *
+     * @return true if firmware_retraction was detected
+     */
+    [[nodiscard]] bool has_firmware_retraction() const {
+        return has_firmware_retraction_;
+    }
+
+    /**
      * @brief Check if printer has any filament sensors
      *
      * Detects filament_switch_sensor or filament_motion_sensor objects.
@@ -420,6 +433,7 @@ class PrinterCapabilities {
     bool has_mmu_ = false;
     bool has_tool_changer_ = false;
     bool has_timelapse_ = false;
+    bool has_firmware_retraction_ = false;
     AmsType mmu_type_ = AmsType::NONE;
 
     // Macro names (stored uppercase for case-insensitive matching)

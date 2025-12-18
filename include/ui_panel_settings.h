@@ -77,6 +77,7 @@ class SettingsPanel : public PanelBase {
     lv_obj_t* animations_switch_ = nullptr;
     lv_obj_t* gcode_3d_switch_ = nullptr;
     lv_obj_t* led_light_switch_ = nullptr;
+    lv_obj_t* firmware_retraction_switch_ = nullptr;
     lv_obj_t* sounds_switch_ = nullptr;
     lv_obj_t* estop_confirm_switch_ = nullptr;
 
@@ -157,6 +158,7 @@ class SettingsPanel : public PanelBase {
     void handle_gcode_3d_changed(bool enabled);
     void handle_display_sleep_changed(int index);
     void handle_led_light_changed(bool enabled);
+    void handle_firmware_retraction_changed(bool enabled);
     void handle_sounds_changed(bool enabled);
     void handle_estop_confirm_changed(bool enabled);
 
@@ -182,6 +184,7 @@ class SettingsPanel : public PanelBase {
     static void on_gcode_3d_changed(lv_event_t* e);
     static void on_display_sleep_changed(lv_event_t* e);
     static void on_led_light_changed(lv_event_t* e);
+    static void on_firmware_retraction_changed(lv_event_t* e);
     static void on_sounds_changed(lv_event_t* e);
     static void on_estop_confirm_changed(lv_event_t* e);
     static void on_scroll_throw_changed(lv_event_t* e);

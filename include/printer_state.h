@@ -651,6 +651,19 @@ class PrinterState {
     }
 
     /**
+     * @brief Set Spoolman availability status
+     *
+     * Called after checking Moonraker's server.info components and verifying
+     * Spoolman connection via get_spoolman_status(). Updates printer_has_spoolman_
+     * subject for UI visibility gating.
+     *
+     * Thread-safe: Can be called from any thread, defers LVGL update to main thread.
+     *
+     * @param available True if Spoolman is configured and connected
+     */
+    void set_spoolman_available(bool available);
+
+    /**
      * @brief Set printer kinematics type and update bed_moves subject
      *
      * Updates printer_bed_moves_ subject based on kinematics type.
@@ -778,6 +791,7 @@ class PrinterState {
     lv_subject_t printer_has_spoolman_;      // Integer: 0=no, 1=yes (for filament tracking)
     lv_subject_t printer_has_speaker_;       // Integer: 0=no, 1=yes (for M300 audio feedback)
     lv_subject_t printer_has_timelapse_; // Integer: 0=no, 1=yes (for Moonraker-Timelapse plugin)
+    lv_subject_t printer_has_firmware_retraction_; // Integer: 0=no, 1=yes (for G10/G11 retraction)
     lv_subject_t printer_bed_moves_;     // Integer: 0=no (gantry moves), 1=yes (bed moves on Z)
 
     // Manual probe subjects (for Z-offset calibration)
