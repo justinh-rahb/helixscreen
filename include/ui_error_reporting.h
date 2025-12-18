@@ -19,11 +19,17 @@
  * // Internal error (logged but not shown to user)
  * LOG_ERROR_INTERNAL("Failed to create widget: {}", widget_name);
  *
- * // User-facing error (logged + toast notification)
+ * // User-facing notifications (logged + toast)
+ * NOTIFY_INFO("Configuration loaded");
+ * NOTIFY_SUCCESS("File saved successfully");
+ * NOTIFY_WARNING("Printer temperature approaching {}°C limit", temp);
  * NOTIFY_ERROR("Failed to save configuration");
  *
- * // User-facing warning (logged + warning toast)
- * NOTIFY_WARNING("Printer temperature approaching {}°C limit", temp);
+ * // Titled variants (display "Title: message" in toast)
+ * NOTIFY_INFO_T("Startup", "Loading configuration...");
+ * NOTIFY_SUCCESS_T("Save", "Configuration written to {}", filename);
+ * NOTIFY_WARNING_T("Temperature", "Approaching {}°C limit", temp);
+ * NOTIFY_ERROR_T("Save Failed", "Could not write to {}", filename);
  *
  * // Critical error (logged + modal dialog)
  * NOTIFY_ERROR_MODAL("Connection Failed", "Unable to reach printer at {}", ip_addr);
@@ -65,6 +71,19 @@
     } while (0)
 
 /**
+ * @brief Report error with title and toast notification
+ *
+ * Like NOTIFY_ERROR but includes a title for context (e.g., "Save Failed").
+ * Use when the error needs additional context beyond the message.
+ */
+#define NOTIFY_ERROR_T(title, msg, ...)                                                            \
+    do {                                                                                           \
+        std::string formatted_msg = fmt::format(msg, ##__VA_ARGS__);                               \
+        spdlog::error("[USER] {}: {}", title, formatted_msg);                                      \
+        ui_notification_error(title, formatted_msg.c_str(), false);                                \
+    } while (0)
+
+/**
  * @brief Report warning with toast notification
  *
  * Logs warning and shows non-blocking toast. Use for potential issues
@@ -78,6 +97,16 @@
     } while (0)
 
 /**
+ * @brief Report warning with title and toast notification
+ */
+#define NOTIFY_WARNING_T(title, msg, ...)                                                          \
+    do {                                                                                           \
+        std::string formatted_msg = fmt::format(msg, ##__VA_ARGS__);                               \
+        spdlog::warn("[USER] {}: {}", title, formatted_msg);                                       \
+        ui_notification_warning(title, formatted_msg.c_str());                                     \
+    } while (0)
+
+/**
  * @brief Report info with toast notification
  */
 #define NOTIFY_INFO(msg, ...)                                                                      \
@@ -88,6 +117,16 @@
     } while (0)
 
 /**
+ * @brief Report info with title and toast notification
+ */
+#define NOTIFY_INFO_T(title, msg, ...)                                                             \
+    do {                                                                                           \
+        std::string formatted_msg = fmt::format(msg, ##__VA_ARGS__);                               \
+        spdlog::info("[USER] {}: {}", title, formatted_msg);                                       \
+        ui_notification_info(title, formatted_msg.c_str());                                        \
+    } while (0)
+
+/**
  * @brief Report success with toast notification
  */
 #define NOTIFY_SUCCESS(msg, ...)                                                                   \
@@ -95,6 +134,16 @@
         std::string formatted_msg = fmt::format(msg, ##__VA_ARGS__);                               \
         spdlog::info("[USER] {}", formatted_msg);                                                  \
         ui_notification_success(formatted_msg.c_str());                                            \
+    } while (0)
+
+/**
+ * @brief Report success with title and toast notification
+ */
+#define NOTIFY_SUCCESS_T(title, msg, ...)                                                          \
+    do {                                                                                           \
+        std::string formatted_msg = fmt::format(msg, ##__VA_ARGS__);                               \
+        spdlog::info("[USER] {}: {}", title, formatted_msg);                                       \
+        ui_notification_success(title, formatted_msg.c_str());                                     \
     } while (0)
 
 // ============================================================================

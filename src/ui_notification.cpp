@@ -15,6 +15,7 @@
 
 #include <atomic>
 #include <cstring>
+#include <string>
 #include <thread>
 
 // Forward declarations
@@ -41,6 +42,7 @@ static bool is_main_thread() {
 // ============================================================================
 
 struct AsyncMessageData {
+    char* title;   // Can be nullptr for no title
     char* message;
     ToastSeverity severity;
     uint32_t duration_ms;
@@ -56,21 +58,35 @@ struct AsyncErrorData {
 static void async_message_callback(void* user_data) {
     AsyncMessageData* data = (AsyncMessageData*)user_data;
     if (data && data->message) {
-        ui_toast_show(data->severity, data->message, data->duration_ms);
+        // Format display message with title if present
+        std::string display_msg;
+        if (data->title) {
+            display_msg = std::string(data->title) + ": " + data->message;
+        } else {
+            display_msg = data->message;
+        }
+        ui_toast_show(data->severity, display_msg.c_str(), data->duration_ms);
 
-        // Add to history (title is always null for these)
+        // Add to history
         NotificationHistoryEntry entry = {};
         entry.timestamp_ms = lv_tick_get();
         entry.severity = data->severity;
         entry.was_modal = false;
         entry.was_read = false;
-        entry.title[0] = '\0';
+
+        if (data->title) {
+            strncpy(entry.title, data->title, sizeof(entry.title) - 1);
+            entry.title[sizeof(entry.title) - 1] = '\0';
+        } else {
+            entry.title[0] = '\0';
+        }
         strncpy(entry.message, data->message, sizeof(entry.message) - 1);
         entry.message[sizeof(entry.message) - 1] = '\0';
 
         NotificationHistory::instance().add(entry);
         ui_status_bar_update_notification_count(NotificationHistory::instance().get_unread_count());
 
+        free(data->title);
         free(data->message);
     }
     free(data);
@@ -203,6 +219,7 @@ void ui_notification_info(const char* message) {
             return;
         }
 
+        data->title = nullptr;
         data->severity = ToastSeverity::INFO;
         data->duration_ms = 4000;
 
@@ -246,6 +263,7 @@ void ui_notification_success(const char* message) {
             return;
         }
 
+        data->title = nullptr;
         data->severity = ToastSeverity::SUCCESS;
         data->duration_ms = 4000;
 
@@ -289,11 +307,84 @@ void ui_notification_warning(const char* message) {
             return;
         }
 
+        data->title = nullptr;
         data->severity = ToastSeverity::WARNING;
         data->duration_ms = 5000;
 
         lv_async_call(async_message_callback, data);
     }
+}
+
+// ============================================================================
+// Titled variants (display "Title: message" in toast, store title in history)
+// ============================================================================
+
+// Helper to show titled notification (reduces code duplication)
+static void show_titled_notification(const char* title, const char* message, ToastSeverity severity,
+                                     uint32_t duration_ms) {
+    if (!message) {
+        spdlog::warn("[Notification] Attempted to show notification with null message");
+        return;
+    }
+    if (!title) {
+        spdlog::warn("[Notification] Titled notification called with null title");
+        return;
+    }
+
+    // Format display message as "Title: message"
+    std::string display_msg = std::string(title) + ": " + message;
+
+    if (is_main_thread()) {
+        // Main thread: call LVGL directly
+        ui_toast_show(severity, display_msg.c_str(), duration_ms);
+
+        NotificationHistoryEntry entry = {};
+        entry.timestamp_ms = lv_tick_get();
+        entry.severity = severity;
+        entry.was_modal = false;
+        entry.was_read = false;
+        strncpy(entry.title, title, sizeof(entry.title) - 1);
+        entry.title[sizeof(entry.title) - 1] = '\0';
+        strncpy(entry.message, message, sizeof(entry.message) - 1);
+        entry.message[sizeof(entry.message) - 1] = '\0';
+
+        NotificationHistory::instance().add(entry);
+        ui_status_bar_update_notification_count(NotificationHistory::instance().get_unread_count());
+    } else {
+        // Background thread: marshal to main thread
+        AsyncMessageData* data = (AsyncMessageData*)malloc(sizeof(AsyncMessageData));
+        if (!data) {
+            spdlog::error("[Notification] Failed to allocate memory for async notification");
+            return;
+        }
+
+        data->title = strdup(title);
+        data->message = strdup(message);
+        if (!data->title || !data->message) {
+            free(data->title);
+            free(data->message);
+            free(data);
+            spdlog::error("[Notification] Failed to duplicate strings for async notification");
+            return;
+        }
+
+        data->severity = severity;
+        data->duration_ms = duration_ms;
+
+        lv_async_call(async_message_callback, data);
+    }
+}
+
+void ui_notification_info(const char* title, const char* message) {
+    show_titled_notification(title, message, ToastSeverity::INFO, 4000);
+}
+
+void ui_notification_success(const char* title, const char* message) {
+    show_titled_notification(title, message, ToastSeverity::SUCCESS, 4000);
+}
+
+void ui_notification_warning(const char* title, const char* message) {
+    show_titled_notification(title, message, ToastSeverity::WARNING, 5000);
 }
 
 void ui_notification_error(const char* title, const char* message, bool modal) {

@@ -66,6 +66,17 @@ void ui_notification_init();
 void ui_notification_info(const char* message);
 
 /**
+ * @brief Show an informational toast notification with title
+ *
+ * Like ui_notification_info but includes a title. The toast displays "Title: message"
+ * and the title is stored separately in notification history.
+ *
+ * @param title Title for context (displayed as "Title: message")
+ * @param message Message text to display
+ */
+void ui_notification_info(const char* title, const char* message);
+
+/**
  * @brief Show a success toast notification
  *
  * Displays a non-blocking green toast message that auto-dismisses after 4 seconds.
@@ -78,6 +89,17 @@ void ui_notification_info(const char* message);
 void ui_notification_success(const char* message);
 
 /**
+ * @brief Show a success toast notification with title
+ *
+ * Like ui_notification_success but includes a title. The toast displays "Title: message"
+ * and the title is stored separately in notification history.
+ *
+ * @param title Title for context (displayed as "Title: message")
+ * @param message Message text to display
+ */
+void ui_notification_success(const char* title, const char* message);
+
+/**
  * @brief Show a warning notification
  *
  * Displays a non-blocking orange toast message that auto-dismisses after 5 seconds.
@@ -88,6 +110,17 @@ void ui_notification_success(const char* message);
  * @param message Message text to display
  */
 void ui_notification_warning(const char* message);
+
+/**
+ * @brief Show a warning notification with title
+ *
+ * Like ui_notification_warning but includes a title. The toast displays "Title: message"
+ * and the title is stored separately in notification history.
+ *
+ * @param title Title for context (displayed as "Title: message")
+ * @param message Message text to display
+ */
+void ui_notification_warning(const char* title, const char* message);
 
 /**
  * @brief Show an error notification
