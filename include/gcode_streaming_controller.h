@@ -9,15 +9,129 @@
 #include "gcode_streaming_config.h"
 
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <future>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace helix {
 namespace gcode {
+
+// Forward declaration
+class GCodeStreamingController;
+
+/**
+ * @brief Builds ghost preview progressively in background for streaming mode
+ *
+ * Since streaming mode loads layers on-demand with LRU eviction, we can't
+ * guarantee all layers are cached simultaneously for ghost rendering.
+ * This builder iterates through all layers in the background, rendering
+ * each to the ghost buffer via a callback.
+ *
+ * Features:
+ * - Progressive rendering: ghost fills in as layers are processed
+ * - UI yielding: pauses when user navigates to avoid lag
+ * - Cancellation: stops promptly on file change or destruction
+ *
+ * Usage:
+ * @code
+ *   BackgroundGhostBuilder builder;
+ *   builder.start(&controller, [](size_t layer, const auto& segments) {
+ *       // Render segments to ghost buffer using Bresenham
+ *   });
+ *   // Query progress: builder.get_progress()
+ *   // Check completion: builder.is_complete()
+ * @endcode
+ */
+class BackgroundGhostBuilder {
+  public:
+    /// Callback type for rendering a layer's segments
+    using RenderCallback =
+        std::function<void(size_t layer_index, const std::vector<ToolpathSegment>& segments)>;
+
+    BackgroundGhostBuilder() = default;
+    ~BackgroundGhostBuilder();
+
+    // Non-copyable, non-moveable
+    BackgroundGhostBuilder(const BackgroundGhostBuilder&) = delete;
+    BackgroundGhostBuilder& operator=(const BackgroundGhostBuilder&) = delete;
+    BackgroundGhostBuilder(BackgroundGhostBuilder&&) = delete;
+    BackgroundGhostBuilder& operator=(BackgroundGhostBuilder&&) = delete;
+
+    /**
+     * @brief Start building ghost preview in background
+     *
+     * @param controller Streaming controller to load layers from
+     * @param render_callback Called for each layer with its segments
+     */
+    void start(GCodeStreamingController* controller, RenderCallback render_callback);
+
+    /**
+     * @brief Cancel the background build
+     *
+     * Signals the worker thread to stop. Blocks until thread exits.
+     */
+    void cancel();
+
+    /**
+     * @brief Get build progress as fraction
+     * @return Progress from 0.0 (starting) to 1.0 (complete)
+     */
+    float get_progress() const;
+
+    /**
+     * @brief Check if build has completed all layers
+     * @return true if all layers have been rendered
+     */
+    bool is_complete() const;
+
+    /**
+     * @brief Check if build is currently running
+     * @return true if worker thread is active
+     */
+    bool is_running() const;
+
+    /**
+     * @brief Get number of layers rendered so far
+     * @return Count of layers processed
+     */
+    size_t layers_rendered() const;
+
+    /**
+     * @brief Get total number of layers to render
+     * @return Total layer count
+     */
+    size_t total_layers() const;
+
+    /**
+     * @brief Signal that UI has a pending layer request
+     *
+     * Call this when user navigates layers. The ghost builder will
+     * pause briefly to let the UI load complete first.
+     */
+    void notify_user_request();
+
+  private:
+    void worker_thread();
+
+    GCodeStreamingController* controller_{nullptr};
+    RenderCallback render_callback_;
+
+    std::thread worker_;
+    std::atomic<size_t> current_layer_{0};
+    std::atomic<size_t> total_layers_{0};
+    std::atomic<bool> complete_{false};
+    std::atomic<bool> cancelled_{false};
+    std::atomic<bool> running_{false};
+
+    // UI yielding: timestamp of last user navigation
+    std::atomic<std::chrono::steady_clock::time_point> last_user_request_{};
+    static constexpr std::chrono::milliseconds YIELD_DURATION{50};
+};
 
 /**
  * @brief Orchestrates streaming G-code loading for memory-constrained devices

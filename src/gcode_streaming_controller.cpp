@@ -13,6 +13,123 @@
 namespace helix {
 namespace gcode {
 
+// =============================================================================
+// BackgroundGhostBuilder Implementation
+// =============================================================================
+
+BackgroundGhostBuilder::~BackgroundGhostBuilder() {
+    cancel();
+}
+
+void BackgroundGhostBuilder::start(GCodeStreamingController* controller,
+                                   RenderCallback render_callback) {
+    // Cancel any existing build
+    cancel();
+
+    if (!controller || !controller->is_open()) {
+        spdlog::warn("[GhostBuilder] Cannot start: controller not ready");
+        return;
+    }
+
+    controller_ = controller;
+    render_callback_ = std::move(render_callback);
+
+    total_layers_.store(controller_->get_layer_count());
+    current_layer_.store(0);
+    complete_.store(false);
+    cancelled_.store(false);
+    running_.store(true);
+
+    spdlog::info("[GhostBuilder] Starting background ghost build for {} layers",
+                 total_layers_.load());
+
+    worker_ = std::thread(&BackgroundGhostBuilder::worker_thread, this);
+}
+
+void BackgroundGhostBuilder::cancel() {
+    // Signal cancellation
+    cancelled_.store(true);
+
+    // Always join if joinable - even if not running (thread may have completed)
+    if (worker_.joinable()) {
+        spdlog::debug("[GhostBuilder] Joining ghost build thread");
+        worker_.join();
+    }
+
+    running_.store(false);
+    cancelled_.store(false);
+}
+
+float BackgroundGhostBuilder::get_progress() const {
+    size_t total = total_layers_.load();
+    if (total == 0) {
+        return complete_.load() ? 1.0f : 0.0f;
+    }
+    return static_cast<float>(current_layer_.load()) / static_cast<float>(total);
+}
+
+bool BackgroundGhostBuilder::is_complete() const {
+    return complete_.load();
+}
+
+bool BackgroundGhostBuilder::is_running() const {
+    return running_.load();
+}
+
+size_t BackgroundGhostBuilder::layers_rendered() const {
+    return current_layer_.load();
+}
+
+size_t BackgroundGhostBuilder::total_layers() const {
+    return total_layers_.load();
+}
+
+void BackgroundGhostBuilder::notify_user_request() {
+    last_user_request_.store(std::chrono::steady_clock::now());
+}
+
+void BackgroundGhostBuilder::worker_thread() {
+    spdlog::debug("[GhostBuilder] Worker thread started");
+
+    size_t total = total_layers_.load();
+
+    for (size_t i = 0; i < total && !cancelled_.load(); ++i) {
+        // Yield to UI: pause if user recently navigated layers
+        auto now = std::chrono::steady_clock::now();
+        auto last_request = last_user_request_.load();
+        while ((now - last_request) < YIELD_DURATION && !cancelled_.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            now = std::chrono::steady_clock::now();
+            last_request = last_user_request_.load();
+        }
+
+        if (cancelled_.load()) {
+            break;
+        }
+
+        // Load layer segments
+        const auto* segments = controller_->get_layer_segments(i);
+        if (segments && render_callback_) {
+            render_callback_(i, *segments);
+        }
+
+        current_layer_.store(i + 1);
+
+        // Small yield between layers to avoid starving UI thread
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    if (!cancelled_.load()) {
+        complete_.store(true);
+        spdlog::info("[GhostBuilder] Ghost build complete ({} layers)", current_layer_.load());
+    } else {
+        spdlog::debug("[GhostBuilder] Ghost build cancelled at layer {}/{}", current_layer_.load(),
+                      total);
+    }
+
+    running_.store(false);
+}
+
 // Static member initialization
 const LayerIndexStats GCodeStreamingController::empty_stats_{};
 

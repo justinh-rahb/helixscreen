@@ -297,12 +297,13 @@ else
 endif
 
 # spdlog (logging library) - Use system version if available, otherwise use submodule
-SPDLOG_SYSTEM_PATHS := /usr/include/spdlog /usr/local/include/spdlog /opt/homebrew/include/spdlog
-SPDLOG_SYSTEM_AVAILABLE := $(firstword $(wildcard $(SPDLOG_SYSTEM_PATHS)))
-ifneq ($(SPDLOG_SYSTEM_AVAILABLE),)
-    # System spdlog found - use it (header-only library)
-    # Use -isystem to suppress warnings from third-party headers in strict mode
-    SPDLOG_INC := -isystem $(dir $(SPDLOG_SYSTEM_AVAILABLE))
+# Check for actual header file to avoid $(dir) path issues with directory paths
+SPDLOG_SYSTEM_HEADER_PATHS := /usr/include/spdlog/spdlog.h /usr/local/include/spdlog/spdlog.h /opt/homebrew/include/spdlog/spdlog.h
+SPDLOG_SYSTEM_HEADER := $(firstword $(wildcard $(SPDLOG_SYSTEM_HEADER_PATHS)))
+ifneq ($(SPDLOG_SYSTEM_HEADER),)
+    # System spdlog found - no extra include path needed (system paths already searched)
+    # Compiler already searches /usr/include, /usr/local/include, etc.
+    SPDLOG_INC :=
 else
     # No system spdlog - use submodule
     SPDLOG_DIR := lib/spdlog

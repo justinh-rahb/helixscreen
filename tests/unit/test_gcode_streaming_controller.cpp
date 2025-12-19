@@ -395,3 +395,247 @@ TEST_CASE("GCodeStreamingController error handling", "[gcode][streaming]") {
         REQUIRE(stats.total_bytes == 0);
     }
 }
+
+// =============================================================================
+// BackgroundGhostBuilder Tests
+// =============================================================================
+
+TEST_CASE("BackgroundGhostBuilder basic operations", "[gcode][streaming][ghost]") {
+    TempGCodeFile temp_file(SIMPLE_3_LAYER_GCODE);
+    GCodeStreamingController controller;
+    REQUIRE(controller.open_file(temp_file.path()));
+
+    SECTION("initial state is correct") {
+        BackgroundGhostBuilder builder;
+
+        REQUIRE_FALSE(builder.is_running());
+        REQUIRE_FALSE(builder.is_complete());
+        REQUIRE(builder.get_progress() == 0.0f);
+        REQUIRE(builder.layers_rendered() == 0);
+    }
+
+    SECTION("starts and completes with callback") {
+        BackgroundGhostBuilder builder;
+        std::atomic<size_t> layers_rendered{0};
+        std::atomic<size_t> segments_received{0};
+
+        builder.start(&controller, [&](size_t layer_idx, const std::vector<ToolpathSegment>& segs) {
+            layers_rendered++;
+            segments_received += segs.size();
+        });
+
+        // Wait for completion
+        auto start = std::chrono::steady_clock::now();
+        while (!builder.is_complete()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            auto elapsed = std::chrono::steady_clock::now() - start;
+            if (elapsed > std::chrono::seconds(5)) {
+                FAIL("Ghost builder timed out");
+                break;
+            }
+        }
+
+        REQUIRE(builder.is_complete());
+        REQUIRE_FALSE(builder.is_running());
+        REQUIRE(builder.get_progress() == 1.0f);
+        REQUIRE(builder.layers_rendered() == 3);
+        REQUIRE(layers_rendered.load() == 3);
+        REQUIRE(segments_received.load() > 0);
+    }
+
+    SECTION("reports progress during build") {
+        // Create a larger file for more measurable progress
+        std::string large_gcode = "; Test file\nG28\n";
+        for (int layer = 0; layer < 50; ++layer) {
+            float z = 0.2f + layer * 0.2f;
+            large_gcode += "G1 Z" + std::to_string(z) + " F1000\n";
+            large_gcode += "G1 X" + std::to_string(10 + layer) + " Y10 E" +
+                           std::to_string(layer + 1) + " F1500\n";
+        }
+        TempGCodeFile large_file(large_gcode);
+
+        GCodeStreamingController large_controller;
+        REQUIRE(large_controller.open_file(large_file.path()));
+
+        BackgroundGhostBuilder builder;
+        std::vector<float> progress_samples;
+        std::mutex samples_mutex;
+
+        builder.start(&large_controller,
+                      [&](size_t /*layer_idx*/, const std::vector<ToolpathSegment>& /*segs*/) {
+                          // Record progress at each layer
+                          float p = builder.get_progress();
+                          std::lock_guard<std::mutex> lock(samples_mutex);
+                          progress_samples.push_back(p);
+                      });
+
+        // Wait for completion
+        auto start = std::chrono::steady_clock::now();
+        while (!builder.is_complete()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            auto elapsed = std::chrono::steady_clock::now() - start;
+            if (elapsed > std::chrono::seconds(10)) {
+                FAIL("Ghost builder timed out");
+                break;
+            }
+        }
+
+        REQUIRE(builder.is_complete());
+        REQUIRE(builder.total_layers() == 50);
+
+        // Verify progress increased monotonically
+        std::lock_guard<std::mutex> lock(samples_mutex);
+        REQUIRE(progress_samples.size() > 0);
+        for (size_t i = 1; i < progress_samples.size(); ++i) {
+            REQUIRE(progress_samples[i] >= progress_samples[i - 1]);
+        }
+    }
+}
+
+TEST_CASE("BackgroundGhostBuilder cancellation", "[gcode][streaming][ghost]") {
+    // Create larger file so we have time to cancel
+    std::string large_gcode = "; Test file\nG28\n";
+    for (int layer = 0; layer < 100; ++layer) {
+        float z = 0.2f + layer * 0.2f;
+        large_gcode += "G1 Z" + std::to_string(z) + " F1000\n";
+        for (int seg = 0; seg < 10; ++seg) {
+            large_gcode += "G1 X" + std::to_string(10 + seg) + " Y" + std::to_string(10 + seg) +
+                           " E" + std::to_string(layer * 10 + seg + 1) + " F1500\n";
+        }
+    }
+    TempGCodeFile temp_file(large_gcode);
+
+    GCodeStreamingController controller;
+    REQUIRE(controller.open_file(temp_file.path()));
+
+    SECTION("cancel stops the build") {
+        BackgroundGhostBuilder builder;
+        std::atomic<size_t> layers_rendered{0};
+
+        builder.start(&controller, [&](size_t /*layer_idx*/, const std::vector<ToolpathSegment>&) {
+            layers_rendered++;
+            // Add a small delay to make cancellation easier
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        });
+
+        // Let it run briefly
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+        // Cancel
+        builder.cancel();
+
+        // Should have stopped before completing all layers
+        REQUIRE_FALSE(builder.is_running());
+        REQUIRE_FALSE(builder.is_complete()); // Was cancelled, not completed
+        REQUIRE(layers_rendered.load() < 100);
+    }
+
+    SECTION("cancel is idempotent") {
+        BackgroundGhostBuilder builder;
+
+        // Cancel without starting - should be safe
+        builder.cancel();
+        builder.cancel();
+        REQUIRE_FALSE(builder.is_running());
+    }
+
+    SECTION("destructor cancels automatically") {
+        std::atomic<bool> callback_called{false};
+        {
+            BackgroundGhostBuilder builder;
+            builder.start(&controller, [&](size_t, const std::vector<ToolpathSegment>&) {
+                callback_called = true;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            });
+            // Let it start
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            // Destructor should cancel and join
+        }
+        // If we get here without hanging, destructor worked correctly
+        REQUIRE(true);
+    }
+}
+
+TEST_CASE("BackgroundGhostBuilder UI yielding", "[gcode][streaming][ghost]") {
+    TempGCodeFile temp_file(SIMPLE_3_LAYER_GCODE);
+    GCodeStreamingController controller;
+    REQUIRE(controller.open_file(temp_file.path()));
+
+    SECTION("notify_user_request can be called during build") {
+        BackgroundGhostBuilder builder;
+
+        builder.start(&controller, [&](size_t, const std::vector<ToolpathSegment>&) {
+            // Simulate user navigation during build
+            builder.notify_user_request();
+        });
+
+        // Wait for completion
+        auto start = std::chrono::steady_clock::now();
+        while (!builder.is_complete()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            auto elapsed = std::chrono::steady_clock::now() - start;
+            if (elapsed > std::chrono::seconds(5)) {
+                FAIL("Ghost builder timed out");
+                break;
+            }
+        }
+
+        REQUIRE(builder.is_complete());
+    }
+}
+
+TEST_CASE("BackgroundGhostBuilder error handling", "[gcode][streaming][ghost]") {
+    SECTION("start with closed controller does nothing") {
+        GCodeStreamingController controller;
+        BackgroundGhostBuilder builder;
+
+        // Controller is not open
+        builder.start(&controller, [](size_t, const std::vector<ToolpathSegment>&) {});
+
+        // Should not start
+        REQUIRE_FALSE(builder.is_running());
+        REQUIRE_FALSE(builder.is_complete());
+    }
+
+    SECTION("start with null controller does nothing") {
+        BackgroundGhostBuilder builder;
+
+        builder.start(nullptr, [](size_t, const std::vector<ToolpathSegment>&) {});
+
+        REQUIRE_FALSE(builder.is_running());
+    }
+
+    SECTION("restart cancels previous build") {
+        TempGCodeFile temp_file(SIMPLE_3_LAYER_GCODE);
+        GCodeStreamingController controller;
+        REQUIRE(controller.open_file(temp_file.path()));
+
+        BackgroundGhostBuilder builder;
+        std::atomic<int> callback_count{0};
+
+        // Start first build
+        builder.start(&controller, [&](size_t, const std::vector<ToolpathSegment>&) {
+            callback_count++;
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        });
+
+        // Start second build immediately (should cancel first)
+        builder.start(&controller,
+                      [&](size_t, const std::vector<ToolpathSegment>&) { callback_count++; });
+
+        // Wait for second build to complete
+        auto start = std::chrono::steady_clock::now();
+        while (!builder.is_complete()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            auto elapsed = std::chrono::steady_clock::now() - start;
+            if (elapsed > std::chrono::seconds(5)) {
+                FAIL("Ghost builder timed out");
+                break;
+            }
+        }
+
+        REQUIRE(builder.is_complete());
+        // Should have rendered all layers from second build
+        REQUIRE(builder.layers_rendered() == 3);
+    }
+}

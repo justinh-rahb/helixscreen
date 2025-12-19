@@ -217,6 +217,28 @@ class GCodeLayerRenderer {
     }
 
     /**
+     * @brief Get progress of streaming ghost build
+     *
+     * In streaming mode, ghost is built progressively in background.
+     * Returns 0.0 to 1.0 indicating build progress.
+     *
+     * @return Progress fraction, or 1.0 if complete/not applicable
+     */
+    float get_ghost_build_progress() const;
+
+    /**
+     * @brief Check if streaming ghost build is complete
+     * @return true if ghost is fully built (all layers rendered)
+     */
+    bool is_ghost_build_complete() const;
+
+    /**
+     * @brief Check if streaming ghost build is running
+     * @return true if background ghost build is in progress
+     */
+    bool is_ghost_build_running() const;
+
+    /**
      * @brief View mode for 2D layer renderer
      */
     enum class ViewMode {
@@ -474,14 +496,24 @@ class GCodeLayerRenderer {
     int ghost_raw_height_ = 0;
     int ghost_raw_stride_ = 0; // Bytes per row
 
-    /// Background thread management
+    /// Background thread management (non-streaming mode)
     std::thread ghost_thread_;
     std::atomic<bool> ghost_thread_cancel_{false};
     std::atomic<bool> ghost_thread_running_{false};
     std::atomic<bool> ghost_thread_ready_{false}; // True when raw buffer is complete
 
+    /// Streaming mode ghost builder
+    std::unique_ptr<BackgroundGhostBuilder> streaming_ghost_builder_;
+
     /// Start background ghost rendering (called when new gcode loaded)
     void start_background_ghost_render();
+
+    /// Start streaming ghost build (called when in streaming mode)
+    void start_streaming_ghost_build();
+
+    /// Render a single layer's segments to ghost raw buffer (thread-safe)
+    void render_layer_to_ghost_buffer(size_t layer_index,
+                                      const std::vector<ToolpathSegment>& segments);
 
     /// Cancel any in-progress background ghost render
     void cancel_background_ghost_render();
@@ -491,6 +523,9 @@ class GCodeLayerRenderer {
 
     /// Copy completed raw buffer to LVGL ghost_buf_ (called on main thread)
     void copy_raw_to_ghost_buf();
+
+    /// Copy raw buffer to LVGL ghost_buf_ for streaming mode (progressive display)
+    void copy_raw_to_ghost_buf_streaming();
 
     /// Software Bresenham line drawing to raw ARGB8888 buffer
     void draw_line_bresenham(int x0, int y0, int x1, int y1, uint32_t color);

@@ -3,10 +3,10 @@
 
 #include "gcode_layer_renderer.h"
 
-#include "gcode_parser.h"
 #include "ui_theme.h"
 
 #include "config.h"
+#include "gcode_parser.h"
 
 #include <spdlog/spdlog.h>
 
@@ -63,9 +63,10 @@ void GCodeLayerRenderer::set_streaming_controller(GCodeStreamingController* cont
     invalidate_cache();
 
     if (streaming_controller_) {
-        spdlog::info("[GCodeLayerRenderer] Set streaming controller: {} layers, cache budget {:.1f}MB",
-                     streaming_controller_->get_layer_count(),
-                     static_cast<double>(streaming_controller_->get_cache_budget()) / (1024 * 1024));
+        spdlog::info(
+            "[GCodeLayerRenderer] Set streaming controller: {} layers, cache budget {:.1f}MB",
+            streaming_controller_->get_layer_count(),
+            static_cast<double>(streaming_controller_->get_cache_budget()) / (1024 * 1024));
     }
 }
 
@@ -683,19 +684,35 @@ void GCodeLayerRenderer::render(lv_layer_t* layer, const lv_area_t* widget_area)
 
         // =====================================================================
         // GHOST CACHE: Background thread rendering (non-blocking)
-        // Renders ALL layers in a background thread using software Bresenham,
-        // then copies to LVGL buffer when complete.
+        // Ghost rendering is done in a background thread:
+        // - Non-streaming: renders all layers from gcode_ to raw buffer
+        // - Streaming: uses BackgroundGhostBuilder to load and render progressively
+        // Both copy to LVGL buffer when ready.
         // =====================================================================
         if (ghost_mode_enabled_ && ghost_buf_ && !ghost_cache_valid_) {
-            // Check if background thread has completed
-            if (ghost_thread_ready_.load()) {
-                copy_raw_to_ghost_buf();
+            // Streaming mode: check ghost builder
+            if (streaming_ghost_builder_) {
+                // Progressive ghost: copy partial buffer periodically during build
+                if (streaming_ghost_builder_->is_running() ||
+                    streaming_ghost_builder_->is_complete()) {
+                    if (ghost_raw_buffer_) {
+                        copy_raw_to_ghost_buf_streaming();
+                    }
+                }
+                // Start build if not running and not complete
+                if (!streaming_ghost_builder_->is_running() &&
+                    !streaming_ghost_builder_->is_complete()) {
+                    start_background_ghost_render();
+                }
+            } else {
+                // Non-streaming mode: check background thread
+                if (ghost_thread_ready_.load()) {
+                    copy_raw_to_ghost_buf();
+                } else if (!ghost_thread_running_.load()) {
+                    start_background_ghost_render();
+                }
+                // else: background thread is running, wait for it
             }
-            // Start background render if not already running
-            else if (!ghost_thread_running_.load()) {
-                start_background_ghost_render();
-            }
-            // else: background thread is running, wait for it
         }
 
         // =====================================================================
@@ -747,7 +764,8 @@ void GCodeLayerRenderer::render(lv_layer_t* layer, const lv_area_t* widget_area)
 
         if (streaming_controller_) {
             // Streaming mode: get segments from controller
-            segments = streaming_controller_->get_layer_segments(static_cast<size_t>(current_layer_));
+            segments =
+                streaming_controller_->get_layer_segments(static_cast<size_t>(current_layer_));
             // Use default centering for streaming mode
             // (Could be improved by computing bounds from segments if needed)
         } else if (gcode_) {
@@ -804,12 +822,19 @@ bool GCodeLayerRenderer::needs_more_frames() const {
         return true;
     }
 
-    // Ghost rendering in background thread?
-    // Keep triggering frames until background thread completes so we can
-    // copy the result to the LVGL buffer
+    // Ghost rendering in background?
+    // Keep triggering frames while ghost is building so we can show progress
     if (ghost_mode_enabled_ && !ghost_cache_valid_) {
-        if (ghost_thread_running_.load() || ghost_thread_ready_.load()) {
-            return true;
+        // Streaming mode: check ghost builder
+        if (streaming_ghost_builder_) {
+            if (streaming_ghost_builder_->is_running()) {
+                return true;
+            }
+        } else {
+            // Non-streaming: check background thread
+            if (ghost_thread_running_.load() || ghost_thread_ready_.load()) {
+                return true;
+            }
         }
     }
 
@@ -1019,9 +1044,9 @@ void GCodeLayerRenderer::start_background_ghost_render() {
     // Cancel any existing render first
     cancel_background_ghost_render();
 
-    // Ghost rendering requires all layers in memory (not compatible with streaming)
+    // Streaming mode uses BackgroundGhostBuilder for progressive ghost building
     if (streaming_controller_) {
-        spdlog::debug("[GCodeLayerRenderer] Ghost mode disabled in streaming mode");
+        start_streaming_ghost_build();
         return;
     }
 
@@ -1058,6 +1083,11 @@ void GCodeLayerRenderer::start_background_ghost_render() {
 }
 
 void GCodeLayerRenderer::cancel_background_ghost_render() {
+    // Cancel streaming ghost builder if active
+    if (streaming_ghost_builder_) {
+        streaming_ghost_builder_->cancel();
+    }
+
     // Always signal cancellation and join if the thread is joinable.
     // This handles the case where the thread completed naturally but wasn't
     // joined yet - we MUST join before assigning a new thread or std::terminate() is called.
@@ -1067,6 +1097,168 @@ void GCodeLayerRenderer::cancel_background_ghost_render() {
     }
     ghost_thread_running_.store(false);
     ghost_thread_cancel_.store(false); // Reset for next run
+}
+
+// =============================================================================
+// Streaming Ghost Build
+// =============================================================================
+
+float GCodeLayerRenderer::get_ghost_build_progress() const {
+    if (streaming_ghost_builder_) {
+        return streaming_ghost_builder_->get_progress();
+    }
+    // Non-streaming mode: return 1.0 if ready, 0.0 otherwise
+    return ghost_thread_ready_.load() ? 1.0f : (ghost_thread_running_.load() ? 0.5f : 1.0f);
+}
+
+bool GCodeLayerRenderer::is_ghost_build_complete() const {
+    if (streaming_ghost_builder_) {
+        return streaming_ghost_builder_->is_complete();
+    }
+    return ghost_thread_ready_.load();
+}
+
+bool GCodeLayerRenderer::is_ghost_build_running() const {
+    if (streaming_ghost_builder_) {
+        return streaming_ghost_builder_->is_running();
+    }
+    return ghost_thread_running_.load();
+}
+
+void GCodeLayerRenderer::start_streaming_ghost_build() {
+    if (!streaming_controller_ || !streaming_controller_->is_open()) {
+        spdlog::warn("[GCodeLayerRenderer] Cannot start streaming ghost: controller not ready");
+        return;
+    }
+
+    // Allocate raw buffer if dimensions changed or not allocated
+    int width = canvas_width_;
+    int height = canvas_height_;
+    size_t stride = width * 4; // ARGB8888 = 4 bytes per pixel
+    size_t buffer_size = stride * height;
+
+    if (ghost_raw_width_ != width || ghost_raw_height_ != height || !ghost_raw_buffer_) {
+        ghost_raw_buffer_ = std::make_unique<uint8_t[]>(buffer_size);
+        ghost_raw_width_ = width;
+        ghost_raw_height_ = height;
+        ghost_raw_stride_ = static_cast<int>(stride);
+    }
+
+    // Clear buffer to transparent black (ARGB = 0x00000000)
+    std::memset(ghost_raw_buffer_.get(), 0, buffer_size);
+
+    // Create ghost builder if needed
+    if (!streaming_ghost_builder_) {
+        streaming_ghost_builder_ = std::make_unique<BackgroundGhostBuilder>();
+    }
+
+    // Capture transformation parameters for the render callback
+    // These are captured by value for thread safety
+    const float local_scale = scale_;
+    const float local_offset_x = offset_x_;
+    const float local_offset_y = offset_y_;
+    const float local_offset_z = offset_z_;
+    const int local_width = ghost_raw_width_;
+    const int local_height = ghost_raw_height_;
+    const ViewMode local_view_mode = view_mode_;
+    const bool local_show_travels = show_travels_;
+    const bool local_show_extrusions = show_extrusions_;
+    const bool local_show_supports = show_supports_;
+    const lv_color_t local_color_extrusion = color_extrusion_;
+
+    // Compute ghost color (darkened extrusion color)
+    uint8_t ghost_r = local_color_extrusion.red * 40 / 100;
+    uint8_t ghost_g = local_color_extrusion.green * 40 / 100;
+    uint8_t ghost_b = local_color_extrusion.blue * 40 / 100;
+    uint8_t ghost_a = 255;
+    uint32_t ghost_color = (ghost_a << 24) | (ghost_r << 16) | (ghost_g << 8) | ghost_b;
+
+    // Start the ghost builder with a render callback
+    streaming_ghost_builder_->start(
+        streaming_controller_,
+        [this, local_scale, local_offset_x, local_offset_y, local_offset_z, local_width,
+         local_height, local_view_mode, local_show_travels, local_show_extrusions,
+         local_show_supports,
+         ghost_color](size_t /*layer_index*/, const std::vector<ToolpathSegment>& segments) {
+            // Lambda for world_to_screen (same as background_ghost_render_thread)
+            auto local_world_to_screen = [&](float x, float y, float z) -> glm::ivec2 {
+                float sx, sy;
+
+                switch (local_view_mode) {
+                case ViewMode::FRONT: {
+                    float raw_dx = x - local_offset_x;
+                    float raw_dy = y - local_offset_y;
+                    float dx = -raw_dy;
+                    float dy = raw_dx;
+                    float dz = z - local_offset_z;
+
+                    constexpr float COS_H = 0.7071f;
+                    constexpr float SIN_H = -0.7071f;
+                    constexpr float COS_E = 0.866f;
+                    constexpr float SIN_E = 0.5f;
+
+                    float rx = dx * COS_H - dy * SIN_H;
+                    float ry = dx * SIN_H + dy * COS_H;
+
+                    sx = rx * local_scale + static_cast<float>(local_width) / 2.0f;
+                    sy = static_cast<float>(local_height) / 2.0f -
+                         (dz * COS_E + ry * SIN_E) * local_scale;
+                    break;
+                }
+                case ViewMode::ISOMETRIC: {
+                    float dx = x - local_offset_x;
+                    float dy = y - local_offset_y;
+                    constexpr float ISO_ANGLE = 0.7071f;
+                    constexpr float ISO_Y_SCALE = 0.5f;
+                    float iso_x = (dx - dy) * ISO_ANGLE;
+                    float iso_y = (dx + dy) * ISO_ANGLE * ISO_Y_SCALE;
+                    sx = iso_x * local_scale + static_cast<float>(local_width) / 2.0f;
+                    sy = static_cast<float>(local_height) / 2.0f - iso_y * local_scale;
+                    break;
+                }
+                case ViewMode::TOP_DOWN:
+                default: {
+                    float dx = x - local_offset_x;
+                    float dy = y - local_offset_y;
+                    sx = dx * local_scale + static_cast<float>(local_width) / 2.0f;
+                    sy = static_cast<float>(local_height) / 2.0f - dy * local_scale;
+                    break;
+                }
+                }
+                return {static_cast<int>(sx), static_cast<int>(sy)};
+            };
+
+            // Render segments to ghost buffer
+            for (const auto& seg : segments) {
+                // Filter by visibility settings
+                if (seg.is_extrusion) {
+                    if (is_support_segment(seg)) {
+                        if (!local_show_supports)
+                            continue;
+                    } else {
+                        if (!local_show_extrusions)
+                            continue;
+                    }
+                } else {
+                    if (!local_show_travels)
+                        continue;
+                }
+
+                // Convert to screen coordinates
+                glm::ivec2 p1 = local_world_to_screen(seg.start.x, seg.start.y, seg.start.z);
+                glm::ivec2 p2 = local_world_to_screen(seg.end.x, seg.end.y, seg.end.z);
+
+                // Skip zero-length segments
+                if (p1.x == p2.x && p1.y == p2.y)
+                    continue;
+
+                // Draw line using Bresenham
+                draw_line_bresenham(p1.x, p1.y, p2.x, p2.y, ghost_color);
+            }
+        });
+
+    spdlog::info("[GCodeLayerRenderer] Started streaming ghost build for {} layers ({}x{})",
+                 streaming_controller_->get_layer_count(), width, height);
 }
 
 void GCodeLayerRenderer::background_ghost_render_thread() {
@@ -1253,6 +1445,42 @@ void GCodeLayerRenderer::copy_raw_to_ghost_buf() {
 
     spdlog::debug("[GCodeLayerRenderer] Copied raw ghost buffer to LVGL ({}x{})", ghost_raw_width_,
                   ghost_raw_height_);
+}
+
+void GCodeLayerRenderer::copy_raw_to_ghost_buf_streaming() {
+    if (!ghost_raw_buffer_ || !ghost_buf_) {
+        return;
+    }
+
+    // Validate dimensions match
+    uint32_t lvgl_width = ghost_buf_->header.w;
+    uint32_t lvgl_height = ghost_buf_->header.h;
+    if (ghost_raw_width_ != static_cast<int>(lvgl_width) ||
+        ghost_raw_height_ != static_cast<int>(lvgl_height)) {
+        // Dimension mismatch - buffer was resized, wait for rebuild
+        return;
+    }
+
+    // Get LVGL buffer stride
+    uint32_t lvgl_stride = ghost_buf_->header.stride;
+
+    if (static_cast<int>(lvgl_stride) == ghost_raw_stride_) {
+        // Fast path: strides match, single memcpy
+        size_t buffer_size = ghost_raw_stride_ * ghost_raw_height_;
+        std::memcpy(ghost_buf_->data, ghost_raw_buffer_.get(), buffer_size);
+    } else {
+        // Slow path: strides differ, copy row by row
+        for (int y = 0; y < ghost_raw_height_; ++y) {
+            std::memcpy(static_cast<uint8_t*>(ghost_buf_->data) + y * lvgl_stride,
+                        ghost_raw_buffer_.get() + y * ghost_raw_stride_, ghost_raw_width_ * 4);
+        }
+    }
+
+    // For streaming mode, mark as valid only when complete
+    // This allows progressive updates while building
+    if (streaming_ghost_builder_ && streaming_ghost_builder_->is_complete()) {
+        ghost_cache_valid_ = true;
+    }
 }
 
 void GCodeLayerRenderer::blend_pixel(int x, int y, uint32_t color) {

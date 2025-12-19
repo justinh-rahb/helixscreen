@@ -206,6 +206,9 @@ class GCodeViewerState {
     lv_obj_t* loading_spinner{nullptr};
     lv_obj_t* loading_label{nullptr};
 
+    // Ghost build progress label (streaming mode only)
+    lv_obj_t* ghost_progress_label_{nullptr};
+
     // ========================================================================
     // Render Mode (Phase 5: 2D Layer View)
     // ========================================================================
@@ -372,6 +375,58 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
                     }
                 },
                 obj);
+        }
+
+        // Update ghost build progress label (streaming mode)
+        // IMPORTANT: Cannot create/delete/modify objects during draw callback!
+        // Use lv_async_call() to defer all label operations to after render completes.
+        if (st->layer_renderer_2d_->is_ghost_build_running()) {
+            int percent = static_cast<int>(st->layer_renderer_2d_->get_ghost_build_progress() * 100.0f);
+            // Capture needed data for deferred update
+            struct GhostProgressUpdate {
+                lv_obj_t* viewer;
+                int percent;
+            };
+            auto* update = new GhostProgressUpdate{obj, percent};
+            lv_async_call(
+                [](void* user_data) {
+                    auto* u = static_cast<GhostProgressUpdate*>(user_data);
+                    if (!lv_obj_is_valid(u->viewer)) {
+                        delete u;
+                        return;
+                    }
+                    auto* state = static_cast<GCodeViewerState*>(lv_obj_get_user_data(u->viewer));
+                    if (!state) {
+                        delete u;
+                        return;
+                    }
+                    // Create label if needed
+                    if (!state->ghost_progress_label_) {
+                        state->ghost_progress_label_ = lv_label_create(u->viewer);
+                        lv_obj_set_style_text_color(state->ghost_progress_label_,
+                                                    ui_theme_get_color("text_secondary"), LV_PART_MAIN);
+                        lv_obj_set_style_text_font(state->ghost_progress_label_, UI_FONT_SMALL,
+                                                   LV_PART_MAIN);
+                        lv_obj_align(state->ghost_progress_label_, LV_ALIGN_BOTTOM_LEFT, 8, -8);
+                    }
+                    static char text[32];
+                    lv_snprintf(text, sizeof(text), "Building preview: %d%%", u->percent);
+                    lv_label_set_text(state->ghost_progress_label_, text);
+                    delete u;
+                },
+                update);
+        } else if (st->ghost_progress_label_) {
+            // Defer label deletion to after render
+            lv_obj_t* label_to_delete = st->ghost_progress_label_;
+            st->ghost_progress_label_ = nullptr; // Clear reference immediately
+            lv_async_call(
+                [](void* user_data) {
+                    auto* label = static_cast<lv_obj_t*>(user_data);
+                    if (lv_obj_is_valid(label)) {
+                        lv_obj_delete(label);
+                    }
+                },
+                label_to_delete);
         }
     } else {
         // 3D TinyGL Renderer (isometric ribbon view)
@@ -825,8 +880,8 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
     }
 
     bool use_streaming = helix::should_use_gcode_streaming(file_size);
-    spdlog::info("[GCode Viewer] File size: {}KB, streaming mode: {}",
-                 file_size / 1024, use_streaming ? "ON" : "OFF");
+    spdlog::info("[GCode Viewer] File size: {}KB, streaming mode: {}", file_size / 1024,
+                 use_streaming ? "ON" : "OFF");
 
     // Clean up previous loading UI if it exists
     if (st->loading_container) {
@@ -847,7 +902,8 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
         lv_obj_set_flex_flow(st->loading_container, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(st->loading_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
                               LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_bg_color(st->loading_container, ui_theme_get_color("card_bg"), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(st->loading_container, ui_theme_get_color("card_bg"),
+                                  LV_PART_MAIN);
         lv_obj_set_style_bg_opa(st->loading_container, 220, LV_PART_MAIN);
         lv_obj_set_style_border_width(st->loading_container, 0, LV_PART_MAIN);
         lv_obj_set_style_radius(st->loading_container, 8, LV_PART_MAIN);
@@ -896,13 +952,15 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                     st->loading_label = nullptr;
                 }
 
-                if (r->success && st->streaming_controller_ && st->streaming_controller_->is_open()) {
+                if (r->success && st->streaming_controller_ &&
+                    st->streaming_controller_->is_open()) {
                     spdlog::info("[GCode Viewer] Streaming mode: indexed {} layers",
                                  st->streaming_controller_->get_layer_count());
 
                     // Initialize 2D renderer with streaming controller
                     st->layer_renderer_2d_ = std::make_unique<helix::gcode::GCodeLayerRenderer>();
-                    st->layer_renderer_2d_->set_streaming_controller(st->streaming_controller_.get());
+                    st->layer_renderer_2d_->set_streaming_controller(
+                        st->streaming_controller_.get());
 
                     // Get canvas size from widget
                     lv_area_t coords;
