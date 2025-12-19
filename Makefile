@@ -301,9 +301,15 @@ endif
 SPDLOG_SYSTEM_HEADER_PATHS := /usr/include/spdlog/spdlog.h /usr/local/include/spdlog/spdlog.h /opt/homebrew/include/spdlog/spdlog.h
 SPDLOG_SYSTEM_HEADER := $(firstword $(wildcard $(SPDLOG_SYSTEM_HEADER_PATHS)))
 ifneq ($(SPDLOG_SYSTEM_HEADER),)
-    # System spdlog found - no extra include path needed (system paths already searched)
-    # Compiler already searches /usr/include, /usr/local/include, etc.
-    SPDLOG_INC :=
+    # System spdlog found
+    # /usr/include and /usr/local/include are in compiler defaults - no -isystem needed
+    # /opt/homebrew/include is NOT in macOS compiler defaults - needs explicit -isystem
+    ifeq ($(SPDLOG_SYSTEM_HEADER),/opt/homebrew/include/spdlog/spdlog.h)
+        SPDLOG_INC := -isystem /opt/homebrew/include
+    else
+        # /usr/include or /usr/local/include - compiler already searches these
+        SPDLOG_INC :=
+    endif
 else
     # No system spdlog - use submodule
     SPDLOG_DIR := lib/spdlog
