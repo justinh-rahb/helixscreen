@@ -7,7 +7,7 @@ This document tracks the implementation of comprehensive standalone filament sen
 **Branch:** `feat/filament-sensors`
 **Worktree:** `/Users/pbrown/Code/Printing/helixscreen-filament-sensors`
 **Started:** 2025-12-15
-**Status:** Phase 1-4 Complete (wizard step deferred), Phase 5.3 Complete
+**Status:** ✅ COMPLETE (Phase 1-4 done, Phase 5.3 done, wizard deferred)
 
 ---
 
@@ -192,41 +192,47 @@ Deferred along with wizard step.
 
 ---
 
-### Phase 4: Behavioral Integration 🔲 PENDING
+### Phase 4: Behavioral Integration ✅ COMPLETE
 
-#### 4.1 Load/Unload Warnings
-**Modify:** `src/ui_panel_filament.cpp`
+#### 4.1 Load/Unload Warnings ✅
+**File:** `src/ui_panel_filament.cpp`
 
-- Warn if toolhead already has filament on load
-- Warn if no filament detected on unload
-- Allow proceed with warning dialogs
+Implemented:
+- `handle_load_button()` checks toolhead sensor, warns if filament already present
+- `handle_unload_button()` checks toolhead sensor, warns if no filament detected
+- `show_load_warning()` / `show_unload_warning()` create modal dialogs
+- Proceed/Cancel handlers with proper cleanup
 
-#### 4.2 Pre-Print Warning
-**Modify:** `src/ui_panel_print_select.cpp`
+#### 4.2 Pre-Print Warning ✅
+**File:** `src/ui_panel_print_select.cpp`
 
-- Check runout sensor before starting print
-- Show warning if no filament, allow proceed
+Implemented at line 1430:
+- Checks runout sensor before starting print
+- Shows warning modal if no filament detected
+- Allows user to proceed anyway or cancel
 
-#### 4.3 State Change Toasts
-**Already implemented in:** `src/filament_sensor_manager.cpp`
+#### 4.3 State Change Toasts ✅
+**File:** `src/filament_sensor_manager.cpp`
 
-Toast on insert/remove with role name (e.g., "Runout: Filament inserted").
+Implemented in `update_from_status()`:
+- Toast on insert: "Runout Sensor: Filament inserted"
+- Toast on remove: "Runout Sensor: Filament removed" (warning)
+- Only fires for enabled sensors with assigned roles
 
-#### 4.4 Runout Guidance Modal
-**New file:** `ui_xml/runout_guidance_modal.xml`
+#### 4.4 Runout Guidance Modal ✅
+**Files:** `ui_xml/runout_guidance_modal.xml`, `src/ui_panel_print_status.cpp`
 
-Modal shown when print pauses + no filament detected:
-- "Load Filament" button → Navigate to filament panel
-- "Resume Print" button → Resume command
-- "Cancel Print" button → Cancel command
-
-**Modify:** `src/ui_panel_print_status.cpp`
-
-Detect print paused + runout condition and show modal.
+Implemented:
+- Modal with warning icon, customizable title/message
+- "Load Filament" button → navigates to filament panel
+- "Resume Print" button → sends resume command
+- "Cancel Print" button → sends cancel command
+- `check_and_show_runout_guidance()` triggered when print pauses
+- Proper cleanup on panel deactivation
 
 ---
 
-### Phase 5: Testing & Polish 🔲 PENDING
+### Phase 5: Testing & Polish (Partial)
 
 #### 5.1 Mock Testing
 - Test with `HELIX_MOCK_FILAMENT_SENSORS=switch:runout,switch:toolhead`
