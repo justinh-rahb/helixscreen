@@ -9,6 +9,7 @@
 #include "ui_theme.h"
 #include "ui_wizard_connection.h"
 #include "ui_wizard_fan_select.h"
+#include "ui_wizard_filament_sensor_select.h"
 #include "ui_wizard_heater_select.h"
 #include "ui_wizard_led_select.h"
 #include "ui_wizard_printer_identify.h"
@@ -50,6 +51,12 @@ static lv_obj_t* wizard_container = nullptr;
 // Track current screen for proper cleanup
 static int current_screen_step = 0;
 
+// Track if LED step (6) is being skipped - no LEDs discovered
+static bool led_step_skipped = false;
+
+// Track if filament sensor step (7) is being skipped - <2 standalone sensors
+static bool filament_step_skipped = false;
+
 // Forward declarations
 static void on_back_clicked(lv_event_t* e);
 static void on_next_clicked(lv_event_t* e);
@@ -67,16 +74,17 @@ static const char* get_step_subtitle_from_xml(int step);
  * Each component defines its own step_title in its <consts> block
  */
 static const char* const STEP_COMPONENT_NAMES[] = {
-    nullptr,                   // 0 (unused, 1-indexed)
-    "wizard_wifi_setup",       // 1
-    "wizard_connection",       // 2
-    "wizard_printer_identify", // 3
-    "wizard_heater_select",    // 4
-    "wizard_fan_select",       // 5
-    "wizard_led_select",       // 6
-    "wizard_summary"           // 7
+    nullptr,                         // 0 (unused, 1-indexed)
+    "wizard_wifi_setup",             // 1
+    "wizard_connection",             // 2
+    "wizard_printer_identify",       // 3
+    "wizard_heater_select",          // 4
+    "wizard_fan_select",             // 5
+    "wizard_led_select",             // 6
+    "wizard_filament_sensor_select", // 7 (may be skipped if <2 sensors)
+    "wizard_summary"                 // 8
 };
-static constexpr int STEP_COMPONENT_COUNT = 7;
+static constexpr int STEP_COMPONENT_COUNT = 8;
 
 /**
  * Get step title from XML component's <consts> block
@@ -139,12 +147,12 @@ void ui_wizard_init_subjects() {
     // Initialize subjects with defaults
     UI_SUBJECT_INIT_AND_REGISTER_INT(current_step, 1, "current_step");
     UI_SUBJECT_INIT_AND_REGISTER_INT(
-        total_steps, 7,
-        "total_steps"); // 7 steps: WiFi, Connection, Printer, Heater, Fan, LED, Summary
+        total_steps, 8,
+        "total_steps"); // 8 steps: WiFi, Connection, Printer, Heater, Fan, LED, Filament, Summary
 
     UI_SUBJECT_INIT_AND_REGISTER_STRING(wizard_title, wizard_title_buffer, "Welcome",
                                         "wizard_title");
-    UI_SUBJECT_INIT_AND_REGISTER_STRING(wizard_progress, wizard_progress_buffer, "Step 1 of 7",
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(wizard_progress, wizard_progress_buffer, "Step 1 of 8",
                                         "wizard_progress");
     UI_SUBJECT_INIT_AND_REGISTER_STRING(wizard_next_button_text, wizard_next_button_text_buffer,
                                         "Next", "wizard_next_button_text");
@@ -155,7 +163,7 @@ void ui_wizard_init_subjects() {
     // Step 2 (connection) will set it to 0 until test passes
     UI_SUBJECT_INIT_AND_REGISTER_INT(connection_test_passed, 1, "connection_test_passed");
 
-    spdlog::debug("[0");
+    spdlog::debug("[Wizard] Subjects initialized");
 }
 
 // Helper type for constant name/value pairs
@@ -269,6 +277,7 @@ void ui_wizard_container_register_responsive_constants() {
         "wizard_heater_select",
         "wizard_fan_select",
         "wizard_led_select",
+        "wizard_filament_sensor_select",
         "wizard_summary",
         NULL // Sentinel
     };
@@ -284,7 +293,7 @@ void ui_wizard_container_register_responsive_constants() {
     }
 
     spdlog::debug("[Wizard] Registered 11 constants to wizard_container and propagated to {} child "
-                  "components (7 wizard screens)",
+                  "components (8 wizard screens)",
                   child_count);
     spdlog::debug("[Wizard] Values: padding={}, gap={}, header_h={}, footer_h={}, button_w={}",
                   padding_value, gap_value, header_height, footer_height, button_width);
@@ -320,29 +329,55 @@ lv_obj_t* ui_wizard_create(lv_obj_t* parent) {
 void ui_wizard_navigate_to_step(int step) {
     spdlog::debug("[Wizard] Navigating to step {}", step);
 
-    // Clamp step to valid range
-    int total = lv_subject_get_int(&total_steps);
+    // Clamp step to valid range (internal steps are always 1-8)
     if (step < 1)
         step = 1;
-    if (step > total)
-        step = total;
+    if (step > STEP_COMPONENT_COUNT)
+        step = STEP_COMPONENT_COUNT;
 
-    // Update current_step subject
+    // Reset skip flags when starting wizard from the beginning
+    // This ensures correct behavior if wizard is restarted after hardware changes
+    if (step == 1) {
+        led_step_skipped = false;
+        filament_step_skipped = false;
+    }
+
+    // Calculate display step and total for progress indicator
+    // When steps are skipped, we adjust the display numbers:
+    // - LED skip (6): steps 7+ display one lower
+    // - Filament skip (7): steps 8+ display one lower
+    // Total = 8 - skipped_count
+    int display_step = step;
+    if (led_step_skipped && step > 6)
+        display_step--;
+    if (filament_step_skipped && step > 7)
+        display_step--;
+
+    int display_total = 8;
+    if (led_step_skipped)
+        display_total--;
+    if (filament_step_skipped)
+        display_total--;
+
+    // Update current_step subject (internal step number for UI bindings)
     lv_subject_set_int(&current_step, step);
 
+    // Determine if this is the last step (summary is always step 8 internally)
+    bool is_last_step = (step == 8);
+
     // Update next button text based on step
-    if (step == total) {
+    if (is_last_step) {
         lv_subject_copy_string(&wizard_next_button_text, "Finish");
     } else {
         lv_subject_copy_string(&wizard_next_button_text, "Next");
     }
 
-    // Update progress text
+    // Update progress text with display values
     char progress_buf[32];
-    snprintf(progress_buf, sizeof(progress_buf), "Step %d of %d", step, total);
+    snprintf(progress_buf, sizeof(progress_buf), "Step %d of %d", display_step, display_total);
     lv_subject_copy_string(&wizard_progress, progress_buf);
 
-    // Load screen content
+    // Load screen content (uses internal step number)
     ui_wizard_load_screen(step);
 
     // Force layout update on entire wizard after screen is loaded
@@ -350,8 +385,8 @@ void ui_wizard_navigate_to_step(int step) {
         lv_obj_update_layout(wizard_container);
     }
 
-    spdlog::debug("[Wizard] Updated to step {}/{}, button: {}", step, total,
-                  (step == total) ? "Finish" : "Next");
+    spdlog::debug("[Wizard] Updated to step {}/{} (internal: {}), button: {}", display_step,
+                  display_total, step, is_last_step ? "Finish" : "Next");
 }
 
 void ui_wizard_set_title(const char* title) {
@@ -400,7 +435,10 @@ static void ui_wizard_cleanup_current_screen() {
     case 6: // LED Select
         get_wizard_led_select_step()->cleanup();
         break;
-    case 7: // Summary
+    case 7: // Filament Sensor Select
+        get_wizard_filament_sensor_select_step()->cleanup();
+        break;
+    case 8: // Summary
         get_wizard_summary_step()->cleanup();
         break;
     default:
@@ -492,7 +530,15 @@ static void ui_wizard_load_screen(int step) {
         lv_obj_update_layout(content);
         break;
 
-    case 7: // Summary
+    case 7: // Filament Sensor Select
+        spdlog::debug("[Wizard] Creating filament sensor select screen");
+        get_wizard_filament_sensor_select_step()->init_subjects();
+        get_wizard_filament_sensor_select_step()->register_callbacks();
+        get_wizard_filament_sensor_select_step()->create(content);
+        lv_obj_update_layout(content);
+        break;
+
+    case 8: // Summary
         spdlog::debug("[Wizard] Creating summary screen");
         get_wizard_summary_step()->init_subjects();
         get_wizard_summary_step()->register_callbacks();
@@ -621,21 +667,57 @@ static void on_back_clicked(lv_event_t* e) {
     (void)e;
     int current = lv_subject_get_int(&current_step);
     if (current > 1) {
-        ui_wizard_navigate_to_step(current - 1);
+        int prev_step = current - 1;
+
+        // Skip filament sensor step (7) when going back if it was skipped
+        if (prev_step == 7 && filament_step_skipped) {
+            prev_step = 6;
+        }
+
+        // Skip LED step (6) when going back if it was skipped
+        if (prev_step == 6 && led_step_skipped) {
+            prev_step = 5;
+        }
+
+        ui_wizard_navigate_to_step(prev_step);
+        spdlog::debug("[Wizard] Back button clicked, step: {}", prev_step);
     }
-    spdlog::debug("[Wizard] Back button clicked, step: {}", current - 1);
 }
 
 static void on_next_clicked(lv_event_t* e) {
     (void)e;
     int current = lv_subject_get_int(&current_step);
-    int total = lv_subject_get_int(&total_steps);
 
-    if (current < total) {
-        ui_wizard_navigate_to_step(current + 1);
-        spdlog::debug("[Wizard] Next button clicked, step: {}", current + 1);
-    } else {
+    // Summary (step 8) is always the last internal step
+    if (current >= STEP_COMPONENT_COUNT) {
         spdlog::info("[Wizard] Finish button clicked, completing wizard");
         ui_wizard_complete();
+        return;
     }
+
+    int next_step = current + 1;
+
+    // Skip LED step (6) if no LEDs detected
+    if (next_step == 6 && get_wizard_led_select_step()->should_skip()) {
+        led_step_skipped = true;
+        next_step = 7;
+        spdlog::debug("[Wizard] Skipping LED step (no LEDs detected)");
+    }
+
+    // Skip filament sensor step (7) if <2 standalone sensors
+    if (next_step == 7 && get_wizard_filament_sensor_select_step()->should_skip()) {
+        filament_step_skipped = true;
+
+        // Auto-configure single sensor if exactly 1 detected
+        auto* step = get_wizard_filament_sensor_select_step();
+        if (step->get_standalone_sensor_count() == 1) {
+            step->auto_configure_single_sensor();
+            spdlog::info("[Wizard] Auto-configured single filament sensor as RUNOUT");
+        }
+        next_step = 8;
+        spdlog::debug("[Wizard] Skipping filament sensor step (<2 sensors)");
+    }
+
+    ui_wizard_navigate_to_step(next_step);
+    spdlog::debug("[Wizard] Next button clicked, step: {}", next_step);
 }

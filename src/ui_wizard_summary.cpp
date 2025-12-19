@@ -8,6 +8,7 @@
 
 #include "app_globals.h"
 #include "config.h"
+#include "filament_sensor_manager.h"
 #include "lvgl/lvgl.h"
 #include "wizard_config_paths.h"
 
@@ -50,6 +51,7 @@ WizardSummaryStep::WizardSummaryStep() {
     std::memset(part_fan_buffer_, 0, sizeof(part_fan_buffer_));
     std::memset(hotend_fan_buffer_, 0, sizeof(hotend_fan_buffer_));
     std::memset(led_strip_buffer_, 0, sizeof(led_strip_buffer_));
+    std::memset(filament_sensor_buffer_, 0, sizeof(filament_sensor_buffer_));
 
     spdlog::debug("[{}] Instance created", get_name());
 }
@@ -71,6 +73,8 @@ WizardSummaryStep::WizardSummaryStep(WizardSummaryStep&& other) noexcept
       part_fan_(other.part_fan_), part_fan_visible_(other.part_fan_visible_),
       hotend_fan_(other.hotend_fan_), hotend_fan_visible_(other.hotend_fan_visible_),
       led_strip_(other.led_strip_), led_strip_visible_(other.led_strip_visible_),
+      filament_sensor_(other.filament_sensor_),
+      filament_sensor_visible_(other.filament_sensor_visible_),
       subjects_initialized_(other.subjects_initialized_) {
     // Move buffers
     std::memcpy(printer_name_buffer_, other.printer_name_buffer_, sizeof(printer_name_buffer_));
@@ -83,6 +87,8 @@ WizardSummaryStep::WizardSummaryStep(WizardSummaryStep&& other) noexcept
     std::memcpy(part_fan_buffer_, other.part_fan_buffer_, sizeof(part_fan_buffer_));
     std::memcpy(hotend_fan_buffer_, other.hotend_fan_buffer_, sizeof(hotend_fan_buffer_));
     std::memcpy(led_strip_buffer_, other.led_strip_buffer_, sizeof(led_strip_buffer_));
+    std::memcpy(filament_sensor_buffer_, other.filament_sensor_buffer_,
+                sizeof(filament_sensor_buffer_));
 
     // Null out other
     other.screen_root_ = nullptr;
@@ -104,6 +110,8 @@ WizardSummaryStep& WizardSummaryStep::operator=(WizardSummaryStep&& other) noexc
         hotend_fan_visible_ = other.hotend_fan_visible_;
         led_strip_ = other.led_strip_;
         led_strip_visible_ = other.led_strip_visible_;
+        filament_sensor_ = other.filament_sensor_;
+        filament_sensor_visible_ = other.filament_sensor_visible_;
         subjects_initialized_ = other.subjects_initialized_;
 
         // Move buffers
@@ -117,6 +125,8 @@ WizardSummaryStep& WizardSummaryStep::operator=(WizardSummaryStep&& other) noexc
         std::memcpy(part_fan_buffer_, other.part_fan_buffer_, sizeof(part_fan_buffer_));
         std::memcpy(hotend_fan_buffer_, other.hotend_fan_buffer_, sizeof(hotend_fan_buffer_));
         std::memcpy(led_strip_buffer_, other.led_strip_buffer_, sizeof(led_strip_buffer_));
+        std::memcpy(filament_sensor_buffer_, other.filament_sensor_buffer_,
+                    sizeof(filament_sensor_buffer_));
 
         // Null out other
         other.screen_root_ = nullptr;
@@ -238,6 +248,32 @@ void WizardSummaryStep::init_subjects() {
     led_strip_buffer_[sizeof(led_strip_buffer_) - 1] = '\0';
     int led_strip_visible = (led_strip != "None") ? 1 : 0;
 
+    // Filament sensor - get from FilamentSensorManager
+    std::string filament_sensor = "None";
+    int filament_sensor_visible = 0;
+    auto& sensor_mgr = helix::FilamentSensorManager::instance();
+    auto sensors = sensor_mgr.get_sensors();
+    for (const auto& sensor : sensors) {
+        if (sensor.role == helix::FilamentSensorRole::RUNOUT) {
+            filament_sensor = sensor.sensor_name + " (Runout)";
+            filament_sensor_visible = 1;
+            break;
+        }
+    }
+    // If no runout, check for any assigned role
+    if (filament_sensor_visible == 0) {
+        for (const auto& sensor : sensors) {
+            if (sensor.role != helix::FilamentSensorRole::NONE) {
+                filament_sensor =
+                    sensor.sensor_name + " (" + helix::role_to_display_string(sensor.role) + ")";
+                filament_sensor_visible = 1;
+                break;
+            }
+        }
+    }
+    strncpy(filament_sensor_buffer_, filament_sensor.c_str(), sizeof(filament_sensor_buffer_) - 1);
+    filament_sensor_buffer_[sizeof(filament_sensor_buffer_) - 1] = '\0';
+
     // Initialize and register all subjects
     UI_SUBJECT_INIT_AND_REGISTER_STRING(printer_name_, printer_name_buffer_, printer_name_buffer_,
                                         "summary_printer_name");
@@ -262,6 +298,10 @@ void WizardSummaryStep::init_subjects() {
                                         "summary_led_strip");
     UI_SUBJECT_INIT_AND_REGISTER_INT(led_strip_visible_, led_strip_visible,
                                      "summary_led_strip_visible");
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(filament_sensor_, filament_sensor_buffer_,
+                                        filament_sensor_buffer_, "summary_filament_sensor");
+    UI_SUBJECT_INIT_AND_REGISTER_INT(filament_sensor_visible_, filament_sensor_visible,
+                                     "summary_filament_sensor_visible");
 
     subjects_initialized_ = true;
     spdlog::debug("[{}] Subjects initialized with config values", get_name());

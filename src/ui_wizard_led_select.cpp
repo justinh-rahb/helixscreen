@@ -178,3 +178,26 @@ bool WizardLedSelectStep::is_validated() const {
     // Always return true for baseline implementation
     return true;
 }
+
+// ============================================================================
+// Skip Logic
+// ============================================================================
+
+bool WizardLedSelectStep::should_skip() const {
+    MoonrakerClient* client = get_moonraker_client();
+    if (!client) {
+        spdlog::debug("[{}] No MoonrakerClient, skipping LED step", get_name());
+        return true;
+    }
+
+    const auto& leds = client->get_leds();
+    bool should_skip = leds.empty();
+
+    if (should_skip) {
+        spdlog::info("[{}] No LEDs discovered, skipping step", get_name());
+    } else {
+        spdlog::debug("[{}] Found {} LED(s), showing step", get_name(), leds.size());
+    }
+
+    return should_skip;
+}

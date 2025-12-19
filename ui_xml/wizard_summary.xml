@@ -8,7 +8,7 @@
     <!-- Step metadata (read by wizard orchestrator) -->
     <str name="step_title" value="Printer Setup: Review"/>
     <str name="step_subtitle" value="Review your configuration below, then click Finish to save"/>
-    <int name="step_order" value="7"/>
+    <int name="step_order" value="8"/>
   </consts>
   <view name="wizard_summary_root"
         extends="lv_obj" width="100%" height="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0"
@@ -95,6 +95,14 @@
           <text_small text="LED Strip" style_text_color="#text_secondary"/>
           <text_body name="summary_led_strip_label" bind_text="summary_led_strip" style_text_color="#text_primary"/>
           <lv_obj-bind_flag_if_eq subject="summary_led_strip_visible" flag="hidden" ref_value="0"/>
+        </lv_obj>
+        <!-- Filament Sensor (conditionally visible) -->
+        <lv_obj name="filament_sensor_row"
+                width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0"
+                style_pad_top="#space_xs" flex_flow="column" style_pad_gap="0">
+          <text_small text="Filament Sensor" style_text_color="#text_secondary"/>
+          <text_body name="summary_filament_sensor_label" bind_text="summary_filament_sensor" style_text_color="#text_primary"/>
+          <lv_obj-bind_flag_if_eq subject="summary_filament_sensor_visible" flag="hidden" ref_value="0"/>
         </lv_obj>
       </lv_obj>
     </ui_card>

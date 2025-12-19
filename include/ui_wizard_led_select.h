@@ -75,6 +75,15 @@ class WizardLedSelectStep {
     bool is_validated() const;
 
     /**
+     * @brief Check if this step should be skipped
+     *
+     * Skips if no LEDs are discovered from the printer.
+     *
+     * @return true if step should be skipped, false otherwise
+     */
+    bool should_skip() const;
+
+    /**
      * @brief Get step name for logging
      */
     const char* get_name() const {

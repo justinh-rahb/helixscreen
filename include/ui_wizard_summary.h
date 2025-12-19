@@ -22,7 +22,7 @@
  * - Static trampolines for any LVGL callbacks
  * - Global singleton getter for backwards compatibility
  *
- * ## Subject Bindings (12 total):
+ * ## Subject Bindings (14 total):
  *
  * - summary_printer_name (string) - Configured printer name
  * - summary_printer_type (string) - Selected printer type
@@ -36,6 +36,8 @@
  * - summary_hotend_fan_visible (int) - Hotend fan row visibility
  * - summary_led_strip (string) - LED strip selection
  * - summary_led_strip_visible (int) - LED strip row visibility
+ * - summary_filament_sensor (string) - Filament sensor selection
+ * - summary_filament_sensor_visible (int) - Filament sensor row visibility
  */
 
 /**
@@ -107,7 +109,7 @@ class WizardSummaryStep {
     // Screen instance
     lv_obj_t* screen_root_ = nullptr;
 
-    // Subjects (12 total)
+    // Subjects (14 total)
     lv_subject_t printer_name_;
     lv_subject_t printer_type_;
     lv_subject_t wifi_ssid_;
@@ -120,6 +122,8 @@ class WizardSummaryStep {
     lv_subject_t hotend_fan_visible_;
     lv_subject_t led_strip_;
     lv_subject_t led_strip_visible_;
+    lv_subject_t filament_sensor_;
+    lv_subject_t filament_sensor_visible_;
 
     // String buffers (must be persistent for subject lifetimes)
     char printer_name_buffer_[128];
@@ -131,6 +135,7 @@ class WizardSummaryStep {
     char part_fan_buffer_[128];
     char hotend_fan_buffer_[128];
     char led_strip_buffer_[128];
+    char filament_sensor_buffer_[128];
 
     // Track initialization
     bool subjects_initialized_ = false;

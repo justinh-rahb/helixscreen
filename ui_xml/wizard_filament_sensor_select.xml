@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<!-- Copyright 2025 HelixScreen -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<component>
+  <!-- First-Run Wizard: Filament Sensor Select Screen -->
+  <!-- User assigns roles to detected filament sensors -->
+  <!-- Only shown when 2+ non-AMS sensors are detected -->
+  <consts>
+    <!-- Step metadata (read by wizard orchestrator) -->
+    <str name="step_title" value="Printer Setup: Filament Sensors"/>
+    <str name="step_subtitle" value="Assign roles to your filament sensors"/>
+    <int name="step_order" value="7"/>
+  </consts>
+  <view name="wizard_filament_sensor_select_root"
+        extends="lv_obj" width="100%" height="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0"
+        flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
+    <!-- Selection container -->
+    <ui_card width="100%"
+             flex_grow="1" style_radius="#border_radius" style_pad_all="#space_lg" style_pad_gap="#space_sm"
+             flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start">
+      <!-- Runout sensor selection (primary) -->
+      <text_body text="Runout Sensor" style_text_color="#text_primary"/>
+      <lv_dropdown name="runout_sensor_dropdown"
+                   width="100%" height="#header_height" options="None" style_border_width="#input_border_width"
+                   style_border_opa="100%" style_radius="#border_radius" style_pad_all="#space_lg">
+        <event_cb trigger="value_changed" callback="on_runout_sensor_dropdown_changed"/>
+      </lv_dropdown>
+      <!-- Toolhead sensor selection (optional) -->
+      <text_body text="Toolhead Sensor (optional)" style_pad_top="#space_md" style_text_color="#text_secondary"/>
+      <lv_dropdown name="toolhead_sensor_dropdown"
+                   width="100%" height="#header_height" options="None" style_border_width="#input_border_width"
+                   style_border_opa="100%" style_radius="#border_radius" style_pad_all="#space_lg">
+        <event_cb trigger="value_changed" callback="on_toolhead_sensor_dropdown_changed"/>
+      </lv_dropdown>
+      <!-- Entry sensor selection (optional) -->
+      <text_body text="Entry Sensor (optional)" style_pad_top="#space_md" style_text_color="#text_secondary"/>
+      <lv_dropdown name="entry_sensor_dropdown"
+                   width="100%" height="#header_height" options="None" style_border_width="#input_border_width"
+                   style_border_opa="100%" style_radius="#border_radius" style_pad_all="#space_lg">
+        <event_cb trigger="value_changed" callback="on_entry_sensor_dropdown_changed"/>
+      </lv_dropdown>
+      <!-- Spacer to push info text to bottom -->
+      <lv_obj width="1" flex_grow="1" style_bg_opa="0" style_border_width="0"/>
+      <!-- Info text -->
+      <lv_obj width="100%"
+              height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_top="#space_md"
+              flex_flow="row" style_flex_cross_place="center" style_pad_gap="#space_sm">
+        <icon src="information" size="sm" variant="secondary"/>
+        <text_small text="Most printers only need the Runout sensor configured." style_text_color="#text_secondary" flex_grow="1"/>
+      </lv_obj>
+    </ui_card>
+  </view>
+</component>
