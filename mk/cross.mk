@@ -589,6 +589,15 @@ release-pi: | build/pi/bin/helix-screen build/pi/bin/helix-splash
 	@for asset in $(RELEASE_ASSETS); do \
 		if [ -d "$$asset" ]; then cp -r "$$asset" $(RELEASE_DIR)/helixscreen/assets/; fi; \
 	done
+	@# Copy pre-rendered images from build directory (splash + printer images)
+	@if [ -d "build/assets/images/prerendered" ]; then \
+		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/prerendered; \
+		cp -r build/assets/images/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/prerendered/; \
+	fi
+	@if [ -d "build/assets/images/printers/prerendered" ]; then \
+		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/printers/prerendered; \
+		cp -r build/assets/images/printers/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/printers/prerendered/; \
+	fi
 	@find $(RELEASE_DIR)/helixscreen -name '.DS_Store' -delete 2>/dev/null || true
 	@cd $(RELEASE_DIR) && COPYFILE_DISABLE=1 tar -czvf helixscreen-pi-$(VERSION).tar.gz helixscreen
 	@rm -rf $(RELEASE_DIR)/helixscreen
@@ -608,6 +617,15 @@ release-ad5m: | build/ad5m/bin/helix-screen build/ad5m/bin/helix-splash
 	@for asset in $(RELEASE_ASSETS); do \
 		if [ -d "$$asset" ]; then cp -r "$$asset" $(RELEASE_DIR)/helixscreen/assets/; fi; \
 	done
+	@# Copy pre-rendered images from build directory (splash + printer images)
+	@if [ -d "build/assets/images/prerendered" ]; then \
+		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/prerendered; \
+		cp -r build/assets/images/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/prerendered/; \
+	fi
+	@if [ -d "build/assets/images/printers/prerendered" ]; then \
+		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/printers/prerendered; \
+		cp -r build/assets/images/printers/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/printers/prerendered/; \
+	fi
 	@find $(RELEASE_DIR)/helixscreen -name '.DS_Store' -delete 2>/dev/null || true
 	@cd $(RELEASE_DIR) && COPYFILE_DISABLE=1 tar -czvf helixscreen-ad5m-$(VERSION).tar.gz helixscreen
 	@rm -rf $(RELEASE_DIR)/helixscreen
@@ -623,3 +641,11 @@ release-all: release-pi release-ad5m
 release-clean:
 	@rm -rf $(RELEASE_DIR)
 	@echo "$(GREEN)✓ Release directory cleaned$(RESET)"
+
+# Aliases for package-* (matches scripts/package.sh naming)
+# These trigger the full build + package workflow
+.PHONY: package-ad5m package-pi package-all package-clean
+package-ad5m: ad5m-docker gen-images-ad5m gen-printer-images release-ad5m
+package-pi: pi-docker gen-images gen-printer-images release-pi
+package-all: package-ad5m package-pi
+package-clean: release-clean

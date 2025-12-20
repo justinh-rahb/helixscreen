@@ -40,23 +40,28 @@ PRERENDERED_IMAGES_ALL := \
     $(PRERENDERED_DIR)/splash-logo-large.bin
 
 # Generate images for AD5M (800x480 fixed display only)
+# NOTE: Uses mkdir -p instead of $(BUILD_DIR) dependency to avoid triggering 'build' target
+# which runs 'make clean' and wipes cross-compiled binaries
 .PHONY: gen-images-ad5m
-gen-images-ad5m: | $(BUILD_DIR)
+gen-images-ad5m:
 	$(ECHO) "$(CYAN)Generating pre-rendered images for AD5M (800x480)...$(RESET)"
+	$(Q)mkdir -p $(PRERENDERED_DIR)
 	$(Q)OUTPUT_DIR=$(PRERENDERED_DIR) TARGET_SIZES=small ./$(REGEN_IMAGES_SCRIPT)
 	$(ECHO) "$(GREEN)✓ AD5M images generated$(RESET)"
 
 # Generate images for Pi (all sizes for variable displays)
 .PHONY: gen-images-pi
-gen-images-pi: | $(BUILD_DIR)
+gen-images-pi:
 	$(ECHO) "$(CYAN)Generating pre-rendered images for Pi (all sizes)...$(RESET)"
+	$(Q)mkdir -p $(PRERENDERED_DIR)
 	$(Q)OUTPUT_DIR=$(PRERENDERED_DIR) ./$(REGEN_IMAGES_SCRIPT)
 	$(ECHO) "$(GREEN)✓ Pi images generated$(RESET)"
 
 # Generate all pre-rendered images (generic)
 .PHONY: gen-images
-gen-images: | $(BUILD_DIR)
+gen-images:
 	$(ECHO) "$(CYAN)Generating pre-rendered images (all sizes)...$(RESET)"
+	$(Q)mkdir -p $(PRERENDERED_DIR)
 	$(Q)OUTPUT_DIR=$(PRERENDERED_DIR) ./$(REGEN_IMAGES_SCRIPT)
 	$(ECHO) "$(GREEN)✓ Pre-rendered images generated in $(PRERENDERED_DIR)/$(RESET)"
 
@@ -101,9 +106,11 @@ check-images:
 # Original PNGs kept as fallbacks
 
 # Generate pre-rendered printer images (all sizes)
+# NOTE: Uses mkdir -p instead of $(BUILD_DIR) dependency (see gen-images-ad5m comment)
 .PHONY: gen-printer-images
-gen-printer-images: | $(BUILD_DIR)
+gen-printer-images:
 	$(ECHO) "$(CYAN)Generating pre-rendered printer images...$(RESET)"
+	$(Q)mkdir -p $(PRERENDERED_PRINTERS_DIR)
 	$(Q)OUTPUT_DIR=$(PRERENDERED_PRINTERS_DIR) ./$(REGEN_PRINTER_IMAGES_SCRIPT)
 	$(ECHO) "$(GREEN)✓ Printer images generated$(RESET)"
 
