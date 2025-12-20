@@ -36,6 +36,22 @@ COMPETING_UIS="guppyscreen GuppyScreen KlipperScreen klipperscreen featherscreen
 
 # Stop competing screen UIs
 stop_competing_uis() {
+    # On Klipper Mod, stop Xorg first (required for framebuffer access)
+    # Xorg takes over /dev/fb0 layer, preventing direct framebuffer rendering
+    if [ -x "/etc/init.d/S40xorg" ]; then
+        echo "Stopping Xorg (Klipper Mod)..."
+        /etc/init.d/S40xorg stop 2>/dev/null || true
+        # Kill any remaining Xorg processes
+        if command -v killall >/dev/null 2>&1; then
+            killall Xorg 2>/dev/null || true
+            killall X 2>/dev/null || true
+        else
+            for pid in $(pidof Xorg 2>/dev/null) $(pidof X 2>/dev/null); do
+                kill "$pid" 2>/dev/null || true
+            done
+        fi
+    fi
+
     for ui in $COMPETING_UIS; do
         # Check init.d scripts
         for initscript in /etc/init.d/S*${ui}* /opt/config/mod/.root/S*${ui}*; do
@@ -44,7 +60,7 @@ stop_competing_uis() {
                 "$initscript" stop 2>/dev/null || true
             fi
         done
-        # Kill any remaining processes
+        # Kill any remaining processes (BusyBox compatible - no pkill)
         if command -v killall >/dev/null 2>&1; then
             killall "$ui" 2>/dev/null || true
         else
@@ -54,6 +70,16 @@ stop_competing_uis() {
             done
         fi
     done
+
+    # Kill python-based KlipperScreen (runs as python3 process)
+    if command -v killall >/dev/null 2>&1; then
+        # Match python processes running screen.py (KlipperScreen entry point)
+        for pid in $(ps 2>/dev/null | grep -E 'python.*screen\.py' | grep -v grep | awk '{print $1}'); do
+            echo "Killing KlipperScreen python process (PID $pid)"
+            kill "$pid" 2>/dev/null || true
+        done
+    fi
+
     # Brief pause to let processes exit
     sleep 1
 }

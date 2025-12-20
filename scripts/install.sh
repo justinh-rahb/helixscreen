@@ -337,11 +337,30 @@ detect_init_system() {
     exit 1
 }
 
-# Stop competing screen UIs (GuppyScreen, KlipperScreen, etc.)
+# Stop competing screen UIs (GuppyScreen, KlipperScreen, Xorg, etc.)
 stop_competing_uis() {
     log_info "Checking for competing screen UIs..."
 
     local found_any=false
+
+    # On Klipper Mod, stop Xorg first (required for framebuffer access)
+    # Xorg takes over /dev/fb0 layer, preventing direct framebuffer rendering
+    if [ -x "/etc/init.d/S40xorg" ]; then
+        log_info "Stopping Xorg (Klipper Mod display server)..."
+        $SUDO /etc/init.d/S40xorg stop 2>/dev/null || true
+        # Disable Xorg init script (non-destructive, reversible)
+        $SUDO chmod -x /etc/init.d/S40xorg 2>/dev/null || true
+        # Kill any remaining Xorg processes (BusyBox compatible - no pkill)
+        if command -v killall &> /dev/null; then
+            $SUDO killall Xorg 2>/dev/null || true
+            $SUDO killall X 2>/dev/null || true
+        elif command -v pidof &> /dev/null; then
+            for pid in $(pidof Xorg 2>/dev/null) $(pidof X 2>/dev/null); do
+                $SUDO kill "$pid" 2>/dev/null || true
+            done
+        fi
+        found_any=true
+    fi
 
     # First, handle the specific previous UI if we know it (for clean reversibility)
     if [ -n "$PREVIOUS_UI_SCRIPT" ] && [ -x "$PREVIOUS_UI_SCRIPT" ] 2>/dev/null; then
@@ -741,9 +760,14 @@ uninstall() {
     # Re-enable the previous UI based on firmware
     log_info "Re-enabling previous screen UI..."
     local restored_ui=""
+    local restored_xorg=""
 
     if [ "$AD5M_FIRMWARE" = "klipper_mod" ] || [ -f "/etc/init.d/S80klipperscreen" ]; then
-        # Klipper Mod - restore KlipperScreen
+        # Klipper Mod - restore Xorg and KlipperScreen
+        if [ -f "/etc/init.d/S40xorg" ]; then
+            $SUDO chmod +x "/etc/init.d/S40xorg" 2>/dev/null || true
+            restored_xorg="Xorg (/etc/init.d/S40xorg)"
+        fi
         if [ -f "/etc/init.d/S80klipperscreen" ]; then
             $SUDO chmod +x "/etc/init.d/S80klipperscreen" 2>/dev/null || true
             restored_ui="KlipperScreen (/etc/init.d/S80klipperscreen)"
@@ -759,6 +783,9 @@ uninstall() {
     fi
 
     log_success "HelixScreen uninstalled"
+    if [ -n "$restored_xorg" ]; then
+        log_info "Re-enabled: $restored_xorg"
+    fi
     if [ -n "$restored_ui" ]; then
         log_info "Re-enabled: $restored_ui"
         log_info "Reboot to start the previous UI"
