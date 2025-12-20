@@ -882,6 +882,11 @@ void PrinterState::set_klippy_state(KlippyState state) {
     lv_async_call(async_klippy_state_callback, ctx);
 }
 
+void PrinterState::set_klippy_state_sync(KlippyState state) {
+    // Direct call for main-thread use (testing, or when already on main thread)
+    set_klippy_state_internal(state);
+}
+
 void PrinterState::set_klippy_state_internal(KlippyState state) {
     const char* state_names[] = {"READY", "STARTUP", "SHUTDOWN", "ERROR"};
     int state_int = static_cast<int>(state);

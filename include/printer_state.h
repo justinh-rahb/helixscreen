@@ -573,15 +573,26 @@ class PrinterState {
     }
 
     /**
-     * @brief Set Klipper firmware state
+     * @brief Set Klipper firmware state (thread-safe, async)
      *
-     * Updates klippy_state subject. Called when Moonraker sends klippy state
-     * notifications (notify_klippy_ready, notify_klippy_disconnected) or when
-     * the mock simulates RESTART/FIRMWARE_RESTART.
+     * Updates klippy_state subject via lv_async_call to ensure thread safety.
+     * Called when Moonraker sends klippy state notifications from WebSocket
+     * callbacks (notify_klippy_ready, notify_klippy_disconnected).
      *
      * @param state KlippyState enum value
      */
     void set_klippy_state(KlippyState state);
+
+    /**
+     * @brief Set Klipper firmware state (synchronous, main-thread only)
+     *
+     * Directly updates klippy_state subject without async deferral.
+     * Only call this from the main LVGL thread. Use for testing or when
+     * already on the main thread.
+     *
+     * @param state KlippyState enum value
+     */
+    void set_klippy_state_sync(KlippyState state);
 
     /**
      * @brief Set network connectivity status
