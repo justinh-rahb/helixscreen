@@ -97,7 +97,7 @@ class PrintSelectCardView {
     static constexpr int ROW_3_MIN_HEIGHT = 520; ///< Min height for 3-row layout
 
     static constexpr const char* COMPONENT_NAME = "print_file_card";
-    static constexpr const char* DEFAULT_THUMB = "A:assets/images/thumbnail-placeholder.png";
+    static constexpr const char* DEFAULT_THUMB = "A:assets/images/thumbnail-placeholder-160.png";
     static constexpr const char* FOLDER_ICON = "A:assets/images/folder.png";
 
     // Directory card styling (reduced overlay heights)

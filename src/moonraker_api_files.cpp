@@ -390,9 +390,8 @@ void MoonrakerAPI::download_thumbnail(const std::string& thumbnail_path,
         return;
     }
 
-    if (http_base_url_.empty()) {
-        spdlog::error(
-            "[Moonraker API] HTTP base URL not configured - call set_http_base_url first");
+    // Ensure HTTP URL is available (auto-derives from WebSocket if needed)
+    if (!ensure_http_base_url()) {
         if (on_error) {
             MoonrakerError err;
             err.type = MoonrakerErrorType::CONNECTION_LOST;

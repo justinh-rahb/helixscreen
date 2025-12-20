@@ -595,6 +595,16 @@ class MoonrakerAPI {
         return http_base_url_;
     }
 
+    /**
+     * @brief Ensure HTTP base URL is set, auto-deriving from WebSocket if needed
+     *
+     * If http_base_url_ is empty, attempts to derive it from the client's
+     * WebSocket URL: ws://host:port/websocket -> http://host:port
+     *
+     * @return true if HTTP base URL is available, false if derivation failed
+     */
+    bool ensure_http_base_url();
+
     // ========================================================================
     // Print History Operations
     // ========================================================================

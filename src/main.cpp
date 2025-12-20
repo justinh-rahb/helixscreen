@@ -457,8 +457,8 @@ static void register_fonts_and_images() {
                           "A:assets/images/placeholder_thumb_centered.png");
     lv_xml_register_image(NULL, "A:assets/images/thumbnail-gradient-bg.png",
                           "A:assets/images/thumbnail-gradient-bg.png");
-    lv_xml_register_image(NULL, "A:assets/images/thumbnail-placeholder.png",
-                          "A:assets/images/thumbnail-placeholder.png");
+    lv_xml_register_image(NULL, "A:assets/images/thumbnail-placeholder-160.png",
+                          "A:assets/images/thumbnail-placeholder-160.png");
     lv_xml_register_image(NULL, "A:assets/images/large-extruder-icon.svg",
                           "A:assets/images/large-extruder-icon.svg");
     lv_xml_register_image(NULL, "A:assets/images/benchy_thumbnail_white.png",

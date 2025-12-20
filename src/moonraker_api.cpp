@@ -36,6 +36,30 @@ MoonrakerAPI::~MoonrakerAPI() {
     }
 }
 
+bool MoonrakerAPI::ensure_http_base_url() {
+    if (!http_base_url_.empty()) {
+        return true;
+    }
+
+    // Try to derive from WebSocket URL
+    const std::string& ws_url = client_.get_last_url();
+    if (!ws_url.empty() && ws_url.find("ws://") == 0) {
+        // Convert ws://host:port/websocket -> http://host:port
+        std::string host_port = ws_url.substr(5); // Skip "ws://"
+        auto slash_pos = host_port.find('/');
+        if (slash_pos != std::string::npos) {
+            host_port = host_port.substr(0, slash_pos);
+        }
+        http_base_url_ = "http://" + host_port;
+        spdlog::info("[Moonraker API] Auto-derived HTTP base URL from WebSocket: {}",
+                     http_base_url_);
+        return true;
+    }
+
+    spdlog::error("[Moonraker API] HTTP base URL not configured and cannot derive from WebSocket");
+    return false;
+}
+
 void MoonrakerAPI::launch_http_thread(std::function<void()> func) {
     // Check if we're shutting down - don't spawn new threads
     if (shutting_down_.load()) {
