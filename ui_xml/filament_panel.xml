@@ -11,26 +11,38 @@
     <!-- LEFT COLUMN: Temperature Status & AMS                              -->
     <!-- ================================================================== -->
     <lv_obj name="left_column"
-            width="40%" height="content" style_bg_opa="0" style_pad_all="0" style_border_width="0" scrollable="false"
-            flex_flow="column" style_flex_main_place="start" style_pad_gap="#space_lg">
-      <!-- Temperature Status Card -->
-      <ui_card name="temp_status_card"
-               width="100%" height="content" style_radius="#border_radius_large" style_pad_all="#space_lg"
-               flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center"
-               style_pad_gap="#space_sm">
-        <!-- Header -->
-        <text_body text="Nozzle Temperature" align="center"/>
-        <!-- Temperature Display (Current / Target) - uses responsive heading font -->
-        <lv_label name="temp_display" bind_text="filament_temp_display" style_text_font="#font_heading" align="center"/>
-        <!-- Status Indicator (icon + text row) -->
-        <lv_obj width="content"
-                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
-                flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_xs">
-          <icon name="status_icon" src="cooldown" size="xs" variant="secondary"/>
-          <text_small name="status_text" bind_text="filament_status"/>
-        </lv_obj>
-      </ui_card>
-      <!-- AMS Multi-Filament Card (hidden if no AMS) -->
+            width="40%" height="100%" style_bg_opa="0" style_pad_all="0" style_border_width="0" scrollable="false"
+            flex_flow="column" style_flex_main_place="space_between" style_pad_gap="#space_lg">
+      <!-- TOP GROUP: Temperature displays -->
+      <lv_obj name="temp_group"
+              width="100%" height="content" style_bg_opa="0" style_pad_all="0" style_border_width="0" scrollable="false"
+              flex_flow="column" style_flex_main_place="start" style_pad_gap="#space_lg">
+        <!-- Temperature Status Card -->
+        <ui_card name="temp_status_card"
+                 width="100%" height="content" style_radius="#border_radius_large" style_pad_all="#space_lg"
+                 flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center"
+                 style_pad_gap="#space_sm">
+          <!-- Header -->
+          <text_body text="Nozzle Temperature" align="center"/>
+          <!-- Temperature Display (Current / Target) - uses responsive heading font -->
+          <lv_label name="temp_display" bind_text="filament_temp_display" style_text_font="#font_heading" align="center"/>
+          <!-- Status Indicator (icon + text row) -->
+          <lv_obj width="content"
+                  height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
+                  flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_xs">
+            <icon name="status_icon" src="cooldown" size="xs" variant="secondary"/>
+            <text_small name="status_text" bind_text="filament_status"/>
+          </lv_obj>
+        </ui_card>
+        <!-- Temperature Graph Card (combined nozzle + bed) -->
+        <ui_card name="temp_graph_card"
+                 width="100%" height="120" style_radius="#border_radius" style_pad_all="#space_sm">
+          <!-- Graph container - populated by C++ via TempControlPanel -->
+          <lv_obj name="temp_graph_container"
+                  width="100%" height="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0"/>
+        </ui_card>
+      </lv_obj>
+      <!-- BOTTOM: AMS Multi-Filament Card (hidden if no AMS) -->
       <ui_card name="ams_status_card"
                width="100%" height="content" style_radius="#border_radius" style_pad_all="#space_md" flex_flow="column"
                style_flex_main_place="start" style_flex_cross_place="center" style_pad_gap="#space_sm">

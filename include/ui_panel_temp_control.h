@@ -56,6 +56,16 @@ class TempControlPanel {
         api_ = api;
     }
 
+    /**
+     * @brief Setup a compact combined temperature graph for the filament panel
+     *
+     * Creates a 5-minute graph with both nozzle and bed temperature series.
+     * Replays recent history from internal buffers and updates in real-time.
+     *
+     * @param container The LVGL object to create the graph in
+     */
+    void setup_mini_combined_graph(lv_obj_t* container);
+
     // XML event callbacks (public static for XML registration)
     static void on_nozzle_confirm_clicked(lv_event_t* e);
     static void on_bed_confirm_clicked(lv_event_t* e);
@@ -161,11 +171,17 @@ class TempControlPanel {
     HeatingIconAnimator nozzle_animator_;
     HeatingIconAnimator bed_animator_;
 
-    // Graph widgets
+    // Graph widgets (main panels)
     ui_temp_graph_t* nozzle_graph_ = nullptr;
     ui_temp_graph_t* bed_graph_ = nullptr;
     int nozzle_series_id_ = -1;
     int bed_series_id_ = -1;
+
+    // Mini combined graph (filament panel)
+    ui_temp_graph_t* mini_graph_ = nullptr;
+    int mini_nozzle_series_id_ = -1;
+    int mini_bed_series_id_ = -1;
+    float mini_graph_y_max_ = 150.0f; // Dynamic Y-max, starts at 150°C
 
     // Graph update throttling (1 sample per second max)
     // Moonraker sends at ~4Hz, but we only graph at 1Hz to show 20 minutes
@@ -201,4 +217,5 @@ class TempControlPanel {
     // Helper to replay buffered history to graph when panel opens
     void replay_nozzle_history_to_graph();
     void replay_bed_history_to_graph();
+    void replay_history_to_mini_graph();
 };

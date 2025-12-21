@@ -206,6 +206,7 @@ void SubjectInitializer::init_panel_subjects(const RuntimeConfig& runtime_config
     get_global_controls_panel().set_temp_control_panel(m_temp_control_panel.get());
     get_global_home_panel().set_temp_control_panel(m_temp_control_panel.get());
     get_global_print_status_panel().set_temp_control_panel(m_temp_control_panel.get());
+    get_global_filament_panel().set_temp_control_panel(m_temp_control_panel.get());
 
     // E-Stop overlay
     EmergencyStopOverlay::instance().init_subjects();

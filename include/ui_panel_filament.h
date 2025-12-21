@@ -5,6 +5,9 @@
 
 #include "ui_panel_base.h"
 
+// Forward declarations
+class TempControlPanel;
+
 /**
  * @file ui_panel_filament.h
  * @brief Filament panel - Filament loading/unloading operations with safety checks
@@ -137,6 +140,15 @@ class FilamentPanel : public PanelBase {
      */
     void set_limits(int min_temp, int max_temp);
 
+    /**
+     * @brief Set TempControlPanel for combined temperature graph
+     *
+     * @param tcp Pointer to TempControlPanel (for mini combined graph)
+     */
+    void set_temp_control_panel(TempControlPanel* tcp) {
+        temp_control_panel_ = tcp;
+    }
+
   private:
     //
     // === Subjects (owned by this panel) ===
@@ -175,6 +187,9 @@ class FilamentPanel : public PanelBase {
     // Warning dialogs for filament sensor integration
     lv_obj_t* load_warning_dialog_ = nullptr;
     lv_obj_t* unload_warning_dialog_ = nullptr;
+
+    // Temperature graph (managed by TempControlPanel)
+    TempControlPanel* temp_control_panel_ = nullptr;
 
     //
     // === Private Helpers ===

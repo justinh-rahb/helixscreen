@@ -4,6 +4,7 @@
 #include "ui_panel_filament.h"
 
 #include "ui_component_keypad.h"
+#include "ui_panel_temp_control.h"
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_icon.h"
@@ -143,6 +144,17 @@ void FilamentPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     update_status();
     update_warning_text();
     update_safety_state();
+
+    // Setup combined temperature graph if TempControlPanel is available
+    if (temp_control_panel_) {
+        lv_obj_t* graph_container = lv_obj_find_by_name(panel_, "temp_graph_container");
+        if (graph_container) {
+            temp_control_panel_->setup_mini_combined_graph(graph_container);
+            spdlog::debug("[{}] Temperature graph initialized", get_name());
+        } else {
+            spdlog::warn("[{}] temp_graph_container not found in XML", get_name());
+        }
+    }
 
     spdlog::info("[{}] Setup complete!", get_name());
 }

@@ -4,6 +4,7 @@
 #include "ui_panel_temp_control.h"
 
 #include "ui_component_keypad.h"
+#include "ui_temp_graph_scaling.h"
 #include "ui_error_reporting.h"
 #include "ui_nav.h"
 #include "ui_panel_common.h"
@@ -133,10 +134,27 @@ void TempControlPanel::on_nozzle_temp_changed(int temp_centi) {
 
     // Push to graph if it exists (convert centidegrees to degrees with 0.1°C precision)
     // X-axis labels are rendered by the graph widget using the timestamp
+    float temp_deg = static_cast<float>(temp_centi) / 10.0f;
+
     if (nozzle_graph_ && nozzle_series_id_ >= 0) {
-        float temp_deg = static_cast<float>(temp_centi) / 10.0f;
         ui_temp_graph_update_series_with_time(nozzle_graph_, nozzle_series_id_, temp_deg, now_ms);
         spdlog::trace("[TempPanel] Nozzle graph updated: {:.1f}°C", temp_deg);
+    }
+
+    // Also update mini combined graph (filament panel)
+    if (mini_graph_ && mini_nozzle_series_id_ >= 0) {
+        // Dynamic Y-axis scaling using extracted helper
+        float bed_deg = static_cast<float>(bed_current_) / 10.0f;
+        float new_y_max = calculate_mini_graph_y_max(mini_graph_y_max_, temp_deg, bed_deg);
+
+        if (new_y_max != mini_graph_y_max_) {
+            spdlog::debug("[TempPanel] Mini graph Y-axis {} to {}°C",
+                          new_y_max > mini_graph_y_max_ ? "expanded" : "shrunk", new_y_max);
+            mini_graph_y_max_ = new_y_max;
+            ui_temp_graph_set_temp_range(mini_graph_, 0.0f, mini_graph_y_max_);
+        }
+
+        ui_temp_graph_update_series_with_time(mini_graph_, mini_nozzle_series_id_, temp_deg, now_ms);
     }
 }
 
@@ -146,12 +164,19 @@ void TempControlPanel::on_nozzle_target_changed(int target_centi) {
     update_nozzle_status(); // Update status text and heating icon state
 
     // Update target line on graph (convert centidegrees to degrees)
+    float target_deg = static_cast<float>(target_centi) / 10.0f;
+    bool show_target = (target_centi > 0);
+
     if (nozzle_graph_ && nozzle_series_id_ >= 0) {
-        float target_deg = static_cast<float>(target_centi) / 10.0f;
-        bool show_target = (target_centi > 0);
         ui_temp_graph_set_series_target(nozzle_graph_, nozzle_series_id_, target_deg, show_target);
         spdlog::trace("[TempPanel] Nozzle target line: {:.1f}°C (visible={})", target_deg,
                       show_target);
+    }
+
+    // Also update mini combined graph target line
+    if (mini_graph_ && mini_nozzle_series_id_ >= 0) {
+        ui_temp_graph_set_series_target(mini_graph_, mini_nozzle_series_id_, target_deg,
+                                        show_target);
     }
 }
 
@@ -191,10 +216,16 @@ void TempControlPanel::on_bed_temp_changed(int temp_centi) {
 
     // Push to graph if it exists (convert centidegrees to degrees with 0.1°C precision)
     // X-axis labels are rendered by the graph widget using the timestamp
+    float temp_deg = static_cast<float>(temp_centi) / 10.0f;
+
     if (bed_graph_ && bed_series_id_ >= 0) {
-        float temp_deg = static_cast<float>(temp_centi) / 10.0f;
         ui_temp_graph_update_series_with_time(bed_graph_, bed_series_id_, temp_deg, now_ms);
         spdlog::trace("[TempPanel] Bed graph updated: {:.1f}°C", temp_deg);
+    }
+
+    // Also update mini combined graph (filament panel)
+    if (mini_graph_ && mini_bed_series_id_ >= 0) {
+        ui_temp_graph_update_series_with_time(mini_graph_, mini_bed_series_id_, temp_deg, now_ms);
     }
 }
 
@@ -204,12 +235,18 @@ void TempControlPanel::on_bed_target_changed(int target_centi) {
     update_bed_status(); // Update status text and heating icon state
 
     // Update target line on graph (convert centidegrees to degrees)
+    float target_deg = static_cast<float>(target_centi) / 10.0f;
+    bool show_target = (target_centi > 0);
+
     if (bed_graph_ && bed_series_id_ >= 0) {
-        float target_deg = static_cast<float>(target_centi) / 10.0f;
-        bool show_target = (target_centi > 0);
         ui_temp_graph_set_series_target(bed_graph_, bed_series_id_, target_deg, show_target);
         spdlog::trace("[TempPanel] Bed target line: {:.1f}°C (visible={})", target_deg,
                       show_target);
+    }
+
+    // Also update mini combined graph target line
+    if (mini_graph_ && mini_bed_series_id_ >= 0) {
+        ui_temp_graph_set_series_target(mini_graph_, mini_bed_series_id_, target_deg, show_target);
     }
 }
 
@@ -1001,5 +1038,154 @@ void TempControlPanel::replay_bed_history_to_graph() {
     if (replayed > 0) {
         spdlog::info("[TempPanel] Replayed {} bed temp samples to graph (from {} available)",
                      replayed, samples_available);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mini Combined Graph (for FilamentPanel)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// 5-minute window at 1Hz = 300 points
+static constexpr int MINI_GRAPH_POINTS = 300;
+
+void TempControlPanel::setup_mini_combined_graph(lv_obj_t* container) {
+    if (!container) {
+        spdlog::warn("[TempPanel] setup_mini_combined_graph: null container");
+        return;
+    }
+
+    // Create the graph widget
+    mini_graph_ = ui_temp_graph_create(container);
+    if (!mini_graph_) {
+        spdlog::error("[TempPanel] Failed to create mini combined graph");
+        return;
+    }
+
+    // Size it to fill the container
+    lv_obj_t* chart = ui_temp_graph_get_chart(mini_graph_);
+    lv_obj_set_size(chart, lv_pct(100), lv_pct(100));
+
+    // Configure for combined view:
+    // Use 0-150°C for better visibility of typical temps (room temp through bed range)
+    // High nozzle temps (>150°C) will clip at top, but that's acceptable for this mini view
+    // since the full temp panels show the complete range
+    ui_temp_graph_set_temp_range(mini_graph_, 0.0f, 150.0f);
+    ui_temp_graph_set_point_count(mini_graph_, MINI_GRAPH_POINTS);
+
+    // Configure Y-axis with 50°C increments for readability
+    ui_temp_graph_set_y_axis(mini_graph_, 50.0f, true);
+
+    // Add nozzle series (red/heating color) with stronger gradient fill
+    mini_nozzle_series_id_ =
+        ui_temp_graph_add_series(mini_graph_, "Nozzle", nozzle_config_.color);
+    if (mini_nozzle_series_id_ >= 0) {
+        // Subtle gradient to not obscure bed line
+        ui_temp_graph_set_series_gradient(mini_graph_, mini_nozzle_series_id_, LV_OPA_0, LV_OPA_10);
+    }
+
+    // Add bed series (cyan/cooling color) with more visible gradient
+    mini_bed_series_id_ = ui_temp_graph_add_series(mini_graph_, "Bed", bed_config_.color);
+    if (mini_bed_series_id_ >= 0) {
+        // Slightly more visible gradient to distinguish from nozzle
+        ui_temp_graph_set_series_gradient(mini_graph_, mini_bed_series_id_, LV_OPA_0, LV_OPA_20);
+    }
+
+    // Replay last 5 minutes of history to each series
+    replay_history_to_mini_graph();
+
+    // Set target lines if targets are set
+    if (mini_nozzle_series_id_ >= 0 && nozzle_target_ > 0) {
+        float target_deg = static_cast<float>(nozzle_target_) / 10.0f;
+        ui_temp_graph_set_series_target(mini_graph_, mini_nozzle_series_id_, target_deg, true);
+    }
+    if (mini_bed_series_id_ >= 0 && bed_target_ > 0) {
+        float target_deg = static_cast<float>(bed_target_) / 10.0f;
+        ui_temp_graph_set_series_target(mini_graph_, mini_bed_series_id_, target_deg, true);
+    }
+
+    spdlog::info("[TempPanel] Mini combined graph created with {} point capacity", MINI_GRAPH_POINTS);
+}
+
+void TempControlPanel::replay_history_to_mini_graph() {
+    if (!mini_graph_) {
+        return;
+    }
+
+    int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::system_clock::now().time_since_epoch())
+                         .count();
+
+    // Only replay last 5 minutes (300 seconds)
+    int64_t cutoff_ms = now_ms - (MINI_GRAPH_POINTS * 1000);
+
+    // Replay nozzle history
+    if (mini_nozzle_series_id_ >= 0 && nozzle_history_count_ > 0) {
+        int samples_available = std::min(nozzle_history_count_, TEMP_HISTORY_SIZE);
+        int start_idx = (nozzle_history_count_ <= TEMP_HISTORY_SIZE)
+                            ? 0
+                            : (nozzle_history_count_ % TEMP_HISTORY_SIZE);
+
+        int64_t last_graphed_time = 0;
+        int replayed = 0;
+
+        for (int i = 0; i < samples_available; i++) {
+            int idx = (start_idx + i) % TEMP_HISTORY_SIZE;
+            int temp_centi = nozzle_history_[idx].temp;
+            int64_t sample_time = nozzle_history_[idx].timestamp_ms;
+
+            if (temp_centi == 0 || sample_time < cutoff_ms) {
+                continue;
+            }
+
+            if (last_graphed_time > 0 &&
+                (sample_time - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
+                continue;
+            }
+
+            float temp_deg = static_cast<float>(temp_centi) / 10.0f;
+            ui_temp_graph_update_series_with_time(mini_graph_, mini_nozzle_series_id_, temp_deg,
+                                                  sample_time);
+            last_graphed_time = sample_time;
+            replayed++;
+        }
+
+        if (replayed > 0) {
+            spdlog::debug("[TempPanel] Mini graph: replayed {} nozzle samples", replayed);
+        }
+    }
+
+    // Replay bed history
+    if (mini_bed_series_id_ >= 0 && bed_history_count_ > 0) {
+        int samples_available = std::min(bed_history_count_, TEMP_HISTORY_SIZE);
+        int start_idx =
+            (bed_history_count_ <= TEMP_HISTORY_SIZE) ? 0 : (bed_history_count_ % TEMP_HISTORY_SIZE);
+
+        int64_t last_graphed_time = 0;
+        int replayed = 0;
+
+        for (int i = 0; i < samples_available; i++) {
+            int idx = (start_idx + i) % TEMP_HISTORY_SIZE;
+            int temp_centi = bed_history_[idx].temp;
+            int64_t sample_time = bed_history_[idx].timestamp_ms;
+
+            if (temp_centi == 0 || sample_time < cutoff_ms) {
+                continue;
+            }
+
+            if (last_graphed_time > 0 &&
+                (sample_time - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
+                continue;
+            }
+
+            float temp_deg = static_cast<float>(temp_centi) / 10.0f;
+            ui_temp_graph_update_series_with_time(mini_graph_, mini_bed_series_id_, temp_deg,
+                                                  sample_time);
+            last_graphed_time = sample_time;
+            replayed++;
+        }
+
+        if (replayed > 0) {
+            spdlog::debug("[TempPanel] Mini graph: replayed {} bed samples", replayed);
+        }
     }
 }
