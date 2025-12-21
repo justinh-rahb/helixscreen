@@ -136,6 +136,9 @@
     <!-- accent_bar_gap moved to home_panel.xml -->
     <percentage name="card_width" value="45%"/>
     <percentage name="card_height" value="80%"/>
+    <!-- Preview/thumbnail vertical offset to account for metadata overlays -->
+    <!-- Shifts content up to prevent overlap with bottom metadata areas -->
+    <percentage name="preview_offset_y" value="-20%"/>
     <!-- Print file card dimensions - responsive layouts for different screen sizes -->
     <!-- Shared constants -->
     <px name="print_file_card_padding" value="12"/>

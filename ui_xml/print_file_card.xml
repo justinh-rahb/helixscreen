@@ -39,7 +39,7 @@
          so contain scaling is nearly 1:1 with minimal CPU overhead -->
     <lv_image name="thumbnail"
               width="100%" height="100%" src="$thumbnail_src" style_bg_opa="0" align="center" inner_align="contain"
-              style_translate_y="-20%"/>
+              style_translate_y="#preview_offset_y"/>
     <!-- Metadata clip container - sharp top edge, clips the inner overlay's top rounded corners -->
     <lv_obj name="metadata_clip"
             width="100%" height="#metadata_overlay_min_height" style_bg_opa="0" style_border_width="0" style_radius="0"
