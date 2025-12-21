@@ -3,9 +3,6 @@
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- Numeric Keypad Overlay - Responsive layout for all screen sizes -->
 <component>
-  <api>
-    <prop name="unit_label" type="string" default=""/>
-  </api>
   <view name="keypad_panel"
         extends="lv_obj" width="#keypad_width" height="100%" align="right_mid" style_pad_all="0" style_border_width="0"
         style_bg_opa="255" style_bg_color="#card_bg" scrollable="false" flex_flow="column" hidden="true">
@@ -15,16 +12,17 @@
     <lv_obj name="overlay_content"
             width="100%" flex_grow="1" style_bg_opa="0" style_pad_all="#space_md" scrollable="false"
             style_border_width="0" flex_flow="column" style_pad_gap="#space_md">
-      <!-- Display: Large font with border -->
+      <!-- Display: Textarea styled input (read-only) with unit label -->
       <lv_obj name="display_container"
-              width="100%" height="#keypad_display_height" style_bg_opa="50" style_bg_color="#card_bg"
-              style_border_width="2" style_border_color="#card_border" style_radius="#border_radius" scrollable="false"
-              flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center">
-        <lv_label name="input_display"
-                  text="" bind_text="keypad_display" style_text_font="noto_sans_bold_28"
-                  style_text_color="#text_primary"/>
+              width="100%" height="#keypad_display_height" style_bg_opa="0" style_border_width="0"
+              style_pad_all="0" scrollable="false" flex_flow="row" style_flex_cross_place="center">
+        <text_input name="input_display"
+                    flex_grow="1" height="100%" text="" bind_text="keypad_display"
+                    style_text_font="#font_heading" style_text_align="right"
+                    style_border_width="#input_border_width" style_radius="#border_radius"
+                    one_line="true" clickable="false" scrollable="false"/>
         <lv_label name="input_unit"
-                  text="$unit_label" style_text_font="noto_sans_24" style_text_color="#text_secondary"
+                  text="" style_text_font="#font_body" style_text_color="#text_secondary"
                   style_pad_left="#space_sm"/>
       </lv_obj>
       <!-- Button Grid: row_wrap with explicit row gaps (no space_evenly override) -->

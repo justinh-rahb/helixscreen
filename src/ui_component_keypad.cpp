@@ -12,6 +12,7 @@
 
 #include "ui_component_keypad.h"
 
+#include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav.h"
 
@@ -58,8 +59,6 @@ void ui_keypad_init_subjects() {
     // Initialize display subject for reactive binding (starts empty)
     lv_subject_init_string(&keypad_display_subject, keypad_display_buf, nullptr,
                            sizeof(keypad_display_buf), "");
-
-    // Register with XML binding system so <lv_label-bind_text subject="keypad_display"/> works
     lv_xml_register_subject(nullptr, "keypad_display", &keypad_display_subject);
 
     subjects_initialized = true;
@@ -83,10 +82,8 @@ void ui_keypad_init(lv_obj_t* parent) {
     // Ensure subjects are initialized first
     ui_keypad_init_subjects();
 
-    // Create keypad from XML component (no title - header just has back/OK)
-    const char* attrs[] = {"unit_label", "", NULL};
-
-    keypad_widget = (lv_obj_t*)lv_xml_create(parent, "numeric_keypad_modal", attrs);
+    // Create keypad from XML component
+    keypad_widget = (lv_obj_t*)lv_xml_create(parent, "numeric_keypad_modal", nullptr);
     if (!keypad_widget) {
         spdlog::error("[Keypad] Failed to create keypad from XML");
         return;
@@ -115,6 +112,12 @@ void ui_keypad_show(const ui_keypad_config_t* config) {
 
     // Update display via subject (reactive binding updates XML automatically)
     update_display();
+
+    // Update unit label (set dynamically since XML prop is only evaluated at creation)
+    lv_obj_t* unit_label = lv_obj_find_by_name(keypad_widget, "input_unit");
+    if (unit_label) {
+        lv_label_set_text(unit_label, config->unit_label ? config->unit_label : "");
+    }
 
     // Show via overlay navigation, but keep previous panel visible (transparent overlay)
     ui_nav_push_overlay(keypad_widget, false /* hide_previous */);
@@ -183,11 +186,12 @@ static void handle_confirm() {
     // Parse value (empty = 0)
     float value = (input_buffer[0] == '\0') ? 0.0f : static_cast<float>(atof(input_buffer));
 
-    // Clamp to configured range
-    if (value < current_config.min_value)
-        value = current_config.min_value;
-    if (value > current_config.max_value)
-        value = current_config.max_value;
+    // Validate range - show error if out of bounds
+    if (value < current_config.min_value || value > current_config.max_value) {
+        NOTIFY_ERROR("Value must be between {:.0f} and {:.0f}", current_config.min_value,
+                     current_config.max_value);
+        return; // Don't close keypad, let user correct the value
+    }
 
     // Hide first (before callback, in case callback shows something else)
     ui_keypad_hide();
