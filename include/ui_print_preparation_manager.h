@@ -7,6 +7,7 @@
 #include "gcode_file_modifier.h"
 #include "gcode_ops_detector.h"
 #include "moonraker_api.h"
+#include "print_start_analyzer.h"
 #include "printer_state.h"
 
 #include <functional>
@@ -46,11 +47,19 @@ namespace helix::ui {
  * @brief Pre-print options read from UI checkboxes
  */
 struct PrePrintOptions {
+    // File-level operations (from checkboxes in detail view)
     bool bed_leveling = false;
     bool qgl = false;
     bool z_tilt = false;
     bool nozzle_clean = false;
     bool timelapse = false;
+
+    // Macro-level skip flags (passed to PRINT_START as parameters)
+    // These are only used when the macro supports the corresponding skip param
+    bool skip_macro_bed_mesh = false;
+    bool skip_macro_qgl = false;
+    bool skip_macro_z_tilt = false;
+    bool skip_macro_nozzle_clean = false;
 };
 
 /**
@@ -98,6 +107,13 @@ using PrintCompletionCallback = std::function<void(bool success, const std::stri
 using ScanCompleteCallback = std::function<void(const std::string& formatted_ops)>;
 
 /**
+ * @brief Callback when PRINT_START macro analysis completes
+ *
+ * @param analysis The analysis result (check .found for validity)
+ */
+using MacroAnalysisCallback = std::function<void(const helix::PrintStartAnalysis& analysis)>;
+
+/**
  * @brief Manages print preparation workflow
  */
 class PrintPreparationManager {
@@ -138,6 +154,63 @@ class PrintPreparationManager {
     void set_scan_complete_callback(ScanCompleteCallback callback) {
         on_scan_complete_ = std::move(callback);
     }
+
+    /**
+     * @brief Set callback for when PRINT_START macro analysis completes
+     */
+    void set_macro_analysis_callback(MacroAnalysisCallback callback) {
+        on_macro_analysis_complete_ = std::move(callback);
+    }
+
+    // === PRINT_START Macro Analysis ===
+
+    /**
+     * @brief Analyze the printer's PRINT_START macro (async)
+     *
+     * Fetches macro definition from printer config and detects operations
+     * like bed mesh, QGL, etc. Result is cached and reused.
+     *
+     * Call this once when connecting to the printer or when the detail
+     * view needs to show macro-level operations.
+     */
+    void analyze_print_start_macro();
+
+    /**
+     * @brief Check if PRINT_START analysis is available
+     */
+    [[nodiscard]] bool has_macro_analysis() const {
+        return macro_analysis_.has_value() && macro_analysis_->found;
+    }
+
+    /**
+     * @brief Get cached PRINT_START analysis result
+     */
+    [[nodiscard]] const std::optional<helix::PrintStartAnalysis>& get_macro_analysis() const {
+        return macro_analysis_;
+    }
+
+    /**
+     * @brief Format macro-detected operations as human-readable string
+     *
+     * @return Formatted string like "PRINT_START contains: Bed Mesh, QGL" or ""
+     */
+    [[nodiscard]] std::string format_macro_operations() const;
+
+    /**
+     * @brief Check if a specific operation in PRINT_START is controllable
+     *
+     * @param category The operation category to check
+     * @return true if the operation has a skip parameter in the macro
+     */
+    [[nodiscard]] bool is_macro_op_controllable(helix::PrintStartOpCategory category) const;
+
+    /**
+     * @brief Get the skip parameter name for a macro operation (if controllable)
+     *
+     * @param category The operation category
+     * @return Parameter name (e.g., "SKIP_BED_MESH") or empty string if not controllable
+     */
+    [[nodiscard]] std::string get_macro_skip_param(helix::PrintStartOpCategory category) const;
 
     // === G-code Scanning ===
 
@@ -273,6 +346,16 @@ class PrintPreparationManager {
 
     // === Callbacks ===
     ScanCompleteCallback on_scan_complete_;
+    MacroAnalysisCallback on_macro_analysis_complete_;
+
+    // === PRINT_START Analysis Cache ===
+    std::optional<helix::PrintStartAnalysis> macro_analysis_;
+    bool macro_analysis_in_progress_ = false;
+
+    // === Lifetime Guard for Async Callbacks ===
+    // Shared pointer to track if this object is still alive when async callbacks execute.
+    // Callbacks capture this shared_ptr; if *alive_guard_ is false, the callback bails out.
+    std::shared_ptr<bool> alive_guard_ = std::make_shared<bool>(true);
 
     // === Command Sequencer ===
     std::unique_ptr<gcode::CommandSequencer> pre_print_sequencer_;

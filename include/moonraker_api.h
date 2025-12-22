@@ -42,6 +42,7 @@ class MoonrakerAPI {
     using TimelapseSettingsCallback = std::function<void(const TimelapseSettings&)>;
     using SpoolCallback = std::function<void(const std::optional<SpoolInfo>&)>;
     using SpoolListCallback = std::function<void(const std::vector<SpoolInfo>&)>;
+    using JsonCallback = std::function<void(const json&)>;
 
     /**
      * @brief Constructor
@@ -466,6 +467,22 @@ class MoonrakerAPI {
      * @param on_error Error callback
      */
     void update_safety_limits_from_printer(SuccessCallback on_success, ErrorCallback on_error);
+
+    /**
+     * @brief Query the printer's configfile object
+     *
+     * Fetches the raw configuration from Klipper's configfile object.
+     * This includes all sections and their raw string values, which is useful
+     * for parsing macro definitions (gcode_macro sections contain the raw gcode).
+     *
+     * The response is the "config" portion of configfile, not "settings".
+     * - "config": Raw strings as written in config files
+     * - "settings": Parsed/typed values (not useful for macro text)
+     *
+     * @param on_success Callback with parsed JSON config object
+     * @param on_error Error callback
+     */
+    void query_configfile(JsonCallback on_success, ErrorCallback on_error);
 
     // ========================================================================
     // Generic REST Endpoint Operations (for Moonraker extensions)

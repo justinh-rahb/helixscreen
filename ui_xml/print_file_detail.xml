@@ -79,12 +79,21 @@
       <lv_obj name="options_section"
               height="100%" flex_grow="4" style_bg_opa="0" style_border_width="0" style_pad_all="#space_sm"
               style_pad_gap="#space_lg" flex_flow="column" scrollable="false">
-        <!-- Detected G-code operations (hidden if empty, shown when file contains operations) -->
+        <!-- Detected G-code file operations (hidden if empty via reactive binding) -->
         <lv_obj name="detected_ops_row"
                 width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
                 style_pad_gap="#space_xs" style_flex_cross_place="center">
+          <lv_obj-bind_flag_if_eq subject="selected_file_ops_visible" flag="hidden" ref_value="0"/>
           <icon src="code_tags" size="xs" variant="secondary"/>
           <text_small name="detail_ops_label" bind_text="selected_file_ops" style_text_color="#text_secondary"/>
+        </lv_obj>
+        <!-- PRINT_START macro operations (hidden if empty via reactive binding) -->
+        <lv_obj name="macro_ops_row"
+                width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
+                style_pad_gap="#space_xs" style_flex_cross_place="center">
+          <lv_obj-bind_flag_if_eq subject="selected_macro_ops_visible" flag="hidden" ref_value="0"/>
+          <icon src="code_braces" size="xs" variant="secondary"/>
+          <text_small name="macro_ops_label" bind_text="selected_macro_ops" style_text_color="#text_secondary"/>
         </lv_obj>
         <!-- Color requirements card (hidden by default, shown for multi-color prints) -->
         <ui_card name="color_requirements_card"

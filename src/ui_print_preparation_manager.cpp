@@ -26,6 +26,11 @@ namespace helix::ui {
 // ============================================================================
 
 PrintPreparationManager::~PrintPreparationManager() {
+    // Invalidate lifetime guard so pending async callbacks bail out safely
+    if (alive_guard_) {
+        *alive_guard_ = false;
+    }
+
     // Cancel any running sequence
     if (pre_print_sequencer_) {
         pre_print_sequencer_.reset();
@@ -39,6 +44,12 @@ PrintPreparationManager::~PrintPreparationManager() {
 void PrintPreparationManager::set_dependencies(MoonrakerAPI* api, PrinterState* printer_state) {
     api_ = api;
     printer_state_ = printer_state;
+
+    // Trigger PRINT_START macro analysis when dependencies are set
+    // This allows the UI to show macro operations as soon as possible
+    if (api_) {
+        analyze_print_start_macro();
+    }
 }
 
 void PrintPreparationManager::set_checkboxes(lv_obj_t* bed_leveling, lv_obj_t* qgl,
@@ -49,6 +60,170 @@ void PrintPreparationManager::set_checkboxes(lv_obj_t* bed_leveling, lv_obj_t* q
     z_tilt_checkbox_ = z_tilt;
     nozzle_clean_checkbox_ = nozzle_clean;
     timelapse_checkbox_ = timelapse;
+}
+
+// ============================================================================
+// PRINT_START Macro Analysis
+// ============================================================================
+
+void PrintPreparationManager::analyze_print_start_macro() {
+    // Skip if analysis already in progress
+    if (macro_analysis_in_progress_) {
+        spdlog::debug("[PrintPreparationManager] PRINT_START analysis already in progress");
+        return;
+    }
+
+    // Skip if we already have a cached result
+    if (macro_analysis_.has_value()) {
+        spdlog::debug("[PrintPreparationManager] Using cached PRINT_START analysis");
+        if (on_macro_analysis_complete_) {
+            on_macro_analysis_complete_(*macro_analysis_);
+        }
+        return;
+    }
+
+    if (!api_) {
+        spdlog::warn("[PrintPreparationManager] Cannot analyze PRINT_START - no API connection");
+        return;
+    }
+
+    macro_analysis_in_progress_ = true;
+    spdlog::info("[PrintPreparationManager] Starting PRINT_START macro analysis");
+
+    auto* self = this;
+    auto alive = alive_guard_;  // Capture shared_ptr to detect destruction
+    helix::PrintStartAnalyzer analyzer;
+
+    analyzer.analyze(
+        api_,
+        // Success callback - NOTE: runs on HTTP thread
+        [self, alive](const helix::PrintStartAnalysis& analysis) {
+            spdlog::info("[PrintPreparationManager] PRINT_START analysis complete: {}",
+                         analysis.summary());
+
+            // Defer shared state updates to main LVGL thread
+            struct MacroAnalysisData {
+                PrintPreparationManager* mgr;
+                std::shared_ptr<bool> alive_guard;
+                helix::PrintStartAnalysis result;
+            };
+            ui_async_call_safe<MacroAnalysisData>(
+                std::make_unique<MacroAnalysisData>(MacroAnalysisData{self, alive, analysis}),
+                [](MacroAnalysisData* d) {
+                    // Check if manager was destroyed before this callback executed
+                    if (!d->alive_guard || !*d->alive_guard) {
+                        spdlog::debug("[PrintPreparationManager] Skipping macro analysis callback - "
+                                      "manager destroyed");
+                        return;
+                    }
+                    d->mgr->macro_analysis_ = d->result;
+                    d->mgr->macro_analysis_in_progress_ = false;
+                    if (d->mgr->on_macro_analysis_complete_) {
+                        d->mgr->on_macro_analysis_complete_(d->result);
+                    }
+                });
+        },
+        // Error callback - NOTE: runs on HTTP thread
+        [self, alive](const MoonrakerError& error) {
+            spdlog::warn("[PrintPreparationManager] PRINT_START analysis failed: {}", error.message);
+
+            // Defer shared state updates to main LVGL thread
+            struct MacroErrorData {
+                PrintPreparationManager* mgr;
+                std::shared_ptr<bool> alive_guard;
+            };
+            ui_async_call_safe<MacroErrorData>(
+                std::make_unique<MacroErrorData>(MacroErrorData{self, alive}),
+                [](MacroErrorData* d) {
+                    // Check if manager was destroyed before this callback executed
+                    if (!d->alive_guard || !*d->alive_guard) {
+                        spdlog::debug("[PrintPreparationManager] Skipping macro error callback - "
+                                      "manager destroyed");
+                        return;
+                    }
+                    d->mgr->macro_analysis_in_progress_ = false;
+                    // Create empty "not found" result
+                    helix::PrintStartAnalysis not_found;
+                    not_found.found = false;
+                    d->mgr->macro_analysis_ = not_found;
+                    if (d->mgr->on_macro_analysis_complete_) {
+                        d->mgr->on_macro_analysis_complete_(not_found);
+                    }
+                });
+        });
+}
+
+std::string PrintPreparationManager::format_macro_operations() const {
+    if (!macro_analysis_.has_value() || !macro_analysis_->found ||
+        macro_analysis_->operations.empty()) {
+        return "";
+    }
+
+    // Build operation list, noting controllability
+    std::string result = macro_analysis_->macro_name + " contains: ";
+    bool first = true;
+
+    for (const auto& op : macro_analysis_->operations) {
+        // Skip homing (always present, not interesting to display)
+        if (op.category == helix::PrintStartOpCategory::HOMING) {
+            continue;
+        }
+
+        if (!first) {
+            result += ", ";
+        }
+        first = false;
+
+        // Get user-friendly name for the operation
+        switch (op.category) {
+        case helix::PrintStartOpCategory::BED_LEVELING:
+            result += "Bed Mesh";
+            break;
+        case helix::PrintStartOpCategory::QGL:
+            result += "QGL";
+            break;
+        case helix::PrintStartOpCategory::Z_TILT:
+            result += "Z-Tilt";
+            break;
+        case helix::PrintStartOpCategory::NOZZLE_CLEAN:
+            result += "Nozzle Clean";
+            break;
+        case helix::PrintStartOpCategory::CHAMBER_SOAK:
+            result += "Chamber Soak";
+            break;
+        default:
+            result += op.name;
+            break;
+        }
+
+        // Add skip indicator if controllable
+        if (op.has_skip_param) {
+            result += " (skippable)";
+        }
+    }
+
+    return first ? "" : result; // Return empty if we only had homing
+}
+
+bool PrintPreparationManager::is_macro_op_controllable(helix::PrintStartOpCategory category) const {
+    if (!macro_analysis_.has_value() || !macro_analysis_->found) {
+        return false;
+    }
+
+    const auto* op = macro_analysis_->get_operation(category);
+    return op && op->has_skip_param;
+}
+
+std::string PrintPreparationManager::get_macro_skip_param(helix::PrintStartOpCategory category) const {
+    if (!macro_analysis_.has_value() || !macro_analysis_->found) {
+        return "";
+    }
+
+    const auto* op = macro_analysis_->get_operation(category);
+    if (op && op->has_skip_param) {
+        return op->skip_param_name;
+    }
+    return "";
 }
 
 // ============================================================================
@@ -82,12 +257,13 @@ void PrintPreparationManager::scan_file_for_operations(const std::string& filena
                  file_path);
 
     auto* self = this;
+    auto alive = alive_guard_;  // Capture shared_ptr to detect destruction
     api_->download_file(
         "gcodes", file_path,
         // Success: parse content and cache result
         // NOTE: This callback runs on a background HTTP thread, so we must defer
         // shared state updates and LVGL calls to the main thread via lv_async_call
-        [self, filename](const std::string& content) {
+        [self, alive, filename](const std::string& content) {
             // Parse on background thread (safe - no shared state access)
             gcode::GCodeOpsDetector detector;
             auto scan_result = detector.scan_content(content);
@@ -108,12 +284,19 @@ void PrintPreparationManager::scan_file_for_operations(const std::string& filena
             // Defer shared state updates to main LVGL thread
             struct ScanUpdateData {
                 PrintPreparationManager* mgr;
+                std::shared_ptr<bool> alive_guard;
                 std::string filename;
                 gcode::ScanResult result;
             };
             ui_async_call_safe<ScanUpdateData>(
-                std::make_unique<ScanUpdateData>(ScanUpdateData{self, filename, scan_result}),
+                std::make_unique<ScanUpdateData>(ScanUpdateData{self, alive, filename, scan_result}),
                 [](ScanUpdateData* d) {
+                    // Check if manager was destroyed before this callback executed
+                    if (!d->alive_guard || !*d->alive_guard) {
+                        spdlog::debug("[PrintPreparationManager] Skipping scan callback - "
+                                      "manager destroyed");
+                        return;
+                    }
                     d->mgr->cached_scan_result_ = d->result;
                     d->mgr->cached_scan_filename_ = d->filename;
                     if (d->mgr->on_scan_complete_) {
@@ -123,22 +306,30 @@ void PrintPreparationManager::scan_file_for_operations(const std::string& filena
         },
         // Error: just log, don't block the UI
         // NOTE: Also runs on background thread
-        [self, filename](const MoonrakerError& error) {
+        [self, alive, filename](const MoonrakerError& error) {
             spdlog::warn("[PrintPreparationManager] Failed to scan G-code {}: {}", filename,
                          error.message);
 
             // Defer shared state updates to main LVGL thread
             struct ScanErrorData {
                 PrintPreparationManager* mgr;
+                std::shared_ptr<bool> alive_guard;
             };
-            ui_async_call_safe<ScanErrorData>(std::make_unique<ScanErrorData>(ScanErrorData{self}),
-                                              [](ScanErrorData* d) {
-                                                  d->mgr->cached_scan_result_.reset();
-                                                  d->mgr->cached_scan_filename_.clear();
-                                                  if (d->mgr->on_scan_complete_) {
-                                                      d->mgr->on_scan_complete_("");
-                                                  }
-                                              });
+            ui_async_call_safe<ScanErrorData>(
+                std::make_unique<ScanErrorData>(ScanErrorData{self, alive}),
+                [](ScanErrorData* d) {
+                    // Check if manager was destroyed before this callback executed
+                    if (!d->alive_guard || !*d->alive_guard) {
+                        spdlog::debug("[PrintPreparationManager] Skipping scan error callback - "
+                                      "manager destroyed");
+                        return;
+                    }
+                    d->mgr->cached_scan_result_.reset();
+                    d->mgr->cached_scan_filename_.clear();
+                    if (d->mgr->on_scan_complete_) {
+                        d->mgr->on_scan_complete_("");
+                    }
+                });
         });
 }
 

@@ -409,6 +409,11 @@ class PrintSelectPanel : public PanelBase {
 
     lv_subject_t selected_file_ops_subject_; ///< Detected G-code operations (e.g., "Contains: ...")
     char selected_file_ops_buffer_[128];
+    lv_subject_t selected_file_ops_visible_subject_; ///< 1 if file ops row should be visible, 0 if empty
+
+    lv_subject_t selected_macro_ops_subject_; ///< PRINT_START macro operations (e.g., "PRINT_START contains: ...")
+    char selected_macro_ops_buffer_[128];
+    lv_subject_t selected_macro_ops_visible_subject_; ///< 1 if macro ops row should be visible, 0 if empty
 
     lv_subject_t detail_view_visible_subject_;
 

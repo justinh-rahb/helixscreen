@@ -70,6 +70,7 @@ static const IconMapping ICON_MAP[] = {
     {"clock",              "\xF3\xB0\x85\x90"},  // F0150 clock-outline
     {"close",              "\xF3\xB0\x85\x96"},  // F0156 close/xmark
     {"close_circle",       "\xF3\xB0\x85\x99"},  // F0159 close-circle
+    {"code_braces",        "\xF3\xB0\x85\xA9"},  // F0169 code-braces
     {"code_tags",          "\xF3\xB0\x85\xB4"},  // F0174 code-tags
     {"cog",                "\xF3\xB0\x92\x93"},  // F0493 cog/settings
     {"console",            "\xF3\xB0\x86\x8D"},  // F018D console/terminal

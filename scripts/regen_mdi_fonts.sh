@@ -134,6 +134,7 @@ MDI_ICONS+=",0xF0143"    # chevron-up
 MDI_ICONS+=",0xF0150"    # clock-outline
 MDI_ICONS+=",0xF0156"    # close (xmark)
 MDI_ICONS+=",0xF0159"    # close-circle (xmark-circle)
+MDI_ICONS+=",0xF0169"    # code-braces
 MDI_ICONS+=",0xF0174"    # code-tags
 MDI_ICONS+=",0xF018D"    # console/terminal
 MDI_ICONS+=",0xF01B4"    # delete (trash)

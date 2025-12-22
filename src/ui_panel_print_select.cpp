@@ -20,6 +20,7 @@
 #include "filament_sensor_manager.h"
 #include "lvgl/src/xml/lv_xml.h"
 #include "moonraker_api.h"
+#include "print_start_analyzer.h"
 #include "printer_state.h"
 #include "runtime_config.h"
 #include "settings_manager.h"
@@ -224,6 +225,13 @@ void PrintSelectPanel::init_subjects() {
                                         "", "selected_layer_count");
     UI_SUBJECT_INIT_AND_REGISTER_STRING(selected_file_ops_subject_, selected_file_ops_buffer_, "",
                                         "selected_file_ops");
+    UI_SUBJECT_INIT_AND_REGISTER_INT(selected_file_ops_visible_subject_, 0,
+                                     "selected_file_ops_visible");
+
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(selected_macro_ops_subject_, selected_macro_ops_buffer_, "",
+                                        "selected_macro_ops");
+    UI_SUBJECT_INIT_AND_REGISTER_INT(selected_macro_ops_visible_subject_, 0,
+                                     "selected_macro_ops_visible");
 
     // Initialize detail view visibility subject (0 = hidden, 1 = visible)
     UI_SUBJECT_INIT_AND_REGISTER_INT(detail_view_visible_subject_, 0, "detail_view_visible");
@@ -1392,7 +1400,24 @@ void PrintSelectPanel::create_detail_view() {
     if (auto* prep_mgr = detail_view_->get_prep_manager()) {
         prep_mgr->set_scan_complete_callback([this](const std::string& formatted_ops) {
             lv_subject_copy_string(&selected_file_ops_subject_, formatted_ops.c_str());
-            spdlog::debug("[{}] Updated detected ops: '{}'", get_name(), formatted_ops);
+            // Update visibility: 1 = show (has content), 0 = hide (empty)
+            lv_subject_set_int(&selected_file_ops_visible_subject_, formatted_ops.empty() ? 0 : 1);
+            spdlog::debug("[{}] Updated file ops: '{}' (visible: {})", get_name(), formatted_ops,
+                          !formatted_ops.empty());
+        });
+
+        // Set callback to update PRINT_START macro operations display
+        prep_mgr->set_macro_analysis_callback([this](const helix::PrintStartAnalysis& /*analysis*/) {
+            // Note: detail_view_ guaranteed valid here - callback stored in prep_manager owned by
+            // detail_view_
+            if (auto* prep_mgr = detail_view_->get_prep_manager()) {
+                std::string formatted = prep_mgr->format_macro_operations();
+                lv_subject_copy_string(&selected_macro_ops_subject_, formatted.c_str());
+                // Update visibility: 1 = show (has content), 0 = hide (empty)
+                lv_subject_set_int(&selected_macro_ops_visible_subject_, formatted.empty() ? 0 : 1);
+                spdlog::debug("[{}] Updated macro ops: '{}' (visible: {})", get_name(), formatted,
+                              !formatted.empty());
+            }
         });
     }
 
