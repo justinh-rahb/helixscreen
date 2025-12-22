@@ -56,6 +56,10 @@
     <px name="space_2xl_small" value="24"/>
     <px name="space_2xl_medium" value="32"/>
     <px name="space_2xl_large" value="40"/>
+    <!-- space_2xl_neg: Negative variant for positioning (e.g., toast right offset) -->
+    <px name="space_2xl_neg_small" value="-24"/>
+    <px name="space_2xl_neg_medium" value="-32"/>
+    <px name="space_2xl_neg_large" value="-40"/>
     <!-- ===================================================================== -->
     <!-- Responsive Icon Sizes (icon_size_*)                                  -->
     <!-- ===================================================================== -->

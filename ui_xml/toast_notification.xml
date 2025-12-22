@@ -7,7 +7,7 @@
   </api>
   <!-- Toast container - floating appearance with shadow, positioned top-right -->
   <view name="toast_root"
-        extends="lv_obj" width="content" height="content" align="top_right" x="#space_lg_negative" y="#space_2xl"
+        extends="lv_obj" width="content" height="content" align="top_right" x="#space_2xl_neg" y="#space_2xl"
         style_min_width="50%" style_max_width="450" style_radius="#border_radius_large" style_pad_all="#space_lg"
         style_pad_gap="#space_sm" style_border_width="0" style_bg_color="#app_bg_color" style_shadow_width="#space_2xl"
         style_shadow_spread="#space_xs" style_shadow_opa="120" style_shadow_ofs_y="#space_xs" flex_flow="row"
