@@ -1116,18 +1116,18 @@ void TempControlPanel::setup_mini_combined_graph(lv_obj_t* container) {
     // Configure Y-axis with 50°C increments for readability
     ui_temp_graph_set_y_axis(mini_graph_, 50.0f, true);
 
-    // Add nozzle series (red/heating color) with stronger gradient fill
-    mini_nozzle_series_id_ = ui_temp_graph_add_series(mini_graph_, "Nozzle", nozzle_config_.color);
-    if (mini_nozzle_series_id_ >= 0) {
-        // Subtle gradient to not obscure bed line
-        ui_temp_graph_set_series_gradient(mini_graph_, mini_nozzle_series_id_, LV_OPA_0, LV_OPA_10);
-    }
-
-    // Add bed series (cyan/cooling color) with more visible gradient
+    // Add bed series FIRST (renders underneath) - cyan/cooling color
     mini_bed_series_id_ = ui_temp_graph_add_series(mini_graph_, "Bed", bed_config_.color);
     if (mini_bed_series_id_ >= 0) {
-        // Slightly more visible gradient to distinguish from nozzle
-        ui_temp_graph_set_series_gradient(mini_graph_, mini_bed_series_id_, LV_OPA_0, LV_OPA_20);
+        // Subtle gradient so it doesn't dominate
+        ui_temp_graph_set_series_gradient(mini_graph_, mini_bed_series_id_, LV_OPA_0, LV_OPA_10);
+    }
+
+    // Add nozzle series SECOND (renders on top) - red/heating color
+    mini_nozzle_series_id_ = ui_temp_graph_add_series(mini_graph_, "Nozzle", nozzle_config_.color);
+    if (mini_nozzle_series_id_ >= 0) {
+        // More visible gradient for the primary temp (filament loading)
+        ui_temp_graph_set_series_gradient(mini_graph_, mini_nozzle_series_id_, LV_OPA_0, LV_OPA_20);
     }
 
     // Replay last 5 minutes of history to each series
