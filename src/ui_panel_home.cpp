@@ -506,7 +506,7 @@ void HomePanel::handle_tip_text_clicked() {
 
     spdlog::info("[{}] Tip text clicked - showing detail dialog", get_name());
 
-    ModalConfig config = {.backdrop_opa = 180};
+    ModalConfig config{};
 
     const char* attrs[] = {"title", current_tip_.title.c_str(), "message",
                            current_tip_.content.c_str(), nullptr};

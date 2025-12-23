@@ -13,6 +13,12 @@
 #include <algorithm>
 
 // ============================================================================
+// MODAL STYLE CONSTANTS
+// ============================================================================
+// Backdrop opacity: 180 = ~70% opacity (dark overlay behind modal)
+static constexpr uint8_t MODAL_BACKDROP_OPACITY = 180;
+
+// ============================================================================
 // ANIMATION CONSTANTS
 // ============================================================================
 // Duration values match globals.xml tokens for consistency
@@ -369,7 +375,7 @@ lv_obj_t* Modal::show(const char* component_name, const ModalConfig& config, con
     lv_obj_set_size(backdrop, LV_PCT(100), LV_PCT(100));
     lv_obj_align(backdrop, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(backdrop, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(backdrop, config.backdrop_opa, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(backdrop, MODAL_BACKDROP_OPACITY, LV_PART_MAIN);
     lv_obj_set_style_border_width(backdrop, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(backdrop, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(backdrop, 0, LV_PART_MAIN);
@@ -578,7 +584,7 @@ bool Modal::create_and_show(lv_obj_t* parent, const char* comp_name, const char*
     lv_obj_set_size(backdrop_, LV_PCT(100), LV_PCT(100));
     lv_obj_align(backdrop_, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(backdrop_, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(backdrop_, config_.backdrop_opa, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(backdrop_, MODAL_BACKDROP_OPACITY, LV_PART_MAIN);
     lv_obj_set_style_border_width(backdrop_, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(backdrop_, 0, LV_PART_MAIN);
     lv_obj_set_style_pad_all(backdrop_, 0, LV_PART_MAIN);

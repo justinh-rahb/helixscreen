@@ -499,7 +499,7 @@ void InputShaperPanel::handle_help_clicked() {
 
         "Lower vibration % is better. Lower smoothing preserves detail.";
 
-    ModalConfig config = {.backdrop_opa = 180};
+    ModalConfig config{};
 
     const char* attrs[] = {"title", "Input Shaper Help", "message", help_message, nullptr};
 

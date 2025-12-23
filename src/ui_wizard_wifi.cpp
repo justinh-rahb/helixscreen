@@ -892,7 +892,7 @@ void WizardWifiStep::show_password_modal(const char* ssid) {
 
     spdlog::debug("[{}] Showing password modal for SSID: {}", get_name(), ssid);
 
-    ModalConfig config = {.backdrop_opa = 180};
+    ModalConfig config{};
 
     const char* attrs[] = {"ssid", ssid, NULL};
     password_modal_ = ui_modal_show("wifi_password_modal", &config, attrs);

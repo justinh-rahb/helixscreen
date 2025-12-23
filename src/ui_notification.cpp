@@ -114,7 +114,7 @@ static void async_error_callback(void* user_data) {
             }
 
             // Show modal dialog for critical errors
-            ModalConfig config = {.backdrop_opa = 180};
+            ModalConfig config{};
 
             const char* attrs[] = {"title", data->title, "message", data->message, nullptr};
 
@@ -406,7 +406,7 @@ void ui_notification_error(const char* title, const char* message, bool modal) {
             }
 
             // Show modal dialog for critical errors
-            ModalConfig config = {.backdrop_opa = 180};
+            ModalConfig config{};
 
             const char* attrs[] = {"title", title, "message", message, nullptr};
 

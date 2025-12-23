@@ -180,7 +180,7 @@ bool PrintSelectDetailView::is_visible() const {
 // ============================================================================
 
 void PrintSelectDetailView::show_delete_confirmation(const std::string& filename) {
-    ModalConfig config = {.backdrop_opa = 180};
+    ModalConfig config{};
 
     // Create message with current filename
     char msg_buf[256];

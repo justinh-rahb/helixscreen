@@ -36,7 +36,6 @@ struct ModalPosition {
  */
 struct ModalConfig {
     ModalPosition position;
-    uint8_t backdrop_opa = 200;
     bool persistent = false; /**< true = hide only, false = delete on close */
     lv_event_cb_t on_close = nullptr;
 };

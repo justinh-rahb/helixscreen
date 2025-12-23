@@ -1594,7 +1594,7 @@ void PrintSelectPanel::show_filament_warning() {
         filament_warning_dialog_ = nullptr;
     }
 
-    ModalConfig config = {.backdrop_opa = 180};
+    ModalConfig config{};
 
     const char* attrs[] = {"title", "No Filament Detected", "message",
                            "The runout sensor indicates no filament is loaded. "
@@ -1846,7 +1846,7 @@ void PrintSelectPanel::show_color_mismatch_warning(const std::vector<int>& missi
     }
     message += "\nLoad the required filaments or start anyway?";
 
-    ModalConfig config = {.backdrop_opa = 180};
+    ModalConfig config{};
 
     // Static buffer for message - must persist during modal lifetime.
     // Safe because we always close any existing dialog first (line 1822-1825),

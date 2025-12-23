@@ -790,7 +790,7 @@ void NetworkSettingsOverlay::handle_test_network_clicked() {
     // Reset test complete flag (disables close button)
     lv_subject_set_int(&test_complete_, 0);
 
-    ModalConfig config = {.backdrop_opa = 180};
+    ModalConfig config{};
 
     test_modal_ = ui_modal_show("network_test_modal", &config, nullptr);
     if (!test_modal_) {
