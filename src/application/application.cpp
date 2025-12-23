@@ -296,18 +296,18 @@ void Application::auto_configure_mock_state() {
         if (m_args.overlays.print_status) {
             config->mock_auto_start_print = true;
             config->gcode_test_file = RuntimeConfig::get_default_test_file_path();
-            printf("  [Auto] Mock will simulate active print for print-status panel\n");
+            spdlog::info("[Auto] Mock will simulate active print for print-status panel");
         }
 
         if (m_args.initial_panel == UI_PANEL_PRINT_SELECT && !config->select_file) {
             config->select_file = RuntimeConfig::DEFAULT_TEST_FILE;
-            printf("  [Auto] Auto-selecting '%s' for print-select panel\n",
-                   RuntimeConfig::DEFAULT_TEST_FILE);
+            spdlog::info("[Auto] Auto-selecting '{}' for print-select panel",
+                         RuntimeConfig::DEFAULT_TEST_FILE);
         }
 
         if (m_args.overlays.history_dashboard) {
             config->mock_auto_history = true;
-            printf("  [Auto] Mock will generate history data for history panel\n");
+            spdlog::info("[Auto] Mock will generate history data for history panel");
         }
     }
 }

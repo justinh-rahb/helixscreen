@@ -727,6 +727,11 @@ void SettingsPanel::populate_sensor_list() {
         // Store klipper_name as user data for callbacks
         // Note: We need to allocate this because sensor goes out of scope
         char* klipper_name = static_cast<char*>(lv_malloc(sensor.klipper_name.size() + 1));
+        if (!klipper_name) {
+            spdlog::error("[{}] Failed to allocate memory for sensor name: {}", get_name(),
+                          sensor.klipper_name);
+            continue;
+        }
         strcpy(klipper_name, sensor.klipper_name.c_str());
         lv_obj_set_user_data(row, klipper_name);
 
