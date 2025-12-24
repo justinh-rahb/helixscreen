@@ -380,6 +380,50 @@ class GCodeLayerRenderer {
      */
     glm::ivec2 world_to_screen(float x, float y, float z = 0.0f) const;
 
+    // =========================================================================
+    // Transformation Parameters (for thread-safe coordinate conversion)
+    // =========================================================================
+
+    /**
+     * @brief Captured transformation state for thread-safe rendering
+     *
+     * This struct captures all parameters needed for world_to_screen conversion.
+     * Background threads capture this at start to ensure consistent rendering
+     * even if main thread modifies renderer state during the operation.
+     */
+    struct TransformParams {
+        ViewMode view_mode;
+        float scale;
+        float offset_x;
+        float offset_y;
+        float offset_z;
+        int canvas_width;
+        int canvas_height;
+        float content_offset_y_percent; // CRITICAL: must be included for alignment!
+    };
+
+    /**
+     * @brief Capture current transformation parameters (thread-safe snapshot)
+     * @return TransformParams struct with current values
+     */
+    TransformParams capture_transform_params() const;
+
+    /**
+     * @brief Convert world coordinates to screen using captured parameters
+     *
+     * This is the single source of truth for coordinate conversion. Both
+     * world_to_screen() and background ghost rendering use this method
+     * to ensure perfect alignment between solid and ghost layers.
+     *
+     * @param params Captured transformation parameters
+     * @param x World X coordinate (mm)
+     * @param y World Y coordinate (mm)
+     * @param z World Z coordinate (mm) - used for FRONT view
+     * @return Screen coordinates (pixels, no widget offset applied)
+     */
+    static glm::ivec2 world_to_screen_raw(const TransformParams& params, float x, float y,
+                                          float z = 0.0f);
+
     /**
      * @brief Check if a segment is a support structure
      * @param seg Segment to check
@@ -509,24 +553,14 @@ class GCodeLayerRenderer {
     int ghost_raw_height_ = 0;
     int ghost_raw_stride_ = 0; // Bytes per row
 
-    /// Background thread management (non-streaming mode)
+    /// Background thread management (works for both streaming and non-streaming modes)
     std::thread ghost_thread_;
     std::atomic<bool> ghost_thread_cancel_{false};
     std::atomic<bool> ghost_thread_running_{false};
     std::atomic<bool> ghost_thread_ready_{false}; // True when raw buffer is complete
 
-    /// Streaming mode ghost builder
-    std::unique_ptr<BackgroundGhostBuilder> streaming_ghost_builder_;
-
     /// Start background ghost rendering (called when new gcode loaded)
     void start_background_ghost_render();
-
-    /// Start streaming ghost build (called when in streaming mode)
-    void start_streaming_ghost_build();
-
-    /// Render a single layer's segments to ghost raw buffer (thread-safe)
-    void render_layer_to_ghost_buffer(size_t layer_index,
-                                      const std::vector<ToolpathSegment>& segments);
 
     /// Cancel any in-progress background ghost render
     void cancel_background_ghost_render();
@@ -536,9 +570,6 @@ class GCodeLayerRenderer {
 
     /// Copy completed raw buffer to LVGL ghost_buf_ (called on main thread)
     void copy_raw_to_ghost_buf();
-
-    /// Copy raw buffer to LVGL ghost_buf_ for streaming mode (progressive display)
-    void copy_raw_to_ghost_buf_streaming();
 
     /// Software Bresenham line drawing to raw ARGB8888 buffer
     void draw_line_bresenham(int x0, int y0, int x1, int y1, uint32_t color);
