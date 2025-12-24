@@ -1013,6 +1013,56 @@ The XML/Subject architecture adapts easily to different display sizes:
 - **Theme scaling** - Adjust font sizes and padding in `globals.xml`
 - **Content adaptation** - Show/hide elements with conditional flag bindings
 
+## Legitimate Exceptions to UI Patterns
+
+During code audits, the following patterns may appear to violate declarative UI guidelines but are **acceptable exceptions**. Future audits should not flag these:
+
+### 1. DELETE Event Handlers
+`lv_obj_add_event_cb(obj, cb, LV_EVENT_DELETE, ...)` is required for RAII cleanup of widget user_data. Cannot be done in XML.
+
+### 2. Canvas/Drawing Code
+Files like `nozzle_renderer_*.cpp`, `ui_filament_path_canvas.cpp`, `ui_bed_mesh.cpp` use hardcoded colors for physical/material rendering (brass nozzle, charcoal frame). These are not theme colors.
+
+### 3. Dynamic Widget Creation
+Widgets created at runtime (step progress indicators, AMS mini status, keyboard overlays) cannot use XML bindings since they're generated programmatically.
+
+### 4. Gesture State Machines
+Keyboard long-press detection, jog pad touch handling require imperative state management for gesture recognition.
+
+### 5. Bootstrap Components
+Fatal error screen (`ui_fatal_error.cpp`) runs before theme is loaded - must use hardcoded colors.
+
+### 6. Fallback Color Pattern
+```cpp
+const char* str = lv_xml_get_const("color_token");
+lv_color_t c = str ? ui_theme_parse_hex_color(str) : lv_color_hex(0xFALLBACK);
+```
+This is correct - `str` contains an actual hex value from XML, not a token name.
+
+### 7. fprintf in Destructors
+spdlog may be destroyed during static destruction. Use `fprintf(stderr, ...)` in destructors of static/global objects.
+
+### 8. Async Context new/delete
+`lv_async_call()` requires heap-allocated context structs for thread marshaling. The async callback must `delete` the context.
+
+### 9. CLI printf
+Code in `cli_args.cpp` runs before logging infrastructure is initialized - printf is acceptable.
+
+### 10. Experimental Test Code
+Test scaffolding in `experimental/src/*.cpp` uses printf for test output - not production code.
+
+### 11. Modal Dialog Buttons
+Dynamically created modals (confirmation dialogs, warnings) wire buttons imperatively since they're created at runtime.
+
+### 12. snprintf with sizeof()
+```cpp
+char buf[256];
+snprintf(buf, sizeof(buf), "format...", args);
+```
+This is safe - truncates rather than overflows. Not a security issue.
+
+---
+
 ## Related Documentation
 
 This document focuses on system design, patterns, and architectural decisions ("why"). For implementation details:
