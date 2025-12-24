@@ -5,6 +5,7 @@
 
 #include "ui_event_safety.h"
 #include "ui_keyboard.h"
+#include "ui_update_queue.h"
 
 #include "settings_manager.h"
 
@@ -203,9 +204,16 @@ void ModalStack::exit_animation_done(lv_anim_t* anim) {
     // Remove from stack (animation is complete, safe to remove)
     ModalStack::instance().remove(backdrop);
 
-    // Delete the backdrop
+    // Delete the backdrop using our safe queue (not lv_obj_delete_async which uses
+    // LVGL's internal timer and could potentially fire during rendering)
     spdlog::debug("[ModalStack] Exit animation complete - deleting backdrop");
-    lv_obj_delete_async(backdrop);
+    ui_async_call(
+        [](void* obj) {
+            if (lv_obj_is_valid(static_cast<lv_obj_t*>(obj))) {
+                lv_obj_delete(static_cast<lv_obj_t*>(obj));
+            }
+        },
+        backdrop);
 }
 
 void ModalStack::animate_exit(lv_obj_t* backdrop, lv_obj_t* dialog) {
@@ -218,7 +226,13 @@ void ModalStack::animate_exit(lv_obj_t* backdrop, lv_obj_t* dialog) {
         lv_obj_set_style_transform_scale(dialog, MODAL_SCALE_END, LV_PART_MAIN);
         lv_obj_set_style_opa(dialog, LV_OPA_COVER, LV_PART_MAIN);
         spdlog::debug("[ModalStack] Animations disabled - deleting modal instantly");
-        lv_obj_delete_async(backdrop);
+        ui_async_call(
+            [](void* obj) {
+                if (lv_obj_is_valid(static_cast<lv_obj_t*>(obj))) {
+                    lv_obj_delete(static_cast<lv_obj_t*>(obj));
+                }
+            },
+            backdrop);
         return;
     }
 
@@ -397,7 +411,13 @@ void Modal::hide(lv_obj_t* dialog) {
     if (!backdrop) {
         spdlog::warn("[Modal] Dialog not found in stack");
         if (lv_obj_is_valid(dialog)) {
-            lv_obj_delete_async(dialog);
+            ui_async_call(
+                [](void* obj) {
+                    if (lv_obj_is_valid(static_cast<lv_obj_t*>(obj))) {
+                        lv_obj_delete(static_cast<lv_obj_t*>(obj));
+                    }
+                },
+                dialog);
         }
         return;
     }
