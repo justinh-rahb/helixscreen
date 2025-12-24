@@ -119,7 +119,7 @@ class SubjectInitializer {
     void init_core_subjects();
     void init_printer_state_subjects();
     void init_ams_subjects();
-    void init_panel_subjects(const RuntimeConfig& runtime_config);
+    void init_panel_subjects();
     void init_observers();
     void init_utility_subjects();
     void init_usb_manager(const RuntimeConfig& runtime_config);

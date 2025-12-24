@@ -198,7 +198,6 @@ class FilamentPanel : public PanelBase {
     int selected_material_ = -1; // -1=none, 0=PLA, 1=PETG, 2=ABS, 3=TPU
     int nozzle_min_temp_ = 0;
     int nozzle_max_temp_ = 500;
-    int bed_min_temp_ = 0;
     int bed_max_temp_ = 150;
 
     // Child widgets (for imperative state management)

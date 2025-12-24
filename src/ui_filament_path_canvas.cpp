@@ -398,32 +398,6 @@ static void draw_line(lv_layer_t* layer, int32_t x1, int32_t y1, int32_t x2, int
     lv_draw_line(layer, &line_dsc);
 }
 
-// Draw a partial line (for animation) - draws from start to a point determined by progress (0-100)
-static void draw_partial_line(lv_layer_t* layer, int32_t x1, int32_t y1, int32_t x2, int32_t y2,
-                              lv_color_t color, int32_t width, int progress, bool reverse) {
-    if (progress <= 0)
-        return;
-    if (progress >= 100) {
-        draw_line(layer, x1, y1, x2, y2, color, width);
-        return;
-    }
-
-    float factor = progress / 100.0f;
-    int32_t end_x, end_y;
-
-    if (reverse) {
-        // Draw from (x2,y2) backwards by factor
-        end_x = x2 - (int32_t)((x2 - x1) * factor);
-        end_y = y2 - (int32_t)((y2 - y1) * factor);
-        draw_line(layer, end_x, end_y, x2, y2, color, width);
-    } else {
-        // Draw from (x1,y1) forward by factor
-        end_x = x1 + (int32_t)((x2 - x1) * factor);
-        end_y = y1 + (int32_t)((y2 - y1) * factor);
-        draw_line(layer, x1, y1, end_x, end_y, color, width);
-    }
-}
-
 static void draw_hub_box(lv_layer_t* layer, int32_t cx, int32_t cy, int32_t width, int32_t height,
                          lv_color_t bg_color, lv_color_t border_color, lv_color_t text_color,
                          const lv_font_t* font, int32_t radius, const char* label) {

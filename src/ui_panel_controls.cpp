@@ -801,7 +801,7 @@ void ControlsPanel::handle_motors_confirm() {
         api_->execute_gcode(
             "M84", // Klipper command to disable steppers
             []() { NOTIFY_SUCCESS("Motors disabled"); },
-            [](const MoonrakerError& err) { NOTIFY_ERROR("Motors disable failed"); });
+            [](const MoonrakerError& err) { NOTIFY_ERROR("Motors disable failed: {}", err.message); });
     }
 }
 

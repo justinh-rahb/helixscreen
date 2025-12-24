@@ -1056,16 +1056,19 @@ void NetworkSettingsOverlay::on_wlan_toggle_changed(lv_event_t* e) {
 }
 
 void NetworkSettingsOverlay::on_refresh_clicked(lv_event_t* e) {
+    (void)e;
     auto& self = get_network_settings_overlay();
     self.handle_refresh_clicked();
 }
 
 void NetworkSettingsOverlay::on_test_network_clicked(lv_event_t* e) {
+    (void)e;
     auto& self = get_network_settings_overlay();
     self.handle_test_network_clicked();
 }
 
 void NetworkSettingsOverlay::on_add_other_clicked(lv_event_t* e) {
+    (void)e;
     auto& self = get_network_settings_overlay();
     self.handle_add_other_clicked();
 }

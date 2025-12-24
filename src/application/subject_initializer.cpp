@@ -66,8 +66,8 @@ bool SubjectInitializer::init_all(const RuntimeConfig& runtime_config) {
     // Phase 3: AMS and filament sensor subjects
     init_ams_subjects();
 
-    // Phase 4: Panel subjects (most complex, uses runtime_config)
-    init_panel_subjects(runtime_config);
+    // Phase 4: Panel subjects
+    init_panel_subjects();
 
     // Phase 5: Observers (depend on subjects being ready)
     init_observers();
@@ -139,7 +139,7 @@ void SubjectInitializer::init_ams_subjects() {
     helix::FilamentSensorManager::instance().init_subjects();
 }
 
-void SubjectInitializer::init_panel_subjects(const RuntimeConfig& runtime_config) {
+void SubjectInitializer::init_panel_subjects() {
     spdlog::trace("[SubjectInitializer] Initializing panel subjects");
 
     // Basic panels

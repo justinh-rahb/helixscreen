@@ -24,9 +24,6 @@
 // Layout constants
 // ============================================================================
 
-/** Minimum fill height in pixels (ensures visibility when present) */
-static constexpr int32_t MIN_FILL_HEIGHT_PX = 2;
-
 /** Minimum bar width in pixels (prevents bars from becoming invisible) */
 static constexpr int32_t MIN_BAR_WIDTH_PX = 3;
 
@@ -102,8 +99,8 @@ static constexpr int32_t STATUS_LINE_HEIGHT_PX = 3;
 /** Gap between filament bar and status line underneath */
 static constexpr int32_t STATUS_LINE_GAP_PX = 2;
 
-/** Update a single slot bar's appearance */
-static void update_slot_bar(SlotBarData* slot, int32_t bar_height) {
+/** Update a single slot bar's appearance (colors, opacity, status line) */
+static void update_slot_bar(SlotBarData* slot) {
     if (!slot->bar_bg || !slot->bar_fill)
         return;
 
@@ -238,7 +235,7 @@ static void rebuild_bars(AmsMiniStatusData* data) {
             lv_obj_set_size(slot->status_line, bar_width, STATUS_LINE_HEIGHT_PX);
 
             lv_obj_remove_flag(slot->slot_container, LV_OBJ_FLAG_HIDDEN);
-            update_slot_bar(slot, bar_height);
+            update_slot_bar(slot);
         } else {
             // Hide this slot
             if (slot->slot_container) {
@@ -436,7 +433,7 @@ void ui_ams_mini_status_set_slot(lv_obj_t* obj, int slot_index, uint32_t color_r
     slot->fill_pct = std::clamp(fill_pct, 0, 100);
     slot->present = present;
 
-    update_slot_bar(slot, data->height);
+    update_slot_bar(slot);
 }
 
 /** Timer callback for deferred refresh */

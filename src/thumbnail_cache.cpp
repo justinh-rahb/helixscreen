@@ -671,6 +671,10 @@ void ThumbnailCache::process_and_callback(const std::string& png_lvgl_path,
                                           const std::string& source_path,
                                           const helix::ThumbnailTarget& target,
                                           SuccessCallback on_success, ErrorCallback on_error) {
+    // This function uses graceful fallback - on failure, it calls on_success with
+    // the PNG path instead of calling on_error. The PNG still works, just slower.
+    (void)on_error;
+
     // Read PNG file into memory
     std::string local_path = png_lvgl_path;
     if (is_lvgl_path(local_path)) {

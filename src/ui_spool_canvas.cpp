@@ -68,41 +68,6 @@ static lv_color_t blend_color(lv_color_t c1, lv_color_t c2, float factor) {
                          (uint8_t)(c1.blue + (c2.blue - c1.blue) * factor));
 }
 
-static void draw_filled_ellipse(lv_layer_t* layer, int32_t cx, int32_t cy, int32_t rx, int32_t ry,
-                                lv_color_t color) {
-    lv_draw_fill_dsc_t fill_dsc;
-    lv_draw_fill_dsc_init(&fill_dsc);
-    fill_dsc.color = color;
-
-    // Draw ellipse as horizontal line strips with anti-aliased edges
-    for (int32_t y = -ry; y <= ry; y++) {
-        float y_norm = (float)y / (float)ry;
-        float x_extent = rx * sqrtf(1.0f - y_norm * y_norm);
-        if (x_extent < 0.5f)
-            continue;
-
-        // Calculate integer bounds and fractional coverage
-        int32_t x_inner = (int32_t)x_extent;      // Fully covered pixels
-        float x_frac = x_extent - (float)x_inner; // Fractional coverage for edge
-
-        // Draw anti-aliased left edge pixel (partial coverage)
-        if (x_frac > 0.01f) {
-            fill_dsc.opa = (lv_opa_t)(x_frac * 255.0f);
-            lv_area_t left_edge = {cx - x_inner - 1, cy + y, cx - x_inner - 1, cy + y};
-            lv_draw_fill(layer, &fill_dsc, &left_edge);
-            lv_area_t right_edge = {cx + x_inner + 1, cy + y, cx + x_inner + 1, cy + y};
-            lv_draw_fill(layer, &fill_dsc, &right_edge);
-        }
-
-        // Draw fully opaque interior
-        if (x_inner > 0) {
-            fill_dsc.opa = LV_OPA_COVER;
-            lv_area_t line_area = {cx - x_inner, cy + y, cx + x_inner, cy + y};
-            lv_draw_fill(layer, &fill_dsc, &line_area);
-        }
-    }
-}
-
 // Draw ellipse with vertical gradient (top_color at top, bottom_color at bottom)
 // Includes coverage-based anti-aliasing at left/right edges
 static void draw_gradient_ellipse(lv_layer_t* layer, int32_t cx, int32_t cy, int32_t rx, int32_t ry,

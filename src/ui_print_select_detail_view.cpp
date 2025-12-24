@@ -116,6 +116,9 @@ void PrintSelectDetailView::show(const std::string& filename, const std::string&
                                  const std::string& filament_type,
                                  const std::vector<std::string>& filament_colors,
                                  size_t file_size_bytes) {
+    // TODO: Use filament_type to set default in filament dropdown
+    (void)filament_type;
+
     if (!detail_view_widget_) {
         spdlog::warn("[DetailView] Cannot show: widget not created");
         return;
