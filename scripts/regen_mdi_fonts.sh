@@ -162,6 +162,7 @@ MDI_ICONS+=",0xF033E"    # lock
 MDI_ICONS+=",0xF0374"    # minus
 MDI_ICONS+=",0xF040D"    # play-outline (optional)
 MDI_ICONS+=",0xF0415"    # plus
+MDI_ICONS+=",0xF046D"    # ruler (print height)
 MDI_ICONS+=",0xF03D6"    # package-variant (inventory)
 MDI_ICONS+=",0xF03E4"    # pause
 MDI_ICONS+=",0xF03EB"    # pencil (edit)

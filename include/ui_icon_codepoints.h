@@ -157,6 +157,7 @@ static const IconMapping ICON_MAP[] = {
     {"rotate_left",        "\xF3\xB0\x91\xA5"},  // F0465 rotate-left (CCW)
     {"rotate_right",       "\xF3\xB0\x91\xA7"},  // F0467 rotate-right (CW)
     {"router",             "\xF3\xB0\x91\xA9"},  // F0469 router-wireless
+    {"ruler",              "\xF3\xB0\x91\xAD"},  // F046D ruler (print height)
 
     // SD card / Send
     {"sd",                 "\xF3\xB0\x91\xB9"},  // F0479 sd
