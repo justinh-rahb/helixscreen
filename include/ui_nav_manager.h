@@ -195,6 +195,9 @@ class NavigationManager {
     // Clear overlay stack (used during connection loss)
     void clear_overlay_stack();
 
+    // Internal panel switch implementation (called via ui_queue_update)
+    void switch_to_panel_impl(int panel_id);
+
     // Animation helpers
     void overlay_animate_slide_in(lv_obj_t* panel);
     void overlay_animate_slide_out(lv_obj_t* panel);

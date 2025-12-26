@@ -195,7 +195,7 @@ void ExtrusionPanel::update_safety_state() {
     // 2. Action button disabled state (bind_state_if_eq disabled when value=1)
     lv_subject_set_int(&safety_warning_visible_subject_, allowed ? 0 : 1);
 
-    spdlog::debug("[{}] Safety state updated: allowed={} (temp={}°C)", get_name(), allowed,
+    spdlog::trace("[{}] Safety state updated: allowed={} (temp={}°C)", get_name(), allowed,
                   nozzle_current_);
 }
 

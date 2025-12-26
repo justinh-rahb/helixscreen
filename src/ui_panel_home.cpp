@@ -1087,7 +1087,7 @@ void HomePanel::on_print_state_changed(PrintJobState state) {
 
     if (is_active) {
         spdlog::info("[{}] Print active - updating card progress display", get_name());
-        on_print_progress_or_time_changed(); // Update label immediately
+        update_print_card_from_state(); // Update label immediately
     } else {
         spdlog::info("[{}] Print not active - reverting card to idle state", get_name());
         reset_print_card_to_idle();
@@ -1095,6 +1095,10 @@ void HomePanel::on_print_state_changed(PrintJobState state) {
 }
 
 void HomePanel::on_print_progress_or_time_changed() {
+    update_print_card_from_state();
+}
+
+void HomePanel::update_print_card_from_state() {
     auto state = static_cast<PrintJobState>(
         lv_subject_get_int(printer_state_.get_print_state_enum_subject()));
 

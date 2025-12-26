@@ -49,10 +49,12 @@
 
 #include <spdlog/spdlog.h>
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <thread>
 #include <vector>
 
 namespace helix::ui {
@@ -83,14 +85,30 @@ class UpdateQueue {
     }
 
     /**
-     * @brief Initialize the update queue (call once at startup)
+     * @brief Check if current thread is the main LVGL thread
+     *
+     * This is used by ui_async_call() to determine whether to use the
+     * render-phase check (safe on main thread) or always defer (background thread).
+     *
+     * @return true if called from the main LVGL thread
+     */
+    static bool is_main_thread() {
+        return std::this_thread::get_id() == main_thread_id_;
+    }
+
+    /**
+     * @brief Initialize the update queue (call once at startup FROM MAIN THREAD)
      *
      * Registers an event handler on the default display that processes
      * pending updates at the START of each refresh cycle, BEFORE rendering.
+     * Also stores the main thread ID for thread-safety checks.
      */
     void init() {
         if (initialized_)
             return;
+
+        // Store main thread ID - init() MUST be called from main thread
+        main_thread_id_ = std::this_thread::get_id();
 
         lv_display_t* disp = lv_display_get_default();
         if (!disp) {
@@ -181,6 +199,9 @@ class UpdateQueue {
     std::queue<UpdateCallback> pending_;
     lv_display_t* display_ = nullptr;
     bool initialized_ = false;
+
+    // Static thread ID of the main LVGL thread (set in init())
+    static inline std::thread::id main_thread_id_{};
 };
 
 /**
@@ -336,34 +357,39 @@ inline void ui_update_queue_shutdown() {
 }
 
 /**
- * @brief Thread-safe async call wrapper with render-phase protection
+ * @brief Thread-aware async call with automatic routing
  *
- * This wrapper handles a critical LVGL edge case: when lv_async_call() is invoked
- * DURING render (e.g., from a draw callback), LVGL's timer restart behavior causes
- * the async callback to fire immediately within the render phase. This triggers
- * cascading lv_inv_area() assertions when the callback modifies UI state.
+ * This function handles LVGL async calls correctly based on the calling thread:
  *
- * Solution: When called during render, callbacks are queued and executed AFTER
- * render completes (via LV_EVENT_REFR_READY). When called outside render, we
- * delegate directly to lv_async_call() for immediate timer scheduling.
+ * **Main Thread (LVGL thread):**
+ * - Checks rendering_in_progress flag (safe - no race condition)
+ * - If rendering: defers to REFR_READY (after render completes)
+ * - If not rendering: uses lv_async_call() directly
+ *
+ * **Background Thread (WebSocket, async ops):**
+ * - Always defers to DeferredRenderQueue (REFR_READY)
+ * - Eliminates TOCTOU race on rendering_in_progress flag
  *
  * @param async_xcb Callback function (same signature as lv_async_call)
  * @param user_data User data passed to callback
  * @return LV_RESULT_OK on success
  */
 inline lv_result_t ui_async_call(lv_async_cb_t async_xcb, void* user_data) {
-    lv_display_t* disp = lv_display_get_default();
+    // Background thread: always defer to avoid TOCTOU race
+    if (!helix::ui::UpdateQueue::is_main_thread()) {
+        helix::ui::DeferredRenderQueue::instance().queue(async_xcb, user_data);
+        return LV_RESULT_OK;
+    }
 
-    // CRITICAL: If we're inside render phase, DO NOT use lv_async_call() directly!
-    // LVGL's timer restart behavior would cause the callback to fire immediately,
-    // leading to cascading lv_inv_area() assertions when observers trigger invalidation.
+    // Main thread: check render phase (safe - no race)
+    lv_display_t* disp = lv_display_get_default();
     if (disp && disp->rendering_in_progress) {
         spdlog::debug("[UI ASYNC] Deferring callback - render in progress");
         helix::ui::DeferredRenderQueue::instance().queue(async_xcb, user_data);
         return LV_RESULT_OK;
     }
 
-    // Outside render phase - safe to use LVGL's native async call
+    // Main thread, not rendering: use LVGL's native async call
     return lv_async_call(async_xcb, user_data);
 }
 
@@ -378,18 +404,8 @@ inline lv_result_t ui_async_call(lv_async_cb_t async_xcb, void* user_data) {
  */
 inline void ui_queue_update(helix::ui::UpdateCallback callback) {
     helix::ui::UpdateQueue::instance().queue(std::move(callback));
-
-    // Trigger a screen refresh so REFR_START fires and processes the queue
-    // Without this, callbacks wait until something else triggers a refresh
-    // Use ui_async_call (not lv_async_call) to handle render-phase safety
-    ui_async_call(
-        [](void*) {
-            lv_obj_t* scr = lv_screen_active();
-            if (scr) {
-                lv_obj_invalidate(scr);
-            }
-        },
-        nullptr);
+    // Queue is drained at REFR_START - no need to force invalidation
+    // Forcing invalidation here was causing cascading lv_inv_area assertions
 }
 
 /**
@@ -411,3 +427,35 @@ void ui_queue_update(std::unique_ptr<T> data, std::function<void(T*)> callback) 
         callback(owned.get());
     });
 }
+
+/**
+ * @brief Macro for safe widget modifications from event callbacks
+ *
+ * Use this macro to safely modify LVGL widgets from any callback context.
+ * The code block is queued and executed at LV_EVENT_REFR_START, guaranteeing
+ * it never runs during the render phase.
+ *
+ * CRITICAL: You MUST capture all needed variables by VALUE in the capture list.
+ * By the time the queued code runs, local variables will be out of scope!
+ *
+ * Usage:
+ * @code
+ * void my_button_clicked(lv_event_t* e) {
+ *     LVGL_SAFE_EVENT_CB_BEGIN("my_button_clicked");
+ *
+ *     lv_obj_t* target = lv_event_get_target(e);
+ *     auto* panel = get_my_panel();
+ *
+ *     SAFE_WIDGET_UPDATE([target, panel], {
+ *         lv_obj_add_flag(target, LV_OBJ_FLAG_HIDDEN);
+ *         panel->show_overlay();
+ *     });
+ *
+ *     LVGL_SAFE_EVENT_CB_END();
+ * }
+ * @endcode
+ *
+ * @param captures Lambda capture list (e.g., [target, panel] or [=] or [this])
+ * @param body Code block to execute safely { ... }
+ */
+#define SAFE_WIDGET_UPDATE(captures, body) ui_queue_update(captures() body)

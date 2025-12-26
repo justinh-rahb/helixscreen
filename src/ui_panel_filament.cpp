@@ -358,7 +358,7 @@ void FilamentPanel::update_safety_state() {
     // Safety warning visibility is handled by XML binding to safety_warning_visible_subject_
     // (updated at line 177 above)
 
-    spdlog::debug("[{}] Safety state updated: allowed={} (temp={}°C)", get_name(), allowed,
+    spdlog::trace("[{}] Safety state updated: allowed={} (temp={}°C)", get_name(), allowed,
                   nozzle_current_);
 }
 

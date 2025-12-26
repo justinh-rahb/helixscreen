@@ -7,6 +7,7 @@
 #include "ui_fonts.h"
 #include "ui_status_bar.h"
 #include "ui_theme.h"
+#include "ui_update_queue.h"
 
 #include "app_globals.h"
 #include "moonraker_client.h" // For ConnectionState enum
@@ -373,90 +374,98 @@ void NavigationManager::nav_button_clicked_cb(lv_event_t* event) {
             }
         }
 
-        // Hide ALL visible overlay panels
-        lv_obj_t* screen = lv_screen_active();
-        if (screen) {
-            for (uint32_t i = 0; i < lv_obj_get_child_count(screen); i++) {
-                lv_obj_t* child = lv_obj_get_child(screen, static_cast<int32_t>(i));
-                if (lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) {
-                    continue;
-                }
-
-                if (child == mgr.app_layout_widget_) {
-                    continue;
-                }
-
-                bool is_main_panel = false;
-                for (int j = 0; j < UI_PANEL_COUNT; j++) {
-                    if (mgr.panel_widgets_[j] == child) {
-                        is_main_panel = true;
-                        break;
-                    }
-                }
-
-                if (!is_main_panel) {
-                    lv_obj_add_flag(child, LV_OBJ_FLAG_HIDDEN);
-                    // Reset transform and opacity for potential reuse
-                    lv_obj_set_style_translate_x(child, 0, LV_PART_MAIN);
-                    lv_obj_set_style_opa(child, LV_OPA_COVER, LV_PART_MAIN);
-                    spdlog::trace(
-                        "[NavigationManager] Hiding overlay panel {} (nav button clicked)",
-                        (void*)child);
-                }
-            }
-        }
-
-        // Hide all main panels
-        for (int i = 0; i < UI_PANEL_COUNT; i++) {
-            if (mgr.panel_widgets_[i]) {
-                lv_obj_add_flag(mgr.panel_widgets_[i], LV_OBJ_FLAG_HIDDEN);
-            }
-        }
-
-        // Invoke close callbacks and clean up dynamic backdrops for any overlays being cleared
-        // (e.g., AMS panel needs to destroy its UI to free memory)
-        for (lv_obj_t* panel : mgr.panel_stack_) {
-            // Invoke close callback if registered
-            auto it = mgr.overlay_close_callbacks_.find(panel);
-            if (it != mgr.overlay_close_callbacks_.end()) {
-                auto callback = std::move(it->second);
-                mgr.overlay_close_callbacks_.erase(it);
-                spdlog::debug("[NavigationManager] Invoking close callback for panel {} (navbar)",
-                              (void*)panel);
-                callback();
-            }
-
-            // Clean up dynamic backdrop for this overlay (if one was created)
-            auto backdrop_it = mgr.overlay_backdrops_.find(panel);
-            if (backdrop_it != mgr.overlay_backdrops_.end()) {
-                lv_obj_del(backdrop_it->second);
-                mgr.overlay_backdrops_.erase(backdrop_it);
-            }
-        }
-
-        // Clear panel stack
-        mgr.panel_stack_.clear();
-        spdlog::trace("[NavigationManager] Panel stack cleared (nav button clicked)");
-
-        // Hide primary backdrop since all overlays are being cleared
-        if (mgr.overlay_backdrop_) {
-            ui_status_bar_set_backdrop_visible(false);
-        }
-
-        // Show the clicked panel
-        lv_obj_t* new_panel = mgr.panel_widgets_[panel_id];
-        if (new_panel) {
-            lv_obj_remove_flag(new_panel, LV_OBJ_FLAG_HIDDEN);
-            mgr.panel_stack_.push_back(new_panel);
-            spdlog::trace("[NavigationManager] Showing panel {} (stack depth: {})",
-                          (void*)new_panel, mgr.panel_stack_.size());
-        }
-
-        spdlog::info("[NavigationManager] Switching to panel {}", panel_id);
-        mgr.set_active((ui_panel_id_t)panel_id);
+        // Queue for REFR_START - guarantees we never modify widgets during render phase
+        spdlog::info("[NavigationManager] Queuing switch to panel {}", panel_id);
+        ui_queue_update(
+            [panel_id]() { NavigationManager::instance().switch_to_panel_impl(panel_id); });
     }
 
     LVGL_SAFE_EVENT_CB_END();
+}
+
+void NavigationManager::switch_to_panel_impl(int panel_id) {
+    spdlog::debug("[NavigationManager] switch_to_panel_impl executing for panel {}", panel_id);
+
+    // Hide ALL visible overlay panels
+    lv_obj_t* screen = lv_screen_active();
+    if (screen) {
+        for (uint32_t i = 0; i < lv_obj_get_child_count(screen); i++) {
+            lv_obj_t* child = lv_obj_get_child(screen, static_cast<int32_t>(i));
+            if (lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) {
+                continue;
+            }
+
+            if (child == app_layout_widget_) {
+                continue;
+            }
+
+            bool is_main_panel = false;
+            for (int j = 0; j < UI_PANEL_COUNT; j++) {
+                if (panel_widgets_[j] == child) {
+                    is_main_panel = true;
+                    break;
+                }
+            }
+
+            if (!is_main_panel) {
+                lv_obj_add_flag(child, LV_OBJ_FLAG_HIDDEN);
+                // Reset transform and opacity for potential reuse
+                lv_obj_set_style_translate_x(child, 0, LV_PART_MAIN);
+                lv_obj_set_style_opa(child, LV_OPA_COVER, LV_PART_MAIN);
+                spdlog::trace("[NavigationManager] Hiding overlay panel {} (nav button clicked)",
+                              (void*)child);
+            }
+        }
+    }
+
+    // Hide all main panels
+    for (int i = 0; i < UI_PANEL_COUNT; i++) {
+        if (panel_widgets_[i]) {
+            lv_obj_add_flag(panel_widgets_[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    // Invoke close callbacks and clean up dynamic backdrops for any overlays being cleared
+    // (e.g., AMS panel needs to destroy its UI to free memory)
+    for (lv_obj_t* panel : panel_stack_) {
+        // Invoke close callback if registered
+        auto it = overlay_close_callbacks_.find(panel);
+        if (it != overlay_close_callbacks_.end()) {
+            auto callback = std::move(it->second);
+            overlay_close_callbacks_.erase(it);
+            spdlog::debug("[NavigationManager] Invoking close callback for panel {} (navbar)",
+                          (void*)panel);
+            callback();
+        }
+
+        // Clean up dynamic backdrop for this overlay (if one was created)
+        auto backdrop_it = overlay_backdrops_.find(panel);
+        if (backdrop_it != overlay_backdrops_.end()) {
+            lv_obj_del(backdrop_it->second);
+            overlay_backdrops_.erase(backdrop_it);
+        }
+    }
+
+    // Clear panel stack
+    panel_stack_.clear();
+    spdlog::trace("[NavigationManager] Panel stack cleared (nav button clicked)");
+
+    // Hide primary backdrop since all overlays are being cleared
+    if (overlay_backdrop_) {
+        ui_status_bar_set_backdrop_visible(false);
+    }
+
+    // Show the clicked panel
+    lv_obj_t* new_panel = panel_widgets_[panel_id];
+    if (new_panel) {
+        lv_obj_remove_flag(new_panel, LV_OBJ_FLAG_HIDDEN);
+        panel_stack_.push_back(new_panel);
+        spdlog::trace("[NavigationManager] Showing panel {} (stack depth: {})", (void*)new_panel,
+                      panel_stack_.size());
+    }
+
+    spdlog::info("[NavigationManager] Switched to panel {}", panel_id);
+    set_active((ui_panel_id_t)panel_id);
 }
 
 // ============================================================================
@@ -646,51 +655,46 @@ void NavigationManager::push_overlay(lv_obj_t* overlay_panel, bool hide_previous
         return;
     }
 
-    bool is_first_overlay = (panel_stack_.size() == 1);
+    // Always queue - this is the safest pattern for overlay operations
+    // which can be triggered from various contexts (events, observers, etc.)
+    ui_queue_update([overlay_panel, hide_previous]() {
+        auto& mgr = NavigationManager::instance();
+        bool is_first_overlay = (mgr.panel_stack_.size() == 1);
 
-    // Optionally hide current top panel (default behavior)
-    // When hide_previous=false, the previous panel stays visible beneath the new overlay
-    if (hide_previous && !panel_stack_.empty()) {
-        lv_obj_t* current_top = panel_stack_.back();
-        lv_obj_add_flag(current_top, LV_OBJ_FLAG_HIDDEN);
-        spdlog::debug("[NavigationManager] Hiding current top panel {} (pushing overlay)",
-                      (void*)current_top);
-    }
+        // Optionally hide current top panel
+        if (hide_previous && !mgr.panel_stack_.empty()) {
+            lv_obj_t* current_top = mgr.panel_stack_.back();
+            lv_obj_add_flag(current_top, LV_OBJ_FLAG_HIDDEN);
+        }
 
-    // Create backdrop for this overlay (dims what's beneath it)
-    lv_obj_t* screen = lv_obj_get_screen(overlay_panel);
-    if (screen) {
-        if (is_first_overlay && overlay_backdrop_) {
-            // First overlay: use the shared backdrop
-            ui_status_bar_set_backdrop_visible(true);
-            lv_obj_move_foreground(overlay_backdrop_);
-            spdlog::debug("[NavigationManager] Showing primary backdrop for first overlay");
-        } else if (!is_first_overlay) {
-            // Subsequent overlays: create a dynamic backdrop
-            lv_obj_t* backdrop =
-                static_cast<lv_obj_t*>(lv_xml_create(screen, "overlay_backdrop", nullptr));
-            if (backdrop) {
-                overlay_backdrops_[overlay_panel] = backdrop;
-                lv_obj_remove_flag(backdrop, LV_OBJ_FLAG_HIDDEN);
-                lv_obj_move_foreground(backdrop);
-                // Wire up click handler (same as primary backdrop)
-                lv_obj_add_event_cb(backdrop, backdrop_click_event_cb, LV_EVENT_CLICKED, nullptr);
-                spdlog::debug("[NavigationManager] Created dynamic backdrop {} for overlay {}",
-                              (void*)backdrop, (void*)overlay_panel);
+        // Create backdrop
+        lv_obj_t* screen = lv_obj_get_screen(overlay_panel);
+        if (screen) {
+            if (is_first_overlay && mgr.overlay_backdrop_) {
+                ui_status_bar_set_backdrop_visible(true);
+                lv_obj_move_foreground(mgr.overlay_backdrop_);
+            } else if (!is_first_overlay) {
+                lv_obj_t* backdrop =
+                    static_cast<lv_obj_t*>(lv_xml_create(screen, "overlay_backdrop", nullptr));
+                if (backdrop) {
+                    mgr.overlay_backdrops_[overlay_panel] = backdrop;
+                    lv_obj_remove_flag(backdrop, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_move_foreground(backdrop);
+                    lv_obj_add_event_cb(backdrop, backdrop_click_event_cb, LV_EVENT_CLICKED,
+                                        nullptr);
+                }
             }
         }
-    }
 
-    // Show the new overlay
-    lv_obj_remove_flag(overlay_panel, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_move_foreground(overlay_panel);
-    panel_stack_.push_back(overlay_panel);
+        // Show overlay
+        lv_obj_remove_flag(overlay_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(overlay_panel);
+        mgr.panel_stack_.push_back(overlay_panel);
+        mgr.overlay_animate_slide_in(overlay_panel);
 
-    // Animate slide-in
-    overlay_animate_slide_in(overlay_panel);
-
-    spdlog::debug("[NavigationManager] Showing overlay panel {} (stack depth: {}, hide_prev={})",
-                  (void*)overlay_panel, panel_stack_.size(), hide_previous);
+        spdlog::debug("[NavigationManager] Pushed overlay {} (stack: {})", (void*)overlay_panel,
+                      mgr.panel_stack_.size());
+    });
 }
 
 void NavigationManager::register_overlay_close_callback(lv_obj_t* overlay_panel,
@@ -713,129 +717,100 @@ void NavigationManager::unregister_overlay_close_callback(lv_obj_t* overlay_pane
 }
 
 bool NavigationManager::go_back() {
-    spdlog::debug("[NavigationManager] === go_back() called, stack depth: {} ===",
-                  panel_stack_.size());
+    ui_queue_update([]() {
+        auto& mgr = NavigationManager::instance();
+        spdlog::debug("[NavigationManager] go_back executing, stack depth: {}",
+                      mgr.panel_stack_.size());
 
-    lv_obj_t* current_top = panel_stack_.empty() ? nullptr : panel_stack_.back();
+        lv_obj_t* current_top = mgr.panel_stack_.empty() ? nullptr : mgr.panel_stack_.back();
 
-    // Check if current top is an overlay
-    bool is_overlay = false;
-    if (current_top) {
-        is_overlay = true;
-        for (int j = 0; j < UI_PANEL_COUNT; j++) {
-            if (panel_widgets_[j] == current_top) {
-                is_overlay = false;
-                break;
-            }
-        }
-    }
-
-    // Animate slide-out if overlay (callback invoked after animation completes)
-    if (is_overlay && current_top) {
-        overlay_animate_slide_out(current_top);
-    }
-
-    // Hide any OTHER overlay panels
-    lv_obj_t* screen = lv_screen_active();
-    if (screen) {
-        for (uint32_t i = 0; i < lv_obj_get_child_count(screen); i++) {
-            lv_obj_t* child = lv_obj_get_child(screen, static_cast<int32_t>(i));
-
-            if (child == app_layout_widget_ || child == overlay_backdrop_ || child == current_top) {
-                continue;
-            }
-
-            bool is_main_panel = false;
+        // Check if current top is an overlay
+        bool is_overlay = false;
+        if (current_top) {
+            is_overlay = true;
             for (int j = 0; j < UI_PANEL_COUNT; j++) {
-                if (panel_widgets_[j] == child) {
-                    is_main_panel = true;
+                if (mgr.panel_widgets_[j] == current_top) {
+                    is_overlay = false;
                     break;
                 }
             }
-
-            if (!is_main_panel && !lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) {
-                lv_obj_add_flag(child, LV_OBJ_FLAG_HIDDEN);
-                // Reset transform and opacity for potential reuse
-                lv_obj_set_style_translate_x(child, 0, LV_PART_MAIN);
-                lv_obj_set_style_opa(child, LV_OPA_COVER, LV_PART_MAIN);
-                spdlog::trace("[NavigationManager] Child {}: {} - HIDING stale overlay", i,
-                              (void*)child);
-            }
-        }
-    }
-
-    // Pop current panel and clean up its dynamic backdrop if any
-    if (!panel_stack_.empty()) {
-        lv_obj_t* popped_panel = panel_stack_.back();
-        panel_stack_.pop_back();
-
-        // Clean up dynamic backdrop for this overlay (if one was created)
-        auto backdrop_it = overlay_backdrops_.find(popped_panel);
-        if (backdrop_it != overlay_backdrops_.end()) {
-            lv_obj_t* backdrop = backdrop_it->second;
-            lv_obj_del(backdrop);
-            overlay_backdrops_.erase(backdrop_it);
-            spdlog::debug("[NavigationManager] Deleted dynamic backdrop {} for overlay {}",
-                          (void*)backdrop, (void*)popped_panel);
         }
 
-        spdlog::debug("[NavigationManager] Popped panel from stack (remaining depth: {})",
-                      panel_stack_.size());
-    }
-
-    // Hide backdrop if no more overlays
-    if (panel_stack_.size() <= 1 && overlay_backdrop_) {
-        ui_status_bar_set_backdrop_visible(false);
-        spdlog::debug("[NavigationManager] Hiding overlay backdrop (no more overlays)");
-    }
-
-    // Fallback to home if stack empty
-    if (panel_stack_.empty()) {
-        spdlog::debug(
-            "[NavigationManager] Panel stack empty after pop, falling back to home panel");
-
-        for (int i = 0; i < UI_PANEL_COUNT; i++) {
-            if (panel_widgets_[i]) {
-                lv_obj_add_flag(panel_widgets_[i], LV_OBJ_FLAG_HIDDEN);
-            }
+        // Animate slide-out if overlay
+        if (is_overlay && current_top) {
+            mgr.overlay_animate_slide_out(current_top);
         }
 
-        if (panel_widgets_[UI_PANEL_HOME]) {
-            lv_obj_remove_flag(panel_widgets_[UI_PANEL_HOME], LV_OBJ_FLAG_HIDDEN);
-            panel_stack_.push_back(panel_widgets_[UI_PANEL_HOME]);
-            active_panel_ = UI_PANEL_HOME;
-            lv_subject_set_int(&active_panel_subject_, UI_PANEL_HOME);
-            spdlog::debug("[NavigationManager] Fallback: showing home panel");
-            return true;
-        }
-
-        spdlog::error("[NavigationManager] Cannot show home panel - widget not found!");
-        return false;
-    }
-
-    // Show previous panel
-    lv_obj_t* previous_panel = panel_stack_.back();
-
-    bool is_main_panel = false;
-    for (int i = 0; i < UI_PANEL_COUNT; i++) {
-        if (panel_widgets_[i] == previous_panel) {
-            is_main_panel = true;
-            for (int j = 0; j < UI_PANEL_COUNT; j++) {
-                if (j != i && panel_widgets_[j]) {
-                    lv_obj_add_flag(panel_widgets_[j], LV_OBJ_FLAG_HIDDEN);
+        // Hide stale overlays
+        lv_obj_t* screen = lv_screen_active();
+        if (screen) {
+            for (uint32_t i = 0; i < lv_obj_get_child_count(screen); i++) {
+                lv_obj_t* child = lv_obj_get_child(screen, static_cast<int32_t>(i));
+                if (child == mgr.app_layout_widget_ || child == mgr.overlay_backdrop_ ||
+                    child == current_top) {
+                    continue;
+                }
+                bool is_main = false;
+                for (int j = 0; j < UI_PANEL_COUNT; j++) {
+                    if (mgr.panel_widgets_[j] == child) {
+                        is_main = true;
+                        break;
+                    }
+                }
+                if (!is_main && !lv_obj_has_flag(child, LV_OBJ_FLAG_HIDDEN)) {
+                    lv_obj_add_flag(child, LV_OBJ_FLAG_HIDDEN);
+                    lv_obj_set_style_translate_x(child, 0, LV_PART_MAIN);
+                    lv_obj_set_style_opa(child, LV_OPA_COVER, LV_PART_MAIN);
                 }
             }
-            active_panel_ = (ui_panel_id_t)i;
-            lv_subject_set_int(&active_panel_subject_, i);
-            spdlog::debug("[NavigationManager] Updated active panel to {}", i);
-            break;
         }
-    }
 
-    lv_obj_remove_flag(previous_panel, LV_OBJ_FLAG_HIDDEN);
-    spdlog::debug("[NavigationManager] Showing previous panel {} (stack depth: {}, is_main={})",
-                  (void*)previous_panel, panel_stack_.size(), is_main_panel);
+        // Pop and clean up backdrop
+        if (!mgr.panel_stack_.empty()) {
+            lv_obj_t* popped = mgr.panel_stack_.back();
+            mgr.panel_stack_.pop_back();
+            auto it = mgr.overlay_backdrops_.find(popped);
+            if (it != mgr.overlay_backdrops_.end()) {
+                lv_obj_del(it->second);
+                mgr.overlay_backdrops_.erase(it);
+            }
+        }
 
+        // Hide backdrop if no more overlays
+        if (mgr.panel_stack_.size() <= 1 && mgr.overlay_backdrop_) {
+            ui_status_bar_set_backdrop_visible(false);
+        }
+
+        // Fallback to home if empty
+        if (mgr.panel_stack_.empty()) {
+            for (int i = 0; i < UI_PANEL_COUNT; i++) {
+                if (mgr.panel_widgets_[i])
+                    lv_obj_add_flag(mgr.panel_widgets_[i], LV_OBJ_FLAG_HIDDEN);
+            }
+            if (mgr.panel_widgets_[UI_PANEL_HOME]) {
+                lv_obj_remove_flag(mgr.panel_widgets_[UI_PANEL_HOME], LV_OBJ_FLAG_HIDDEN);
+                mgr.panel_stack_.push_back(mgr.panel_widgets_[UI_PANEL_HOME]);
+                mgr.active_panel_ = UI_PANEL_HOME;
+                lv_subject_set_int(&mgr.active_panel_subject_, UI_PANEL_HOME);
+            }
+            return;
+        }
+
+        // Show previous panel
+        lv_obj_t* prev = mgr.panel_stack_.back();
+        for (int i = 0; i < UI_PANEL_COUNT; i++) {
+            if (mgr.panel_widgets_[i] == prev) {
+                for (int j = 0; j < UI_PANEL_COUNT; j++) {
+                    if (j != i && mgr.panel_widgets_[j])
+                        lv_obj_add_flag(mgr.panel_widgets_[j], LV_OBJ_FLAG_HIDDEN);
+                }
+                mgr.active_panel_ = static_cast<ui_panel_id_t>(i);
+                lv_subject_set_int(&mgr.active_panel_subject_, i);
+                break;
+            }
+        }
+        lv_obj_remove_flag(prev, LV_OBJ_FLAG_HIDDEN);
+    });
     return true;
 }
 

@@ -188,6 +188,7 @@ class HomePanel : public PanelBase {
     void on_print_state_changed(PrintJobState state);
     void on_print_progress_or_time_changed();
     void on_print_thumbnail_path_changed(const char* path);
+    void update_print_card_from_state();
     void update_print_card_label(int progress, int time_left_secs);
     void reset_print_card_to_idle();
 
