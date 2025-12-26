@@ -81,16 +81,22 @@ FilamentPanel::FilamentPanel(PrinterState& printer_state, MoonrakerAPI* api)
     lv_xml_register_event_cb(nullptr, "on_filament_purge_25mm", on_purge_25mm_clicked);
 
     // Subscribe to PrinterState temperatures to show actual printer state
+    // NOTE: Observers must defer UI updates via ui_async_call to avoid render-phase assertions [L029]
     extruder_temp_observer_ = ObserverGuard(
         printer_state_.get_extruder_temp_subject(),
         [](lv_observer_t* observer, lv_subject_t* subject) {
             auto* self = static_cast<FilamentPanel*>(lv_observer_get_user_data(observer));
             if (self) {
                 self->nozzle_current_ = centi_to_degrees(lv_subject_get_int(subject));
-                self->update_left_card_temps();
-                self->update_temp_display();
-                self->update_warning_text();
-                self->update_safety_state();
+                ui_async_call(
+                    [](void* ctx) {
+                        auto* panel = static_cast<FilamentPanel*>(ctx);
+                        panel->update_left_card_temps();
+                        panel->update_temp_display();
+                        panel->update_warning_text();
+                        panel->update_safety_state();
+                    },
+                    self);
             }
         },
         this);
@@ -101,9 +107,14 @@ FilamentPanel::FilamentPanel(PrinterState& printer_state, MoonrakerAPI* api)
             auto* self = static_cast<FilamentPanel*>(lv_observer_get_user_data(observer));
             if (self) {
                 self->nozzle_target_ = centi_to_degrees(lv_subject_get_int(subject));
-                self->update_left_card_temps();
-                self->update_material_temp_display();
-                self->update_warning_text();
+                ui_async_call(
+                    [](void* ctx) {
+                        auto* panel = static_cast<FilamentPanel*>(ctx);
+                        panel->update_left_card_temps();
+                        panel->update_material_temp_display();
+                        panel->update_warning_text();
+                    },
+                    self);
             }
         },
         this);
@@ -114,7 +125,12 @@ FilamentPanel::FilamentPanel(PrinterState& printer_state, MoonrakerAPI* api)
             auto* self = static_cast<FilamentPanel*>(lv_observer_get_user_data(observer));
             if (self) {
                 self->bed_current_ = centi_to_degrees(lv_subject_get_int(subject));
-                self->update_left_card_temps();
+                ui_async_call(
+                    [](void* ctx) {
+                        auto* panel = static_cast<FilamentPanel*>(ctx);
+                        panel->update_left_card_temps();
+                    },
+                    self);
             }
         },
         this);
@@ -125,8 +141,13 @@ FilamentPanel::FilamentPanel(PrinterState& printer_state, MoonrakerAPI* api)
             auto* self = static_cast<FilamentPanel*>(lv_observer_get_user_data(observer));
             if (self) {
                 self->bed_target_ = centi_to_degrees(lv_subject_get_int(subject));
-                self->update_left_card_temps();
-                self->update_material_temp_display();
+                ui_async_call(
+                    [](void* ctx) {
+                        auto* panel = static_cast<FilamentPanel*>(ctx);
+                        panel->update_left_card_temps();
+                        panel->update_material_temp_display();
+                    },
+                    self);
             }
         },
         this);

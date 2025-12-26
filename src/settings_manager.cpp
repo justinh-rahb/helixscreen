@@ -521,45 +521,65 @@ void SettingsManager::set_estop_require_confirmation(bool require) {
 void SettingsManager::check_display_sleep() {
     // Get configured sleep timeout (0 = disabled)
     int sleep_timeout_sec = get_display_sleep_sec();
-    if (sleep_timeout_sec == 0) {
-        // Sleep disabled - ensure we're awake
-        if (display_sleeping_) {
-            wake_display();
-        }
-        return;
-    }
 
     // Get LVGL inactivity time (milliseconds since last touch/input)
     uint32_t inactive_ms = lv_display_get_inactive_time(nullptr);
-    uint32_t timeout_ms = static_cast<uint32_t>(sleep_timeout_sec) * 1000U;
+    uint32_t dim_timeout_ms = static_cast<uint32_t>(DIM_TIMEOUT_SEC) * 1000U;
+    uint32_t sleep_timeout_ms =
+        (sleep_timeout_sec > 0) ? static_cast<uint32_t>(sleep_timeout_sec) * 1000U : UINT32_MAX;
+
+    // Check for activity (touch detected within last 500ms)
+    bool activity_detected = (inactive_ms < 500);
 
     if (display_sleeping_) {
-        // Currently sleeping - check if user touched screen (activity detected)
-        // LVGL resets inactivity time on any input event
-        if (inactive_ms < 500) { // Touch detected (< 500ms since activity)
+        // Currently sleeping - wake on any touch
+        if (activity_detected) {
             wake_display();
         }
-    } else {
-        // Currently awake - check if we should sleep
-        if (inactive_ms >= timeout_ms) {
+    } else if (display_dimmed_) {
+        // Currently dimmed - wake on touch, or go to sleep if timeout exceeded
+        if (activity_detected) {
+            wake_display();
+        } else if (sleep_timeout_sec > 0 && inactive_ms >= sleep_timeout_ms) {
+            // Transition from dimmed to sleeping
             display_sleeping_ = true;
-
-            // Turn backlight OFF (0%) - don't use set_brightness() to avoid persisting
             if (backlight_backend_) {
                 backlight_backend_->set_brightness(0);
             }
             spdlog::info("[DisplaySleep] Display sleeping (backlight off) after {}s inactivity",
                          sleep_timeout_sec);
         }
+    } else {
+        // Currently awake - check if we should dim or sleep
+        if (sleep_timeout_sec > 0 && inactive_ms >= sleep_timeout_ms) {
+            // Skip dim, go straight to sleep (sleep timeout <= dim timeout)
+            display_sleeping_ = true;
+            if (backlight_backend_) {
+                backlight_backend_->set_brightness(0);
+            }
+            spdlog::info("[DisplaySleep] Display sleeping (backlight off) after {}s inactivity",
+                         sleep_timeout_sec);
+        } else if (inactive_ms >= dim_timeout_ms) {
+            // Dim the display
+            display_dimmed_ = true;
+            if (backlight_backend_) {
+                backlight_backend_->set_brightness(DIM_BRIGHTNESS_PERCENT);
+            }
+            spdlog::info("[DisplaySleep] Display dimmed to {}% after {}s inactivity",
+                         DIM_BRIGHTNESS_PERCENT, DIM_TIMEOUT_SEC);
+        }
     }
 }
 
 void SettingsManager::wake_display() {
-    if (!display_sleeping_) {
-        return; // Already awake
+    if (!display_sleeping_ && !display_dimmed_) {
+        return; // Already fully awake
     }
 
+    bool was_sleeping = display_sleeping_;
+    bool was_dimmed = display_dimmed_;
     display_sleeping_ = false;
+    display_dimmed_ = false;
 
     // Restore configured brightness from config file (source of truth)
     Config* config = Config::get_instance();
@@ -584,13 +604,14 @@ void SettingsManager::wake_display() {
     if (backlight_backend_) {
         backlight_backend_->set_brightness(brightness);
     }
-    spdlog::info("[DisplaySleep] Display woken, brightness restored to {}% (from config)",
-                 brightness);
+    spdlog::info("[DisplaySleep] Display woken from {}, brightness restored to {}%",
+                 was_sleeping ? "sleep" : "dim", brightness);
 }
 
 void SettingsManager::ensure_display_on() {
     // Force display awake at startup regardless of previous state
     display_sleeping_ = false;
+    display_dimmed_ = false;
 
     // Get configured brightness (or default to 50%)
     Config* config = Config::get_instance();
