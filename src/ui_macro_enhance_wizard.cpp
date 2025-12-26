@@ -118,6 +118,10 @@ bool MacroEnhanceWizard::show(lv_obj_t* parent) {
     // Reset callback guard
     callback_guard_ = std::make_shared<bool>(true);
 
+    // Initialize subjects BEFORE Modal::show() calls lv_xml_create() [L004]
+    // XML bindings like bind_text="macro_enhance_step_title" require subjects to exist
+    init_subjects();
+
     // Use Modal base class to show
     if (!Modal::show(parent)) {
         spdlog::error("[MacroEnhanceWizard] Failed to show modal");
