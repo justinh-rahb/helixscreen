@@ -527,7 +527,7 @@ deploy-ad5m:
 	@echo "$(CYAN)Restarting helix-screen on $(AD5M_HOST)...$(RESET)"
 	ssh $(AD5M_SSH_TARGET) "killall helix-watchdog helix-screen helix-splash 2>/dev/null || true; sleep 1; cd $(AD5M_DEPLOY_DIR) && ./config/helix-launcher.sh >/dev/null 2>&1 &"
 	@echo "$(GREEN)✓ helix-screen restarted in background$(RESET)"
-	@echo "$(DIM)Logs: ssh $(AD5M_SSH_TARGET) 'logread -f | grep helix'$(RESET)"
+	@echo "$(DIM)Logs: ssh $(AD5M_SSH_TARGET) 'tail -f /var/log/messages | grep helix'$(RESET)"
 
 # Legacy deploy using tar/scp (for systems without rsync)
 deploy-ad5m-legacy:
@@ -564,7 +564,7 @@ deploy-ad5m-legacy:
 	@echo "$(CYAN)Restarting helix-screen on $(AD5M_HOST)...$(RESET)"
 	ssh $(AD5M_SSH_TARGET) "killall helix-watchdog helix-screen helix-splash 2>/dev/null || true; sleep 1; cd $(AD5M_DEPLOY_DIR) && ./config/helix-launcher.sh >/dev/null 2>&1 &"
 	@echo "$(GREEN)✓ helix-screen restarted in background$(RESET)"
-	@echo "$(DIM)Logs: ssh $(AD5M_SSH_TARGET) 'logread -f | grep helix'$(RESET)"
+	@echo "$(DIM)Logs: ssh $(AD5M_SSH_TARGET) 'tail -f /var/log/messages | grep helix'$(RESET)"
 
 # Deploy and run in foreground with verbose logging (for interactive debugging)
 deploy-ad5m-fg:
