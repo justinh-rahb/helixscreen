@@ -63,6 +63,12 @@ void SettingsManager::init_subjects() {
     int sleep_sec = config->get<int>("/display_sleep_sec", 1800);
     lv_subject_init_int(&display_sleep_subject_, sleep_sec);
 
+    // Display dim settings (default: dim to 30% after 60 seconds)
+    dim_timeout_sec_ = config->get<int>("/display_dim_sec", 60);
+    dim_brightness_percent_ = std::clamp(config->get<int>("/display_dim_brightness", 30), 1, 100);
+    spdlog::info("[SettingsManager] Display dim: {}s timeout, {}% brightness",
+                 dim_timeout_sec_, dim_brightness_percent_);
+
     // Brightness: Read from hardware first, fall back to config
     // This ensures UI reflects actual display state on startup
     // NOTE: If hardware reports 0 (screen off), use config value - we always want to turn ON
@@ -524,7 +530,8 @@ void SettingsManager::check_display_sleep() {
 
     // Get LVGL inactivity time (milliseconds since last touch/input)
     uint32_t inactive_ms = lv_display_get_inactive_time(nullptr);
-    uint32_t dim_timeout_ms = static_cast<uint32_t>(DIM_TIMEOUT_SEC) * 1000U;
+    uint32_t dim_timeout_ms =
+        (dim_timeout_sec_ > 0) ? static_cast<uint32_t>(dim_timeout_sec_) * 1000U : UINT32_MAX;
     uint32_t sleep_timeout_ms =
         (sleep_timeout_sec > 0) ? static_cast<uint32_t>(sleep_timeout_sec) * 1000U : UINT32_MAX;
 
@@ -559,14 +566,14 @@ void SettingsManager::check_display_sleep() {
             }
             spdlog::info("[DisplaySleep] Display sleeping (backlight off) after {}s inactivity",
                          sleep_timeout_sec);
-        } else if (inactive_ms >= dim_timeout_ms) {
+        } else if (dim_timeout_sec_ > 0 && inactive_ms >= dim_timeout_ms) {
             // Dim the display
             display_dimmed_ = true;
             if (backlight_backend_) {
-                backlight_backend_->set_brightness(DIM_BRIGHTNESS_PERCENT);
+                backlight_backend_->set_brightness(dim_brightness_percent_);
             }
             spdlog::info("[DisplaySleep] Display dimmed to {}% after {}s inactivity",
-                         DIM_BRIGHTNESS_PERCENT, DIM_TIMEOUT_SEC);
+                         dim_brightness_percent_, dim_timeout_sec_);
         }
     }
 }

@@ -535,12 +535,9 @@ class SettingsManager {
     bool subjects_initialized_ = false;
     bool restart_pending_ = false;
 
-    // Display sleep state
+    // Display sleep/dim state
     bool display_sleeping_ = false;
     bool display_dimmed_ = false;
-
-    /// Seconds of inactivity before dimming (1 minute)
-    static constexpr int DIM_TIMEOUT_SEC = 60;
-    /// Brightness when dimmed (percentage)
-    static constexpr int DIM_BRIGHTNESS_PERCENT = 30;
+    int dim_timeout_sec_ = 60;      ///< Configurable: seconds before dimming (0 = no dim)
+    int dim_brightness_percent_ = 30; ///< Configurable: brightness when dimmed (1-100)
 };
