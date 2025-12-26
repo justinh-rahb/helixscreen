@@ -240,16 +240,11 @@ bool MacroAnalysisManager::is_wizard_visible() const {
 
 bool MacroAnalysisManager::should_show_notification(
     const PrintStartAnalysis& analysis, const PrintStartWizardConfig& wizard_config) const {
-    // Count uncontrollable operations
-    size_t uncontrollable = 0;
-    for (const auto& op : analysis.operations) {
-        if (!op.has_skip_param) {
-            uncontrollable++;
-        }
-    }
+    // Use get_uncontrollable_operations() which excludes HOMING (same as wizard)
+    size_t uncontrollable = analysis.get_uncontrollable_operations().size();
 
     if (uncontrollable == 0) {
-        // All operations are already controllable
+        // All operations are already controllable (or only homing which can't be skipped)
         return false;
     }
 
@@ -270,12 +265,8 @@ bool MacroAnalysisManager::should_show_notification(
 }
 
 void MacroAnalysisManager::show_configure_toast() {
-    size_t uncontrollable = 0;
-    for (const auto& op : cached_analysis_.operations) {
-        if (!op.has_skip_param) {
-            uncontrollable++;
-        }
-    }
+    // Use get_uncontrollable_operations() which excludes HOMING (same as wizard)
+    size_t uncontrollable = cached_analysis_.get_uncontrollable_operations().size();
 
     char message[128];
     snprintf(message, sizeof(message), "PRINT_START has %zu skippable operation%s", uncontrollable,
@@ -295,10 +286,20 @@ void MacroAnalysisManager::show_configure_toast() {
 }
 
 void MacroAnalysisManager::launch_wizard() {
+    spdlog::debug("[MacroAnalysisManager] launch_wizard() called");
+
     if (is_wizard_visible()) {
         spdlog::debug("[MacroAnalysisManager] Wizard already visible");
         return;
     }
+
+    // Log cached analysis state
+    spdlog::debug("[MacroAnalysisManager] Cached analysis: found={}, macro={}, ops={}, "
+                  "uncontrollable={}",
+                  cached_analysis_.found, cached_analysis_.macro_name,
+                  cached_analysis_.operations.size(),
+                  cached_analysis_.get_uncontrollable_operations().size());
+    spdlog::debug("[MacroAnalysisManager] Analysis summary: {}", cached_analysis_.summary());
 
     // Create wizard
     wizard_ = std::make_unique<ui::MacroEnhanceWizard>();

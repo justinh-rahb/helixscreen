@@ -80,10 +80,19 @@ void MacroEnhanceWizard::set_analysis(const helix::PrintStartAnalysis& analysis)
     enhancements_.clear();
     current_op_index_ = 0;
 
+    // Log what we're working with
+    auto uncontrollable = analysis_.get_uncontrollable_operations();
+    spdlog::debug("[MacroEnhanceWizard] Analysis: {} total ops, {} uncontrollable",
+                  analysis_.operations.size(), uncontrollable.size());
+
     // Collect uncontrollable operations (excluding homing which shouldn't be skipped)
-    for (const auto* op : analysis_.get_uncontrollable_operations()) {
+    for (const auto* op : uncontrollable) {
+        spdlog::debug("[MacroEnhanceWizard] Uncontrollable op: {} (category={}, has_skip={})",
+                      op->name, static_cast<int>(op->category), op->has_skip_param);
         if (op->category != helix::PrintStartOpCategory::HOMING) {
             operations_.push_back(op);
+        } else {
+            spdlog::debug("[MacroEnhanceWizard] Skipping homing operation");
         }
     }
 
@@ -95,6 +104,9 @@ void MacroEnhanceWizard::set_analysis(const helix::PrintStartAnalysis& analysis)
 // ============================================================================
 
 bool MacroEnhanceWizard::show(lv_obj_t* parent) {
+    spdlog::debug("[MacroEnhanceWizard] show() called: visible={}, api={}, operations={}",
+                  is_visible(), static_cast<void*>(api_), operations_.size());
+
     if (is_visible()) {
         spdlog::warn("[MacroEnhanceWizard] Wizard already open");
         return false;
@@ -106,7 +118,7 @@ bool MacroEnhanceWizard::show(lv_obj_t* parent) {
     }
 
     if (operations_.empty()) {
-        spdlog::info("[MacroEnhanceWizard] No operations to enhance");
+        spdlog::warn("[MacroEnhanceWizard] No operations to enhance - nothing for wizard to do");
         return false;
     }
 
