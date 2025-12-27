@@ -42,7 +42,7 @@
 > After adding icon to codepoints.h: add to regen_mdi_fonts.sh, run make regen-fonts, then rebuild. Forgetting any step = missing icon
 
 ### [L010] [*****/*****] No spdlog in destructors
-- **Uses**: 32 | **Learned**: 2025-12-14 | **Last**: 2025-12-26 | **Category**: gotcha
+- **Uses**: 34 | **Learned**: 2025-12-14 | **Last**: 2025-12-27 | **Category**: gotcha
 > Never call spdlog::info/warn/error in destructors. Logger may be destroyed before your object during static destruction, causing crash on exit
 
 ### [L011] [*****/-----] No mutex in destructors
@@ -121,4 +121,9 @@
 ### [L030] [***--/-----] Local vs remote UI design
 - **Uses**: 6 | **Learned**: 2025-12-25 | **Last**: 2025-12-26 | **Category**: pattern
 > Touchscreen UIs are for physically present users - prioritize tactile controls, at-a-glance info, and real-time tuning. Don't copy features from remote web UIs (cameras, system stats, multi-device views) that assume users aren't standing at the machine.
+
+
+### [L031] [+----/-----] XML no recompile
+- **Uses**: 1 | **Learned**: 2025-12-27 | **Last**: 2025-12-27 | **Category**: gotcha
+> XML layout changes (ui_xml/*.xml) don't require recompilation - just restart the app. Only C++ changes need make.
 

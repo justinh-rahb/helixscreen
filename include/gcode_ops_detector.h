@@ -24,6 +24,7 @@ enum class OperationType {
     HOMING,       ///< G28
     CHAMBER_SOAK, ///< HEAT_SOAK, chamber heating commands
     PURGE_LINE,   ///< Priming/purge line sequences
+    SKEW_CORRECT, ///< SKEW_PROFILE, SET_SKEW
     START_PRINT,  ///< SDCARD_PRINT_FILE or api call to start print
 };
 

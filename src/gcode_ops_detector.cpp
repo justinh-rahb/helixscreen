@@ -41,6 +41,8 @@ OperationType to_operation_type(OperationCategory cat) {
         return OperationType::HOMING;
     case OperationCategory::CHAMBER_SOAK:
         return OperationType::CHAMBER_SOAK;
+    case OperationCategory::SKEW_CORRECT:
+        return OperationType::SKEW_CORRECT;
     case OperationCategory::START_PRINT:
         return OperationType::START_PRINT;
     default:
@@ -70,6 +72,8 @@ std::string DetectedOperation::display_name() const {
         return "Chamber Soak";
     case OperationType::PURGE_LINE:
         return "Purge Line";
+    case OperationType::SKEW_CORRECT:
+        return "Skew Correction";
     case OperationType::START_PRINT:
         return "Start Print";
     }
@@ -168,6 +172,8 @@ std::string GCodeOpsDetector::operation_type_name(OperationType type) {
         return "chamber_soak";
     case OperationType::PURGE_LINE:
         return "purge_line";
+    case OperationType::SKEW_CORRECT:
+        return "skew_correct";
     case OperationType::START_PRINT:
         return "start_print";
     }
@@ -190,10 +196,13 @@ void GCodeOpsDetector::init_default_patterns() {
         OperationEmbedding embedding = OperationEmbedding::MACRO_CALL;
 
         std::string pattern = kw.keyword;
-        if (pattern.rfind("G", 0) == 0 || // G28, G29
-            pattern == "BED_MESH_CALIBRATE" || pattern == "QUAD_GANTRY_LEVEL" ||
-            pattern == "Z_TILT_ADJUST" || pattern.find("BED_MESH_PROFILE") == 0 ||
-            pattern.find("SET_HEATER_TEMPERATURE") == 0) {
+        if (pattern.rfind("G", 0) == 0 ||     // G28, G29
+            pattern.find("BED_MESH") == 0 ||  // BED_MESH, BED_MESH_CALIBRATE, etc.
+            pattern.find("BED_LEVEL") == 0 || // BED_LEVEL variants
+            pattern == "QUAD_GANTRY_LEVEL" || pattern == "QGL" ||
+            pattern.find("Z_TILT") == 0 || // Z_TILT, Z_TILT_ADJUST
+            pattern.find("SET_HEATER_TEMPERATURE") == 0 ||
+            pattern.find("SKEW") == 0) { // SKEW_PROFILE, SET_SKEW
             embedding = OperationEmbedding::DIRECT_COMMAND;
         }
 
@@ -345,7 +354,10 @@ void GCodeOpsDetector::check_line(const std::string& line, size_t line_number, s
                 op.type = pattern.type;
                 op.embedding = pattern.embedding;
                 op.raw_line = line;
-                op.macro_name = pattern.pattern;
+                // Extract actual command from line (first word before space/params)
+                size_t space_pos = trimmed.find(' ');
+                op.macro_name =
+                    (space_pos != std::string::npos) ? trimmed.substr(0, space_pos) : trimmed;
                 op.line_number = line_number;
                 op.byte_offset = byte_offset;
 

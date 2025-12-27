@@ -173,6 +173,15 @@ ifeq ($(WERROR),1)
     CXXFLAGS += -Werror -Wconversion -Wshadow -Wno-error=deprecated-declarations
 endif
 
+# Address Sanitizer support for debugging heap corruption
+# Usage: make SANITIZE=address
+ifeq ($(SANITIZE),address)
+    SANITIZE_FLAGS := -fsanitize=address -fno-omit-frame-pointer
+    CFLAGS += $(SANITIZE_FLAGS)
+    CXXFLAGS += $(SANITIZE_FLAGS)
+    LDFLAGS += $(SANITIZE_FLAGS)
+endif
+
 # Submodule flags - suppress warnings from third-party code we don't control
 # Uses -w to completely silence warnings (cleaner build output)
 # Note: No DEPFLAGS for submodules - we don't track their internal dependencies
