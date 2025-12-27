@@ -457,27 +457,19 @@ void GCodeLayerRenderer::render_layers_to_cache(int from_layer, int to_layer) {
     if (!gcode_ && !streaming_controller_)
         return;
 
-    // Manually initialize layer for offscreen rendering (no canvas widget)
-    // This avoids clip area contamination from overlays/toasts on lv_layer_top()
-    lv_layer_t cache_layer;
-    lv_memzero(&cache_layer, sizeof(cache_layer));
-    cache_layer.draw_buf = cache_buf_;
-    cache_layer.color_format = LV_COLOR_FORMAT_ARGB8888;
-    cache_layer.buf_area.x1 = 0;
-    cache_layer.buf_area.y1 = 0;
-    cache_layer.buf_area.x2 = cached_width_ - 1;
-    cache_layer.buf_area.y2 = cached_height_ - 1;
-    cache_layer._clip_area = cache_layer.buf_area; // Full buffer as clip area
-    cache_layer.phy_clip_area = cache_layer.buf_area;
-
-    // Temporarily set widget offset to 0 since we're rendering to cache origin
-    int saved_offset_x = widget_offset_x_;
-    int saved_offset_y = widget_offset_y_;
-    widget_offset_x_ = 0;
-    widget_offset_y_ = 0;
+    // Capture transform params for coordinate conversion
+    // This ensures consistent rendering with widget offset set to 0 for cache
+    TransformParams transform = capture_transform_params();
+    transform.canvas_width = cached_width_;
+    transform.canvas_height = cached_height_;
 
     int layer_count = get_layer_count();
     size_t segments_rendered = 0;
+
+    // Compute base color once (full filament color with full alpha)
+    uint8_t base_r = color_extrusion_.red;
+    uint8_t base_g = color_extrusion_.green;
+    uint8_t base_b = color_extrusion_.blue;
 
     for (int layer_idx = from_layer; layer_idx <= to_layer; ++layer_idx) {
         if (layer_idx < 0 || layer_idx >= layer_count)
@@ -498,28 +490,63 @@ void GCodeLayerRenderer::render_layers_to_cache(int from_layer, int to_layer) {
             continue;
 
         for (const auto& seg : *segments) {
-            if (should_render_segment(seg)) {
-                render_segment(&cache_layer, seg);
-                ++segments_rendered;
+            if (!should_render_segment(seg))
+                continue;
+
+            // Skip non-extrusion moves for solid rendering (travels are subtle)
+            if (!seg.is_extrusion)
+                continue;
+
+            // Convert world coordinates to screen using cached transform
+            glm::ivec2 p1 = world_to_screen_raw(transform, seg.start.x, seg.start.y, seg.start.z);
+            glm::ivec2 p2 = world_to_screen_raw(transform, seg.end.x, seg.end.y, seg.end.z);
+
+            // Skip zero-length segments
+            if (p1.x == p2.x && p1.y == p2.y)
+                continue;
+
+            // Calculate color with depth shading for 3D-like appearance
+            uint8_t r = base_r, g = base_g, b = base_b;
+            if (depth_shading_ && view_mode_ == ViewMode::FRONT) {
+                // Calculate brightness factor based on Z position
+                float z_range = bounds_max_z_ - bounds_min_z_;
+                float avg_z = (seg.start.z + seg.end.z) / 2.0f;
+
+                float brightness = 0.4f;
+                if (z_range > 0.001f) {
+                    float normalized_z = (avg_z - bounds_min_z_) / z_range;
+                    brightness = 0.4f + 0.6f * normalized_z;
+                }
+
+                // Y-depth fade
+                float y_range = bounds_max_y_ - bounds_min_y_;
+                float avg_y = (seg.start.y + seg.end.y) / 2.0f;
+                if (y_range > 0.001f) {
+                    float normalized_y = (avg_y - bounds_min_y_) / y_range;
+                    float depth_fade = 0.85f + 0.15f * (1.0f - normalized_y);
+                    brightness *= depth_fade;
+                }
+
+                r = static_cast<uint8_t>(base_r * brightness);
+                g = static_cast<uint8_t>(base_g * brightness);
+                b = static_cast<uint8_t>(base_b * brightness);
             }
+
+            // Build ARGB8888 color (full alpha for solid layers)
+            uint32_t color = (255u << 24) | (r << 16) | (g << 8) | b;
+
+            // Draw using software Bresenham - bypasses LVGL draw API for AD5M compatibility
+            draw_line_bresenham_solid(p1.x, p1.y, p2.x, p2.y, color);
+            ++segments_rendered;
         }
     }
 
-    // Dispatch pending draw tasks (equivalent to lv_canvas_finish_layer)
-    // This executes all queued draw operations to the buffer
-    lv_draw_dispatch_wait_for_request();
-    while (cache_layer.draw_task_head) {
-        lv_draw_dispatch_layer(nullptr, &cache_layer);
-        if (cache_layer.draw_task_head) {
-            lv_draw_dispatch_wait_for_request();
-        }
-    }
-
-    widget_offset_x_ = saved_offset_x;
-    widget_offset_y_ = saved_offset_y;
-
-    spdlog::debug("[GCodeLayerRenderer] Rendered layers {}-{}: {} segments to cache", from_layer,
-                  to_layer, segments_rendered);
+    spdlog::debug("[GCodeLayerRenderer] Rendered layers {}-{}: {} segments to cache (direct), "
+                  "color=#{:02X}{:02X}{:02X}, buf={}x{} stride={}",
+                  from_layer, to_layer, segments_rendered,
+                  base_r, base_g, base_b,
+                  cached_width_, cached_height_,
+                  cache_buf_ ? cache_buf_->header.stride : 0);
 }
 
 void GCodeLayerRenderer::blit_cache(lv_layer_t* target) {
@@ -1294,6 +1321,56 @@ void GCodeLayerRenderer::blend_pixel(int x, int y, uint32_t color) {
     pixel[1] = (color >> 8) & 0xFF;  // G
     pixel[2] = (color >> 16) & 0xFF; // R
     pixel[3] = (color >> 24) & 0xFF; // A
+}
+
+void GCodeLayerRenderer::blend_pixel_solid(int x, int y, uint32_t color) {
+    // Bounds check using cached dimensions
+    if (x < 0 || x >= cached_width_ || y < 0 || y >= cached_height_ || !cache_buf_) {
+        return;
+    }
+
+    // Get stride from LVGL buffer (may differ from width * 4 due to alignment)
+    uint32_t stride = cache_buf_->header.stride;
+
+    // Calculate pixel offset (ARGB8888 = 4 bytes per pixel)
+    uint8_t* pixel = static_cast<uint8_t*>(cache_buf_->data) + y * stride + x * 4;
+
+    // LVGL uses ARGB8888: byte order is B, G, R, A on little-endian
+    pixel[0] = color & 0xFF;         // B
+    pixel[1] = (color >> 8) & 0xFF;  // G
+    pixel[2] = (color >> 16) & 0xFF; // R
+    pixel[3] = (color >> 24) & 0xFF; // A
+}
+
+void GCodeLayerRenderer::draw_line_bresenham_solid(int x0, int y0, int x1, int y1, uint32_t color) {
+    // Bresenham's line algorithm for software line drawing to solid cache
+
+    int dx = std::abs(x1 - x0);
+    int dy = -std::abs(y1 - y0);
+    int sx = x0 < x1 ? 1 : -1;
+    int sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy;
+
+    while (true) {
+        blend_pixel_solid(x0, y0, color);
+
+        if (x0 == x1 && y0 == y1)
+            break;
+
+        int e2 = 2 * err;
+        if (e2 >= dy) {
+            if (x0 == x1)
+                break;
+            err += dy;
+            x0 += sx;
+        }
+        if (e2 <= dx) {
+            if (y0 == y1)
+                break;
+            err += dx;
+            y0 += sy;
+        }
+    }
 }
 
 void GCodeLayerRenderer::draw_line_bresenham(int x0, int y0, int x1, int y1, uint32_t color) {
