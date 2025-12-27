@@ -108,7 +108,28 @@ void PrintSelectFileProvider::refresh_files(const std::string& current_path,
                     time_t new_modified = static_cast<time_t>(file.modified);
                     if (it->second.modified_timestamp == new_modified) {
                         // Same file - preserve existing data (thumbnail, metadata already loaded)
-                        file_list.push_back(it->second);
+                        // BUT: validate thumbnail still exists (may have been invalidated during
+                        // print)
+                        PrintFileData preserved = it->second;
+                        if (!preserved.thumbnail_path.empty() &&
+                            preserved.thumbnail_path.rfind("A:", 0) == 0 &&
+                            preserved.thumbnail_path !=
+                                PrintSelectCardView::get_default_thumbnail()) {
+                            // Convert LVGL path to filesystem path and check existence
+                            std::string fs_path = preserved.thumbnail_path.substr(2); // Strip "A:"
+                            if (!std::filesystem::exists(fs_path)) {
+                                spdlog::debug(
+                                    "[FileProvider] Cached thumbnail missing, will re-fetch: {}",
+                                    preserved.thumbnail_path);
+                                preserved.thumbnail_path =
+                                    PrintSelectCardView::get_default_thumbnail();
+                                // Mark as needing metadata fetch to trigger thumbnail re-download
+                                metadata_fetched.push_back(false);
+                                file_list.push_back(preserved);
+                                continue;
+                            }
+                        }
+                        file_list.push_back(preserved);
                         metadata_fetched.push_back(already_fetched.count(file.filename) > 0);
                         continue;
                     }

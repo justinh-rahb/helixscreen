@@ -25,6 +25,7 @@
 #include "runtime_config.h"
 #include "settings_manager.h"
 #include "thumbnail_cache.h"
+#include "thumbnail_processor.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -247,8 +248,8 @@ void PrintStatusPanel::init_subjects() {
         current_layer_ = initial_layer;
         total_layers_ = initial_total_layers;
         update_all_displays();
-        spdlog::debug("[{}] Synced initial print state: progress={}%, layer={}/{}",
-                      get_name(), initial_progress, initial_layer, initial_total_layers);
+        spdlog::debug("[{}] Synced initial print state: progress={}%, layer={}/{}", get_name(),
+                      initial_progress, initial_layer, initial_total_layers);
     }
 
     // Sync initial preparation state from PrinterState (in case panel opens mid-preparation)
@@ -1955,8 +1956,10 @@ void PrintStatusPanel::load_thumbnail_for_file(const std::string& filename) {
             // Print Select just cached, resulting in placeholder thumbnails.
 
             // Use centralized ThumbnailCache for download and LVGL path handling
-            get_thumbnail_cache().fetch(
-                api_, thumbnail_rel_path,
+            // Use fetch_optimized() for pre-scaled .bin files (faster on embedded hardware)
+            helix::ThumbnailTarget target = helix::ThumbnailProcessor::get_target_for_display();
+            get_thumbnail_cache().fetch_optimized(
+                api_, thumbnail_rel_path, target,
                 [this, current_gen](const std::string& lvgl_path) {
                     // Check if this callback is still relevant
                     if (current_gen != thumbnail_load_generation_) {
