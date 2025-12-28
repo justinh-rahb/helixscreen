@@ -836,6 +836,25 @@ class PrinterState {
     bool service_has_helix_plugin() const;
 
     /**
+     * @brief Set phase tracking enabled/disabled status
+     *
+     * Called after querying the plugin's phase tracking status.
+     * Updates phase_tracking_enabled_ subject for UI toggle state.
+     *
+     * Thread-safe: Can be called from any thread, defers LVGL update to main thread.
+     *
+     * @param enabled True if phase tracking is enabled
+     */
+    void set_phase_tracking_enabled(bool enabled);
+
+    /**
+     * @brief Check if phase tracking is enabled
+     *
+     * @return True if phase tracking is enabled, false otherwise
+     */
+    bool is_phase_tracking_enabled() const;
+
+    /**
      * @brief Get helix_plugin_installed subject for observers
      *
      * Use this when you need to observe plugin status changes (e.g., for install prompts).
@@ -984,6 +1003,7 @@ class PrinterState {
     lv_subject_t printer_has_speaker_;       // Integer: 0=no, 1=yes (for M300 audio feedback)
     lv_subject_t printer_has_timelapse_;  // Integer: 0=no, 1=yes (for Moonraker-Timelapse plugin)
     lv_subject_t helix_plugin_installed_; // Tri-state: -1=unknown, 0=not installed, 1=installed
+    lv_subject_t phase_tracking_enabled_; // Tri-state: -1=unknown, 0=disabled, 1=enabled
     lv_subject_t printer_has_firmware_retraction_; // Integer: 0=no, 1=yes (for G10/G11 retraction)
     lv_subject_t printer_bed_moves_; // Integer: 0=no (gantry moves), 1=yes (bed moves on Z)
 

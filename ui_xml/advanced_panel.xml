@@ -116,7 +116,9 @@
     <lv_obj name="container_helix_plugin_install"
             width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false">
       <lv_obj-bind_flag_if_eq subject="helix_plugin_installed" flag="hidden" ref_value="1"/>
-      <setting_action_row name="row_helix_plugin_install" label="Install HelixPrint Plugin" icon="puzzle_outline" description="Control optional print start features">
+      <setting_action_row name="row_helix_plugin_install"
+                          label="Install HelixPrint Plugin" icon="puzzle_outline"
+                          description="Control optional print start features">
         <event_cb trigger="clicked" callback="on_helix_plugin_install_clicked"/>
       </setting_action_row>
     </lv_obj>
@@ -124,7 +126,9 @@
     <lv_obj name="container_helix_plugin_uninstall"
             width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false">
       <lv_obj-bind_flag_if_eq subject="helix_plugin_installed" flag="hidden" ref_value="0"/>
-      <setting_action_row name="row_helix_plugin_uninstall" label="Uninstall HelixPrint Plugin" icon="puzzle_outline" description="Remove plugin from printer">
+      <setting_action_row name="row_helix_plugin_uninstall"
+                          label="Uninstall HelixPrint Plugin" icon="puzzle_outline"
+                          description="Remove plugin from printer">
         <event_cb trigger="clicked" callback="on_helix_plugin_uninstall_clicked"/>
       </setting_action_row>
     </lv_obj>
@@ -137,9 +141,19 @@
                   long_mode="wrap" style_text_color="#text_secondary"/>
     </lv_obj>
     <!-- Configure PRINT_START -->
-    <setting_action_row name="row_configure_print_start" label="Configure PRINT_START" icon="code_braces" description="Make bed mesh and QGL skippable">
+    <setting_action_row name="row_configure_print_start"
+                        label="Configure PRINT_START" icon="code_braces" description="Make bed mesh and QGL skippable">
       <event_cb trigger="clicked" callback="on_configure_print_start"/>
     </setting_action_row>
+    <!-- Phase Tracking Toggle (visible when plugin installed) -->
+    <lv_obj name="container_phase_tracking"
+            width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false">
+      <lv_obj-bind_flag_if_eq subject="helix_plugin_installed" flag="hidden" ref_value="0"/>
+      <setting_toggle_row name="row_phase_tracking"
+                          label="Phase Tracking" icon="progress_clock"
+                          description="Show detailed print preparation status" subject="phase_tracking_enabled"
+                          callback="on_phase_tracking_changed"/>
+    </lv_obj>
     <!-- Timelapse Settings -->
     <setting_action_row name="row_timelapse" label="Timelapse" icon="video" description="Configure timelapse recording">
       <lv_obj-bind_flag_if_eq subject="printer_has_timelapse" flag="hidden" ref_value="0"/>

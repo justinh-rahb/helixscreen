@@ -60,6 +60,7 @@ void AdvancedPanel::init_subjects() {
                              on_helix_plugin_install_clicked);
     lv_xml_register_event_cb(nullptr, "on_helix_plugin_uninstall_clicked",
                              on_helix_plugin_uninstall_clicked);
+    lv_xml_register_event_cb(nullptr, "on_phase_tracking_changed", on_phase_tracking_changed);
     lv_xml_register_event_cb(nullptr, "on_restart_helix_clicked", on_restart_helix_clicked);
 
     // Note: Input shaping uses on_input_shaper_row_clicked registered by InputShaperPanel
@@ -88,6 +89,25 @@ void AdvancedPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 void AdvancedPanel::on_activate() {
     spdlog::debug("[{}] Activated", get_name());
     // Note: Plugin detection now happens automatically in discovery flow (application.cpp)
+
+    // Query phase tracking status if plugin is installed
+    if (printer_state_.service_has_helix_plugin() && api_) {
+        api_->get_client().send_jsonrpc(
+            "server.helix.phase_tracking.status", json::object(),
+            [this](json response) {
+                if (response.contains("result")) {
+                    bool enabled = response["result"].value("enabled", false);
+                    printer_state_.set_phase_tracking_enabled(enabled);
+                    spdlog::debug("[{}] Phase tracking status: {}", get_name(), enabled);
+                }
+            },
+            [this](const MoonrakerError& err) {
+                spdlog::debug("[{}] Phase tracking status query failed: {}", get_name(),
+                              err.message);
+            },
+            0,     // timeout_ms: use default
+            true); // silent: suppress RPC_ERROR events/toasts
+    }
 }
 
 // ============================================================================
@@ -211,6 +231,13 @@ void AdvancedPanel::on_helix_plugin_uninstall_clicked(lv_event_t* /*e*/) {
     get_global_advanced_panel().handle_helix_plugin_uninstall_clicked();
 }
 
+void AdvancedPanel::on_phase_tracking_changed(lv_event_t* e) {
+    // Toggle switch callback - get the new state
+    lv_obj_t* toggle = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    get_global_advanced_panel().handle_phase_tracking_changed(enabled);
+}
+
 void AdvancedPanel::on_restart_helix_clicked(lv_event_t* /*e*/) {
     get_global_advanced_panel().handle_restart_helix_clicked();
 }
@@ -249,6 +276,56 @@ void AdvancedPanel::handle_helix_plugin_uninstall_clicked() {
     spdlog::debug("[{}] HelixPrint Plugin Uninstall clicked", get_name());
     // TODO: Implement uninstall functionality
     ui_toast_show(ToastSeverity::INFO, "Uninstall: Coming soon", 2000);
+}
+
+void AdvancedPanel::handle_phase_tracking_changed(bool enabled) {
+    spdlog::info("[{}] Phase tracking toggle: {}", get_name(), enabled);
+
+    if (!api_) {
+        ui_toast_show(ToastSeverity::ERROR, "Not connected to printer", 2000);
+        return;
+    }
+
+    // Call the plugin API to enable/disable phase tracking via JSON-RPC
+    std::string method =
+        enabled ? "server.helix.phase_tracking.enable" : "server.helix.phase_tracking.disable";
+
+    api_->get_client().send_jsonrpc(
+        method, json::object(),
+        [this, enabled](json response) {
+            // Check response for success
+            if (response.contains("result")) {
+                bool success = response["result"].value("success", false);
+                if (success) {
+                    printer_state_.set_phase_tracking_enabled(enabled);
+                    ui_toast_show(ToastSeverity::SUCCESS,
+                                  enabled ? "Phase tracking enabled" : "Phase tracking disabled",
+                                  2000);
+                    return;
+                }
+
+                // Check for error message
+                if (response["result"].contains("error")) {
+                    std::string error = response["result"]["error"].get<std::string>();
+                    spdlog::warn("[{}] Phase tracking API error: {}", get_name(), error);
+                    ui_toast_show(ToastSeverity::WARNING, error.c_str(), 3000);
+                    // Revert the toggle state
+                    printer_state_.set_phase_tracking_enabled(!enabled);
+                    return;
+                }
+            }
+
+            // Fallback: assume success if we got a response without error
+            printer_state_.set_phase_tracking_enabled(enabled);
+            ui_toast_show(ToastSeverity::INFO,
+                          enabled ? "Phase tracking enabled" : "Phase tracking disabled", 2000);
+        },
+        [this, enabled](const MoonrakerError& err) {
+            spdlog::error("[{}] Phase tracking API call failed: {}", get_name(), err.message);
+            ui_toast_show(ToastSeverity::ERROR, "Failed to update phase tracking", 2000);
+            // Revert the toggle state
+            printer_state_.set_phase_tracking_enabled(!enabled);
+        });
 }
 
 // ============================================================================

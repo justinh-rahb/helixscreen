@@ -50,7 +50,7 @@ HELIX_TEMP_TABLE = "helix_temp_files"
 DB_RECORD_MAX_AGE = 30 * 86400
 
 # Plugin version - used for API version detection by clients
-PLUGIN_VERSION = "2.0.0"
+PLUGIN_VERSION = "1.0.0"
 
 
 class PrintInfo:
@@ -120,6 +120,23 @@ class HelixPrint:
             "/server/helix/status",
             ["GET"],
             self._handle_status,
+        )
+
+        # Phase tracking endpoints
+        self.server.register_endpoint(
+            "/server/helix/phase_tracking/enable",
+            ["POST"],
+            self._handle_phase_tracking_enable,
+        )
+        self.server.register_endpoint(
+            "/server/helix/phase_tracking/disable",
+            ["POST"],
+            self._handle_phase_tracking_disable,
+        )
+        self.server.register_endpoint(
+            "/server/helix/phase_tracking/status",
+            ["GET"],
+            self._handle_phase_tracking_status,
         )
 
         # Register event handlers
@@ -737,6 +754,409 @@ class HelixPrint:
 
         except Exception as e:
             logging.exception(f"HelixPrint: Startup cleanup failed: {e}")
+
+    # =========================================================================
+    # Phase Tracking API
+    # =========================================================================
+
+    # Markers used to identify injected tracking code
+    TRACKING_MARKER_BEGIN = "# <<< HELIX_TRACKING v1 >>>"
+    TRACKING_MARKER_END = "# <<< /HELIX_TRACKING >>>"
+
+    # Operations to detect and their phase names
+    PHASE_PATTERNS = [
+        (r"\bG28\b", "HOMING"),
+        (r"\bQUAD_GANTRY_LEVEL\b", "QGL"),
+        (r"\bZ_TILT_ADJUST\b", "Z_TILT"),
+        (r"\bBED_MESH_CALIBRATE\b", "BED_MESH"),
+        (r"\b(CLEAN|WIPE)_NOZZLE\b", "CLEANING"),
+        (r"\b\w*PURGE\w*\b", "PURGING"),
+        (r"\bM109\b", "HEATING_NOZZLE"),
+        (r"\bM190\b", "HEATING_BED"),
+    ]
+
+    async def _handle_phase_tracking_enable(
+        self, web_request: WebRequest
+    ) -> Dict[str, Any]:
+        """
+        Enable phase tracking by instrumenting the PRINT_START macro.
+
+        POST /server/helix/phase_tracking/enable
+        """
+        import re
+
+        try:
+            # Get the PRINT_START macro definition
+            macro_name, gcode = await self._get_print_start_macro()
+            if not gcode:
+                return {
+                    "success": False,
+                    "error": "PRINT_START macro not found",
+                    "macro_name": macro_name,
+                }
+
+            # Check if already instrumented
+            if self.TRACKING_MARKER_BEGIN in gcode:
+                return {
+                    "success": True,
+                    "already_instrumented": True,
+                    "macro_name": macro_name,
+                }
+
+            # Instrument the macro
+            instrumented = self._instrument_gcode(gcode)
+
+            # Write the modified macro back
+            success = await self._update_macro(macro_name, instrumented)
+
+            # Trigger Klipper restart to load the modified config
+            klipper_restarted = False
+            if success:
+                try:
+                    kc: KlippyConnection = self.server.lookup_component("klippy_connection")
+                    await kc.request("printer/restart", {})
+                    klipper_restarted = True
+                    logging.info("HelixPrint: Triggered Klipper restart after enabling phase tracking")
+                except Exception as e:
+                    logging.warning(f"HelixPrint: Could not restart Klipper: {e}")
+
+            return {
+                "success": success,
+                "macro_name": macro_name,
+                "instrumented": success,
+                "klipper_restarted": klipper_restarted,
+            }
+
+        except Exception as e:
+            logging.exception(f"HelixPrint: Phase tracking enable failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _handle_phase_tracking_disable(
+        self, web_request: WebRequest
+    ) -> Dict[str, Any]:
+        """
+        Disable phase tracking by removing instrumentation from PRINT_START.
+
+        POST /server/helix/phase_tracking/disable
+        """
+        try:
+            # Get the PRINT_START macro definition
+            macro_name, gcode = await self._get_print_start_macro()
+            if not gcode:
+                return {
+                    "success": False,
+                    "error": "PRINT_START macro not found",
+                    "macro_name": macro_name,
+                }
+
+            # Check if instrumented
+            if self.TRACKING_MARKER_BEGIN not in gcode:
+                return {
+                    "success": True,
+                    "was_instrumented": False,
+                    "macro_name": macro_name,
+                }
+
+            # Strip instrumentation
+            stripped = self._strip_instrumentation(gcode)
+
+            # Write the modified macro back
+            success = await self._update_macro(macro_name, stripped)
+
+            # Trigger Klipper restart to load the modified config
+            klipper_restarted = False
+            if success:
+                try:
+                    kc: KlippyConnection = self.server.lookup_component("klippy_connection")
+                    await kc.request("printer/restart", {})
+                    klipper_restarted = True
+                    logging.info("HelixPrint: Triggered Klipper restart after disabling phase tracking")
+                except Exception as e:
+                    logging.warning(f"HelixPrint: Could not restart Klipper: {e}")
+
+            return {
+                "success": success,
+                "macro_name": macro_name,
+                "was_instrumented": True,
+                "klipper_restarted": klipper_restarted,
+            }
+
+        except Exception as e:
+            logging.exception(f"HelixPrint: Phase tracking disable failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _handle_phase_tracking_status(
+        self, web_request: WebRequest
+    ) -> Dict[str, Any]:
+        """
+        Get phase tracking status.
+
+        GET /server/helix/phase_tracking/status
+        """
+        try:
+            macro_name, gcode = await self._get_print_start_macro()
+            # Use bool() to ensure we return False (not None) when gcode is None
+            instrumented = bool(gcode and self.TRACKING_MARKER_BEGIN in gcode)
+
+            return {
+                "enabled": instrumented,
+                "instrumented": instrumented,
+                "macro_name": macro_name,
+                "version": "v1" if instrumented else None,
+            }
+
+        except Exception as e:
+            logging.exception(f"HelixPrint: Phase tracking status failed: {e}")
+            return {"enabled": False, "error": str(e)}
+
+    async def _get_print_start_macro(self) -> tuple:
+        """
+        Get the PRINT_START macro definition from Klipper.
+
+        Returns (macro_name, gcode) tuple. Returns (name, None) if not found.
+        """
+        if not self.klippy:
+            return (None, None)
+
+        # Try common macro names
+        macro_names = ["PRINT_START", "START_PRINT", "_PRINT_START"]
+
+        for name in macro_names:
+            try:
+                result = await self.klippy.request(
+                    "gcode_macro_variable",
+                    {"macro": name},
+                )
+                if result and "gcode" in result:
+                    return (name, result["gcode"])
+            except Exception:
+                continue
+
+        # Not found via API, try reading from config files
+        config_dir = await self._get_config_dir()
+        if config_dir:
+            for name in macro_names:
+                gcode = self._read_macro_from_config(config_dir, name)
+                if gcode:
+                    return (name, gcode)
+
+        return (macro_names[0], None)
+
+    def _read_macro_from_config(
+        self, config_dir: Path, macro_name: str
+    ) -> Optional[str]:
+        """Read a macro definition from Klipper config files."""
+        import re
+
+        # Search all .cfg files
+        for cfg_file in config_dir.glob("**/*.cfg"):
+            try:
+                content = cfg_file.read_text()
+
+                # Find the macro section
+                pattern = rf"\[gcode_macro\s+{macro_name}\]"
+                match = re.search(pattern, content, re.IGNORECASE)
+                if not match:
+                    continue
+
+                # Extract the gcode block
+                section_start = match.end()
+                lines = []
+                in_gcode = False
+
+                for line in content[section_start:].split("\n"):
+                    # Check for next section
+                    if line.startswith("[") and not line.startswith("[gcode_macro"):
+                        break
+                    if re.match(r"^\[gcode_macro", line, re.IGNORECASE):
+                        break
+
+                    # Check for gcode: line
+                    if line.strip().startswith("gcode:"):
+                        in_gcode = True
+                        # Get content after gcode: on same line
+                        after_gcode = line.split("gcode:", 1)[1].strip()
+                        if after_gcode:
+                            lines.append(after_gcode)
+                        continue
+
+                    # Collect gcode lines (indented continuation)
+                    if in_gcode:
+                        if line and not line[0].isspace() and line.strip():
+                            # End of gcode block
+                            break
+                        lines.append(line)
+
+                if lines:
+                    return "\n".join(lines)
+
+            except Exception as e:
+                logging.debug(f"Error reading {cfg_file}: {e}")
+                continue
+
+        return None
+
+    async def _get_config_dir(self) -> Optional[Path]:
+        """Get the Klipper config directory."""
+        # Common locations
+        locations = [
+            Path.home() / "printer_data" / "config",
+            Path.home() / "klipper_config",
+            Path("/home/pi/printer_data/config"),
+            Path("/home/pi/klipper_config"),
+        ]
+
+        for loc in locations:
+            if loc.exists() and (loc / "printer.cfg").exists():
+                return loc
+
+        return None
+
+    def _instrument_gcode(self, gcode: str) -> str:
+        """Inject phase tracking code into gcode."""
+        import re
+
+        lines = gcode.split("\n")
+        result = []
+
+        # Add STARTING marker at the beginning
+        result.append(self.TRACKING_MARKER_BEGIN)
+        result.append(
+            'SET_GCODE_VARIABLE MACRO=_HELIX_PHASE_STATE VARIABLE=phase VALUE=\'"STARTING"\''
+        )
+        result.append(self.TRACKING_MARKER_END)
+
+        for line in lines:
+            result.append(line)
+
+            # Check if this line matches any phase pattern
+            line_upper = line.upper().strip()
+            if not line_upper or line_upper.startswith("#"):
+                continue
+
+            for pattern, phase in self.PHASE_PATTERNS:
+                if re.search(pattern, line_upper, re.IGNORECASE):
+                    result.append(self.TRACKING_MARKER_BEGIN)
+                    result.append(
+                        f'SET_GCODE_VARIABLE MACRO=_HELIX_PHASE_STATE VARIABLE=phase VALUE=\'"{phase}"\''
+                    )
+                    result.append(self.TRACKING_MARKER_END)
+                    break  # Only one marker per line
+
+        # Add COMPLETE marker at the end
+        result.append(self.TRACKING_MARKER_BEGIN)
+        result.append(
+            'SET_GCODE_VARIABLE MACRO=_HELIX_PHASE_STATE VARIABLE=phase VALUE=\'"COMPLETE"\''
+        )
+        result.append(self.TRACKING_MARKER_END)
+
+        return "\n".join(result)
+
+    def _strip_instrumentation(self, gcode: str) -> str:
+        """Remove phase tracking code from gcode."""
+        lines = gcode.split("\n")
+        result = []
+        skip = False
+
+        for line in lines:
+            if self.TRACKING_MARKER_BEGIN in line:
+                skip = True
+                continue
+            if self.TRACKING_MARKER_END in line:
+                skip = False
+                continue
+            if not skip:
+                result.append(line)
+
+        return "\n".join(result)
+
+    async def _update_macro(self, macro_name: str, gcode: str) -> bool:
+        """
+        Update a macro definition in the config file.
+
+        This is a simplified implementation that updates printer.cfg.
+        A production version would need to handle includes properly.
+        """
+        import re
+
+        config_dir = await self._get_config_dir()
+        if not config_dir:
+            logging.error("HelixPrint: Config directory not found")
+            return False
+
+        # Find the file containing the macro
+        for cfg_file in config_dir.glob("**/*.cfg"):
+            try:
+                content = cfg_file.read_text()
+
+                # Check if this file contains the macro
+                pattern = rf"\[gcode_macro\s+{re.escape(macro_name)}\]"
+                match = re.search(pattern, content, re.IGNORECASE)
+                if not match:
+                    continue
+
+                # Found the file - update the gcode section
+                # This is complex because we need to preserve the section structure
+
+                # Create backup
+                backup_path = cfg_file.with_suffix(
+                    f".bak.{int(time.time())}"
+                )
+                shutil.copy(cfg_file, backup_path)
+                logging.info(f"HelixPrint: Created backup: {backup_path}")
+
+                # Find section boundaries
+                section_start = match.start()
+                section_end = len(content)
+
+                # Find next section
+                next_section = re.search(r"\n\[", content[match.end():])
+                if next_section:
+                    section_end = match.end() + next_section.start()
+
+                # Extract the section
+                section = content[section_start:section_end]
+
+                # Find and replace gcode block within section
+                gcode_match = re.search(
+                    r"gcode:\s*\n((?:[ \t]+.*\n)*)",
+                    section,
+                    re.MULTILINE
+                )
+
+                if gcode_match:
+                    # Preserve indentation
+                    indent = "    "
+                    indented_gcode = "\n".join(
+                        indent + line if line.strip() else line
+                        for line in gcode.split("\n")
+                    )
+
+                    new_section = (
+                        section[:gcode_match.start(1)]
+                        + indented_gcode
+                        + "\n"
+                        + section[gcode_match.end(1):]
+                    )
+
+                    new_content = (
+                        content[:section_start]
+                        + new_section
+                        + content[section_end:]
+                    )
+
+                    cfg_file.write_text(new_content)
+                    logging.info(
+                        f"HelixPrint: Updated {macro_name} in {cfg_file}"
+                    )
+                    return True
+
+            except Exception as e:
+                logging.exception(f"Error updating {cfg_file}: {e}")
+                continue
+
+        logging.error(f"HelixPrint: Could not find {macro_name} in config files")
+        return False
 
 
 def load_component(config: ConfigHelper) -> HelixPrint:

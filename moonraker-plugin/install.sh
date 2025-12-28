@@ -17,7 +17,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_FILE="$SCRIPT_DIR/helix_print.py"
+PHASE_TRACKING_CFG="$SCRIPT_DIR/../config/helix_phase_tracking.cfg"
 AUTO_MODE=false
+ENABLE_PHASE_TRACKING=false
 
 # Colors for output
 RED='\033[0;31m'
@@ -188,6 +190,9 @@ auto_uninstall() {
         fi
     done
 
+    # Remove phase tracking BEFORE removing plugin (need API access)
+    remove_phase_tracking "$config_dir"
+
     # Remove symlink
     if [[ -L "$target" ]]; then
         rm "$target"
@@ -257,6 +262,95 @@ wait_for_moonraker() {
     return 1
 }
 
+# Install phase tracking macros and optionally instrument PRINT_START
+install_phase_tracking() {
+    local config_dir="$1"
+    local moonraker_url="${MOONRAKER_URL:-http://localhost:7125}"
+
+    if [[ -z "$config_dir" ]]; then
+        warn "Config directory not found - skipping phase tracking setup"
+        return 1
+    fi
+
+    info "Setting up detailed print preparation tracking..."
+
+    # Copy helix_phase_tracking.cfg to config directory
+    if [[ -f "$PHASE_TRACKING_CFG" ]]; then
+        cp "$PHASE_TRACKING_CFG" "$config_dir/helix_phase_tracking.cfg"
+        info "Installed helix_phase_tracking.cfg"
+    else
+        warn "Phase tracking config not found: $PHASE_TRACKING_CFG"
+        return 1
+    fi
+
+    # Add include to printer.cfg if not already present
+    local printer_cfg="$config_dir/printer.cfg"
+    if [[ -f "$printer_cfg" ]]; then
+        if ! grep -q '\[include helix_phase_tracking.cfg\]' "$printer_cfg"; then
+            # Create backup
+            local backup_file="${printer_cfg}.bak.$(date +%Y%m%d_%H%M%S)"
+            cp "$printer_cfg" "$backup_file"
+            info "Created backup: $backup_file"
+
+            # Append include at end of file (safe, simple approach)
+            echo "" >> "$printer_cfg"
+            echo "[include helix_phase_tracking.cfg]" >> "$printer_cfg"
+
+            info "Added [include helix_phase_tracking.cfg] to printer.cfg"
+        else
+            info "Phase tracking include already present in printer.cfg"
+        fi
+    else
+        warn "printer.cfg not found - please add [include helix_phase_tracking.cfg] manually"
+    fi
+
+    # Call plugin API to instrument PRINT_START macro
+    info "Instrumenting PRINT_START macro..."
+    local response
+    response=$(curl -s -X POST "$moonraker_url/server/helix/phase_tracking/enable" 2>/dev/null || echo '{"error": "API call failed"}')
+
+    if echo "$response" | grep -q '"success".*true'; then
+        info "PRINT_START macro instrumented successfully"
+    else
+        warn "Could not auto-instrument PRINT_START macro"
+        warn "You can enable this later from HelixScreen Settings"
+        warn "Or manually add HELIX_PRINT_COMPLETE to the end of your PRINT_START macro"
+    fi
+
+    return 0
+}
+
+# Remove phase tracking from printer config
+remove_phase_tracking() {
+    local config_dir="$1"
+    local moonraker_url="${MOONRAKER_URL:-http://localhost:7125}"
+
+    if [[ -z "$config_dir" ]]; then
+        return 0
+    fi
+
+    info "Removing phase tracking..."
+
+    # Call plugin API to strip instrumentation first (while Moonraker is still running)
+    curl -s -X POST "$moonraker_url/server/helix/phase_tracking/disable" 2>/dev/null || true
+
+    # Remove include from printer.cfg
+    local printer_cfg="$config_dir/printer.cfg"
+    if [[ -f "$printer_cfg" ]] && grep -q '\[include helix_phase_tracking.cfg\]' "$printer_cfg"; then
+        local backup_file="${printer_cfg}.bak.$(date +%Y%m%d_%H%M%S)"
+        cp "$printer_cfg" "$backup_file"
+        grep -v '\[include helix_phase_tracking.cfg\]' "$printer_cfg" > "$printer_cfg.tmp"
+        mv "$printer_cfg.tmp" "$printer_cfg"
+        info "Removed phase tracking include from printer.cfg"
+    fi
+
+    # Remove the cfg file
+    if [[ -f "$config_dir/helix_phase_tracking.cfg" ]]; then
+        rm "$config_dir/helix_phase_tracking.cfg"
+        info "Removed helix_phase_tracking.cfg"
+    fi
+}
+
 # Auto-install function (non-interactive, for HelixScreen integration)
 auto_install() {
     info "HelixPrint Auto-Install Mode"
@@ -296,6 +390,9 @@ auto_install() {
 
     info "Moonraker: $moonraker_path"
     info "Config: ${config_dir:-not found}"
+    if [[ "$ENABLE_PHASE_TRACKING" == "true" ]]; then
+        info "Phase tracking: ENABLED"
+    fi
     echo ""
 
     # Pre-flight permission checks
@@ -355,39 +452,80 @@ auto_install() {
     # Wait for Moonraker to come back up
     wait_for_moonraker
 
+    # Install phase tracking if requested
+    if [[ "$ENABLE_PHASE_TRACKING" == "true" ]]; then
+        install_phase_tracking "$config_dir"
+
+        # Need to restart Klipper to load the new macros
+        info "Restarting Klipper to load phase tracking macros..."
+        local moonraker_url="${MOONRAKER_URL:-http://localhost:7125}"
+        curl -s -X POST "$moonraker_url/printer/restart" 2>/dev/null || warn "Could not restart Klipper via API"
+
+        # Give Klipper time to restart
+        sleep 5
+    fi
+
     echo ""
     info "Auto-install complete!"
 }
 
 # Parse arguments
-case "${1:-}" in
-    --auto|-a)
-        auto_install
-        ;;
-    --uninstall|-u)
-        uninstall "$2"
-        ;;
-    --uninstall-auto)
-        auto_uninstall
-        ;;
-    --help|-h)
-        echo "Usage: $0 [OPTIONS] [MOONRAKER_PATH]"
-        echo ""
-        echo "Options:"
-        echo "  --auto, -a         Full auto-install (updates config, restarts Moonraker)"
-        echo "  --uninstall, -u    Remove the plugin symlink (interactive)"
-        echo "  --uninstall-auto   Full auto-uninstall (removes config, restarts Moonraker)"
-        echo "  --help, -h         Show this help message"
-        echo ""
-        echo "Arguments:"
-        echo "  MOONRAKER_PATH     Path to Moonraker installation (auto-detected if not provided)"
-        echo ""
-        echo "Environment Variables:"
-        echo "  MOONRAKER_URL      URL for Moonraker API health check after restart"
-        echo "                     Default: http://localhost:7125"
-        echo "                     Example: MOONRAKER_URL=http://192.168.1.100:7125 ./install.sh --auto"
-        ;;
-    *)
-        main "$1"
-        ;;
-esac
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --auto|-a)
+            AUTO_MODE=true
+            shift
+            ;;
+        --with-phase-tracking)
+            ENABLE_PHASE_TRACKING=true
+            shift
+            ;;
+        --uninstall|-u)
+            uninstall "$2"
+            exit 0
+            ;;
+        --uninstall-auto)
+            auto_uninstall
+            exit 0
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS] [MOONRAKER_PATH]"
+            echo ""
+            echo "Options:"
+            echo "  --auto, -a              Full auto-install (updates config, restarts Moonraker)"
+            echo "  --with-phase-tracking   Enable detailed print preparation tracking"
+            echo "  --uninstall, -u         Remove the plugin symlink (interactive)"
+            echo "  --uninstall-auto        Full auto-uninstall (removes config, restarts Moonraker)"
+            echo "  --help, -h              Show this help message"
+            echo ""
+            echo "Arguments:"
+            echo "  MOONRAKER_PATH     Path to Moonraker installation (auto-detected if not provided)"
+            echo ""
+            echo "Environment Variables:"
+            echo "  MOONRAKER_URL      URL for Moonraker API health check after restart"
+            echo "                     Default: http://localhost:7125"
+            echo "                     Example: MOONRAKER_URL=http://192.168.1.100:7125 ./install.sh --auto"
+            echo ""
+            echo "Examples:"
+            echo "  ./install.sh --auto                         # Auto-install without phase tracking"
+            echo "  ./install.sh --auto --with-phase-tracking   # Auto-install with phase tracking"
+            exit 0
+            ;;
+        *)
+            # Assume it's a moonraker path for interactive mode
+            if [[ "$AUTO_MODE" == "true" ]]; then
+                auto_install
+            else
+                main "$1"
+            fi
+            exit 0
+            ;;
+    esac
+done
+
+# No arguments left - run in appropriate mode
+if [[ "$AUTO_MODE" == "true" ]]; then
+    auto_install
+else
+    main ""
+fi

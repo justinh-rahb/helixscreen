@@ -127,8 +127,9 @@ class HelixPluginInstaller {
      * Only works when connected to local Moonraker.
      *
      * @param callback Called when installation completes or fails
+     * @param enable_phase_tracking If true, also installs phase tracking macros
      */
-    void install_local(InstallCallback callback);
+    void install_local(InstallCallback callback, bool enable_phase_tracking = false);
 
     /**
      * @brief Attempt local auto-uninstallation

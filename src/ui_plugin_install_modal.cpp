@@ -46,6 +46,7 @@ void PluginInstallModal::on_show() {
     result_container_ = find_widget("result_container");
     checkbox_container_ = find_widget("checkbox_container");
     dont_ask_checkbox_ = find_widget("dont_ask_checkbox");
+    phase_tracking_checkbox_ = find_widget("phase_tracking_checkbox");
     copy_feedback_ = find_widget("copy_feedback");
 
     // Determine mode based on installer
@@ -116,6 +117,7 @@ void PluginInstallModal::on_hide() {
     result_container_ = nullptr;
     checkbox_container_ = nullptr;
     dont_ask_checkbox_ = nullptr;
+    phase_tracking_checkbox_ = nullptr;
     copy_feedback_ = nullptr;
 }
 
@@ -209,7 +211,14 @@ void PluginInstallModal::on_install_clicked() {
         return;
     }
 
-    spdlog::info("[Plugin Install] Starting local installation (async)");
+    // Check if phase tracking is enabled (checkbox is checked by default)
+    bool enable_phase_tracking = false;
+    if (phase_tracking_checkbox_) {
+        enable_phase_tracking = lv_obj_has_state(phase_tracking_checkbox_, LV_STATE_CHECKED);
+    }
+
+    spdlog::info("[Plugin Install] Starting local installation (async, phase_tracking={})",
+                 enable_phase_tracking);
     show_installing_state();
 
     // Capture state for async callback
@@ -221,59 +230,62 @@ void PluginInstallModal::on_install_clicked() {
     auto* destroying_flag = &is_destroying_;
 
     // Run installation in background thread to keep UI responsive
-    std::thread install_thread([self, installer, callback, destroying_flag]() {
-        bool success = false;
-        std::string message;
-
-        // Run blocking installation in background
-        installer->install_local([&success, &message](bool s, const std::string& m) {
-            success = s;
-            message = m;
-        });
-
-        spdlog::info("[Plugin Install] Installation result: {} - {}",
-                     success ? "success" : "failed", message);
-
-        // Allocate result data for async callback (will be freed in callback)
-        struct InstallResult {
-            PluginInstallModal* modal;
-            std::atomic<bool>* destroying_flag;
-            bool success;
+    std::thread install_thread(
+        [self, installer, callback, destroying_flag, enable_phase_tracking]() {
+            bool success = false;
             std::string message;
-            InstallCompleteCallback callback;
-        };
-        auto* result = new InstallResult{self, destroying_flag, success, message, callback};
 
-        // Schedule UI update on main LVGL thread
-        ui_async_call(
-            [](void* user_data) {
-                auto* r = static_cast<InstallResult*>(user_data);
+            // Run blocking installation in background
+            installer->install_local(
+                [&success, &message](bool s, const std::string& m) {
+                    success = s;
+                    message = m;
+                },
+                enable_phase_tracking);
 
-                // Guard: check if modal was destroyed before we got here
-                if (r->destroying_flag->load()) {
-                    spdlog::debug(
-                        "[Plugin Install] Modal destroyed before result - skipping UI update");
-                    delete r;
-                    return;
-                }
+            spdlog::info("[Plugin Install] Installation result: {} - {}",
+                         success ? "success" : "failed", message);
 
-                // Guard: only update UI if modal is still visible
-                if (r->modal->is_visible()) {
-                    r->modal->show_result_state(r->success, r->message);
-                    r->modal->check_dont_ask_preference();
+            // Allocate result data for async callback (will be freed in callback)
+            struct InstallResult {
+                PluginInstallModal* modal;
+                std::atomic<bool>* destroying_flag;
+                bool success;
+                std::string message;
+                InstallCompleteCallback callback;
+            };
+            auto* result = new InstallResult{self, destroying_flag, success, message, callback};
 
-                    if (r->callback) {
-                        r->callback(r->success);
+            // Schedule UI update on main LVGL thread
+            ui_async_call(
+                [](void* user_data) {
+                    auto* r = static_cast<InstallResult*>(user_data);
+
+                    // Guard: check if modal was destroyed before we got here
+                    if (r->destroying_flag->load()) {
+                        spdlog::debug(
+                            "[Plugin Install] Modal destroyed before result - skipping UI update");
+                        delete r;
+                        return;
                     }
-                } else {
-                    spdlog::debug(
-                        "[Plugin Install] Modal hidden before result - skipping UI update");
-                }
 
-                delete r;
-            },
-            result);
-    });
+                    // Guard: only update UI if modal is still visible
+                    if (r->modal->is_visible()) {
+                        r->modal->show_result_state(r->success, r->message);
+                        r->modal->check_dont_ask_preference();
+
+                        if (r->callback) {
+                            r->callback(r->success);
+                        }
+                    } else {
+                        spdlog::debug(
+                            "[Plugin Install] Modal hidden before result - skipping UI update");
+                    }
+
+                    delete r;
+                },
+                result);
+        });
 
     // Detach thread - it will clean up via lv_async_call when done
     install_thread.detach();

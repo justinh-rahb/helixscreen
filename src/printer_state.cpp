@@ -249,6 +249,7 @@ void PrinterState::reset_for_testing() {
     lv_subject_deinit(&printer_has_speaker_);
     lv_subject_deinit(&printer_has_timelapse_);
     lv_subject_deinit(&helix_plugin_installed_);
+    lv_subject_deinit(&phase_tracking_enabled_);
     lv_subject_deinit(&printer_has_firmware_retraction_);
     lv_subject_deinit(&printer_bed_moves_);
     lv_subject_deinit(&can_show_bed_mesh_);
@@ -359,6 +360,7 @@ void PrinterState::init_subjects(bool register_xml) {
     lv_subject_init_int(&printer_has_speaker_, 0);
     lv_subject_init_int(&printer_has_timelapse_, 0);
     lv_subject_init_int(&helix_plugin_installed_, -1); // -1=unknown, 0=not installed, 1=installed
+    lv_subject_init_int(&phase_tracking_enabled_, -1); // -1=unknown, 0=disabled, 1=enabled
     lv_subject_init_int(&printer_has_firmware_retraction_, 0);
     lv_subject_init_int(&printer_bed_moves_, 0); // 0=gantry moves, 1=bed moves (cartesian)
 
@@ -435,6 +437,7 @@ void PrinterState::init_subjects(bool register_xml) {
         lv_xml_register_subject(NULL, "printer_has_speaker", &printer_has_speaker_);
         lv_xml_register_subject(NULL, "printer_has_timelapse", &printer_has_timelapse_);
         lv_xml_register_subject(NULL, "helix_plugin_installed", &helix_plugin_installed_);
+        lv_xml_register_subject(NULL, "phase_tracking_enabled", &phase_tracking_enabled_);
         lv_xml_register_subject(NULL, "printer_has_firmware_retraction",
                                 &printer_has_firmware_retraction_);
         lv_xml_register_subject(NULL, "printer_bed_moves", &printer_bed_moves_);
@@ -491,14 +494,14 @@ void PrinterState::update_from_status(const json& state) {
     if (state.contains("extruder")) {
         const auto& extruder = state["extruder"];
 
-        if (extruder.contains("temperature")) {
+        if (extruder.contains("temperature") && extruder["temperature"].is_number()) {
             int temp_centi = static_cast<int>(extruder["temperature"].get<double>() * 10.0);
             lv_subject_set_int(&extruder_temp_, temp_centi);
             // Always notify for temp graphing even when value unchanged
             lv_subject_notify(&extruder_temp_);
         }
 
-        if (extruder.contains("target")) {
+        if (extruder.contains("target") && extruder["target"].is_number()) {
             int target_centi = static_cast<int>(extruder["target"].get<double>() * 10.0);
             lv_subject_set_int(&extruder_target_, target_centi);
         }
@@ -508,7 +511,7 @@ void PrinterState::update_from_status(const json& state) {
     if (state.contains("heater_bed")) {
         const auto& bed = state["heater_bed"];
 
-        if (bed.contains("temperature")) {
+        if (bed.contains("temperature") && bed["temperature"].is_number()) {
             int temp_centi = static_cast<int>(bed["temperature"].get<double>() * 10.0);
             lv_subject_set_int(&bed_temp_, temp_centi);
             // Always notify for temp graphing even when value unchanged
@@ -516,7 +519,7 @@ void PrinterState::update_from_status(const json& state) {
             spdlog::trace("[PrinterState] Bed temp: {}.{}°C", temp_centi / 10, temp_centi % 10);
         }
 
-        if (bed.contains("target")) {
+        if (bed.contains("target") && bed["target"].is_number()) {
             int target_centi = static_cast<int>(bed["target"].get<double>() * 10.0);
             lv_subject_set_int(&bed_target_, target_centi);
             spdlog::trace("[PrinterState] Bed target: {}.{}°C", target_centi / 10,
@@ -528,7 +531,7 @@ void PrinterState::update_from_status(const json& state) {
     if (state.contains("virtual_sdcard")) {
         const auto& sdcard = state["virtual_sdcard"];
 
-        if (sdcard.contains("progress")) {
+        if (sdcard.contains("progress") && sdcard["progress"].is_number()) {
             double progress = sdcard["progress"].get<double>();
             int progress_pct = static_cast<int>(progress * 100.0);
 
@@ -673,13 +676,13 @@ void PrinterState::update_from_status(const json& state) {
     if (state.contains("gcode_move")) {
         const auto& gcode_move = state["gcode_move"];
 
-        if (gcode_move.contains("speed_factor")) {
+        if (gcode_move.contains("speed_factor") && gcode_move["speed_factor"].is_number()) {
             double factor = gcode_move["speed_factor"].get<double>();
             int factor_pct = static_cast<int>(factor * 100.0);
             lv_subject_set_int(&speed_factor_, factor_pct);
         }
 
-        if (gcode_move.contains("extrude_factor")) {
+        if (gcode_move.contains("extrude_factor") && gcode_move["extrude_factor"].is_number()) {
             double factor = gcode_move["extrude_factor"].get<double>();
             int factor_pct = static_cast<int>(factor * 100.0);
             lv_subject_set_int(&flow_factor_, factor_pct);
@@ -700,7 +703,7 @@ void PrinterState::update_from_status(const json& state) {
     if (state.contains("fan")) {
         const auto& fan = state["fan"];
 
-        if (fan.contains("speed")) {
+        if (fan.contains("speed") && fan["speed"].is_number()) {
             double speed = fan["speed"].get<double>();
             int speed_pct = static_cast<int>(speed * 100.0);
             lv_subject_set_int(&fan_speed_, speed_pct);
@@ -716,7 +719,7 @@ void PrinterState::update_from_status(const json& state) {
         // Skip non-fan objects
         if (key.rfind("heater_fan ", 0) == 0 || key.rfind("fan_generic ", 0) == 0 ||
             key.rfind("controller_fan ", 0) == 0) {
-            if (value.is_object() && value.contains("speed")) {
+            if (value.is_object() && value.contains("speed") && value["speed"].is_number()) {
                 double speed = value["speed"].get<double>();
                 update_fan_speed(key, speed);
             }
@@ -733,11 +736,14 @@ void PrinterState::update_from_status(const json& state) {
             // color_data is array of [R, G, B, W] arrays (one per LED in strip)
             // For on/off, we check if any color component of the first LED is > 0
             const auto& first_led = led["color_data"][0];
-            if (first_led.is_array() && first_led.size() >= 3) {
+            if (first_led.is_array() && first_led.size() >= 3 && first_led[0].is_number() &&
+                first_led[1].is_number() && first_led[2].is_number()) {
                 double r = first_led[0].get<double>();
                 double g = first_led[1].get<double>();
                 double b = first_led[2].get<double>();
-                double w = (first_led.size() >= 4) ? first_led[3].get<double>() : 0.0;
+                double w = (first_led.size() >= 4 && first_led[3].is_number())
+                               ? first_led[3].get<double>()
+                               : 0.0;
 
                 // LED is "on" if any color component is non-zero
                 bool is_on = (r > 0.001 || g > 0.001 || b > 0.001 || w > 0.001);
@@ -1152,6 +1158,29 @@ bool PrinterState::service_has_helix_plugin() const {
     // Note: lv_subject_get_int is thread-safe (atomic read)
     // Tri-state: -1=unknown, 0=not installed, 1=installed
     return lv_subject_get_int(const_cast<lv_subject_t*>(&helix_plugin_installed_)) == 1;
+}
+
+// Context struct for async phase tracking status update
+struct PhaseTrackingContext {
+    PrinterState* state;
+    bool enabled;
+};
+
+void PrinterState::set_phase_tracking_enabled(bool enabled) {
+    // Thread-safe: Use lv_async_call to update LVGL subject from any thread
+    auto callback = [](void* user_data) {
+        auto* ctx = static_cast<PhaseTrackingContext*>(user_data);
+        lv_subject_set_int(&ctx->state->phase_tracking_enabled_, ctx->enabled ? 1 : 0);
+        spdlog::info("[PrinterState] Phase tracking enabled: {}", ctx->enabled);
+        delete ctx;
+    };
+    ui_async_call(callback, new PhaseTrackingContext{this, enabled});
+}
+
+bool PrinterState::is_phase_tracking_enabled() const {
+    // Note: lv_subject_get_int is thread-safe (atomic read)
+    // Tri-state: -1=unknown, 0=disabled, 1=enabled
+    return lv_subject_get_int(const_cast<lv_subject_t*>(&phase_tracking_enabled_)) == 1;
 }
 
 void PrinterState::update_gcode_modification_visibility() {

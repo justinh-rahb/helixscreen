@@ -25,6 +25,14 @@
         <text_body width="100%"
                    text="The HelixPrint plugin enables fast G-code modifications directly on your printer—like skipping bed leveling for quick reprints."
                    long_mode="wrap" style_text_align="left" style_text_color="#text_secondary"/>
+        <!-- Phase tracking option (recommended) -->
+        <lv_obj name="phase_tracking_option"
+                width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_top="#space_sm"
+                style_pad_bottom="0" flex_flow="row" style_flex_main_place="start">
+          <lv_checkbox name="phase_tracking_checkbox"
+                       text="Enable detailed print preparation tracking (Recommended)" style_pad_all="#space_xs"
+                       checked="true"/>
+        </lv_obj>
         <text_small width="100%"
                     text="Installation takes about 30 seconds." long_mode="wrap" style_text_align="left"
                     style_text_color="#text_secondary"/>
