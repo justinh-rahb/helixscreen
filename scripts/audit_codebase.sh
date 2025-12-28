@@ -266,9 +266,9 @@ if [ "$FILE_MODE" = true ]; then
             fi
 
             # Check for manual lv_display_delete (lv_deinit iterates and deletes all displays)
-            # Exclude comments (lines with //)
+            # Exclude comments: // style, Doxygen * style, and @tag documentation
             set +e
-            display_delete=$(grep -n 'lv_display_delete' "$f" 2>/dev/null | grep -v '//')
+            display_delete=$(grep -n 'lv_display_delete' "$f" 2>/dev/null | grep -v '//' | grep -v '^\s*\*' | grep -v '@')
             set -e
             if [ -n "$display_delete" ]; then
                 error "$fname: uses lv_display_delete() - lv_deinit() handles this, causes double-free"
@@ -277,7 +277,7 @@ if [ "$FILE_MODE" = true ]; then
 
             # Check for manual lv_group_delete (lv_deinit calls lv_group_deinit)
             set +e
-            group_delete=$(grep -n 'lv_group_delete' "$f" 2>/dev/null | grep -v '//')
+            group_delete=$(grep -n 'lv_group_delete' "$f" 2>/dev/null | grep -v '//' | grep -v '^\s*\*' | grep -v '@')
             set -e
             if [ -n "$group_delete" ]; then
                 error "$fname: uses lv_group_delete() - lv_deinit() handles this, causes crash on dangling pointers"
@@ -286,7 +286,7 @@ if [ "$FILE_MODE" = true ]; then
 
             # Check for manual lv_indev_delete (also managed by lv_deinit)
             set +e
-            indev_delete=$(grep -n 'lv_indev_delete' "$f" 2>/dev/null | grep -v '//')
+            indev_delete=$(grep -n 'lv_indev_delete' "$f" 2>/dev/null | grep -v '//' | grep -v '^\s*\*' | grep -v '@')
             set -e
             if [ -n "$indev_delete" ]; then
                 error "$fname: uses lv_indev_delete() - lv_deinit() handles this, causes double-free"
