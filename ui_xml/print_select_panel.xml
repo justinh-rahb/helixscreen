@@ -6,7 +6,6 @@
   <!-- Panel-specific constants -->
   <consts>
     <!-- List view dimensions -->
-    <px name="list_header_height" value="48"/>
     <px name="list_row_height" value="44"/>
     <px name="list_row_gap" value="4"/>
     <px name="list_header_padding" value="8"/>
@@ -64,16 +63,16 @@
     </lv_obj>
     <!-- List view container (visible when view_mode == 1) -->
     <lv_obj name="list_view_container"
-            width="100%" height="100%" style_pad_all="0" style_border_width="0" flex_flow="column" flex_grow="1">
+            width="100%" height="100%" style_pad_all="0" style_pad_gap="0" style_border_width="0" flex_flow="column" flex_grow="1">
       <lv_obj-bind_flag_if_eq subject="print_select_view_mode" flag="hidden" ref_value="0"/>
       <!-- Column headers -->
       <lv_obj name="list_header"
-              width="100%" height="#list_header_height" style_border_width="0" style_border_side="bottom"
-              style_pad_left="#nav_padding" style_pad_right="#nav_padding" style_pad_top="0" style_pad_bottom="0"
+              width="100%" height="content" style_border_width="0"
+              style_pad_left="#nav_padding" style_pad_right="#nav_padding" style_pad_top="#space_xs" style_pad_bottom="#space_sm"
               flex_flow="row" style_flex_main_place="start" style_flex_cross_place="center">
         <!-- Filename header (flex-grow) -->
         <lv_button name="header_filename"
-                   height="100%" style_bg_opa="0" style_border_width="0" style_shadow_width="0"
+                   height="content" style_bg_opa="0" style_border_width="0" style_shadow_width="0"
                    style_pad_all="#list_header_padding" flex_grow="1" flex_flow="row" style_flex_main_place="start"
                    style_flex_cross_place="center">
           <event_cb trigger="clicked" callback="on_print_select_header_filename"/>
@@ -83,7 +82,7 @@
         </lv_button>
         <!-- Size header -->
         <lv_button name="header_size"
-                   width="#col_size_width" height="100%" style_bg_opa="0" style_border_width="0" style_shadow_width="0"
+                   width="#col_size_width" height="content" style_bg_opa="0" style_border_width="0" style_shadow_width="0"
                    style_pad_all="#list_header_padding" flex_flow="row" style_flex_main_place="start"
                    style_flex_cross_place="center">
           <event_cb trigger="clicked" callback="on_print_select_header_size"/>
@@ -93,7 +92,7 @@
         </lv_button>
         <!-- Modified header -->
         <lv_button name="header_modified"
-                   width="#col_modified_width" height="100%" style_bg_opa="0" style_border_width="0"
+                   width="#col_modified_width" height="content" style_bg_opa="0" style_border_width="0"
                    style_shadow_width="0" style_pad_all="#list_header_padding" flex_flow="row"
                    style_flex_main_place="start" style_flex_cross_place="center">
           <event_cb trigger="clicked" callback="on_print_select_header_modified"/>
@@ -103,7 +102,7 @@
         </lv_button>
         <!-- Print Time header -->
         <lv_button name="header_print_time"
-                   width="#col_time_width" height="100%" style_bg_opa="0" style_border_width="0" style_shadow_width="0"
+                   width="#col_time_width" height="content" style_bg_opa="0" style_border_width="0" style_shadow_width="0"
                    style_pad_all="#list_header_padding" flex_flow="row" style_flex_main_place="start"
                    style_flex_cross_place="center">
           <event_cb trigger="clicked" callback="on_print_select_header_print_time"/>
@@ -115,7 +114,7 @@
       <!-- Scrollable list rows container -->
       <lv_obj name="list_rows_container"
               width="100%" height="100%" style_pad_left="#nav_padding" style_pad_right="#nav_padding"
-              style_pad_top="#space_sm" style_pad_bottom="#nav_padding" style_pad_gap="#space_sm" style_border_width="0"
+              style_pad_top="0" style_pad_bottom="#nav_padding" style_pad_gap="#space_sm" style_border_width="0"
               flex_flow="column" scrollable="true" flex_grow="1">
         <!-- List rows will be dynamically added here via C++ -->
       </lv_obj>

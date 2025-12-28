@@ -6,6 +6,7 @@
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_fonts.h"
+#include "ui_icon.h"
 #include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_panel_print_status.h"
@@ -647,10 +648,7 @@ void PrintSelectPanel::toggle_view() {
         lv_subject_set_int(&view_mode_subject_, 1);
 
         // Update icon to show grid_view (indicates you can switch back to card view)
-        const void* grid_icon = lv_xml_get_image(NULL, "mat_grid_view_img");
-        if (grid_icon) {
-            lv_image_set_src(view_toggle_icon_, grid_icon);
-        }
+        ui_icon_set_source(view_toggle_icon_, "grid_view");
         spdlog::debug("[{}] Switched to list view", get_name());
 
         // Populate list view (initializes pool if needed)
@@ -671,10 +669,7 @@ void PrintSelectPanel::toggle_view() {
         lv_subject_set_int(&view_mode_subject_, 0);
 
         // Update icon to show list (indicates you can switch to list view)
-        const void* list_icon = lv_xml_get_image(NULL, "mat_list_img");
-        if (list_icon) {
-            lv_image_set_src(view_toggle_icon_, list_icon);
-        }
+        ui_icon_set_source(view_toggle_icon_, "list");
         spdlog::debug("[{}] Switched to card view", get_name());
 
         // Repopulate card view
