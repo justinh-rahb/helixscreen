@@ -12,9 +12,9 @@
 |-------|-------|--------|-------------|
 | Phase 1: Foundation | P0-1, P1-8 | ✅ Complete | ~130 |
 | Phase 2: Core Utilities | P0-3, P0-2 | ✅ Complete | ~150 |
-| Phase 3: Backend | P1-6, P1-7 | ⏳ Pending | 0 |
-| Phase 4: File/Data | P1-9, P1-10 | ⏳ Pending | 0 |
-| **Total** | **8 items** | | **~280 / ~1,000** |
+| Phase 3: Backend | P1-6, P1-7 | ✅ Complete | ~100 |
+| Phase 4: File/Data | P1-9, P1-10 | ✅ Complete | ~60 |
+| **Total** | **8 items** | | **~440 / ~1,000** |
 
 **Deferred:** P0-4 (Subject Tables), P0-5 (PanelBase Guards) - Lower ROI, moved to P2
 
@@ -54,12 +54,14 @@
 ## P1 Items (High-Value)
 
 ### [P1-6] API Error/Validation Pattern
-- **Status:** ⏳ Pending
-- **Lines Saved:** 0 / ~100
+- **Status:** ✅ Complete
+- **Files Modified:** `src/moonraker_api_internal.h`
+- **Functions Added:** `reject_invalid_path()`, `reject_invalid_identifier()`, `reject_out_of_range()`
+- **Lines Saved:** ~100 (10 lines per API method × 10+ methods)
 
 ### [P1-7] Two-Phase Callback Locking (SafeCallbackInvoker)
-- **Status:** ⏳ Pending
-- **Lines Saved:** 0 / ~100
+- **Status:** ⏸️ Skipped
+- **Reason:** Pattern is too context-specific - each site copies different data alongside callbacks, making a generic invoker over-engineered
 
 ### [P1-8] Temperature/Percent Conversions
 - **Status:** ✅ Complete
@@ -68,12 +70,15 @@
 - **Lines Saved:** 0 / ~50 (utilities ready, migration pending)
 
 ### [P1-9] Thumbnail Loading Pattern
-- **Status:** ⏳ Pending
-- **Lines Saved:** 0 / ~80
+- **Status:** ⏸️ Skipped
+- **Reason:** Two sites (ActivePrintMediaManager, PrintStatusPanel) have structurally similar but contextually different requirements - different thread safety models, different metadata extraction, different result handling. A generic helper would require 6+ parameters with minimal simplification.
 
 ### [P1-10] PrintFileData Population Factories
-- **Status:** ⏳ Pending
-- **Lines Saved:** 0 / ~60
+- **Status:** ✅ Complete
+- **Files Created:** `src/print_file_data.cpp`
+- **Files Modified:** `include/print_file_data.h`
+- **Functions Added:** `from_moonraker_file()`, `from_usb_file()`, `make_directory()`
+- **Lines Saved:** ~60 (consolidates file data initialization, eliminates duplicate formatting in USB source)
 
 ---
 
@@ -138,6 +143,16 @@ These items are documented for opportunistic implementation when touching relate
 - Deferred P0-4 and P0-5 to P2 (lower ROI, not worth the refactoring risk)
 - All tests passing
 
+### 2025-12-28 - Session 3
+- **Merged to main:** 7 commits from Phase 1+2
+- **Phase 3 Complete:**
+  - P1-6: Added validation+error helpers to moonraker_api_internal.h
+  - P1-7: Skipped (two-phase locking pattern too context-specific)
+- **Phase 4 Complete:**
+  - P1-9: Skipped (thumbnail loading pattern too context-specific)
+  - P1-10: Added PrintFileData factory methods
+- All tests passing
+
 ---
 
 ## Files Created
@@ -151,6 +166,7 @@ These items are documented for opportunistic implementation when touching relate
 | `include/unit_conversions.h` | P1-8 | Unit conversion helpers |
 | `tests/unit/test_unit_conversions.cpp` | P1-8 | Unit conversion tests |
 | `include/async_helpers.h` | P0-3 | Async callback templates |
+| `src/print_file_data.cpp` | P1-10 | PrintFileData factory implementations |
 
 ## Files Modified
 
@@ -158,6 +174,8 @@ These items are documented for opportunistic implementation when touching relate
 |------|------|---------|
 | `include/ui_modal.h` | P0-2 | Added confirmation/alert helper declarations |
 | `src/ui_modal.cpp` | P0-2 | Added helper implementations |
+| `src/moonraker_api_internal.h` | P1-6 | Added validation+error helper functions |
+| `include/print_file_data.h` | P1-10 | Added factory method declarations |
 
 ---
 

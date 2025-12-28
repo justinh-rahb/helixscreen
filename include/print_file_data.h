@@ -7,6 +7,10 @@
 #include <string>
 #include <vector>
 
+// Forward declarations for factory methods (avoid header coupling)
+struct FileInfo;
+struct UsbGcodeFile;
+
 /**
  * @brief Print history status for file list display
  *
@@ -57,4 +61,46 @@ struct PrintFileData {
     // Print history status (from PrintHistoryManager)
     FileHistoryStatus history_status = FileHistoryStatus::NEVER_PRINTED;
     int success_count = 0; ///< Number of successful prints (shown as "N ✓")
+
+    // ========================================================================
+    // FACTORY METHODS
+    // ========================================================================
+
+    /**
+     * @brief Create PrintFileData from Moonraker FileInfo
+     *
+     * Populates basic file info (filename, size, modified time) and sets
+     * placeholder values for metadata fields. The thumbnail_path is set to
+     * the default placeholder.
+     *
+     * @param file FileInfo from Moonraker file listing API
+     * @param default_thumbnail Path to default/placeholder thumbnail
+     * @return Initialized PrintFileData with formatted strings
+     */
+    static PrintFileData from_moonraker_file(const FileInfo& file,
+                                             const std::string& default_thumbnail);
+
+    /**
+     * @brief Create PrintFileData from USB G-code file
+     *
+     * USB files don't have Moonraker metadata, so print_time, filament, etc.
+     * are set to defaults. Formatted strings use "--" for unavailable fields.
+     *
+     * @param file UsbGcodeFile from USB manager scan
+     * @param default_thumbnail Path to default/placeholder thumbnail
+     * @return Initialized PrintFileData with formatted strings
+     */
+    static PrintFileData from_usb_file(const UsbGcodeFile& file,
+                                       const std::string& default_thumbnail);
+
+    /**
+     * @brief Create a directory entry
+     *
+     * @param name Directory name (e.g., ".." for parent, "folder_name" for subdirs)
+     * @param icon_path Path to folder icon
+     * @param is_parent True if this is the parent directory entry ".."
+     * @return Initialized PrintFileData for directory display
+     */
+    static PrintFileData make_directory(const std::string& name, const std::string& icon_path,
+                                        bool is_parent = false);
 };
