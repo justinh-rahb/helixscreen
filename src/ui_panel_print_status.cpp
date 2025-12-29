@@ -2184,6 +2184,15 @@ void PrintStatusPanel::set_thumbnail_source(const std::string& filename) {
         spdlog::info("[{}] Refreshing display/thumbnail/gcode with source override: {} -> {}",
                      get_name(), current_print_filename_, filename);
         set_filename(current_print_filename_.c_str());
+    } else if (!filename.empty()) {
+        // WebSocket hasn't updated current_print_filename_ yet (race condition).
+        // Clear loaded filename so when on_print_filename_changed() eventually
+        // fires and calls set_filename(), the idempotency check will pass and
+        // trigger the actual thumbnail/gcode load.
+        loaded_thumbnail_filename_.clear();
+        spdlog::debug(
+            "[{}] Source set before WebSocket, cleared loaded filename for deferred reload",
+            get_name());
     }
 }
 
