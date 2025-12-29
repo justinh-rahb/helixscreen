@@ -550,14 +550,15 @@ void PrinterState::update_from_status(const json& state) {
 
         if (toolhead.contains("position") && toolhead["position"].is_array()) {
             const auto& pos = toolhead["position"];
-            if (pos.size() >= 3) {
+            // Note: Klipper can send null position values before homing or during errors
+            if (pos.size() >= 3 && pos[0].is_number() && pos[1].is_number() && pos[2].is_number()) {
                 lv_subject_set_int(&position_x_, static_cast<int>(pos[0].get<double>()));
                 lv_subject_set_int(&position_y_, static_cast<int>(pos[1].get<double>()));
                 lv_subject_set_int(&position_z_, static_cast<int>(pos[2].get<double>()));
             }
         }
 
-        if (toolhead.contains("homed_axes")) {
+        if (toolhead.contains("homed_axes") && toolhead["homed_axes"].is_string()) {
             std::string axes = toolhead["homed_axes"].get<std::string>();
             lv_subject_copy_string(&homed_axes_, axes.c_str());
         }
@@ -676,7 +677,7 @@ void PrinterState::update_from_status(const json& state) {
     // Update klippy state from webhooks (for restart simulation)
     if (state.contains("webhooks")) {
         const auto& webhooks = state["webhooks"];
-        if (webhooks.contains("state")) {
+        if (webhooks.contains("state") && webhooks["state"].is_string()) {
             std::string klippy_state_str = webhooks["state"].get<std::string>();
             KlippyState new_state = KlippyState::READY; // default
 
