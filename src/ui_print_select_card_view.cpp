@@ -3,10 +3,11 @@
 
 #include "ui_print_select_card_view.h"
 
-#include "prerendered_images.h"
 #include "ui_panel_print_select.h" // For PrintFileData, CardDimensions
 #include "ui_theme.h"
 #include "ui_utils.h" // For strip_gcode_extension
+
+#include "prerendered_images.h"
 
 #include <spdlog/spdlog.h>
 
@@ -19,8 +20,10 @@ namespace helix::ui {
 // ============================================================================
 
 std::string PrintSelectCardView::get_default_thumbnail() {
-    // Try prerendered .bin first for embedded performance
-    return helix::get_prerendered_placeholder_path("thumbnail-placeholder-160");
+    // Cache result - path never changes at runtime
+    static const std::string cached =
+        helix::get_prerendered_placeholder_path("thumbnail-placeholder-160");
+    return cached;
 }
 
 bool PrintSelectCardView::is_placeholder_thumbnail(const std::string& path) {
