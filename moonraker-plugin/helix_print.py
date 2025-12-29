@@ -677,6 +677,11 @@ class HelixPrint:
                     await self.database.update_item(
                         HELIX_NAMESPACE, print_info.temp_filename, record
                     )
+                else:
+                    logging.warning(
+                        f"HelixPrint: Record not found for cleanup scheduling: "
+                        f"{print_info.temp_filename}"
+                    )
         except Exception as e:
             logging.warning(f"HelixPrint: Failed to update cleanup status: {e}")
 
@@ -717,11 +722,23 @@ class HelixPrint:
             return
 
         temp_path = self.gc_path / temp_filename
-        if temp_path.exists():
-            temp_path.unlink()
-            logging.info(f"HelixPrint: Cleaned up {temp_filename}")
+        file_deleted = False
+        try:
+            if temp_path.exists():
+                temp_path.unlink()
+                file_deleted = True
+                logging.info(f"HelixPrint: Cleaned up {temp_filename}")
+            else:
+                # File already gone (manual deletion or previous cleanup)
+                file_deleted = True
+        except OSError as e:
+            logging.error(f"HelixPrint: Failed to delete {temp_filename}: {e}")
+            return  # Don't mark as cleaned if file delete failed
 
-        # Update database
+        # Only update database if file was actually deleted
+        if not file_deleted:
+            return
+
         try:
             if self._use_sqlite:
                 await self.database.execute_db_command(
@@ -738,6 +755,10 @@ class HelixPrint:
                     record["status"] = "cleaned"
                     await self.database.update_item(
                         HELIX_NAMESPACE, temp_filename, record
+                    )
+                else:
+                    logging.debug(
+                        f"HelixPrint: No record to update for cleaned file: {temp_filename}"
                     )
         except Exception as e:
             logging.warning(f"HelixPrint: Failed to update cleanup status: {e}")
@@ -771,8 +792,8 @@ class HelixPrint:
                 # Get all items and filter in Python
                 try:
                     all_items = await self.database.ns_items(HELIX_NAMESPACE)
-                except Exception:
-                    # Namespace doesn't exist yet (no records)
+                except self.server.error:
+                    # Namespace doesn't exist yet (no records inserted)
                     all_items = []
                 for key, record in all_items:
                     if (
@@ -841,7 +862,8 @@ class HelixPrint:
                 # Get all items and delete old ones
                 try:
                     all_items = await self.database.ns_items(HELIX_NAMESPACE)
-                except Exception:
+                except self.server.error:
+                    # Namespace doesn't exist yet
                     all_items = []
                 for key, record in all_items:
                     if (
