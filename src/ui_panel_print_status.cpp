@@ -43,6 +43,25 @@ static std::unique_ptr<PrintStatusPanel> g_print_status_panel;
 
 using helix::ui::temperature::centi_to_degrees;
 
+// ============================================================================
+// Modal Subclass Implementations
+// ============================================================================
+
+void ExcludeObjectModal::on_show() {
+    wire_ok_button("btn_ok");
+    wire_cancel_button("btn_cancel");
+}
+
+void RunoutGuidanceModal::on_show() {
+    // RunoutGuidanceModal has custom button names for 3 options:
+    // - btn_load_filament → on_ok() (primary action)
+    // - btn_resume → on_cancel() (secondary action)
+    // - btn_cancel_print → on_tertiary() (destructive action)
+    wire_ok_button("btn_load_filament");
+    wire_cancel_button("btn_resume");
+    wire_tertiary_button("btn_cancel_print");
+}
+
 // Forward declarations for XML event callbacks (registered in init_subjects)
 static void on_tune_speed_changed_cb(lv_event_t* e);
 static void on_tune_flow_changed_cb(lv_event_t* e);
@@ -145,16 +164,8 @@ PrintStatusPanel::~PrintStatusPanel() {
             lv_timer_delete(exclude_undo_timer_);
             exclude_undo_timer_ = nullptr;
         }
-        if (exclude_confirm_dialog_) {
-            lv_obj_delete(exclude_confirm_dialog_);
-            exclude_confirm_dialog_ = nullptr;
-        }
-        // Clean up runout guidance modal if open
-        // See docs/QUICK_REFERENCE.md "Modal Dialog Lifecycle"
-        if (runout_guidance_modal_) {
-            ui_modal_hide(runout_guidance_modal_);
-            runout_guidance_modal_ = nullptr;
-        }
+        // Modal subclasses (exclude_modal_, runout_modal_) use RAII cleanup
+        // Their destructors will call hide() automatically
     }
 }
 
@@ -2399,68 +2410,25 @@ void PrintStatusPanel::handle_object_long_press(const char* object_name) {
     // Store the object name for when confirmation happens
     pending_exclude_object_ = object_name;
 
-    // Create confirmation dialog
-    std::string title = "Exclude Object?";
+    // Configure and show the modal
+    exclude_modal_.set_object_name(object_name);
+    exclude_modal_.set_on_confirm([this]() { handle_exclude_confirmed(); });
+    exclude_modal_.set_on_cancel([this]() { handle_exclude_cancelled(); });
+
     std::string message = "Stop printing \"" + std::string(object_name) +
                           "\"?\n\nThis cannot be undone after 5 seconds.";
+    const char* attrs[] = {"title", "Exclude Object?", "message", message.c_str(), nullptr};
 
-    const char* attrs[] = {"title", title.c_str(), "message", message.c_str(), nullptr};
-
-    lv_obj_t* screen = lv_screen_active();
-    lv_xml_create(screen, "confirmation_dialog", attrs);
-
-    // Find the created dialog (should be last child of screen)
-    uint32_t child_cnt = lv_obj_get_child_count(screen);
-    exclude_confirm_dialog_ =
-        (child_cnt > 0) ? lv_obj_get_child(screen, static_cast<int32_t>(child_cnt - 1)) : nullptr;
-
-    if (!exclude_confirm_dialog_) {
-        spdlog::error("[{}] Failed to create exclude confirmation dialog", get_name());
+    if (!exclude_modal_.show(lv_screen_active(), attrs)) {
+        spdlog::error("[{}] Failed to show exclude confirmation modal", get_name());
         pending_exclude_object_.clear();
-        return;
-    }
-
-    // Update button text - "Exclude" instead of default "Delete"
-    lv_obj_t* confirm_btn = lv_obj_find_by_name(exclude_confirm_dialog_, "dialog_confirm_btn");
-    if (confirm_btn) {
-        lv_obj_t* btn_label = lv_obj_get_child(confirm_btn, 0);
-        if (btn_label) {
-            lv_label_set_text(btn_label, "Exclude");
-        }
-    }
-
-    // Wire up button callbacks
-    lv_obj_t* cancel_btn = lv_obj_find_by_name(exclude_confirm_dialog_, "dialog_cancel_btn");
-    if (cancel_btn) {
-        lv_obj_add_event_cb(cancel_btn, on_exclude_cancel_clicked, LV_EVENT_CLICKED, this);
-    }
-    if (confirm_btn) {
-        lv_obj_add_event_cb(confirm_btn, on_exclude_confirm_clicked, LV_EVENT_CLICKED, this);
-    }
-}
-
-void PrintStatusPanel::on_exclude_confirm_clicked(lv_event_t* e) {
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_exclude_confirmed();
-    }
-}
-
-void PrintStatusPanel::on_exclude_cancel_clicked(lv_event_t* e) {
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_exclude_cancelled();
     }
 }
 
 void PrintStatusPanel::handle_exclude_confirmed() {
     spdlog::info("[{}] Exclusion confirmed for '{}'", get_name(), pending_exclude_object_);
 
-    // Close the dialog
-    if (exclude_confirm_dialog_) {
-        lv_obj_delete(exclude_confirm_dialog_);
-        exclude_confirm_dialog_ = nullptr;
-    }
+    // Note: Modal is hidden by on_ok() calling hide() before this callback
 
     if (pending_exclude_object_.empty()) {
         spdlog::error("[{}] No pending object for exclusion", get_name());
@@ -2503,11 +2471,7 @@ void PrintStatusPanel::handle_exclude_confirmed() {
 void PrintStatusPanel::handle_exclude_cancelled() {
     spdlog::info("[{}] Exclusion cancelled for '{}'", get_name(), pending_exclude_object_);
 
-    // Close the dialog
-    if (exclude_confirm_dialog_) {
-        lv_obj_delete(exclude_confirm_dialog_);
-        exclude_confirm_dialog_ = nullptr;
-    }
+    // Modal hides itself via on_cancel() - no manual cleanup needed
 
     // Clear pending state
     pending_exclude_object_.clear();
@@ -2615,113 +2579,68 @@ void PrintStatusPanel::check_and_show_runout_guidance() {
 }
 
 void PrintStatusPanel::show_runout_guidance_modal() {
-    if (runout_guidance_modal_) {
+    if (runout_modal_.is_visible()) {
         // Already showing
         return;
     }
 
     spdlog::info("[{}] Showing runout guidance modal", get_name());
 
-    runout_guidance_modal_ = ui_modal_show("runout_guidance_modal");
-    if (!runout_guidance_modal_) {
+    // Configure callbacks for the three options
+    runout_modal_.set_on_load_filament([this]() {
+        spdlog::info("[{}] User chose to load filament after runout", get_name());
+        // Navigate to filament panel for loading
+        ui_nav_set_active(UI_PANEL_FILAMENT);
+    });
+
+    runout_modal_.set_on_resume([this]() {
+        // Check if filament is now present before allowing resume
+        auto& sensor_mgr = helix::FilamentSensorManager::instance();
+        if (sensor_mgr.has_any_runout()) {
+            spdlog::warn("[{}] User attempted resume but filament still not detected", get_name());
+            NOTIFY_WARNING("Insert filament before resuming");
+            return; // Modal stays open - user needs to load filament first
+        }
+
+        spdlog::info("[{}] User chose to resume print after runout", get_name());
+
+        // Resume the print
+        if (api_) {
+            api_->resume_print(
+                []() { spdlog::info("[PrintStatusPanel] Print resumed after runout"); },
+                [](const MoonrakerError& err) {
+                    spdlog::error("[PrintStatusPanel] Failed to resume print: {}", err.message);
+                    NOTIFY_ERROR("Failed to resume: {}", err.user_message());
+                });
+        }
+    });
+
+    runout_modal_.set_on_cancel_print([this]() {
+        spdlog::info("[{}] User chose to cancel print after runout", get_name());
+
+        // Cancel the print
+        if (api_) {
+            api_->cancel_print(
+                []() { spdlog::info("[PrintStatusPanel] Print cancelled after runout"); },
+                [](const MoonrakerError& err) {
+                    spdlog::error("[PrintStatusPanel] Failed to cancel print: {}", err.message);
+                    NOTIFY_ERROR("Failed to cancel: {}", err.user_message());
+                });
+        }
+    });
+
+    if (!runout_modal_.show(lv_screen_active())) {
         spdlog::error("[{}] Failed to create runout guidance modal", get_name());
-        return;
-    }
-
-    // Store reference to this panel for callbacks
-    lv_obj_set_user_data(runout_guidance_modal_, this);
-
-    // Wire up button callbacks
-    lv_obj_t* btn_load = lv_obj_find_by_name(runout_guidance_modal_, "btn_load_filament");
-    lv_obj_t* btn_resume = lv_obj_find_by_name(runout_guidance_modal_, "btn_resume");
-    lv_obj_t* btn_cancel = lv_obj_find_by_name(runout_guidance_modal_, "btn_cancel_print");
-
-    if (btn_load) {
-        lv_obj_add_event_cb(btn_load, on_runout_load_filament_clicked, LV_EVENT_CLICKED, this);
-    }
-    if (btn_resume) {
-        lv_obj_add_event_cb(btn_resume, on_runout_resume_clicked, LV_EVENT_CLICKED, this);
-    }
-    if (btn_cancel) {
-        lv_obj_add_event_cb(btn_cancel, on_runout_cancel_print_clicked, LV_EVENT_CLICKED, this);
     }
 }
 
 void PrintStatusPanel::hide_runout_guidance_modal() {
-    if (!runout_guidance_modal_) {
+    if (!runout_modal_.is_visible()) {
         return;
     }
 
     spdlog::debug("[{}] Hiding runout guidance modal", get_name());
-
-    // Clear user_data BEFORE hiding to prevent use-after-free in pending callbacks
-    // (ui_modal_hide uses async deletion)
-    lv_obj_set_user_data(runout_guidance_modal_, nullptr);
-
-    ui_modal_hide(runout_guidance_modal_);
-    runout_guidance_modal_ = nullptr;
-}
-
-void PrintStatusPanel::on_runout_load_filament_clicked(lv_event_t* e) {
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (!self) {
-        return;
-    }
-
-    spdlog::info("[PrintStatusPanel] User chose to load filament after runout");
-    self->hide_runout_guidance_modal();
-
-    // Navigate to filament panel for loading
-    // This closes overlay stack and switches to the main filament panel
-    ui_nav_set_active(UI_PANEL_FILAMENT);
-}
-
-void PrintStatusPanel::on_runout_resume_clicked(lv_event_t* e) {
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (!self) {
-        return;
-    }
-
-    // Check if filament is now present before allowing resume
-    auto& sensor_mgr = helix::FilamentSensorManager::instance();
-    if (sensor_mgr.has_any_runout()) {
-        spdlog::warn("[PrintStatusPanel] User attempted resume but filament still not detected");
-        NOTIFY_WARNING("Insert filament before resuming");
-        return; // Don't hide modal - user needs to load filament first
-    }
-
-    spdlog::info("[PrintStatusPanel] User chose to resume print after runout");
-    self->hide_runout_guidance_modal();
-
-    // Resume the print
-    if (self->api_) {
-        self->api_->resume_print(
-            []() { spdlog::info("[PrintStatusPanel] Print resumed after runout"); },
-            [](const MoonrakerError& err) {
-                spdlog::error("[PrintStatusPanel] Failed to resume print: {}", err.message);
-                NOTIFY_ERROR("Failed to resume: {}", err.user_message());
-            });
-    }
-}
-
-void PrintStatusPanel::on_runout_cancel_print_clicked(lv_event_t* e) {
-    auto* self = static_cast<PrintStatusPanel*>(lv_event_get_user_data(e));
-    if (!self) {
-        return;
-    }
-
-    spdlog::info("[PrintStatusPanel] User chose to cancel print after runout");
-    self->hide_runout_guidance_modal();
-
-    // Cancel the print
-    if (self->api_) {
-        self->api_->cancel_print(
-            []() { spdlog::info("[PrintStatusPanel] Print cancelled after runout"); },
-            [](const MoonrakerError& err) {
-                spdlog::error("[PrintStatusPanel] Failed to cancel print: {}", err.message);
-                NOTIFY_ERROR("Failed to cancel: {}", err.user_message());
-            });
-    }
+    runout_modal_.hide();
 }
 
 void PrintStatusPanel::auto_configure_led_if_needed(const std::vector<std::string>& leds) {

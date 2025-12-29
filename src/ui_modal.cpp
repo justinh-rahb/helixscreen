@@ -471,6 +471,7 @@ bool Modal::show(lv_obj_t* parent, const char** attrs) {
     // Register event callbacks for XML components
     lv_xml_register_event_cb(nullptr, "on_modal_ok_clicked", ok_button_cb);
     lv_xml_register_event_cb(nullptr, "on_modal_cancel_clicked", cancel_button_cb);
+    lv_xml_register_event_cb(nullptr, "on_modal_tertiary_clicked", tertiary_button_cb);
 
     // Use internal create method
     if (!create_and_show(parent_, component_name(), attrs)) {
@@ -545,6 +546,16 @@ void Modal::wire_cancel_button(const char* name) {
         spdlog::trace("[{}] Wired Cancel button '{}'", get_name(), name);
     } else {
         spdlog::warn("[{}] Cancel button '{}' not found", get_name(), name);
+    }
+}
+
+void Modal::wire_tertiary_button(const char* name) {
+    lv_obj_t* btn = find_widget(name);
+    if (btn) {
+        lv_obj_set_user_data(btn, this);
+        spdlog::trace("[{}] Wired Tertiary button '{}'", get_name(), name);
+    } else {
+        spdlog::warn("[{}] Tertiary button '{}' not found", get_name(), name);
     }
 }
 
@@ -693,6 +704,20 @@ void Modal::cancel_button_cb(lv_event_t* e) {
     if (self) {
         spdlog::debug("[{}] Cancel button clicked", self->get_name());
         self->on_cancel();
+    }
+
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void Modal::tertiary_button_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[Modal] tertiary_button_cb");
+
+    // Get Modal instance from button's user_data (set by wire_tertiary_button)
+    lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<Modal*>(lv_obj_get_user_data(btn));
+    if (self) {
+        spdlog::debug("[{}] Tertiary button clicked", self->get_name());
+        self->on_tertiary();
     }
 
     LVGL_SAFE_EVENT_CB_END();

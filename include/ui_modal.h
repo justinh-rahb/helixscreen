@@ -201,6 +201,15 @@ class Modal {
         hide();
     }
 
+    /**
+     * @brief Called when Tertiary button is clicked (default: hides)
+     *
+     * Used for 3-button modals like runout guidance (Load/Resume/Cancel Print).
+     */
+    virtual void on_tertiary() {
+        hide();
+    }
+
   protected:
     // Modal state
     lv_obj_t* backdrop_ = nullptr;
@@ -211,6 +220,7 @@ class Modal {
     lv_obj_t* find_widget(const char* name);
     void wire_ok_button(const char* name = "btn_ok");
     void wire_cancel_button(const char* name = "btn_cancel");
+    void wire_tertiary_button(const char* name = "btn_tertiary");
 
   private:
     // Internal implementation
@@ -222,6 +232,7 @@ class Modal {
     static void esc_key_cb(lv_event_t* e);
     static void ok_button_cb(lv_event_t* e);
     static void cancel_button_cb(lv_event_t* e);
+    static void tertiary_button_cb(lv_event_t* e);
 };
 
 // ============================================================================

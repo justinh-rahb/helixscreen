@@ -100,6 +100,111 @@ class SaveZOffsetModal : public Modal {
 };
 
 /**
+ * @brief Confirmation modal for excluding an object during print
+ *
+ * Shows a warning with the object name and confirm/cancel options.
+ * After 5 seconds, the exclusion becomes permanent.
+ */
+class ExcludeObjectModal : public Modal {
+  public:
+    using Callback = std::function<void()>;
+
+    const char* get_name() const override {
+        return "Exclude Object";
+    }
+    const char* component_name() const override {
+        return "exclude_object_modal";
+    }
+
+    void set_object_name(const std::string& name) {
+        object_name_ = name;
+    }
+    void set_on_confirm(Callback cb) {
+        on_confirm_cb_ = std::move(cb);
+    }
+    void set_on_cancel(Callback cb) {
+        on_cancel_cb_ = std::move(cb);
+    }
+
+  protected:
+    void on_show() override;
+    void on_ok() override {
+        if (on_confirm_cb_) {
+            on_confirm_cb_();
+        }
+        hide();
+    }
+    void on_cancel() override {
+        if (on_cancel_cb_) {
+            on_cancel_cb_();
+        }
+        hide();
+    }
+
+  private:
+    std::string object_name_;
+    Callback on_confirm_cb_;
+    Callback on_cancel_cb_;
+};
+
+/**
+ * @brief Runout guidance modal with 3 options
+ *
+ * Shown when filament runout is detected during a print pause.
+ * Offers: Load Filament, Resume Print, Cancel Print.
+ */
+class RunoutGuidanceModal : public Modal {
+  public:
+    using Callback = std::function<void()>;
+
+    const char* get_name() const override {
+        return "Runout Guidance";
+    }
+    const char* component_name() const override {
+        return "runout_guidance_modal";
+    }
+
+    void set_on_load_filament(Callback cb) {
+        on_load_filament_ = std::move(cb);
+    }
+    void set_on_resume(Callback cb) {
+        on_resume_ = std::move(cb);
+    }
+    void set_on_cancel_print(Callback cb) {
+        on_cancel_print_ = std::move(cb);
+    }
+
+  protected:
+    void on_show() override;
+    void on_ok() override {
+        // Load Filament button
+        if (on_load_filament_) {
+            on_load_filament_();
+        }
+        hide();
+    }
+    void on_cancel() override {
+        // Resume button
+        if (on_resume_) {
+            on_resume_();
+        }
+        hide();
+    }
+    void on_tertiary() override {
+        // Cancel Print button
+        if (on_cancel_print_) {
+            on_cancel_print_();
+        }
+        hide();
+    }
+
+  private:
+    Callback on_load_filament_;
+    Callback on_resume_;
+    Callback on_cancel_print_;
+};
+
+/**
  * @brief Print status panel - shows active print progress and controls
  *
  * Displays filename, thumbnail, progress, layers, times, temperatures,
@@ -610,14 +715,14 @@ class PrintStatusPanel : public PanelBase {
     /// Timer for undo window (5 seconds before sending EXCLUDE_OBJECT to Klipper)
     lv_timer_t* exclude_undo_timer_{nullptr};
 
-    /// Active confirmation dialog (if showing)
-    lv_obj_t* exclude_confirm_dialog_{nullptr};
+    /// Exclude object confirmation modal (RAII - auto-hides when destroyed)
+    ExcludeObjectModal exclude_modal_;
 
     /// Print cancel confirmation modal (RAII - auto-hides when destroyed)
     PrintCancelModal cancel_modal_;
 
-    /// Runout guidance modal (shown when print pauses + no filament detected)
-    lv_obj_t* runout_guidance_modal_ = nullptr;
+    /// Runout guidance modal (RAII - auto-hides when destroyed)
+    RunoutGuidanceModal runout_modal_;
 
     /// Flag to track if runout modal was shown for current pause
     /// Reset when print resumes or ends, prevents repeated modal popups
@@ -659,8 +764,6 @@ class PrintStatusPanel : public PanelBase {
     //
 
     static void on_object_long_pressed(lv_obj_t* viewer, const char* object_name, void* user_data);
-    static void on_exclude_confirm_clicked(lv_event_t* e);
-    static void on_exclude_cancel_clicked(lv_event_t* e);
 
     //
     // === Runout Guidance Modal ===
@@ -686,11 +789,6 @@ class PrintStatusPanel : public PanelBase {
      * is available and shows no filament - if so, displays guidance modal.
      */
     void check_and_show_runout_guidance();
-
-    // Runout modal button callbacks
-    static void on_runout_load_filament_clicked(lv_event_t* e);
-    static void on_runout_resume_clicked(lv_event_t* e);
-    static void on_runout_cancel_print_clicked(lv_event_t* e);
 };
 
 // Global instance accessor (needed by main.cpp)

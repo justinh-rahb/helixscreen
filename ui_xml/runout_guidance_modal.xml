@@ -37,6 +37,7 @@
       <lv_button name="btn_load_filament"
                  width="100%" height="#button_height" style_radius="0" style_border_width="0" style_shadow_width="0"
                  clickable="true">
+        <event_cb trigger="clicked" callback="on_modal_ok_clicked"/>
         <lv_obj width="100%"
                 height="100%" style_bg_opa="0" style_border_width="0" flex_flow="row" style_flex_main_place="center"
                 style_flex_cross_place="center" style_pad_gap="#space_sm">
@@ -51,6 +52,7 @@
       <lv_button name="btn_resume"
                  width="100%" height="#button_height" style_radius="0" style_border_width="0" style_shadow_width="0"
                  clickable="true">
+        <event_cb trigger="clicked" callback="on_modal_cancel_clicked"/>
         <lv_obj width="100%"
                 height="100%" style_bg_opa="0" style_border_width="0" flex_flow="row" style_flex_main_place="center"
                 style_flex_cross_place="center" style_pad_gap="#space_sm">
@@ -65,6 +67,7 @@
       <lv_button name="btn_cancel_print"
                  width="100%" height="#button_height" style_radius="0" style_border_width="0" style_shadow_width="0"
                  clickable="true">
+        <event_cb trigger="clicked" callback="on_modal_tertiary_clicked"/>
         <lv_obj width="100%"
                 height="100%" style_bg_opa="0" style_border_width="0" flex_flow="row" style_flex_main_place="center"
                 style_flex_cross_place="center" style_pad_gap="#space_sm">
