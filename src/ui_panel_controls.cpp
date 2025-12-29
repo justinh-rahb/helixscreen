@@ -67,10 +67,6 @@ ControlsPanel::~ControlsPanel() {
         lv_obj_del(bed_temp_panel_);
         bed_temp_panel_ = nullptr;
     }
-    if (extrusion_panel_) {
-        lv_obj_del(extrusion_panel_);
-        extrusion_panel_ = nullptr;
-    }
     if (fan_panel_) {
         lv_obj_del(fan_panel_);
         fan_panel_ = nullptr;
@@ -140,10 +136,6 @@ void ControlsPanel::init_subjects() {
                                         "controls_fan_speed");
     UI_SUBJECT_INIT_AND_REGISTER_INT(fan_pct_subject_, 0, "controls_fan_pct");
 
-    // Preheat status (for Filament card)
-    UI_SUBJECT_INIT_AND_REGISTER_STRING(preheat_status_subject_, preheat_status_buf_,
-                                        "Noz: --°C  Bed: --°C", "controls_preheat_status");
-
     // Z-Offset delta display (for banner showing unsaved adjustment)
     UI_SUBJECT_INIT_AND_REGISTER_STRING(z_offset_delta_display_subject_,
                                         z_offset_delta_display_buf_, "", "z_offset_delta_display");
@@ -170,17 +162,6 @@ void ControlsPanel::init_subjects() {
     // Cooling: Fan slider
     lv_xml_register_event_cb(nullptr, "on_controls_fan_slider", on_fan_slider_changed);
 
-    // Filament: Preheat buttons
-    lv_xml_register_event_cb(nullptr, "on_controls_preheat_pla", on_preheat_pla);
-    lv_xml_register_event_cb(nullptr, "on_controls_preheat_petg", on_preheat_petg);
-    lv_xml_register_event_cb(nullptr, "on_controls_preheat_abs", on_preheat_abs);
-    lv_xml_register_event_cb(nullptr, "on_controls_preheat_asa", on_preheat_asa);
-    lv_xml_register_event_cb(nullptr, "on_controls_preheat_off", on_preheat_off);
-
-    // Filament: Extrude/Retract buttons
-    lv_xml_register_event_cb(nullptr, "on_controls_extrude", on_extrude);
-    lv_xml_register_event_cb(nullptr, "on_controls_retract", on_retract);
-
     // Z-Offset banner: Save button
     lv_xml_register_event_cb(nullptr, "on_controls_save_z_offset", on_save_z_offset);
 
@@ -188,7 +169,6 @@ void ControlsPanel::init_subjects() {
     lv_xml_register_event_cb(nullptr, "on_controls_quick_actions", on_quick_actions_clicked);
     lv_xml_register_event_cb(nullptr, "on_controls_temperatures", on_temperatures_clicked);
     lv_xml_register_event_cb(nullptr, "on_controls_cooling", on_cooling_clicked);
-    lv_xml_register_event_cb(nullptr, "on_controls_filament", on_filament_clicked);
     lv_xml_register_event_cb(nullptr, "on_controls_calibration", on_calibration_clicked);
 
     subjects_initialized_ = true;
@@ -233,11 +213,9 @@ void ControlsPanel::setup_card_handlers() {
     lv_obj_t* card_quick_actions = lv_obj_find_by_name(panel_, "card_quick_actions");
     lv_obj_t* card_temperatures = lv_obj_find_by_name(panel_, "card_temperatures");
     lv_obj_t* card_cooling = lv_obj_find_by_name(panel_, "card_cooling");
-    lv_obj_t* card_filament = lv_obj_find_by_name(panel_, "card_filament");
     lv_obj_t* card_calibration = lv_obj_find_by_name(panel_, "card_calibration");
 
-    if (!card_quick_actions || !card_temperatures || !card_cooling || !card_filament ||
-        !card_calibration) {
+    if (!card_quick_actions || !card_temperatures || !card_cooling || !card_calibration) {
         spdlog::error("[{}] Failed to find all V2 cards", get_name());
         return;
     }
@@ -313,9 +291,6 @@ void ControlsPanel::update_nozzle_temp_display() {
         std::snprintf(nozzle_status_buf_, sizeof(nozzle_status_buf_), "Heating...");
     }
     lv_subject_copy_string(&nozzle_status_subject_, nozzle_status_buf_);
-
-    // Also update preheat status display
-    update_preheat_status();
 }
 
 void ControlsPanel::update_bed_temp_display() {
@@ -347,9 +322,6 @@ void ControlsPanel::update_bed_temp_display() {
         std::snprintf(bed_status_buf_, sizeof(bed_status_buf_), "Heating...");
     }
     lv_subject_copy_string(&bed_status_subject_, bed_status_buf_);
-
-    // Also update preheat status display (shows both temps)
-    update_preheat_status();
 }
 
 void ControlsPanel::update_fan_display() {
@@ -364,15 +336,6 @@ void ControlsPanel::update_fan_display() {
     }
     lv_subject_copy_string(&fan_speed_subject_, fan_speed_buf_);
     lv_subject_set_int(&fan_pct_subject_, fan_pct);
-}
-
-void ControlsPanel::update_preheat_status() {
-    float nozzle_c = centi_to_degrees_f(cached_extruder_temp_);
-    float bed_c = centi_to_degrees_f(cached_bed_temp_);
-
-    std::snprintf(preheat_status_buf_, sizeof(preheat_status_buf_), "Noz: %.0f°C  Bed: %.0f°C",
-                  nozzle_c, bed_c);
-    lv_subject_copy_string(&preheat_status_subject_, preheat_status_buf_);
 }
 
 void ControlsPanel::populate_secondary_fans() {
@@ -575,31 +538,6 @@ void ControlsPanel::handle_cooling_clicked() {
     }
 }
 
-void ControlsPanel::handle_filament_clicked() {
-    spdlog::debug("[{}] Filament card clicked - opening Extrusion panel", get_name());
-
-    if (!extrusion_panel_ && parent_screen_) {
-        auto& extrusion_panel_instance = get_global_controls_extrusion_panel();
-        if (!extrusion_panel_instance.are_subjects_initialized()) {
-            extrusion_panel_instance.init_subjects();
-        }
-
-        extrusion_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "extrusion_panel", nullptr));
-        if (extrusion_panel_) {
-            extrusion_panel_instance.setup(extrusion_panel_, parent_screen_);
-            // Panel starts hidden via XML hidden="true" attribute
-        } else {
-            NOTIFY_ERROR("Failed to load extrusion panel");
-            return;
-        }
-    }
-
-    if (extrusion_panel_) {
-        ui_nav_push_overlay(extrusion_panel_);
-    }
-}
-
 // ============================================================================
 // QUICK ACTION BUTTON HANDLERS
 // ============================================================================
@@ -657,77 +595,6 @@ void ControlsPanel::handle_macro_2() {
             "HELIX_BED_LEVEL_IF_NEEDED", []() { NOTIFY_SUCCESS("Macro started"); },
             [](const MoonrakerError& err) {
                 NOTIFY_ERROR("Macro failed: {}", err.user_message());
-            });
-    }
-}
-
-// ============================================================================
-// PREHEAT HANDLERS
-// ============================================================================
-
-void ControlsPanel::handle_preheat(int nozzle_temp, int bed_temp, const char* material_name) {
-    spdlog::debug("[{}] Preheat {} - nozzle {}°C, bed {}°C", get_name(), material_name, nozzle_temp,
-                  bed_temp);
-
-    if (api_) {
-        // Set nozzle temperature
-        api_->set_temperature(
-            "extruder", static_cast<double>(nozzle_temp),
-            [material_name, nozzle_temp]() {
-                spdlog::info("[ControlsPanel] Preheat {} - nozzle set to {}°C", material_name,
-                             nozzle_temp);
-            },
-            [](const MoonrakerError& err) {
-                NOTIFY_ERROR("Preheat failed: {}", err.user_message());
-            });
-
-        // Set bed temperature
-        api_->set_temperature(
-            "heater_bed", static_cast<double>(bed_temp),
-            [material_name, bed_temp]() {
-                spdlog::info("[ControlsPanel] Preheat {} - bed set to {}°C", material_name,
-                             bed_temp);
-            },
-            [](const MoonrakerError& err) {
-                NOTIFY_ERROR("Preheat failed: {}", err.user_message());
-            });
-
-        if (nozzle_temp > 0 || bed_temp > 0) {
-            NOTIFY_INFO("Preheating for {}", material_name);
-        } else {
-            NOTIFY_INFO("Heaters off");
-        }
-    }
-}
-
-// ============================================================================
-// EXTRUSION HANDLERS
-// ============================================================================
-
-void ControlsPanel::handle_extrude() {
-    spdlog::debug("[{}] Extrude clicked", get_name());
-    if (api_) {
-        // Extrude 10mm at 300mm/min using G-code
-        // G1 E10 F300 - Extrude 10mm at 5mm/s (300mm/min)
-        api_->execute_gcode(
-            "M83\nG1 E10 F300", // Set relative extrusion, extrude 10mm
-            []() { NOTIFY_SUCCESS("Extruding 10mm"); },
-            [](const MoonrakerError& err) {
-                NOTIFY_ERROR("Extrude failed: {}", err.user_message());
-            });
-    }
-}
-
-void ControlsPanel::handle_retract() {
-    spdlog::debug("[{}] Retract clicked", get_name());
-    if (api_) {
-        // Retract 10mm at 300mm/min using G-code
-        // G1 E-10 F300 - Retract 10mm at 5mm/s (300mm/min)
-        api_->execute_gcode(
-            "M83\nG1 E-10 F300", // Set relative extrusion, retract 10mm
-            []() { NOTIFY_SUCCESS("Retracting 10mm"); },
-            [](const MoonrakerError& err) {
-                NOTIFY_ERROR("Retract failed: {}", err.user_message());
             });
     }
 }
@@ -942,13 +809,6 @@ void ControlsPanel::on_cooling_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void ControlsPanel::on_filament_clicked(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_filament_clicked");
-    (void)e;
-    get_global_controls_panel().handle_filament_clicked();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
 void ControlsPanel::on_calibration_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_calibration_clicked");
     (void)e;
@@ -1057,55 +917,6 @@ void ControlsPanel::on_fan_slider_changed(lv_event_t* e) {
     auto* slider = static_cast<lv_obj_t*>(lv_event_get_target(e));
     int value = lv_slider_get_value(slider);
     get_global_controls_panel().handle_fan_slider_changed(value);
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_preheat_pla(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_preheat_pla");
-    (void)e;
-    get_global_controls_panel().handle_preheat(210, 60, "PLA");
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_preheat_petg(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_preheat_petg");
-    (void)e;
-    get_global_controls_panel().handle_preheat(240, 80, "PETG");
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_preheat_abs(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_preheat_abs");
-    (void)e;
-    get_global_controls_panel().handle_preheat(250, 100, "ABS");
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_preheat_asa(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_preheat_asa");
-    (void)e;
-    get_global_controls_panel().handle_preheat(250, 100, "ASA");
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_preheat_off(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_preheat_off");
-    (void)e;
-    get_global_controls_panel().handle_preheat(0, 0, "Off");
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_extrude(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_extrude");
-    (void)e;
-    get_global_controls_panel().handle_extrude();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_retract(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_retract");
-    (void)e;
-    get_global_controls_panel().handle_retract();
     LVGL_SAFE_EVENT_CB_END();
 }
 

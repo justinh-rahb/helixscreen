@@ -4,15 +4,19 @@
 <!-- Controls Panel Dashboard V2 - 5 smart cards with live data -->
 <component>
   <!-- Main container: 3+2 layout (3 cards top, 2 cards bottom) -->
+  <!-- NOTE: Using explicit heights (50%) instead of flex-grow to work around LVGL bug
+       where hidden objects affect flex-grow space calculation -->
   <view name="controls_panel"
         extends="lv_obj" width="100%" height="100%" style_pad_all="#space_md" style_border_width="0" flex_flow="column"
-        style_pad_gap="#space_md" style_bg_color="#app_bg_color" scrollable="false">
+        style_bg_color="#app_bg_color" style_pad_gap="#space_md" scrollable="false">
+
     <!-- Z-Offset Adjustment Banner (reactive: hidden when pending_z_offset_delta == 0) -->
-    <lv_obj name="z_offset_banner"
-            width="100%" height="content" style_bg_color="#info_color" style_bg_opa="60" style_radius="#border_radius"
+    <!-- Uses absolute positioning via align to avoid affecting flex layout -->
+    <lv_obj name="z_offset_banner" hidden="true"
+            width="content" height="content" align="top_mid"
+            style_bg_color="#info_color" style_bg_opa="200" style_radius="#border_radius"
             style_pad_all="#space_sm" style_border_width="0" scrollable="false" flex_flow="row"
             style_flex_main_place="space_between" style_flex_cross_place="center">
-      <!-- Hide banner when pending_z_offset_delta == 0 -->
       <lv_obj-bind_flag_if_eq subject="pending_z_offset_delta" flag="hidden" ref_value="0"/>
       <lv_obj width="content"
               height="content" style_bg_opa="0" style_border_width="0" scrollable="false" flex_flow="column"
@@ -22,22 +26,27 @@
       </lv_obj>
       <lv_button name="btn_save_z_offset"
                  height="content" style_radius="#border_radius" style_bg_color="#success_color" style_border_width="0"
-                 style_pad_left="#space_sm" style_pad_right="#space_sm">
+                 style_pad_left="#space_sm" style_pad_right="#space_sm" style_margin_left="#space_md">
         <event_cb trigger="clicked" callback="on_controls_save_z_offset"/>
         <text_small text="Save" style_text_color="#text_primary"/>
       </lv_button>
     </lv_obj>
+
     <!-- Row 1: Quick Actions, Temperatures, Cooling (3 equal cards) -->
+    <!-- Using explicit 50% height instead of flex-grow to avoid LVGL hidden-object bug -->
     <lv_obj width="100%"
-            flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
+            height="50%" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
             style_pad_gap="#space_md" scrollable="false">
       <!-- Card 1: Quick Actions (Home + Macros) -->
       <ui_card name="card_quick_actions"
                height="100%" flex_grow="1" flex_flow="column" flex_main_place="center" flex_cross_place="center"
                style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
         <event_cb trigger="clicked" callback="on_controls_quick_actions"/>
-        <icon src="home" size="md" variant="secondary"/>
-        <text_small text="Quick Actions" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
+        <lv_obj height="content" flex_flow="row" style_flex_cross_place="center" style_pad_all="0" style_pad_gap="#space_sm" style_border_width="0">
+          <icon src="home" size="md" variant="secondary"/>
+          <text_small text="Quick Actions" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
+        </lv_obj>
+
         <!-- Home buttons row -->
         <lv_obj width="100%"
                 height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
@@ -64,6 +73,7 @@
             <text_small text="Z"/>
           </lv_button>
         </lv_obj>
+
         <!-- Macro buttons row -->
         <lv_obj name="macro_buttons_row"
                 width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0"
@@ -84,6 +94,7 @@
             <text_small name="macro_2_label" text="Macro 2" style_text_color="#text_primary"/>
           </lv_button>
         </lv_obj>
+
         <!-- Motion panel navigation button -->
         <lv_button name="btn_motion"
                    width="100%" height="#button_height_small" style_radius="#border_radius"
@@ -95,13 +106,16 @@
           <text_small text="Motion" style_text_color="#text_primary"/>
         </lv_button>
       </ui_card>
+
       <!-- Card 2: Temperatures (Combined Nozzle + Bed) -->
       <ui_card name="card_temperatures"
                height="100%" flex_grow="1" flex_flow="column" flex_main_place="center" flex_cross_place="center"
                style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
         <event_cb trigger="clicked" callback="on_controls_temperatures"/>
-        <icon src="heater" size="md" variant="secondary"/>
-        <text_small text="Temperatures" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
+        <lv_obj height="content" flex_flow="row" style_flex_cross_place="center" style_pad_all="0" style_pad_gap="#space_sm" style_border_width="0">
+          <icon src="heater" size="md" variant="secondary"/>
+          <text_small text="Temperatures" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
+		</lv_obj>
         <!-- Nozzle section -->
         <lv_obj width="90%"
                 height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
@@ -127,13 +141,16 @@
                 style_bg_color="#theme_grey" style_radius="#space_xs"/>
         <text_small name="bed_status" bind_text="controls_bed_status" style_text_color="#text_secondary"/>
       </ui_card>
+
       <!-- Card 3: Cooling (Multi-Fan) -->
       <ui_card name="card_cooling"
                height="100%" flex_grow="1" flex_flow="column" flex_main_place="center" flex_cross_place="center"
                style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
         <event_cb trigger="clicked" callback="on_controls_cooling"/>
-        <icon name="fan_icon" src="fan" size="md" variant="secondary"/>
-        <text_small text="Cooling" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
+        <lv_obj height="content" flex_flow="row" style_flex_cross_place="center" style_pad_all="0" style_pad_gap="#space_sm" style_border_width="0">
+          <icon name="fan_icon" src="fan" size="md" variant="secondary"/>
+          <text_small text="Cooling" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
+        </lv_obj>
         <!-- Part cooling hero section -->
         <text_small text="Part Fan" style_text_color="#text_secondary" style_pad_top="#space_sm"/>
         <lv_slider name="part_fan_slider"
@@ -150,90 +167,16 @@
         </lv_obj>
       </ui_card>
     </lv_obj>
-    <!-- Row 2: Filament (wider), Calibration (2 cards) -->
+    
+    <!-- Row 2: Calibration & Tools (centered) -->
+    <!-- Using flex_grow here since Row 1 has explicit 50% height -->
     <lv_obj width="100%"
             flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
-            style_pad_gap="#space_md" scrollable="false">
-      <!-- Card 4: Filament (Preheat + Extrusion) - wider -->
-      <ui_card name="card_filament"
-               height="100%" flex_grow="2" flex_flow="column" flex_main_place="center" flex_cross_place="center"
-               style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
-        <event_cb trigger="clicked" callback="on_controls_filament"/>
-        <!-- Icon with sensor indicator -->
-        <lv_obj width="content"
-                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
-                style_flex_cross_place="center" style_pad_gap="#space_xs">
-          <icon src="filament" size="md" variant="secondary"/>
-          <filament_sensor_indicator/>
-        </lv_obj>
-        <text_small text="Filament" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
-        <!-- Preheat preset buttons -->
-        <lv_obj width="100%"
-                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
-                flex_flow="row" flex_main_place="center" style_pad_gap="#space_xs" style_pad_top="#space_sm">
-          <lv_button name="btn_preheat_pla"
-                     width="content" height="#button_height_small" style_radius="#border_radius"
-                     style_pad_left="#space_sm" style_pad_right="#space_sm" style_bg_color="#success_color"
-                     style_bg_opa="80" style_border_width="0">
-            <event_cb trigger="clicked" callback="on_controls_preheat_pla"/>
-            <text_small text="PLA" style_text_color="#text_primary"/>
-          </lv_button>
-          <lv_button name="btn_preheat_petg"
-                     width="content" height="#button_height_small" style_radius="#border_radius"
-                     style_pad_left="#space_sm" style_pad_right="#space_sm" style_bg_color="#info_color"
-                     style_bg_opa="80" style_border_width="0">
-            <event_cb trigger="clicked" callback="on_controls_preheat_petg"/>
-            <text_small text="PETG" style_text_color="#text_primary"/>
-          </lv_button>
-          <lv_button name="btn_preheat_abs"
-                     width="content" height="#button_height_small" style_radius="#border_radius"
-                     style_pad_left="#space_sm" style_pad_right="#space_sm" style_bg_color="#warning_color"
-                     style_bg_opa="80" style_border_width="0">
-            <event_cb trigger="clicked" callback="on_controls_preheat_abs"/>
-            <text_small text="ABS" style_text_color="#text_primary"/>
-          </lv_button>
-          <lv_button name="btn_preheat_asa"
-                     width="content" height="#button_height_small" style_radius="#border_radius"
-                     style_pad_left="#space_sm" style_pad_right="#space_sm" style_bg_color="#accent_color"
-                     style_bg_opa="80" style_border_width="0">
-            <event_cb trigger="clicked" callback="on_controls_preheat_asa"/>
-            <text_small text="ASA" style_text_color="#text_primary"/>
-          </lv_button>
-          <lv_button name="btn_preheat_off"
-                     width="content" height="#button_height_small" style_radius="#border_radius"
-                     style_pad_left="#space_sm" style_pad_right="#space_sm" style_bg_color="#text_secondary"
-                     style_bg_opa="40" style_border_width="0">
-            <event_cb trigger="clicked" callback="on_controls_preheat_off"/>
-            <text_small text="Off" style_text_color="#text_primary"/>
-          </lv_button>
-        </lv_obj>
-        <!-- Current temps status -->
-        <text_small name="preheat_status"
-                    bind_text="controls_preheat_status" style_text_color="#text_secondary" style_pad_top="#space_xs"/>
-        <!-- Extrude/Retract buttons -->
-        <lv_obj width="100%"
-                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
-                flex_flow="row" flex_main_place="center" style_pad_gap="#space_sm" style_pad_top="#space_sm">
-          <lv_button name="btn_extrude"
-                     width="content" height="#button_height_small" style_radius="#border_radius"
-                     style_pad_left="#space_md" style_pad_right="#space_md" style_bg_color="#card_bg"
-                     style_border_width="1" style_border_color="#text_secondary" style_border_opa="60">
-            <event_cb trigger="clicked" callback="on_controls_extrude"/>
-            <text_small text="Extrude 10mm"/>
-          </lv_button>
-          <lv_button name="btn_retract"
-                     width="content" height="#button_height_small" style_radius="#border_radius"
-                     style_pad_left="#space_md" style_pad_right="#space_md" style_bg_color="#card_bg"
-                     style_border_width="1" style_border_color="#text_secondary" style_border_opa="60">
-            <event_cb trigger="clicked" callback="on_controls_retract"/>
-            <text_small text="Retract 10mm"/>
-          </lv_button>
-        </lv_obj>
-      </ui_card>
-      <!-- Card 5: Calibration & Tools (unchanged) -->
+            style_pad_gap="#space_md" style_flex_main_place="center" scrollable="false">
+      <!-- Card 4: Calibration & Tools -->
       <ui_card name="card_calibration"
                height="100%" flex_grow="1" flex_flow="column" flex_main_place="center" flex_cross_place="center"
-               style_radius="#border_radius_large" style_pad_all="#space_sm" scrollable="false" clickable="true">
+               style_radius="#border_radius_large" style_border_width="0" style_pad_all="#space_sm" scrollable="false" clickable="true">
         <event_cb trigger="clicked" callback="on_controls_calibration"/>
         <lv_obj width="content"
                 height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
@@ -246,10 +189,11 @@
         <text_small text="Mesh | Z-Offset | Leveling" style_text_color="#text_secondary"/>
       </ui_card>
     </lv_obj>
-    <!-- Row 3: Emergency Stop (ONLY visible when printing) -->
-    <lv_obj name="estop_row"
-            width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_left="#space_md"
-            style_pad_right="#space_md" style_pad_bottom="#space_md" scrollable="false" hidden="true">
+
+    <!-- Emergency Stop Row (ONLY visible when printing) -->
+    <lv_obj name="estop_row" hidden="true"
+            width="100%" height="content" style_bg_opa="0" style_border_width="0"
+            scrollable="false" style_margin_top="#space_md">
       <lv_obj-bind_flag_if_eq subject="estop_visible" flag="hidden" ref_value="0"/>
       <lv_button name="estop_button_controls"
                  width="100%" height="#button_height_normal" style_radius="#border_radius_large" style_border_width="0"
@@ -260,5 +204,6 @@
         <event_cb trigger="clicked" callback="emergency_stop_clicked"/>
       </lv_button>
     </lv_obj>
+
   </view>
 </component>

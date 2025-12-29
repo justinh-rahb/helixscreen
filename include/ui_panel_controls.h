@@ -16,15 +16,14 @@ class TempControlPanel;
  * A card-based dashboard providing quick access to printer controls with
  * live data display. Uses proper reactive XML event_cb bindings.
  *
- * ## V2 Layout (3+2 Grid):
+ * ## V2 Layout (3+1 Grid):
  * - Row 1: Quick Actions | Temperatures | Cooling
- * - Row 2: Filament (wide) | Calibration & Tools
+ * - Row 2: Calibration & Tools (centered)
  *
  * ## Key Features:
  * - Combined nozzle + bed temperature card with dual progress bars
  * - Quick Actions: Home buttons (All/XY/Z) + configurable macro slots
  * - Cooling: Part fan hero slider + secondary fans list
- * - Filament: Preheat presets (PLA/PETG/ABS/ASA/Off) + extrude/retract
  * - Calibration: Bed mesh, Z-offset, screws, motor disable
  *
  * ## Event Binding Pattern:
@@ -115,10 +114,6 @@ class ControlsPanel : public PanelBase {
     char fan_speed_buf_[16] = {};
     lv_subject_t fan_pct_subject_{};
 
-    // Preheat status (Filament card)
-    lv_subject_t preheat_status_subject_{};
-    char preheat_status_buf_[48] = {};
-
     // Note: Calibration modal uses ui_modal_show pattern (pointer is calibration_modal_ below)
 
     //
@@ -148,7 +143,6 @@ class ControlsPanel : public PanelBase {
     lv_obj_t* motion_panel_ = nullptr;
     lv_obj_t* nozzle_temp_panel_ = nullptr;
     lv_obj_t* bed_temp_panel_ = nullptr;
-    lv_obj_t* extrusion_panel_ = nullptr;
     lv_obj_t* fan_panel_ = nullptr;
     lv_obj_t* calibration_modal_ = nullptr;
     lv_obj_t* bed_mesh_panel_ = nullptr;
@@ -186,7 +180,6 @@ class ControlsPanel : public PanelBase {
     void update_nozzle_temp_display();
     void update_bed_temp_display();
     void update_fan_display();
-    void update_preheat_status();
     void populate_secondary_fans();                        // Build fan list from PrinterState
     void update_z_offset_delta_display(int delta_microns); // Format delta for banner
 
@@ -200,7 +193,6 @@ class ControlsPanel : public PanelBase {
     void handle_quick_actions_clicked();
     void handle_temperatures_clicked();
     void handle_cooling_clicked();
-    void handle_filament_clicked();
     void handle_calibration_clicked();
 
     //
@@ -212,19 +204,6 @@ class ControlsPanel : public PanelBase {
     void handle_home_z();
     void handle_macro_1();
     void handle_macro_2();
-
-    //
-    // === Preheat Handlers ===
-    //
-
-    void handle_preheat(int nozzle_temp, int bed_temp, const char* material_name);
-
-    //
-    // === Extrusion Handlers ===
-    //
-
-    void handle_extrude();
-    void handle_retract();
 
     //
     // === Fan Slider Handler ===
@@ -252,7 +231,6 @@ class ControlsPanel : public PanelBase {
     static void on_quick_actions_clicked(lv_event_t* e);
     static void on_temperatures_clicked(lv_event_t* e);
     static void on_cooling_clicked(lv_event_t* e);
-    static void on_filament_clicked(lv_event_t* e);
     static void on_calibration_clicked(lv_event_t* e);
     static void on_motors_confirm(lv_event_t* e);
     static void on_motors_cancel(lv_event_t* e);
@@ -277,13 +255,6 @@ class ControlsPanel : public PanelBase {
     static void on_macro_1(lv_event_t* e);
     static void on_macro_2(lv_event_t* e);
     static void on_fan_slider_changed(lv_event_t* e);
-    static void on_preheat_pla(lv_event_t* e);
-    static void on_preheat_petg(lv_event_t* e);
-    static void on_preheat_abs(lv_event_t* e);
-    static void on_preheat_asa(lv_event_t* e);
-    static void on_preheat_off(lv_event_t* e);
-    static void on_extrude(lv_event_t* e);
-    static void on_retract(lv_event_t* e);
     static void on_save_z_offset(lv_event_t* e);
 
     //
