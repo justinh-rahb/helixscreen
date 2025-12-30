@@ -30,6 +30,7 @@
 #include <regex>
 #include <signal.h>
 #include <string>
+#include <sys/stat.h>
 #include <unistd.h>
 
 // Signal handling for graceful shutdown
@@ -136,21 +137,33 @@ static lv_obj_t* create_splash_ui(lv_obj_t* screen, int width, int height) {
 
     // Create logo image
     lv_obj_t* logo = lv_image_create(container);
-    const char* logo_path = "A:assets/images/helixscreen-logo.png";
-    lv_image_set_src(logo, logo_path);
 
-    // Scale logo to 60% of screen width (50% on tiny screens)
-    lv_image_header_t header;
-    if (lv_image_decoder_get_info(logo_path, &header) == LV_RESULT_OK) {
-        int target_size = (width * 3) / 5; // 60%
-        if (height < 500) {
-            target_size = width / 2; // 50% on tiny screens
-        }
-        int scale = (target_size * 256) / header.w;
-        lv_image_set_scale(logo, scale);
+    // Check for pre-rendered image first (AD5M = 800x480 = "small" category)
+    // Pre-rendered = exact 400x400 pixels, no decode/scale needed → 60+ FPS
+    // PNG fallback = decode + scale each frame → 2-3 FPS on Cortex-A7
+    const char* prerendered_path = "assets/images/prerendered/splash-logo-small.bin";
+    struct stat st;
+    bool use_prerendered = (stat(prerendered_path, &st) == 0);
+
+    if (use_prerendered) {
+        // Pre-rendered: instant display, no scaling needed!
+        lv_image_set_src(logo, "A:assets/images/prerendered/splash-logo-small.bin");
+        fprintf(stderr, "helix-splash: Using pre-rendered splash (fast path)\n");
     } else {
-        // Fallback if we can't get dimensions
-        lv_image_set_scale(logo, 128); // 50%
+        // PNG fallback with runtime scaling (slow but works)
+        const char* logo_path = "A:assets/images/helixscreen-logo.png";
+        lv_image_set_src(logo, logo_path);
+        fprintf(stderr, "helix-splash: Using PNG fallback (slow path)\n");
+
+        // Scale logo to 50% of screen width (AD5M height 480 < 500)
+        lv_image_header_t header;
+        if (lv_image_decoder_get_info(logo_path, &header) == LV_RESULT_OK) {
+            int target_size = width / 2; // 50% on small screens
+            int scale = (target_size * 256) / header.w;
+            lv_image_set_scale(logo, scale);
+        } else {
+            lv_image_set_scale(logo, 128); // Fallback: 50%
+        }
     }
 
     // Start fade-in animation
