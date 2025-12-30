@@ -16,6 +16,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace helix {
 namespace gcode {
@@ -162,15 +163,56 @@ void GCodeLayerRenderer::auto_fit() {
     // Get bounding box from either full file or streaming index stats
     AABB bb;
     if (streaming_controller_) {
-        // In streaming mode, we use the index stats for bounding box
-        // The stats contain min_z and max_z, but not X/Y bounds
-        // For now, use a default print volume and refine when first layer loads
+        // In streaming mode, compute actual X/Y bounds from layer data
+        // The index stats only have Z bounds, so we sample layers for X/Y
         const auto& stats = streaming_controller_->get_index_stats();
-        // Assume typical 3D printer bed size (this will be refined on first render)
-        bb.min = {0.0f, 0.0f, stats.min_z};
-        bb.max = {200.0f, 200.0f, stats.max_z};
-        spdlog::debug("[GCodeLayerRenderer] Streaming auto_fit using Z range [{:.1f}, {:.1f}]",
-                      stats.min_z, stats.max_z);
+
+        // Initialize with Z bounds from index
+        bb.min = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
+                  stats.min_z};
+        bb.max = {std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest(),
+                  stats.max_z};
+
+        // Sample a few layers to compute X/Y bounds (first, middle, last)
+        size_t layer_count = streaming_controller_->get_layer_count();
+        std::vector<size_t> sample_layers;
+        if (layer_count > 0) {
+            sample_layers.push_back(0); // First layer
+            if (layer_count > 2) {
+                sample_layers.push_back(layer_count / 2); // Middle layer
+            }
+            if (layer_count > 1) {
+                sample_layers.push_back(layer_count - 1); // Last layer
+            }
+        }
+
+        bool found_bounds = false;
+        for (size_t layer_idx : sample_layers) {
+            auto segments = streaming_controller_->get_layer_segments(layer_idx);
+            if (segments && !segments->empty()) {
+                for (const auto& seg : *segments) {
+                    bb.min.x = std::min(bb.min.x, std::min(seg.start.x, seg.end.x));
+                    bb.max.x = std::max(bb.max.x, std::max(seg.start.x, seg.end.x));
+                    bb.min.y = std::min(bb.min.y, std::min(seg.start.y, seg.end.y));
+                    bb.max.y = std::max(bb.max.y, std::max(seg.start.y, seg.end.y));
+                    found_bounds = true;
+                }
+            }
+        }
+
+        // Fallback to 200x200 if no layer data available yet
+        if (!found_bounds) {
+            bb.min.x = 0.0f;
+            bb.min.y = 0.0f;
+            bb.max.x = 200.0f;
+            bb.max.y = 200.0f;
+            spdlog::debug(
+                "[GCodeLayerRenderer] Streaming: no layers loaded yet, using default 200x200");
+        } else {
+            spdlog::info("[GCodeLayerRenderer] Streaming: computed bounds X[{:.1f},{:.1f}] "
+                         "Y[{:.1f},{:.1f}] from {} layers",
+                         bb.min.x, bb.max.x, bb.min.y, bb.max.y, sample_layers.size());
+        }
     } else if (gcode_) {
         bb = gcode_->global_bounding_box;
     } else {
@@ -256,8 +298,10 @@ void GCodeLayerRenderer::auto_fit() {
 
     bounds_valid_ = true;
 
-    spdlog::debug("[GCodeLayerRenderer] auto_fit: mode={}, range=({:.1f},{:.1f}), scale={:.2f}",
-                  static_cast<int>(view_mode_), range_x, range_y, scale_);
+    spdlog::debug("[GCodeLayerRenderer] auto_fit: canvas={}x{}, mode={}, range=({:.1f},{:.1f}), "
+                  "scale={:.2f}, center=({:.1f},{:.1f},{:.1f})",
+                  canvas_width_, canvas_height_, static_cast<int>(view_mode_), range_x, range_y,
+                  scale_, offset_x_, offset_y_, offset_z_);
 }
 
 void GCodeLayerRenderer::fit_layer() {
