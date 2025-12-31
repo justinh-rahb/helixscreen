@@ -1123,18 +1123,24 @@ void ControlsPanel::on_homed_axes_changed(lv_observer_t* obs, lv_subject_t* subj
     int all = (has_x && has_y && has_z) ? 1 : 0;
 
     // Only update if changed (avoid unnecessary redraws)
+    bool changed = false;
     if (lv_subject_get_int(&self->xy_homed_) != xy) {
         lv_subject_set_int(&self->xy_homed_, xy);
+        changed = true;
     }
     if (lv_subject_get_int(&self->z_homed_) != z) {
         lv_subject_set_int(&self->z_homed_, z);
+        changed = true;
     }
     if (lv_subject_get_int(&self->all_homed_) != all) {
         lv_subject_set_int(&self->all_homed_, all);
+        changed = true;
     }
 
-    spdlog::debug("[Controls Panel] Homing status: xy={}, z={}, all={} (axes='{}')", xy, z, all,
-                  axes);
+    if (changed) {
+        spdlog::info("[ControlsPanel] Homing status changed: xy={}, z={}, all={} (axes='{}')", xy,
+                     z, all, axes);
+    }
 }
 
 // ============================================================================

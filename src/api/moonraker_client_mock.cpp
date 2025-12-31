@@ -668,6 +668,15 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
         spdlog::info("[MoonrakerClientMock] Set relative positioning mode (G91)");
     }
 
+    // M84 - Disable stepper motors (sets idle_timeout.state to "Idle")
+    if (gcode.find("M84") != std::string::npos || gcode.find("M18") != std::string::npos) {
+        motors_enabled_.store(false);
+        spdlog::info("[MoonrakerClientMock] Motors disabled (M84/M18)");
+        // Dispatch idle_timeout state change
+        json idle_status = {{"idle_timeout", {{"state", "Idle"}}}};
+        dispatch_status_update(idle_status);
+    }
+
     // Parse homing command (G28)
     // G28 - Home all axes
     // G28 X - Home X axis only
@@ -675,6 +684,8 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
     // G28 Z - Home Z axis only
     // G28 X Y - Home X and Y axes
     if (gcode.find("G28") != std::string::npos) {
+        // Re-enable motors when homing
+        motors_enabled_.store(true);
         // Check if specific axes are mentioned after G28
         // Need to look after the G28 to avoid false matches
         size_t g28_pos = gcode.find("G28");
@@ -731,6 +742,8 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
     // G0 X100 Y50 Z10 - Rapid move
     // G1 X100 Y50 Z10 E5 F3000 - Linear move (E and F ignored for now)
     if (gcode.find("G0") != std::string::npos || gcode.find("G1") != std::string::npos) {
+        // Re-enable motors when moving
+        motors_enabled_.store(true);
         bool is_relative = relative_mode_.load();
 
         // Helper lambda to parse axis value from gcode string
@@ -2147,7 +2160,19 @@ void MoonrakerClientMock::temperature_simulation_loop() {
              {{"file_path", filename},
               {"progress", progress},
               {"is_active",
-               phase == MockPrintPhase::PRINTING || phase == MockPrintPhase::PREHEAT}}}};
+               phase == MockPrintPhase::PRINTING || phase == MockPrintPhase::PREHEAT}}},
+            // idle_timeout tracks motor state: "Printing" = active print, "Ready" = motors enabled,
+            // "Idle" = motors disabled (via M84)
+            {"idle_timeout", {{"state", [&]() -> std::string {
+                                   if (!motors_enabled_.load()) {
+                                       return "Idle";
+                                   } else if (phase == MockPrintPhase::PRINTING ||
+                                              phase == MockPrintPhase::PREHEAT) {
+                                       return "Printing";
+                                   } else {
+                                       return "Ready";
+                                   }
+                               }()}}}};
 
         // Add klippy state if not ready (only send when abnormal)
         KlippyState klippy = klippy_state_.load();

@@ -20,6 +20,24 @@
 namespace helix {
 
 /**
+ * No-op callback for optional event handlers in XML components.
+ * When a component has an optional callback prop with default="",
+ * LVGL tries to find a callback named "" which doesn't exist.
+ * Registering this no-op callback silences those warnings.
+ */
+static void noop_event_callback(lv_event_t* /*e*/) {
+    // Intentionally empty - used for optional callbacks that weren't provided
+}
+
+/**
+ * No-op subject for optional subject bindings in XML components.
+ * When a component has an optional subject prop with default="",
+ * LVGL tries to find a subject named "" which doesn't exist.
+ * Registering this no-op subject silences those warnings.
+ */
+static lv_subject_t s_noop_subject;
+
+/**
  * Register responsive constants for color picker sizing based on screen dimensions
  * Call this BEFORE registering XML components that use the color picker
  */
@@ -130,6 +148,12 @@ void register_xml_components() {
     ui_text_input_init(); // <text_input> with bind_text support
     ui_spinner_init();    // <spinner> with responsive sizing
 
+    // Register no-op callback and subject for optional handlers in XML components
+    // This silences warnings when components use callback/subject props with default=""
+    lv_xml_register_event_cb(nullptr, "", noop_event_callback);
+    lv_subject_init_int(&s_noop_subject, 0);
+    lv_xml_register_subject(nullptr, "", &s_noop_subject);
+
     // Register custom widgets (BEFORE components that use them)
     ui_gcode_viewer_register();
     ui_spool_canvas_register(); // Needed by Spoolman panel (and AMS panel)
@@ -150,7 +174,6 @@ void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/header_bar.xml");
     lv_xml_register_component_from_file("A:ui_xml/overlay_backdrop.xml");
     lv_xml_register_component_from_file("A:ui_xml/overlay_panel.xml");
-    lv_xml_register_component_from_file("A:ui_xml/status_bar.xml");
     lv_xml_register_component_from_file("A:ui_xml/toast_notification.xml");
     // emergency_stop_button.xml removed - E-Stop buttons are now embedded in panels
     lv_xml_register_component_from_file("A:ui_xml/estop_confirmation_dialog.xml");
@@ -179,7 +202,6 @@ void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/navigation_bar.xml");
     lv_xml_register_component_from_file("A:ui_xml/home_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/controls_panel.xml");
-    lv_xml_register_component_from_file("A:ui_xml/calibration_modal.xml");
     lv_xml_register_component_from_file("A:ui_xml/motion_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/nozzle_temp_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/bed_temp_panel.xml");
@@ -226,7 +248,6 @@ void register_xml_components() {
     // Bed mesh modals (must be registered before bed_mesh_panel which uses them)
     lv_xml_register_component_from_file("A:ui_xml/bed_mesh_calibrate_modal.xml");
     lv_xml_register_component_from_file("A:ui_xml/bed_mesh_rename_modal.xml");
-    lv_xml_register_component_from_file("A:ui_xml/bed_mesh_delete_confirm_modal.xml");
     lv_xml_register_component_from_file("A:ui_xml/bed_mesh_save_config_modal.xml");
     lv_xml_register_component_from_file("A:ui_xml/bed_mesh_panel.xml");
 
@@ -249,10 +270,8 @@ void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/advanced_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/test_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/print_select_panel.xml");
-    lv_xml_register_component_from_file("A:ui_xml/step_progress_test.xml");
     lv_xml_register_component_from_file("A:ui_xml/gcode_test_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/glyphs_panel.xml");
-    lv_xml_register_component_from_file("A:ui_xml/gradient_test_panel.xml");
 
     // App layout
     lv_xml_register_component_from_file("A:ui_xml/app_layout.xml");

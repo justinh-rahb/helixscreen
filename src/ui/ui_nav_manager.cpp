@@ -657,11 +657,28 @@ void NavigationManager::set_active(ui_panel_id_t panel_id) {
     ui_panel_id_t old_panel = active_panel_;
 
     // Update panel stack
+    // IMPORTANT: Only update the base panel in the stack, preserving any overlays.
+    // This fixes the bug where closing an overlay from Controls would return to Home
+    // because set_active() was clearing the entire stack unconditionally.
     if (panel_widgets_[panel_id]) {
-        panel_stack_.clear();
-        panel_stack_.push_back(panel_widgets_[panel_id]);
-        spdlog::trace("[NavigationManager] Panel stack updated to panel {} (set_active)",
-                      static_cast<int>(panel_id));
+        if (panel_stack_.empty()) {
+            // Stack is empty - just push the new panel
+            panel_stack_.push_back(panel_widgets_[panel_id]);
+            spdlog::trace("[NavigationManager] Panel stack initialized with panel {}",
+                          static_cast<int>(panel_id));
+        } else if (panel_stack_.size() == 1) {
+            // Only base panel in stack - replace it
+            panel_stack_[0] = panel_widgets_[panel_id];
+            spdlog::trace("[NavigationManager] Panel stack base updated to panel {}",
+                          static_cast<int>(panel_id));
+        } else {
+            // Overlays are present - update base panel but preserve overlays
+            // This handles the case where connection changes while an overlay is open
+            panel_stack_[0] = panel_widgets_[panel_id];
+            spdlog::debug("[NavigationManager] Panel stack base updated to panel {}, "
+                          "preserving {} overlays",
+                          static_cast<int>(panel_id), panel_stack_.size() - 1);
+        }
     }
 
     // Call on_deactivate() BEFORE state update
@@ -930,6 +947,7 @@ bool NavigationManager::go_back() {
 
         // Fallback to home if empty
         if (mgr.panel_stack_.empty()) {
+            spdlog::debug("[NavigationManager] go_back stack empty, falling back to HOME");
             for (int i = 0; i < UI_PANEL_COUNT; i++) {
                 if (mgr.panel_widgets_[i])
                     lv_obj_add_flag(mgr.panel_widgets_[i], LV_OBJ_FLAG_HIDDEN);

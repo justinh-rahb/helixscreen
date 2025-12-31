@@ -208,7 +208,7 @@
           <lv_button name="print_button" height="#button_height" flex_grow="1" style_bg_color="#primary_color">
             <event_cb trigger="clicked" callback="on_print_select_print_button"/>
             <text_body text="Print" align="center" style_text_color="#FFFFFF"/>
-            <lv_obj-bind_flag_if_eq subject="print_select_can_print" flag="disabled" ref_value="0"/>
+            <lv_obj-bind_state_if_eq subject="print_select_can_print" state="disabled" ref_value="0"/>
           </lv_button>
         </lv_obj>
       </lv_obj>

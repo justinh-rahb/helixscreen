@@ -152,6 +152,14 @@ class MoonrakerClientMock : public MoonrakerClient {
     }
 
     /**
+     * @brief Check if motors are currently enabled
+     * @return true if motors enabled (Ready/Printing), false if disabled (Idle via M84)
+     */
+    bool are_motors_enabled() const {
+        return motors_enabled_.load();
+    }
+
+    /**
      * @brief Get current layer number in simulated print
      * @return Current layer (0-based), or 0 if not printing
      */
@@ -576,6 +584,7 @@ class MoonrakerClientMock : public MoonrakerClient {
 
     // Motion mode state
     std::atomic<bool> relative_mode_{false}; // G90=absolute (false), G91=relative (true)
+    std::atomic<bool> motors_enabled_{true}; // Track motor enable state for idle_timeout
 
     // Homing state (needs mutex since std::string is not atomic)
     mutable std::mutex homed_axes_mutex_;

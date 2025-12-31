@@ -923,6 +923,17 @@ class PrinterState {
     }
 
     /**
+     * @brief Get motors enabled subject for UI binding
+     *
+     * Returns 1 when stepper motors are enabled (idle_timeout.state is "Ready" or "Printing"),
+     * 0 when motors are disabled (idle_timeout.state is "Idle").
+     * Used to reflect motor state in the UI (e.g., disable motion controls when motors off).
+     */
+    lv_subject_t* get_motors_enabled_subject() {
+        return &motors_enabled_;
+    }
+
+    /**
      * @brief Check if printer has a probe configured
      *
      * Used by Z-offset calibration to determine whether to use
@@ -1045,6 +1056,9 @@ class PrinterState {
     // Manual probe subjects (for Z-offset calibration)
     lv_subject_t manual_probe_active_; // Integer: 0=inactive, 1=active (PROBE_CALIBRATE running)
     lv_subject_t manual_probe_z_position_; // Integer: Z position * 1000 (for 0.001mm resolution)
+
+    // Motor enabled state (from idle_timeout.state)
+    lv_subject_t motors_enabled_; // Integer: 0=disabled (Idle), 1=enabled (Ready/Printing)
 
     // Version subjects (for About section)
     lv_subject_t klipper_version_;

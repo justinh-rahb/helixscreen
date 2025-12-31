@@ -80,6 +80,25 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
                        {{"min_temp", 0.0}, {"max_temp", 300.0}, {"min_extrude_temp", 170.0}}},
                       {"heater_bed", {{"min_temp", 0.0}, {"max_temp", 120.0}}}}}};
             }
+
+            // idle_timeout (for motors_enabled state)
+            if (objects.contains("idle_timeout")) {
+                // Derive state from print phase and motor state:
+                // - "Idle" when motors disabled (via M84)
+                // - "Printing" when active print in progress
+                // - "Ready" when motors enabled but not printing
+                std::string idle_state;
+                if (!self->are_motors_enabled()) {
+                    idle_state = "Idle";
+                } else {
+                    auto phase = self->get_print_phase();
+                    idle_state = (phase == MoonrakerClientMock::MockPrintPhase::PRINTING ||
+                                  phase == MoonrakerClientMock::MockPrintPhase::PREHEAT)
+                                     ? "Printing"
+                                     : "Ready";
+                }
+                status_obj["idle_timeout"] = {{"state", idle_state}};
+            }
         }
 
         if (success_cb) {

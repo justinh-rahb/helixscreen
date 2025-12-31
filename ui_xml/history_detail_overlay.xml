@@ -187,7 +187,7 @@
           <!-- View Timelapse button -->
           <lv_button name="view_timelapse_btn"
                      width="100%" height="#button_height_small" style_radius="#border_radius"
-                     style_bg_color="#surface_bg_dark">
+                     style_bg_color="#app_bg_color">
             <text_body text="View Timelapse" align="center"/>
             <event_cb trigger="clicked" callback="history_detail_view_timelapse"/>
           </lv_button>
@@ -210,7 +210,7 @@
                      height="#button_height" flex_grow="1" style_radius="#border_radius" style_bg_color="#primary_color">
             <text_body text="Reprint" align="center"/>
             <event_cb trigger="clicked" callback="history_detail_reprint"/>
-            <lv_obj-bind_flag_if_eq subject="history_detail_can_reprint" flag="disabled" ref_value="0"/>
+            <lv_obj-bind_state_if_eq subject="history_detail_can_reprint" state="disabled" ref_value="0"/>
           </lv_button>
         </lv_obj>
       </lv_obj>

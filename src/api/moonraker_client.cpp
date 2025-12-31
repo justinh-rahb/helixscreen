@@ -1235,6 +1235,9 @@ void MoonrakerClient::complete_discovery_subscription(std::function<void()> on_c
     // Manual probe (for Z-offset calibration - PROBE_CALIBRATE, Z_ENDSTOP_CALIBRATE)
     subscription_objects["manual_probe"] = nullptr;
 
+    // Idle timeout (for motor enabled state tracking)
+    subscription_objects["idle_timeout"] = nullptr;
+
     // All discovered AFC objects (AFC, AFC_stepper, AFC_hub, AFC_extruder)
     // These provide lane status, sensor states, and filament info for MMU support
     for (const auto& afc_obj : afc_objects_) {

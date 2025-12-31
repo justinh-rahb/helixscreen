@@ -17,6 +17,7 @@
     <px name="nav_button_size" value="70"/>
     <px name="border_radius" value="8"/>
     <px name="border_radius_small" value="4"/>
+    <px name="border_radius_medium" value="9"/>
     <px name="border_radius_large" value="12"/>
     <!-- ===================================================================== -->
     <!-- Unified Responsive Spacing System (space_*)                         -->
@@ -169,6 +170,8 @@
     <!-- Button dimensions -->
     <px name="button_height" value="50"/>
     <px name="button_height_small" value="48"/>
+    <px name="button_height_medium" value="52"/>
+    <px name="button_height_large" value="72"/>
     <px name="button_padding" value="12"/>
     <!-- Icon buttons, back buttons -->
     <px name="button_height_normal" value="56"/>
@@ -299,6 +302,8 @@
     <px name="anim_release" value="120"/>
     <!-- Theme colors -->
     <color name="primary_color" value="#AD2724"/>
+    <color name="primary_color_light" value="#AD2724"/>
+    <color name="primary_color_dark" value="#AD2724"/>
     <color name="secondary_color" value="#D4A84B"/>
     <!-- Graph/Visualization colors -->
     <color name="graph_line_primary" value="#AD2724"/>
@@ -306,6 +311,9 @@
     <color name="graph_line_target" value="#2196F3"/>
     <color name="graph_bg_dark" value="#2D2D2D"/>
     <color name="graph_bg_light" value="#F5F5F5"/>
+    <!-- Theme-aware variants for dynamic binding -->
+    <color name="graph_bg_dark_dark" value="#2D2D2D"/>
+    <color name="graph_bg_dark_light" value="#F5F5F5"/>
     <!-- Mesh visualization gradient -->
     <color name="mesh_low" value="#2196F3"/>
     <color name="mesh_mid" value="#4CAF50"/>
@@ -363,10 +371,16 @@
     <color name="secondary_color" value="#37AEB3"/>  Original teal/cyan
     -->
     <color name="error_color" value="#AD2724"/>
+    <color name="error_color_light" value="#AD2724"/>
+    <color name="error_color_dark" value="#AD2724"/>
     <!-- Error/validation feedback (red) -->
     <color name="warning_color" value="#FF9800"/>
+    <color name="warning_color_light" value="#FF9800"/>
+    <color name="warning_color_dark" value="#FF9800"/>
     <!-- Warning feedback (orange) -->
     <color name="success_color" value="#4CAF50"/>
+    <color name="success_color_light" value="#4CAF50"/>
+    <color name="success_color_dark" value="#4CAF50"/>
     <!-- Success feedback (green) -->
     <color name="info_color" value="#2196F3"/>
     <!-- Info feedback (blue) -->
@@ -401,8 +415,10 @@
     <!-- Light mode: very dark -->
     <color name="header_text_dark" value="#FFFFFF"/>
     <!-- Dark mode: very light -->
-    <!-- Secondary text color (same for both themes) -->
+    <!-- Secondary text color (theme-aware: light/dark modes) -->
     <color name="text_secondary" value="#ADAEB8"/>
+    <color name="text_secondary_light" value="#565656"/>
+    <color name="text_secondary_dark" value="#ADAEB8"/>
     <!-- Card background colors (theme-aware: light/dark modes) -->
     <color name="card_bg_light" value="#F0F3F9"/>
     <color name="card_bg_dark" value="#292A2D"/>
@@ -496,6 +512,8 @@
     <str name="icon_droplet" value="󰖌"/>
     <!-- U+F058C water (purge) -->
     <str name="icon_edit" value="󰏫"/>
+    <!-- U+F0A46 engine-off (motors disabled) -->
+    <str name="icon_engine_off" value="󰩆"/>
     <!-- U+F03EB pencil (custom) -->
     <str name="icon_ethernet" value="󰈀"/>
     <!-- U+F0200 ethernet -->

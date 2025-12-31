@@ -178,6 +178,7 @@ void PrinterState::reset_for_testing() {
     lv_subject_deinit(&unretract_speed_);
     lv_subject_deinit(&manual_probe_active_);
     lv_subject_deinit(&manual_probe_z_position_);
+    lv_subject_deinit(&motors_enabled_);
     lv_subject_deinit(&klipper_version_);
     lv_subject_deinit(&moonraker_version_);
 
@@ -303,6 +304,9 @@ void PrinterState::init_subjects(bool register_xml) {
     lv_subject_init_int(&manual_probe_active_, 0);     // 0=inactive, 1=active
     lv_subject_init_int(&manual_probe_z_position_, 0); // Z position in microns
 
+    // Motor enabled state (from idle_timeout.state - defaults to enabled/Ready)
+    lv_subject_init_int(&motors_enabled_, 1); // 1=enabled (Ready/Printing), 0=disabled (Idle)
+
     // Version subjects (for About section)
     lv_subject_init_string(&klipper_version_, klipper_version_buf_, nullptr,
                            sizeof(klipper_version_buf_), "—");
@@ -377,6 +381,7 @@ void PrinterState::init_subjects(bool register_xml) {
         lv_xml_register_subject(NULL, "unretract_speed", &unretract_speed_);
         lv_xml_register_subject(NULL, "manual_probe_active", &manual_probe_active_);
         lv_xml_register_subject(NULL, "manual_probe_z_position", &manual_probe_z_position_);
+        lv_xml_register_subject(NULL, "motors_enabled", &motors_enabled_);
         lv_xml_register_subject(NULL, "klipper_version", &klipper_version_);
         lv_xml_register_subject(NULL, "moonraker_version", &moonraker_version_);
     } else {
@@ -772,6 +777,25 @@ void PrinterState::update_from_status(const json& state) {
             int z_microns = static_cast<int>(z_mm * 1000.0);
             lv_subject_set_int(&manual_probe_z_position_, z_microns);
             spdlog::trace("[PrinterState] Manual probe Z: {:.3f}mm", z_mm);
+        }
+    }
+
+    // Update motor enabled state from idle_timeout
+    // idle_timeout.state: "Ready" or "Printing" = motors enabled, "Idle" = motors disabled
+    if (state.contains("idle_timeout")) {
+        const auto& it = state["idle_timeout"];
+
+        if (it.contains("state") && it["state"].is_string()) {
+            std::string timeout_state = it["state"].get<std::string>();
+            // Motors are enabled when state is "Ready" or "Printing", disabled when "Idle"
+            int new_enabled = (timeout_state == "Ready" || timeout_state == "Printing") ? 1 : 0;
+            int old_enabled = lv_subject_get_int(&motors_enabled_);
+
+            if (old_enabled != new_enabled) {
+                lv_subject_set_int(&motors_enabled_, new_enabled);
+                spdlog::info("[PrinterState] Motors {}: idle_timeout.state='{}'",
+                             new_enabled ? "enabled" : "disabled", timeout_state);
+            }
         }
     }
 
