@@ -12,7 +12,7 @@
   <!-- Modal card (backdrop created programmatically) -->
   <view name="spoolman_picker_modal"
         extends="ui_card" width="#modal_width" height="content" align="center" style_radius="#border_radius_large"
-        style_pad_all="#space_md" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="stretch"
+        style_pad_all="#space_md" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start"
         style_pad_gap="#space_sm" scrollable="false" style_max_height="#modal_max_height">
     <!-- Header row -->
     <lv_obj width="100%"
@@ -50,7 +50,7 @@
     <lv_obj name="spool_list"
             width="100%" height="content" style_max_height="#list_max_height" style_bg_opa="0" style_border_width="0"
             style_pad_all="0" style_pad_gap="#space_xs" flex_flow="column" style_flex_main_place="start"
-            style_flex_cross_place="stretch" scrollable="true" scroll_direction="y" overflow="scroll">
+            style_flex_cross_place="start" scrollable="true" scroll_direction="y" overflow="scroll">
       <bind_flag_if_not_eq subject="ams_picker_state" flag="hidden" ref_value="2"/>
       <!-- Spool items populated dynamically by C++ -->
     </lv_obj>

@@ -42,7 +42,7 @@
       <!-- Firmware Restart Button -->
       <lv_button name="advanced_firmware_restart_btn"
                  height="#button_height_small" flex_grow="1" style_radius="#border_radius" style_border_width="0"
-                 style_bg_color="#surface_bg_dark" style_pad_ver="#button_padding" flex_flow="row"
+                 style_bg_color="#app_bg_color" style_pad_ver="#button_padding" flex_flow="row"
                  style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
         <icon src="update" size="sm" color="#text_secondary"/>
         <text_body text="Firmware Restart" style_text_color="#text_secondary"/>

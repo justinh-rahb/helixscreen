@@ -40,8 +40,7 @@
       <!-- ================================================================== -->
       <lv_obj name="right_column"
               width="60%" height="100%" style_bg_opa="0" style_pad_all="0" scrollable="false" style_border_width="0"
-              flex_flow="column" style_flex_main_place="start" style_flex_cross_place="stretch"
-              style_pad_gap="#space_sm">
+              flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start" style_pad_gap="#space_sm">
         <!-- Amount Selector: Single row of 4 compact buttons -->
         <text_small width="100%" text="Amount:"/>
         <lv_obj name="amount_grid"

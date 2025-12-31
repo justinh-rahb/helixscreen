@@ -39,7 +39,7 @@
     <!-- Action button (hidden by default, shown via toast_action_visible subject) -->
     <lv_button name="toast_action_btn"
                width="content" height="36" style_min_width="72" style_radius="#border_radius_small"
-               style_border_width="0" style_bg_color="#accent_color" style_pad_left="#space_lg"
+               style_border_width="0" style_bg_color="#secondary_color" style_pad_left="#space_lg"
                style_pad_right="#space_lg" hidden="true" clickable="true">
       <lv_obj-bind_flag_if_eq subject="toast_action_visible" flag="hidden" ref_value="0"/>
       <text_body name="toast_action_label"

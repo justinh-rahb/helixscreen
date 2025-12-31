@@ -14,7 +14,7 @@
     <lv_obj name="context_menu"
             width="150" height="content" style_bg_color="#theme_grey" style_bg_opa="255" style_radius="#border_radius"
             style_border_width="0" style_pad_all="#space_sm" style_pad_gap="#space_xs" flex_flow="column"
-            style_flex_main_place="start" style_flex_cross_place="stretch" scrollable="false" clickable="true">
+            style_flex_main_place="start" style_flex_cross_place="start" scrollable="false" clickable="true">
       <!-- Load Button -->
       <lv_button name="btn_load"
                  width="100%" height="#button_height_small" style_radius="#border_radius" style_border_width="0"

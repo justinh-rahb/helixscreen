@@ -6,74 +6,74 @@
 <component>
   <!-- Dialog card (backdrop created programmatically) -->
   <view name="bed_mesh_calibrate_modal"
-        extends="ui_dialog" width="70%" height="content" align="center" flex_flow="column"
-        style_flex_main_place="start" style_pad_gap="0">
-      <!-- ============================================================ -->
-      <!-- STATE: IDLE - Profile name entry form -->
-      <!-- ============================================================ -->
-      <lv_obj name="calibrate_form_container"
-              width="100%" height="content" style_min_height="180" style_bg_opa="0" style_border_width="0"
-              style_pad_left="#space_lg" style_pad_right="#space_lg" style_pad_top="#space_lg"
-              style_pad_bottom="#space_lg" flex_flow="column" style_flex_cross_place="center" style_pad_gap="#space_md">
-        <!-- Hide form when calibrating -->
+        extends="ui_dialog" width="70%" height="content" align="center" flex_flow="column" style_flex_main_place="start"
+        style_pad_gap="0">
+    <!-- ============================================================ -->
+    <!-- STATE: IDLE - Profile name entry form -->
+    <!-- ============================================================ -->
+    <lv_obj name="calibrate_form_container"
+            width="100%" height="content" style_min_height="180" style_bg_opa="0" style_border_width="0"
+            style_pad_left="#space_lg" style_pad_right="#space_lg" style_pad_top="#space_lg"
+            style_pad_bottom="#space_lg" flex_flow="column" style_flex_cross_place="center" style_pad_gap="#space_md">
+      <!-- Hide form when calibrating -->
+      <lv_obj-bind_flag_if_eq subject="bed_mesh_calibrating" flag="hidden" ref_value="1"/>
+      <!-- Title -->
+      <text_heading width="100%" text="New Bed Mesh Calibration" style_text_align="center"/>
+      <!-- Instructions -->
+      <text_small width="100%"
+                  text="Enter a name for the new mesh profile" style_text_align="center"
+                  style_text_color="#text_secondary"/>
+      <!-- Profile name input -->
+      <lv_textarea name="calibrate_profile_name_input"
+                   width="100%" height="#input_height" placeholder="Profile name (e.g., default)" max_length="32"
+                   one_line="true" style_border_width="#input_border_width" style_pad_all="#space_md"
+                   style_text_font="#font_body" style_margin_top="#space_sm"/>
+      <!-- Status message (hidden by default) -->
+      <text_small name="calibrate_status"
+                  width="100%" text="" style_text_align="center" style_text_color="#error_color" hidden="true"/>
+    </lv_obj>
+    <!-- ============================================================ -->
+    <!-- STATE: CALIBRATING - Spinner and status -->
+    <!-- ============================================================ -->
+    <lv_obj name="calibrating_container"
+            width="100%" height="content" style_min_height="180" style_bg_opa="0" style_border_width="0"
+            style_pad_left="#space_lg" style_pad_right="#space_lg" style_pad_top="#space_xl"
+            style_pad_bottom="#space_xl" flex_flow="column" style_flex_track_place="center"
+            style_flex_cross_place="center" style_pad_gap="#space_md" hidden="true">
+      <!-- Show spinner when calibrating -->
+      <lv_obj-bind_flag_if_eq subject="bed_mesh_calibrating" flag="hidden" ref_value="0"/>
+      <spinner size="lg"/>
+      <text_heading text="Calibrating..." style_text_align="center"/>
+      <text_small text="Please wait while the bed mesh is being probed"
+                  style_text_color="#text_secondary" style_text_align="center"/>
+    </lv_obj>
+    <!-- Horizontal divider above buttons -->
+    <lv_obj width="100%"
+            height="1" style_bg_color="#text_secondary" style_bg_opa="64" style_border_width="0" style_pad_all="0"/>
+    <!-- Button row -->
+    <lv_obj width="100%"
+            height="#button_height" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row">
+      <!-- Cancel button -->
+      <lv_button name="calibrate_cancel_btn"
+                 height="100%" flex_grow="1" style_radius="#border_radius" style_border_width="0" style_shadow_width="0"
+                 clickable="true">
+        <event_cb trigger="clicked" callback="on_bed_mesh_calibrate_cancel"/>
+        <text_body text="Cancel" align="center"/>
+      </lv_button>
+      <!-- Vertical divider (hidden when calibrating) -->
+      <lv_obj name="calibrate_btn_divider"
+              width="1" height="100%" style_bg_color="#text_secondary" style_bg_opa="64" style_border_width="0"
+              style_pad_all="0">
         <lv_obj-bind_flag_if_eq subject="bed_mesh_calibrating" flag="hidden" ref_value="1"/>
-        <!-- Title -->
-        <text_heading width="100%" text="New Bed Mesh Calibration" style_text_align="center"/>
-        <!-- Instructions -->
-        <text_small width="100%"
-                    text="Enter a name for the new mesh profile" style_text_align="center"
-                    style_text_color="#text_secondary"/>
-        <!-- Profile name input -->
-        <lv_textarea name="calibrate_profile_name_input"
-                     width="100%" height="#input_height" placeholder="Profile name (e.g., default)" max_length="32"
-                     one_line="true" style_border_width="#input_border_width" style_pad_all="#space_md"
-                     style_text_font="#font_body" style_margin_top="#space_sm"/>
-        <!-- Status message (hidden by default) -->
-        <text_small name="calibrate_status"
-                    width="100%" text="" style_text_align="center" style_text_color="#error_color" hidden="true"/>
       </lv_obj>
-      <!-- ============================================================ -->
-      <!-- STATE: CALIBRATING - Spinner and status -->
-      <!-- ============================================================ -->
-      <lv_obj name="calibrating_container"
-              width="100%" height="content" style_min_height="180" style_bg_opa="0" style_border_width="0"
-              style_pad_left="#space_lg" style_pad_right="#space_lg" style_pad_top="#space_xl"
-              style_pad_bottom="#space_xl" flex_flow="column" style_flex_track_place="center"
-              style_flex_cross_place="center" style_pad_gap="#space_md" hidden="true">
-        <!-- Show spinner when calibrating -->
-        <lv_obj-bind_flag_if_eq subject="bed_mesh_calibrating" flag="hidden" ref_value="0"/>
-        <spinner size="lg"/>
-        <text_heading text="Calibrating..." style_text_align="center"/>
-        <text_small text="Please wait while the bed mesh is being probed"
-                    style_text_color="#text_secondary" style_text_align="center"/>
-      </lv_obj>
-      <!-- Horizontal divider above buttons -->
-      <lv_obj width="100%"
-              height="1" style_bg_color="#text_secondary" style_bg_opa="64" style_border_width="0" style_pad_all="0"/>
-      <!-- Button row -->
-      <lv_obj width="100%"
-              height="#button_height" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row">
-        <!-- Cancel button -->
-        <lv_button name="calibrate_cancel_btn"
-                   height="100%" flex_grow="1" style_radius="#border_radius" style_border_width="0"
-                   style_shadow_width="0" clickable="true">
-          <event_cb trigger="clicked" callback="on_bed_mesh_calibrate_cancel"/>
-          <text_body text="Cancel" align="center"/>
-        </lv_button>
-        <!-- Vertical divider (hidden when calibrating) -->
-        <lv_obj name="calibrate_btn_divider"
-                width="1" height="100%" style_bg_color="#text_secondary" style_bg_opa="64" style_border_width="0"
-                style_pad_all="0">
-          <lv_obj-bind_flag_if_eq subject="bed_mesh_calibrating" flag="hidden" ref_value="1"/>
-        </lv_obj>
-        <!-- Start button (hidden while calibrating) -->
-        <lv_button name="calibrate_start_btn"
-                   height="100%" flex_grow="1" style_radius="#border_radius" style_border_width="0"
-                   style_shadow_width="0" clickable="true">
-          <lv_obj-bind_flag_if_eq subject="bed_mesh_calibrating" flag="hidden" ref_value="1"/>
-          <event_cb trigger="clicked" callback="on_bed_mesh_calibrate_start"/>
-          <text_body text="Start" align="center"/>
-        </lv_button>
-      </lv_obj>
+      <!-- Start button (hidden while calibrating) -->
+      <lv_button name="calibrate_start_btn"
+                 height="100%" flex_grow="1" style_radius="#border_radius" style_border_width="0" style_shadow_width="0"
+                 clickable="true">
+        <lv_obj-bind_flag_if_eq subject="bed_mesh_calibrating" flag="hidden" ref_value="1"/>
+        <event_cb trigger="clicked" callback="on_bed_mesh_calibrate_start"/>
+        <text_body text="Start" align="center"/>
+      </lv_button>
+    </lv_obj>
   </view>
 </component>

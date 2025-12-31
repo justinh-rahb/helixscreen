@@ -61,8 +61,7 @@ void ActivePrintMediaManager::set_thumbnail_source(const std::string& original_f
                   original_filename.empty() ? "(cleared)" : original_filename);
 
     // If we have a current print filename, re-process it with the new source
-    const char* current = static_cast<const char*>(
-        lv_subject_get_pointer(printer_state_.get_print_filename_subject()));
+    const char* current = lv_subject_get_string(printer_state_.get_print_filename_subject());
     if (current && current[0] != '\0' && !original_filename.empty()) {
         spdlog::info("[ActivePrintMediaManager] Re-processing with source override: {}",
                      original_filename);

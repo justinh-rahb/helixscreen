@@ -54,16 +54,15 @@
     <!-- Supports both text (action_button_text) and icon (action_button_icon) modes -->
     <!-- For icon-only buttons like E-stop, use circular radius and custom bg_color -->
     <lv_button name="action_button"
-               width="$action_button_width" height="$action_button_height"
-               style_radius="$action_button_radius" style_bg_color="$action_button_bg_color" style_border_width="0"
-               style_shadow_width="0" style_pad_all="$action_button_pad" flex_flow="row"
-               style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_xs"
-               scrollable="false" hidden="$hide_action_button">
-      <lv_obj width="100%" height="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0"
-              flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center"
-              style_flex_track_place="center" hidden="$hide_action_button_icon" scrollable="false">
-        <icon name="action_button_icon_widget"
-              src="$action_button_icon" size="sm" color="$action_button_icon_color"/>
+               width="$action_button_width" height="$action_button_height" style_radius="$action_button_radius"
+               style_bg_color="$action_button_bg_color" style_border_width="0" style_shadow_width="0"
+               style_pad_all="$action_button_pad" flex_flow="row" style_flex_main_place="center"
+               style_flex_cross_place="center" style_pad_gap="#space_xs" scrollable="false" hidden="$hide_action_button">
+      <lv_obj width="100%"
+              height="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
+              style_flex_main_place="center" style_flex_cross_place="center" style_flex_track_place="center"
+              hidden="$hide_action_button_icon" scrollable="false">
+        <icon name="action_button_icon_widget" src="$action_button_icon" size="sm" color="$action_button_icon_color"/>
       </lv_obj>
       <text_body name="action_button_label" text="$action_button_text" hidden="$hide_action_button_text"/>
       <event_cb trigger="clicked" callback="$action_button_callback"/>

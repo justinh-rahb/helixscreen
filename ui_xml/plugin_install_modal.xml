@@ -15,7 +15,7 @@
             style_pad_right="#space_lg" style_pad_top="#space_lg" style_pad_bottom="#space_lg" flex_flow="column"
             style_flex_cross_place="center" style_pad_gap="#space_md">
       <!-- Icon -->
-      <icon src="puzzle_outline" size="lg" color="#accent_color"/>
+      <icon src="puzzle_outline" size="lg" color="#secondary_color"/>
       <!-- Title -->
       <text_heading name="modal_title" width="100%" text="Optimize Your Printing" style_text_align="center"/>
       <!-- Description (LOCAL mode - auto-install available) -->
@@ -100,7 +100,7 @@
       <!-- Install button -->
       <lv_button name="btn_install"
                  height="100%" flex_grow="1" style_radius="0" style_border_width="0" style_shadow_width="0"
-                 style_bg_color="#accent_color" clickable="true">
+                 style_bg_color="#secondary_color" clickable="true">
         <event_cb trigger="clicked" callback="on_plugin_install_clicked"/>
         <text_body text="Install Plugin" align="center" style_text_color="#text_primary"/>
       </lv_button>
@@ -124,7 +124,7 @@
       <!-- Copy Command button -->
       <lv_button name="btn_copy"
                  height="100%" flex_grow="1" style_radius="0" style_border_width="0" style_shadow_width="0"
-                 style_bg_color="#accent_color" clickable="true">
+                 style_bg_color="#secondary_color" clickable="true">
         <event_cb trigger="clicked" callback="on_plugin_copy_clicked"/>
         <text_body text="Copy Command" align="center" style_text_color="#text_primary"/>
       </lv_button>

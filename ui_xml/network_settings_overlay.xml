@@ -6,23 +6,23 @@
 <component>
   <subjects>
     <!-- WiFi subjects -->
-    <subject name="wifi_enabled" type="int" default="0"/>
-    <subject name="wifi_connected" type="int" default="0"/>
-    <subject name="wifi_only_24ghz" type="int" default="0"/>
-    <subject name="connected_ssid" type="string"/>
-    <subject name="ip_address" type="string"/>
-    <subject name="mac_address" type="string"/>
-    <subject name="network_count" type="string" default="(0)"/>
-    <subject name="wifi_scanning" type="int" default="0"/>
+    <subject name="wifi_enabled" type="int" value="0"/>
+    <subject name="wifi_connected" type="int" value="0"/>
+    <subject name="wifi_only_24ghz" type="int" value="0"/>
+    <subject name="connected_ssid" type="string" value=""/>
+    <subject name="ip_address" type="string" value=""/>
+    <subject name="mac_address" type="string" value=""/>
+    <subject name="network_count" type="string" value="(0)"/>
+    <subject name="wifi_scanning" type="int" value="0"/>
     <!-- Ethernet subjects -->
-    <subject name="eth_connected" type="int" default="0"/>
-    <subject name="eth_ip_address" type="string"/>
-    <subject name="eth_mac_address" type="string"/>
+    <subject name="eth_connected" type="int" value="0"/>
+    <subject name="eth_ip_address" type="string" value=""/>
+    <subject name="eth_mac_address" type="string" value=""/>
     <!-- Network test subjects -->
-    <subject name="any_network_connected" type="int" default="0"/>
-    <subject name="test_running" type="int" default="0"/>
-    <subject name="test_gateway_status" type="int" default="0"/>
-    <subject name="test_internet_status" type="int" default="0"/>
+    <subject name="any_network_connected" type="int" value="0"/>
+    <subject name="test_running" type="int" value="0"/>
+    <subject name="test_gateway_status" type="int" value="0"/>
+    <subject name="test_internet_status" type="int" value="0"/>
   </subjects>
   <view name="network_settings_overlay"
         extends="overlay_panel" width="#overlay_panel_width_full" title="Network Settings" bg_color="#app_bg_color">

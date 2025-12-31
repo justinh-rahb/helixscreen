@@ -85,7 +85,7 @@
     <!-- Bottom section: Info cards (40% of height via flex_grow="2", balances with top section's flex_grow="3") -->
     <lv_obj width="100%"
             flex_grow="2" style_bg_opa="0%" style_border_width="0" style_pad_all="#space_lg" flex_flow="row"
-            style_pad_gap="#space_md" style_flex_cross_place="stretch" scrollable="false">
+            style_pad_gap="#space_md" style_flex_cross_place="start" scrollable="false">
       <!-- Print Files Card - Benchy thumbnail + text in horizontal layout -->
       <!-- Disabled when not connected (state != 2) using LVGL's native disabled state -->
       <lv_button name="print_card"
@@ -137,8 +137,9 @@
                   style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_xs"
                   scrollable="false">
             <!-- Filename (constrained width with wrapping for long names) -->
-            <text_body bind_text="print_display_filename" style_text_color="#text_primary"
-                       width="100%" long_mode="wrap" style_text_align="center"/>
+            <text_body width="100%"
+                       bind_text="print_display_filename" style_text_color="#text_primary" long_mode="wrap"
+                       style_text_align="center"/>
             <!-- Progress bar showing actual print progress -->
             <lv_bar name="print_progress_bar"
                     width="90%" height="8" bind_value="print_progress" range_min="0" range_max="100"
@@ -342,7 +343,8 @@
             <lv_obj-bind_flag_if_eq subject="printer_has_led" flag="hidden" ref_value="0"/>
             <lv_obj-bind_state_if_not_eq subject="printer_connection_state" state="disabled" ref_value="2"/>
             <!-- Dynamic icon - source and color set by C++ based on LED brightness/color -->
-            <icon name="light_icon" src="lightbulb_outline" size="#icon_size_card" align="center" color="#light_icon_off"/>
+            <icon name="light_icon"
+                  src="lightbulb_outline" size="#icon_size_card" align="center" color="#light_icon_off"/>
             <event_cb trigger="clicked" callback="light_toggle_cb"/>
           </lv_button>
           <!-- Vertical divider for filament sensor (hidden if no sensors) -->

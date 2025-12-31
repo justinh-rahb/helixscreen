@@ -174,8 +174,10 @@ void DisplayManager::shutdown() {
     // Shutdown UI update queue before LVGL
     ui_update_queue_shutdown();
 
-    // Deinitialize LVGL
-    lv_deinit();
+    // Deinitialize LVGL (guard against static destruction order issues)
+    if (lv_is_initialized()) {
+        lv_deinit();
+    }
 
     m_width = 0;
     m_height = 0;

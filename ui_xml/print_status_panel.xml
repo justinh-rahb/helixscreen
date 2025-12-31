@@ -40,8 +40,7 @@
           <!-- Thumbnail image (shown in thumbnail[0] mode only, hidden in 3D[1] and 2D[2]) -->
           <!-- Image source set programmatically via lv_image_set_src() when thumbnail available -->
           <lv_image name="print_thumbnail"
-                    width="100%" height="100%" style_bg_opa="0" align="center"
-                    inner_align="contain">
+                    width="100%" height="100%" style_bg_opa="0" align="center" inner_align="contain">
             <lv_obj-bind_flag_if_gt subject="gcode_viewer_mode" flag="hidden" ref_value="0"/>
           </lv_image>
           <!-- Rotate hint icon (shown in 3D[1] mode only, hidden in thumbnail[0] and 2D[2]) -->

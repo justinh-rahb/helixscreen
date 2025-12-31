@@ -271,8 +271,7 @@ void PrintStatusPanel::init_subjects() {
     int initial_phase = lv_subject_get_int(printer_state_.get_print_start_phase_subject());
     if (initial_phase != 0) {
         on_print_start_phase_changed(initial_phase);
-        auto* msg = static_cast<const char*>(
-            lv_subject_get_pointer(printer_state_.get_print_start_message_subject()));
+        auto* msg = lv_subject_get_string(printer_state_.get_print_start_message_subject());
         on_print_start_message_changed(msg);
         int prog = lv_subject_get_int(printer_state_.get_print_start_progress_subject());
         on_print_start_progress_changed(prog);
@@ -1210,7 +1209,7 @@ void PrintStatusPanel::print_start_message_observer_cb(lv_observer_t* observer,
                                                        lv_subject_t* subject) {
     auto* self = static_cast<PrintStatusPanel*>(lv_observer_get_user_data(observer));
     if (self) {
-        auto* msg = static_cast<const char*>(lv_subject_get_pointer(subject));
+        auto* msg = lv_subject_get_string(subject);
         self->on_print_start_message_changed(msg);
     }
 }

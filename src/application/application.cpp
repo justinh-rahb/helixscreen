@@ -153,14 +153,14 @@ int Application::run(int argc, char** argv) {
         return 1;
     }
 
-    // Phase 5: Initialize theme
-    if (!init_theme()) {
+    // Phase 5: Register fonts and images (fonts needed for globals.xml parsing)
+    if (!init_assets()) {
         shutdown();
         return 1;
     }
 
-    // Phase 6: Register fonts and images
-    if (!init_assets()) {
+    // Phase 6: Initialize theme
+    if (!init_theme()) {
         shutdown();
         return 1;
     }
@@ -500,6 +500,7 @@ bool Application::init_theme() {
     }
 
     // Register globals.xml first (required for theme constants)
+    // Note: fonts must be registered before this (done in init_assets phase)
     lv_xml_register_component_from_file("A:ui_xml/globals.xml");
 
     // Initialize theme

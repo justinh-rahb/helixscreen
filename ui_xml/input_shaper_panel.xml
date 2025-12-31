@@ -19,10 +19,9 @@
         <lv_obj-bind_flag_if_not_eq subject="input_shaper_state" flag="hidden" ref_value="0"/>
         <!-- Hero section: icon + title + help button -->
         <lv_obj width="100%"
-                height="content" style_bg_color="#surface_bg_dark" style_bg_opa="255"
-                style_radius="#border_radius_large" style_border_width="0" style_pad_all="#space_lg" flex_flow="column"
-                style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm"
-                scrollable="false">
+                height="content" style_bg_color="#app_bg_color" style_bg_opa="255" style_radius="#border_radius_large"
+                style_border_width="0" style_pad_all="#space_lg" flex_flow="column" style_flex_main_place="center"
+                style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
           <!-- Top row: icon and help button -->
           <lv_obj width="100%"
                   height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
@@ -33,7 +32,7 @@
             <!-- Help button -->
             <lv_button name="btn_help"
                        width="36" height="36" style_radius="#space_lg" style_border_width="0"
-                       style_bg_color="#surface_bg_dark" style_bg_opa="128" style_pad_all="0">
+                       style_bg_color="#app_bg_color" style_bg_opa="128" style_pad_all="0">
               <icon src="help_circle" size="sm" color="#text_secondary"/>
               <event_cb trigger="clicked" callback="input_shaper_help_cb"/>
             </lv_button>
@@ -68,7 +67,7 @@
         <!-- Measure Noise Button (secondary) -->
         <lv_button name="btn_measure_noise"
                    width="100%" height="#button_height_normal" style_radius="#border_radius" style_border_width="1"
-                   style_border_color="#card_border" style_bg_color="#surface_bg_dark" flex_flow="row"
+                   style_border_color="#card_border" style_bg_color="#app_bg_color" flex_flow="row"
                    style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
           <icon src="vibrate" size="sm" color="#text_secondary"/>
           <text_body text="Measure Noise" style_text_color="#text_secondary"/>
@@ -84,7 +83,7 @@
         <lv_obj-bind_flag_if_not_eq subject="input_shaper_state" flag="hidden" ref_value="1"/>
         <!-- Spinner and status container -->
         <lv_obj width="100%"
-                height="content" style_min_height="160" style_bg_color="#surface_bg_dark" style_bg_opa="255"
+                height="content" style_min_height="160" style_bg_color="#app_bg_color" style_bg_opa="255"
                 style_radius="#border_radius_large" style_border_width="0" style_pad_all="#space_xl" flex_flow="column"
                 style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_md"
                 scrollable="false">
@@ -96,7 +95,7 @@
         <!-- Cancel button -->
         <lv_button name="btn_cancel"
                    width="100%" height="#button_height_normal" style_radius="#border_radius" style_border_width="1"
-                   style_border_color="#card_border" style_bg_color="#surface_bg_dark" flex_flow="row"
+                   style_border_color="#card_border" style_bg_color="#app_bg_color" flex_flow="row"
                    style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
           <icon src="close" size="sm" color="#error_color"/>
           <text_body text="Cancel" style_text_color="#text_secondary"/>
@@ -133,7 +132,7 @@
         </lv_obj>
         <!-- Results rows container -->
         <lv_obj width="100%"
-                height="content" style_bg_color="#surface_bg_dark" style_bg_opa="255" style_radius="#border_radius"
+                height="content" style_bg_color="#app_bg_color" style_bg_opa="255" style_radius="#border_radius"
                 style_border_width="0" style_pad_all="0" flex_flow="column" scrollable="false">
           <!-- Row 0 -->
           <lv_obj name="shaper_row_0"
@@ -223,7 +222,7 @@
           <!-- Close button (secondary) -->
           <lv_button name="btn_close"
                      height="#button_height_normal" flex_grow="1" style_radius="#border_radius" style_border_width="1"
-                     style_border_color="#card_border" style_bg_color="#surface_bg_dark" flex_flow="row"
+                     style_border_color="#card_border" style_bg_color="#app_bg_color" flex_flow="row"
                      style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
             <text_body text="Close" style_text_color="#text_secondary"/>
             <event_cb trigger="clicked" callback="input_shaper_close_cb"/>
@@ -276,7 +275,7 @@
         </lv_obj>
         <!-- Troubleshooting tips -->
         <lv_obj width="100%"
-                height="content" style_bg_color="#surface_bg_dark" style_bg_opa="255" style_radius="#border_radius"
+                height="content" style_bg_color="#app_bg_color" style_bg_opa="255" style_radius="#border_radius"
                 style_border_width="0" style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_xs"
                 scrollable="false">
           <text_small text="Troubleshooting:" style_text_color="#text_primary"/>
@@ -291,7 +290,7 @@
           <!-- Back button -->
           <lv_button name="btn_error_back"
                      height="#button_height_normal" flex_grow="1" style_radius="#border_radius" style_border_width="1"
-                     style_border_color="#card_border" style_bg_color="#surface_bg_dark" flex_flow="row"
+                     style_border_color="#card_border" style_bg_color="#app_bg_color" flex_flow="row"
                      style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
             <text_body text="Back" style_text_color="#text_secondary"/>
             <event_cb trigger="clicked" callback="input_shaper_close_cb"/>

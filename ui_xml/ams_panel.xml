@@ -22,7 +22,7 @@
     <lv_obj name="overlay_content"
             width="100%" flex_grow="1" style_bg_opa="0" style_pad_all="#space_lg" style_pad_gap="#space_lg"
             scrollable="false" style_border_width="0" flex_flow="row" style_flex_main_place="space_between"
-            style_flex_cross_place="stretch">
+            style_flex_cross_place="start">
       <!-- ================================================================== -->
       <!-- LEFT COLUMN: AMS Unit Visualization                               -->
       <!-- ================================================================== -->

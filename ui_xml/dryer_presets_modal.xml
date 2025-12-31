@@ -9,180 +9,180 @@
   </consts>
   <!-- Dialog card (backdrop created programmatically) -->
   <view name="dryer_presets_modal"
-        extends="ui_dialog" width="320" height="content" align="center" flex_flow="column"
-        style_flex_main_place="start" style_pad_gap="0">
-      <!-- Header with title and close button -->
-      <lv_obj width="100%"
-              height="content" style_bg_opa="0" style_border_width="0" style_pad_left="#space_lg"
-              style_pad_right="#space_md" style_pad_top="#space_lg" style_pad_bottom="#space_sm" flex_flow="row"
+        extends="ui_dialog" width="320" height="content" align="center" flex_flow="column" style_flex_main_place="start"
+        style_pad_gap="0">
+    <!-- Header with title and close button -->
+    <lv_obj width="100%"
+            height="content" style_bg_opa="0" style_border_width="0" style_pad_left="#space_lg"
+            style_pad_right="#space_md" style_pad_top="#space_lg" style_pad_bottom="#space_sm" flex_flow="row"
+            style_flex_main_place="space_between" style_flex_cross_place="center" scrollable="false">
+      <text_heading text="Dryer Control"/>
+      <!-- Close button -->
+      <lv_button name="btn_close"
+                 width="40" height="40" style_radius="#border_radius" style_bg_opa="0" style_border_width="0"
+                 style_shadow_width="0" clickable="true">
+        <event_cb trigger="clicked" callback="dryer_modal_close_cb"/>
+        <icon src="close" size="sm" variant="secondary" align="center"/>
+      </lv_button>
+    </lv_obj>
+    <!-- Horizontal divider -->
+    <lv_obj width="100%"
+            height="1" style_bg_color="#text_secondary" style_bg_opa="64" style_border_width="0" style_pad_all="0"
+            scrollable="false"/>
+    <!-- Content area -->
+    <lv_obj width="100%"
+            height="content" style_bg_opa="0" style_border_width="0" style_pad_all="#space_md" flex_flow="column"
+            style_pad_gap="#space_md" scrollable="false">
+      <!-- Power Toggle Row -->
+      <lv_obj name="power_row"
+              width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
               style_flex_main_place="space_between" style_flex_cross_place="center" scrollable="false">
-        <text_heading text="Dryer Control"/>
-        <!-- Close button -->
-        <lv_button name="btn_close"
-                   width="40" height="40" style_radius="#border_radius" style_bg_opa="0" style_border_width="0"
-                   style_shadow_width="0" clickable="true">
-          <event_cb trigger="clicked" callback="dryer_modal_close_cb"/>
-          <icon src="close" size="sm" variant="secondary" align="center"/>
-        </lv_button>
+        <lv_obj width="content"
+                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
+                style_flex_cross_place="center" style_pad_gap="#space_xs" scrollable="false">
+          <icon src="power" size="sm"/>
+          <text_body text="Power"/>
+        </lv_obj>
+        <lv_switch name="dryer_power_switch">
+          <bind_state_if_eq subject="dryer_active" state="checked" ref_value="1"/>
+          <event_cb trigger="value_changed" callback="dryer_power_toggled_cb"/>
+        </lv_switch>
       </lv_obj>
-      <!-- Horizontal divider -->
+      <!-- Temperature Section -->
       <lv_obj width="100%"
-              height="1" style_bg_color="#text_secondary" style_bg_opa="64" style_border_width="0" style_pad_all="0"
-              scrollable="false"/>
-      <!-- Content area -->
+              height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
+              style_pad_gap="#space_xs" scrollable="false">
+        <text_small text="Temperature" style_text_color="#text_secondary"/>
+        <lv_obj width="100%"
+                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
+                style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm"
+                scrollable="false">
+          <!-- Minus button -->
+          <lv_button name="btn_temp_minus"
+                     width="#stepper_btn_size" height="#stepper_btn_size" style_radius="#border_radius"
+                     style_border_width="0" style_shadow_width="0">
+            <icon src="minus" size="sm" align="center"/>
+            <event_cb trigger="clicked" callback="dryer_temp_minus_cb"/>
+          </lv_button>
+          <!-- Temperature value display -->
+          <lv_obj width="80"
+                  height="#stepper_btn_size" style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius"
+                  style_border_width="0" style_pad_all="0" scrollable="false">
+            <text_heading name="temp_value" bind_text="dryer_modal_temp_text" align="center"/>
+          </lv_obj>
+          <!-- Plus button -->
+          <lv_button name="btn_temp_plus"
+                     width="#stepper_btn_size" height="#stepper_btn_size" style_radius="#border_radius"
+                     style_border_width="0" style_shadow_width="0">
+            <icon src="plus" size="sm" align="center"/>
+            <event_cb trigger="clicked" callback="dryer_temp_plus_cb"/>
+          </lv_button>
+        </lv_obj>
+      </lv_obj>
+      <!-- Duration Section -->
       <lv_obj width="100%"
-              height="content" style_bg_opa="0" style_border_width="0" style_pad_all="#space_md" flex_flow="column"
-              style_pad_gap="#space_md" scrollable="false">
-        <!-- Power Toggle Row -->
-        <lv_obj name="power_row"
-                width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
+              height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
+              style_pad_gap="#space_xs" scrollable="false">
+        <text_small text="Duration" style_text_color="#text_secondary"/>
+        <lv_obj width="100%"
+                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
+                style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm"
+                scrollable="false">
+          <!-- Minus button -->
+          <lv_button name="btn_duration_minus"
+                     width="#stepper_btn_size" height="#stepper_btn_size" style_radius="#border_radius"
+                     style_border_width="0" style_shadow_width="0">
+            <icon src="minus" size="sm" align="center"/>
+            <event_cb trigger="clicked" callback="dryer_duration_minus_cb"/>
+          </lv_button>
+          <!-- Duration value display -->
+          <lv_obj width="100"
+                  height="#stepper_btn_size" style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius"
+                  style_border_width="0" style_pad_all="0" scrollable="false">
+            <text_heading name="duration_value" bind_text="dryer_modal_duration_text" align="center"/>
+          </lv_obj>
+          <!-- Plus button -->
+          <lv_button name="btn_duration_plus"
+                     width="#stepper_btn_size" height="#stepper_btn_size" style_radius="#border_radius"
+                     style_border_width="0" style_shadow_width="0">
+            <icon src="plus" size="sm" align="center"/>
+            <event_cb trigger="clicked" callback="dryer_duration_plus_cb"/>
+          </lv_button>
+        </lv_obj>
+      </lv_obj>
+      <!-- Presets Section -->
+      <lv_obj width="100%"
+              height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
+              style_pad_gap="#space_xs" scrollable="false">
+        <text_small text="Presets" style_text_color="#text_secondary"/>
+        <lv_obj width="100%"
+                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
+                style_flex_main_place="space_between" style_pad_gap="#space_xs" scrollable="false">
+          <lv_button name="btn_preset_pla"
+                     height="content" flex_grow="1" style_radius="#border_radius" style_border_width="0"
+                     style_shadow_width="0" style_bg_color="#card_bg" style_pad_all="#space_sm" clickable="true">
+            <event_cb trigger="clicked" callback="dryer_preset_pla_cb"/>
+            <lv_obj width="100%"
+                    height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
+                    style_flex_cross_place="center" style_pad_gap="#space_xxs" scrollable="false" clickable="false">
+              <text_body text="PLA"/>
+              <text_small text="45°C" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_button>
+          <lv_button name="btn_preset_petg"
+                     height="content" flex_grow="1" style_radius="#border_radius" style_border_width="0"
+                     style_shadow_width="0" style_bg_color="#card_bg" style_pad_all="#space_sm" clickable="true">
+            <event_cb trigger="clicked" callback="dryer_preset_petg_cb"/>
+            <lv_obj width="100%"
+                    height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
+                    style_flex_cross_place="center" style_pad_gap="#space_xxs" scrollable="false" clickable="false">
+              <text_body text="PETG"/>
+              <text_small text="55°C" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_button>
+          <lv_button name="btn_preset_abs"
+                     height="content" flex_grow="1" style_radius="#border_radius" style_border_width="0"
+                     style_shadow_width="0" style_bg_color="#card_bg" style_pad_all="#space_sm" clickable="true">
+            <event_cb trigger="clicked" callback="dryer_preset_abs_cb"/>
+            <lv_obj width="100%"
+                    height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
+                    style_flex_cross_place="center" style_pad_gap="#space_xxs" scrollable="false" clickable="false">
+              <text_body text="ABS"/>
+              <text_small text="65°C" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_button>
+        </lv_obj>
+      </lv_obj>
+      <!-- Status Section (visible when dryer is active) -->
+      <lv_obj name="status_section"
+              width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
+              style_pad_gap="#space_xs" scrollable="false">
+        <bind_flag_if_eq subject="dryer_active" flag="hidden" ref_value="0"/>
+        <!-- Divider -->
+        <lv_obj width="100%"
+                height="1" style_bg_color="#text_secondary" style_bg_opa="38" style_border_width="0" style_pad_all="0"
+                scrollable="false"/>
+        <!-- Temperature and time status -->
+        <lv_obj width="100%"
+                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
                 style_flex_main_place="space_between" style_flex_cross_place="center" scrollable="false">
           <lv_obj width="content"
                   height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
                   style_flex_cross_place="center" style_pad_gap="#space_xs" scrollable="false">
-            <icon src="power" size="sm"/>
-            <text_body text="Power"/>
+            <icon src="thermometer" size="sm" variant="secondary"/>
+            <text_body bind_text="dryer_current_temp_text"/>
           </lv_obj>
-          <lv_switch name="dryer_power_switch">
-            <bind_state_if_eq subject="dryer_active" state="checked" ref_value="1"/>
-            <event_cb trigger="value_changed" callback="dryer_power_toggled_cb"/>
-          </lv_switch>
+          <text_body bind_text="dryer_time_text"/>
         </lv_obj>
-        <!-- Temperature Section -->
-        <lv_obj width="100%"
-                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
-                style_pad_gap="#space_xs" scrollable="false">
-          <text_small text="Temperature" style_text_color="#text_secondary"/>
-          <lv_obj width="100%"
-                  height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
-                  style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm"
-                  scrollable="false">
-            <!-- Minus button -->
-            <lv_button name="btn_temp_minus"
-                       width="#stepper_btn_size" height="#stepper_btn_size" style_radius="#border_radius"
-                       style_border_width="0" style_shadow_width="0">
-              <icon src="minus" size="sm" align="center"/>
-              <event_cb trigger="clicked" callback="dryer_temp_minus_cb"/>
-            </lv_button>
-            <!-- Temperature value display -->
-            <lv_obj width="80"
-                    height="#stepper_btn_size" style_bg_color="#card_bg" style_bg_opa="255"
-                    style_radius="#border_radius" style_border_width="0" style_pad_all="0" scrollable="false">
-              <text_heading name="temp_value" bind_text="dryer_modal_temp_text" align="center"/>
-            </lv_obj>
-            <!-- Plus button -->
-            <lv_button name="btn_temp_plus"
-                       width="#stepper_btn_size" height="#stepper_btn_size" style_radius="#border_radius"
-                       style_border_width="0" style_shadow_width="0">
-              <icon src="plus" size="sm" align="center"/>
-              <event_cb trigger="clicked" callback="dryer_temp_plus_cb"/>
-            </lv_button>
-          </lv_obj>
-        </lv_obj>
-        <!-- Duration Section -->
-        <lv_obj width="100%"
-                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
-                style_pad_gap="#space_xs" scrollable="false">
-          <text_small text="Duration" style_text_color="#text_secondary"/>
-          <lv_obj width="100%"
-                  height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
-                  style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm"
-                  scrollable="false">
-            <!-- Minus button -->
-            <lv_button name="btn_duration_minus"
-                       width="#stepper_btn_size" height="#stepper_btn_size" style_radius="#border_radius"
-                       style_border_width="0" style_shadow_width="0">
-              <icon src="minus" size="sm" align="center"/>
-              <event_cb trigger="clicked" callback="dryer_duration_minus_cb"/>
-            </lv_button>
-            <!-- Duration value display -->
-            <lv_obj width="100"
-                    height="#stepper_btn_size" style_bg_color="#card_bg" style_bg_opa="255"
-                    style_radius="#border_radius" style_border_width="0" style_pad_all="0" scrollable="false">
-              <text_heading name="duration_value" bind_text="dryer_modal_duration_text" align="center"/>
-            </lv_obj>
-            <!-- Plus button -->
-            <lv_button name="btn_duration_plus"
-                       width="#stepper_btn_size" height="#stepper_btn_size" style_radius="#border_radius"
-                       style_border_width="0" style_shadow_width="0">
-              <icon src="plus" size="sm" align="center"/>
-              <event_cb trigger="clicked" callback="dryer_duration_plus_cb"/>
-            </lv_button>
-          </lv_obj>
-        </lv_obj>
-        <!-- Presets Section -->
-        <lv_obj width="100%"
-                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
-                style_pad_gap="#space_xs" scrollable="false">
-          <text_small text="Presets" style_text_color="#text_secondary"/>
-          <lv_obj width="100%"
-                  height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
-                  style_flex_main_place="space_between" style_pad_gap="#space_xs" scrollable="false">
-            <lv_button name="btn_preset_pla"
-                       height="content" flex_grow="1" style_radius="#border_radius" style_border_width="0"
-                       style_shadow_width="0" style_bg_color="#card_bg" style_pad_all="#space_sm" clickable="true">
-              <event_cb trigger="clicked" callback="dryer_preset_pla_cb"/>
-              <lv_obj width="100%"
-                      height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
-                      style_flex_cross_place="center" style_pad_gap="#space_xxs" scrollable="false" clickable="false">
-                <text_body text="PLA"/>
-                <text_small text="45°C" style_text_color="#text_secondary"/>
-              </lv_obj>
-            </lv_button>
-            <lv_button name="btn_preset_petg"
-                       height="content" flex_grow="1" style_radius="#border_radius" style_border_width="0"
-                       style_shadow_width="0" style_bg_color="#card_bg" style_pad_all="#space_sm" clickable="true">
-              <event_cb trigger="clicked" callback="dryer_preset_petg_cb"/>
-              <lv_obj width="100%"
-                      height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
-                      style_flex_cross_place="center" style_pad_gap="#space_xxs" scrollable="false" clickable="false">
-                <text_body text="PETG"/>
-                <text_small text="55°C" style_text_color="#text_secondary"/>
-              </lv_obj>
-            </lv_button>
-            <lv_button name="btn_preset_abs"
-                       height="content" flex_grow="1" style_radius="#border_radius" style_border_width="0"
-                       style_shadow_width="0" style_bg_color="#card_bg" style_pad_all="#space_sm" clickable="true">
-              <event_cb trigger="clicked" callback="dryer_preset_abs_cb"/>
-              <lv_obj width="100%"
-                      height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="column"
-                      style_flex_cross_place="center" style_pad_gap="#space_xxs" scrollable="false" clickable="false">
-                <text_body text="ABS"/>
-                <text_small text="65°C" style_text_color="#text_secondary"/>
-              </lv_obj>
-            </lv_button>
-          </lv_obj>
-        </lv_obj>
-        <!-- Status Section (visible when dryer is active) -->
-        <lv_obj name="status_section"
-                width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0"
-                flex_flow="column" style_pad_gap="#space_xs" scrollable="false">
-          <bind_flag_if_eq subject="dryer_active" flag="hidden" ref_value="0"/>
-          <!-- Divider -->
-          <lv_obj width="100%"
-                  height="1" style_bg_color="#text_secondary" style_bg_opa="38" style_border_width="0" style_pad_all="0"
-                  scrollable="false"/>
-          <!-- Temperature and time status -->
-          <lv_obj width="100%"
-                  height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
-                  style_flex_main_place="space_between" style_flex_cross_place="center" scrollable="false">
-            <lv_obj width="content"
-                    height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
-                    style_flex_cross_place="center" style_pad_gap="#space_xs" scrollable="false">
-              <icon src="thermometer" size="sm" variant="secondary"/>
-              <text_body bind_text="dryer_current_temp_text"/>
-            </lv_obj>
-            <text_body bind_text="dryer_time_text"/>
-          </lv_obj>
-          <!-- Progress bar -->
-          <lv_obj name="modal_progress_container"
-                  width="100%" height="#progress_height" style_bg_color="#text_secondary" style_bg_opa="38"
-                  style_radius="#border_radius_small" style_border_width="0" style_pad_all="0" scrollable="false">
-            <lv_obj name="modal_progress_fill"
-                    height="100%" style_bg_color="#success_color" style_bg_opa="255" style_radius="#border_radius_small"
-                    style_border_width="0" style_pad_all="0" scrollable="false"/>
-          </lv_obj>
+        <!-- Progress bar -->
+        <lv_obj name="modal_progress_container"
+                width="100%" height="#progress_height" style_bg_color="#text_secondary" style_bg_opa="38"
+                style_radius="#border_radius_small" style_border_width="0" style_pad_all="0" scrollable="false">
+          <lv_obj name="modal_progress_fill"
+                  height="100%" style_bg_color="#success_color" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="0" style_pad_all="0" scrollable="false"/>
         </lv_obj>
       </lv_obj>
+    </lv_obj>
   </view>
 </component>

@@ -28,7 +28,7 @@
               height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_bottom="#space_md"
               flex_flow="row" style_pad_gap="#space_xs" scrollable="false">
         <lv_button name="filter_day"
-                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#surface_bg_dark"
+                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#app_bg_color"
                    style_pad_all="#space_sm">
           <bind_style name="filter_btn_active" subject="history_filter" ref_value="0"/>
           <text_small name="filter_day_label" text="Day" style_text_color="#text_secondary" align="center">
@@ -37,7 +37,7 @@
           <event_cb trigger="clicked" callback="history_filter_day_clicked"/>
         </lv_button>
         <lv_button name="filter_week"
-                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#surface_bg_dark"
+                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#app_bg_color"
                    style_pad_all="#space_sm">
           <bind_style name="filter_btn_active" subject="history_filter" ref_value="1"/>
           <text_small name="filter_week_label" text="Week" style_text_color="#text_secondary" align="center">
@@ -46,7 +46,7 @@
           <event_cb trigger="clicked" callback="history_filter_week_clicked"/>
         </lv_button>
         <lv_button name="filter_month"
-                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#surface_bg_dark"
+                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#app_bg_color"
                    style_pad_all="#space_sm">
           <bind_style name="filter_btn_active" subject="history_filter" ref_value="2"/>
           <text_small name="filter_month_label" text="Month" style_text_color="#text_secondary" align="center">
@@ -55,7 +55,7 @@
           <event_cb trigger="clicked" callback="history_filter_month_clicked"/>
         </lv_button>
         <lv_button name="filter_year"
-                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#surface_bg_dark"
+                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#app_bg_color"
                    style_pad_all="#space_sm">
           <bind_style name="filter_btn_active" subject="history_filter" ref_value="3"/>
           <text_small name="filter_year_label" text="Year" style_text_color="#text_secondary" align="center">
@@ -64,7 +64,7 @@
           <event_cb trigger="clicked" callback="history_filter_year_clicked"/>
         </lv_button>
         <lv_button name="filter_all"
-                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#surface_bg_dark"
+                   flex_grow="1" style_radius="#border_radius" style_border_width="0" style_bg_color="#app_bg_color"
                    style_pad_all="#space_sm">
           <bind_style name="filter_btn_active" subject="history_filter" ref_value="4"/>
           <text_small name="filter_all_label" text="All" style_text_color="#text_secondary" align="center">
