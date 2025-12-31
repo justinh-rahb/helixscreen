@@ -42,7 +42,7 @@ PrintSelectCardView::PrintSelectCardView() {
 
 PrintSelectCardView::~PrintSelectCardView() {
     cleanup();
-    // Note: No spdlog here - logger may be destroyed during static destruction [L010]
+    spdlog::debug("[PrintSelectCardView] Destroyed");
 }
 
 PrintSelectCardView::PrintSelectCardView(PrintSelectCardView&& other) noexcept
@@ -136,7 +136,7 @@ void PrintSelectCardView::cleanup() {
     trailing_spacer_ = nullptr;
     visible_start_row_ = -1;
     visible_end_row_ = -1;
-    // Note: No spdlog here - may be called from destructor during static destruction [L010]
+    spdlog::debug("[PrintSelectCardView] cleanup()");
 }
 
 // ============================================================================

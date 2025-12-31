@@ -200,10 +200,3 @@ class WizardWifiStep {
  * Creates the instance on first call. Used by wizard framework.
  */
 WizardWifiStep* get_wizard_wifi_step();
-
-/**
- * @brief Destroy the global WizardWifiStep instance
- *
- * Call during application shutdown.
- */
-void destroy_wizard_wifi_step();

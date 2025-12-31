@@ -13,6 +13,7 @@
 
 #include "ethernet_manager.h"
 #include "lvgl/lvgl.h"
+#include "static_panel_registry.h"
 #include "wifi_manager.h"
 
 #include <spdlog/spdlog.h>
@@ -30,12 +31,10 @@ static std::unique_ptr<WizardWifiStep> g_wizard_wifi_step;
 WizardWifiStep* get_wizard_wifi_step() {
     if (!g_wizard_wifi_step) {
         g_wizard_wifi_step = std::make_unique<WizardWifiStep>();
+        StaticPanelRegistry::instance().register_destroy("WizardWifiStep",
+                                                         []() { g_wizard_wifi_step.reset(); });
     }
     return g_wizard_wifi_step.get();
-}
-
-void destroy_wizard_wifi_step() {
-    g_wizard_wifi_step.reset();
 }
 
 // ============================================================================

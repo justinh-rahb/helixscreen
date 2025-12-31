@@ -2,7 +2,7 @@
 // Copyright (C) 2025 HelixScreen Contributors
 
 /**
- * @file network_settings_overlay.h
+ * @file ui_overlay_network_settings.h
  * @brief Network Settings overlay panel - WiFi and Ethernet configuration
  *
  * Manages reactive network settings overlay with:

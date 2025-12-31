@@ -14,6 +14,7 @@
 #include "app_globals.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -32,6 +33,7 @@ static std::unique_ptr<FanPanel> g_fan_panel;
 FanPanel& get_global_fan_panel() {
     if (!g_fan_panel) {
         g_fan_panel = std::make_unique<FanPanel>();
+        StaticPanelRegistry::instance().register_destroy("FanPanel", []() { g_fan_panel.reset(); });
     }
     return *g_fan_panel;
 }

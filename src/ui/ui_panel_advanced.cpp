@@ -5,10 +5,10 @@
 
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
+#include "ui_overlay_timelapse_settings.h"
 #include "ui_panel_console.h"
 #include "ui_panel_macros.h"
 #include "ui_panel_spoolman.h"
-#include "ui_timelapse_settings.h"
 #include "ui_toast.h"
 #include "ui_update_queue.h"
 
@@ -19,6 +19,7 @@
 #include "moonraker_manager.h"
 #include "printer_capabilities.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -37,6 +38,8 @@ AdvancedPanel& get_global_advanced_panel() {
 // Called by main.cpp to initialize the global instance
 void init_global_advanced_panel(PrinterState& printer_state, MoonrakerAPI* api) {
     g_advanced_panel = std::make_unique<AdvancedPanel>(printer_state, api);
+    StaticPanelRegistry::instance().register_destroy("AdvancedPanel",
+                                                     []() { g_advanced_panel.reset(); });
 }
 
 // ============================================================================

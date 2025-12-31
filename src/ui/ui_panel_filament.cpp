@@ -22,6 +22,7 @@
 #include "moonraker_api.h"
 #include "printer_state.h"
 #include "standard_macros.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
@@ -1018,6 +1019,8 @@ static std::unique_ptr<FilamentPanel> g_filament_panel;
 FilamentPanel& get_global_filament_panel() {
     if (!g_filament_panel) {
         g_filament_panel = std::make_unique<FilamentPanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy("FilamentPanel",
+                                                         []() { g_filament_panel.reset(); });
     }
     return *g_filament_panel;
 }

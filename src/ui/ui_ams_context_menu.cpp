@@ -20,7 +20,7 @@ AmsContextMenu::AmsContextMenu() {
 
 AmsContextMenu::~AmsContextMenu() {
     hide();
-    // Note: No spdlog here - logger may be destroyed during static destruction [L010]
+    spdlog::debug("[AmsContextMenu] Destroyed");
 }
 
 AmsContextMenu::AmsContextMenu(AmsContextMenu&& other) noexcept
@@ -129,7 +129,7 @@ void AmsContextMenu::hide() {
         lv_obj_delete(menu_);
         menu_ = nullptr;
         slot_index_ = -1;
-        // Note: No spdlog here - may be called from destructor during static destruction [L010]
+        spdlog::debug("[AmsContextMenu] hide()");
     }
 }
 

@@ -49,7 +49,7 @@ AmsColorPicker::AmsColorPicker() {
 
 AmsColorPicker::~AmsColorPicker() {
     // Modal destructor will call hide() if visible
-    // Note: No spdlog here - logger may be destroyed during static destruction [L010]
+    spdlog::debug("[AmsColorPicker] Destroyed");
 }
 
 AmsColorPicker::AmsColorPicker(AmsColorPicker&& other) noexcept
@@ -155,7 +155,7 @@ void AmsColorPicker::on_hide() {
             name_label_observer_ = nullptr;
         }
     }
-    // Note: No spdlog here - may be called from destructor during static destruction [L010]
+    spdlog::debug("[AmsColorPicker] cleanup()");
 }
 
 void AmsColorPicker::on_cancel() {

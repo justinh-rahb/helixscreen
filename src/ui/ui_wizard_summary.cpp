@@ -10,6 +10,7 @@
 #include "config.h"
 #include "filament_sensor_manager.h"
 #include "lvgl/lvgl.h"
+#include "static_panel_registry.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -28,12 +29,10 @@ static std::unique_ptr<WizardSummaryStep> g_wizard_summary_step;
 WizardSummaryStep* get_wizard_summary_step() {
     if (!g_wizard_summary_step) {
         g_wizard_summary_step = std::make_unique<WizardSummaryStep>();
+        StaticPanelRegistry::instance().register_destroy("WizardSummaryStep",
+                                                         []() { g_wizard_summary_step.reset(); });
     }
     return g_wizard_summary_step.get();
-}
-
-void destroy_wizard_summary_step() {
-    g_wizard_summary_step.reset();
 }
 
 // ============================================================================

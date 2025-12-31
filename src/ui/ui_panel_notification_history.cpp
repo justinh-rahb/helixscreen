@@ -12,6 +12,7 @@
 
 #include "app_globals.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
@@ -209,6 +210,8 @@ NotificationHistoryPanel& get_global_notification_history_panel() {
     if (!g_notification_history_panel) {
         g_notification_history_panel =
             std::make_unique<NotificationHistoryPanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy(
+            "NotificationHistoryPanel", []() { g_notification_history_panel.reset(); });
     }
     return *g_notification_history_panel;
 }

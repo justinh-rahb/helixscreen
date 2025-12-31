@@ -17,6 +17,7 @@
 #include "print_history_manager.h"
 #include "printer_state.h"
 #include "settings_manager.h"
+#include "static_panel_registry.h"
 #include "thumbnail_cache.h"
 
 #include <spdlog/spdlog.h>
@@ -38,6 +39,8 @@ static std::unique_ptr<HistoryListPanel> g_history_list_panel;
 HistoryListPanel& get_global_history_list_panel() {
     if (!g_history_list_panel) {
         g_history_list_panel = std::make_unique<HistoryListPanel>();
+        StaticPanelRegistry::instance().register_destroy("HistoryListPanel",
+                                                         []() { g_history_list_panel.reset(); });
     }
     return *g_history_list_panel;
 }
@@ -51,11 +54,11 @@ HistoryListPanel::HistoryListPanel() : history_manager_(get_print_history_manage
 }
 
 // Destructor - remove observer from history manager
-// Applying [L010]: No spdlog in destructors - logger may be destroyed first
 HistoryListPanel::~HistoryListPanel() {
     if (history_manager_ && history_observer_) {
         history_manager_->remove_observer(&history_observer_);
     }
+    spdlog::debug("[HistoryList] Destroyed");
 }
 
 // ============================================================================

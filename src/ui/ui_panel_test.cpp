@@ -8,6 +8,7 @@
 
 #include "app_globals.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -131,6 +132,8 @@ static std::unique_ptr<TestPanel> g_test_panel;
 TestPanel& get_global_test_panel() {
     if (!g_test_panel) {
         g_test_panel = std::make_unique<TestPanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy("TestPanel",
+                                                         []() { g_test_panel.reset(); });
     }
     return *g_test_panel;
 }

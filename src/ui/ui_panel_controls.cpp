@@ -25,6 +25,7 @@
 #include "moonraker_api.h"
 #include "printer_state.h"
 #include "standard_macros.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -1152,6 +1153,8 @@ static std::unique_ptr<ControlsPanel> g_controls_panel;
 ControlsPanel& get_global_controls_panel() {
     if (!g_controls_panel) {
         g_controls_panel = std::make_unique<ControlsPanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy("ControlsPanel",
+                                                         []() { g_controls_panel.reset(); });
     }
     return *g_controls_panel;
 }

@@ -8,6 +8,8 @@
 #include "ui_error_reporting.h"
 #include "ui_nav.h"
 #include "ui_notification.h"
+#include "ui_overlay_retraction_settings.h"
+#include "ui_overlay_timelapse_settings.h"
 #include "ui_panel_advanced.h"
 #include "ui_panel_bed_mesh.h"
 #include "ui_panel_calibration_pid.h"
@@ -27,9 +29,7 @@
 #include "ui_panel_settings.h"
 #include "ui_panel_spoolman.h"
 #include "ui_panel_temp_control.h"
-#include "ui_retraction_settings.h"
 #include "ui_status_bar.h"
-#include "ui_timelapse_settings.h"
 #include "ui_wizard.h"
 
 #include "active_print_media_manager.h"

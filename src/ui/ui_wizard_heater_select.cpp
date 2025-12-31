@@ -14,6 +14,7 @@
 #include "lvgl/lvgl.h"
 #include "moonraker_client.h"
 #include "printer_hardware.h"
+#include "static_panel_registry.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -32,12 +33,10 @@ static std::unique_ptr<WizardHeaterSelectStep> g_wizard_heater_select_step;
 WizardHeaterSelectStep* get_wizard_heater_select_step() {
     if (!g_wizard_heater_select_step) {
         g_wizard_heater_select_step = std::make_unique<WizardHeaterSelectStep>();
+        StaticPanelRegistry::instance().register_destroy(
+            "WizardHeaterSelectStep", []() { g_wizard_heater_select_step.reset(); });
     }
     return g_wizard_heater_select_step.get();
-}
-
-void destroy_wizard_heater_select_step() {
-    g_wizard_heater_select_step.reset();
 }
 
 // ============================================================================

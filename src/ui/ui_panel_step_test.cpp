@@ -7,6 +7,7 @@
 
 #include "app_globals.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -194,6 +195,8 @@ static std::unique_ptr<StepTestPanel> g_step_test_panel;
 StepTestPanel& get_global_step_test_panel() {
     if (!g_step_test_panel) {
         g_step_test_panel = std::make_unique<StepTestPanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy("StepTestPanel",
+                                                         []() { g_step_test_panel.reset(); });
     }
     return *g_step_test_panel;
 }

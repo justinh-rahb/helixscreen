@@ -24,7 +24,7 @@ PrintSelectListView::PrintSelectListView() {
 
 PrintSelectListView::~PrintSelectListView() {
     cleanup();
-    // Note: No spdlog here - logger may be destroyed during static destruction [L010]
+    spdlog::debug("[PrintSelectListView] Destroyed");
 }
 
 PrintSelectListView::PrintSelectListView(PrintSelectListView&& other) noexcept
@@ -120,7 +120,7 @@ void PrintSelectListView::cleanup() {
     trailing_spacer_ = nullptr;
     visible_start_ = -1;
     visible_end_ = -1;
-    // Note: No spdlog here - may be called from destructor during static destruction [L010]
+    spdlog::debug("[PrintSelectListView] cleanup()");
 }
 
 // ============================================================================

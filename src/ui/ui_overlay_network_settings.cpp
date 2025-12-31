@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2025 HelixScreen Contributors
 
-#include "network_settings_overlay.h"
+#include "ui_overlay_network_settings.h"
 
+#include "static_panel_registry.h"
 #include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
@@ -31,6 +32,8 @@ static std::unique_ptr<NetworkSettingsOverlay> g_network_settings_overlay;
 NetworkSettingsOverlay& get_network_settings_overlay() {
     if (!g_network_settings_overlay) {
         g_network_settings_overlay = std::make_unique<NetworkSettingsOverlay>();
+        StaticPanelRegistry::instance().register_destroy(
+            "NetworkSettingsOverlay", []() { g_network_settings_overlay.reset(); });
     }
     return *g_network_settings_overlay;
 }

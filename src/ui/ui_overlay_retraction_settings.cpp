@@ -1,8 +1,9 @@
 // Copyright 2025 356C LLC
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "ui_retraction_settings.h"
+#include "ui_overlay_retraction_settings.h"
 
+#include "static_panel_registry.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
 
@@ -34,6 +35,8 @@ void init_global_retraction_settings(PrinterState& printer_state, MoonrakerClien
         return;
     }
     g_retraction_settings = std::make_unique<RetractionSettingsOverlay>(printer_state, client);
+    StaticPanelRegistry::instance().register_destroy(
+        "RetractionSettingsOverlay", []() { g_retraction_settings.reset(); });
     spdlog::debug("[Retraction Settings] RetractionSettingsOverlay initialized");
 }
 
@@ -44,10 +47,9 @@ RetractionSettingsOverlay::RetractionSettingsOverlay(PrinterState& printer_state
 }
 
 RetractionSettingsOverlay::~RetractionSettingsOverlay() {
-    // [L010] No spdlog in destructors - may crash during static destruction
-
     // LVGL may already be destroyed during static destruction
     if (!lv_is_initialized()) {
+        spdlog::debug("[RetractionSettings] Destroyed (LVGL already deinit)");
         return;
     }
 
@@ -55,6 +57,8 @@ RetractionSettingsOverlay::~RetractionSettingsOverlay() {
     lv_subject_deinit(&retract_speed_display_);
     lv_subject_deinit(&unretract_extra_display_);
     lv_subject_deinit(&unretract_speed_display_);
+
+    spdlog::debug("[RetractionSettings] Destroyed");
 }
 
 void RetractionSettingsOverlay::init_subjects() {

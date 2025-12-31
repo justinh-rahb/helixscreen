@@ -990,6 +990,34 @@ bool NavigationManager::is_panel_in_stack(lv_obj_t* panel) const {
     return std::find(panel_stack_.begin(), panel_stack_.end(), panel) != panel_stack_.end();
 }
 
+void NavigationManager::shutdown() {
+    spdlog::debug("[NavigationManager] Shutting down...");
+
+    // Deactivate any overlays in the stack
+    for (lv_obj_t* overlay_widget : panel_stack_) {
+        auto it = overlay_instances_.find(overlay_widget);
+        if (it != overlay_instances_.end() && it->second) {
+            spdlog::debug("[NavigationManager] Deactivating overlay: {}", it->second->get_name());
+            it->second->on_deactivate();
+        }
+    }
+
+    // Clear overlay registry
+    // Note: The actual panel objects are destroyed via StaticPanelRegistry,
+    // we just clear our tracking references here
+    overlay_instances_.clear();
+
+    // Clear panel instances
+    for (auto& panel : panel_instances_) {
+        panel = nullptr;
+    }
+
+    // Clear panel stack
+    panel_stack_.clear();
+
+    spdlog::debug("[NavigationManager] Shutdown complete");
+}
+
 // ============================================================================
 // LEGACY API (forwards to NavigationManager)
 // ============================================================================

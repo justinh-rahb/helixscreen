@@ -27,6 +27,7 @@
 #include "runtime_config.h"
 #include "settings_manager.h"
 #include "standard_macros.h"
+#include "static_panel_registry.h"
 #include "thumbnail_cache.h"
 #include "thumbnail_processor.h"
 #include "wizard_config_paths.h"
@@ -76,6 +77,8 @@ static void on_tune_save_z_offset_cb(lv_event_t* e);
 PrintStatusPanel& get_global_print_status_panel() {
     if (!g_print_status_panel) {
         g_print_status_panel = std::make_unique<PrintStatusPanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy("PrintStatusPanel",
+                                                         []() { g_print_status_panel.reset(); });
     }
     return *g_print_status_panel;
 }
@@ -151,7 +154,7 @@ PrintStatusPanel::~PrintStatusPanel() {
     // ObserverGuard handles observer cleanup automatically
     resize_registered_ = false;
 
-    // Clean up temp G-code file if any (silent - no logging in destructor per L010)
+    // Clean up temp G-code file if any
     if (!temp_gcode_path_.empty()) {
         std::remove(temp_gcode_path_.c_str());
         temp_gcode_path_.clear();

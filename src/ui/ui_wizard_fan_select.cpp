@@ -15,6 +15,7 @@
 #include "lvgl/lvgl.h"
 #include "moonraker_client.h"
 #include "printer_hardware.h"
+#include "static_panel_registry.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -33,12 +34,10 @@ static std::unique_ptr<WizardFanSelectStep> g_wizard_fan_select_step;
 WizardFanSelectStep* get_wizard_fan_select_step() {
     if (!g_wizard_fan_select_step) {
         g_wizard_fan_select_step = std::make_unique<WizardFanSelectStep>();
+        StaticPanelRegistry::instance().register_destroy(
+            "WizardFanSelectStep", []() { g_wizard_fan_select_step.reset(); });
     }
     return g_wizard_fan_select_step.get();
-}
-
-void destroy_wizard_fan_select_step() {
-    g_wizard_fan_select_step.reset();
 }
 
 // ============================================================================

@@ -26,10 +26,12 @@ PrintSelectDetailView::~PrintSelectDetailView() {
 
     // CRITICAL: During static destruction (app exit), LVGL may already be gone.
     // We check if LVGL is still initialized before calling any LVGL functions.
-    // Applying [L010]: No spdlog in destructors
     if (!lv_is_initialized()) {
+        spdlog::debug("[DetailView] Destroyed (LVGL already deinit)");
         return;
     }
+
+    spdlog::debug("[DetailView] Destroyed");
 
     // Unregister from NavigationManager (fallback if cleanup() wasn't called)
     if (overlay_root_) {

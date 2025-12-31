@@ -13,6 +13,7 @@
 #include "lvgl/lvgl.h"
 #include "moonraker_client.h"
 #include "printer_hardware.h"
+#include "static_panel_registry.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -31,12 +32,10 @@ static std::unique_ptr<WizardLedSelectStep> g_wizard_led_select_step;
 WizardLedSelectStep* get_wizard_led_select_step() {
     if (!g_wizard_led_select_step) {
         g_wizard_led_select_step = std::make_unique<WizardLedSelectStep>();
+        StaticPanelRegistry::instance().register_destroy(
+            "WizardLedSelectStep", []() { g_wizard_led_select_step.reset(); });
     }
     return g_wizard_led_select_step.get();
-}
-
-void destroy_wizard_led_select_step() {
-    g_wizard_led_select_step.reset();
 }
 
 // ============================================================================

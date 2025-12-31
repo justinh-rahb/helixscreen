@@ -10,6 +10,7 @@
 #include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
+#include "ui_overlay_network_settings.h"
 #include "ui_panel_ams.h"
 #include "ui_panel_print_status.h"
 #include "ui_panel_temp_control.h"
@@ -23,11 +24,11 @@
 #include "config.h"
 #include "ethernet_manager.h"
 #include "moonraker_api.h"
-#include "network_settings_overlay.h"
 #include "prerendered_images.h"
 #include "printer_detector.h"
 #include "printer_state.h"
 #include "settings_manager.h"
+#include "static_panel_registry.h"
 #include "wifi_manager.h"
 #include "wizard_config_paths.h"
 
@@ -1232,6 +1233,8 @@ static std::unique_ptr<HomePanel> g_home_panel;
 HomePanel& get_global_home_panel() {
     if (!g_home_panel) {
         g_home_panel = std::make_unique<HomePanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy("HomePanel",
+                                                         []() { g_home_panel.reset(); });
     }
     return *g_home_panel;
 }

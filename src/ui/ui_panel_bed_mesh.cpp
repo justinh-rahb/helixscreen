@@ -25,6 +25,7 @@
 #include "app_globals.h"
 #include "moonraker_api.h"
 #include "settings_manager.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -1007,6 +1008,8 @@ static void on_save_config_yes_cb(lv_event_t* /*e*/) {
 BedMeshPanel& get_global_bed_mesh_panel() {
     if (!g_bed_mesh_panel) {
         g_bed_mesh_panel = std::make_unique<BedMeshPanel>();
+        StaticPanelRegistry::instance().register_destroy("BedMeshPanel",
+                                                         []() { g_bed_mesh_panel.reset(); });
     }
     return *g_bed_mesh_panel;
 }

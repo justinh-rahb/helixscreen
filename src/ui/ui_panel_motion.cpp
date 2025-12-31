@@ -16,6 +16,7 @@
 #include "app_globals.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -38,6 +39,8 @@ static std::unique_ptr<MotionPanel> g_motion_panel;
 MotionPanel& get_global_motion_panel() {
     if (!g_motion_panel) {
         g_motion_panel = std::make_unique<MotionPanel>();
+        StaticPanelRegistry::instance().register_destroy("MotionPanel",
+                                                         []() { g_motion_panel.reset(); });
     }
     return *g_motion_panel;
 }

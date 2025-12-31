@@ -17,6 +17,7 @@
 #include "moonraker_api.h"
 #include "printer_state.h"
 #include "settings_manager.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -35,6 +36,8 @@ static std::unique_ptr<ExtrusionPanel> g_extrusion_panel;
 ExtrusionPanel& get_global_extrusion_panel() {
     if (!g_extrusion_panel) {
         g_extrusion_panel = std::make_unique<ExtrusionPanel>();
+        StaticPanelRegistry::instance().register_destroy("ExtrusionPanel",
+                                                         []() { g_extrusion_panel.reset(); });
     }
     return *g_extrusion_panel;
 }

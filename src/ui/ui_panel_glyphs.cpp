@@ -9,6 +9,7 @@
 
 #include "app_globals.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <lvgl/lvgl.h>
 #include <spdlog/spdlog.h>
@@ -147,6 +148,8 @@ static std::unique_ptr<GlyphsPanel> g_glyphs_panel;
 GlyphsPanel& get_global_glyphs_panel() {
     if (!g_glyphs_panel) {
         g_glyphs_panel = std::make_unique<GlyphsPanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy("GlyphsPanel",
+                                                         []() { g_glyphs_panel.reset(); });
     }
     return *g_glyphs_panel;
 }

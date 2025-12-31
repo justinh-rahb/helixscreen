@@ -9,7 +9,7 @@
 #include "printer_state.h"
 
 /**
- * @file ui_timelapse_settings.h
+ * @file ui_overlay_timelapse_settings.h
  * @brief Timelapse settings overlay panel
  *
  * Configures Moonraker-Timelapse plugin settings for recording prints.

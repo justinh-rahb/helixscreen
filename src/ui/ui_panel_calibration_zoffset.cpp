@@ -10,6 +10,7 @@
 #include "app_globals.h"
 #include "moonraker_client.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -33,7 +34,6 @@ ZOffsetCalibrationPanel::ZOffsetCalibrationPanel() {
 }
 
 ZOffsetCalibrationPanel::~ZOffsetCalibrationPanel() {
-    // Applying [L010]: No spdlog in destructors
     // Applying [L011]: No mutex in destructors
 
     // Remove observers to prevent use-after-free if subjects outlive us
@@ -52,6 +52,8 @@ ZOffsetCalibrationPanel::~ZOffsetCalibrationPanel() {
     z_position_display_ = nullptr;
     final_offset_label_ = nullptr;
     error_message_ = nullptr;
+
+    spdlog::debug("[ZOffsetCal] Destroyed");
 }
 
 // ============================================================================
@@ -560,6 +562,8 @@ MoonrakerClient* get_moonraker_client();
 ZOffsetCalibrationPanel& get_global_zoffset_cal_panel() {
     if (!g_zoffset_cal_panel) {
         g_zoffset_cal_panel = std::make_unique<ZOffsetCalibrationPanel>();
+        StaticPanelRegistry::instance().register_destroy("ZOffsetCalibrationPanel",
+                                                         []() { g_zoffset_cal_panel.reset(); });
     }
     return *g_zoffset_cal_panel;
 }

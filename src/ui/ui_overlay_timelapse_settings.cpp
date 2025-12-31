@@ -1,8 +1,9 @@
 // Copyright 2025 356C LLC
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "ui_timelapse_settings.h"
+#include "ui_overlay_timelapse_settings.h"
 
+#include "static_panel_registry.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
 
@@ -33,6 +34,8 @@ void init_global_timelapse_settings(PrinterState& printer_state, MoonrakerAPI* a
         return;
     }
     g_timelapse_settings = std::make_unique<TimelapseSettingsOverlay>(printer_state, api);
+    StaticPanelRegistry::instance().register_destroy(
+        "TimelapseSettingsOverlay", []() { g_timelapse_settings.reset(); });
     spdlog::debug("[Timelapse Settings] TimelapseSettingsOverlay initialized");
 }
 

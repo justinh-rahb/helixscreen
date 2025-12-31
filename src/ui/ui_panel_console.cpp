@@ -14,6 +14,7 @@
 
 #include "app_globals.h"
 #include "moonraker_client.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -32,6 +33,8 @@ static std::unique_ptr<ConsolePanel> g_console_panel;
 ConsolePanel& get_global_console_panel() {
     if (!g_console_panel) {
         g_console_panel = std::make_unique<ConsolePanel>();
+        StaticPanelRegistry::instance().register_destroy("ConsolePanel",
+                                                         []() { g_console_panel.reset(); });
     }
     return *g_console_panel;
 }

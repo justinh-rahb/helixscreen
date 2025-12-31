@@ -15,6 +15,7 @@
 #include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -32,6 +33,8 @@ static std::unique_ptr<HistoryDashboardPanel> g_history_dashboard_panel;
 HistoryDashboardPanel& get_global_history_dashboard_panel() {
     if (!g_history_dashboard_panel) {
         g_history_dashboard_panel = std::make_unique<HistoryDashboardPanel>();
+        StaticPanelRegistry::instance().register_destroy(
+            "HistoryDashboardPanel", []() { g_history_dashboard_panel.reset(); });
     }
     return *g_history_dashboard_panel;
 }
@@ -45,11 +48,11 @@ HistoryDashboardPanel::HistoryDashboardPanel() : history_manager_(get_print_hist
 }
 
 // Destructor - remove observer from history manager
-// Applying [L010]: No spdlog in destructors - logger may be destroyed first
 HistoryDashboardPanel::~HistoryDashboardPanel() {
     if (history_manager_ && history_observer_) {
         history_manager_->remove_observer(&history_observer_);
     }
+    spdlog::debug("[HistoryDashboard] Destroyed");
 }
 
 // ============================================================================

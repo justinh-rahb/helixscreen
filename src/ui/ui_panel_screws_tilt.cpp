@@ -10,6 +10,7 @@
 
 #include "moonraker_api.h"
 #include "moonraker_client.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -34,6 +35,8 @@ MoonrakerAPI* get_moonraker_api();
 ScrewsTiltPanel& get_global_screws_tilt_panel() {
     if (!s_screws_tilt_panel) {
         s_screws_tilt_panel = std::make_unique<ScrewsTiltPanel>();
+        StaticPanelRegistry::instance().register_destroy("ScrewsTiltPanel",
+                                                         []() { s_screws_tilt_panel.reset(); });
     }
     return *s_screws_tilt_panel;
 }
@@ -181,13 +184,14 @@ void ScrewsTiltPanel::init_subjects() {
 // ============================================================================
 
 ScrewsTiltPanel::~ScrewsTiltPanel() {
-    // Applying [L010]: No spdlog in destructors - may crash after spdlog::shutdown()
     // Applying [L011]: No mutex in destructors - may deadlock
 
     // Signal pending callbacks to stop (safe even if already done in cleanup())
     if (alive_) {
         alive_->store(false);
     }
+
+    spdlog::debug("[ScrewsTilt] Destroyed");
 }
 
 // ============================================================================

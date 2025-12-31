@@ -15,6 +15,7 @@
 #include "config.h"
 #include "lvgl/lvgl.h"
 #include "moonraker_client.h"
+#include "static_panel_registry.h"
 #include "wizard_validation.h"
 
 #include <spdlog/spdlog.h>
@@ -39,12 +40,10 @@ static std::unique_ptr<WizardConnectionStep> g_wizard_connection_step;
 WizardConnectionStep* get_wizard_connection_step() {
     if (!g_wizard_connection_step) {
         g_wizard_connection_step = std::make_unique<WizardConnectionStep>();
+        StaticPanelRegistry::instance().register_destroy(
+            "WizardConnectionStep", []() { g_wizard_connection_step.reset(); });
     }
     return g_wizard_connection_step.get();
-}
-
-void destroy_wizard_connection_step() {
-    g_wizard_connection_step.reset();
 }
 
 // ============================================================================

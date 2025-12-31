@@ -17,6 +17,7 @@
 #include "printer_detector.h"
 #include "printer_images.h"
 #include "printer_types.h"
+#include "static_panel_registry.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -44,12 +45,10 @@ static std::unique_ptr<WizardPrinterIdentifyStep> g_wizard_printer_identify_step
 WizardPrinterIdentifyStep* get_wizard_printer_identify_step() {
     if (!g_wizard_printer_identify_step) {
         g_wizard_printer_identify_step = std::make_unique<WizardPrinterIdentifyStep>();
+        StaticPanelRegistry::instance().register_destroy(
+            "WizardPrinterIdentifyStep", []() { g_wizard_printer_identify_step.reset(); });
     }
     return g_wizard_printer_identify_step.get();
-}
-
-void destroy_wizard_printer_identify_step() {
-    g_wizard_printer_identify_step.reset();
 }
 
 // ============================================================================

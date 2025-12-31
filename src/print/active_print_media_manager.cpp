@@ -47,7 +47,7 @@ ActivePrintMediaManager::ActivePrintMediaManager(PrinterState& printer_state)
 
 ActivePrintMediaManager::~ActivePrintMediaManager() {
     // ObserverGuard handles cleanup automatically
-    // Note: No spdlog here - [L010] logger may be destroyed before this static singleton
+    // NOTE: No logging here - spdlog may be destroyed before this singleton
 }
 
 void ActivePrintMediaManager::set_api(MoonrakerAPI* api) {

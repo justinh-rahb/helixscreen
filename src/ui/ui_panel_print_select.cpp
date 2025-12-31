@@ -34,6 +34,7 @@
 #include "printer_state.h"
 #include "runtime_config.h"
 #include "settings_manager.h"
+#include "static_panel_registry.h"
 #include "thumbnail_cache.h"
 #include "usb_manager.h"
 
@@ -63,6 +64,8 @@ static std::unique_ptr<PrintSelectPanel> g_print_select_panel;
 PrintSelectPanel* get_print_select_panel(PrinterState& printer_state, MoonrakerAPI* api) {
     if (!g_print_select_panel) {
         g_print_select_panel = std::make_unique<PrintSelectPanel>(printer_state, api);
+        StaticPanelRegistry::instance().register_destroy("PrintSelectPanel",
+                                                         []() { g_print_select_panel.reset(); });
     }
     return g_print_select_panel.get();
 }
@@ -154,7 +157,6 @@ PrintSelectPanel::~PrintSelectPanel() {
     alive_->store(false);
 
     // Remove history manager observer first (simple pointer comparison removal)
-    // Applying [L010]: No spdlog in destructors
     if (history_observer_) {
         auto* history_manager = get_print_history_manager();
         if (history_manager) {
@@ -166,7 +168,6 @@ PrintSelectPanel::~PrintSelectPanel() {
     // CRITICAL: During static destruction, MoonrakerManager may already be destroyed
     // causing the api_ pointer to reference a destroyed client. Guard by checking
     // if the global manager is still valid (it returns nullptr after destruction).
-    // Applying [L010]: No spdlog in destructors - we also can't safely log here.
     auto* mgr = get_moonraker_manager();
     if (mgr && api_ && !filelist_handler_name_.empty()) {
         api_->get_client().unregister_method_callback("notify_filelist_changed",
@@ -213,7 +214,7 @@ PrintSelectPanel::~PrintSelectPanel() {
     view_toggle_icon_ = nullptr;
     print_status_panel_widget_ = nullptr;
 
-    // NOTE: Do NOT log here - spdlog may be destroyed first
+    spdlog::debug("[PrintSelectPanel] Destroyed");
 }
 
 // ============================================================================

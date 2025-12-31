@@ -9,7 +9,7 @@
 #include "printer_state.h"
 
 /**
- * @file ui_retraction_settings.h
+ * @file ui_overlay_retraction_settings.h
  * @brief Firmware retraction settings overlay panel
  *
  * Configures Klipper firmware_retraction module parameters for G10/G11 retraction.

@@ -12,6 +12,7 @@
 #include "app_globals.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -345,6 +346,8 @@ static std::unique_ptr<PowerPanel> g_power_panel;
 PowerPanel& get_global_power_panel() {
     if (!g_power_panel) {
         g_power_panel = std::make_unique<PowerPanel>(get_printer_state(), get_moonraker_api());
+        StaticPanelRegistry::instance().register_destroy("PowerPanel",
+                                                         []() { g_power_panel.reset(); });
     }
     return *g_power_panel;
 }

@@ -287,7 +287,7 @@ Modal::Modal() = default;
 
 Modal::~Modal() {
     // RAII: auto-hide if still visible
-    // CRITICAL: Check if LVGL is initialized - may be during static destruction [L010]
+    // CRITICAL: Check if LVGL is initialized - may be during static destruction
     if (backdrop_ && lv_is_initialized()) {
         // Hide immediately without calling virtual on_hide() - derived class already destroyed
         ModalStack::instance().remove(backdrop_);
@@ -295,7 +295,7 @@ Modal::~Modal() {
         backdrop_ = nullptr;
         dialog_ = nullptr;
     }
-    // Note: No spdlog here - logger may be destroyed during static destruction [L010]
+    spdlog::debug("[Modal] Destroyed");
 }
 
 // ============================================================================

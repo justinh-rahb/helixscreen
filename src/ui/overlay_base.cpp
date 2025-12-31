@@ -14,8 +14,7 @@ OverlayBase::~OverlayBase() {
         NavigationManager::instance().unregister_overlay_instance(overlay_root_);
     }
 
-    // Note: Do NOT log here - spdlog may already be shut down during static
-    // destruction (violates [L010]: No spdlog in destructors)
+    spdlog::debug("[OverlayBase] Destroyed");
 }
 
 void OverlayBase::on_activate() {

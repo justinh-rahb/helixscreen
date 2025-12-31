@@ -9,6 +9,7 @@
 #include "ui_theme.h"
 
 #include "moonraker_client.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -44,7 +45,6 @@ PIDCalibrationPanel::PIDCalibrationPanel() {
 }
 
 PIDCalibrationPanel::~PIDCalibrationPanel() {
-    // Applying [L010]: No spdlog in destructors
     // Applying [L011]: No mutex in destructors
 
     // Cancel any pending timers before destruction
@@ -68,6 +68,8 @@ PIDCalibrationPanel::~PIDCalibrationPanel() {
     parent_screen_ = nullptr;
     btn_heater_extruder_ = nullptr;
     btn_heater_bed_ = nullptr;
+
+    spdlog::debug("[PIDCal] Destroyed");
 }
 
 // ============================================================================
@@ -599,6 +601,8 @@ static std::unique_ptr<PIDCalibrationPanel> g_pid_cal_panel;
 PIDCalibrationPanel& get_global_pid_cal_panel() {
     if (!g_pid_cal_panel) {
         g_pid_cal_panel = std::make_unique<PIDCalibrationPanel>();
+        StaticPanelRegistry::instance().register_destroy("PIDCalibrationPanel",
+                                                         []() { g_pid_cal_panel.reset(); });
     }
     return *g_pid_cal_panel;
 }

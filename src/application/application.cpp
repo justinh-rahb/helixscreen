@@ -6,7 +6,7 @@
  *
  * @pattern Singleton orchestrator with ordered dependency initialization/teardown
  * @threading Main thread only; shutdown guards against double-call
- * @gotchas Must call spdlog::shutdown() LAST; m_shutdown_complete prevents destructor re-entry
+ * @gotchas m_shutdown_complete prevents destructor re-entry
  *
  * @see display_manager.cpp, moonraker_manager.cpp
  */
@@ -22,6 +22,7 @@
 #include "panel_factory.h"
 #include "print_history_manager.h"
 #include "screenshot.h"
+#include "static_panel_registry.h"
 #include "streaming_policy.h"
 #include "subject_initializer.h"
 
@@ -1168,7 +1169,7 @@ void Application::shutdown() {
     }
     m_shutdown_complete = true;
 
-    // Stop memory monitor first (uses spdlog, must stop before spdlog::shutdown)
+    // Stop memory monitor first
     helix::MemoryMonitor::instance().stop();
 
     spdlog::info("[Application] Shutting down...");
@@ -1180,16 +1181,20 @@ void Application::shutdown() {
     set_moonraker_client(nullptr);
     set_print_history_manager(nullptr);
 
+    // Deactivate UI and clear navigation registries
+    NavigationManager::instance().shutdown();
+
     // Reset managers in reverse order (MoonrakerManager handles print_start_collector cleanup)
     // History manager MUST be reset before moonraker (uses client for unregistration)
-    // and before spdlog::shutdown() (unregistration calls spdlog) [L010]
     m_history_manager.reset();
     m_moonraker.reset();
     m_panels.reset();
     m_subjects.reset();
 
-    // Clean up wizard
-    destroy_wizard_wifi_step();
+    // Destroy ALL static panel/overlay globals via self-registration pattern.
+    // This runs BEFORE spdlog's registry is destroyed during static destruction,
+    // ensuring panel destructors can safely log.
+    StaticPanelRegistry::instance().destroy_all();
 
     // Restore display backlight
     m_display->restore_display_on_shutdown();
@@ -1198,7 +1203,4 @@ void Application::shutdown() {
     m_display.reset();
 
     spdlog::info("[Application] Shutdown complete");
-
-    // Shutdown spdlog LAST - no logging after this point
-    spdlog::shutdown();
 }

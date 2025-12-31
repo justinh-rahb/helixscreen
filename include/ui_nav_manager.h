@@ -230,6 +230,15 @@ class NavigationManager {
      */
     bool is_panel_in_stack(lv_obj_t* panel) const;
 
+    /**
+     * @brief Shutdown navigation system during application exit
+     *
+     * Deactivates current overlay/panel and clears all registries.
+     * Called from Application::shutdown() before StaticPanelRegistry::destroy_all().
+     * This ensures UI is cleanly deactivated before panels are destroyed.
+     */
+    void shutdown();
+
   private:
     // Private constructor/destructor for singleton
     NavigationManager() = default;

@@ -10,6 +10,7 @@
 
 #include "filament_sensor_manager.h"
 #include "lvgl/lvgl.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -28,12 +29,11 @@ static std::unique_ptr<WizardFilamentSensorSelectStep> g_wizard_filament_sensor_
 WizardFilamentSensorSelectStep* get_wizard_filament_sensor_select_step() {
     if (!g_wizard_filament_sensor_select_step) {
         g_wizard_filament_sensor_select_step = std::make_unique<WizardFilamentSensorSelectStep>();
+        StaticPanelRegistry::instance().register_destroy("WizardFilamentSensorSelectStep", []() {
+            g_wizard_filament_sensor_select_step.reset();
+        });
     }
     return g_wizard_filament_sensor_select_step.get();
-}
-
-void destroy_wizard_filament_sensor_select_step() {
-    g_wizard_filament_sensor_select_step.reset();
 }
 
 // ============================================================================

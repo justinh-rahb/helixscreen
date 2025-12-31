@@ -34,9 +34,7 @@ InputShaperPanel& get_global_input_shaper_panel() {
 }
 
 InputShaperPanel::~InputShaperPanel() {
-    // Applying [L010]: No spdlog in destructors
     // Applying [L011]: No mutex in destructors
-
     // Signal to async callbacks that this panel is being destroyed [L012]
     alive_->store(false);
 

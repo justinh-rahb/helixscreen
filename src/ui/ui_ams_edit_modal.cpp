@@ -32,7 +32,7 @@ AmsEditModal::AmsEditModal() {
 
 AmsEditModal::~AmsEditModal() {
     // Modal destructor will call hide() if visible
-    // Note: No spdlog here - logger may be destroyed during static destruction [L010]
+    spdlog::debug("[AmsEditModal] Destroyed");
 }
 
 AmsEditModal::AmsEditModal(AmsEditModal&& other) noexcept
@@ -194,7 +194,7 @@ void AmsEditModal::on_hide() {
 
     // Reset edit mode subject
     lv_subject_set_int(&remaining_mode_subject_, 0);
-    // Note: No spdlog here - may be called from destructor during static destruction [L010]
+    spdlog::debug("[AmsEditModal] cleanup()");
 }
 
 // ============================================================================

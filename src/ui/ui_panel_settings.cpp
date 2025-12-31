@@ -8,6 +8,7 @@
 #include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
+#include "ui_overlay_network_settings.h"
 #include "ui_panel_bed_mesh.h"
 #include "ui_panel_calibration_pid.h"
 #include "ui_panel_calibration_zoffset.h"
@@ -19,11 +20,11 @@
 #include "filament_sensor_manager.h"
 #include "helix_version.h"
 #include "moonraker_client.h"
-#include "network_settings_overlay.h"
 #include "printer_state.h"
 #include "settings_manager.h"
 #include "sound_manager.h"
 #include "standard_macros.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -1422,6 +1423,8 @@ static std::unique_ptr<SettingsPanel> g_settings_panel;
 SettingsPanel& get_global_settings_panel() {
     if (!g_settings_panel) {
         g_settings_panel = std::make_unique<SettingsPanel>(get_printer_state(), nullptr);
+        StaticPanelRegistry::instance().register_destroy("SettingsPanel",
+                                                         []() { g_settings_panel.reset(); });
     }
     return *g_settings_panel;
 }

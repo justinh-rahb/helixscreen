@@ -30,7 +30,7 @@ AmsDryerCard::AmsDryerCard() {
 
 AmsDryerCard::~AmsDryerCard() {
     cleanup();
-    // Note: No spdlog here - logger may be destroyed during static destruction [L010]
+    spdlog::debug("[AmsDryerCard] Destroyed");
 }
 
 AmsDryerCard::AmsDryerCard(AmsDryerCard&& other) noexcept
@@ -120,7 +120,7 @@ void AmsDryerCard::cleanup() {
     // Clear widget references (dryer_card_ is owned by panel)
     dryer_card_ = nullptr;
     progress_fill_ = nullptr;
-    // Note: No spdlog here - may be called from destructor during static destruction [L010]
+    spdlog::debug("[AmsDryerCard] cleanup()");
 }
 
 // ============================================================================

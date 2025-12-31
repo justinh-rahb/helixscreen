@@ -11,6 +11,7 @@
 #include "printer_state.h"
 #include "runtime_config.h"
 #include "settings_manager.h"
+#include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -29,6 +30,8 @@ static std::unique_ptr<GcodeTestPanel> g_gcode_test_panel;
 GcodeTestPanel* get_gcode_test_panel(PrinterState& printer_state, MoonrakerAPI* api) {
     if (!g_gcode_test_panel) {
         g_gcode_test_panel = std::make_unique<GcodeTestPanel>(printer_state, api);
+        StaticPanelRegistry::instance().register_destroy("GcodeTestPanel",
+                                                         []() { g_gcode_test_panel.reset(); });
     }
     return g_gcode_test_panel.get();
 }
