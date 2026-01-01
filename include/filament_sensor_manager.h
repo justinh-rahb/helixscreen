@@ -271,6 +271,16 @@ class FilamentSensorManager {
     [[nodiscard]] lv_subject_t* get_sensor_count_subject();
 
     /**
+     * @brief Check if still within startup grace period
+     *
+     * Used to suppress notifications and modals during initial startup
+     * when sensor states are being synchronized.
+     *
+     * @return true if within grace period (first 10 seconds after init)
+     */
+    [[nodiscard]] bool is_in_startup_grace_period() const;
+
+    /**
      * @brief Reset all state for testing.
      *
      * Clears all sensors, states, and resets flags.

@@ -170,11 +170,20 @@ class RunoutGuidanceModal : public Modal {
     void set_on_load_filament(Callback cb) {
         on_load_filament_ = std::move(cb);
     }
+    void set_on_unload_filament(Callback cb) {
+        on_unload_filament_ = std::move(cb);
+    }
+    void set_on_purge(Callback cb) {
+        on_purge_ = std::move(cb);
+    }
     void set_on_resume(Callback cb) {
         on_resume_ = std::move(cb);
     }
     void set_on_cancel_print(Callback cb) {
         on_cancel_print_ = std::move(cb);
+    }
+    void set_on_ok_dismiss(Callback cb) {
+        on_ok_dismiss_ = std::move(cb);
     }
 
   protected:
@@ -200,11 +209,35 @@ class RunoutGuidanceModal : public Modal {
         }
         hide();
     }
+    void on_quaternary() override {
+        // Unload Filament button
+        if (on_unload_filament_) {
+            on_unload_filament_();
+        }
+        // Don't hide - user may want to load after unload
+    }
+    void on_quinary() override {
+        // Purge button
+        if (on_purge_) {
+            on_purge_();
+        }
+        // Don't hide - user may want to purge multiple times
+    }
+    void on_senary() override {
+        // OK button (dismiss when idle)
+        if (on_ok_dismiss_) {
+            on_ok_dismiss_();
+        }
+        hide();
+    }
 
   private:
     Callback on_load_filament_;
+    Callback on_unload_filament_;
+    Callback on_purge_;
     Callback on_resume_;
     Callback on_cancel_print_;
+    Callback on_ok_dismiss_;
 };
 
 /**

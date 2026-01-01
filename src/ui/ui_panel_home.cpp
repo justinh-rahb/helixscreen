@@ -23,6 +23,7 @@
 #include "app_globals.h"
 #include "config.h"
 #include "ethernet_manager.h"
+#include "filament_sensor_manager.h"
 #include "moonraker_api.h"
 #include "prerendered_images.h"
 #include "printer_detector.h"
@@ -71,6 +72,12 @@ HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
     spdlog::debug("[{}] Subscribed to PrinterState extruder temperature and target", get_name());
     spdlog::debug("[{}] Subscribed to PrinterState print state/progress/time/thumbnail",
                   get_name());
+
+    // Subscribe to filament runout for idle modal
+    auto& fsm = helix::FilamentSensorManager::instance();
+    filament_runout_observer_ =
+        ObserverGuard(fsm.get_any_runout_subject(), filament_runout_observer_cb, this);
+    spdlog::debug("[{}] Subscribed to filament_any_runout subject", get_name());
 
     // Load configured LED from wizard settings and tell PrinterState to track it
     Config* config = Config::get_instance();
@@ -718,8 +725,11 @@ void HomePanel::on_extruder_temp_changed(int temp_centi) {
     int temp_deg = centi_to_degrees(temp_centi);
 
     // Format temperature for display and update the string subject
+    // Guard: Observer callback fires during constructor before init_subjects()
     std::snprintf(temp_buffer_, sizeof(temp_buffer_), "%d °C", temp_deg);
-    lv_subject_copy_string(&temp_subject_, temp_buffer_);
+    if (subjects_initialized_) {
+        lv_subject_copy_string(&temp_subject_, temp_buffer_);
+    }
 
     // Update cached value and animator (animator expects centidegrees)
     cached_extruder_temp_ = temp_centi;
@@ -1247,6 +1257,79 @@ void HomePanel::reset_print_card_to_idle() {
     if (print_card_label_) {
         lv_label_set_text(print_card_label_, "Print Files");
     }
+}
+
+// ============================================================================
+// Filament Runout Modal
+// ============================================================================
+
+void HomePanel::filament_runout_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
+    auto* self = static_cast<HomePanel*>(lv_observer_get_user_data(observer));
+    if (!self) {
+        return;
+    }
+
+    int any_runout = lv_subject_get_int(subject);
+    spdlog::debug("[{}] Filament runout subject changed: {}", self->get_name(), any_runout);
+
+    if (any_runout == 1) {
+        // Runout detected - check if we should show modal
+        self->check_and_show_idle_runout_modal();
+    } else {
+        // Filament present - reset the shown flag so modal can show again next time
+        self->runout_modal_shown_ = false;
+    }
+}
+
+void HomePanel::check_and_show_idle_runout_modal() {
+    // Grace period - don't show modal during startup
+    auto& fsm = helix::FilamentSensorManager::instance();
+    if (fsm.is_in_startup_grace_period()) {
+        spdlog::debug("[{}] In startup grace period - skipping runout modal", get_name());
+        return;
+    }
+
+    // Only show modal if not already shown
+    if (runout_modal_shown_) {
+        spdlog::debug("[{}] Runout modal already shown - skipping", get_name());
+        return;
+    }
+
+    // Only show if printer is idle (not printing/paused)
+    int print_state = lv_subject_get_int(printer_state_.get_print_state_enum_subject());
+    if (print_state != static_cast<int>(PrintJobState::STANDBY) &&
+        print_state != static_cast<int>(PrintJobState::COMPLETE) &&
+        print_state != static_cast<int>(PrintJobState::CANCELLED)) {
+        spdlog::debug("[{}] Print active (state={}) - skipping idle runout modal", get_name(),
+                      print_state);
+        return;
+    }
+
+    spdlog::info("[{}] Showing idle runout modal", get_name());
+    show_idle_runout_modal();
+    runout_modal_shown_ = true;
+}
+
+void HomePanel::show_idle_runout_modal() {
+    if (runout_modal_.is_visible()) {
+        return;
+    }
+
+    // Configure callbacks for the modal buttons
+    runout_modal_.set_on_load_filament([this]() {
+        spdlog::info("[{}] User chose to load filament (idle)", get_name());
+        ui_nav_set_active(UI_PANEL_FILAMENT);
+    });
+
+    runout_modal_.set_on_resume([]() {
+        // Resume not applicable when idle, but modal handles this
+    });
+
+    runout_modal_.set_on_cancel_print([]() {
+        // Cancel not applicable when idle, but modal handles this
+    });
+
+    runout_modal_.show(parent_screen_);
 }
 
 static std::unique_ptr<HomePanel> g_home_panel;

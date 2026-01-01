@@ -437,6 +437,16 @@ class MoonrakerClientMock : public MoonrakerClient {
      */
     bool cancel_print_internal();
 
+    /**
+     * @brief Toggle filament runout state for simulation
+     *
+     * Toggles the filament_detected state on the primary runout sensor and
+     * dispatches a status update. Useful for testing filament runout handling.
+     *
+     * @return true if toggled, false if no filament sensors configured
+     */
+    bool toggle_filament_runout();
+
   private:
     /**
      * @brief Populate hardware lists based on configured printer type
@@ -683,6 +693,9 @@ class MoonrakerClientMock : public MoonrakerClient {
 
     // Simulation tick counter
     std::atomic<uint32_t> tick_count_{0};
+
+    // Filament runout simulation state
+    std::atomic<bool> filament_runout_state_{true}; // true = filament detected
 
     // PRINT_START simulation phases (for G-code response notifications)
     // Tracks which phases have already been dispatched during current print

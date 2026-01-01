@@ -599,6 +599,11 @@ lv_subject_t* FilamentSensorManager::get_sensor_count_subject() {
     return &sensor_count_;
 }
 
+bool FilamentSensorManager::is_in_startup_grace_period() const {
+    auto now = std::chrono::steady_clock::now();
+    return (now - startup_time_) < AppConstants::Startup::NOTIFICATION_GRACE_PERIOD;
+}
+
 // ============================================================================
 // Private Helpers
 // ============================================================================

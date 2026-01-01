@@ -6,6 +6,7 @@
 #include "ui_heating_animator.h"
 #include "ui_observer_guard.h"
 #include "ui_panel_base.h"
+#include "ui_panel_print_status.h" // For RunoutGuidanceModal
 
 #include "tips_manager.h"
 
@@ -179,6 +180,11 @@ class HomePanel : public PanelBase {
     ObserverGuard print_time_left_observer_;
     ObserverGuard print_thumbnail_path_observer_; // Observes shared thumbnail from PrintStatusPanel
 
+    // Filament runout observer and modal (shows when idle + runout detected)
+    ObserverGuard filament_runout_observer_;
+    RunoutGuidanceModal runout_modal_;
+    bool runout_modal_shown_ = false; // Prevent repeated modals
+
     // Print card widgets (looked up after XML creation)
     lv_obj_t* print_card_thumb_ = nullptr;        // Idle state thumbnail
     lv_obj_t* print_card_active_thumb_ = nullptr; // Active print thumbnail
@@ -203,6 +209,11 @@ class HomePanel : public PanelBase {
     static void print_progress_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
     static void print_time_left_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
     static void print_thumbnail_path_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
+
+    // Filament runout handling
+    static void filament_runout_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
+    void check_and_show_idle_runout_modal();
+    void show_idle_runout_modal();
 };
 
 // Global instance accessor (needed by main.cpp)

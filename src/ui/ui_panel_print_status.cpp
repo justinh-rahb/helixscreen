@@ -55,13 +55,19 @@ void ExcludeObjectModal::on_show() {
 }
 
 void RunoutGuidanceModal::on_show() {
-    // RunoutGuidanceModal has custom button names for 3 options:
+    // RunoutGuidanceModal has 6 buttons for runout handling:
     // - btn_load_filament → on_ok() (primary action)
-    // - btn_resume → on_cancel() (secondary action)
-    // - btn_cancel_print → on_tertiary() (destructive action)
+    // - btn_unload_filament → on_quaternary() (unload before loading new)
+    // - btn_purge → on_quinary() (purge after loading)
+    // - btn_resume → on_cancel() (resume paused print)
+    // - btn_cancel_print → on_tertiary() (cancel print)
+    // - btn_ok → on_senary() (dismiss when idle)
     wire_ok_button("btn_load_filament");
+    wire_quaternary_button("btn_unload_filament");
+    wire_quinary_button("btn_purge");
     wire_cancel_button("btn_resume");
     wire_tertiary_button("btn_cancel_print");
+    wire_senary_button("btn_ok");
 }
 
 // Forward declarations for XML event callbacks (registered in init_subjects)
@@ -496,11 +502,12 @@ void PrintStatusPanel::on_activate() {
         pending_gcode_filename_.clear();
     }
 
-    // Resume G-code viewer rendering if viewer mode is active (3D=1 or 2D=2, not thumbnail=0)
-    int mode = lv_subject_get_int(&gcode_viewer_mode_subject_);
-    if (gcode_viewer_ && (mode == 1 || mode == 2)) {
-        ui_gcode_viewer_set_paused(gcode_viewer_, false);
-    }
+    // Restore G-code viewer state based on current print conditions
+    // This ensures the viewer is properly restored when returning from overlays like Tune panel
+    bool want_viewer =
+        (current_state_ == PrintState::Preparing || current_state_ == PrintState::Printing ||
+         current_state_ == PrintState::Paused);
+    show_gcode_viewer(want_viewer && gcode_loaded_);
 }
 
 void PrintStatusPanel::on_deactivate() {
@@ -2734,6 +2741,56 @@ void PrintStatusPanel::show_runout_guidance_modal() {
                     NOTIFY_ERROR("Failed to cancel: {}", err.user_message());
                 });
         }
+    });
+
+    runout_modal_.set_on_unload_filament([this]() {
+        spdlog::info("[{}] User chose to unload filament after runout", get_name());
+
+        const auto& unload_info = StandardMacros::instance().get(StandardMacroSlot::UnloadFilament);
+        if (unload_info.is_empty()) {
+            spdlog::warn("[{}] Unload filament macro slot is empty", get_name());
+            NOTIFY_WARNING("Unload macro not configured");
+            return;
+        }
+
+        if (api_) {
+            spdlog::info("[{}] Using StandardMacros unload: {}", get_name(),
+                         unload_info.get_macro());
+            StandardMacros::instance().execute(
+                StandardMacroSlot::UnloadFilament, api_,
+                []() { spdlog::info("[PrintStatusPanel] Unload filament started"); },
+                [](const MoonrakerError& err) {
+                    spdlog::error("[PrintStatusPanel] Failed to unload filament: {}", err.message);
+                    NOTIFY_ERROR("Failed to unload: {}", err.user_message());
+                });
+        }
+    });
+
+    runout_modal_.set_on_purge([this]() {
+        spdlog::info("[{}] User chose to purge after runout", get_name());
+
+        const auto& purge_info = StandardMacros::instance().get(StandardMacroSlot::Purge);
+        if (purge_info.is_empty()) {
+            spdlog::warn("[{}] Purge macro slot is empty", get_name());
+            NOTIFY_WARNING("Purge macro not configured");
+            return;
+        }
+
+        if (api_) {
+            spdlog::info("[{}] Using StandardMacros purge: {}", get_name(), purge_info.get_macro());
+            StandardMacros::instance().execute(
+                StandardMacroSlot::Purge, api_,
+                []() { spdlog::info("[PrintStatusPanel] Purge started"); },
+                [](const MoonrakerError& err) {
+                    spdlog::error("[PrintStatusPanel] Failed to purge: {}", err.message);
+                    NOTIFY_ERROR("Failed to purge: {}", err.user_message());
+                });
+        }
+    });
+
+    runout_modal_.set_on_ok_dismiss([this]() {
+        spdlog::info("[{}] User dismissed runout modal (idle mode)", get_name());
+        // Just hide the modal - no action needed
     });
 
     if (!runout_modal_.show(lv_screen_active())) {

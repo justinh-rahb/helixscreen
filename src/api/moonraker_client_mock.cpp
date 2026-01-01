@@ -1522,6 +1522,41 @@ bool MoonrakerClientMock::cancel_print_internal() {
     return true;
 }
 
+bool MoonrakerClientMock::toggle_filament_runout() {
+    // Find primary runout sensor from filament_sensors_ list
+    std::string runout_sensor;
+    for (const auto& sensor : filament_sensors_) {
+        if (sensor.find("runout") != std::string::npos) {
+            runout_sensor = sensor;
+            break;
+        }
+    }
+
+    // Fallback to first sensor if no "runout" sensor found
+    if (runout_sensor.empty() && !filament_sensors_.empty()) {
+        runout_sensor = filament_sensors_[0];
+    }
+
+    if (runout_sensor.empty()) {
+        spdlog::warn("[MoonrakerClientMock] No filament sensor to toggle");
+        return false;
+    }
+
+    // Toggle state
+    bool new_state = !filament_runout_state_.load();
+    filament_runout_state_.store(new_state);
+
+    spdlog::info("[MoonrakerClientMock] Filament toggle on '{}': {} -> {}", runout_sensor,
+                 new_state ? "empty" : "detected", new_state ? "detected" : "empty");
+
+    // Dispatch status update through normal flow
+    json status;
+    status[runout_sensor]["filament_detected"] = new_state;
+    dispatch_status_update(status);
+
+    return true;
+}
+
 // ============================================================================
 // Simulation Helpers
 // ============================================================================

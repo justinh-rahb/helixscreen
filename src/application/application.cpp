@@ -82,6 +82,7 @@
 #include "memory_utils.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
+#include "moonraker_client_mock.h"
 #include "printer_state.h"
 #include "settings_manager.h"
 #include "splash_screen.h"
@@ -1164,6 +1165,20 @@ void Application::handle_keyboard_shortcuts() {
         MemoryStatsOverlay::instance().toggle();
     }
     m_key_was_pressed = m_key_pressed;
+
+    // F key toggle for filament runout simulation (test mode only, with debounce)
+    static bool f_key_was_pressed = false;
+    bool f_key_pressed = keyboard_state[SDL_SCANCODE_F] != 0;
+    if (f_key_pressed && !f_key_was_pressed) {
+        if (get_runtime_config()->is_test_mode() && m_moonraker) {
+            auto* mock = dynamic_cast<MoonrakerClientMock*>(m_moonraker->client());
+            if (mock) {
+                spdlog::info("[Application] F key - toggling filament runout simulation");
+                mock->toggle_filament_runout();
+            }
+        }
+    }
+    f_key_was_pressed = f_key_pressed;
 #endif
 }
 

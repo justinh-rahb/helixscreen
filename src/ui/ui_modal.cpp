@@ -483,6 +483,9 @@ bool Modal::show(lv_obj_t* parent, const char** attrs) {
     lv_xml_register_event_cb(nullptr, "on_runout_load_filament", ok_button_cb);
     lv_xml_register_event_cb(nullptr, "on_runout_resume", cancel_button_cb);
     lv_xml_register_event_cb(nullptr, "on_runout_cancel_print", tertiary_button_cb);
+    lv_xml_register_event_cb(nullptr, "on_runout_unload_filament", quaternary_button_cb);
+    lv_xml_register_event_cb(nullptr, "on_runout_purge", quinary_button_cb);
+    lv_xml_register_event_cb(nullptr, "on_runout_ok", senary_button_cb);
 
     // Use internal create method
     if (!create_and_show(parent_, component_name(), attrs)) {
@@ -567,6 +570,36 @@ void Modal::wire_tertiary_button(const char* name) {
         spdlog::trace("[{}] Wired Tertiary button '{}'", get_name(), name);
     } else {
         spdlog::warn("[{}] Tertiary button '{}' not found", get_name(), name);
+    }
+}
+
+void Modal::wire_quaternary_button(const char* name) {
+    lv_obj_t* btn = find_widget(name);
+    if (btn) {
+        lv_obj_set_user_data(btn, this);
+        spdlog::trace("[{}] Wired Quaternary button '{}'", get_name(), name);
+    } else {
+        spdlog::warn("[{}] Quaternary button '{}' not found", get_name(), name);
+    }
+}
+
+void Modal::wire_quinary_button(const char* name) {
+    lv_obj_t* btn = find_widget(name);
+    if (btn) {
+        lv_obj_set_user_data(btn, this);
+        spdlog::trace("[{}] Wired Quinary button '{}'", get_name(), name);
+    } else {
+        spdlog::warn("[{}] Quinary button '{}' not found", get_name(), name);
+    }
+}
+
+void Modal::wire_senary_button(const char* name) {
+    lv_obj_t* btn = find_widget(name);
+    if (btn) {
+        lv_obj_set_user_data(btn, this);
+        spdlog::trace("[{}] Wired Senary button '{}'", get_name(), name);
+    } else {
+        spdlog::warn("[{}] Senary button '{}' not found", get_name(), name);
     }
 }
 
@@ -729,6 +762,45 @@ void Modal::tertiary_button_cb(lv_event_t* e) {
     if (self) {
         spdlog::debug("[{}] Tertiary button clicked", self->get_name());
         self->on_tertiary();
+    }
+
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void Modal::quaternary_button_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[Modal] quaternary_button_cb");
+
+    lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<Modal*>(lv_obj_get_user_data(btn));
+    if (self) {
+        spdlog::debug("[{}] Quaternary button clicked", self->get_name());
+        self->on_quaternary();
+    }
+
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void Modal::quinary_button_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[Modal] quinary_button_cb");
+
+    lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<Modal*>(lv_obj_get_user_data(btn));
+    if (self) {
+        spdlog::debug("[{}] Quinary button clicked", self->get_name());
+        self->on_quinary();
+    }
+
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void Modal::senary_button_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[Modal] senary_button_cb");
+
+    lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<Modal*>(lv_obj_get_user_data(btn));
+    if (self) {
+        spdlog::debug("[{}] Senary button clicked", self->get_name());
+        self->on_senary();
     }
 
     LVGL_SAFE_EVENT_CB_END();
