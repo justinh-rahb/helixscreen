@@ -386,6 +386,9 @@ lv_obj_t* PrintStatusPanel::create(lv_obj_t* parent) {
         // Register long-press callback for exclude object feature
         ui_gcode_viewer_set_object_long_press_callback(gcode_viewer_, on_object_long_pressed, this);
         spdlog::debug("[{}]   ✓ Registered long-press callback for exclude object", get_name());
+
+        // Vertical offset to match thumbnail positioning (tuned empirically)
+        ui_gcode_viewer_set_content_offset_y(gcode_viewer_, -0.10f);
     } else {
         spdlog::error("[{}]   ✗ G-code viewer widget NOT FOUND", get_name());
     }
@@ -605,8 +608,13 @@ void PrintStatusPanel::load_gcode_file(const char* file_path) {
             // Mark G-code as successfully loaded (enables viewer mode on state changes)
             self->gcode_loaded_ = true;
 
-            // Show the viewer (hide gradient and thumbnail)
-            self->show_gcode_viewer(true);
+            // Only show viewer if print is still active (avoid race with completion)
+            bool want_viewer = (self->current_state_ == PrintState::Preparing ||
+                                self->current_state_ == PrintState::Printing ||
+                                self->current_state_ == PrintState::Paused);
+            if (want_viewer) {
+                self->show_gcode_viewer(true);
+            }
 
             // Force layout recalculation now that viewer is visible
             lv_obj_update_layout(viewer);

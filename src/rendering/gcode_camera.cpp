@@ -30,7 +30,7 @@ void GCodeCamera::reset() {
     // Default isometric view matching common slicer thumbnail angles
     // Most slicers (OrcaSlicer, PrusaSlicer, Bambu) show front-left view
     azimuth_ = -45.0f;  // Front-left (was 45° = back-right)
-    elevation_ = 25.0f; // Slightly lower for dramatic view
+    elevation_ = 20.0f; // Match OrcaSlicer thumbnail angle
     target_ = glm::vec3(0, 0, 0);
     distance_ = 100.0f;
     zoom_level_ = 1.8f; // Tighter framing to match thumbnails (was 1.4)
