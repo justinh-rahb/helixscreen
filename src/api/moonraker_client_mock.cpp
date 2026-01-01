@@ -370,7 +370,7 @@ void MoonrakerClientMock::populate_hardware() {
                     "extruder",   // Hotend thermistor (Klipper naming: bare heater name)
                     "temperature_sensor chamber", "temperature_sensor mcu_temp"};
         fans_ = {"heater_fan hotend_fan", "fan", "fan_generic chamber_fan"};
-        leds_ = {"led chamber_light"};
+        leds_ = {"led chamber_led"};
         break;
 
     case PrinterType::GENERIC_COREXY:
@@ -380,7 +380,7 @@ void MoonrakerClientMock::populate_hardware() {
                     "extruder",   // Hotend thermistor (Klipper naming: bare heater name)
                     "temperature_sensor raspberry_pi"};
         fans_ = {"heater_fan hotend_fan", "fan"};
-        leds_ = {};
+        leds_ = {"neopixel chamber_led"};
         break;
 
     case PrinterType::GENERIC_BEDSLINGER:
