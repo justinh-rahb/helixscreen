@@ -1444,3 +1444,25 @@ void PrinterState::set_hardware_validation_result(const HardwareValidationResult
 const HardwareValidationResult& PrinterState::get_hardware_validation_result() const {
     return hardware_validation_result_;
 }
+
+void PrinterState::remove_hardware_issue(const std::string& hardware_name) {
+    // Helper lambda to remove an issue from a vector by hardware_name
+    auto remove_by_name = [&hardware_name](std::vector<HardwareIssue>& issues) {
+        issues.erase(std::remove_if(issues.begin(), issues.end(),
+                                    [&hardware_name](const HardwareIssue& issue) {
+                                        return issue.hardware_name == hardware_name;
+                                    }),
+                     issues.end());
+    };
+
+    // Remove from all issue lists
+    remove_by_name(hardware_validation_result_.critical_missing);
+    remove_by_name(hardware_validation_result_.expected_missing);
+    remove_by_name(hardware_validation_result_.newly_discovered);
+    remove_by_name(hardware_validation_result_.changed_from_last_session);
+
+    // Re-apply the updated result to refresh all subjects
+    set_hardware_validation_result(hardware_validation_result_);
+
+    spdlog::debug("[PrinterState] Removed hardware issue: {}", hardware_name);
+}

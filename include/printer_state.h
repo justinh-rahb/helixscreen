@@ -1024,6 +1024,17 @@ class PrinterState {
      */
     const HardwareValidationResult& get_hardware_validation_result() const;
 
+    /**
+     * @brief Remove a hardware issue from the cached validation result
+     *
+     * Removes the issue matching the given hardware name from all issue lists
+     * and updates all related subjects (counts, status text, etc.).
+     * Used when user clicks "Ignore" or "Save" on a hardware issue.
+     *
+     * @param hardware_name The hardware name to remove (e.g., "filament_sensor runout")
+     */
+    void remove_hardware_issue(const std::string& hardware_name);
+
   private:
     // Temperature subjects
     lv_subject_t extruder_temp_;

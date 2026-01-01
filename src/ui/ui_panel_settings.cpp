@@ -1297,19 +1297,19 @@ void SettingsPanel::populate_hardware_issues() {
                 lv_label_set_text(message_label, issue.message.c_str());
             }
 
-            // Configure action button for non-critical issues
+            // Configure action buttons for non-critical issues
             if (issue.severity != HardwareIssueSeverity::CRITICAL) {
-                lv_obj_t* action_btn = lv_obj_find_by_name(row, "action_btn");
-                lv_obj_t* action_label = lv_obj_find_by_name(row, "action_label");
-                if (action_btn && action_label) {
-                    // Show button
-                    lv_obj_clear_flag(action_btn, LV_OBJ_FLAG_HIDDEN);
+                lv_obj_t* action_buttons = lv_obj_find_by_name(row, "action_buttons");
+                lv_obj_t* ignore_btn = lv_obj_find_by_name(row, "ignore_btn");
+                lv_obj_t* save_btn = lv_obj_find_by_name(row, "save_btn");
 
-                    // Set label based on severity
-                    if (issue.severity == HardwareIssueSeverity::WARNING) {
-                        lv_label_set_text(action_label, "Ignore");
-                    } else {
-                        lv_label_set_text(action_label, "Save");
+                if (action_buttons && ignore_btn) {
+                    // Show button container
+                    lv_obj_clear_flag(action_buttons, LV_OBJ_FLAG_HIDDEN);
+
+                    // Show Save button only for INFO severity (newly discovered)
+                    if (save_btn && issue.severity == HardwareIssueSeverity::INFO) {
+                        lv_obj_clear_flag(save_btn, LV_OBJ_FLAG_HIDDEN);
                     }
 
                     // Store hardware name in row for callback (freed on row delete)
@@ -1328,27 +1328,38 @@ void SettingsPanel::populate_hardware_issues() {
                         },
                         LV_EVENT_DELETE, nullptr);
 
-                    // Add click handler
-                    lv_obj_add_event_cb(
-                        action_btn,
-                        [](lv_event_t* e) {
-                            LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] hardware_action_clicked");
-                            auto* btn = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-                            lv_obj_t* row = lv_obj_get_parent(btn);
-                            const char* hw_name =
-                                static_cast<const char*>(lv_obj_get_user_data(row));
-                            bool is_ignore = static_cast<bool>(
-                                reinterpret_cast<uintptr_t>(lv_event_get_user_data(e)));
+                    // Helper lambda for button click handlers
+                    auto add_button_handler = [&](lv_obj_t* btn, bool is_ignore) {
+                        lv_obj_add_event_cb(
+                            btn,
+                            [](lv_event_t* e) {
+                                LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] hardware_action_clicked");
+                                auto* btn = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+                                // Navigate up: btn -> action_buttons -> row
+                                lv_obj_t* action_container = lv_obj_get_parent(btn);
+                                lv_obj_t* row = lv_obj_get_parent(action_container);
+                                const char* hw_name =
+                                    static_cast<const char*>(lv_obj_get_user_data(row));
+                                bool is_ignore = static_cast<bool>(
+                                    reinterpret_cast<uintptr_t>(lv_event_get_user_data(e)));
 
-                            if (hw_name) {
-                                get_global_settings_panel().handle_hardware_action(hw_name,
-                                                                                   is_ignore);
-                            }
-                            LVGL_SAFE_EVENT_CB_END();
-                        },
-                        LV_EVENT_CLICKED,
-                        reinterpret_cast<void*>(static_cast<uintptr_t>(
-                            issue.severity == HardwareIssueSeverity::WARNING)));
+                                if (hw_name) {
+                                    get_global_settings_panel().handle_hardware_action(hw_name,
+                                                                                       is_ignore);
+                                }
+                                LVGL_SAFE_EVENT_CB_END();
+                            },
+                            LV_EVENT_CLICKED,
+                            reinterpret_cast<void*>(static_cast<uintptr_t>(is_ignore)));
+                    };
+
+                    // Wire up Ignore button (always visible for non-critical)
+                    add_button_handler(ignore_btn, true);
+
+                    // Wire up Save button (only for INFO severity)
+                    if (save_btn && issue.severity == HardwareIssueSeverity::INFO) {
+                        add_button_handler(save_btn, false);
+                    }
                 }
             }
         }
@@ -1379,7 +1390,8 @@ void SettingsPanel::handle_hardware_action(const char* hardware_name, bool is_ig
         ui_toast_show(ToastSeverity::SUCCESS, "Hardware marked as optional", 2000);
         spdlog::info("[{}] Marked hardware '{}' as optional", get_name(), hw_name);
 
-        // Refresh the overlay
+        // Remove from cached validation result and refresh overlay
+        printer_state_.remove_hardware_issue(hw_name);
         populate_hardware_issues();
     } else {
         // "Save" - Add to expected hardware (with confirmation)
@@ -1392,9 +1404,16 @@ void SettingsPanel::handle_hardware_action(const char* hardware_name, bool is_ig
                  "Add '%s' to expected hardware?\n\nYou'll be notified if it's removed later.",
                  hw_name.c_str());
 
+        // Close any existing dialog first
+        if (hardware_save_dialog_) {
+            ui_modal_hide(hardware_save_dialog_);
+            hardware_save_dialog_ = nullptr;
+        }
+
         // Show confirmation dialog
-        ui_modal_show_confirmation("Save Hardware", message_buf, ModalSeverity::Info, "Save",
-                                   on_hardware_save_confirm, on_hardware_save_cancel, this);
+        hardware_save_dialog_ =
+            ui_modal_show_confirmation("Save Hardware", message_buf, ModalSeverity::Info, "Save",
+                                       on_hardware_save_confirm, on_hardware_save_cancel, this);
     }
 }
 
@@ -1417,6 +1436,12 @@ void SettingsPanel::on_hardware_save_cancel(lv_event_t* e) {
 }
 
 void SettingsPanel::handle_hardware_save_confirm() {
+    // Close dialog first
+    if (hardware_save_dialog_) {
+        ui_modal_hide(hardware_save_dialog_);
+        hardware_save_dialog_ = nullptr;
+    }
+
     Config* cfg = Config::get_instance();
 
     // Add to expected hardware list
@@ -1424,12 +1449,19 @@ void SettingsPanel::handle_hardware_save_confirm() {
     ui_toast_show(ToastSeverity::SUCCESS, "Hardware saved to config", 2000);
     spdlog::info("[{}] Added hardware '{}' to expected list", get_name(), pending_hardware_save_);
 
-    // Refresh the overlay
+    // Remove from cached validation result and refresh overlay
+    printer_state_.remove_hardware_issue(pending_hardware_save_);
     populate_hardware_issues();
     pending_hardware_save_.clear();
 }
 
 void SettingsPanel::handle_hardware_save_cancel() {
+    // Close dialog
+    if (hardware_save_dialog_) {
+        ui_modal_hide(hardware_save_dialog_);
+        hardware_save_dialog_ = nullptr;
+    }
+
     pending_hardware_save_.clear();
 }
 

@@ -137,8 +137,9 @@ class SettingsPanel : public PanelBase {
     // Note: PID calibration panel managed by get_global_pid_cal_panel()
     // Note: factory_reset_dialog_ and theme_restart_dialog_ are public (for static callbacks)
 
-    // Pending hardware name for save confirmation dialog
+    // Hardware save confirmation dialog state
     std::string pending_hardware_save_;
+    lv_obj_t* hardware_save_dialog_ = nullptr;
 
     //
     // === Setup Helpers ===
