@@ -17,6 +17,7 @@ class SubjectInitializer;
 class MoonrakerManager;
 class PanelFactory;
 class PrintHistoryManager;
+class TemperatureHistoryManager;
 
 /**
  * @brief Main application orchestrator
@@ -92,6 +93,7 @@ class Application {
     std::unique_ptr<SubjectInitializer> m_subjects;
     std::unique_ptr<MoonrakerManager> m_moonraker;
     std::unique_ptr<PrintHistoryManager> m_history_manager;
+    std::unique_ptr<TemperatureHistoryManager> m_temp_history_manager;
     std::unique_ptr<PanelFactory> m_panels;
 
     // Configuration

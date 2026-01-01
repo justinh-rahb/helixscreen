@@ -217,27 +217,12 @@ class TempControlPanel {
     // Subjects initialized flag
     bool subjects_initialized_ = false;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Background temperature history buffers
-    // Store temperature readings from app start so graphs show data immediately
-    // ─────────────────────────────────────────────────────────────────────────
-    static constexpr int TEMP_HISTORY_SIZE =
-        UI_TEMP_GRAPH_DEFAULT_POINTS; // Match graph point count
-
-    // Circular buffer storage (temp values + timestamps)
-    struct TempSample {
-        int temp;
-        int64_t timestamp_ms;
-    };
-    std::array<TempSample, TEMP_HISTORY_SIZE> nozzle_history_{};
-    std::array<TempSample, TEMP_HISTORY_SIZE> bed_history_{};
-
-    // Circular buffer write indices
-    int nozzle_history_count_ = 0; // Total samples received (for wrap detection)
-    int bed_history_count_ = 0;
-
     // Helper to replay buffered history to graph when panel opens
     void replay_nozzle_history_to_graph();
     void replay_bed_history_to_graph();
     void replay_history_to_mini_graph();
+
+    // Helper to replay history from TemperatureHistoryManager
+    void replay_history_from_manager(ui_temp_graph_t* graph, int series_id,
+                                     const std::string& heater_name);
 };

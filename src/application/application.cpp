@@ -26,6 +26,7 @@
 #include "static_subject_registry.h"
 #include "streaming_policy.h"
 #include "subject_initializer.h"
+#include "temperature_history_manager.h"
 
 // UI headers
 #include "ui_bed_mesh.h"
@@ -573,6 +574,11 @@ bool Application::init_subjects() {
     ui_status_bar_register_callbacks();
     ui_panel_screws_tilt_register_callbacks();
     ui_panel_input_shaper_register_callbacks();
+
+    // Create temperature history manager (collects temp samples from PrinterState subjects)
+    m_temp_history_manager = std::make_unique<TemperatureHistoryManager>(get_printer_state());
+    set_temperature_history_manager(m_temp_history_manager.get());
+    spdlog::debug("[Application] TemperatureHistoryManager created");
 
     spdlog::debug("[Application] Subjects initialized");
     helix::MemoryMonitor::log_now("after_subjects_init");
@@ -1181,6 +1187,7 @@ void Application::shutdown() {
     set_moonraker_api(nullptr);
     set_moonraker_client(nullptr);
     set_print_history_manager(nullptr);
+    set_temperature_history_manager(nullptr);
 
     // Deactivate UI and clear navigation registries
     NavigationManager::instance().shutdown();
@@ -1188,6 +1195,7 @@ void Application::shutdown() {
     // Reset managers in reverse order (MoonrakerManager handles print_start_collector cleanup)
     // History manager MUST be reset before moonraker (uses client for unregistration)
     m_history_manager.reset();
+    m_temp_history_manager.reset();
     m_moonraker.reset();
     m_panels.reset();
     m_subjects.reset();

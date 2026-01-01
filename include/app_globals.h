@@ -13,6 +13,7 @@ class MoonrakerAPI;
 class MoonrakerManager;
 class PrinterState;
 class PrintHistoryManager;
+class TemperatureHistoryManager;
 
 /**
  * @brief Get global MoonrakerClient instance
@@ -65,6 +66,22 @@ PrintHistoryManager* get_print_history_manager();
  * @param manager Pointer to PrintHistoryManager instance
  */
 void set_print_history_manager(PrintHistoryManager* manager);
+
+/**
+ * @brief Get global TemperatureHistoryManager instance
+ *
+ * Provides centralized temperature history tracking for chart panels.
+ * Collects 20 minutes of temperature samples at 1Hz for all heaters.
+ *
+ * @return Pointer to global TemperatureHistoryManager (may be nullptr if not initialized)
+ */
+TemperatureHistoryManager* get_temperature_history_manager();
+
+/**
+ * @brief Set global TemperatureHistoryManager instance (called by Application during init)
+ * @param manager Pointer to TemperatureHistoryManager instance
+ */
+void set_temperature_history_manager(TemperatureHistoryManager* manager);
 
 /**
  * @brief Get global PrinterState singleton instance

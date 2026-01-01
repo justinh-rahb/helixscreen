@@ -14,8 +14,10 @@
 #include "ui_utils.h"
 
 #include "app_constants.h"
+#include "app_globals.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
+#include "temperature_history_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -139,15 +141,9 @@ void TempControlPanel::on_nozzle_temp_changed(int temp_centi) {
     update_nozzle_display();
     update_nozzle_status(); // Update status text and heating icon state
 
-    // Always store in history buffer (even at 4Hz) for later replay with downsampling
-    // This ensures we capture ALL data from app start
     int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::system_clock::now().time_since_epoch())
                          .count();
-
-    int write_idx = nozzle_history_count_ % TEMP_HISTORY_SIZE;
-    nozzle_history_[write_idx] = {temp_centi, now_ms};
-    nozzle_history_count_++;
 
     // Guard: don't update live graph until subjects initialized
     if (!subjects_initialized_) {
@@ -245,15 +241,9 @@ void TempControlPanel::on_bed_temp_changed(int temp_centi) {
     update_bed_display();
     update_bed_status(); // Update status text and heating icon state
 
-    // Always store in history buffer (even at 4Hz) for later replay with downsampling
-    // This ensures we capture ALL data from app start
     int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::system_clock::now().time_since_epoch())
                          .count();
-
-    int write_idx = bed_history_count_ % TEMP_HISTORY_SIZE;
-    bed_history_[write_idx] = {temp_centi, now_ms};
-    bed_history_count_++;
 
     // Guard: don't update live graph until subjects initialized
     if (!subjects_initialized_) {
@@ -1046,105 +1036,46 @@ void TempControlPanel::set_bed_limits(int min_temp, int max_temp) {
     spdlog::debug("[TempPanel] Bed limits updated: {}-{}°C", min_temp, max_temp);
 }
 
-void TempControlPanel::replay_nozzle_history_to_graph() {
-    if (!nozzle_graph_ || nozzle_series_id_ < 0 || nozzle_history_count_ == 0) {
+void TempControlPanel::replay_history_from_manager(ui_temp_graph_t* graph, int series_id,
+                                                   const std::string& heater_name) {
+    auto* mgr = get_temperature_history_manager();
+    if (mgr == nullptr || graph == nullptr || series_id < 0) {
         return;
     }
 
-    // Determine how many samples are available (up to TEMP_HISTORY_SIZE)
-    int samples_available = std::min(nozzle_history_count_, TEMP_HISTORY_SIZE);
-
-    // Find the oldest sample index
-    int start_idx;
-    if (nozzle_history_count_ <= TEMP_HISTORY_SIZE) {
-        // Buffer hasn't wrapped yet - start from 0
-        start_idx = 0;
-    } else {
-        // Buffer has wrapped - oldest is at current write position
-        start_idx = nozzle_history_count_ % TEMP_HISTORY_SIZE;
+    auto samples = mgr->get_samples(heater_name);
+    if (samples.empty()) {
+        spdlog::debug("[TempPanel] No history samples from manager for {}", heater_name);
+        return;
     }
 
-    // Replay samples at 1Hz (downsample if data came in faster)
-    // History may have been stored at 4Hz during startup, but graph expects 1Hz
-    // Only graph samples that are at least GRAPH_SAMPLE_INTERVAL_MS apart
     int replayed = 0;
-    int64_t last_graphed_time = 0;
-
-    for (int i = 0; i < samples_available; i++) {
-        int idx = (start_idx + i) % TEMP_HISTORY_SIZE;
-        int temp_centi = nozzle_history_[idx].temp;
-        int64_t sample_time = nozzle_history_[idx].timestamp_ms;
-
-        if (temp_centi == 0) {
-            continue; // Skip uninitialized/zero entries
-        }
-
-        // Downsample: only graph if enough time has passed since last point
-        if (last_graphed_time > 0 && (sample_time - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
-            continue; // Skip - too close to previous point
-        }
-
-        float temp_deg = centi_to_degrees_f(temp_centi);
-        ui_temp_graph_update_series_with_time(nozzle_graph_, nozzle_series_id_, temp_deg,
-                                              sample_time);
-        last_graphed_time = sample_time;
+    for (const auto& sample : samples) {
+        // Convert centidegrees to degrees for graph
+        float temp = static_cast<float>(sample.temp_centi) / 10.0f;
+        ui_temp_graph_update_series_with_time(graph, series_id, temp, sample.timestamp_ms);
         replayed++;
     }
 
-    if (replayed > 0) {
-        spdlog::info("[TempPanel] Replayed {} nozzle temp samples to graph (from {} available)",
-                     replayed, samples_available);
+    spdlog::info("[TempPanel] Replayed {} {} samples from history manager", replayed, heater_name);
+}
+
+void TempControlPanel::replay_nozzle_history_to_graph() {
+    if (!nozzle_graph_ || nozzle_series_id_ < 0) {
+        return;
     }
+
+    // Use TemperatureHistoryManager for history data
+    replay_history_from_manager(nozzle_graph_, nozzle_series_id_, "extruder");
 }
 
 void TempControlPanel::replay_bed_history_to_graph() {
-    if (!bed_graph_ || bed_series_id_ < 0 || bed_history_count_ == 0) {
+    if (!bed_graph_ || bed_series_id_ < 0) {
         return;
     }
 
-    // Determine how many samples are available (up to TEMP_HISTORY_SIZE)
-    int samples_available = std::min(bed_history_count_, TEMP_HISTORY_SIZE);
-
-    // Find the oldest sample index
-    int start_idx;
-    if (bed_history_count_ <= TEMP_HISTORY_SIZE) {
-        // Buffer hasn't wrapped yet - start from 0
-        start_idx = 0;
-    } else {
-        // Buffer has wrapped - oldest is at current write position
-        start_idx = bed_history_count_ % TEMP_HISTORY_SIZE;
-    }
-
-    // Replay samples at 1Hz (downsample if data came in faster)
-    // History may have been stored at 4Hz during startup, but graph expects 1Hz
-    // Only graph samples that are at least GRAPH_SAMPLE_INTERVAL_MS apart
-    int replayed = 0;
-    int64_t last_graphed_time = 0;
-
-    for (int i = 0; i < samples_available; i++) {
-        int idx = (start_idx + i) % TEMP_HISTORY_SIZE;
-        int temp_centi = bed_history_[idx].temp;
-        int64_t sample_time = bed_history_[idx].timestamp_ms;
-
-        if (temp_centi == 0) {
-            continue; // Skip uninitialized/zero entries
-        }
-
-        // Downsample: only graph if enough time has passed since last point
-        if (last_graphed_time > 0 && (sample_time - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
-            continue; // Skip - too close to previous point
-        }
-
-        float temp_deg = centi_to_degrees_f(temp_centi);
-        ui_temp_graph_update_series_with_time(bed_graph_, bed_series_id_, temp_deg, sample_time);
-        last_graphed_time = sample_time;
-        replayed++;
-    }
-
-    if (replayed > 0) {
-        spdlog::info("[TempPanel] Replayed {} bed temp samples to graph (from {} available)",
-                     replayed, samples_available);
-    }
+    // Use TemperatureHistoryManager for history data
+    replay_history_from_manager(bed_graph_, bed_series_id_, "heater_bed");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1222,6 +1153,12 @@ void TempControlPanel::replay_history_to_mini_graph() {
         return;
     }
 
+    auto* mgr = get_temperature_history_manager();
+    if (mgr == nullptr) {
+        spdlog::debug("[TempPanel] Mini graph: no history manager available");
+        return;
+    }
+
     int64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                          std::chrono::system_clock::now().time_since_epoch())
                          .count();
@@ -1229,75 +1166,40 @@ void TempControlPanel::replay_history_to_mini_graph() {
     // Only replay last 5 minutes (300 seconds)
     int64_t cutoff_ms = now_ms - (MINI_GRAPH_POINTS * 1000);
 
-    // Replay nozzle history
-    if (mini_nozzle_series_id_ >= 0 && nozzle_history_count_ > 0) {
-        int samples_available = std::min(nozzle_history_count_, TEMP_HISTORY_SIZE);
-        int start_idx = (nozzle_history_count_ <= TEMP_HISTORY_SIZE)
-                            ? 0
-                            : (nozzle_history_count_ % TEMP_HISTORY_SIZE);
+    // Helper lambda to replay samples from manager
+    auto replay_heater = [&](const std::string& heater_name, int series_id) {
+        if (series_id < 0) {
+            return;
+        }
+
+        auto samples = mgr->get_samples_since(heater_name, cutoff_ms);
+        if (samples.empty()) {
+            return;
+        }
 
         int64_t last_graphed_time = 0;
         int replayed = 0;
 
-        for (int i = 0; i < samples_available; i++) {
-            int idx = (start_idx + i) % TEMP_HISTORY_SIZE;
-            int temp_centi = nozzle_history_[idx].temp;
-            int64_t sample_time = nozzle_history_[idx].timestamp_ms;
-
-            if (temp_centi == 0 || sample_time < cutoff_ms) {
-                continue;
-            }
-
+        for (const auto& sample : samples) {
+            // Throttle to GRAPH_SAMPLE_INTERVAL_MS
             if (last_graphed_time > 0 &&
-                (sample_time - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
+                (sample.timestamp_ms - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
                 continue;
             }
 
-            float temp_deg = centi_to_degrees_f(temp_centi);
-            ui_temp_graph_update_series_with_time(mini_graph_, mini_nozzle_series_id_, temp_deg,
-                                                  sample_time);
-            last_graphed_time = sample_time;
+            float temp_deg = centi_to_degrees_f(sample.temp_centi);
+            ui_temp_graph_update_series_with_time(mini_graph_, series_id, temp_deg,
+                                                  sample.timestamp_ms);
+            last_graphed_time = sample.timestamp_ms;
             replayed++;
         }
 
         if (replayed > 0) {
-            spdlog::debug("[TempPanel] Mini graph: replayed {} nozzle samples", replayed);
+            spdlog::debug("[TempPanel] Mini graph: replayed {} {} samples", replayed, heater_name);
         }
-    }
+    };
 
-    // Replay bed history
-    if (mini_bed_series_id_ >= 0 && bed_history_count_ > 0) {
-        int samples_available = std::min(bed_history_count_, TEMP_HISTORY_SIZE);
-        int start_idx = (bed_history_count_ <= TEMP_HISTORY_SIZE)
-                            ? 0
-                            : (bed_history_count_ % TEMP_HISTORY_SIZE);
-
-        int64_t last_graphed_time = 0;
-        int replayed = 0;
-
-        for (int i = 0; i < samples_available; i++) {
-            int idx = (start_idx + i) % TEMP_HISTORY_SIZE;
-            int temp_centi = bed_history_[idx].temp;
-            int64_t sample_time = bed_history_[idx].timestamp_ms;
-
-            if (temp_centi == 0 || sample_time < cutoff_ms) {
-                continue;
-            }
-
-            if (last_graphed_time > 0 &&
-                (sample_time - last_graphed_time) < GRAPH_SAMPLE_INTERVAL_MS) {
-                continue;
-            }
-
-            float temp_deg = centi_to_degrees_f(temp_centi);
-            ui_temp_graph_update_series_with_time(mini_graph_, mini_bed_series_id_, temp_deg,
-                                                  sample_time);
-            last_graphed_time = sample_time;
-            replayed++;
-        }
-
-        if (replayed > 0) {
-            spdlog::debug("[TempPanel] Mini graph: replayed {} bed samples", replayed);
-        }
-    }
+    // Replay both heaters
+    replay_heater("extruder", mini_nozzle_series_id_);
+    replay_heater("heater_bed", mini_bed_series_id_);
 }
