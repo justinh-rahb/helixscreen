@@ -174,6 +174,9 @@ void SubjectInitializer::init_panel_subjects() {
 
     // Basic panels
     get_global_home_panel().init_subjects();
+    StaticPanelRegistry::instance().register_destroy(
+        "HomePanelSubjects", []() { get_global_home_panel().deinit_subjects(); });
+
     get_global_controls_panel().init_subjects();
     get_global_filament_panel().init_subjects();
     get_global_settings_panel().init_subjects();

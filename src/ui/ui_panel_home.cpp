@@ -96,6 +96,10 @@ HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
 }
 
 HomePanel::~HomePanel() {
+    // Deinit subjects FIRST - disconnects observers before subject memory is freed
+    // This prevents crashes during lv_deinit() when widgets try to unsubscribe
+    deinit_subjects();
+
     // ObserverGuard handles observer cleanup automatically
 
     // Clean up timers - must be deleted explicitly before LVGL shutdown
@@ -163,6 +167,23 @@ void HomePanel::init_subjects() {
 
     // Set initial tip of the day
     update_tip_of_day();
+}
+
+void HomePanel::deinit_subjects() {
+    if (!subjects_initialized_) {
+        return;
+    }
+    // Applying [L041]: Subject init/deinit symmetry
+    // Disconnect all observers before subject memory becomes invalid
+    lv_subject_deinit(&status_subject_);
+    lv_subject_deinit(&temp_subject_);
+    lv_subject_deinit(&network_icon_state_);
+    lv_subject_deinit(&network_label_subject_);
+    lv_subject_deinit(&printer_type_subject_);
+    lv_subject_deinit(&printer_host_subject_);
+    lv_subject_deinit(&printer_info_visible_);
+    subjects_initialized_ = false;
+    spdlog::debug("[{}] Subjects deinitialized", get_name());
 }
 
 void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {

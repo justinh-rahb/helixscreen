@@ -40,6 +40,7 @@ class HomePanel : public PanelBase {
     ~HomePanel() override;
 
     void init_subjects() override;
+    void deinit_subjects();
     void setup(lv_obj_t* panel, lv_obj_t* parent_screen) override;
     void on_activate() override;
     void on_deactivate() override;
