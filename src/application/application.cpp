@@ -713,13 +713,22 @@ bool Application::init_plugins() {
     // Load all enabled plugins
     bool all_loaded = m_plugin_manager->load_all();
 
-    // Log any errors
+    // Log any errors and show toast notification
     auto errors = m_plugin_manager->get_load_errors();
     if (!errors.empty()) {
         spdlog::warn("[Application] {} plugin(s) failed to load", errors.size());
         for (const auto& err : errors) {
             spdlog::warn("[Application]   - {}: {}", err.plugin_id, err.message);
         }
+
+        // Show toast notification for failed plugins
+        char toast_msg[64];
+        if (errors.size() == 1) {
+            snprintf(toast_msg, sizeof(toast_msg), "1 plugin failed to load");
+        } else {
+            snprintf(toast_msg, sizeof(toast_msg), "%zu plugin(s) failed to load", errors.size());
+        }
+        ToastManager::instance().show(ToastSeverity::WARNING, toast_msg, 5000);
     }
 
     auto loaded = m_plugin_manager->get_loaded_plugins();

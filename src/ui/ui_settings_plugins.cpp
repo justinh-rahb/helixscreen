@@ -3,6 +3,8 @@
 
 #include "ui_settings_plugins.h"
 
+#include "ui_icon.h"
+
 #include "plugin_manager.h"
 #include "static_panel_registry.h"
 
@@ -209,13 +211,20 @@ void SettingsPluginsOverlay::create_plugin_card(lv_obj_t* parent,
         return;
     }
 
-    // Show error container if there's an error message
+    // Show error container and update icon if there's an error message
     if (!error_msg.empty()) {
         lv_obj_t* error_container = lv_obj_find_by_name(card, "error_container");
         lv_obj_t* error_label = lv_obj_find_by_name(card, "error_label");
         if (error_container && error_label) {
             lv_obj_remove_flag(error_container, LV_OBJ_FLAG_HIDDEN);
             lv_label_set_text(error_label, error_msg.c_str());
+        }
+
+        // Change plugin icon to alert icon for failed plugins
+        lv_obj_t* plugin_icon = lv_obj_find_by_name(card, "plugin_icon");
+        if (plugin_icon) {
+            ui_icon_set_source(plugin_icon, "alert_circle");
+            ui_icon_set_variant(plugin_icon, "error");
         }
     }
 

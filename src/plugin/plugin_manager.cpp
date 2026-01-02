@@ -3,8 +3,12 @@
 
 #include "plugin_manager.h"
 
+#include "helix_version.h"
 #include "injection_point_manager.h"
-#include "spdlog/spdlog.h"
+#include "version.h"
+
+#include <spdlog/fmt/fmt.h>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <dlfcn.h>
@@ -101,6 +105,19 @@ bool PluginManager::discover_plugins(const std::string& plugins_dir) {
             add_error(manifest.id, PluginError::Type::MANIFEST_MISSING_FIELD, error_msg);
             error_count++;
             continue;
+        }
+
+        // Check helix_version compatibility
+        if (!manifest.helix_version.empty()) {
+            if (!version::check_version_constraint(manifest.helix_version, HELIX_VERSION)) {
+                add_error(manifest.id, PluginError::Type::VERSION_MISMATCH,
+                          fmt::format("Requires HelixScreen {}, running {}", manifest.helix_version,
+                                      HELIX_VERSION));
+                error_count++;
+                continue;
+            }
+            spdlog::debug("[plugin] {} version constraint {} satisfied by {}", manifest.id,
+                          manifest.helix_version, HELIX_VERSION);
         }
 
         // Find library file
