@@ -644,6 +644,21 @@ class MoonrakerClient : public hv::WebSocketClient {
         check_request_timeouts();
     }
 
+    // ========== Simulation Methods (for testing) ==========
+
+    /**
+     * @brief Toggle filament runout simulation (for testing)
+     *
+     * No-op in real client. Mock client overrides to simulate filament runout
+     * sensor triggering, allowing F-key toggling during development.
+     *
+     * This abstraction allows Application to call through the base class
+     * without needing to know about or cast to MoonrakerClientMock.
+     */
+    virtual void toggle_filament_runout_simulation() {
+        // No-op in real client - only mock client implements
+    }
+
   protected:
     /**
      * @brief Transition to new connection state

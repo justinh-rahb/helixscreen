@@ -4,8 +4,10 @@
 #include "moonraker_client_mock.h"
 
 #include "../tests/mocks/mock_printer_state.h"
+#include "app_globals.h"
 #include "gcode_parser.h"
 #include "moonraker_client_mock_internal.h"
+#include "printer_state.h"
 #include "runtime_config.h"
 
 #include <spdlog/spdlog.h>
@@ -15,31 +17,8 @@
 #include <cstdlib>
 #include <map>
 
-MoonrakerClientMock::MoonrakerClientMock(PrinterType type) : printer_type_(type) {
-    spdlog::info("[MoonrakerClientMock] Created with printer type: {}", static_cast<int>(type));
-
-    // Register method handlers for all RPC domains
-    mock_internal::register_file_handlers(method_handlers_);
-    mock_internal::register_print_handlers(method_handlers_);
-    mock_internal::register_object_handlers(method_handlers_);
-    mock_internal::register_history_handlers(method_handlers_);
-    mock_internal::register_server_handlers(method_handlers_);
-    spdlog::debug("[MoonrakerClientMock] Registered {} RPC method handlers",
-                  method_handlers_.size());
-
-    // Populate hardware immediately (available for wizard without calling discover_printer())
-    populate_hardware();
-    spdlog::debug(
-        "[MoonrakerClientMock] Hardware populated: {} heaters, {} sensors, {} fans, {} LEDs",
-        heaters_.size(), sensors_.size(), fans_.size(), leds_.size());
-
-    // Generate synthetic bed mesh data
-    generate_mock_bed_mesh();
-
-    // Pre-populate capabilities so they're available immediately for UI testing
-    // (without waiting for connect() -> discover_printer() to be called)
-    populate_capabilities();
-}
+// Delegating constructor - uses default speedup of 1.0
+MoonrakerClientMock::MoonrakerClientMock(PrinterType type) : MoonrakerClientMock(type, 1.0) {}
 
 MoonrakerClientMock::MoonrakerClientMock(PrinterType type, double speedup_factor)
     : printer_type_(type) {
@@ -68,7 +47,15 @@ MoonrakerClientMock::MoonrakerClientMock(PrinterType type, double speedup_factor
     generate_mock_bed_mesh();
 
     // Pre-populate capabilities so they're available immediately for UI testing
+    // (without waiting for connect() -> discover_printer() to be called)
     populate_capabilities();
+
+    // Check HELIX_MOCK_SPOOLMAN env var for Spoolman availability
+    const char* spoolman_env = std::getenv("HELIX_MOCK_SPOOLMAN");
+    if (spoolman_env && (std::string(spoolman_env) == "0" || std::string(spoolman_env) == "off")) {
+        mock_spoolman_enabled_ = false;
+        spdlog::info("[MoonrakerClientMock] Mock Spoolman disabled via HELIX_MOCK_SPOOLMAN=0");
+    }
 }
 
 void MoonrakerClientMock::set_simulation_speedup(double factor) {
@@ -187,6 +174,10 @@ void MoonrakerClientMock::populate_capabilities() {
     mock_objects.push_back("bed_mesh");
     mock_objects.push_back("probe"); // Most printers have a probe for bed mesh/leveling
 
+    // Add capabilities for UI testing (speaker for M300, firmware retraction for G10/G11)
+    mock_objects.push_back("output_pin beeper");   // Triggers has_speaker_ capability
+    mock_objects.push_back("firmware_retraction"); // Triggers has_firmware_retraction_ capability
+
     // Add LED objects from populated hardware
     for (const auto& led : leds_) {
         mock_objects.push_back(led);
@@ -294,6 +285,11 @@ void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
 
     // Populate capabilities (may have already been done in constructor, but idempotent)
     populate_capabilities();
+
+    // Set Spoolman availability during discovery (matches real Moonraker behavior)
+    // Real client queries server.spoolman.status during discovery - see moonraker_client.cpp:1047
+    get_printer_state().set_spoolman_available(mock_spoolman_enabled_);
+    spdlog::debug("[MoonrakerClientMock] Spoolman available: {}", mock_spoolman_enabled_);
 
     // Log discovered hardware
     spdlog::debug("[MoonrakerClientMock] Discovered: {} heaters, {} sensors, {} fans, {} LEDs",

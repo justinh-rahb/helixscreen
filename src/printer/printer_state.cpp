@@ -143,6 +143,11 @@ void PrinterState::reset_for_testing() {
     lv_subject_deinit(&pending_z_offset_delta_);
     lv_subject_deinit(&fan_speed_);
     lv_subject_deinit(&fans_version_);
+    // Deinit per-fan speed subjects
+    for (auto& [name, subject] : fan_speed_subjects_) {
+        lv_subject_deinit(&subject);
+    }
+    fan_speed_subjects_.clear();
     lv_subject_deinit(&printer_connection_state_);
     lv_subject_deinit(&printer_connection_message_);
     lv_subject_deinit(&network_status_);
@@ -976,6 +981,12 @@ bool is_fan_controllable(FanType type) {
 } // namespace
 
 void PrinterState::init_fans(const std::vector<std::string>& fan_objects) {
+    // Deinit existing per-fan subjects before clearing
+    for (auto& [name, subject] : fan_speed_subjects_) {
+        lv_subject_deinit(&subject);
+    }
+    fan_speed_subjects_.clear();
+
     fans_.clear();
     fans_.reserve(fan_objects.size());
 
@@ -991,12 +1002,19 @@ void PrinterState::init_fans(const std::vector<std::string>& fan_objects) {
                       obj_name, info.display_name, static_cast<int>(info.type),
                       info.is_controllable);
         fans_.push_back(std::move(info));
+
+        // Create per-fan speed subject for reactive UI updates
+        auto [it, inserted] = fan_speed_subjects_.emplace(obj_name, lv_subject_t{});
+        if (inserted) {
+            lv_subject_init_int(&it->second, 0);
+            spdlog::debug("[PrinterState] Created speed subject for fan: {}", obj_name);
+        }
     }
 
     // Initialize and bump version to notify UI
     lv_subject_set_int(&fans_version_, lv_subject_get_int(&fans_version_) + 1);
-    spdlog::info("[PrinterState] Initialized {} fans (version {})", fans_.size(),
-                 lv_subject_get_int(&fans_version_));
+    spdlog::info("[PrinterState] Initialized {} fans with {} speed subjects (version {})",
+                 fans_.size(), fan_speed_subjects_.size(), lv_subject_get_int(&fans_version_));
 }
 
 void PrinterState::update_fan_speed(const std::string& object_name, double speed) {
@@ -1006,14 +1024,27 @@ void PrinterState::update_fan_speed(const std::string& object_name, double speed
         if (fan.object_name == object_name) {
             if (fan.speed_percent != speed_pct) {
                 fan.speed_percent = speed_pct;
-                // Note: Don't bump fans_version_ here - that's only for structural changes
-                // (fan discovery). Speed changes are stored but don't trigger UI rebuild.
-                // TODO: Add per-fan speed subjects for reactive UI updates if needed.
+
+                // Fire per-fan subject for reactive UI updates
+                auto it = fan_speed_subjects_.find(object_name);
+                if (it != fan_speed_subjects_.end()) {
+                    lv_subject_set_int(&it->second, speed_pct);
+                    spdlog::trace("[PrinterState] Fan {} speed updated to {}%", object_name,
+                                  speed_pct);
+                }
             }
             return;
         }
     }
     // Fan not in list - this is normal during initial status before discovery
+}
+
+lv_subject_t* PrinterState::get_fan_speed_subject(const std::string& object_name) {
+    auto it = fan_speed_subjects_.find(object_name);
+    if (it != fan_speed_subjects_.end()) {
+        return &it->second;
+    }
+    return nullptr;
 }
 
 void PrinterState::set_printer_connection_state(int state, const char* message) {
@@ -1099,23 +1130,21 @@ void PrinterState::set_printer_capabilities_internal(const PrinterCapabilities& 
     lv_subject_set_int(&printer_has_led_, caps.has_led() ? 1 : 0);
     lv_subject_set_int(&printer_has_accelerometer_, caps.has_accelerometer() ? 1 : 0);
 
-    // Speaker capability (with test mode override - always show in test mode for UI testing)
-    bool has_speaker = caps.has_speaker() || get_runtime_config()->is_test_mode();
-    lv_subject_set_int(&printer_has_speaker_, has_speaker ? 1 : 0);
+    // Speaker capability (for M300 audio feedback)
+    lv_subject_set_int(&printer_has_speaker_, caps.has_speaker() ? 1 : 0);
 
     // Timelapse capability (Moonraker-Timelapse plugin)
     lv_subject_set_int(&printer_has_timelapse_, caps.has_timelapse() ? 1 : 0);
 
-    // Firmware retraction capability (with test mode override for UI testing)
-    bool has_fw_retraction = caps.has_firmware_retraction() || get_runtime_config()->is_test_mode();
-    lv_subject_set_int(&printer_has_firmware_retraction_, has_fw_retraction ? 1 : 0);
+    // Firmware retraction capability (for G10/G11 retraction settings)
+    lv_subject_set_int(&printer_has_firmware_retraction_, caps.has_firmware_retraction() ? 1 : 0);
 
     // Spoolman requires async check - default to 0, updated separately
 
     spdlog::info("[PrinterState] Capabilities set: probe={}, heater_bed={}, LED={}, "
                  "accelerometer={}, speaker={}, timelapse={}, fw_retraction={}",
                  caps.has_probe(), caps.has_heater_bed(), caps.has_led(), caps.has_accelerometer(),
-                 has_speaker, caps.has_timelapse(), has_fw_retraction);
+                 caps.has_speaker(), caps.has_timelapse(), caps.has_firmware_retraction());
     spdlog::info("[PrinterState] Capabilities set (with overrides): {}",
                  capability_overrides_.summary());
 

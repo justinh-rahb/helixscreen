@@ -397,6 +397,18 @@ class MoonrakerClientMock : public MoonrakerClient {
         filament_sensors_ = std::move(sensors);
     }
 
+    /**
+     * @brief Check if mock Spoolman is enabled
+     *
+     * Controlled by HELIX_MOCK_SPOOLMAN env var (default: true).
+     * Set to "0" or "off" to disable.
+     *
+     * @return true if Spoolman should be reported as available during discovery
+     */
+    [[nodiscard]] bool is_mock_spoolman_enabled() const {
+        return mock_spoolman_enabled_;
+    }
+
     // ========== Internal API (for use by method handler modules) ==========
 
     /**
@@ -446,6 +458,16 @@ class MoonrakerClientMock : public MoonrakerClient {
      * @return true if toggled, false if no filament sensors configured
      */
     bool toggle_filament_runout();
+
+    /**
+     * @brief Override base class simulation method
+     *
+     * Delegates to toggle_filament_runout() to avoid layer violation
+     * where Application would need to cast to MoonrakerClientMock.
+     */
+    void toggle_filament_runout_simulation() override {
+        toggle_filament_runout();
+    }
 
   private:
     /**
@@ -731,6 +753,9 @@ class MoonrakerClientMock : public MoonrakerClient {
     static constexpr double BED_HEAT_RATE = 1.0;       // °C/sec when heating
     static constexpr double BED_COOL_RATE = 0.3;       // °C/sec when cooling
     static constexpr int SIMULATION_INTERVAL_MS = 250; // Match real Moonraker ~250ms
+
+    // Mock service availability flags (initialized from env vars in constructor)
+    bool mock_spoolman_enabled_{true}; ///< Controlled by HELIX_MOCK_SPOOLMAN env var
 };
 
 // ============================================================================

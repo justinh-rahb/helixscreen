@@ -6,12 +6,19 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <chrono>
 
 UsbBackendMock::UsbBackendMock() : running_(false) {
     spdlog::debug("[UsbBackendMock] Created");
 }
 
 UsbBackendMock::~UsbBackendMock() {
+    // Signal demo thread to stop and wait for it
+    demo_cancelled_.store(true);
+    if (demo_thread_.joinable()) {
+        demo_thread_.join();
+    }
+
     // Don't call stop() - it locks mutex_ which may be in invalid state during
     // static destruction. Just mark as not running (no lock needed in destructor).
     running_ = false;
@@ -25,10 +32,30 @@ UsbError UsbBackendMock::start() {
 
     running_ = true;
     spdlog::info("[UsbBackendMock] Started - mock USB monitoring active");
+
+    // Schedule demo drives to be added after UI is ready (1.5s delay)
+    // This matches the timing previously done in subject_initializer.cpp
+    demo_cancelled_.store(false);
+    demo_thread_ = std::thread([this]() {
+        // Sleep in small increments to allow cancellation
+        for (int i = 0; i < 15 && !demo_cancelled_.load(); ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        if (!demo_cancelled_.load()) {
+            add_demo_drives();
+        }
+    });
+
     return UsbError(UsbResult::SUCCESS);
 }
 
 void UsbBackendMock::stop() {
+    // Cancel and join demo thread BEFORE locking mutex (thread may hold mutex)
+    demo_cancelled_.store(true);
+    if (demo_thread_.joinable()) {
+        demo_thread_.join();
+    }
+
     std::lock_guard<std::mutex> lock(mutex_);
     if (!running_) {
         return;

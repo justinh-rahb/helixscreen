@@ -5,8 +5,10 @@
 
 #include "usb_backend.h"
 
+#include <atomic>
 #include <map>
 #include <mutex>
+#include <thread>
 
 /**
  * @brief Mock USB backend for testing and development
@@ -86,4 +88,8 @@ class UsbBackendMock : public UsbBackend {
     EventCallback event_callback_;
     std::vector<UsbDrive> drives_;
     std::map<std::string, std::vector<UsbGcodeFile>> mock_files_; ///< mount_path -> files
+
+    // Demo drive scheduling (auto-adds after delay when started)
+    std::thread demo_thread_;
+    std::atomic<bool> demo_cancelled_{false};
 };

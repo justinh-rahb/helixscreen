@@ -45,7 +45,6 @@
 #include "settings_manager.h"
 #include "static_panel_registry.h"
 #include "static_subject_registry.h"
-#include "usb_backend_mock.h"
 #include "usb_manager.h"
 #include "xml_registration.h"
 
@@ -342,21 +341,6 @@ void SubjectInitializer::init_usb_manager(const RuntimeConfig& runtime_config) {
                 }
             }
         });
-
-        // In test mode, schedule demo drive insertion after UI is ready
-        if (runtime_config.should_mock_usb()) {
-            UsbManager* usb_mgr = m_usb_manager.get();
-            lv_timer_create(
-                [](lv_timer_t* timer) {
-                    auto* usb_mgr = static_cast<UsbManager*>(lv_timer_get_user_data(timer));
-                    if (auto* mock = dynamic_cast<UsbBackendMock*>(usb_mgr->get_backend())) {
-                        mock->add_demo_drives();
-                        spdlog::debug("[SubjectInitializer] Added demo USB drives for test mode");
-                    }
-                    lv_timer_delete(timer);
-                },
-                1500, // 1.5s delay - within grace period so no toast
-                usb_mgr);
-        }
+        // Note: Demo drives are now auto-added by UsbBackendMock::start() after 1.5s delay
     }
 }

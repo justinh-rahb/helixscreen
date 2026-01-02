@@ -34,6 +34,7 @@
 #include "ui_card.h"
 #include "ui_component_header_bar.h"
 #include "ui_dialog.h"
+#include "ui_fan_control_overlay.h"
 #include "ui_gcode_viewer.h"
 #include "ui_gradient_canvas.h"
 #include "ui_icon.h"
@@ -46,7 +47,6 @@
 #include "ui_panel_calibration_pid.h"
 #include "ui_panel_calibration_zoffset.h"
 #include "ui_panel_extrusion.h"
-#include "ui_panel_fan.h"
 #include "ui_panel_gcode_test.h"
 #include "ui_panel_glyphs.h"
 #include "ui_panel_history_dashboard.h"
@@ -82,7 +82,6 @@
 #include "memory_utils.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
-#include "moonraker_client_mock.h"
 #include "printer_state.h"
 #include "settings_manager.h"
 #include "splash_screen.h"
@@ -781,18 +780,21 @@ void Application::create_overlays() {
     }
 
     if (m_args.overlays.fan) {
-        auto& fan = get_global_fan_panel();
+        auto& overlay = get_fan_control_overlay();
 
         // Initialize subjects and callbacks if not already done
-        if (!fan.are_subjects_initialized()) {
-            fan.init_subjects();
+        if (!overlay.are_subjects_initialized()) {
+            overlay.init_subjects();
         }
-        fan.register_callbacks();
+        overlay.register_callbacks();
+
+        // Pass API reference for fan commands
+        overlay.set_api(get_moonraker_api());
 
         // Create overlay UI
-        auto* p = fan.create(m_screen);
+        auto* p = overlay.create(m_screen);
         if (p) {
-            NavigationManager::instance().register_overlay_instance(p, &fan);
+            NavigationManager::instance().register_overlay_instance(p, &overlay);
             ui_nav_push_overlay(p);
         }
     }
@@ -1167,15 +1169,13 @@ void Application::handle_keyboard_shortcuts() {
     m_key_was_pressed = m_key_pressed;
 
     // F key toggle for filament runout simulation (test mode only, with debounce)
+    // Uses base class virtual method - no-op on real client, toggles on mock
     static bool f_key_was_pressed = false;
     bool f_key_pressed = keyboard_state[SDL_SCANCODE_F] != 0;
     if (f_key_pressed && !f_key_was_pressed) {
-        if (get_runtime_config()->is_test_mode() && m_moonraker) {
-            auto* mock = dynamic_cast<MoonrakerClientMock*>(m_moonraker->client());
-            if (mock) {
-                spdlog::info("[Application] F key - toggling filament runout simulation");
-                mock->toggle_filament_runout();
-            }
+        if (m_moonraker && m_moonraker->client()) {
+            spdlog::info("[Application] F key - toggling filament runout simulation");
+            m_moonraker->client()->toggle_filament_runout_simulation();
         }
     }
     f_key_was_pressed = f_key_pressed;
