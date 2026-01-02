@@ -6,14 +6,14 @@
   <!-- Uses reactive subjects for file data (no API properties needed) -->
   <view name="detail_view_root"
         extends="lv_obj" width="#overlay_panel_width" height="100%" align="right_mid" style_bg_opa="255"
-        style_border_width="0" style_pad_all="0" flex_flow="column" clickable="true">
+        style_border_width="0" style_pad_all="0" style_pad_gap="0" flex_flow="column" clickable="true">
     <event_cb trigger="clicked" callback="on_print_select_detail_backdrop"/>
     <!-- HEADER BAR (full width at top) -->
     <header_bar name="detail_header" title="Print File" back_button_callback="on_print_detail_back_clicked"/>
     <!-- CONTENT AREA (two columns) -->
     <lv_obj name="content_container"
             width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_left="#space_lg"
-            style_pad_right="#space_lg" style_pad_top="#space_lg" style_pad_bottom="#space_lg" flex_flow="row"
+            style_pad_right="#space_lg" style_pad_top="0" style_pad_bottom="#space_lg" flex_flow="row"
             style_pad_gap="#space_md" scrollable="false">
       <!-- ================================================================== -->
       <!-- LEFT SECTION: File card with reactive bindings (5/9 width)        -->
@@ -33,11 +33,11 @@
         <!-- Metadata clip container - clips top rounded corners of inner overlay -->
         <!-- Height sized for 2x3 metadata grid (filename + 3 rows of metadata) -->
         <lv_obj name="detail_metadata_clip"
-                width="100%" height="124" style_bg_opa="0" style_border_width="0" style_radius="0" style_pad_all="0"
+                width="100%" height="112" style_bg_opa="0" style_border_width="0" style_radius="0" style_pad_all="0"
                 align="bottom_mid" scrollable="false">
           <!-- Inner overlay with rounded corners - slightly taller to hide top radius -->
           <lv_obj name="detail_metadata_overlay"
-                  width="100%" height="132" style_bg_opa="160" style_border_width="0" style_radius="#border_radius"
+                  width="100%" height="120" style_bg_opa="160" style_border_width="0" style_radius="#border_radius"
                   style_pad_left="#space_sm" style_pad_right="#space_sm" style_pad_top="#space_lg"
                   style_pad_bottom="#space_sm" style_pad_gap="#space_md" align="bottom_mid" flex_flow="column"
                   scrollable="false">
