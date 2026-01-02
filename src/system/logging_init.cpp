@@ -176,6 +176,15 @@ void lvgl_assert_spdlog_callback(const char* file, int line, const char* func) {
 
 } // namespace
 
+void init_early() {
+    // Create minimal console-only logger at WARN level
+    // This allows early startup code to log without crashing
+    auto console = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    auto logger = std::make_shared<spdlog::logger>("helix", console);
+    logger->set_level(spdlog::level::warn);
+    spdlog::set_default_logger(logger);
+}
+
 void init(const LogConfig& config) {
     std::vector<spdlog::sink_ptr> sinks;
 

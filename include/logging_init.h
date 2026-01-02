@@ -37,6 +37,15 @@ struct LogConfig {
 };
 
 /**
+ * @brief Initialize minimal logging for early startup
+ *
+ * Sets up a basic console logger at WARN level. Call this FIRST in main()
+ * before any log calls. The full init() can reconfigure later with user
+ * preferences from CLI args and config files.
+ */
+void init_early();
+
+/**
  * @brief Initialize logging subsystem
  *
  * Call once at startup before any log calls. Creates a multi-sink logger

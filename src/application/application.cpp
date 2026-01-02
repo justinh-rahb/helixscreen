@@ -119,6 +119,9 @@ Application::~Application() {
 }
 
 int Application::run(int argc, char** argv) {
+    // Initialize minimal logging first so early log calls don't crash
+    helix::logging::init_early();
+
     spdlog::info("[Application] Starting HelixScreen...");
 
     // Store argv early for restart capability
@@ -1313,8 +1316,10 @@ void Application::shutdown() {
     // but BEFORE lv_deinit() which will delete any remaining widgets
     StaticSubjectRegistry::instance().deinit_all();
 
-    // Restore display backlight
-    m_display->restore_display_on_shutdown();
+    // Restore display backlight (guard for early exit paths like --help)
+    if (m_display) {
+        m_display->restore_display_on_shutdown();
+    }
 
     // Shutdown display (calls lv_deinit)
     m_display.reset();
