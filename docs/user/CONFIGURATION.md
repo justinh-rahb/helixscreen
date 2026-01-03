@@ -214,24 +214,32 @@ Located in the `printer` section:
   "printer": {
     "name": "My Printer",
     "type": "Voron 2.4",
-    "heater": {
+    "heaters": {
       "hotend": "extruder",
       "bed": "heater_bed"
     },
-    "sensor": {
-      "hotend": "temperature_sensor extruder",
-      "bed": "temperature_sensor bed"
+    "temp_sensors": {
+      "hotend": "extruder",
+      "bed": "heater_bed"
     },
-    "fan": {
+    "fans": {
       "part": "fan",
       "hotend": "heater_fan hotend_fan"
     },
-    "led": {
-      "strip": "None"
+    "leds": {
+      "strip": "neopixel chamber_light"
+    },
+    "extra_sensors": {},
+    "hardware": {
+      "optional": [],
+      "expected": [],
+      "last_snapshot": {}
     }
   }
 }
 ```
+
+> **Breaking Change (Jan 2026):** The config schema has changed from singular keys (`heater`, `sensor`, `fan`, `led`) to plural keys (`heaters`, `temp_sensors`, `fans`, `leds`). If upgrading from an older version, delete your config file and re-run the first-run wizard.
 
 ### `name`
 **Type:** string
@@ -241,37 +249,49 @@ Located in the `printer` section:
 **Type:** string
 **Description:** Printer model/type for feature detection.
 
-### `heater.hotend`
+### `heaters.hotend`
 **Type:** string
 **Default:** `"extruder"`
 **Description:** Klipper heater name for hotend.
 
-### `heater.bed`
+### `heaters.bed`
 **Type:** string
 **Default:** `"heater_bed"`
 **Description:** Klipper heater name for heated bed.
 
-### `sensor.hotend`
+### `temp_sensors.hotend`
 **Type:** string
-**Description:** Temperature sensor for hotend (if different from heater).
+**Description:** Temperature sensor for hotend (typically same as heater name).
 
-### `sensor.bed`
+### `temp_sensors.bed`
 **Type:** string
-**Description:** Temperature sensor for bed (if different from heater).
+**Description:** Temperature sensor for bed (typically same as heater name).
 
-### `fan.part`
+### `fans.part`
 **Type:** string
 **Default:** `"fan"`
 **Description:** Klipper fan name for part cooling.
 
-### `fan.hotend`
+### `fans.hotend`
 **Type:** string
 **Description:** Klipper fan name for hotend cooling.
 
-### `led.strip`
+### `leds.strip`
 **Type:** string
 **Default:** `"None"`
 **Description:** Klipper LED strip name, or `"None"` if no controllable LEDs.
+
+### `extra_sensors`
+**Type:** object
+**Default:** `{}`
+**Description:** Additional temperature sensors to monitor (beyond hotend/bed). Keys are display names, values are Klipper sensor names.
+
+### `hardware`
+**Type:** object
+**Description:** Hardware tracking information (managed automatically by the wizard):
+- `optional` - List of optional hardware detected
+- `expected` - List of expected hardware based on printer type
+- `last_snapshot` - Last hardware state snapshot for change detection
 
 ---
 
@@ -536,16 +556,26 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
     "moonraker_api_key": false,
     "moonraker_connection_timeout_ms": 10000,
     "moonraker_request_timeout_ms": 30000,
-    "heater": {
+    "heaters": {
       "hotend": "extruder",
       "bed": "heater_bed"
     },
-    "fan": {
+    "temp_sensors": {
+      "hotend": "extruder",
+      "bed": "heater_bed"
+    },
+    "fans": {
       "part": "fan",
       "hotend": "heater_fan hotend_fan"
     },
-    "led": {
+    "leds": {
       "strip": "caselight"
+    },
+    "extra_sensors": {},
+    "hardware": {
+      "optional": [],
+      "expected": [],
+      "last_snapshot": {}
     }
   },
 

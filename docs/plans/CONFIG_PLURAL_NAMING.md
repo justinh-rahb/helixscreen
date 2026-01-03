@@ -1,8 +1,9 @@
 # Config Schema: Plural Naming Cleanup
 
-**Status:** Planned
+**Status:** Completed
 **Priority:** Low
 **Predecessor:** Commit `4748a55` (single-printer config simplification)
+**Completed:** Jan 2026
 
 ---
 
@@ -97,8 +98,8 @@ In the single-printer config migration (Jan 2026), we simplified `printers.defau
 - [ ] `lib/lvgl/helixconfig.json` (if tracked)
 
 ### Documentation
-- [ ] `docs/user/CONFIGURATION.md`
-- [ ] `docs/DEVELOPMENT.md`
+- [x] `docs/user/CONFIGURATION.md`
+- [x] `docs/DEVELOPMENT.md`
 
 ### Tests
 - [ ] `tests/unit/test_config.cpp`

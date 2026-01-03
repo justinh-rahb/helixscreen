@@ -247,6 +247,58 @@ When adding new configuration options:
 
 **Important:** NEVER commit `config/helixconfig.json`. Only commit template changes.
 
+### Config Key Naming Conventions
+
+When adding or modifying printer hardware configuration, follow these conventions:
+
+**Container Keys (Plural):**
+Use plural names for objects that contain role-based mappings:
+- `heaters` - Heater role mappings (`bed`, `hotend`)
+- `temp_sensors` - Temperature sensor role mappings (`bed`, `hotend`)
+- `fans` - Fan role mappings (`part`, `hotend`)
+- `leds` - LED role mappings (`strip`, `chamber`)
+
+**Role Keys (Singular):**
+Inside containers, use singular role names that describe the hardware's function:
+- `bed`, `hotend`, `chamber` (for heaters/sensors)
+- `part`, `hotend` (for fans)
+- `strip` (for LEDs)
+
+**Extra Hardware Groups:**
+Use `extra_*` prefix for supplementary hardware beyond primary role mappings:
+- `extra_sensors` - Additional temperature sensors to monitor
+
+**Explicit Type Naming:**
+Be explicit about sensor types to avoid ambiguity:
+- `temp_sensors` (not just `sensors`) - Temperature sensors specifically
+- Future: `filament_sensors`, `probe_sensors`, etc.
+
+**Example Structure:**
+```json
+{
+  "printer": {
+    "heaters": { "bed": "heater_bed", "hotend": "extruder" },
+    "temp_sensors": { "bed": "heater_bed", "hotend": "extruder" },
+    "fans": { "part": "fan", "hotend": "heater_fan hotend_fan" },
+    "leds": { "strip": "neopixel chamber_light" },
+    "extra_sensors": {},
+    "hardware": {
+      "optional": [],
+      "expected": [],
+      "last_snapshot": {}
+    }
+  }
+}
+```
+
+**Key Principles:**
+1. Container keys are always **plural** (`heaters`, not `heater`)
+2. Role keys inside containers are always **singular** (`bed`, not `beds`)
+3. Arrays are only used for **hardware tracking** metadata, not role mappings
+4. All hardware role mappings are **objects with string values** (Klipper names)
+
+> **Breaking Change (Jan 2026):** The config schema changed from singular container keys (`heater`, `sensor`, `fan`, `led`) to plural keys (`heaters`, `temp_sensors`, `fans`, `leds`). Users upgrading from older versions must delete their config and re-run the first-run wizard.
+
 ## Multi-Display Development (macOS)
 
 Control which display the UI window appears on:
