@@ -185,6 +185,7 @@ make ad5m-docker                     # Build for Adventurer 5M locally
 # Testing (runs in parallel by default):
 make test-run                        # Run tests in parallel (~4-8x faster)
 make test-serial                     # Run tests sequentially (for debugging)
+./build/bin/helix-tests "[tag]"      # Run specific tests directly
 ```
 
 **⚠️ IMPORTANT:** Always use `--test` when testing without a real printer. Without it, panels expecting printer data show nothing.

@@ -509,7 +509,7 @@ LV_CONF := -DLV_CONF_INCLUDE_SIMPLE
 TEST_DIR := tests
 TEST_UNIT_DIR := $(TEST_DIR)/unit
 TEST_MOCK_DIR := $(TEST_DIR)/mocks
-TEST_BIN := $(BIN_DIR)/run_tests
+TEST_BIN := $(BIN_DIR)/helix-tests
 TEST_INTEGRATION_BIN := $(BIN_DIR)/run_integration_tests
 
 # Unit tests (use real LVGL) - exclude mock example

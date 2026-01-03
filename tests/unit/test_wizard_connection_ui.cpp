@@ -1,5 +1,6 @@
 // Copyright (C) 2025-2026 356C LLC
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "ui_wizard.h"
 #include "ui_wizard_connection.h"
 
@@ -101,7 +102,7 @@ class WizardConnectionUIFixture {
 // The test fixture's ensure_components_registered() is a stub that doesn't
 // actually register XML components. To run these tests, you need to either:
 // - Set up the XML filesystem driver in the test infrastructure
-// - Run tests with: ./build/bin/run_tests "[ui_integration]"
+// - Run tests with: ./build/bin/helix-tests "[ui_integration]"
 // =============================================================================
 
 TEST_CASE_METHOD(WizardConnectionUIFixture, "Connection UI: All widgets exist",

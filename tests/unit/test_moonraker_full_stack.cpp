@@ -19,7 +19,7 @@
  * 5. Domain method parity (API vs Client)
  *
  * Tagged with [integration] for selective test runs:
- *   ./build/bin/run_tests "[integration]"
+ *   ./build/bin/helix-tests "[integration]"
  */
 
 #include "../../include/moonraker_api.h"

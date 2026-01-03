@@ -52,7 +52,7 @@ Added separate test binaries to avoid symbol conflicts:
 
 ```makefile
 # Unit tests (use real LVGL)
-TEST_BIN := build/bin/run_tests
+TEST_BIN := build/bin/helix-tests
 TEST_SRCS := $(filter-out test_mock_example.cpp, ...)
 
 # Integration tests (use mocks instead of real LVGL)
@@ -87,7 +87,7 @@ MOCK_OBJS := build/obj/tests/mocks/*.o
 **Problem:** Linking both real LVGL and mock LVGL causes duplicate symbol errors.
 
 **Solution:**
-- `run_tests` - Unit tests with real LVGL (temp_graph, navigation, config)
+- `helix-tests` - Unit tests with real LVGL (temp_graph, navigation, config)
 - `run_integration_tests` - Integration tests with mocks (wizard UI flow)
 
 **Alternative Considered:** Weak symbols or function wrapping - rejected due to complexity.

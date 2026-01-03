@@ -419,19 +419,19 @@ make install-deps
 make test
 
 # Run specific test tags
-./build/bin/run_tests "[printer_state]"
-./build/bin/run_tests "[ui_utils]"
-./build/bin/run_tests "[temp_utils]"
-./build/bin/run_tests "[bed_mesh]"
-./build/bin/run_tests "[gcode_camera]"
-./build/bin/run_tests "[ethernet]"
-./build/bin/run_tests "[ui_theme]"
+./build/bin/helix-tests "[printer_state]"
+./build/bin/helix-tests "[ui_utils]"
+./build/bin/helix-tests "[temp_utils]"
+./build/bin/helix-tests "[bed_mesh]"
+./build/bin/helix-tests "[gcode_camera]"
+./build/bin/helix-tests "[ethernet]"
+./build/bin/helix-tests "[ui_theme]"
 
 # Run with verbose output
-./build/bin/run_tests -s -v high
+./build/bin/helix-tests -s -v high
 
 # List all tests
-./build/bin/run_tests --list-tests
+./build/bin/helix-tests --list-tests
 ```
 
 ### Build Issues
@@ -465,7 +465,7 @@ coverage:
 	@make clean
 	@CXXFLAGS="$$CXXFLAGS --coverage" LDFLAGS="$$LDFLAGS --coverage" make test
 	@echo "Running tests..."
-	@./build/bin/run_tests
+	@./build/bin/helix-tests
 	@echo "Generating coverage report..."
 	@lcov --capture --directory build/obj --output-file coverage.info
 	@lcov --remove coverage.info '/usr/*' '*/tests/*' '*/lvgl/*' --output-file coverage.info

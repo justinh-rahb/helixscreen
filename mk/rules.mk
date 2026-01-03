@@ -65,14 +65,14 @@ ifndef _PARALLEL_CHECKED
 		fi; \
 	fi
 	@echo "$(CURRENT_TARGET)" > "$(ARCH_MARKER)"
-	@# Now check for unlimited -j
-	@if echo "$(MAKEFLAGS)" | grep -qE '^j$$'; then \
+	@# Now check for unlimited -j (MAKEFLAGS contains 'j' but no 'jobserver')
+	@if echo "$(MAKEFLAGS)" | grep -q 'j' && ! echo "$(MAKEFLAGS)" | grep -q 'jobserver'; then \
 		echo ""; \
 		echo "$(YELLOW)$(BOLD)⚠️  'make -j' (unlimited) detected - auto-fixing to -j$(NPROC)$(RESET)"; \
 		echo ""; \
-		$(MAKE) _PARALLEL_CHECKED=1 -j$(NPROC) $(MAKECMDGOALS); \
+		exec $(MAKE) _PARALLEL_CHECKED=1 -j$(NPROC) $(MAKECMDGOALS); \
 	else \
-		$(MAKE) _PARALLEL_CHECKED=1 $(MAKECMDGOALS); \
+		exec $(MAKE) _PARALLEL_CHECKED=1 $(MAKECMDGOALS); \
 	fi
 else
 # Phase 2: Actual build (only runs when _PARALLEL_CHECKED is set)

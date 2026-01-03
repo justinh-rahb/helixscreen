@@ -309,22 +309,22 @@ TEST_CASE_METHOD(Fixture, "Test", "[macos]") { ... }
 
 ```bash
 # Run all tests
-./build/bin/run_tests
+./build/bin/helix-tests
 
 # Run tests with specific tags
-./build/bin/run_tests "[wizard]"
-./build/bin/run_tests "[wizard][wifi]"
+./build/bin/helix-tests "[wizard]"
+./build/bin/helix-tests "[wizard][wifi]"
 
 # Exclude disabled tests
-./build/bin/run_tests "~[.disabled]"
-./build/bin/run_tests "[wizard]~[.disabled]"
+./build/bin/helix-tests "~[.disabled]"
+./build/bin/helix-tests "[wizard]~[.disabled]"
 
 # Run specific test by name
-./build/bin/run_tests "Wizard WiFi: Password modal"
+./build/bin/helix-tests "Wizard WiFi: Password modal"
 
 # List available tests
-./build/bin/run_tests --list-tests
-./build/bin/run_tests "[wizard]" --list-tests
+./build/bin/helix-tests --list-tests
+./build/bin/helix-tests "[wizard]" --list-tests
 ```
 
 ## Known Limitations & Workarounds
@@ -353,8 +353,8 @@ TEST_CASE_METHOD(Fixture, "Test", "[macos]") { ... }
 TEST_CASE_METHOD(Fixture, "Test 2", "[.disabled]") { ... }
 
 // Run tests individually
-./build/bin/run_tests "Test 1"
-./build/bin/run_tests "Test 2"
+./build/bin/helix-tests "Test 1"
+./build/bin/helix-tests "Test 2"
 ```
 
 **Proper Fix (TODO):**
@@ -513,10 +513,10 @@ TEST_CASE_METHOD(MyComponentFixture, "Component: Button click", "[component]") {
 
 ```bash
 # Show successful assertions
-./build/bin/run_tests --success
+./build/bin/helix-tests --success
 
 # Show all output
-./build/bin/run_tests -s
+./build/bin/helix-tests -s
 ```
 
 ### Use spdlog for Debugging

@@ -18,7 +18,7 @@ permission:
     "git diff*": allow
     "git log*": allow
     "git status": allow
-    "./build/bin/run_tests*": allow
+    "./build/bin/helix-tests*": allow
     "*": deny
 ---
 

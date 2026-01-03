@@ -25,7 +25,7 @@ This document tracks future enhancements to the pre-commit hooks and CI quality 
 - name: Run unit tests
   run: |
     make test
-    # Or if using GoogleTest: ./build/bin/run_tests --gtest_output=xml:test-results.xml
+    # Or if using GoogleTest: ./build/bin/helix-tests --gtest_output=xml:test-results.xml
 ```
 
 **Benefits:**

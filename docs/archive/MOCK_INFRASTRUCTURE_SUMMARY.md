@@ -148,7 +148,7 @@ MOCK_OBJS := build/obj/tests/mocks/*.o
 ```
 
 **Separate Test Binaries:**
-- `run_tests` - Unit tests with **real LVGL** (config, navigation, temp_graph)
+- `helix-tests` - Unit tests with **real LVGL** (config, navigation, temp_graph)
 - `run_integration_tests` - Integration tests with **mocks** (wizard UI flow)
 
 **Reason:** Avoids duplicate symbol errors when linking both real and mock LVGL.
@@ -216,7 +216,7 @@ make test-integration
 **Problem:** Linking both real LVGL and mock LVGL causes duplicate symbol errors.
 
 **Solution:** Two test binaries:
-- `run_tests` - Uses real LVGL for unit tests
+- `helix-tests` - Uses real LVGL for unit tests
 - `run_integration_tests` - Uses mocks for integration tests
 
 **Alternative Rejected:** Weak symbols/function wrapping (too complex)

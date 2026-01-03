@@ -235,7 +235,7 @@ Added comprehensive documentation in test file header:
  * Run with sanitizers to detect memory/thread issues:
  *   ThreadSanitizer: CXXFLAGS="-fsanitize=thread" make test
  *   AddressSanitizer: CXXFLAGS="-fsanitize=address" make test
- *   Valgrind: valgrind --leak-check=full build/bin/run_tests
+ *   Valgrind: valgrind --leak-check=full build/bin/helix-tests
  */
 ```
 
@@ -336,11 +336,11 @@ make test
 **Compiler:** clang++ (Apple clang version)
 **Warnings:** Minor unused variable warnings (non-critical)
 **Link Status:** SUCCESS after adding `helix_theme.o` dependency
-**Test Binary:** `build/bin/run_tests`
+**Test Binary:** `build/bin/helix-tests`
 
 ### Test Execution:
 ```bash
-./build/bin/run_tests "[moonraker][robustness]"
+./build/bin/helix-tests "[moonraker][robustness]"
 ```
 
 **Total Test Cases:** 16
@@ -399,7 +399,7 @@ make test
 
 4. **Run Valgrind**
    ```bash
-   valgrind --leak-check=full --show-leak-kinds=all build/bin/run_tests "[moonraker][robustness]"
+   valgrind --leak-check=full --show-leak-kinds=all build/bin/helix-tests "[moonraker][robustness]"
    ```
    - Comprehensive leak detection
    - Memory error detection

@@ -235,7 +235,7 @@ make -j
 
 Run all pre-print related tests:
 ```bash
-./build/bin/run_tests "[sequencer]" "[capabilities]" "[gcode_ops]"
+./build/bin/helix-tests "[sequencer]" "[capabilities]" "[gcode_ops]"
 ```
 
 #### CommandSequencer Tests (`test_command_sequencer.cpp`)

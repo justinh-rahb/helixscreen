@@ -33,7 +33,7 @@
  * Run with sanitizers to detect memory/thread issues:
  *   ThreadSanitizer: CXXFLAGS="-fsanitize=thread" make test
  *   AddressSanitizer: CXXFLAGS="-fsanitize=address" make test
- *   Valgrind: valgrind --leak-check=full build/bin/run_tests
+ *   Valgrind: valgrind --leak-check=full build/bin/helix-tests
  */
 
 using namespace std::chrono;

@@ -882,7 +882,7 @@ TEST_CASE_METHOD(SecurityFixture, "...", "[security]") {
 #### Testing
 ```bash
 # Re-enable the disabled test
-./build/bin/run_tests "[security]"
+./build/bin/helix-tests "[security]"
 # Run under ASan/TSan to verify no use-after-free
 ```
 
@@ -1096,22 +1096,22 @@ After fixing the race conditions (2.11) and use-after-free (3.2):
 
 ### After Each Item
 ```bash
-make -j && ./build/bin/run_tests
+make -j && ./build/bin/helix-tests
 ```
 
 ### Full Regression
 ```bash
-./build/bin/run_tests
+./build/bin/helix-tests
 ./build/bin/helix-screen --test  # Manual UI verification
 ```
 
 ### Sanitizer Runs (After Tier 3.2)
 ```bash
 make clean && make SANITIZE=address -j
-./build/bin/run_tests
+./build/bin/helix-tests
 
 make clean && make SANITIZE=thread -j
-./build/bin/run_tests
+./build/bin/helix-tests
 ```
 
 ---

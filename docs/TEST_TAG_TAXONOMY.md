@@ -159,4 +159,4 @@ Tests prefixed with `[.]` are hidden/disabled. Currently ~68 disabled tests need
 - Some are obsolete after refactoring
 - Some are flaky and need fixing
 
-Run `./build/bin/run_tests "[.]" --list-tests` to see all disabled tests.
+Run `./build/bin/helix-tests "[.]" --list-tests` to see all disabled tests.

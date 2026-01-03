@@ -35,19 +35,19 @@ We use **Catch2 v2.x** as a single-header vendored dependency. This is the recom
 make test
 
 # Build tests without running
-make build/bin/run_tests
+make build/bin/helix-tests
 
 # Run tests manually
-./build/bin/run_tests
+./build/bin/helix-tests
 
 # Run specific test cases
-./build/bin/run_tests "[navigation]"
+./build/bin/helix-tests "[navigation]"
 
 # List all available test cases
-./build/bin/run_tests --list-tests
+./build/bin/helix-tests --list-tests
 
 # Show verbose output
-./build/bin/run_tests -s
+./build/bin/helix-tests -s
 ```
 
 ### Clean Build
@@ -170,13 +170,13 @@ TEST_CASE("Fast computation", "[unit][math][fast]") { }
 TEST_CASE("Slow rendering", "[ui][rendering][slow]") { }
 
 // Run only fast tests:
-./build/bin/run_tests "[fast]"
+./build/bin/helix-tests "[fast]"
 
 // Run all UI tests:
-./build/bin/run_tests "[ui]"
+./build/bin/helix-tests "[ui]"
 
 // Exclude slow tests:
-./build/bin/run_tests "~[slow]"
+./build/bin/helix-tests "~[slow]"
 ```
 
 **Sections** group related assertions:
@@ -337,23 +337,23 @@ TEST_CASE("Event handling", "[events]") {
 
 ```bash
 # Show all test details
-./build/bin/run_tests -s
+./build/bin/helix-tests -s
 
 # Show successful assertions too
-./build/bin/run_tests -s --success
+./build/bin/helix-tests -s --success
 ```
 
 ### Running Single Test
 
 ```bash
 # By test name
-./build/bin/run_tests "Navigation initialization"
+./build/bin/helix-tests "Navigation initialization"
 
 # By section name
-./build/bin/run_tests "Default active panel is HOME"
+./build/bin/helix-tests "Default active panel is HOME"
 
 # By tag
-./build/bin/run_tests "[navigation]"
+./build/bin/helix-tests "[navigation]"
 ```
 
 ### Adding Debug Output

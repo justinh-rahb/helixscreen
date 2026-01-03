@@ -293,7 +293,7 @@ client->gcode_script("SDCARD_PRINT_FILE FILENAME=test.gcode");
 
 Run mock behavior tests:
 ```bash
-./build/bin/run_tests "[mock]"
+./build/bin/helix-tests "[mock]"
 ```
 
 All 357 assertions should pass.

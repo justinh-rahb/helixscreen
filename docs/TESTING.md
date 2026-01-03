@@ -59,7 +59,7 @@ The parallel infrastructure uses Catch2's `--shard-count N --shard-index M` flag
 ```bash
 # What make test-run does internally (simplified):
 for i in $(seq 0 $((NPROCS-1))); do
-    ./build/bin/run_tests "~[.] ~[slow]" --shard-count $NPROCS --shard-index $i &
+    ./build/bin/helix-tests "~[.] ~[slow]" --shard-count $NPROCS --shard-index $i &
 done
 wait
 ```
@@ -80,13 +80,13 @@ Each shard gets a deterministic subset of tests. Per Catch2 best practices, we u
 
 ```bash
 # ✅ CORRECT - run [application] tests, exclude hidden
-./build/bin/run_tests "[application]" "~[.]"
+./build/bin/helix-tests "[application]" "~[.]"
 
 # ✅ CORRECT - run [gcode] tests, exclude hidden  
-./build/bin/run_tests "[gcode]" "~[.]"
+./build/bin/helix-tests "[gcode]" "~[.]"
 
 # ❌ WRONG - may hang on hidden tests!
-./build/bin/run_tests "[application]"
+./build/bin/helix-tests "[application]"
 ```
 
 Hidden tests (tagged `.pending`, `.integration`, `.slow`) require special
@@ -410,7 +410,7 @@ make test-cards        # Test dynamic card instantiation
 
 ### Test Binary Locations
 
-- Unit tests: `build/bin/run_tests`
+- Unit tests: `build/bin/helix-tests`
 - Integration tests: `build/bin/run_integration_tests`
 - Experimental: `experimental/bin/test_<name>`
 
@@ -603,19 +603,19 @@ TEST_CASE("MultiColor - Backward compatibility", "[multicolor][compatibility]") 
 ### Run Specific Tests
 ```bash
 # Run all multicolor tests (excluding hidden)
-./build/bin/run_tests "[multicolor]" "~[.]"
+./build/bin/helix-tests "[multicolor]" "~[.]"
 
 # Run specific test case by name
-./build/bin/run_tests "MultiColor - Parse extruder_colour"
+./build/bin/helix-tests "MultiColor - Parse extruder_colour"
 
 # Run tests matching multiple tags
-./build/bin/run_tests "[gcode][parser]" "~[.]"
+./build/bin/helix-tests "[gcode][parser]" "~[.]"
 
 # List all tests (including hidden)
-./build/bin/run_tests --list-tests
+./build/bin/helix-tests --list-tests
 
 # List tests matching a tag
-./build/bin/run_tests --list-tests "[application]"
+./build/bin/helix-tests --list-tests "[application]"
 ```
 
 ### ⚠️ Avoiding Test Hangs
@@ -625,17 +625,17 @@ If tests hang, you're likely hitting hidden tests. See [Running Tests by Tag](#r
 ### Verbose Output
 ```bash
 # Show successful assertions
-./build/bin/run_tests -s
+./build/bin/helix-tests -s
 
 # Show all output
-./build/bin/run_tests -s -v high
+./build/bin/helix-tests -s -v high
 ```
 
 ### Debugging in IDE
 
 Set breakpoints in test code and run:
 ```bash
-lldb build/bin/run_tests
+lldb build/bin/helix-tests
 (lldb) run "[multicolor]"
 ```
 

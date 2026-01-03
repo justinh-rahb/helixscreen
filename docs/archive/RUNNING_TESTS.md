@@ -9,10 +9,10 @@ This guide provides quick instructions for building and running the HelixScreen 
 make test
 
 # Build tests only (don't run)
-make build/bin/run_tests
+make build/bin/helix-tests
 
 # Run tests with specific tags
-./build/bin/run_tests "[printer_state]"
+./build/bin/helix-tests "[printer_state]"
 ```
 
 ## Prerequisites
@@ -46,44 +46,44 @@ touch .fonts.stamp
 
 ```bash
 # Printer state management
-./build/bin/run_tests "[printer_state]"
+./build/bin/helix-tests "[printer_state]"
 
 # Utility functions
-./build/bin/run_tests "[ui_utils]"
+./build/bin/helix-tests "[ui_utils]"
 
 # Temperature validation
-./build/bin/run_tests "[temp_utils]"
+./build/bin/helix-tests "[temp_utils]"
 
 # Bed mesh coordinate transforms
-./build/bin/run_tests "[bed_mesh]"
+./build/bin/helix-tests "[bed_mesh]"
 
 # GCode camera control
-./build/bin/run_tests "[gcode_camera]"
+./build/bin/helix-tests "[gcode_camera]"
 
 # Ethernet management
-./build/bin/run_tests "[ethernet]"
+./build/bin/helix-tests "[ethernet]"
 
 # Theme color parsing
-./build/bin/run_tests "[ui_theme]"
+./build/bin/helix-tests "[ui_theme]"
 ```
 
 ### Existing Test Files
 
 ```bash
 # Configuration tests
-./build/bin/run_tests "[config]"
+./build/bin/helix-tests "[config]"
 
 # GCode parser
-./build/bin/run_tests "[gcode]"
+./build/bin/helix-tests "[gcode]"
 
 # Moonraker client
-./build/bin/run_tests "[moonraker]"
+./build/bin/helix-tests "[moonraker]"
 
 # WiFi management
-./build/bin/run_tests "[wifi]"
+./build/bin/helix-tests "[wifi]"
 
 # Wizard tests
-./build/bin/run_tests "[wizard]"
+./build/bin/helix-tests "[wizard]"
 ```
 
 ## Test Output Options
@@ -92,30 +92,30 @@ touch .fonts.stamp
 
 ```bash
 # Show successful assertions
-./build/bin/run_tests -s
+./build/bin/helix-tests -s
 
 # Maximum verbosity
-./build/bin/run_tests -s -v high
+./build/bin/helix-tests -s -v high
 ```
 
 ### List Tests
 
 ```bash
 # List all test cases
-./build/bin/run_tests --list-tests
+./build/bin/helix-tests --list-tests
 
 # List tests with specific tag
-./build/bin/run_tests "[printer_state]" --list-tests
+./build/bin/helix-tests "[printer_state]" --list-tests
 ```
 
 ### Run Specific Test
 
 ```bash
 # Run by test case name
-./build/bin/run_tests "PrinterState: Update extruder temperature"
+./build/bin/helix-tests "PrinterState: Update extruder temperature"
 
 # Run by partial match
-./build/bin/run_tests "temperature"
+./build/bin/helix-tests "temperature"
 ```
 
 ## Troubleshooting
@@ -274,7 +274,7 @@ find tests/unit/ -name "test_*.cpp" | sort
 time make test
 
 # Profile specific tests
-./build/bin/run_tests "[printer_state]" --benchmark-samples 100
+./build/bin/helix-tests "[printer_state]" --benchmark-samples 100
 ```
 
 ## Common Test Patterns

@@ -500,7 +500,7 @@ make -j && ./build/bin/helix-screen --test --timeout 2
 
 ### 3.5 After Successful Replacement
 
-1. Run full test suite: `./build/bin/run_tests "~[.]"`
+1. Run full test suite: `./build/bin/helix-tests "~[.]"`
 2. Mark Phase 3 complete in this document
 3. Commit: `git commit -m "refactor: replace main.cpp with slim Application wrapper"`
 

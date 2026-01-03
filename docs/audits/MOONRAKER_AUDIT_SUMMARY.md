@@ -256,10 +256,10 @@ The audit discovered **one critical bug** (request ID race condition) which has 
 
 ```bash
 # Run all Moonraker tests
-./build/bin/run_tests "[moonraker]"
+./build/bin/helix-tests "[moonraker]"
 
 # Run only robustness tests
-./build/bin/run_tests "[robustness]"
+./build/bin/helix-tests "[robustness]"
 
 # Run with ThreadSanitizer
 CXXFLAGS="-fsanitize=thread" make test

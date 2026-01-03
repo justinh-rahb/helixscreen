@@ -185,19 +185,19 @@ The following `MoonrakerClient` methods are deprecated in favor of `MoonrakerAPI
 
 ```bash
 # All moonraker-related tests
-./build/bin/run_tests "[moonraker]"
+./build/bin/helix-tests "[moonraker]"
 
 # Just event tests
-./build/bin/run_tests "[events]"
+./build/bin/helix-tests "[events]"
 
 # Integration tests
-./build/bin/run_tests "[integration]"
+./build/bin/helix-tests "[integration]"
 
 # Domain method parity tests
-./build/bin/run_tests "[domain]"
+./build/bin/helix-tests "[domain]"
 
 # Shared state tests
-./build/bin/run_tests "[shared_state]"
+./build/bin/helix-tests "[shared_state]"
 ```
 
 ### Test Coverage

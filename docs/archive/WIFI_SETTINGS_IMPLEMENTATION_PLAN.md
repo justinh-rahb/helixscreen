@@ -333,10 +333,10 @@ Integrate WiFiSettingsOverlay:
 make -j
 
 # Run unit tests
-./build/bin/run_tests
+./build/bin/helix-tests
 
 # Run specific WiFi-related tests (if any)
-./build/bin/run_tests "[wifi]" "[network]"
+./build/bin/helix-tests "[wifi]" "[network]"
 ```
 
 ### Runtime Testing

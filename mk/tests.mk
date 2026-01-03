@@ -424,6 +424,21 @@ test-assets: $(TEST_BIN)
 # Unified test binary - uses automatic app object discovery
 # No more manual dependency lists! New source files are automatically included.
 # If you get linker errors, check if the file needs to be excluded (TEST_APP_OBJS filter).
+# Two-phase build for $(TEST_BIN) to handle unlimited -j detection
+# Phase 1: No deps - check for unlimited -j and re-invoke if needed
+# Phase 2: Normal deps and linking (when _PARALLEL_GUARD is set)
+ifndef _PARALLEL_GUARD
+$(TEST_BIN):
+	@if echo "$(MAKEFLAGS)" | grep -q 'j' && ! echo "$(MAKEFLAGS)" | grep -q 'jobserver'; then \
+		NPROC=$$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); \
+		echo ""; \
+		printf '\033[1;33m⚠️  make -j (unlimited) detected - auto-fixing to -j%s\033[0m\n' "$$NPROC"; \
+		echo ""; \
+		exec $(MAKE) _PARALLEL_GUARD=1 -j$$NPROC $@; \
+	else \
+		exec $(MAKE) _PARALLEL_GUARD=1 $@; \
+	fi
+else
 $(TEST_BIN): $(TEST_CORE_DEPS) \
              $(TEST_LVGL_DEPS) \
              $(TEST_APP_OBJS) \
@@ -431,12 +446,13 @@ $(TEST_BIN): $(TEST_CORE_DEPS) \
              $(OBJCPP_OBJS) \
              $(TEST_PLATFORM_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
-	$(ECHO) "$(MAGENTA)$(BOLD)[LD]$(RESET) run_tests"
+	$(ECHO) "$(MAGENTA)$(BOLD)[LD]$(RESET) helix-tests"
 	$(Q)$(CXX) $(CXXFLAGS) $(sort $^) -o $@ $(LDFLAGS) || { \
 		echo "$(RED)$(BOLD)✗ Test linking failed!$(RESET)"; \
 		exit 1; \
 	}
 	$(ECHO) "$(GREEN)✓ Unit test binary ready$(RESET)"
+endif
 
 # Integration test binary (uses mocks instead of real LVGL)
 $(TEST_INTEGRATION_BIN): $(TEST_MAIN_OBJ) $(CATCH2_OBJ) $(TEST_INTEGRATION_OBJS) $(MOCK_OBJS)
@@ -768,10 +784,10 @@ ASAN_FLAGS := -fsanitize=address -fno-omit-frame-pointer -g
 TSAN_FLAGS := -fsanitize=thread -fno-omit-frame-pointer -g
 
 # AddressSanitizer test binary
-TEST_ASAN_BIN := $(BIN_DIR)/run_tests_asan
+TEST_ASAN_BIN := $(BIN_DIR)/helix-tests-asan
 
 # ThreadSanitizer test binary
-TEST_TSAN_BIN := $(BIN_DIR)/run_tests_tsan
+TEST_TSAN_BIN := $(BIN_DIR)/helix-tests-tsan
 
 # Build and run tests with AddressSanitizer
 test-asan: clean-tests

@@ -287,7 +287,7 @@ done
 After each phase, verify:
 
 - [ ] `make -j` builds successfully
-- [ ] `./build/bin/run_tests` passes (note: some pre-existing flaky tests)
+- [ ] `./build/bin/helix-tests` passes (note: some pre-existing flaky tests)
 - [ ] `./build/bin/helix-screen --test -p home` runs and displays correctly
 - [ ] Light/dark theme toggle works (`settings` panel)
 - [ ] AMS panel shows slot states correctly (if AMS backend changes)
