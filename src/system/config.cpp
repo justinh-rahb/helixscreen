@@ -33,9 +33,16 @@ json get_default_macros() {
 /// Default printer configuration - shared between init() and reset_to_defaults()
 /// @param moonraker_host Host address (empty string for reset, "127.0.0.1" for new config)
 json get_default_printer_config(const std::string& moonraker_host) {
-    return {{"moonraker_api_key", false}, {"moonraker_host", moonraker_host},
-            {"moonraker_port", 7125},     {"monitored_sensors", json::array()},
-            {"fans", json::array()},      {"default_macros", get_default_macros()}};
+    return {{"moonraker_api_key", false},
+            {"moonraker_host", moonraker_host},
+            {"moonraker_port", 7125},
+            {"heaters", {{"bed", "heater_bed"}, {"hotend", "extruder"}}},
+            {"temp_sensors", {{"bed", "heater_bed"}, {"hotend", "extruder"}}},
+            {"fans", {{"part", "fan"}, {"hotend", "heater_fan hotend_fan"}}},
+            {"leds", {{"strip", "neopixel chamber_light"}}},
+            {"extra_sensors", json::object()},
+            {"hardware", {{"optional", json::array()}, {"expected", json::array()}, {"last_snapshot", json::object()}}},
+            {"default_macros", get_default_macros()}};
 }
 
 /// Default root-level config - shared between init() and reset_to_defaults()
@@ -130,16 +137,40 @@ void Config::init(const std::string& config_path) {
     if (printer.is_null()) {
         data["/printer"_json_pointer] = get_default_printer_config("127.0.0.1");
     } else {
-        // Ensure monitored_sensors exists (even if empty for auto-discovery)
-        auto& monitored_sensors = data[json::json_pointer(df() + "monitored_sensors")];
-        if (monitored_sensors.is_null()) {
-            data[json::json_pointer(df() + "monitored_sensors")] = json::array();
+        // Ensure heaters exists with defaults
+        auto& heaters = data[json::json_pointer(df() + "heaters")];
+        if (heaters.is_null()) {
+            data[json::json_pointer(df() + "heaters")] = {{"bed", "heater_bed"}, {"hotend", "extruder"}};
         }
 
-        // Ensure fans exists (even if empty for auto-discovery)
+        // Ensure temp_sensors exists with defaults
+        auto& temp_sensors = data[json::json_pointer(df() + "temp_sensors")];
+        if (temp_sensors.is_null()) {
+            data[json::json_pointer(df() + "temp_sensors")] = {{"bed", "heater_bed"}, {"hotend", "extruder"}};
+        }
+
+        // Ensure fans exists with defaults
         auto& fans = data[json::json_pointer(df() + "fans")];
         if (fans.is_null()) {
-            data[json::json_pointer(df() + "fans")] = json::array();
+            data[json::json_pointer(df() + "fans")] = {{"part", "fan"}, {"hotend", "heater_fan hotend_fan"}};
+        }
+
+        // Ensure leds exists with defaults
+        auto& leds = data[json::json_pointer(df() + "leds")];
+        if (leds.is_null()) {
+            data[json::json_pointer(df() + "leds")] = {{"strip", "neopixel chamber_light"}};
+        }
+
+        // Ensure extra_sensors exists (empty object for user additions)
+        auto& extra_sensors = data[json::json_pointer(df() + "extra_sensors")];
+        if (extra_sensors.is_null()) {
+            data[json::json_pointer(df() + "extra_sensors")] = json::object();
+        }
+
+        // Ensure hardware section exists
+        auto& hardware = data[json::json_pointer(df() + "hardware")];
+        if (hardware.is_null()) {
+            data[json::json_pointer(df() + "hardware")] = {{"optional", json::array()}, {"expected", json::array()}, {"last_snapshot", json::object()}};
         }
 
         // Ensure default_macros exists
