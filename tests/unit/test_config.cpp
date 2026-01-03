@@ -12,6 +12,7 @@
  */
 
 #include "config.h"
+#include "wizard_config_paths.h"
 
 #include "../catch_amalgamated.hpp"
 
@@ -27,6 +28,11 @@ class ConfigTestFixture {
 
     void set_data_empty() {
         config.data = {};
+    }
+
+    // Helper for plural naming refactor tests
+    void set_data_for_plural_test(const json& data) {
+        config.data = data;
     }
 
     void setup_default_config() {
@@ -365,4 +371,184 @@ TEST_CASE_METHOD(ConfigTestFixture, "Config: get() with default handles empty co
 
     std::string host = config.get<std::string>("/printer/moonraker_host", "localhost");
     REQUIRE(host == "localhost");
+}
+
+// ============================================================================
+// Config Path Structure Tests - NEW plural naming convention
+// These tests define the contract for the refactored config structure.
+// They SHOULD FAIL until the implementation is updated.
+// ============================================================================
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: heaters path uses plural form /printer/heaters/",
+                 "[config][paths][plural]") {
+    // Set up config with the NEW plural path structure
+    set_data_for_plural_test({{"printer",
+                               {{"heaters", {{"bed", "heater_bed"}, {"hotend", "extruder"}}}}}});
+
+    // Verify we can read from the plural path
+    std::string bed_heater = config.get<std::string>("/printer/heaters/bed");
+    REQUIRE(bed_heater == "heater_bed");
+
+    std::string hotend_heater = config.get<std::string>("/printer/heaters/hotend");
+    REQUIRE(hotend_heater == "extruder");
+}
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: temp_sensors path uses plural form /printer/temp_sensors/",
+                 "[config][paths][plural]") {
+    // Set up config with the NEW plural path structure
+    set_data_for_plural_test(
+        {{"printer", {{"temp_sensors", {{"bed", "heater_bed"}, {"hotend", "extruder"}}}}}});
+
+    // Verify we can read from the plural path
+    std::string bed_sensor = config.get<std::string>("/printer/temp_sensors/bed");
+    REQUIRE(bed_sensor == "heater_bed");
+
+    std::string hotend_sensor = config.get<std::string>("/printer/temp_sensors/hotend");
+    REQUIRE(hotend_sensor == "extruder");
+}
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: fans path uses plural form /printer/fans/",
+                 "[config][paths][plural]") {
+    // Set up config with the NEW plural path structure
+    set_data_for_plural_test(
+        {{"printer", {{"fans", {{"part", "fan"}, {"hotend", "heater_fan hotend_fan"}}}}}});
+
+    // Verify we can read from the plural path - fans is now an OBJECT, not array
+    std::string part_fan = config.get<std::string>("/printer/fans/part");
+    REQUIRE(part_fan == "fan");
+
+    std::string hotend_fan = config.get<std::string>("/printer/fans/hotend");
+    REQUIRE(hotend_fan == "heater_fan hotend_fan");
+}
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: leds path uses plural form /printer/leds/",
+                 "[config][paths][plural]") {
+    // Set up config with the NEW plural path structure
+    set_data_for_plural_test({{"printer", {{"leds", {{"strip", "neopixel chamber_light"}}}}}});
+
+    // Verify we can read from the plural path
+    std::string led_strip = config.get<std::string>("/printer/leds/strip");
+    REQUIRE(led_strip == "neopixel chamber_light");
+}
+
+// ============================================================================
+// Default Config Structure Tests - NEW structure contract
+// These tests verify the default config matches the new schema.
+// They SHOULD FAIL until the implementation is updated.
+// ============================================================================
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: default structure has extra_sensors as empty object",
+                 "[config][defaults][plural]") {
+    // After refactoring, monitored_sensors should become extra_sensors
+    // and should be an empty object {}, not an array []
+    set_data_for_plural_test({{"printer",
+                               {{"moonraker_host", "127.0.0.1"},
+                                {"moonraker_port", 7125},
+                                {"extra_sensors", json::object()}}}});
+
+    auto extra_sensors = config.get<json>("/printer/extra_sensors");
+    REQUIRE(extra_sensors.is_object());
+    REQUIRE(extra_sensors.empty());
+}
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: default structure has no fans array - fans is object only",
+                 "[config][defaults][plural]") {
+    // After refactoring, there should be no separate "fans" array
+    // The fans key should be an object with role mappings, not an array
+    set_data_for_plural_test({{"printer",
+                               {{"moonraker_host", "127.0.0.1"},
+                                {"moonraker_port", 7125},
+                                {"fans", {{"part", "fan"}}}}}});
+
+    auto fans = config.get<json>("/printer/fans");
+    REQUIRE(fans.is_object());
+    REQUIRE_FALSE(fans.is_array());
+}
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: temp_sensors key exists for temperature sensor mappings",
+                 "[config][defaults][plural]") {
+    // The new structure uses temp_sensors (not just sensors) for temperature mappings
+    set_data_for_plural_test(
+        {{"printer", {{"temp_sensors", {{"bed", "heater_bed"}, {"hotend", "extruder"}}}}}});
+
+    auto temp_sensors = config.get<json>("/printer/temp_sensors");
+    REQUIRE(temp_sensors.is_object());
+    REQUIRE(temp_sensors.contains("bed"));
+    REQUIRE(temp_sensors.contains("hotend"));
+}
+
+TEST_CASE_METHOD(ConfigTestFixture,
+                 "Config: hardware section is under /printer/hardware/",
+                 "[config][defaults][plural]") {
+    // Hardware config should be under /printer/hardware/ not /hardware/
+    set_data_for_plural_test({{"printer",
+                               {{"hardware",
+                                 {{"optional", json::array()},
+                                  {"expected", json::array()},
+                                  {"last_snapshot", json::object()}}}}}});
+
+    auto hardware = config.get<json>("/printer/hardware");
+    REQUIRE(hardware.is_object());
+    REQUIRE(hardware.contains("optional"));
+    REQUIRE(hardware.contains("expected"));
+    REQUIRE(hardware.contains("last_snapshot"));
+}
+
+// ============================================================================
+// Wizard Config Path Constants Tests - Verify plural naming
+// These tests verify that wizard_config_paths.h constants use plural form.
+// They SHOULD FAIL until the implementation is updated.
+// ============================================================================
+
+TEST_CASE("WizardConfigPaths: BED_HEATER uses plural /printer/heaters/",
+          "[config][paths][wizard][plural]") {
+    // The path constant should use plural "heaters" not singular "heater"
+    std::string path = helix::wizard::BED_HEATER;
+    REQUIRE(path == "/printer/heaters/bed");
+}
+
+TEST_CASE("WizardConfigPaths: HOTEND_HEATER uses plural /printer/heaters/",
+          "[config][paths][wizard][plural]") {
+    std::string path = helix::wizard::HOTEND_HEATER;
+    REQUIRE(path == "/printer/heaters/hotend");
+}
+
+TEST_CASE("WizardConfigPaths: BED_SENSOR uses plural /printer/temp_sensors/",
+          "[config][paths][wizard][plural]") {
+    // The path constant should use "temp_sensors" not "sensor"
+    std::string path = helix::wizard::BED_SENSOR;
+    REQUIRE(path == "/printer/temp_sensors/bed");
+}
+
+TEST_CASE("WizardConfigPaths: HOTEND_SENSOR uses plural /printer/temp_sensors/",
+          "[config][paths][wizard][plural]") {
+    std::string path = helix::wizard::HOTEND_SENSOR;
+    REQUIRE(path == "/printer/temp_sensors/hotend");
+}
+
+TEST_CASE("WizardConfigPaths: PART_FAN uses plural /printer/fans/",
+          "[config][paths][wizard][plural]") {
+    // The path constant should use plural "fans" not singular "fan"
+    std::string path = helix::wizard::PART_FAN;
+    REQUIRE(path == "/printer/fans/part");
+}
+
+TEST_CASE("WizardConfigPaths: HOTEND_FAN uses plural /printer/fans/",
+          "[config][paths][wizard][plural]") {
+    std::string path = helix::wizard::HOTEND_FAN;
+    REQUIRE(path == "/printer/fans/hotend");
+}
+
+TEST_CASE("WizardConfigPaths: LED_STRIP uses plural /printer/leds/",
+          "[config][paths][wizard][plural]") {
+    // The path constant should use plural "leds" not singular "led"
+    std::string path = helix::wizard::LED_STRIP;
+    REQUIRE(path == "/printer/leds/strip");
 }

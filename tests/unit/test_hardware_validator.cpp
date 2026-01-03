@@ -425,27 +425,66 @@ TEST_CASE("HardwareValidator - Snapshot roundtrip", "[hardware][validator]") {
 #include "config.h"
 
 // Test fixture for Config-dependent HardwareValidator tests
+// NOTE: After the plural naming refactor, hardware config moves from
+// /hardware/ to /printer/hardware/
 class HardwareValidatorConfigFixture {
   protected:
     Config config;
 
+    // Helper to check if a JSON pointer path exists in config data
+    bool config_contains(const std::string& json_ptr) {
+        return config.data.contains(json::json_pointer(json_ptr));
+    }
+
     void setup_empty_hardware_config() {
-        config.data = {{"printer", {{"moonraker_host", "127.0.0.1"}, {"moonraker_port", 7125}}},
-                       {"hardware", {{"optional", json::array()}, {"expected", json::array()}}}};
+        // NEW structure: hardware is under /printer/hardware/
+        config.data = {{"printer",
+                        {{"moonraker_host", "127.0.0.1"},
+                         {"moonraker_port", 7125},
+                         {"hardware",
+                          {{"optional", json::array()},
+                           {"expected", json::array()},
+                           {"last_snapshot", json::object()}}}}}};
     }
 
     void setup_hardware_with_optional() {
-        config.data = {{"printer", {{"moonraker_host", "127.0.0.1"}, {"moonraker_port", 7125}}},
-                       {"hardware",
-                        {{"optional", {"neopixel chamber_light", "fan exhaust"}},
-                         {"expected", json::array()}}}};
+        // NEW structure: hardware is under /printer/hardware/
+        config.data = {{"printer",
+                        {{"moonraker_host", "127.0.0.1"},
+                         {"moonraker_port", 7125},
+                         {"hardware",
+                          {{"optional", {"neopixel chamber_light", "fan exhaust"}},
+                           {"expected", json::array()},
+                           {"last_snapshot", json::object()}}}}}};
     }
 
     void setup_hardware_with_expected() {
-        config.data = {{"printer", {{"moonraker_host", "127.0.0.1"}, {"moonraker_port", 7125}}},
-                       {"hardware",
-                        {{"optional", json::array()},
-                         {"expected", {"temperature_sensor chamber", "neopixel status"}}}}};
+        // NEW structure: hardware is under /printer/hardware/
+        config.data = {{"printer",
+                        {{"moonraker_host", "127.0.0.1"},
+                         {"moonraker_port", 7125},
+                         {"hardware",
+                          {{"optional", json::array()},
+                           {"expected", {"temperature_sensor chamber", "neopixel status"}},
+                           {"last_snapshot", json::object()}}}}}};
+    }
+
+    void setup_hardware_with_snapshot() {
+        // NEW structure: includes last_snapshot for session change detection
+        json snapshot = {{"timestamp", "2025-01-01T12:00:00Z"},
+                         {"heaters", {"extruder", "heater_bed"}},
+                         {"sensors", {"temperature_sensor chamber"}},
+                         {"fans", {"fan", "heater_fan hotend_fan"}},
+                         {"leds", {"neopixel chamber_light"}},
+                         {"filament_sensors", json::array()}};
+
+        config.data = {{"printer",
+                        {{"moonraker_host", "127.0.0.1"},
+                         {"moonraker_port", 7125},
+                         {"hardware",
+                          {{"optional", json::array()},
+                           {"expected", json::array()},
+                           {"last_snapshot", snapshot}}}}}};
     }
 };
 
@@ -508,7 +547,8 @@ TEST_CASE_METHOD(HardwareValidatorConfigFixture,
     HardwareValidator::set_hardware_optional(&config, "test_hw", true);
 
     // Check the list only has one entry
-    json& optional_list = config.get_json("/hardware/optional");
+    // NEW path: /printer/hardware/optional (was /hardware/optional)
+    json& optional_list = config.get_json("/printer/hardware/optional");
     int count = 0;
     for (const auto& item : optional_list) {
         if (item == "test_hw") {
@@ -527,7 +567,8 @@ TEST_CASE_METHOD(HardwareValidatorConfigFixture,
     HardwareValidator::add_expected_hardware(&config, "temperature_sensor chamber");
 
     // Verify it's in the list
-    json& expected_list = config.get_json("/hardware/expected");
+    // NEW path: /printer/hardware/expected (was /hardware/expected)
+    json& expected_list = config.get_json("/printer/hardware/expected");
     bool found = false;
     for (const auto& item : expected_list) {
         if (item == "temperature_sensor chamber") {
@@ -548,7 +589,8 @@ TEST_CASE_METHOD(HardwareValidatorConfigFixture,
     HardwareValidator::add_expected_hardware(&config, "neopixel test");
 
     // Check the list only has one entry
-    json& expected_list = config.get_json("/hardware/expected");
+    // NEW path: /printer/hardware/expected (was /hardware/expected)
+    json& expected_list = config.get_json("/printer/hardware/expected");
     int count = 0;
     for (const auto& item : expected_list) {
         if (item == "neopixel test") {
@@ -566,7 +608,8 @@ TEST_CASE_METHOD(HardwareValidatorConfigFixture,
     // Try to add empty name - should be ignored
     HardwareValidator::add_expected_hardware(&config, "");
 
-    json& expected_list = config.get_json("/hardware/expected");
+    // NEW path: /printer/hardware/expected (was /hardware/expected)
+    json& expected_list = config.get_json("/printer/hardware/expected");
     REQUIRE(expected_list.empty());
 }
 
@@ -582,4 +625,86 @@ TEST_CASE_METHOD(HardwareValidatorConfigFixture,
 
     // If we got here without crashing, the test passes
     REQUIRE(true);
+}
+
+// ============================================================================
+// Hardware Path Structure Tests - NEW /printer/hardware/ paths
+// These tests define the contract for the refactored hardware config paths.
+// They SHOULD FAIL until the implementation is updated.
+// ============================================================================
+
+TEST_CASE_METHOD(HardwareValidatorConfigFixture,
+                 "HardwareValidator - optional hardware uses /printer/hardware/optional path",
+                 "[hardware][validator][config][paths][plural]") {
+    setup_empty_hardware_config();
+
+    // Mark hardware as optional - should write to /printer/hardware/optional
+    HardwareValidator::set_hardware_optional(&config, "test_led", true);
+
+    // Verify the path is /printer/hardware/optional (not /hardware/optional)
+    REQUIRE(config_contains("/printer/hardware/optional"));
+    json& optional_list = config.get_json("/printer/hardware/optional");
+    REQUIRE(optional_list.is_array());
+
+    bool found = false;
+    for (const auto& item : optional_list) {
+        if (item == "test_led") {
+            found = true;
+            break;
+        }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE_METHOD(HardwareValidatorConfigFixture,
+                 "HardwareValidator - expected hardware uses /printer/hardware/expected path",
+                 "[hardware][validator][config][paths][plural]") {
+    setup_empty_hardware_config();
+
+    // Add expected hardware - should write to /printer/hardware/expected
+    HardwareValidator::add_expected_hardware(&config, "temperature_sensor test");
+
+    // Verify the path is /printer/hardware/expected (not /hardware/expected)
+    REQUIRE(config_contains("/printer/hardware/expected"));
+    json& expected_list = config.get_json("/printer/hardware/expected");
+    REQUIRE(expected_list.is_array());
+
+    bool found = false;
+    for (const auto& item : expected_list) {
+        if (item == "temperature_sensor test") {
+            found = true;
+            break;
+        }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE_METHOD(HardwareValidatorConfigFixture,
+                 "HardwareValidator - last_snapshot uses /printer/hardware/last_snapshot path",
+                 "[hardware][validator][config][paths][plural]") {
+    setup_hardware_with_snapshot();
+
+    // Verify the path is /printer/hardware/last_snapshot (not /hardware_session/last_snapshot)
+    REQUIRE(config_contains("/printer/hardware/last_snapshot"));
+    json& snapshot = config.get_json("/printer/hardware/last_snapshot");
+    REQUIRE(snapshot.is_object());
+    REQUIRE(snapshot.contains("timestamp"));
+    REQUIRE(snapshot.contains("heaters"));
+    REQUIRE(snapshot.contains("fans"));
+}
+
+TEST_CASE_METHOD(HardwareValidatorConfigFixture,
+                 "HardwareValidator - hardware section is under /printer/ not root",
+                 "[hardware][validator][config][paths][plural]") {
+    setup_empty_hardware_config();
+
+    // The hardware section should be under /printer/, not at root level
+    REQUIRE(config_contains("/printer/hardware"));
+    REQUIRE_FALSE(config_contains("/hardware"));
+
+    json& hardware = config.get_json("/printer/hardware");
+    REQUIRE(hardware.is_object());
+    REQUIRE(hardware.contains("optional"));
+    REQUIRE(hardware.contains("expected"));
+    REQUIRE(hardware.contains("last_snapshot"));
 }
