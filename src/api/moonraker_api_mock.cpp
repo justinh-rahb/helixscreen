@@ -591,7 +591,7 @@ std::string MockScrewsTiltState::offset_to_adjustment(float offset_mm) {
     const char* direction = (offset_mm > 0) ? "CW" : "CCW";
 
     // Format as "CW 01:15" or "CCW 00:30"
-    char buf[16];
+    char buf[24];
     snprintf(buf, sizeof(buf), "%s %02d:%02d", direction, full_turns, minutes);
     return std::string(buf);
 }

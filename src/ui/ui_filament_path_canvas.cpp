@@ -581,7 +581,7 @@ static void draw_parallel_topology(lv_event_t* e, FilamentPathData* data) {
             label_dsc.font = data->label_font;
             label_dsc.align = LV_TEXT_ALIGN_CENTER;
 
-            char tool_label[8];
+            char tool_label[16];
             snprintf(tool_label, sizeof(tool_label), "T%d", i);
             label_dsc.text = tool_label;
             label_dsc.text_local = 1; // Text is on stack, copy it

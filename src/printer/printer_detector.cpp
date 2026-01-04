@@ -37,7 +37,7 @@ namespace {
  *
  * Loads printer definitions from:
  * 1. Bundled database: config/printer_database.json
- * 2. User extensions: config/printer_database.d/*.json (higher priority)
+ * 2. User extensions: config/printer_database.d/ *.json (higher priority)
  *
  * User definitions can:
  * - Add new printers (unique ID)

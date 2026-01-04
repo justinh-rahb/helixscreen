@@ -641,7 +641,7 @@ static void setup_slot_observers(AmsSlotData* data) {
 
     // Update slot badge with 1-based display number
     if (data->slot_badge) {
-        char badge_text[8];
+        char badge_text[16];
         snprintf(badge_text, sizeof(badge_text), "%d", data->slot_index + 1);
         lv_subject_copy_string(&data->slot_badge_subject, badge_text);
     }

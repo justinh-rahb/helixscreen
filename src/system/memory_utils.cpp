@@ -20,8 +20,10 @@
 
 namespace helix {
 
+#ifdef __APPLE__
 // Track peak memory on macOS (mach doesn't provide HWM)
 static int64_t g_macos_peak_rss_kb = 0;
+#endif
 
 bool read_memory_stats(int64_t& rss_kb, int64_t& hwm_kb) {
     rss_kb = 0;

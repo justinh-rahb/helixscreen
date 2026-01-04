@@ -606,7 +606,7 @@ void MoonrakerAPI::update_safety_limits_from_printer(SuccessCallback on_success,
                 }
 
                 // Extract axis limits from stepper configurations
-                for (const std::string& stepper : {"stepper_x", "stepper_y", "stepper_z"}) {
+                for (const auto& stepper : {"stepper_x", "stepper_y", "stepper_z"}) {
                     if (settings.contains(stepper)) {
                         if (settings[stepper].contains("position_max")) {
                             double pos_max = settings[stepper]["position_max"].get<double>();

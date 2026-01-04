@@ -929,7 +929,7 @@ GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, Ribbon
     // ========== TRIANGLE STRIPS GENERATION (Phase 4: N-based) ==========
 
     // Calculate vertex base indices
-    uint32_t base, start_cap_base, prev_faces_base, curr_faces_base;
+    uint32_t base, start_cap_base = 0, prev_faces_base, curr_faces_base;
 
     if (is_first_segment) {
         // First segment: N (start cap) + 2N (prev) + 2N (curr) = 5N vertices

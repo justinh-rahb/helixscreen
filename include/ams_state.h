@@ -609,7 +609,7 @@ class AmsState {
     lv_subject_t ams_system_name_;
     char system_name_buf_[32];
     lv_subject_t current_tool_text_;
-    char current_tool_text_buf_[8]; // "T0" to "T15" or "---"
+    char current_tool_text_buf_[16]; // "T0" to "T15" or "---"
 
     // Filament path visualization subjects
     lv_subject_t path_topology_;
@@ -646,7 +646,7 @@ class AmsState {
     lv_subject_t current_material_text_;
     char current_material_text_buf_[48];
     lv_subject_t current_slot_text_;
-    char current_slot_text_buf_[16];
+    char current_slot_text_buf_[24];
     lv_subject_t current_weight_text_;
     char current_weight_text_buf_[16];
     lv_subject_t current_has_weight_;

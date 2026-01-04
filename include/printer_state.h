@@ -1233,7 +1233,7 @@ class PrinterState {
     char print_start_message_buf_[64]; // "Heating Nozzle...", "Homing...", etc.
     char hardware_status_title_buf_[64];
     char hardware_status_detail_buf_[128];
-    char hardware_issues_label_buf_[32]; // "1 Hardware Issue" / "5 Hardware Issues"
+    char hardware_issues_label_buf_[48]; // "1 Hardware Issue" / "5 Hardware Issues"
 
     // JSON cache for complex data
     json json_state_;
