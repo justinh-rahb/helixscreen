@@ -182,7 +182,7 @@ TEST_CASE("UI Theme: Multiple parses of same color", "[ui_theme][color]") {
 // ============================================================================
 
 TEST_CASE("UI Theme: Parsed colors work with LVGL", "[ui_theme][integration]") {
-    lv_init();
+    lv_init_safe();
 
     lv_color_t red = ui_theme_parse_hex_color("#FF0000");
     lv_color_t green = ui_theme_parse_hex_color("#00FF00");

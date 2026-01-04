@@ -3,6 +3,8 @@
 
 #include "lvgl_test_fixture.h"
 
+#include "ui_test_utils.h"
+
 #include <chrono>
 #include <thread>
 
@@ -48,8 +50,8 @@ LVGLTestFixture::~LVGLTestFixture() {
 
 void LVGLTestFixture::ensure_lvgl_initialized() {
     std::call_once(s_init_flag, []() {
-        // Initialize LVGL library
-        lv_init();
+        // Initialize LVGL library (safe version avoids "already initialized" warnings)
+        lv_init_safe();
 
         // Create virtual display for headless testing
         s_display = lv_display_create(TEST_DISPLAY_WIDTH, TEST_DISPLAY_HEIGHT);

@@ -15,7 +15,7 @@ using Catch::Approx;
 // ============================================================================
 
 TEST_CASE("PrinterState: Singleton returns same instance", "[core][state][singleton]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& instance1 = get_printer_state();
     PrinterState& instance2 = get_printer_state();
@@ -25,7 +25,7 @@ TEST_CASE("PrinterState: Singleton returns same instance", "[core][state][single
 }
 
 TEST_CASE("PrinterState: Singleton persists modifications", "[core][state][singleton]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.init_subjects();
@@ -41,7 +41,7 @@ TEST_CASE("PrinterState: Singleton persists modifications", "[core][state][singl
 
 TEST_CASE("PrinterState: Singleton subjects have consistent addresses",
           "[core][state][singleton]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state1 = get_printer_state();
     state1.init_subjects();
@@ -61,7 +61,7 @@ TEST_CASE("PrinterState: Singleton subjects have consistent addresses",
 
 TEST_CASE("PrinterState: Observer fires when printer connection state changes",
           "[core][state][observer]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();  // Allow re-initialization after lv_init()
@@ -100,7 +100,7 @@ TEST_CASE("PrinterState: Observer fires when printer connection state changes",
 
 TEST_CASE("PrinterState: Observer fires when network status changes",
           "[state][observer][network]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();  // Allow re-initialization after lv_init()
@@ -128,7 +128,7 @@ TEST_CASE("PrinterState: Observer fires when network status changes",
 }
 
 TEST_CASE("PrinterState: Multiple observers on same subject all fire", "[state][observer]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();  // Allow re-initialization after lv_init()
@@ -164,7 +164,7 @@ TEST_CASE("PrinterState: Multiple observers on same subject all fire", "[state][
 // ============================================================================
 
 TEST_CASE("PrinterState: Initialization sets default values", "[state][init]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.reset_for_testing(); // Reset singleton state from previous tests
     state.init_subjects();
@@ -212,7 +212,7 @@ TEST_CASE("PrinterState: Initialization sets default values", "[state][init]") {
 // lv_async_call() which requires pumping the LVGL timer.
 
 TEST_CASE("PrinterState: Update extruder temperature from status", "[state][temp]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
     state.init_subjects(false);
@@ -226,7 +226,7 @@ TEST_CASE("PrinterState: Update extruder temperature from status", "[state][temp
 }
 
 TEST_CASE("PrinterState: Update bed temperature from status", "[state][temp]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
     state.init_subjects(false);
@@ -240,7 +240,7 @@ TEST_CASE("PrinterState: Update bed temperature from status", "[state][temp]") {
 }
 
 TEST_CASE("PrinterState: Temperature centidegree storage", "[state][temp][edge]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
     state.init_subjects(false);
@@ -269,7 +269,7 @@ TEST_CASE("PrinterState: Temperature centidegree storage", "[state][temp][edge]"
 // ============================================================================
 
 TEST_CASE("PrinterState: Update print progress from notification", "[state][progress]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -282,7 +282,7 @@ TEST_CASE("PrinterState: Update print progress from notification", "[state][prog
 }
 
 TEST_CASE("PrinterState: Update print state and filename", "[state][progress]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -301,7 +301,7 @@ TEST_CASE("PrinterState: Update print state and filename", "[state][progress]") 
 }
 
 TEST_CASE("PrinterState: Progress percentage edge cases", "[state][progress][edge]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -332,7 +332,7 @@ TEST_CASE("PrinterState: Progress percentage edge cases", "[state][progress][edg
 // ============================================================================
 
 TEST_CASE("PrinterState: Update toolhead position", "[state][motion]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -353,7 +353,7 @@ TEST_CASE("PrinterState: Update toolhead position", "[state][motion]") {
 }
 
 TEST_CASE("PrinterState: Homed axes variations", "[state][motion]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -488,7 +488,7 @@ TEST_CASE("PrinterState: Homed axes observer pattern for derived subjects",
     // from homed_axes. ControlsPanel uses this to update xy_homed_, z_homed_,
     // all_homed_ subjects for bind_style on home buttons.
 
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
     state.init_subjects(false);
@@ -552,7 +552,7 @@ TEST_CASE("PrinterState: Homed axes observer pattern for derived subjects",
 // ============================================================================
 
 TEST_CASE("PrinterState: Update speed and flow factors", "[state][speed]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -568,7 +568,7 @@ TEST_CASE("PrinterState: Update speed and flow factors", "[state][speed]") {
 }
 
 TEST_CASE("PrinterState: Update fan speed", "[state][fan]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -585,7 +585,7 @@ TEST_CASE("PrinterState: Update fan speed", "[state][fan]") {
 // ============================================================================
 
 TEST_CASE("PrinterState: Set printer connection state", "[state][connection]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -599,7 +599,7 @@ TEST_CASE("PrinterState: Set printer connection state", "[state][connection]") {
 }
 
 TEST_CASE("PrinterState: Connection state transitions", "[state][connection]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -641,7 +641,7 @@ TEST_CASE("PrinterState: Connection state transitions", "[state][connection]") {
 // ============================================================================
 
 TEST_CASE("PrinterState: Network status initialization", "[state][network]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing(); // Reset singleton state from previous tests
@@ -654,7 +654,7 @@ TEST_CASE("PrinterState: Network status initialization", "[state][network]") {
 }
 
 TEST_CASE("PrinterState: Set network status updates subject", "[state][network]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.init_subjects();
@@ -666,7 +666,7 @@ TEST_CASE("PrinterState: Set network status updates subject", "[state][network]"
 }
 
 TEST_CASE("PrinterState: Network status enum values", "[state][network]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.init_subjects();
@@ -691,7 +691,7 @@ TEST_CASE("PrinterState: Network status enum values", "[state][network]") {
 }
 
 TEST_CASE("PrinterState: Printer and network status are independent", "[state][integration]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.init_subjects();
@@ -724,7 +724,7 @@ TEST_CASE("PrinterState: Printer and network status are independent", "[state][i
 // implicitly through integration tests with MoonrakerClientMock.
 
 TEST_CASE("PrinterState: Empty status object is handled", "[state][error]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
     state.init_subjects(false);
@@ -738,7 +738,7 @@ TEST_CASE("PrinterState: Empty status object is handled", "[state][error]") {
 }
 
 TEST_CASE("PrinterState: Partial status updates work", "[state][error]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
     state.init_subjects(false);
@@ -770,7 +770,7 @@ TEST_CASE("PrinterState: Partial status updates work", "[state][error]") {
 // ============================================================================
 
 TEST_CASE("PrinterState: Complete printing state update", "[state][integration]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -851,7 +851,7 @@ TEST_CASE("PrintJobState: Enum values match expected integers", "[state][enum]")
 }
 
 TEST_CASE("PrinterState: Print state enum subject updates from notification", "[state][enum]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -891,7 +891,7 @@ TEST_CASE("PrinterState: Print state enum subject updates from notification", "[
 }
 
 TEST_CASE("PrinterState: can_start_new_print logic", "[state][enum]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -939,7 +939,7 @@ TEST_CASE("PrinterState: can_start_new_print logic", "[state][enum]") {
 }
 
 TEST_CASE("PrinterState: Enum subject value reflects all state transitions", "[state][enum]") {
-    lv_init();
+    lv_init_safe();
     PrinterState& state = get_printer_state();
     state.init_subjects();
 
@@ -993,7 +993,7 @@ TEST_CASE("PrinterState: Enum subject value reflects all state transitions", "[s
 // ============================================================================
 
 TEST_CASE("PrinterState: Klippy state initialization defaults to READY", "[state][klippy]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1005,7 +1005,7 @@ TEST_CASE("PrinterState: Klippy state initialization defaults to READY", "[state
 }
 
 TEST_CASE("PrinterState: set_klippy_state_sync changes subject value", "[state][klippy]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1037,7 +1037,7 @@ TEST_CASE("PrinterState: set_klippy_state_sync changes subject value", "[state][
 }
 
 TEST_CASE("PrinterState: Observer fires when klippy state changes", "[state][klippy][observer]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1076,7 +1076,7 @@ TEST_CASE("PrinterState: Observer fires when klippy state changes", "[state][kli
 
 TEST_CASE("PrinterState: Update klippy state from webhooks notification",
           "[state][klippy][webhooks]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1120,7 +1120,7 @@ TEST_CASE("PrinterState: Update klippy state from webhooks notification",
 }
 
 TEST_CASE("PrinterState: Unknown webhooks state defaults to READY", "[state][klippy][webhooks]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1141,7 +1141,7 @@ TEST_CASE("PrinterState: Unknown webhooks state defaults to READY", "[state][kli
 // ============================================================================
 
 TEST_CASE("PrinterState: set_kinematics detects cartesian as bed-moves", "[state][kinematics]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1156,7 +1156,7 @@ TEST_CASE("PrinterState: set_kinematics detects cartesian as bed-moves", "[state
 }
 
 TEST_CASE("PrinterState: set_kinematics detects corexy as gantry-moves", "[state][kinematics]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1172,7 +1172,7 @@ TEST_CASE("PrinterState: set_kinematics detects corexy as gantry-moves", "[state
 }
 
 TEST_CASE("PrinterState: set_kinematics detects delta as gantry-moves", "[state][kinematics]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1184,7 +1184,7 @@ TEST_CASE("PrinterState: set_kinematics detects delta as gantry-moves", "[state]
 }
 
 TEST_CASE("PrinterState: set_kinematics handles variations of cartesian", "[state][kinematics]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1210,7 +1210,7 @@ TEST_CASE("PrinterState: set_kinematics handles variations of cartesian", "[stat
 }
 
 TEST_CASE("PrinterState: Update kinematics from toolhead notification", "[state][kinematics][ui]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1227,7 +1227,7 @@ TEST_CASE("PrinterState: Update kinematics from toolhead notification", "[state]
 }
 
 TEST_CASE("PrinterState: Kinematics update from corexy notification", "[state][kinematics][ui]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
@@ -1249,7 +1249,7 @@ TEST_CASE("PrinterState: Kinematics update from corexy notification", "[state][k
 }
 
 TEST_CASE("PrinterState: Observer fires when bed_moves changes", "[state][kinematics][observer]") {
-    lv_init();
+    lv_init_safe();
 
     PrinterState& state = get_printer_state();
     state.reset_for_testing();

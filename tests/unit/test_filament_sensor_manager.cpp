@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "../catch_amalgamated.hpp"
+#include "../ui_test_utils.h"
 
 using namespace helix;
 using json = nlohmann::json;
@@ -34,12 +35,8 @@ using json = nlohmann::json;
 class FilamentSensorTestFixture {
   public:
     FilamentSensorTestFixture() {
-        // Initialize LVGL once (static guard)
-        static bool lvgl_initialized = false;
-        if (!lvgl_initialized) {
-            lv_init();
-            lvgl_initialized = true;
-        }
+        // Initialize LVGL (safe version avoids "already initialized" warnings)
+        lv_init_safe();
 
         // Create a headless display for testing
         if (!display_created_) {

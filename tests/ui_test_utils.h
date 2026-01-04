@@ -25,6 +25,14 @@
  *   ui_test_cleanup();
  */
 
+/**
+ * @brief Safely initialize LVGL (idempotent - no warning if already initialized)
+ *
+ * Use this instead of calling lv_init() directly in tests to avoid
+ * "lv_init: already initialized" warnings when tests run sequentially.
+ */
+void lv_init_safe();
+
 namespace UITest {
 
 /**

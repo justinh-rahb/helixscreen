@@ -18,6 +18,7 @@
 #include <spdlog/spdlog.h>
 
 #include "../catch_amalgamated.hpp"
+#include "../ui_test_utils.h"
 
 // Global LVGL initialization (only once per test run)
 static bool g_lvgl_initialized = false;
@@ -26,7 +27,7 @@ alignas(64) static lv_color_t g_display_buf[800 * 10];
 
 static void ensure_lvgl_init() {
     if (!g_lvgl_initialized) {
-        lv_init();
+        lv_init_safe();
         g_display = lv_display_create(800, 480);
         lv_display_set_buffers(g_display, g_display_buf, nullptr, sizeof(g_display_buf),
                                LV_DISPLAY_RENDER_MODE_PARTIAL);

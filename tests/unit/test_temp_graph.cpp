@@ -6,13 +6,14 @@
 #include "lvgl/lvgl.h"
 
 #include "../catch_amalgamated.hpp"
+#include "../ui_test_utils.h"
 
 // Test fixture for temperature graph tests
 class TempGraphTestFixture {
   public:
     TempGraphTestFixture() {
-        // Initialize LVGL for testing
-        lv_init();
+        // Initialize LVGL for testing (safe version avoids "already initialized" warnings)
+        lv_init_safe();
 
         // Create a display for testing (headless)
         lv_display_t* disp = lv_display_create(800, 480);

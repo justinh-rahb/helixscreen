@@ -9,6 +9,16 @@
 #include <filesystem>
 #include <thread>
 
+// ============================================================================
+// LVGL safe initialization (idempotent)
+// ============================================================================
+
+void lv_init_safe() {
+    if (!lv_is_initialized()) {
+        lv_init();
+    }
+}
+
 namespace UITest {
 
 // Virtual input device for simulating touches/clicks

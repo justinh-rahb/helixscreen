@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "../catch_amalgamated.hpp"
+#include "../ui_test_utils.h"
 
 // ============================================================================
 // Global LVGL Initialization
@@ -40,7 +41,7 @@ struct LVGLInitializerTempHistory {
     LVGLInitializerTempHistory() {
         static bool initialized = false;
         if (!initialized) {
-            lv_init();
+            lv_init_safe();
             lv_display_t* disp = lv_display_create(800, 480);
             alignas(64) static lv_color_t buf[800 * 10];
             lv_display_set_buffers(disp, buf, NULL, sizeof(buf), LV_DISPLAY_RENDER_MODE_PARTIAL);

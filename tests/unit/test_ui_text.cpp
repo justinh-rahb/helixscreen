@@ -16,6 +16,7 @@
 #include <spdlog/spdlog.h>
 
 #include "../catch_amalgamated.hpp"
+#include "../ui_test_utils.h"
 
 // Test fixture for text widget tests
 class TextTest {
@@ -23,12 +24,8 @@ class TextTest {
     TextTest() {
         spdlog::set_level(spdlog::level::debug);
 
-        // Initialize LVGL once (static guard)
-        static bool lvgl_initialized = false;
-        if (!lvgl_initialized) {
-            lv_init();
-            lvgl_initialized = true;
-        }
+        // Initialize LVGL (safe version avoids "already initialized" warnings)
+        lv_init_safe();
 
         // Create a headless display for testing (800x480 = MEDIUM screen)
         alignas(64) static lv_color_t buf[800 * 10];

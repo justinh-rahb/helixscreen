@@ -6,13 +6,14 @@
 #include "lvgl/lvgl.h"
 
 #include "../catch_amalgamated.hpp"
+#include "../ui_test_utils.h"
 
 // Test fixture for navigation tests
 class NavigationTestFixture {
   public:
     NavigationTestFixture() {
-        // Initialize LVGL for testing
-        lv_init();
+        // Initialize LVGL for testing (safe version avoids "already initialized" warnings)
+        lv_init_safe();
 
         // Create a display for testing (headless)
         // LVGL 9 requires aligned buffers - use alignas(64) for portability

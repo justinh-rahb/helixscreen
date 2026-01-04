@@ -5,6 +5,7 @@
 
 #include "../../src/ui/ui_switch.cpp" // Include implementation for internal testing
 #include "../catch_amalgamated.hpp"
+#include "../ui_test_utils.h"
 
 /**
  * @brief Unit tests for ui_switch.cpp - Switch widget with semantic size presets
@@ -24,12 +25,8 @@ class SwitchTest {
     SwitchTest() {
         spdlog::set_level(spdlog::level::debug);
 
-        // Initialize LVGL once (static guard)
-        static bool lvgl_initialized = false;
-        if (!lvgl_initialized) {
-            lv_init();
-            lvgl_initialized = true;
-        }
+        // Initialize LVGL (safe version avoids "already initialized" warnings)
+        lv_init_safe();
 
         // Create a headless display for testing (800x480 = MEDIUM screen)
         alignas(64) static lv_color_t buf[800 * 10];

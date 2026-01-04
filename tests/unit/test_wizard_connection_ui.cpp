@@ -21,12 +21,8 @@
 class WizardConnectionUIFixture {
   public:
     WizardConnectionUIFixture() {
-        // 1. Initialize LVGL (one-time, with static guard)
-        static bool lvgl_initialized = false;
-        if (!lvgl_initialized) {
-            lv_init();
-            lvgl_initialized = true;
-        }
+        // 1. Initialize LVGL (safe version avoids "already initialized" warnings)
+        lv_init_safe();
 
         // 2. Create headless display for testing
         alignas(64) static lv_color_t buf[800 * 10];
