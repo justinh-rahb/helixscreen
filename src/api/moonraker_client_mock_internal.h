@@ -93,6 +93,8 @@ void register_history_handlers(std::unordered_map<std::string, MethodHandler>& r
  *
  * Registers handlers for:
  * - server.connection.identify
+ * - server.info
+ * - printer.info
  *
  * @param registry Map to register handlers into
  */

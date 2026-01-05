@@ -5,6 +5,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <chrono>
+
 namespace mock_internal {
 
 void register_object_handlers(std::unordered_map<std::string, MethodHandler>& registry) {
@@ -115,6 +117,178 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
 
         if (success_cb) {
             json response = {{"result", {{"status", status_obj}}}};
+            success_cb(response);
+        }
+        return true;
+    };
+
+    // printer.objects.subscribe - Subscribe to printer object updates
+    // Returns initial state with eventtime (subsequent updates come via notify_status_update)
+    registry["printer.objects.subscribe"] =
+        [](MoonrakerClientMock* self, const json& params, std::function<void(json)> success_cb,
+           std::function<void(const MoonrakerError&)> error_cb) -> bool {
+        (void)error_cb;
+
+        // Get current time as eventtime (seconds since epoch with microsecond precision)
+        auto now = std::chrono::system_clock::now();
+        auto epoch = now.time_since_epoch();
+        double eventtime =
+            std::chrono::duration_cast<std::chrono::microseconds>(epoch).count() / 1000000.0;
+
+        json status_obj = json::object();
+
+        // Check what objects are being subscribed to
+        if (params.contains("objects")) {
+            auto& objects = params["objects"];
+
+            // webhooks state
+            if (objects.contains("webhooks")) {
+                auto klippy = self->get_klippy_state();
+                std::string state_str = "ready";
+                switch (klippy) {
+                case MoonrakerClientMock::KlippyState::STARTUP:
+                    state_str = "startup";
+                    break;
+                case MoonrakerClientMock::KlippyState::SHUTDOWN:
+                    state_str = "shutdown";
+                    break;
+                case MoonrakerClientMock::KlippyState::ERROR:
+                    state_str = "error";
+                    break;
+                default:
+                    break;
+                }
+                status_obj["webhooks"] = {{"state", state_str}, {"state_message", ""}};
+            }
+
+            // print_stats
+            if (objects.contains("print_stats")) {
+                auto phase = self->get_print_phase();
+                std::string state_str = "standby";
+                switch (phase) {
+                case MoonrakerClientMock::MockPrintPhase::IDLE:
+                    state_str = "standby";
+                    break;
+                case MoonrakerClientMock::MockPrintPhase::PREHEAT:
+                case MoonrakerClientMock::MockPrintPhase::PRINTING:
+                    state_str = "printing";
+                    break;
+                case MoonrakerClientMock::MockPrintPhase::PAUSED:
+                    state_str = "paused";
+                    break;
+                case MoonrakerClientMock::MockPrintPhase::COMPLETE:
+                    state_str = "complete";
+                    break;
+                case MoonrakerClientMock::MockPrintPhase::CANCELLED:
+                    state_str = "cancelled";
+                    break;
+                case MoonrakerClientMock::MockPrintPhase::ERROR:
+                    state_str = "error";
+                    break;
+                }
+                status_obj["print_stats"] = {
+                    {"state", state_str},
+                    {"filename", ""},
+                    {"total_duration", 0.0},
+                    {"print_duration", 0.0},
+                    {"filament_used", 0.0},
+                    {"message", ""},
+                    {"info", {{"total_layer", nullptr}, {"current_layer", nullptr}}}};
+            }
+
+            // heater_bed
+            if (objects.contains("heater_bed")) {
+                status_obj["heater_bed"] = {{"temperature", 25.0}, {"target", 0.0}, {"power", 0.0}};
+            }
+
+            // extruder
+            if (objects.contains("extruder")) {
+                status_obj["extruder"] = {{"temperature", 25.0},
+                                          {"target", 0.0},
+                                          {"power", 0.0},
+                                          {"pressure_advance", 0.04}};
+            }
+
+            // toolhead
+            if (objects.contains("toolhead")) {
+                status_obj["toolhead"] = {{"max_velocity", 500.0},
+                                          {"max_accel", 10000.0},
+                                          {"max_accel_to_decel", 5000.0},
+                                          {"square_corner_velocity", 5.0},
+                                          {"position", {0.0, 0.0, 0.0, 0.0}},
+                                          {"homed_axes", "xyz"},
+                                          {"print_time", 0.0},
+                                          {"estimated_print_time", 0.0},
+                                          {"extruder", "extruder"}};
+            }
+
+            // virtual_sdcard
+            if (objects.contains("virtual_sdcard")) {
+                status_obj["virtual_sdcard"] = {{"file_path", ""},
+                                                {"progress", 0.0},
+                                                {"is_active", false},
+                                                {"file_position", 0}};
+            }
+
+            // fan (part cooling fan)
+            if (objects.contains("fan")) {
+                status_obj["fan"] = {{"speed", 0.0}, {"rpm", nullptr}};
+            }
+
+            // gcode_move
+            if (objects.contains("gcode_move")) {
+                status_obj["gcode_move"] = {{"speed_factor", 1.0},
+                                            {"extrude_factor", 1.0},
+                                            {"absolute_coordinates", true},
+                                            {"absolute_extrude", true},
+                                            {"homing_origin", {0.0, 0.0, 0.0, 0.0}},
+                                            {"position", {0.0, 0.0, 0.0, 0.0}},
+                                            {"gcode_position", {0.0, 0.0, 0.0, 0.0}}};
+            }
+
+            // idle_timeout
+            if (objects.contains("idle_timeout")) {
+                std::string idle_state;
+                if (!self->are_motors_enabled()) {
+                    idle_state = "Idle";
+                } else {
+                    auto phase = self->get_print_phase();
+                    idle_state = (phase == MoonrakerClientMock::MockPrintPhase::PRINTING ||
+                                  phase == MoonrakerClientMock::MockPrintPhase::PREHEAT)
+                                     ? "Printing"
+                                     : "Ready";
+                }
+                status_obj["idle_timeout"] = {{"state", idle_state}, {"printing_time", 0.0}};
+            }
+
+            // motion_report (for live position updates)
+            if (objects.contains("motion_report")) {
+                status_obj["motion_report"] = {{"live_position", {0.0, 0.0, 0.0, 0.0}},
+                                               {"live_velocity", 0.0},
+                                               {"live_extruder_velocity", 0.0}};
+            }
+
+            // display_status (for progress/message display)
+            if (objects.contains("display_status")) {
+                status_obj["display_status"] = {{"progress", 0.0}, {"message", nullptr}};
+            }
+
+            // configfile (printer configuration)
+            if (objects.contains("configfile")) {
+                status_obj["configfile"] = {
+                    {"settings",
+                     {{"printer", {{"max_velocity", 500.0}, {"max_accel", 10000.0}}},
+                      {"stepper_x", {{"position_min", 0.0}, {"position_max", 250.0}}},
+                      {"stepper_y", {{"position_min", 0.0}, {"position_max", 250.0}}},
+                      {"stepper_z", {{"position_min", 0.0}, {"position_max", 300.0}}},
+                      {"extruder",
+                       {{"min_temp", 0.0}, {"max_temp", 300.0}, {"min_extrude_temp", 170.0}}},
+                      {"heater_bed", {{"min_temp", 0.0}, {"max_temp", 120.0}}}}}};
+            }
+        }
+
+        if (success_cb) {
+            json response = {{"result", {{"eventtime", eventtime}, {"status", status_obj}}}};
             success_cb(response);
         }
         return true;

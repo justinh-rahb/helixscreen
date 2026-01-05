@@ -33,7 +33,103 @@ void register_server_handlers(std::unordered_map<std::string, MethodHandler>& re
         return true;
     };
 
-    spdlog::debug("[MoonrakerClientMock] Registered {} server method handlers", 1);
+    // server.info - Get Moonraker server information
+    // https://moonraker.readthedocs.io/en/latest/web_api/#get-server-info
+    registry["server.info"] = [](MoonrakerClientMock* self, const json& /*params*/,
+                                 std::function<void(json)> success_cb,
+                                 std::function<void(const MoonrakerError&)> /*error_cb*/) -> bool {
+        // Map KlippyState enum to string
+        std::string klippy_state_str;
+        bool klippy_connected = false;
+        switch (self->get_klippy_state()) {
+        case MoonrakerClientMock::KlippyState::READY:
+            klippy_state_str = "ready";
+            klippy_connected = true;
+            break;
+        case MoonrakerClientMock::KlippyState::STARTUP:
+            klippy_state_str = "startup";
+            klippy_connected = false;
+            break;
+        case MoonrakerClientMock::KlippyState::SHUTDOWN:
+            klippy_state_str = "shutdown";
+            klippy_connected = true;
+            break;
+        case MoonrakerClientMock::KlippyState::ERROR:
+            klippy_state_str = "error";
+            klippy_connected = true;
+            break;
+        }
+
+        spdlog::debug("[MoonrakerClientMock] server.info: klippy_state={}, connected={}",
+                      klippy_state_str, klippy_connected);
+
+        json response = {
+            {"jsonrpc", "2.0"},
+            {"result",
+             {{"klippy_connected", klippy_connected},
+              {"klippy_state", klippy_state_str},
+              {"moonraker_version", "v0.8.0-mock"},
+              {"api_version", json::array({1, 5, 0})},
+              {"api_version_string", "1.5.0"},
+              {"components", json::array({"file_manager", "database", "machine", "history",
+                                          "announcements", "job_queue", "update_manager"})},
+              {"failed_components", json::array()},
+              {"registered_directories", json::array({"gcodes", "config", "logs"})},
+              {"warnings", json::array()},
+              {"websocket_count", 1}}}};
+
+        if (success_cb) {
+            success_cb(response);
+        }
+        return true;
+    };
+
+    // printer.info - Get Klipper printer information
+    // https://moonraker.readthedocs.io/en/latest/web_api/#get-printer-info
+    registry["printer.info"] = [](MoonrakerClientMock* self, const json& /*params*/,
+                                  std::function<void(json)> success_cb,
+                                  std::function<void(const MoonrakerError&)> /*error_cb*/) -> bool {
+        // Map KlippyState enum to string and state message
+        std::string state_str;
+        std::string state_message;
+        switch (self->get_klippy_state()) {
+        case MoonrakerClientMock::KlippyState::READY:
+            state_str = "ready";
+            state_message = "Printer is ready";
+            break;
+        case MoonrakerClientMock::KlippyState::STARTUP:
+            state_str = "startup";
+            state_message = "Printer is starting up";
+            break;
+        case MoonrakerClientMock::KlippyState::SHUTDOWN:
+            state_str = "shutdown";
+            state_message = "Printer has been shut down";
+            break;
+        case MoonrakerClientMock::KlippyState::ERROR:
+            state_str = "error";
+            state_message = "Printer is in error state";
+            break;
+        }
+
+        spdlog::debug("[MoonrakerClientMock] printer.info: state={}", state_str);
+
+        json response = {{"jsonrpc", "2.0"},
+                         {"result",
+                          {{"state", state_str},
+                           {"state_message", state_message},
+                           {"hostname", "mock-printer"},
+                           {"software_version", "v0.12.0-mock"},
+                           {"klipper_path", "/home/pi/klipper"},
+                           {"python_path", "/home/pi/klippy-env/bin/python"},
+                           {"log_file", "/home/pi/printer_data/logs/klippy.log"}}}};
+
+        if (success_cb) {
+            success_cb(response);
+        }
+        return true;
+    };
+
+    spdlog::debug("[MoonrakerClientMock] Registered {} server method handlers", 3);
 }
 
 } // namespace mock_internal

@@ -278,39 +278,55 @@ void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
     // Generate synthetic bed mesh data (may have already been done in constructor)
     generate_mock_bed_mesh();
 
-    // Set mock printer info (mimics server.info and printer.info responses)
-    hostname_ = "mock-printer";
-    software_version_ = "v0.12.0-mock";
-    moonraker_version_ = "v0.8.0-mock";
+    // Query server.info to get moonraker_version (uses registered RPC handler)
+    send_jsonrpc("server.info", json::object(), [this, on_complete](json response) {
+        if (response.contains("result")) {
+            moonraker_version_ = response["result"].value("moonraker_version", "unknown");
+            spdlog::debug("[MoonrakerClientMock] Moonraker version: {}", moonraker_version_);
+        }
 
-    // Populate capabilities (may have already been done in constructor, but idempotent)
-    populate_capabilities();
+        // Chain to printer.info to get hostname and software_version
+        send_jsonrpc("printer.info", json::object(), [this, on_complete](json response) {
+            if (response.contains("result")) {
+                hostname_ = response["result"].value("hostname", "unknown");
+                software_version_ = response["result"].value("software_version", "unknown");
+                spdlog::debug("[MoonrakerClientMock] Printer hostname: {}", hostname_);
+                spdlog::debug("[MoonrakerClientMock] Klipper software version: {}",
+                              software_version_);
+            }
 
-    // Set Spoolman availability during discovery (matches real Moonraker behavior)
-    // Real client queries server.spoolman.status during discovery - see moonraker_client.cpp:1047
-    get_printer_state().set_spoolman_available(mock_spoolman_enabled_);
-    spdlog::debug("[MoonrakerClientMock] Spoolman available: {}", mock_spoolman_enabled_);
+            // Populate capabilities (may have already been done in constructor, but idempotent)
+            populate_capabilities();
 
-    // Log discovered hardware
-    spdlog::debug("[MoonrakerClientMock] Discovered: {} heaters, {} sensors, {} fans, {} LEDs",
-                  heaters_.size(), sensors_.size(), fans_.size(), leds_.size());
+            // Set Spoolman availability during discovery (matches real Moonraker behavior)
+            // Real client queries server.spoolman.status during discovery - see
+            // moonraker_client.cpp:1047
+            get_printer_state().set_spoolman_available(mock_spoolman_enabled_);
+            spdlog::debug("[MoonrakerClientMock] Spoolman available: {}", mock_spoolman_enabled_);
 
-    // Early hardware discovery callback (for AMS/MMU initialization)
-    // Must be called BEFORE on_discovery_complete_ to match real implementation timing
-    if (on_hardware_discovered_) {
-        spdlog::debug("[MoonrakerClientMock] Invoking early hardware discovery callback");
-        on_hardware_discovered_(capabilities_);
-    }
+            // Log discovered hardware
+            spdlog::debug("[MoonrakerClientMock] Discovered: {} heaters, {} sensors, {} fans, {} "
+                          "LEDs",
+                          heaters_.size(), sensors_.size(), fans_.size(), leds_.size());
 
-    // Invoke discovery complete callback with capabilities (for PrinterState binding)
-    if (on_discovery_complete_) {
-        on_discovery_complete_(capabilities_);
-    }
+            // Early hardware discovery callback (for AMS/MMU initialization)
+            // Must be called BEFORE on_discovery_complete_ to match real implementation timing
+            if (on_hardware_discovered_) {
+                spdlog::debug("[MoonrakerClientMock] Invoking early hardware discovery callback");
+                on_hardware_discovered_(capabilities_);
+            }
 
-    // Invoke completion callback immediately (no async delay in mock)
-    if (on_complete) {
-        on_complete();
-    }
+            // Invoke discovery complete callback with capabilities (for PrinterState binding)
+            if (on_discovery_complete_) {
+                on_discovery_complete_(capabilities_);
+            }
+
+            // Invoke completion callback immediately (no async delay in mock)
+            if (on_complete) {
+                on_complete();
+            }
+        });
+    });
 }
 
 void MoonrakerClientMock::populate_hardware() {

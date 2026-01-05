@@ -156,8 +156,11 @@ static json build_mock_file_metadata_response(const std::string& filename) {
     json thumbnails = json::array();
     if (!thumbnail_path.empty()) {
         // Return relative path to cached thumbnail (no LVGL prefix - that's a UI concern)
-        // Format must match Moonraker's response structure: array of objects with relative_path
-        thumbnails.push_back({{"relative_path", thumbnail_path}});
+        // Format must match Moonraker's response structure: array of objects with dimensions
+        thumbnails.push_back({{"relative_path", thumbnail_path},
+                              {"width", 300},
+                              {"height", 300},
+                              {"size", 16384}}); // approximate file size in bytes
     }
 
     // Convert tool colors vector to JSON array
