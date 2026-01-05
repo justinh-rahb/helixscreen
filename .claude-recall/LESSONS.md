@@ -145,7 +145,7 @@
 
 
 ### [L032] [*****|-----] Re-stage after pre-commit format
-- **Uses**: 50 | **Velocity**: 0.04 | **Learned**: 2025-12-27 | **Last**: 2026-01-04 | **Category**: correction
+- **Uses**: 50 | **Velocity**: 0.01 | **Learned**: 2025-12-27 | **Last**: 2026-01-04 | **Category**: correction
 > When pre-commit hook auto-formats files, they are NOT automatically re-staged. Always check git status after a commit and amend if the hook formatted files. Look for 'Auto-formatted: <file>' messages and run 'git add -u && git commit --amend --no-edit'.
 
 
@@ -164,8 +164,8 @@
 > After successful git push, play Salt-N-Pepa's Push It: open 'https://www.youtube.com/watch?v=vCadcBR95oU&t=45s'
 
 
-### [L036] [*----|-----] Header file documentation
-- **Uses**: 2 | **Velocity**: 0.01 | **Learned**: 2025-12-28 | **Last**: 2025-12-28 | **Category**: pattern
+### [L036] [**---|-----] Header file documentation
+- **Uses**: 3 | **Velocity**: 0.26 | **Learned**: 2025-12-28 | **Last**: 2026-01-05 | **Category**: pattern
 > Important files have documentation in their header files (include/*.h). Check the header file first when trying to understand a class or module - it often contains usage examples, design rationale, and API documentation.
 
 
@@ -200,5 +200,5 @@
 
 
 ### [L044] [**---|-----] Targeted tests during development
-- **Uses**: 4 | **Velocity**: 0.19 | **Learned**: 2026-01-04 | **Last**: 2026-01-04 | **Category**: preference
+- **Uses**: 4 | **Velocity**: 0.03 | **Learned**: 2026-01-04 | **Last**: 2026-01-04 | **Category**: preference
 > Run targeted tests with specific tags during implementation (e.g., ./build/bin/helix-tests "[tag]"). Only run full test suite (make test-run) at the end of a feature or phase. Full suite is SLOW - save it for final verification.
