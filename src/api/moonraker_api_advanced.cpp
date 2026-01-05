@@ -739,13 +739,12 @@ class BedMeshProgressCollector : public std::enable_shared_from_this<BedMeshProg
 };
 
 void MoonrakerAPI::start_bed_mesh_calibrate(BedMeshProgressCallback on_progress,
-                                            SuccessCallback on_complete,
-                                            ErrorCallback on_error) {
+                                            SuccessCallback on_complete, ErrorCallback on_error) {
     spdlog::info("[MoonrakerAPI] Starting bed mesh calibration with progress tracking");
 
     // Create collector to track progress
     auto collector = std::make_shared<BedMeshProgressCollector>(client_, std::move(on_progress),
-                                                                 std::move(on_complete), on_error);
+                                                                std::move(on_complete), on_error);
 
     collector->start();
 

@@ -828,8 +828,7 @@ void BedMeshPanel::show_save_config_modal() {
 void BedMeshPanel::hide_all_modals() {
     // Reset calibration state machine
     lv_subject_set_int(&bed_mesh_calibrating_, 0);
-    lv_subject_set_int(&bed_mesh_calibrate_state_,
-                       static_cast<int>(BedMeshCalibrationState::IDLE));
+    lv_subject_set_int(&bed_mesh_calibrate_state_, static_cast<int>(BedMeshCalibrationState::IDLE));
 
     // Hide all modals (all use ui_modal_hide pattern now)
     if (calibrate_modal_widget_) {
@@ -1033,17 +1032,16 @@ void BedMeshPanel::handle_emergency_stop() {
 
     MoonrakerAPI* api = get_moonraker_api();
     if (api) {
-        api->emergency_stop(
-            []() { spdlog::info("[BedMeshPanel] Emergency stop sent"); },
-            [](const MoonrakerError& err) {
-                spdlog::error("[BedMeshPanel] Emergency stop failed: {}", err.message);
-            });
+        api->emergency_stop([]() { spdlog::info("[BedMeshPanel] Emergency stop sent"); },
+                            [](const MoonrakerError& err) {
+                                spdlog::error("[BedMeshPanel] Emergency stop failed: {}",
+                                              err.message);
+                            });
     }
 
     // Close modal and reset state
     hide_all_modals();
-    lv_subject_set_int(&bed_mesh_calibrate_state_,
-                       static_cast<int>(BedMeshCalibrationState::IDLE));
+    lv_subject_set_int(&bed_mesh_calibrate_state_, static_cast<int>(BedMeshCalibrationState::IDLE));
 }
 
 void BedMeshPanel::save_profile_with_name(const std::string& name) {

@@ -34,8 +34,7 @@ namespace {
  */
 bool parse_probe_progress(const std::string& line, int& current, int& total) {
     // Static regex for performance - handles both formats
-    static const std::regex probe_regex(
-        R"(Prob(?:ing point|e point) (\d+)[/\s]+(?:of\s+)?(\d+))");
+    static const std::regex probe_regex(R"(Prob(?:ing point|e point) (\d+)[/\s]+(?:of\s+)?(\d+))");
 
     std::smatch match;
     if (std::regex_search(line, match, probe_regex) && match.size() == 3) {
@@ -57,15 +56,16 @@ bool is_completion_line(const std::string& line) {
     // Case-insensitive check for completion markers
     return line.find("Mesh Bed Leveling Complete") != std::string::npos ||
            line.find("Mesh bed leveling complete") != std::string::npos ||
-           (line.find("BED_MESH_CALIBRATE") != std::string::npos && line.find("ok") != std::string::npos);
+           (line.find("BED_MESH_CALIBRATE") != std::string::npos &&
+            line.find("ok") != std::string::npos);
 }
 
 /**
  * @brief Check if a line indicates an error
  */
 bool is_error_line(const std::string& line) {
-    return line.rfind("!! ", 0) == 0 ||        // Emergency errors start with "!! "
-           line.rfind("Error:", 0) == 0 ||     // Standard errors
+    return line.rfind("!! ", 0) == 0 ||              // Emergency errors start with "!! "
+           line.rfind("Error:", 0) == 0 ||           // Standard errors
            line.find("error:") != std::string::npos; // Python tracebacks
 }
 
