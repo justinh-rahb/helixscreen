@@ -173,7 +173,8 @@ void HardwareValidator::notify_user(const HardwareValidationResult& result) {
         severity = ToastSeverity::ERROR;
     } else if (!result.expected_missing.empty() || !result.changed_from_last_session.empty()) {
         size_t count = result.expected_missing.size() + result.changed_from_last_session.size();
-        message = std::to_string(count) + " configured hardware not found";
+        message =
+            std::to_string(count) + " configured " + (count == 1 ? "item" : "items") + " not found";
         severity = ToastSeverity::WARNING;
     } else {
         // Build intelligent message based on hardware types

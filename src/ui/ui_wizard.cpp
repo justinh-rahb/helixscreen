@@ -26,6 +26,7 @@
 #include "lvgl/src/xml/lv_xml.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
+#include "printer_capabilities.h"
 #include "runtime_config.h"
 #include "wizard_config_paths.h"
 
@@ -848,6 +849,22 @@ static void on_next_clicked(lv_event_t* e) {
         led_step_skipped = true;
         next_step = 8;
         spdlog::debug("[Wizard] Skipping LED step (no LEDs detected)");
+    }
+
+    // Ensure FilamentSensorManager is populated before skip check
+    if (next_step == 8) {
+        auto& fsm = helix::FilamentSensorManager::instance();
+        if (fsm.get_sensors().empty()) {
+            MoonrakerClient* client = get_moonraker_client();
+            if (client) {
+                PrinterCapabilities caps;
+                caps.parse_objects(client->get_printer_objects());
+                if (caps.has_filament_sensors()) {
+                    fsm.discover_sensors(caps.get_filament_sensor_names());
+                    spdlog::debug("[Wizard] Populated FilamentSensorManager before skip check");
+                }
+            }
+        }
     }
 
     // Skip filament sensor step (8) if <2 standalone sensors

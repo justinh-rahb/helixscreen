@@ -325,36 +325,18 @@ void WizardFilamentSensorSelectStep::refresh() {
 // Skip Logic
 // ============================================================================
 
-size_t WizardFilamentSensorSelectStep::count_standalone_sensors_from_printer_objects() const {
-    MoonrakerClient* client = get_moonraker_client();
-    if (!client) {
-        spdlog::debug("[{}] No MoonrakerClient available for skip check", get_name());
-        return 0;
-    }
+size_t WizardFilamentSensorSelectStep::get_standalone_sensor_count() const {
+    // Query FilamentSensorManager directly as the single source of truth
+    // This works even when the step is skipped and create() was never called
+    auto& sensor_mgr = helix::FilamentSensorManager::instance();
+    auto all_sensors = sensor_mgr.get_sensors();
 
-    const auto& printer_objects = client->get_printer_objects();
     size_t count = 0;
-
-    for (const auto& obj : printer_objects) {
-        // Check for filament sensor objects
-        if (obj.find("filament_switch_sensor ") == 0 || obj.find("filament_motion_sensor ") == 0) {
-            // Extract sensor name after the space
-            auto pos = obj.find(' ');
-            if (pos != std::string::npos) {
-                std::string sensor_name = obj.substr(pos + 1);
-                if (!is_ams_sensor(sensor_name)) {
-                    count++;
-                    spdlog::debug("[{}] Found standalone sensor from printer_objects: {}",
-                                  get_name(), sensor_name);
-                } else {
-                    spdlog::debug("[{}] Filtered AMS sensor from printer_objects: {}", get_name(),
-                                  sensor_name);
-                }
-            }
+    for (const auto& sensor : all_sensors) {
+        if (!is_ams_sensor(sensor.sensor_name)) {
+            count++;
         }
     }
-
-    spdlog::debug("[{}] Counted {} standalone sensors from printer_objects", get_name(), count);
     return count;
 }
 
@@ -362,25 +344,15 @@ bool WizardFilamentSensorSelectStep::should_skip() const {
     auto& sensor_mgr = helix::FilamentSensorManager::instance();
     auto all_sensors = sensor_mgr.get_sensors();
 
-    // If FilamentSensorManager has sensors, use those
-    if (!all_sensors.empty()) {
-        // Count non-AMS sensors
-        size_t standalone_count = 0;
-        for (const auto& sensor : all_sensors) {
-            if (!is_ams_sensor(sensor.sensor_name)) {
-                standalone_count++;
-            }
+    // Count non-AMS sensors from the single source of truth
+    size_t standalone_count = 0;
+    for (const auto& sensor : all_sensors) {
+        if (!is_ams_sensor(sensor.sensor_name)) {
+            standalone_count++;
         }
-        spdlog::debug("[{}] should_skip: {} standalone sensors from FilamentSensorManager",
-                      get_name(), standalone_count);
-        return standalone_count < 2;
     }
 
-    // FilamentSensorManager::discover_sensors() hasn't been called yet (async race).
-    // Query MoonrakerClient's printer_objects directly.
-    size_t standalone_count = count_standalone_sensors_from_printer_objects();
-    spdlog::debug("[{}] should_skip: {} standalone sensors from printer_objects (manager empty)",
-                  get_name(), standalone_count);
+    spdlog::debug("[{}] should_skip: {} standalone sensors", get_name(), standalone_count);
     return standalone_count < 2;
 }
 

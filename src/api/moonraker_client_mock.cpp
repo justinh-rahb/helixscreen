@@ -216,6 +216,10 @@ void MoonrakerClientMock::populate_capabilities() {
     // Moonraker plugins
     mock_objects.push_back("timelapse"); // Moonraker-Timelapse plugin
 
+    // MMU/AMS system - Happy Hare uses "mmu" object name
+    // Add this so hardware validator can detect it
+    mock_objects.push_back("mmu");
+
     // Filament sensors (common setup: runout sensor at spool holder)
     // Check HELIX_MOCK_FILAMENT_SENSORS env var for custom sensor names
     // Default: single switch sensor named "runout_sensor"
@@ -254,6 +258,12 @@ void MoonrakerClientMock::populate_capabilities() {
 
     // Parse objects into capabilities (for PrinterCapabilities queries)
     capabilities_.parse_objects(mock_objects);
+
+    // Populate printer_objects_ for get_printer_objects() - used by hardware validator
+    printer_objects_.clear();
+    for (const auto& obj : mock_objects) {
+        printer_objects_.push_back(obj.get<std::string>());
+    }
 
     // Also populate filament_sensors_ member for subscription (same as real parse_objects)
     filament_sensors_.clear();

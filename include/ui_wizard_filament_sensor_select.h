@@ -105,10 +105,11 @@ class WizardFilamentSensorSelectStep {
 
     /**
      * @brief Get the number of standalone (non-AMS) sensors
+     *
+     * Queries FilamentSensorManager directly as the single source of truth.
+     * This works even when the step is skipped and create() was never called.
      */
-    size_t get_standalone_sensor_count() const {
-        return standalone_sensors_.size();
-    }
+    size_t get_standalone_sensor_count() const;
 
     /**
      * @brief Auto-configure a single sensor as RUNOUT
@@ -131,17 +132,6 @@ class WizardFilamentSensorSelectStep {
      * @brief Check if a sensor name indicates it's managed by AMS
      */
     static bool is_ams_sensor(const std::string& name);
-
-    /**
-     * @brief Count standalone sensors directly from MoonrakerClient's printer_objects
-     *
-     * Used as fallback when FilamentSensorManager::discover_sensors() hasn't run yet.
-     * This solves the async race condition where should_skip() is called before the
-     * FilamentSensorManager has discovered sensors.
-     *
-     * @return Number of non-AMS filament sensors found in printer_objects
-     */
-    size_t count_standalone_sensors_from_printer_objects() const;
 
     /**
      * @brief Filter sensors to get only standalone (non-AMS) sensors

@@ -5,14 +5,29 @@
  * @file test_app_stubs.cpp
  * @brief Stub implementations for application module unit tests
  *
- * This file is intentionally empty - stubs for global accessors like
- * get_runtime_config() are already provided by test_test_config.cpp.
- *
- * If additional stubs are needed specifically for application module tests,
- * add them here. For now, the existing test infrastructure provides all
- * necessary stubs.
+ * Provides stub implementations for global functions from app_globals.h
+ * that are referenced by other modules (like runtime_config.cpp) but
+ * whose real implementations aren't linked into the test binary.
  */
 
 // Note: PrinterState, MoonrakerClient, and MoonrakerAPI stubs are provided
 // by the test fixtures when needed, not as global stubs. This allows each
 // test to have its own isolated instance.
+
+// ============================================================================
+// Wizard State Stubs
+// ============================================================================
+
+// These stubs are needed because runtime_config.cpp calls is_wizard_active()
+// but app_globals.cpp (where the real implementation lives) isn't linked
+// into the test binary.
+
+static bool g_test_wizard_active = false;
+
+bool is_wizard_active() {
+    return g_test_wizard_active;
+}
+
+void set_wizard_active(bool active) {
+    g_test_wizard_active = active;
+}
