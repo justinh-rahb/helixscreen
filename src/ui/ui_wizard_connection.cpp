@@ -61,6 +61,10 @@ WizardConnectionStep::WizardConnectionStep() {
     std::memset(connection_port_buffer_, 0, sizeof(connection_port_buffer_));
     std::memset(connection_status_icon_buffer_, 0, sizeof(connection_status_icon_buffer_));
     std::memset(connection_status_text_buffer_, 0, sizeof(connection_status_text_buffer_));
+    std::memset(mdns_status_buffer_, 0, sizeof(mdns_status_buffer_));
+
+    // Create mDNS discovery instance
+    mdns_discovery_ = std::make_unique<MdnsDiscovery>();
 
     spdlog::debug("[{}] Instance created", get_name());
 }
@@ -169,6 +173,10 @@ void WizardConnectionStep::init_subjects() {
                                         "connection_status_text");
     UI_SUBJECT_INIT_AND_REGISTER_INT(connection_testing_, 0, "connection_testing");
     UI_SUBJECT_INIT_AND_REGISTER_INT(connection_discovering_, 0, "connection_discovering");
+
+    // mDNS discovery subjects
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(mdns_status_, mdns_status_buffer_, "Scanning...",
+                                        "mdns_status");
 
     // Set connection_test_passed to 0 (disabled) for this step
     lv_subject_set_int(&connection_test_passed, 0);
@@ -853,6 +861,7 @@ void WizardConnectionStep::register_callbacks() {
                              on_test_connection_clicked_static);
     lv_xml_register_event_cb(nullptr, "on_ip_input_changed", on_ip_input_changed_static);
     lv_xml_register_event_cb(nullptr, "on_port_input_changed", on_port_input_changed_static);
+    lv_xml_register_event_cb(nullptr, "on_printer_selected", on_printer_selected_cb);
 
     spdlog::debug("[{}] Event callbacks registered", get_name());
 }
@@ -916,11 +925,25 @@ lv_obj_t* WizardConnectionStep::create(lv_obj_t* parent) {
 
     lv_obj_update_layout(screen_root_);
 
+    // Set initial dropdown text (bind_options doesn't work for dropdowns)
+    lv_obj_t* printer_dropdown = lv_obj_find_by_name(screen_root_, "printer_dropdown");
+    if (printer_dropdown) {
+        lv_dropdown_set_options(printer_dropdown, "Searching...");
+    }
+
     // Schedule auto-probe if appropriate (empty config, first visit)
     if (should_auto_probe()) {
         spdlog::debug("[{}] Scheduling auto-probe for localhost", get_name());
         auto_probe_timer_ = lv_timer_create(auto_probe_timer_cb, 100, this);
         lv_timer_set_repeat_count(auto_probe_timer_, 1); // One-shot timer
+    }
+
+    // Start mDNS discovery
+    if (mdns_discovery_) {
+        spdlog::debug("[{}] Starting mDNS discovery", get_name());
+        mdns_discovery_->start_discovery([this](const std::vector<DiscoveredPrinter>& printers) {
+            on_printers_discovered(printers);
+        });
     }
 
     spdlog::debug("[{}] Screen created successfully", get_name());
@@ -936,6 +959,12 @@ void WizardConnectionStep::cleanup() {
 
     // Mark cleanup as called to guard async callbacks (atomic store with release semantics)
     cleanup_called_.store(true, std::memory_order_release);
+
+    // Stop mDNS discovery
+    if (mdns_discovery_) {
+        spdlog::debug("[{}] Stopping mDNS discovery", get_name());
+        mdns_discovery_->stop_discovery();
+    }
 
     // Cancel any pending auto-probe timer
     if (auto_probe_timer_) {
@@ -964,6 +993,101 @@ void WizardConnectionStep::cleanup() {
     screen_root_ = nullptr;
 
     spdlog::debug("[{}] Cleanup complete", get_name());
+}
+
+// ============================================================================
+// mDNS Discovery Handlers
+// ============================================================================
+
+void WizardConnectionStep::on_printers_discovered(const std::vector<DiscoveredPrinter>& printers) {
+    // NOTE: This callback comes from the mDNS discovery thread via ui_async_call
+    // but MdnsDiscovery already handles thread marshaling, so we're on main thread here
+
+    if (is_stale()) {
+        spdlog::debug("[Wizard Connection] Ignoring mDNS update (cleanup called)");
+        return;
+    }
+
+    discovered_printers_ = printers;
+
+    // Update status text
+    if (printers.empty()) {
+        lv_subject_copy_string(&mdns_status_, "No printers found");
+    } else if (printers.size() == 1) {
+        lv_subject_copy_string(&mdns_status_, "Found 1 printer");
+    } else {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Found %zu printers", printers.size());
+        lv_subject_copy_string(&mdns_status_, buf);
+    }
+
+    // Update dropdown options (newline-separated for LVGL dropdown)
+    std::string options;
+    if (printers.empty()) {
+        options = "No printers found";
+    } else {
+        for (const auto& p : printers) {
+            if (!options.empty()) {
+                options += "\n";
+            }
+            options += p.name + " (" + p.ip_address + ")";
+        }
+    }
+
+    // Set dropdown options directly (bind_options doesn't work for dropdowns)
+    if (screen_root_) {
+        lv_obj_t* dropdown = lv_obj_find_by_name(screen_root_, "printer_dropdown");
+        if (dropdown) {
+            lv_dropdown_set_options(dropdown, options.c_str());
+        }
+    }
+
+    spdlog::debug("[Wizard Connection] mDNS update: {} printers discovered", printers.size());
+}
+
+void WizardConnectionStep::on_printer_selected_cb(lv_event_t* e) {
+    auto* self = get_wizard_connection_step();
+    if (!self || self->is_stale()) {
+        return;
+    }
+
+    lv_obj_t* dropdown = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    uint32_t selected = lv_dropdown_get_selected(dropdown);
+
+    if (selected < self->discovered_printers_.size()) {
+        const auto& printer = self->discovered_printers_[selected];
+
+        // Update IP input
+        lv_subject_copy_string(&self->connection_ip_, printer.ip_address.c_str());
+
+        // Update port input
+        char port_str[8];
+        snprintf(port_str, sizeof(port_str), "%u", printer.port);
+        lv_subject_copy_string(&self->connection_port_, port_str);
+
+        // Also update the text areas directly so user sees the change
+        if (self->screen_root_) {
+            lv_obj_t* ip_input = lv_obj_find_by_name(self->screen_root_, "ip_input");
+            if (ip_input) {
+                lv_textarea_set_text(ip_input, printer.ip_address.c_str());
+            }
+            lv_obj_t* port_input = lv_obj_find_by_name(self->screen_root_, "port_input");
+            if (port_input) {
+                lv_textarea_set_text(port_input, port_str);
+            }
+        }
+
+        // Clear any previous validation (user still needs to test)
+        self->connection_validated_ = false;
+        lv_subject_set_int(&connection_test_passed, 0);
+
+        // Clear previous status
+        lv_subject_copy_string(&self->connection_status_icon_, "");
+        lv_subject_copy_string(&self->connection_status_text_, "");
+
+        spdlog::info("[Wizard Connection] Selected printer: {} at {}:{}", printer.name,
+                     printer.ip_address, printer.port);
+    }
 }
 
 // ============================================================================

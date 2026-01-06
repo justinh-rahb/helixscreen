@@ -4,11 +4,13 @@
 #pragma once
 
 #include "lvgl/lvgl.h"
+#include "mdns_discovery.h"
 
 #include <atomic>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 /**
  * @file ui_wizard_connection.h
@@ -216,6 +218,18 @@ class WizardConnectionStep {
     static void on_ip_input_changed_static(lv_event_t* e);
     static void on_port_input_changed_static(lv_event_t* e);
     static void auto_probe_timer_cb(lv_timer_t* timer);
+
+    // mDNS discovery
+    std::unique_ptr<MdnsDiscovery> mdns_discovery_;
+    std::vector<DiscoveredPrinter> discovered_printers_;
+
+    // Subjects for mDNS UI
+    lv_subject_t mdns_status_; ///< "Scanning..." / "Found N printer(s)"
+    char mdns_status_buffer_[64];
+
+    // mDNS callbacks
+    void on_printers_discovered(const std::vector<DiscoveredPrinter>& printers);
+    static void on_printer_selected_cb(lv_event_t* e);
 };
 
 // ============================================================================
