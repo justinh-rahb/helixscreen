@@ -6,6 +6,8 @@
 #include "ui_subject_registry.h"
 #include "ui_wizard.h"
 
+#include "ams_backend.h"
+#include "ams_state.h"
 #include "app_globals.h"
 #include "config.h"
 #include "filament_sensor_manager.h"
@@ -51,6 +53,7 @@ WizardSummaryStep::WizardSummaryStep() {
     std::memset(hotend_fan_buffer_, 0, sizeof(hotend_fan_buffer_));
     std::memset(led_strip_buffer_, 0, sizeof(led_strip_buffer_));
     std::memset(filament_sensor_buffer_, 0, sizeof(filament_sensor_buffer_));
+    std::memset(ams_type_buffer_, 0, sizeof(ams_type_buffer_));
 
     spdlog::debug("[{}] Instance created", get_name());
 }
@@ -73,8 +76,8 @@ WizardSummaryStep::WizardSummaryStep(WizardSummaryStep&& other) noexcept
       hotend_fan_(other.hotend_fan_), hotend_fan_visible_(other.hotend_fan_visible_),
       led_strip_(other.led_strip_), led_strip_visible_(other.led_strip_visible_),
       filament_sensor_(other.filament_sensor_),
-      filament_sensor_visible_(other.filament_sensor_visible_),
-      subjects_initialized_(other.subjects_initialized_) {
+      filament_sensor_visible_(other.filament_sensor_visible_), ams_type_(other.ams_type_),
+      ams_visible_(other.ams_visible_), subjects_initialized_(other.subjects_initialized_) {
     // Move buffers
     std::memcpy(printer_name_buffer_, other.printer_name_buffer_, sizeof(printer_name_buffer_));
     std::memcpy(printer_type_buffer_, other.printer_type_buffer_, sizeof(printer_type_buffer_));
@@ -88,6 +91,7 @@ WizardSummaryStep::WizardSummaryStep(WizardSummaryStep&& other) noexcept
     std::memcpy(led_strip_buffer_, other.led_strip_buffer_, sizeof(led_strip_buffer_));
     std::memcpy(filament_sensor_buffer_, other.filament_sensor_buffer_,
                 sizeof(filament_sensor_buffer_));
+    std::memcpy(ams_type_buffer_, other.ams_type_buffer_, sizeof(ams_type_buffer_));
 
     // Null out other
     other.screen_root_ = nullptr;
@@ -111,6 +115,8 @@ WizardSummaryStep& WizardSummaryStep::operator=(WizardSummaryStep&& other) noexc
         led_strip_visible_ = other.led_strip_visible_;
         filament_sensor_ = other.filament_sensor_;
         filament_sensor_visible_ = other.filament_sensor_visible_;
+        ams_type_ = other.ams_type_;
+        ams_visible_ = other.ams_visible_;
         subjects_initialized_ = other.subjects_initialized_;
 
         // Move buffers
@@ -126,6 +132,7 @@ WizardSummaryStep& WizardSummaryStep::operator=(WizardSummaryStep&& other) noexc
         std::memcpy(led_strip_buffer_, other.led_strip_buffer_, sizeof(led_strip_buffer_));
         std::memcpy(filament_sensor_buffer_, other.filament_sensor_buffer_,
                     sizeof(filament_sensor_buffer_));
+        std::memcpy(ams_type_buffer_, other.ams_type_buffer_, sizeof(ams_type_buffer_));
 
         // Null out other
         other.screen_root_ = nullptr;
@@ -283,6 +290,26 @@ void WizardSummaryStep::init_subjects() {
                                         filament_sensor.c_str(), "summary_filament_sensor");
     UI_SUBJECT_INIT_AND_REGISTER_INT(filament_sensor_visible_, filament_sensor_visible,
                                      "summary_filament_sensor_visible");
+
+    // AMS/Multi-Material System
+    std::string ams_type_str = "None";
+    int ams_visible = 0;
+
+    auto& ams = AmsState::instance();
+    AmsBackend* backend = ams.get_backend();
+    if (backend && backend->get_type() != AmsType::NONE) {
+        AmsSystemInfo info = backend->get_system_info();
+        // Format: "AFC • 4 lanes" or "Happy Hare • 8 lanes"
+        ams_type_str = info.type_name;
+        if (info.total_slots > 0) {
+            ams_type_str += " • " + std::to_string(info.total_slots) + " lanes";
+        }
+        ams_visible = 1;
+    }
+
+    UI_SUBJECT_INIT_AND_REGISTER_STRING(ams_type_, ams_type_buffer_, ams_type_str.c_str(),
+                                        "summary_ams_type");
+    UI_SUBJECT_INIT_AND_REGISTER_INT(ams_visible_, ams_visible, "summary_ams_visible");
 
     subjects_initialized_ = true;
     spdlog::debug("[{}] Subjects initialized with config values", get_name());
