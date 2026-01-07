@@ -19,9 +19,11 @@
 
 #pragma once
 
+#include "device_display_name.h"
 #include "lvgl/lvgl.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -60,6 +62,7 @@ void wizard_hardware_dropdown_changed_cb(lv_event_t* e);
  * @param config_key Config persistence key (e.g., "wizard.hotend.heater")
  * @param guess_fallback Optional fallback if config not found (uses PrinterHardware)
  * @param log_prefix Logging prefix (e.g., "[Wizard Hotend]")
+ * @param device_type Optional device type for friendly name display (e.g., DeviceType::HEATER)
  * @return true if dropdown found and populated
  */
 bool wizard_populate_hardware_dropdown(
@@ -67,4 +70,5 @@ bool wizard_populate_hardware_dropdown(
     std::vector<std::string>& items_out,
     std::function<const std::vector<std::string>&(MoonrakerClient*)> moonraker_getter,
     const char* prefix_filter, bool allow_none, const char* config_key,
-    std::function<std::string(const PrinterHardware&)> guess_fallback, const char* log_prefix);
+    std::function<std::string(const PrinterHardware&)> guess_fallback, const char* log_prefix,
+    std::optional<helix::DeviceType> device_type = std::nullopt);

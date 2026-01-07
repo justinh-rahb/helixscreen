@@ -10,71 +10,16 @@
 #include "ui_subject_registry.h"
 
 #include "app_globals.h"
+#include "device_display_name.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
 #include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
-#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <memory>
-#include <unordered_map>
-
-namespace {
-
-/**
- * Convert technical device name to user-friendly label
- * Examples: "printer_psu" → "Printer Power", "led_strip" → "LED Strip"
- */
-std::string prettify_device_name(const std::string& technical_name) {
-    // Common abbreviation expansions
-    static const std::unordered_map<std::string, std::string> expansions = {
-        {"psu", "Power"},    {"led", "LED"},     {"aux", "Auxiliary"}, {"temp", "Temperature"},
-        {"ctrl", "Control"}, {"sw", "Switch"},   {"btn", "Button"},    {"pwr", "Power"},
-        {"htr", "Heater"},   {"fan", "Fan"},     {"enc", "Enclosure"}, {"cam", "Camera"},
-        {"usb", "USB"},      {"ac", "AC"},       {"dc", "DC"},         {"io", "I/O"},
-        {"gpio", "GPIO"},    {"relay", "Relay"},
-    };
-
-    std::string result;
-    std::string word;
-
-    for (size_t i = 0; i <= technical_name.size(); ++i) {
-        char c = (i < technical_name.size()) ? technical_name[i] : '\0';
-
-        if (c == '_' || c == '-' || c == '\0') {
-            if (!word.empty()) {
-                // Check for expansion
-                std::string lower_word = word;
-                std::transform(lower_word.begin(), lower_word.end(), lower_word.begin(),
-                               [](unsigned char ch) { return std::tolower(ch); });
-
-                auto it = expansions.find(lower_word);
-                if (it != expansions.end()) {
-                    word = it->second;
-                } else {
-                    // Capitalize first letter
-                    word[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(word[0])));
-                }
-
-                if (!result.empty()) {
-                    result += ' ';
-                }
-                result += word;
-                word.clear();
-            }
-        } else {
-            word += c;
-        }
-    }
-
-    return result.empty() ? technical_name : result;
-}
-
-} // namespace
 
 PowerPanel::PowerPanel(PrinterState& printer_state, MoonrakerAPI* api)
     : PanelBase(printer_state, api) {
@@ -227,7 +172,8 @@ void PowerPanel::create_device_row(const PowerDevice& device) {
     }
 
     // Convert technical name to user-friendly label
-    std::string friendly_name = prettify_device_name(device.device);
+    std::string friendly_name =
+        helix::get_display_name(device.device, helix::DeviceType::POWER_DEVICE);
 
     // Create row using XML component with prettified device_name prop
     const char* attrs[] = {"device_name", friendly_name.c_str(), nullptr, nullptr};

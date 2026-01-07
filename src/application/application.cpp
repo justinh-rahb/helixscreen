@@ -258,6 +258,12 @@ int Application::run(int argc, char** argv) {
     // Phase 16: Start memory monitoring (logs at TRACE level, -vvv)
     helix::MemoryMonitor::instance().start(5000);
 
+    // Phase 16b: Force full screen refresh
+    // Ensures complete initial paint on framebuffer displays (AD5M) where
+    // incremental rendering during init can leave visual artifacts
+    lv_obj_invalidate(lv_screen_active());
+    lv_refr_now(nullptr);
+
     // Phase 17: Main loop
     helix::MemoryMonitor::log_now("before_main_loop");
     int result = main_loop();

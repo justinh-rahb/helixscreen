@@ -4,6 +4,7 @@
 #include "ui_wizard_helpers.h"
 
 #include "config.h"
+#include "device_display_name.h"
 #include "printer_hardware.h"
 
 #include <spdlog/spdlog.h>
@@ -14,7 +15,8 @@ namespace wizard {
 
 std::string build_dropdown_options(const std::vector<std::string>& items,
                                    std::function<bool(const std::string&)> filter,
-                                   bool include_none) {
+                                   bool include_none,
+                                   std::optional<helix::DeviceType> device_type) {
     std::string options_str;
 
     // "None" goes FIRST for optional hardware (makes index 0 = safe default)
@@ -32,7 +34,13 @@ std::string build_dropdown_options(const std::vector<std::string>& items,
         if (!options_str.empty()) {
             options_str += "\n";
         }
-        options_str += item;
+
+        // Transform to display name if device type is provided
+        if (device_type.has_value()) {
+            options_str += helix::get_display_name(item, device_type.value());
+        } else {
+            options_str += item;
+        }
     }
 
     return options_str;

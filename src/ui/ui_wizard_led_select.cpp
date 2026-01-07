@@ -129,7 +129,8 @@ lv_obj_t* WizardLedSelectStep::create(lv_obj_t* parent) {
         nullptr, // No filter - include all LEDs
         true,    // Allow "None" option
         helix::wizard::LED_STRIP,
-        [](const PrinterHardware& hw) { return hw.guess_main_led_strip(); }, "[Wizard LED]");
+        [](const PrinterHardware& hw) { return hw.guess_main_led_strip(); }, "[Wizard LED]",
+        helix::DeviceType::LED);
 
     // Attach LED dropdown callback programmatically
     lv_obj_t* led_dropdown = lv_obj_find_by_name(screen_root_, "led_main_dropdown");

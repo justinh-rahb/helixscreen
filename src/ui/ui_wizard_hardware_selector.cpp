@@ -9,12 +9,14 @@
 
 #include "app_globals.h"
 #include "config.h"
+#include "device_display_name.h"
 #include "moonraker_client.h"
 #include "printer_hardware.h"
 
 #include <spdlog/spdlog.h>
 
 #include <memory>
+#include <optional>
 
 void wizard_hardware_dropdown_changed_cb(lv_event_t* e) {
     lv_obj_t* dropdown = (lv_obj_t*)lv_event_get_target(e);
@@ -34,7 +36,8 @@ bool wizard_populate_hardware_dropdown(
     std::vector<std::string>& items_out,
     std::function<const std::vector<std::string>&(MoonrakerClient*)> moonraker_getter,
     const char* prefix_filter, bool allow_none, const char* config_key,
-    std::function<std::string(const PrinterHardware&)> guess_fallback, const char* log_prefix) {
+    std::function<std::string(const PrinterHardware&)> guess_fallback, const char* log_prefix,
+    std::optional<helix::DeviceType> device_type) {
     if (!root || !dropdown_name || !subject) {
         spdlog::error("{} Invalid parameters for dropdown population", log_prefix);
         return false;
@@ -56,11 +59,11 @@ bool wizard_populate_hardware_dropdown(
         }
     }
 
-    // Build dropdown options string
+    // Build dropdown options string with friendly display names if device type is specified
     std::string options_str = helix::ui::wizard::build_dropdown_options(
         items_out,
         nullptr, // No additional filter (already filtered above)
-        allow_none);
+        allow_none, device_type);
 
     // Add "None" to items vector FIRST if needed (to match dropdown order)
     if (allow_none) {

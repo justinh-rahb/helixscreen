@@ -17,6 +17,7 @@
 
 #include "async_helpers.h"
 #include "capability_overrides.h"
+#include "device_display_name.h"
 #include "filament_sensor_manager.h"
 #include "hardware_validator.h"
 #include "lvgl.h"
@@ -928,48 +929,6 @@ void PrinterState::reset_for_new_print() {
 
 namespace {
 /**
- * @brief Convert Moonraker fan object name to human-readable display name
- *
- * Examples:
- * - "fan" -> "Part Cooling"
- * - "heater_fan hotend_fan" -> "Hotend Fan"
- * - "fan_generic nevermore" -> "Nevermore"
- * - "controller_fan electronics_fan" -> "Electronics Fan"
- */
-std::string fan_object_to_display_name(const std::string& object_name) {
-    // Part cooling fan is just "fan"
-    if (object_name == "fan") {
-        return "Part Cooling";
-    }
-
-    // Extract the suffix after the type prefix
-    // "heater_fan hotend_fan" -> "hotend_fan" -> "Hotend Fan"
-    std::string suffix;
-    size_t space_pos = object_name.find(' ');
-    if (space_pos != std::string::npos && space_pos + 1 < object_name.length()) {
-        suffix = object_name.substr(space_pos + 1);
-    } else {
-        suffix = object_name;
-    }
-
-    // Convert snake_case to Title Case
-    std::string display;
-    bool capitalize_next = true;
-    for (char c : suffix) {
-        if (c == '_') {
-            display += ' ';
-            capitalize_next = true;
-        } else if (capitalize_next) {
-            display += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-            capitalize_next = false;
-        } else {
-            display += c;
-        }
-    }
-    return display;
-}
-
-/**
  * @brief Determine fan type from Moonraker object name
  */
 FanType classify_fan_type(const std::string& object_name) {
@@ -1014,7 +973,7 @@ void PrinterState::init_fans(const std::vector<std::string>& fan_objects) {
     for (const auto& obj_name : fan_objects) {
         FanInfo info;
         info.object_name = obj_name;
-        info.display_name = fan_object_to_display_name(obj_name);
+        info.display_name = helix::get_display_name(obj_name, helix::DeviceType::FAN);
         info.type = classify_fan_type(obj_name);
         info.is_controllable = is_fan_controllable(info.type);
         info.speed_percent = 0;

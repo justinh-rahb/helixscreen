@@ -11,6 +11,7 @@
 #include "ui_subject_registry.h"
 
 #include "app_globals.h"
+#include "device_display_name.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "printer_state.h"
@@ -308,36 +309,7 @@ void MacrosPanel::create_macro_card(const std::string& macro_name) {
 }
 
 std::string MacrosPanel::prettify_macro_name(const std::string& name) {
-    if (name.empty()) {
-        return name;
-    }
-
-    std::string result;
-    bool capitalize_next = true;
-
-    // Skip leading underscore for display
-    size_t start = (name[0] == '_') ? 1 : 0;
-
-    // Also skip common prefixes for cleaner display
-    if (name.rfind("HELIX_", 0) == 0) {
-        start = 6;
-    }
-
-    for (size_t i = start; i < name.size(); ++i) {
-        char c = name[i];
-
-        if (c == '_') {
-            result += ' ';
-            capitalize_next = true;
-        } else if (capitalize_next) {
-            result += static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-            capitalize_next = false;
-        } else {
-            result += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        }
-    }
-
-    return result.empty() ? name : result;
+    return helix::get_display_name(name, helix::DeviceType::MACRO);
 }
 
 bool MacrosPanel::is_dangerous_macro(const std::string& name) {

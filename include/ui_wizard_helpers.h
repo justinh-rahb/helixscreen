@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include "device_display_name.h"
 #include "lvgl/lvgl.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -31,11 +33,15 @@ namespace wizard {
  * @param items Vector of item names to include
  * @param filter Optional filter function (return true to include item)
  * @param include_none Whether to append "None" option at end
+ * @param device_type Optional device type for display name transformation.
+ *                    When provided, transforms technical names to friendly names
+ *                    (e.g., "heater_fan hotend_fan" -> "Hotend Fan")
  * @return Newline-delimited dropdown options string
  */
 std::string build_dropdown_options(const std::vector<std::string>& items,
                                    std::function<bool(const std::string&)> filter = nullptr,
-                                   bool include_none = true);
+                                   bool include_none = true,
+                                   std::optional<helix::DeviceType> device_type = std::nullopt);
 
 /**
  * @brief Find item index in vector by name

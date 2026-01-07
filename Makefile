@@ -416,10 +416,13 @@ LDFLAGS_COMMON := $(SDL2_LIBS) $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) -lm -lpth
 ifneq ($(CROSS_COMPILE),)
     # Cross-compilation for embedded Linux targets
     NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+    # libnl libraries (built from submodule for cross-compilation)
+    LIBNL_LIBS := $(BUILD_DIR)/lib/libnl-genl-3.a $(BUILD_DIR)/lib/libnl-3.a
     # Embedded targets link against libhv and wpa_supplicant
     # No SDL2 - display handled by framebuffer/DRM
     # SSL is optional - only needed if connecting to remote Moonraker over HTTPS
-    LDFLAGS := $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(SYSTEMD_LIBS) -ldl -lm -lpthread
+    # Note: libnl must come AFTER wpa_client (static linking order matters)
+    LDFLAGS := $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(LIBNL_LIBS) $(SYSTEMD_LIBS) -ldl -lm -lpthread
     ifeq ($(ENABLE_SSL),yes)
         LDFLAGS += -lssl -lcrypto
     endif
