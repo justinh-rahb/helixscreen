@@ -271,8 +271,17 @@ lvgl-clean:
 	$(Q)rm -rf $(OBJ_DIR)/lvgl 2>/dev/null || true
 	$(ECHO) "$(GREEN)✓ LVGL cleaned$(RESET)"
 
+# Clean libnl build artifacts
+libnl-clean:
+	$(ECHO) "$(CYAN)Cleaning libnl build artifacts...$(RESET)"
+	$(Q)if [ -d "lib/libnl" ] && [ -f "lib/libnl/Makefile" ]; then \
+		$(MAKE) -C lib/libnl distclean 2>/dev/null || true; \
+	fi
+	$(Q)rm -f $(BUILD_DIR)/lib/libnl*.a 2>/dev/null || true
+	$(ECHO) "$(GREEN)✓ libnl cleaned$(RESET)"
+
 # Clean all submodule libraries
-libs-clean: libhv-clean sdl2-clean lvgl-clean
+libs-clean: libhv-clean sdl2-clean lvgl-clean libnl-clean
 	$(ECHO) "$(GREEN)✓ All library artifacts cleaned$(RESET)"
 
 # =============================================================================
@@ -309,6 +318,74 @@ endif
 	$(Q)cp $(LIBHV_DIR)/lib/libhv.a $(BUILD_DIR)/lib/libhv.a 2>/dev/null || \
 		cp $(LIBHV_DIR)/libhv.a $(BUILD_DIR)/lib/libhv.a
 	$(ECHO) "$(GREEN)✓ libhv built: $(BUILD_DIR)/lib/libhv.a$(RESET)"
+
+# Build libnl from submodule (autotools)
+# Required for WiFi backend on Linux/embedded targets
+# Output: $(BUILD_DIR)/lib/libnl-3.a and libnl-genl-3.a
+#
+# Note: libnl uses autogen.sh to create configure script, then standard autotools flow
+# We build static libraries only (--enable-static --disable-shared)
+LIBNL_DIR := lib/libnl
+LIBNL_PREFIX := $(abspath $(BUILD_DIR))/libnl-install
+
+libnl-build:
+	$(ECHO) "$(CYAN)Building libnl...$(RESET)"
+	$(Q)mkdir -p $(BUILD_DIR)/lib $(LIBNL_PREFIX)
+ifneq ($(CROSS_COMPILE),)
+	# Cross-compilation mode
+	$(ECHO) "$(YELLOW)→ Cross-compiling libnl for $(CROSS_COMPILE)...$(RESET)"
+	$(Q)if [ ! -f "$(LIBNL_DIR)/configure" ]; then \
+		echo "$(CYAN)→ Running autogen.sh...$(RESET)"; \
+		cd $(LIBNL_DIR) && ./autogen.sh; \
+	fi
+	$(Q)if [ -f "$(LIBNL_DIR)/Makefile" ]; then \
+		$(MAKE) -C $(LIBNL_DIR) distclean 2>/dev/null || true; \
+	fi
+	$(Q)cd $(LIBNL_DIR) && \
+		CC="$(CC)" \
+		CFLAGS="$(TARGET_CFLAGS)" \
+		./configure \
+			--host=$(patsubst %-,%,$(CROSS_COMPILE)) \
+			--prefix=$(LIBNL_PREFIX) \
+			--enable-static \
+			--disable-shared \
+			--disable-cli \
+			--disable-pthreads \
+			--disable-debug
+	@# Build only the libraries we need (libnl-3 and libnl-genl-3)
+	@# Skip xfrm/idiag/nf/route to avoid build errors and reduce size
+	$(Q)$(MAKE) -C $(LIBNL_DIR) -j$$(nproc) lib/libnl-3.la lib/libnl-genl-3.la
+	@# Install just what we need - libs, pkgconfig, and headers
+	$(Q)mkdir -p $(LIBNL_PREFIX)/lib $(LIBNL_PREFIX)/lib/pkgconfig $(LIBNL_PREFIX)/include/libnl3
+	$(Q)cp $(LIBNL_DIR)/lib/.libs/libnl-3.a $(LIBNL_DIR)/lib/.libs/libnl-genl-3.a $(LIBNL_PREFIX)/lib/
+	$(Q)cp $(LIBNL_DIR)/libnl-3.0.pc $(LIBNL_DIR)/libnl-genl-3.0.pc $(LIBNL_PREFIX)/lib/pkgconfig/
+	$(Q)cp -r $(LIBNL_DIR)/include/netlink $(LIBNL_PREFIX)/include/libnl3/
+	# Copy libraries to build output
+	$(Q)cp $(LIBNL_PREFIX)/lib/libnl-3.a $(BUILD_DIR)/lib/
+	$(Q)cp $(LIBNL_PREFIX)/lib/libnl-genl-3.a $(BUILD_DIR)/lib/
+	$(ECHO) "$(GREEN)✓ libnl built (cross-compiled): $(BUILD_DIR)/lib/libnl-3.a$(RESET)"
+else ifeq ($(UNAME_S),Linux)
+	# Native Linux build (for testing, normally use system package)
+	$(ECHO) "$(YELLOW)→ Building libnl natively (prefer system package for dev)...$(RESET)"
+	$(Q)if [ ! -f "$(LIBNL_DIR)/configure" ]; then \
+		cd $(LIBNL_DIR) && ./autogen.sh; \
+	fi
+	$(Q)if [ -f "$(LIBNL_DIR)/Makefile" ]; then \
+		$(MAKE) -C $(LIBNL_DIR) distclean 2>/dev/null || true; \
+	fi
+	$(Q)cd $(LIBNL_DIR) && ./configure \
+		--prefix=$(LIBNL_PREFIX) \
+		--enable-static \
+		--disable-shared \
+		--disable-cli
+	$(Q)$(MAKE) -C $(LIBNL_DIR) -j$$(nproc)
+	$(Q)$(MAKE) -C $(LIBNL_DIR) install
+	$(Q)cp $(LIBNL_PREFIX)/lib/libnl-3.a $(BUILD_DIR)/lib/
+	$(Q)cp $(LIBNL_PREFIX)/lib/libnl-genl-3.a $(BUILD_DIR)/lib/
+	$(ECHO) "$(GREEN)✓ libnl built: $(BUILD_DIR)/lib/libnl-3.a$(RESET)"
+else
+	$(ECHO) "$(YELLOW)⚠ libnl not needed on macOS (WiFi uses native APIs)$(RESET)"
+endif
 
 # Build SDL2 from submodule (CMake build)
 sdl2-build:
@@ -378,7 +455,12 @@ ifdef CROSS_COMPILE
 # Use EXTRA_CFLAGS since wpa_supplicant's Makefile appends EXTRA_CFLAGS to its internal flags.
 WPA_CFLAGS := $(filter-out -flto -ffunction-sections -fdata-sections,$(TARGET_CFLAGS))
 
-$(WPA_CLIENT_LIB): | $(BUILD_DIR)/lib
+# libnl paths for wpa_supplicant (cross-compilation uses our built libnl)
+LIBNL_INC := -I$(abspath $(BUILD_DIR))/libnl-install/include/libnl3
+LIBNL_LIB := -L$(abspath $(BUILD_DIR))/libnl-install/lib
+
+# wpa_supplicant depends on libnl being built first (order-only prerequisite)
+$(WPA_CLIENT_LIB): | $(BUILD_DIR)/lib libnl-build
 	$(ECHO) "$(BOLD)$(BLUE)[WPA]$(RESET) Building wpa_supplicant client library (cross-compile)..."
 	$(Q)if [ ! -f "$(WPA_DIR)/wpa_supplicant/.config" ]; then \
 		if [ -f "$(WPA_DIR)/wpa_supplicant/defconfig" ]; then \
@@ -396,7 +478,9 @@ $(WPA_CLIENT_LIB): | $(BUILD_DIR)/lib
 	fi
 	@# Use env -u to unset inherited CFLAGS from parent make, then set clean values
 	@# wpa_supplicant uses EXTRA_CFLAGS for additional flags
-	$(Q)env -u CFLAGS CC="$(CC)" EXTRA_CFLAGS="$(WPA_CFLAGS)" $(MAKE) -C $(WPA_DIR)/wpa_supplicant libwpa_client.a
+	@# LIBNL_INC/LIBNL_LIB point to our cross-compiled libnl
+	$(Q)env -u CFLAGS CC="$(CC)" EXTRA_CFLAGS="$(WPA_CFLAGS) $(LIBNL_INC)" LDFLAGS="$(LIBNL_LIB)" \
+		$(MAKE) -C $(WPA_DIR)/wpa_supplicant libwpa_client.a
 	$(Q)rm -f $(BUILD_DIR)/lib/libwpa_client.a 2>/dev/null || true
 	$(Q)cp $(WPA_DIR)/wpa_supplicant/libwpa_client.a $(BUILD_DIR)/lib/libwpa_client.a
 	$(Q)$(RANLIB) $(BUILD_DIR)/lib/libwpa_client.a

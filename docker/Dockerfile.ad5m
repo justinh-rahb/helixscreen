@@ -32,6 +32,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG TARGETARCH
 
 # Install build dependencies
+# Note: autotools required for building libnl submodule
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
@@ -43,6 +44,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     file \
     wget \
     xz-utils \
+    autoconf \
+    automake \
+    libtool \
+    flex \
+    bison \
     && rm -rf /var/lib/apt/lists/*
 
 # Download ARM's pre-built GCC 10.3-2021.07 toolchain
