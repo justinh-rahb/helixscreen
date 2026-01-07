@@ -474,27 +474,18 @@ CXXFLAGS += $(TINYGL_DEFINES)
 CXXFLAGS += $(SYSTEMD_CXXFLAGS)
 
 # Parallel build control
-# CRITICAL: 'make -j' (no number) means UNLIMITED parallelism in GNU Make!
-# This causes hundreds of simultaneous compiler processes, crushing the system.
+# Auto-parallelizes builds: plain 'make' automatically uses -j$(NPROC).
 #
-# Detection method:
-#   - 'make -j' (unlimited): MAKEFLAGS = "pj" (just flags, no jobserver)
-#   - 'make -j8' (bounded):  MAKEFLAGS = "p --jobserver-fds=3,5 -j" (has jobserver)
+# Detection method (see mk/rules.mk):
+#   - 'make':     No jobserver → auto-add -j$(NPROC)
+#   - 'make -j':  No jobserver → auto-fix to -j$(NPROC) with warning
+#   - 'make -j8': Has jobserver → pass through unchanged
 #
-# We check for 'j' in flags WITHOUT '--jobserver-fds' to detect unlimited -j.
+# MAKEFLAGS format:
+#   - 'make' or 'make -j': No 'jobserver' in MAKEFLAGS
+#   - 'make -jN': MAKEFLAGS contains '--jobserver-fds=X,Y' or '--jobserver-auth'
 
 JOBS ?= $(NPROC)
-
-# Detect unbounded 'make -j' (unlimited parallelism)
-# NOTE: Detection happens in a guard target (see mk/rules.mk) because $(MAKEFLAGS)
-# isn't accessible via make functions in GNU Make 3.81. The guard target runs
-# FIRST before any compilation starts and aborts if unlimited -j is detected.
-#
-# MAKEFLAGS format in GNU Make 3.81:
-#   - 'make -j':  MAKEFLAGS = "j" (just the flag, NO jobserver)
-#   - 'make -j8': MAKEFLAGS = " --jobserver-fds=3,5 -j" (has jobserver pipe)
-#
-# Usage: make -j$(nproc) or make -j8 (NEVER bare 'make -j')
 
 # Output synchronization for parallel builds (requires make 4.0+, ignored on 3.81)
 ifneq ($(JOBS),1)
