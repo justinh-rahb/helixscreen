@@ -121,11 +121,12 @@ clean-tests:
 	$(Q)rm -f $(TEST_BIN) $(TEST_MAIN_OBJ) $(CATCH2_OBJ) $(UI_TEST_UTILS_OBJ) $(LVGL_TEST_FIXTURE_OBJ) $(TEST_FIXTURES_OBJ) $(TEST_OBJS)
 	$(ECHO) "$(GREEN)✓ Test artifacts cleaned$(RESET)"
 
-# Build tests in parallel
+# Build tests in parallel (auto-detects core count like main build target)
 test-build:
-	$(ECHO) "$(CYAN)$(BOLD)Building tests (use -j for parallel builds)...$(RESET)"
+	$(ECHO) "$(CYAN)$(BOLD)Building tests with parallel compilation...$(RESET)"
 	@START_TIME=$$(date +%s); \
-	$(MAKE) $(TEST_BIN) && \
+	NPROC=$$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); \
+	$(MAKE) -j$$NPROC $(TEST_BIN) && \
 	END_TIME=$$(date +%s); \
 	DURATION=$$((END_TIME - START_TIME)); \
 	echo "$(GREEN)✓ Tests built in $${DURATION}s$(RESET)"
