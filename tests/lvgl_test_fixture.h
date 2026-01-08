@@ -90,7 +90,7 @@ class LVGLTestFixture {
      */
     static void ensure_lvgl_initialized();
 
-  private:
+  protected:
     lv_obj_t* m_test_screen; ///< Test screen for this fixture instance
 
     // Static initialization state
