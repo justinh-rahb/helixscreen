@@ -4,7 +4,7 @@
 <component>
   <view name="glyphs_panel" extends="lv_obj" width="100%" height="100%">
     <!-- Container with vertical flex layout -->
-    <lv_obj width="100%" height="100%" flex_flow="column" style_bg_color="#bg_dark" style_pad_all="0">
+    <lv_obj width="100%" height="100%" flex_flow="column" style_bg_color="#1A1A1A" style_pad_all="0">
       <!-- Header -->
       <lv_obj width="100%"
               height="#header_height" style_bg_color="#card_bg" style_pad_all="#space_lg" flex_flow="row"
@@ -14,7 +14,7 @@
       </lv_obj>
       <!-- Scrollable content area -->
       <lv_obj width="100%"
-              flex_grow="1" scrollable="true" scroll_dir="VER" flex_flow="column" style_bg_color="#bg_dark"
+              flex_grow="1" scrollable="true" scroll_dir="VER" flex_flow="column" style_bg_color="#1A1A1A"
               style_pad_all="#space_lg" style_pad_row="#space_md">
         <!-- Glyph items will be added here dynamically from C++ -->
         <!-- Each item: [Icon] LV_SYMBOL_NAME -->

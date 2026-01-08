@@ -67,7 +67,7 @@
         <!-- Measure Noise Button (secondary) -->
         <lv_button name="btn_measure_noise"
                    width="100%" height="#button_height_normal" style_radius="#border_radius" style_border_width="1"
-                   style_border_color="#card_border" style_bg_color="#app_bg_color" flex_flow="row"
+                   style_border_color="#text_secondary" style_bg_color="#app_bg_color" flex_flow="row"
                    style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
           <icon src="vibrate" size="sm" color="#text_secondary"/>
           <text_body text="Measure Noise" style_text_color="#text_secondary"/>
@@ -95,7 +95,7 @@
         <!-- Cancel button -->
         <lv_button name="btn_cancel"
                    width="100%" height="#button_height_normal" style_radius="#border_radius" style_border_width="1"
-                   style_border_color="#card_border" style_bg_color="#app_bg_color" flex_flow="row"
+                   style_border_color="#text_secondary" style_bg_color="#app_bg_color" flex_flow="row"
                    style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
           <icon src="close" size="sm" color="#error_color"/>
           <text_body text="Cancel" style_text_color="#text_secondary"/>
@@ -222,7 +222,7 @@
           <!-- Close button (secondary) -->
           <lv_button name="btn_close"
                      height="#button_height_normal" flex_grow="1" style_radius="#border_radius" style_border_width="1"
-                     style_border_color="#card_border" style_bg_color="#app_bg_color" flex_flow="row"
+                     style_border_color="#text_secondary" style_bg_color="#app_bg_color" flex_flow="row"
                      style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
             <text_body text="Close" style_text_color="#text_secondary"/>
             <event_cb trigger="clicked" callback="input_shaper_close_cb"/>
@@ -290,7 +290,7 @@
           <!-- Back button -->
           <lv_button name="btn_error_back"
                      height="#button_height_normal" flex_grow="1" style_radius="#border_radius" style_border_width="1"
-                     style_border_color="#card_border" style_bg_color="#app_bg_color" flex_flow="row"
+                     style_border_color="#text_secondary" style_bg_color="#app_bg_color" flex_flow="row"
                      style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
             <text_body text="Back" style_text_color="#text_secondary"/>
             <event_cb trigger="clicked" callback="input_shaper_close_cb"/>

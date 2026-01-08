@@ -66,7 +66,7 @@
       </lv_obj>
       <!-- Summary list container -->
       <lv_obj width="100%"
-              height="content" style_max_height="180" style_bg_color="#surface_variant" style_bg_opa="255"
+              height="content" style_max_height="180" style_bg_color="#app_bg_color" style_bg_opa="255"
               style_border_width="1" style_border_color="#text_secondary" style_border_opa="64"
               style_radius="#border_radius" style_pad_all="#space_md" scrollable="true" scroll_snap_y="none">
         <lv_label name="summary_list"

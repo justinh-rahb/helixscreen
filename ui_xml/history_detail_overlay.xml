@@ -201,7 +201,7 @@
           <!-- Delete button (secondary style) -->
           <lv_button name="delete_button"
                      height="#button_height" flex_grow="1" style_radius="#border_radius"
-                     style_bg_color="#button_secondary_bg">
+                     style_bg_color="#secondary_color">
             <text_body text="Delete" align="center"/>
             <event_cb trigger="clicked" callback="history_detail_delete"/>
           </lv_button>
