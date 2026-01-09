@@ -1,5 +1,8 @@
 # Pre-Print Toggle Control: Refactor Plan
 
+> **Last Updated**: 2026-01-08
+> **Status**: Core functionality complete, technical debt remains
+
 ## Overview
 
 The pre-print subsystem enables users to control operations like bed mesh calibration, QGL, Z-tilt adjustment, and nozzle cleaning before a print starts. These operations can be embedded in three places:
@@ -76,18 +79,41 @@ The core functionality works correctly after recent fixes. The system uses a pri
 
 ---
 
-## Completed Work
+## Status Summary
 
-| Commit | Description |
-|--------|-------------|
-| `7a56b19d` | Unified priority order (Database > Macro > File) and added capability caching |
-| `95acc10e` | Disabled Print button during macro analysis (race condition fix) |
-| `6c0f3759` | Fixed capability database key naming (bed_mesh not bed_leveling) |
-| `9854ef19` | Added PERFORM_* opt-in parameter support alongside SKIP_* |
+| Category | Status | Details |
+|----------|--------|---------|
+| **Core Feature** | ✅ Complete | Pre-print toggles work for AD5M and generic printers |
+| **PERFORM_* Support** | ✅ Complete | Opt-in parameters detected alongside SKIP_* |
+| **Race Condition Fix** | ✅ Complete | Print button disabled during macro analysis |
+| **Priority Order** | ✅ Complete | Database → Macro → File (unified UI + execution) |
+| **Capability Caching** | ✅ Complete | Avoids repeated database lookups |
+| **Test Coverage** | ⚠️ Partial | Missing tests for async state transitions |
+| **Technical Debt** | 🔴 Remaining | 3 enums, no retry logic, checkbox ambiguity |
 
 ---
 
-## Remaining Issues
+## ✅ Completed Work
+
+| Commit | Date | Description |
+|--------|------|-------------|
+| `653a84fc` | 2026-01-08 | Added this refactor plan document |
+| `7a56b19d` | 2026-01-08 | Unified priority order (Database > Macro > File) and added capability caching |
+| `95acc10e` | 2026-01-08 | Disabled Print button during macro analysis (race condition fix) |
+| `6c0f3759` | 2026-01-07 | Fixed capability database key naming (bed_mesh not bed_leveling) |
+| `9854ef19` | 2026-01-07 | Added PERFORM_* opt-in parameter support alongside SKIP_* |
+
+### What's Working Now
+- ✅ Bed mesh, QGL, Z-tilt, nozzle clean checkboxes in file detail view
+- ✅ Checkboxes correctly disable operations in PRINT_START macro
+- ✅ AD5M uses native `FORCE_LEVELING=false` parameter from database
+- ✅ Generic printers use detected `SKIP_*` or `PERFORM_*` parameters
+- ✅ Print button disabled until macro analysis completes (no race condition)
+- ✅ File-embedded operations can be commented out
+
+---
+
+## 🔴 Remaining Issues
 
 | Priority | Issue | Location | Effort |
 |----------|-------|----------|--------|
@@ -102,7 +128,9 @@ The core functionality works correctly after recent fixes. The system uses a pri
 
 ---
 
-## Medium-Term Refactors (2-4 hours each)
+## 🟡 Medium-Term Refactors (2-4 hours each)
+
+> **Status**: Not started - these are optional improvements
 
 ### MT1: Consolidate Operation Enums
 
@@ -201,7 +229,9 @@ void analyze_print_start_macro() {
 
 ---
 
-## Long-Term Refactors (6+ hours)
+## 🟠 Long-Term Refactors (6+ hours)
+
+> **Status**: Not started - architectural improvements for future consideration
 
 ### LT1: Move Capabilities to PrinterState
 
@@ -255,7 +285,9 @@ Both classes scan for the same operations using similar patterns. `GCodeOpsDetec
 
 ---
 
-## Test Coverage Gaps
+## ⚠️ Test Coverage Gaps
+
+> **Status**: Tests needed before major refactors
 
 ### Missing Tests
 
