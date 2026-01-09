@@ -522,9 +522,11 @@ CATCH2_OBJ := $(OBJ_DIR)/tests/catch_amalgamated.o
 UI_TEST_UTILS_OBJ := $(OBJ_DIR)/tests/ui_test_utils.o
 LVGL_TEST_FIXTURE_OBJ := $(OBJ_DIR)/tests/lvgl_test_fixture.o
 TEST_FIXTURES_OBJ := $(OBJ_DIR)/tests/test_fixtures.o
+LVGL_UI_TEST_FIXTURE_OBJ := $(OBJ_DIR)/tests/lvgl_ui_test_fixture.o
 
 # Mock objects for integration testing
-MOCK_SRCS := $(wildcard $(TEST_MOCK_DIR)/*.cpp)
+# Exclude moonraker_client_mock.cpp - it exists in src/api/ and is already in TEST_APP_OBJS
+MOCK_SRCS := $(filter-out $(TEST_MOCK_DIR)/moonraker_client_mock.cpp, $(wildcard $(TEST_MOCK_DIR)/*.cpp))
 MOCK_OBJS := $(patsubst $(TEST_MOCK_DIR)/%.cpp,$(OBJ_DIR)/tests/mocks/%.o,$(MOCK_SRCS))
 
 # Default target

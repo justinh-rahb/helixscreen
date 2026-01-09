@@ -3,6 +3,7 @@
 
 #include "../../include/moonraker_client.h"
 #include "../../include/moonraker_error.h"
+#include "../mocks/mock_websocket_server.h"
 #include "hv/EventLoopThread.h"
 
 #include <atomic>
@@ -45,26 +46,44 @@ using namespace std::chrono;
 class MoonrakerRobustnessFixture {
   public:
     MoonrakerRobustnessFixture() {
+        // Start mock WebSocket server first (use fixed port for testing)
+        server_ = std::make_unique<MockWebSocketServer>();
+        server_->on_method("printer.info", [](const json&) {
+            return json{{"state", "ready"}, {"hostname", "test-printer"}};
+        });
+        int port = server_->start(18765); // Use fixed port for testing
+        if (port <= 0) {
+            throw std::runtime_error("Failed to start mock server");
+        }
+
+        // Create event loop and client
         loop_thread_ = std::make_shared<hv::EventLoopThread>();
         loop_thread_->start();
 
         client_ = std::make_unique<MoonrakerClient>(loop_thread_->loop());
 
         // Configure for testing
-        client_->set_connection_timeout(1000);      // 1s timeout
-        client_->set_default_request_timeout(1000); // 1s timeout
+        client_->set_connection_timeout(2000);      // 2s timeout
+        client_->set_default_request_timeout(2000); // 2s timeout
         client_->setReconnect(nullptr);             // Disable auto-reconnect
     }
 
     ~MoonrakerRobustnessFixture() {
-        if (client_) {
-            client_->disconnect();
-        }
-        client_.reset();
+        // Stop event loop FIRST to prevent callbacks from firing during teardown
         loop_thread_->stop();
         loop_thread_->join();
+
+        // Now safe to destroy client and server
+        client_.reset();
+        server_->stop();
+        server_.reset();
     }
 
+    std::string server_url() const {
+        return server_->url();
+    }
+
+    std::unique_ptr<MockWebSocketServer> server_;
     std::shared_ptr<hv::EventLoopThread> loop_thread_;
     std::unique_ptr<MoonrakerClient> client_;
 };
@@ -73,49 +92,35 @@ class MoonrakerRobustnessFixture {
 // Priority 1: Concurrent Access Testing
 // ============================================================================
 
-// FIXME: Disabled due to mutex lock failures during test cleanup
-// Error: "mutex lock failed: Invalid argument" when callbacks execute during fixture destruction
-// This indicates a race condition between test teardown and callback execution
-// See: test_moonraker_client_robustness.cpp:95
+// Fixed: Now uses MockWebSocketServer to provide real responses
 TEST_CASE_METHOD(MoonrakerRobustnessFixture,
                  "MoonrakerClient handles concurrent send_jsonrpc calls",
-                 "[.][connection][edge][concurrent][priority1]") {
+                 "[connection][edge][concurrent][priority1]") {
     SECTION("10 threads × 100 requests = 1000 total (no race conditions)") {
-#if 0 // FIXME: Disabled - see comment above TEST_CASE
         constexpr int NUM_THREADS = 10;
         constexpr int REQUESTS_PER_THREAD = 100;
         constexpr int TOTAL_REQUESTS = NUM_THREADS * REQUESTS_PER_THREAD;
 
         std::atomic<int> success_count{0};
         std::atomic<int> error_count{0};
-        std::mutex results_mutex;
-        std::vector<std::string> errors;
+        std::atomic<bool> connected{false};
+
+        // Connect to mock server
+        client_->connect(
+            server_url().c_str(), [&connected]() { connected = true; },
+            []() { /* disconnected */ });
+
+        // Wait for connection (with timeout)
+        for (int i = 0; i < 50 && !connected; i++) {
+            std::this_thread::sleep_for(milliseconds(100));
+        }
+        REQUIRE(connected);
 
         auto send_requests = [&](int thread_id) {
             for (int i = 0; i < REQUESTS_PER_THREAD; i++) {
-                int result = client_->send_jsonrpc(
-                    "printer.info",
-                    json(),
-                    [&success_count](json response) {
-                        success_count++;
-                    },
-                    [&error_count, &results_mutex, &errors, thread_id, i]
-                    (const MoonrakerError& err) {
-                        error_count++;
-                        std::lock_guard<std::mutex> lock(results_mutex);
-                        errors.push_back("Thread " + std::to_string(thread_id) +
-                                        " request " + std::to_string(i) +
-                                        ": " + err.message);
-                    }
-                );
-
-                // Verify send_jsonrpc doesn't fail
-                if (result < 0) {
-                    std::lock_guard<std::mutex> lock(results_mutex);
-                    errors.push_back("send_jsonrpc failed on thread " +
-                                    std::to_string(thread_id) +
-                                    " request " + std::to_string(i));
-                }
+                client_->send_jsonrpc(
+                    "printer.info", json(), [&success_count](json) { success_count++; },
+                    [&error_count](const MoonrakerError&) { error_count++; });
             }
         };
 
@@ -125,26 +130,20 @@ TEST_CASE_METHOD(MoonrakerRobustnessFixture,
             threads.emplace_back(send_requests, i);
         }
 
-        // Wait for completion
+        // Wait for threads to finish sending
         for (auto& thread : threads) {
             thread.join();
         }
 
-        // All requests should be processed (with timeout/error since no server)
-        // Wait for callbacks to complete
-        std::this_thread::sleep_for(milliseconds(500));
-        client_->process_timeouts();
-        std::this_thread::sleep_for(milliseconds(500));
-
-        INFO("Errors encountered: " << errors.size());
-        for (const auto& error : errors) {
-            INFO(error);
+        // Wait for all responses to arrive
+        for (int i = 0; i < 100 && (success_count + error_count) < TOTAL_REQUESTS; i++) {
+            std::this_thread::sleep_for(milliseconds(100));
         }
 
-        // With no server, all should timeout or be cleaned up
-        // Key: no crashes, no race conditions detected
-        REQUIRE(errors.size() < TOTAL_REQUESTS / 10);  // At most 10% fail to send
-#endif
+        INFO("Success: " << success_count.load() << ", Error: " << error_count.load());
+
+        // Most requests should succeed with the mock server
+        REQUIRE(success_count >= TOTAL_REQUESTS * 9 / 10); // At least 90% success
     }
 
     SECTION("Concurrent send_jsonrpc with different methods") {
