@@ -227,7 +227,7 @@ lv_timer_create([](lv_timer_t* timer) {
 
 ## 🟠 Long-Term Refactors (6+ hours)
 
-> **Status**: LT1 complete, LT2/LT3 not started
+> **Status**: LT1 complete, LT2 complete, LT3 not started
 
 ### ✅ LT1: Move Capabilities to PrinterState (COMPLETED 2026-01-09)
 
@@ -276,6 +276,12 @@ Checkbox state now flows through subjects:
 1. User toggles switch → `event_cb` fires → subject updated
 2. `read_options_from_subjects()` reads subject values (no widget tree traversal)
 3. Easier testing, better separation of concerns
+
+**LT2 Completion (ef213e7c):**
+- Updated `start_print()` and `execute_print_start()` to use `read_options_from_subjects()`
+- Added `is_option_disabled_from_subject()` helper for subject-based state checking
+- Updated `collect_ops_to_disable()` and `collect_macro_skip_params()` to use subjects
+- Marked old widget-based methods as deprecated (`[[deprecated]]`)
 
 ---
 
