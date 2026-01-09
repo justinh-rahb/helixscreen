@@ -225,23 +225,26 @@ lv_timer_create([](lv_timer_t* timer) {
 
 ## 🟠 Long-Term Refactors (6+ hours)
 
-> **Status**: Not started - architectural improvements for future consideration
+> **Status**: LT1 complete, LT2/LT3 not started
 
-### LT1: Move Capabilities to PrinterState
+### ✅ LT1: Move Capabilities to PrinterState (COMPLETED 2026-01-09)
 
-**Current State:**
-`PrinterDetector` is a standalone JSON lookup that reads `printer_database.json`. `PrinterState` has separate Moonraker-sourced capabilities. These two sources can diverge.
+**What was done:**
+- Added `printer_type_` and `print_start_capabilities_` storage to `PrinterState`
+- Added `set_printer_type()` (async) and `set_printer_type_sync()` (main-thread) methods
+- `PrinterState` fetches capabilities from `PrinterDetector` when type is set
+- Refactored `UIPrintPreparationManager` to delegate to `PrinterState::get_print_start_capabilities()`
+- Refactored `MacroModificationManager` to use `get_printer_state().get_print_start_capabilities()`
+- Wired up `HomePanel::reload_from_config()` to call `set_printer_type_sync()` on startup/wizard completion
+- Added comprehensive test suite (`test_printer_state_capabilities.cpp`, 20+ tests)
 
-**Target Architecture:**
-- `PrinterState` owns ALL capability information
-- On connection: loads database entry for printer type
-- Merges with Moonraker-reported capabilities
-- Exposes unified `PrinterCapabilities` object
-- `PrinterDetector` becomes a utility for database lookup only
+**Key commits:**
+- `7ef347eb` - Phase 5: Move capability cache to PrinterState
+- `4a589648` - Phase 6: Wire up printer type from config
 
-**Benefit:** Single source of truth eliminates divergence risk. Capabilities are reactive (update when printer state changes).
-
-**Effort:** 8 hours
+**Result:**
+`PrinterState` now owns printer type and capabilities. `PrinterDetector` is a database lookup utility only.
+Capabilities refresh automatically when printer type changes via wizard or config reload.
 
 ---
 
