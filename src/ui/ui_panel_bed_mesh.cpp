@@ -250,24 +250,9 @@ lv_obj_t* BedMeshPanel::create(lv_obj_t* parent) {
     }
 
     // Use standard overlay panel setup
+    // Note: Back button is wired via header_bar.xml default callback (on_header_back_clicked)
     ui_overlay_panel_setup_standard(overlay_root_, parent_screen_, "overlay_header",
                                     "overlay_content");
-
-    // Wire up header bar back button imperatively (exception for overlays)
-    lv_obj_t* header = lv_obj_find_by_name(overlay_root_, "overlay_header");
-    if (header) {
-        lv_obj_t* back_btn = lv_obj_find_by_name(header, "back_button");
-        if (back_btn) {
-            lv_obj_add_event_cb(
-                back_btn,
-                [](lv_event_t*) {
-                    spdlog::debug("[BedMeshPanel] Back button clicked");
-                    ui_nav_go_back();
-                },
-                LV_EVENT_CLICKED, nullptr);
-            spdlog::debug("[{}] Back button wired", get_name());
-        }
-    }
 
     lv_obj_t* overlay_content = lv_obj_find_by_name(overlay_root_, "overlay_content");
     if (!overlay_content) {

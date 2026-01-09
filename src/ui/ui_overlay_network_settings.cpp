@@ -251,21 +251,7 @@ lv_obj_t* NetworkSettingsOverlay::create(lv_obj_t* parent_screen) {
         return nullptr;
     }
 
-    // Wire up header bar back button
-    lv_obj_t* header = lv_obj_find_by_name(overlay_root_, "overlay_header");
-    if (header) {
-        lv_obj_t* back_btn = lv_obj_find_by_name(header, "back_button");
-        if (back_btn) {
-            lv_obj_add_event_cb(
-                back_btn,
-                [](lv_event_t*) {
-                    spdlog::debug("[NetworkSettingsOverlay] Back button clicked");
-                    ui_nav_go_back();
-                },
-                LV_EVENT_CLICKED, nullptr);
-            spdlog::debug("[NetworkSettingsOverlay] Back button wired");
-        }
-    }
+    // Note: Back button is wired via header_bar.xml default callback (on_header_back_clicked)
 
     // Initially hidden
     lv_obj_add_flag(overlay_root_, LV_OBJ_FLAG_HIDDEN);
