@@ -429,7 +429,7 @@ test-assets: $(TEST_BIN)
 # Phase 1: No deps - check for unlimited -j and re-invoke if needed
 # Phase 2: Normal deps and linking (when _PARALLEL_GUARD is set)
 ifndef _PARALLEL_GUARD
-$(TEST_BIN):
+$(TEST_BIN): FORCE
 	@if echo "$(MAKEFLAGS)" | grep -q 'j' && ! echo "$(MAKEFLAGS)" | grep -q 'jobserver'; then \
 		NPROC=$$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); \
 		echo ""; \
@@ -454,6 +454,12 @@ $(TEST_BIN): $(TEST_CORE_DEPS) \
 	}
 	$(ECHO) "$(GREEN)✓ Unit test binary ready$(RESET)"
 endif
+
+# FORCE pattern - ensures Phase 1 always runs for dependency re-evaluation
+# Without this, make would skip Phase 1 entirely when the binary exists,
+# never reaching Phase 2 where real dependencies (.d files) are checked.
+.PHONY: FORCE
+FORCE:
 
 # Integration test binary (uses mocks instead of real LVGL)
 $(TEST_INTEGRATION_BIN): $(TEST_MAIN_OBJ) $(CATCH2_OBJ) $(TEST_INTEGRATION_OBJS) $(MOCK_OBJS)
