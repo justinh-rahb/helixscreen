@@ -2,8 +2,8 @@
 
 > **Document Purpose**: Reference guide for refactoring work and progress tracking
 > **Created**: 2026-01-08
-> **Last Updated**: 2026-01-08
-> **Version**: 1.1 (Added test-first protocol, agent delegation, code review checkpoints)
+> **Last Updated**: 2026-01-09
+> **Version**: 1.2 (Observer Factory Phase 4 complete - all target files migrated)
 
 ## Table of Contents
 
@@ -893,16 +893,16 @@ observer_ = create_value_observer(
 - [x] Verify ExtrusionPanel characterization tests pass
 - [x] **✅ CHECKPOINT 2: Review pilot migration**
 
-**Phase 4: Full Migration** ⏳ IN PROGRESS
-- [ ] Migrate remaining 6 files with 13 observers:
-  - [ ] `ui_panel_motion.cpp` - 3 observers (position_x/y/z)
-  - [ ] `ui_panel_ams.cpp` - 2 observers (action, slot_count)
-  - [ ] `ui_fan_control_overlay.cpp` - 1 observer (fans_version)
-  - [ ] `ui_ams_slot.cpp` - 4 observers (color, status, current_slot, filament_loaded)
-  - [ ] `ui_ams_mini_status.cpp` - 2 observers (slot_count, slots_version)
-  - [ ] `ui_ams_current_tool.cpp` - 1 observer (color)
-- [ ] Run full test suite after each group
-- [ ] **✅ CHECKPOINT 3: Final review before merge**
+**Phase 4: Full Migration** ✅ COMPLETE
+- [x] Migrate remaining 6 files with 13 observers:
+  - [x] `ui_panel_motion.cpp` - 4 observers (position_x/y/z + bed_moves)
+  - [x] `ui_panel_ams.cpp` - 2 observers (action, slot_count)
+  - [x] `ui_fan_control_overlay.cpp` - 1 observer (fans_version)
+  - [x] `ui_ams_slot.cpp` - 2 of 4 observers (color, status); kept current_slot/filament_loaded as traditional due to inter-dependencies
+  - [x] `ui_ams_mini_status.cpp` - 2 observers (slot_count, slots_version)
+  - [x] `ui_ams_current_tool.cpp` - 1 observer (color)
+- [x] Run full test suite after each group
+- [x] **✅ CHECKPOINT 3: Final review before merge**
 
 **Phase 5: Cleanup**
 - [ ] Remove old boilerplate patterns from all panels
@@ -1740,8 +1740,11 @@ while (parent) {
 | PrinterState lines | 2808 | <500 | 0% |
 | PrintStatusPanel lines | 3782 | <1000 | 0% |
 | Panels using SubjectManagedPanel | ~50% | 100% | 50% |
-| Observer boilerplate instances | 129 | <20 | 0% |
+| Observer boilerplate instances | ~90 | <20 | 30% |
 | Modal cleanup boilerplate instances | 74 | <10 | 0% |
+
+> **Note (2026-01-09)**: Observer Factory Phase 4 complete. Migrated ~39 observers across 9 files
+> (3 pilot panels + 6 Phase 4 files) using `observe_int_sync<T>()` lambda pattern.
 
 ---
 
