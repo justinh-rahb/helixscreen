@@ -422,6 +422,17 @@ void AbortManager::complete_abort(const char* message) {
     // Clear klippy observer since we're no longer waiting for reconnect
     klippy_observer_.reset();
 
+    // Set print outcome to CANCELLED for UI badge display
+    // Moonraker reports "standby" after M112+restart, not "cancelled"
+    if (printer_state_) {
+        ui_async_call(
+            [](void* user_data) {
+                auto* state = static_cast<PrinterState*>(user_data);
+                state->set_print_outcome(PrintOutcome::CANCELLED);
+            },
+            printer_state_);
+    }
+
     {
         std::lock_guard<std::mutex> lock(message_mutex_);
         last_result_message_ = message;
