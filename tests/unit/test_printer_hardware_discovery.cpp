@@ -1,0 +1,661 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/**
+ * @file test_printer_hardware_discovery.cpp
+ * @brief TEST-FIRST: Failing tests for PrinterHardwareDiscovery class
+ *
+ * This file contains tests for the NEW PrinterHardwareDiscovery class that will
+ * consolidate all hardware discovery into a single source of truth:
+ * - Hardware lists (heaters, fans, sensors, leds, steppers)
+ * - Capability flags (has_qgl, has_probe, etc.)
+ * - Macros (from gcode_macro objects)
+ * - AMS/MMU detection (AFC, Happy Hare, tool changers)
+ *
+ * These tests are designed to FAIL until the class is implemented.
+ */
+
+#include "../catch_amalgamated.hpp"
+
+// This include will fail until the header is created - that's expected!
+#include "printer_hardware_discovery.h"
+
+#include <json.hpp> // nlohmann/json from libhv
+
+using json = nlohmann::json;
+using namespace helix;
+
+// ============================================================================
+// Empty Input Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery parses empty objects list", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+    hw.parse_objects(json::array());
+
+    // All lists should be empty
+    REQUIRE(hw.heaters().empty());
+    REQUIRE(hw.fans().empty());
+    REQUIRE(hw.sensors().empty());
+    REQUIRE(hw.leds().empty());
+    REQUIRE(hw.steppers().empty());
+
+    // All capability flags should be false
+    REQUIRE_FALSE(hw.has_qgl());
+    REQUIRE_FALSE(hw.has_z_tilt());
+    REQUIRE_FALSE(hw.has_bed_mesh());
+    REQUIRE_FALSE(hw.has_probe());
+    REQUIRE_FALSE(hw.has_heater_bed());
+    REQUIRE_FALSE(hw.has_mmu());
+
+    // Macro-related
+    REQUIRE(hw.macros().empty());
+    REQUIRE(hw.nozzle_clean_macro().empty());
+}
+
+TEST_CASE("PrinterHardwareDiscovery handles malformed input", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Non-array input - object") {
+        hw.parse_objects(json::object());
+        REQUIRE(hw.heaters().empty());
+    }
+
+    SECTION("Non-array input - null") {
+        hw.parse_objects(nullptr);
+        REQUIRE(hw.heaters().empty());
+    }
+
+    SECTION("Array with non-string elements") {
+        json objects = {1, "extruder", nullptr, true, "heater_bed"};
+        hw.parse_objects(objects);
+        REQUIRE(hw.heaters().size() == 2);
+    }
+
+    SECTION("Empty string in array") {
+        json objects = {"extruder", "", "heater_bed"};
+        hw.parse_objects(objects);
+        REQUIRE(hw.heaters().size() == 2);
+    }
+}
+
+// ============================================================================
+// Heater Extraction Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery parses heaters - extruders and bed",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Single extruder and heater_bed") {
+        json objects = {"extruder", "heater_bed"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.heaters().size() == 2);
+        REQUIRE(std::find(hw.heaters().begin(), hw.heaters().end(), "extruder") !=
+                hw.heaters().end());
+        REQUIRE(std::find(hw.heaters().begin(), hw.heaters().end(), "heater_bed") !=
+                hw.heaters().end());
+        REQUIRE(hw.has_heater_bed());
+    }
+
+    SECTION("Multiple extruders") {
+        json objects = {"extruder", "extruder1", "extruder2", "heater_bed"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.heaters().size() == 4);
+        REQUIRE(std::find(hw.heaters().begin(), hw.heaters().end(), "extruder1") !=
+                hw.heaters().end());
+        REQUIRE(std::find(hw.heaters().begin(), hw.heaters().end(), "extruder2") !=
+                hw.heaters().end());
+    }
+
+    SECTION("Generic heaters with chamber") {
+        json objects = {"extruder", "heater_bed", "heater_generic chamber"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.heaters().size() == 3);
+        REQUIRE(std::find(hw.heaters().begin(), hw.heaters().end(), "heater_generic chamber") !=
+                hw.heaters().end());
+    }
+
+    SECTION("Excludes extruder_stepper from heaters") {
+        json objects = {"extruder", "extruder_stepper filament", "heater_bed"};
+        hw.parse_objects(objects);
+
+        // extruder_stepper should NOT be in heaters list
+        REQUIRE(hw.heaters().size() == 2);
+        REQUIRE(std::find(hw.heaters().begin(), hw.heaters().end(), "extruder_stepper filament") ==
+                hw.heaters().end());
+    }
+}
+
+// ============================================================================
+// Fan Extraction Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery parses fans - all fan types", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Part cooling fan (canonical 'fan')") {
+        json objects = {"fan"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.fans().size() == 1);
+        REQUIRE(hw.fans()[0] == "fan");
+    }
+
+    SECTION("Heater fan") {
+        json objects = {"heater_fan hotend"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.fans().size() == 1);
+        REQUIRE(hw.fans()[0] == "heater_fan hotend");
+    }
+
+    SECTION("Generic fan") {
+        json objects = {"fan_generic aux"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.fans().size() == 1);
+        REQUIRE(hw.fans()[0] == "fan_generic aux");
+    }
+
+    SECTION("Controller fan") {
+        json objects = {"controller_fan electronics"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.fans().size() == 1);
+        REQUIRE(hw.fans()[0] == "controller_fan electronics");
+    }
+
+    SECTION("Temperature fan (acts as both sensor and fan)") {
+        json objects = {"temperature_fan exhaust"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.fans().size() == 1);
+        REQUIRE(hw.fans()[0] == "temperature_fan exhaust");
+        // Should also be in sensors
+        REQUIRE(hw.sensors().size() == 1);
+        REQUIRE(hw.sensors()[0] == "temperature_fan exhaust");
+    }
+
+    SECTION("All fan types together") {
+        json objects = {"fan", "heater_fan hotend", "fan_generic aux",
+                        "controller_fan electronics"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.fans().size() == 4);
+    }
+}
+
+// ============================================================================
+// Sensor Extraction Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery parses sensors - temperature sensors",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Temperature sensor") {
+        json objects = {"temperature_sensor chamber"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.sensors().size() == 1);
+        REQUIRE(hw.sensors()[0] == "temperature_sensor chamber");
+    }
+
+    SECTION("Temperature fan (dual-purpose)") {
+        json objects = {"temperature_fan exhaust"};
+        hw.parse_objects(objects);
+
+        // Should appear in both sensors and fans
+        REQUIRE(hw.sensors().size() == 1);
+        REQUIRE(hw.sensors()[0] == "temperature_fan exhaust");
+        REQUIRE(hw.fans().size() == 1);
+    }
+
+    SECTION("Multiple sensors") {
+        json objects = {"temperature_sensor chamber", "temperature_sensor raspberry_pi",
+                        "temperature_sensor mcu_temp"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.sensors().size() == 3);
+    }
+}
+
+// ============================================================================
+// LED Extraction Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery parses LEDs - neopixel and dotstar",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Neopixel strip") {
+        json objects = {"neopixel strip"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.leds().size() == 1);
+        REQUIRE(hw.leds()[0] == "neopixel strip");
+    }
+
+    SECTION("Dotstar") {
+        json objects = {"dotstar"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.leds().size() == 1);
+        REQUIRE(hw.leds()[0] == "dotstar");
+    }
+
+    SECTION("LED indicator") {
+        json objects = {"led indicator"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.leds().size() == 1);
+        REQUIRE(hw.leds()[0] == "led indicator");
+    }
+
+    SECTION("Multiple LED types") {
+        json objects = {"neopixel case_lights", "dotstar toolhead", "led status"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.leds().size() == 3);
+    }
+}
+
+// ============================================================================
+// Capability Detection Tests - Leveling
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery detects QGL when quad_gantry_level present",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    json objects = {"extruder", "heater_bed", "quad_gantry_level", "bed_mesh"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_qgl());
+    REQUIRE(hw.has_bed_mesh());
+    REQUIRE(hw.supports_leveling());
+}
+
+TEST_CASE("PrinterHardwareDiscovery detects z_tilt", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    json objects = {"extruder", "heater_bed", "z_tilt"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_z_tilt());
+    REQUIRE_FALSE(hw.has_qgl());
+    REQUIRE(hw.supports_leveling());
+}
+
+// ============================================================================
+// Capability Detection Tests - Probes
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery detects probe when bltouch present",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("BLTouch probe") {
+        json objects = {"extruder", "heater_bed", "bltouch"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_probe());
+    }
+
+    SECTION("Standard probe") {
+        json objects = {"extruder", "heater_bed", "probe"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_probe());
+    }
+
+    SECTION("Eddy current probe") {
+        json objects = {"extruder", "heater_bed", "probe_eddy_current btt_eddy"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_probe());
+    }
+}
+
+// ============================================================================
+// Macro Detection Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery detects macros and caches common patterns",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Nozzle clean macro - CLEAN_NOZZLE") {
+        json objects = {"gcode_macro CLEAN_NOZZLE", "gcode_macro PRINT_START"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.macros().size() == 2);
+        REQUIRE(hw.has_macro("CLEAN_NOZZLE"));
+        REQUIRE(hw.nozzle_clean_macro() == "CLEAN_NOZZLE");
+    }
+
+    SECTION("Nozzle clean macro - NOZZLE_WIPE variant") {
+        json objects = {"gcode_macro NOZZLE_WIPE"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.nozzle_clean_macro() == "NOZZLE_WIPE");
+    }
+
+    SECTION("Purge line macro") {
+        json objects = {"gcode_macro PURGE_LINE"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.purge_line_macro() == "PURGE_LINE");
+    }
+
+    SECTION("Heat soak macro") {
+        json objects = {"gcode_macro HEAT_SOAK"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.heat_soak_macro() == "HEAT_SOAK");
+    }
+
+    SECTION("Case-insensitive macro lookup") {
+        json objects = {"gcode_macro CLEAN_NOZZLE"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_macro("CLEAN_NOZZLE"));
+        REQUIRE(hw.has_macro("clean_nozzle"));
+        REQUIRE(hw.has_macro("Clean_Nozzle"));
+    }
+}
+
+// ============================================================================
+// AFC/MMU Detection Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery detects AFC and extracts lane names",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("AFC detection") {
+        json objects = {"AFC", "AFC_stepper lane1", "AFC_stepper lane2", "AFC_stepper lane3",
+                        "AFC_stepper lane4"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_mmu());
+        REQUIRE(hw.mmu_type() == AmsType::AFC);
+    }
+
+    SECTION("AFC lane name extraction") {
+        json objects = {"AFC", "AFC_stepper lane1", "AFC_stepper lane2"};
+        hw.parse_objects(objects);
+
+        auto lanes = hw.afc_lane_names();
+        REQUIRE(lanes.size() == 2);
+        REQUIRE(std::find(lanes.begin(), lanes.end(), "lane1") != lanes.end());
+        REQUIRE(std::find(lanes.begin(), lanes.end(), "lane2") != lanes.end());
+    }
+
+    SECTION("AFC hub name extraction") {
+        json objects = {"AFC", "AFC_hub Turtle_1", "AFC_stepper lane1"};
+        hw.parse_objects(objects);
+
+        auto hubs = hw.afc_hub_names();
+        REQUIRE(hubs.size() == 1);
+        REQUIRE(hubs[0] == "Turtle_1");
+    }
+}
+
+TEST_CASE("PrinterHardwareDiscovery detects Happy Hare MMU", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    json objects = {"mmu", "extruder", "heater_bed"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_mmu());
+    REQUIRE(hw.mmu_type() == AmsType::HAPPY_HARE);
+}
+
+TEST_CASE("PrinterHardwareDiscovery detects tool changer", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    json objects = {"toolchanger", "tool T0", "tool T1", "tool T2"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_tool_changer());
+    REQUIRE(hw.mmu_type() == AmsType::TOOL_CHANGER);
+
+    auto tools = hw.tool_names();
+    REQUIRE(tools.size() == 3);
+}
+
+// ============================================================================
+// Filament Sensor Detection Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery detects filament sensors - both types",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Switch sensor") {
+        json objects = {"filament_switch_sensor fsensor"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_filament_sensors());
+        REQUIRE(hw.filament_sensor_names().size() == 1);
+        REQUIRE(hw.filament_sensor_names()[0] == "filament_switch_sensor fsensor");
+    }
+
+    SECTION("Motion sensor") {
+        json objects = {"filament_motion_sensor encoder"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_filament_sensors());
+        REQUIRE(hw.filament_sensor_names().size() == 1);
+    }
+
+    SECTION("Both sensor types") {
+        json objects = {"filament_switch_sensor runout", "filament_motion_sensor encoder"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.filament_sensor_names().size() == 2);
+    }
+}
+
+// ============================================================================
+// Stepper Extraction Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery parses steppers", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    json objects = {"stepper_x",  "stepper_y",  "stepper_z",
+                    "stepper_z1", "stepper_z2", "stepper_z3"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.steppers().size() == 6);
+    REQUIRE(std::find(hw.steppers().begin(), hw.steppers().end(), "stepper_x") !=
+            hw.steppers().end());
+    REQUIRE(std::find(hw.steppers().begin(), hw.steppers().end(), "stepper_z3") !=
+            hw.steppers().end());
+}
+
+// ============================================================================
+// Additional Capability Detection Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery detects accelerometer", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("ADXL345") {
+        json objects = {"adxl345"};
+        hw.parse_objects(objects);
+        REQUIRE(hw.has_accelerometer());
+    }
+
+    SECTION("LIS2DW") {
+        json objects = {"lis2dw"};
+        hw.parse_objects(objects);
+        REQUIRE(hw.has_accelerometer());
+    }
+
+    SECTION("Resonance tester") {
+        json objects = {"resonance_tester"};
+        hw.parse_objects(objects);
+        REQUIRE(hw.has_accelerometer());
+    }
+}
+
+TEST_CASE("PrinterHardwareDiscovery detects LED capability", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Neopixel triggers has_led") {
+        json objects = {"neopixel case_lights"};
+        hw.parse_objects(objects);
+        REQUIRE(hw.has_led());
+    }
+
+    SECTION("Output pin with LED in name triggers has_led") {
+        json objects = {"output_pin case_led"};
+        hw.parse_objects(objects);
+        REQUIRE(hw.has_led());
+    }
+
+    SECTION("Output pin with LIGHT in name triggers has_led") {
+        json objects = {"output_pin chamber_light"};
+        hw.parse_objects(objects);
+        REQUIRE(hw.has_led());
+    }
+
+    SECTION("Output pin without LED/LIGHT keywords does NOT trigger has_led") {
+        json objects = {"output_pin part_fan_boost", "output_pin power_relay"};
+        hw.parse_objects(objects);
+        REQUIRE_FALSE(hw.has_led());
+    }
+}
+
+TEST_CASE("PrinterHardwareDiscovery detects firmware retraction", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    json objects = {"extruder", "firmware_retraction"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_firmware_retraction());
+}
+
+TEST_CASE("PrinterHardwareDiscovery detects timelapse plugin", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    json objects = {"extruder", "timelapse"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_timelapse());
+}
+
+TEST_CASE("PrinterHardwareDiscovery detects chamber heater and sensor",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    SECTION("Chamber heater") {
+        json objects = {"heater_generic chamber"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_chamber_heater());
+        REQUIRE(hw.supports_chamber());
+    }
+
+    SECTION("Chamber sensor") {
+        json objects = {"temperature_sensor chamber"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_chamber_sensor());
+        REQUIRE(hw.supports_chamber());
+    }
+
+    SECTION("Both chamber heater and sensor") {
+        json objects = {"heater_generic chamber", "temperature_sensor chamber_temp"};
+        hw.parse_objects(objects);
+
+        REQUIRE(hw.has_chamber_heater());
+        REQUIRE(hw.has_chamber_sensor());
+    }
+}
+
+// ============================================================================
+// Clear/Reset Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery clear resets all state", "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    // First populate with data
+    json objects = {"extruder", "heater_bed",      "quad_gantry_level", "bed_mesh",
+                    "probe",    "neopixel lights", "gcode_macro FOO"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_qgl());
+    REQUIRE(hw.heaters().size() == 2);
+
+    // Clear should reset everything
+    hw.clear();
+
+    REQUIRE_FALSE(hw.has_qgl());
+    REQUIRE_FALSE(hw.has_bed_mesh());
+    REQUIRE_FALSE(hw.has_probe());
+    REQUIRE(hw.heaters().empty());
+    REQUIRE(hw.leds().empty());
+    REQUIRE(hw.macros().empty());
+}
+
+// ============================================================================
+// Real-world Configuration Tests
+// ============================================================================
+
+TEST_CASE("PrinterHardwareDiscovery handles full Voron 2.4 config",
+          "[printer_hardware_discovery]") {
+    PrinterHardwareDiscovery hw;
+
+    json objects = {"configfile",
+                    "mcu",
+                    "mcu EBBCan",
+                    "stepper_x",
+                    "stepper_y",
+                    "stepper_z",
+                    "stepper_z1",
+                    "stepper_z2",
+                    "stepper_z3",
+                    "extruder",
+                    "heater_bed",
+                    "heater_generic chamber",
+                    "temperature_sensor chamber",
+                    "temperature_sensor raspberry_pi",
+                    "fan",
+                    "heater_fan hotend_fan",
+                    "controller_fan controller",
+                    "neopixel status_led",
+                    "probe",
+                    "quad_gantry_level",
+                    "bed_mesh",
+                    "gcode_macro PRINT_START",
+                    "gcode_macro CLEAN_NOZZLE"};
+    hw.parse_objects(objects);
+
+    // Hardware lists
+    REQUIRE(hw.heaters().size() == 3);  // extruder, heater_bed, heater_generic chamber
+    REQUIRE(hw.fans().size() == 3);     // fan, heater_fan, controller_fan
+    REQUIRE(hw.sensors().size() == 2);  // temperature_sensor chamber, raspberry_pi
+    REQUIRE(hw.leds().size() == 1);     // neopixel status_led
+    REQUIRE(hw.steppers().size() == 6); // stepper_x,y,z,z1,z2,z3
+
+    // Capabilities
+    REQUIRE(hw.has_qgl());
+    REQUIRE(hw.has_bed_mesh());
+    REQUIRE(hw.has_probe());
+    REQUIRE(hw.has_heater_bed());
+    REQUIRE(hw.has_chamber_heater());
+    REQUIRE(hw.has_chamber_sensor());
+    REQUIRE(hw.has_led());
+
+    // Macros
+    REQUIRE(hw.macros().size() == 2);
+    REQUIRE(hw.nozzle_clean_macro() == "CLEAN_NOZZLE");
+}

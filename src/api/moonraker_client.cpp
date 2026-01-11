@@ -57,6 +57,10 @@ MoonrakerClient::~MoonrakerClient() {
     // This flag prevents any callbacks from firing even if methods check it.
     is_destroying_.store(true);
 
+    // Disable auto-reconnect BEFORE closing - prevents libhv from attempting
+    // reconnection after we've started destruction (avoids stderr "No route to host")
+    setReconnect(nullptr);
+
     // During static destruction (via exit()), mutexes may be in an invalid state.
     // DO NOT lock any mutexes or call methods that lock mutexes.
     // Just clear callbacks directly - no other thread should be accessing during destruction.
@@ -140,6 +144,9 @@ void MoonrakerClient::disconnect() {
         current_state != ConnectionState::FAILED) {
         spdlog::debug("[Moonraker Client] Disconnecting from WebSocket server");
     }
+
+    // Disable auto-reconnect BEFORE closing to prevent spurious reconnection attempts
+    setReconnect(nullptr);
 
     // Close the WebSocket connection FIRST (before replacing callbacks)
     // This allows the is_destroying_ flag check in callbacks to prevent execution
@@ -1327,6 +1334,9 @@ void MoonrakerClient::complete_discovery_subscription(std::function<void()> on_c
 }
 
 void MoonrakerClient::parse_objects(const json& objects) {
+    // Populate unified hardware discovery (Phase 2)
+    hardware_.parse_objects(objects);
+
     heaters_.clear();
     sensors_.clear();
     fans_.clear();

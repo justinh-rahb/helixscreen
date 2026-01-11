@@ -10,6 +10,7 @@
 #include "moonraker_request.h"
 #include "printer_capabilities.h"
 #include "printer_detector.h" // For BuildVolume struct
+#include "printer_hardware_discovery.h"
 #include "spdlog/spdlog.h"
 
 #include <atomic>
@@ -308,30 +309,46 @@ class MoonrakerClient : public hv::WebSocketClient {
     void parse_bed_mesh(const json& bed_mesh);
 
     /**
-     * @brief Get discovered heaters (extruders, beds, generic heaters)
+     * @brief Get discovered hardware data
+     * @return Reference to PrinterHardwareDiscovery containing all discovered hardware
      */
-    const std::vector<std::string>& get_heaters() const {
+    [[nodiscard]] const helix::PrinterHardwareDiscovery& hardware() const {
+        return hardware_;
+    }
+
+    /**
+     * @brief Get discovered heaters (extruders, beds, generic heaters)
+     * @deprecated Use hardware().heaters() instead
+     */
+    [[deprecated("Use hardware().heaters() instead")]] const std::vector<std::string>&
+    get_heaters() const {
         return heaters_;
     }
 
     /**
      * @brief Get discovered read-only sensors
+     * @deprecated Use hardware().sensors() instead
      */
-    const std::vector<std::string>& get_sensors() const {
+    [[deprecated("Use hardware().sensors() instead")]] const std::vector<std::string>&
+    get_sensors() const {
         return sensors_;
     }
 
     /**
      * @brief Get discovered fans
+     * @deprecated Use hardware().fans() instead
      */
-    const std::vector<std::string>& get_fans() const {
+    [[deprecated("Use hardware().fans() instead")]] const std::vector<std::string>&
+    get_fans() const {
         return fans_;
     }
 
     /**
      * @brief Get discovered LED outputs
+     * @deprecated Use hardware().leds() instead
      */
-    const std::vector<std::string>& get_leds() const {
+    [[deprecated("Use hardware().leds() instead")]] const std::vector<std::string>&
+    get_leds() const {
         return leds_;
     }
 
@@ -363,8 +380,10 @@ class MoonrakerClient : public hv::WebSocketClient {
      * Populated during discover_printer() from printer.objects.list.
      * Examples: "stepper_x", "stepper_y", "stepper_z", "stepper_z1", etc.
      * Useful for detecting multi-Z printers (Voron 2.4 has 4 Z steppers).
+     * @deprecated Use hardware().steppers() instead
      */
-    const std::vector<std::string>& get_steppers() const {
+    [[deprecated("Use hardware().steppers() instead")]] const std::vector<std::string>&
+    get_steppers() const {
         return steppers_;
     }
 
@@ -374,8 +393,10 @@ class MoonrakerClient : public hv::WebSocketClient {
      * Populated during discover_printer() from printer.objects.list.
      * Contains all Klipper objects including macros, steppers, heaters, etc.
      * Useful for detection heuristics (object_exists, macro_match).
+     * @deprecated Use hardware() accessors instead
      */
-    const std::vector<std::string>& get_printer_objects() const {
+    [[deprecated("Use hardware() accessors instead")]] const std::vector<std::string>&
+    get_printer_objects() const {
         return printer_objects_;
     }
 
@@ -480,8 +501,10 @@ class MoonrakerClient : public hv::WebSocketClient {
      *
      * Returns hostname discovered during printer discovery sequence.
      * Empty string if discovery hasn't completed or printer.info unavailable.
+     * @deprecated Will be moved to hardware() in a future release
      */
-    const std::string& get_hostname() const {
+    [[deprecated("Will be moved to hardware() in a future release")]] const std::string&
+    get_hostname() const {
         return hostname_;
     }
 
@@ -491,8 +514,10 @@ class MoonrakerClient : public hv::WebSocketClient {
      * Returns version string discovered during printer discovery sequence.
      * Examples: "v0.12.0-108-g2c7a9d58", "v0.11.0"
      * Empty string if discovery hasn't completed or printer.info unavailable.
+     * @deprecated Will be moved to hardware() in a future release
      */
-    const std::string& get_software_version() const {
+    [[deprecated("Will be moved to hardware() in a future release")]] const std::string&
+    get_software_version() const {
         return software_version_;
     }
 
@@ -741,6 +766,7 @@ class MoonrakerClient : public hv::WebSocketClient {
     std::string mcu_;                          // Primary MCU chip (stm32f103xe, stm32h723xx, etc.)
     std::vector<std::string> mcu_list_;        // All MCU chips (primary + CAN toolheads + host)
     PrinterCapabilities capabilities_;         // QGL, Z-tilt, bed mesh, macros
+    helix::PrinterHardwareDiscovery hardware_; // Unified hardware discovery (Phase 2)
 
     // Discovery callbacks (protected to allow mock to invoke)
     std::function<void(const PrinterCapabilities&)>
