@@ -14,6 +14,7 @@
  */
 
 #include "ams_types.h"
+#include "printer_detector.h" // For BuildVolume struct
 
 #include <algorithm>
 #include <cctype>
@@ -278,6 +279,10 @@ class PrinterHardwareDiscovery {
 
     /**
      * @brief Reset all discovered hardware to initial state
+     *
+     * @note This clears ALL fields including printer info (hostname, versions, etc).
+     *       When using parse_objects(), call printer info setters AFTER parse_objects()
+     *       since it calls clear() internally.
      */
     void clear() {
         // Hardware lists
@@ -319,6 +324,16 @@ class PrinterHardwareDiscovery {
         has_klippain_shaketune_ = false;
         has_speaker_ = false;
         mmu_type_ = AmsType::NONE;
+
+        // Printer info
+        hostname_.clear();
+        software_version_.clear();
+        moonraker_version_.clear();
+        kinematics_.clear();
+        build_volume_ = BuildVolume{};
+        mcu_.clear();
+        mcu_list_.clear();
+        printer_objects_.clear();
     }
 
     // ========================================================================
@@ -576,6 +591,98 @@ class PrinterHardwareDiscovery {
      */
     [[nodiscard]] std::string summary() const;
 
+    // ========================================================================
+    // Printer Info (populated from server.info / printer.info)
+    // ========================================================================
+
+    /**
+     * @brief Set printer hostname from printer.info
+     */
+    void set_hostname(const std::string& hostname) {
+        hostname_ = hostname;
+    }
+
+    [[nodiscard]] const std::string& hostname() const {
+        return hostname_;
+    }
+
+    /**
+     * @brief Set Klipper software version from printer.info
+     */
+    void set_software_version(const std::string& version) {
+        software_version_ = version;
+    }
+
+    [[nodiscard]] const std::string& software_version() const {
+        return software_version_;
+    }
+
+    /**
+     * @brief Set Moonraker version from server.info
+     */
+    void set_moonraker_version(const std::string& version) {
+        moonraker_version_ = version;
+    }
+
+    [[nodiscard]] const std::string& moonraker_version() const {
+        return moonraker_version_;
+    }
+
+    /**
+     * @brief Set kinematics type from toolhead subscription
+     */
+    void set_kinematics(const std::string& kinematics) {
+        kinematics_ = kinematics;
+    }
+
+    [[nodiscard]] const std::string& kinematics() const {
+        return kinematics_;
+    }
+
+    /**
+     * @brief Set build volume from bed_mesh bounds
+     */
+    void set_build_volume(const BuildVolume& volume) {
+        build_volume_ = volume;
+    }
+
+    [[nodiscard]] const BuildVolume& build_volume() const {
+        return build_volume_;
+    }
+
+    /**
+     * @brief Set primary MCU chip type
+     */
+    void set_mcu(const std::string& mcu) {
+        mcu_ = mcu;
+    }
+
+    [[nodiscard]] const std::string& mcu() const {
+        return mcu_;
+    }
+
+    /**
+     * @brief Set all MCU chip types (primary + secondary)
+     */
+    void set_mcu_list(const std::vector<std::string>& mcu_list) {
+        mcu_list_ = mcu_list;
+    }
+
+    [[nodiscard]] const std::vector<std::string>& mcu_list() const {
+        return mcu_list_;
+    }
+
+    /**
+     * @brief Set all printer objects from Klipper
+     */
+    void set_printer_objects(const std::vector<std::string>& objects) {
+        printer_objects_ = objects;
+    }
+
+    [[nodiscard]] const std::vector<std::string>& printer_objects() const {
+        return printer_objects_;
+    }
+
   private:
     // Helper: convert string to uppercase
     static std::string to_upper(const std::string& str) {
@@ -634,6 +741,16 @@ class PrinterHardwareDiscovery {
     bool has_klippain_shaketune_ = false;
     bool has_speaker_ = false;
     AmsType mmu_type_ = AmsType::NONE;
+
+    // Printer info (from server.info / printer.info)
+    std::string hostname_;
+    std::string software_version_;
+    std::string moonraker_version_;
+    std::string kinematics_;
+    BuildVolume build_volume_;
+    std::string mcu_;
+    std::vector<std::string> mcu_list_;
+    std::vector<std::string> printer_objects_;
 };
 
 } // namespace helix

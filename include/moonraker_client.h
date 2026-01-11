@@ -317,42 +317,6 @@ class MoonrakerClient : public hv::WebSocketClient {
     }
 
     /**
-     * @brief Get discovered heaters (extruders, beds, generic heaters)
-     * @deprecated Use hardware().heaters() instead
-     */
-    [[deprecated("Use hardware().heaters() instead")]] const std::vector<std::string>&
-    get_heaters() const {
-        return heaters_;
-    }
-
-    /**
-     * @brief Get discovered read-only sensors
-     * @deprecated Use hardware().sensors() instead
-     */
-    [[deprecated("Use hardware().sensors() instead")]] const std::vector<std::string>&
-    get_sensors() const {
-        return sensors_;
-    }
-
-    /**
-     * @brief Get discovered fans
-     * @deprecated Use hardware().fans() instead
-     */
-    [[deprecated("Use hardware().fans() instead")]] const std::vector<std::string>&
-    get_fans() const {
-        return fans_;
-    }
-
-    /**
-     * @brief Get discovered LED outputs
-     * @deprecated Use hardware().leds() instead
-     */
-    [[deprecated("Use hardware().leds() instead")]] const std::vector<std::string>&
-    get_leds() const {
-        return leds_;
-    }
-
-    /**
      * @brief Check if client has been identified to Moonraker
      *
      * After a successful server.connection.identify call, this returns true.
@@ -375,80 +339,46 @@ class MoonrakerClient : public hv::WebSocketClient {
     }
 
     /**
-     * @brief Get discovered stepper motors
-     *
-     * Populated during discover_printer() from printer.objects.list.
-     * Examples: "stepper_x", "stepper_y", "stepper_z", "stepper_z1", etc.
-     * Useful for detecting multi-Z printers (Voron 2.4 has 4 Z steppers).
-     * @deprecated Use hardware().steppers() instead
-     */
-    [[deprecated("Use hardware().steppers() instead")]] const std::vector<std::string>&
-    get_steppers() const {
-        return steppers_;
-    }
-
-    /**
      * @brief Get all printer objects from Klipper
-     *
-     * Populated during discover_printer() from printer.objects.list.
-     * Contains all Klipper objects including macros, steppers, heaters, etc.
-     * Useful for detection heuristics (object_exists, macro_match).
-     * @deprecated Use hardware() accessors instead
+     * @deprecated Use hardware().printer_objects() instead
      */
-    [[deprecated("Use hardware() accessors instead")]] const std::vector<std::string>&
+    [[deprecated("Use hardware().printer_objects() instead")]] const std::vector<std::string>&
     get_printer_objects() const {
         return printer_objects_;
     }
 
     /**
      * @brief Get kinematics type (corexy, cartesian, delta, etc.)
-     *
-     * Populated during discover_printer() from toolhead subscription.
-     * Empty string if not yet discovered.
+     * @deprecated Use hardware().kinematics() instead
      */
-    const std::string& get_kinematics() const {
+    [[deprecated("Use hardware().kinematics() instead")]] const std::string& get_kinematics() const {
         return kinematics_;
     }
 
     /**
      * @brief Get build volume dimensions
-     *
-     * Populated from bed_mesh mesh_min/mesh_max bounds during discovery.
-     * Values may be 0 if bed mesh is not configured.
+     * @deprecated Use hardware().build_volume() instead
      */
-    const BuildVolume& get_build_volume() const {
+    [[deprecated("Use hardware().build_volume() instead")]] const BuildVolume&
+    get_build_volume() const {
         return build_volume_;
     }
 
     /**
      * @brief Get primary MCU chip type
-     *
-     * Populated during discover_printer() from mcu.mcu_constants.MCU.
-     * Examples: "stm32h723xx", "stm32f446xx", "rp2040", "linux"
-     * Empty string if not yet discovered or MCU query failed.
+     * @deprecated Use hardware().mcu() instead
      */
-    const std::string& get_mcu() const {
+    [[deprecated("Use hardware().mcu() instead")]] const std::string& get_mcu() const {
         return mcu_;
     }
 
     /**
      * @brief Get all MCU chip types (primary + secondary)
-     *
-     * Populated during discover_printer() by querying all mcu objects.
-     * Useful for detecting CAN bus setups (toolheads often have rp2040).
-     * Vector may contain: primary MCU + CAN toolheads + linux host MCU
+     * @deprecated Use hardware().mcu_list() instead
      */
-    const std::vector<std::string>& get_mcu_list() const {
+    [[deprecated("Use hardware().mcu_list() instead")]] const std::vector<std::string>&
+    get_mcu_list() const {
         return mcu_list_;
-    }
-
-    /**
-     * @brief Get printer capabilities (QGL, Z-tilt, bed mesh, macros, etc.)
-     *
-     * Populated during discover_printer() from printer.objects.list response.
-     */
-    const PrinterCapabilities& capabilities() const {
-        return capabilities_;
     }
 
     /**
@@ -498,37 +428,27 @@ class MoonrakerClient : public hv::WebSocketClient {
 
     /**
      * @brief Get printer hostname from printer.info
-     *
-     * Returns hostname discovered during printer discovery sequence.
-     * Empty string if discovery hasn't completed or printer.info unavailable.
-     * @deprecated Will be moved to hardware() in a future release
+     * @deprecated Use hardware().hostname() instead
      */
-    [[deprecated("Will be moved to hardware() in a future release")]] const std::string&
-    get_hostname() const {
+    [[deprecated("Use hardware().hostname() instead")]] const std::string& get_hostname() const {
         return hostname_;
     }
 
     /**
      * @brief Get Klipper software version from printer.info
-     *
-     * Returns version string discovered during printer discovery sequence.
-     * Examples: "v0.12.0-108-g2c7a9d58", "v0.11.0"
-     * Empty string if discovery hasn't completed or printer.info unavailable.
-     * @deprecated Will be moved to hardware() in a future release
+     * @deprecated Use hardware().software_version() instead
      */
-    [[deprecated("Will be moved to hardware() in a future release")]] const std::string&
+    [[deprecated("Use hardware().software_version() instead")]] const std::string&
     get_software_version() const {
         return software_version_;
     }
 
     /**
      * @brief Get Moonraker software version from server.info
-     *
-     * Returns version string discovered during printer discovery sequence.
-     * Examples: "v0.8.0-143-g2c7a9d58"
-     * Empty string if discovery hasn't completed or server.info unavailable.
+     * @deprecated Use hardware().moonraker_version() instead
      */
-    const std::string& get_moonraker_version() const {
+    [[deprecated("Use hardware().moonraker_version() instead")]] const std::string&
+    get_moonraker_version() const {
         return moonraker_version_;
     }
 

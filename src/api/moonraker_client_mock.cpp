@@ -50,6 +50,9 @@ MoonrakerClientMock::MoonrakerClientMock(PrinterType type, double speedup_factor
     // (without waiting for connect() -> discover_printer() to be called)
     populate_capabilities();
 
+    // Rebuild hardware_ from mock data (ensures hardware() accessors return complete data)
+    rebuild_hardware();
+
     // Check HELIX_MOCK_SPOOLMAN env var for Spoolman availability
     const char* spoolman_env = std::getenv("HELIX_MOCK_SPOOLMAN");
     if (spoolman_env && (std::string(spoolman_env) == "0" || std::string(spoolman_env) == "off")) {
@@ -264,9 +267,13 @@ void MoonrakerClientMock::populate_capabilities() {
 
     // Populate printer_objects_ for get_printer_objects() - used by hardware validator
     printer_objects_.clear();
+    std::vector<std::string> all_objects;
     for (const auto& obj : mock_objects) {
-        printer_objects_.push_back(obj.get<std::string>());
+        std::string name = obj.get<std::string>();
+        printer_objects_.push_back(name);
+        all_objects.push_back(name);
     }
+    hardware_.set_printer_objects(all_objects);
 
     // Also populate filament_sensors_ member for subscription (same as real parse_objects)
     filament_sensors_.clear();
@@ -323,6 +330,7 @@ void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
     send_jsonrpc("server.info", json::object(), [this, on_complete](json response) {
         if (response.contains("result")) {
             moonraker_version_ = response["result"].value("moonraker_version", "unknown");
+            hardware_.set_moonraker_version(moonraker_version_);
             spdlog::debug("[MoonrakerClientMock] Moonraker version: {}", moonraker_version_);
         }
 
@@ -331,6 +339,8 @@ void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
             if (response.contains("result")) {
                 hostname_ = response["result"].value("hostname", "unknown");
                 software_version_ = response["result"].value("software_version", "unknown");
+                hardware_.set_hostname(hostname_);
+                hardware_.set_software_version(software_version_);
                 spdlog::debug("[MoonrakerClientMock] Printer hostname: {}", hostname_);
                 spdlog::debug("[MoonrakerClientMock] Klipper software version: {}",
                               software_version_);
@@ -338,6 +348,10 @@ void MoonrakerClientMock::discover_printer(std::function<void()> on_complete) {
 
             // Populate capabilities (may have already been done in constructor, but idempotent)
             populate_capabilities();
+
+            // Rebuild hardware_ from mock data (heaters_, fans_, sensors_, leds_)
+            // This ensures hardware() accessors return complete data including fans
+            rebuild_hardware();
 
             // Set Spoolman availability during discovery (matches real Moonraker behavior)
             // Real client queries server.spoolman.status during discovery - see
