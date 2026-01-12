@@ -3,7 +3,7 @@
 This document tracks known architectural issues identified during codebase audits.
 These are not urgent but should be addressed when touching related code.
 
-> **Last Updated:** 2026-01-01
+> **Last Updated:** 2026-01-11
 > **Audit Method:** Multi-agent codebase analysis
 
 ---
@@ -163,19 +163,22 @@ struct PrinterDisplay {
 
 ## 5. Mixed Concerns in MoonrakerClient
 
-**Severity:** 🟡 MEDIUM
+**Severity:** ~~🟡 MEDIUM~~ 🟢 PARTIALLY RESOLVED (2026-01-11)
 
-**File:** `src/api/moonraker_client.cpp` (1595 lines)
+**File:** `src/api/moonraker_client.cpp`
 
-**Problem:**
-- Mixes JSON-RPC transport with domain logic
-- Contains: connection management, printer discovery, bed mesh parsing, object list parsing
-- Discovery callbacks are domain events in transport layer
+**Problem (PARTIALLY RESOLVED):**
+- ~~Mixes JSON-RPC transport with domain logic~~ - **RESOLVED:** Hardware discovery data moved to `PrinterHardwareDiscovery` in MoonrakerAPI
+- ~~Contains: connection management, printer discovery, bed mesh parsing, object list parsing~~ - **RESOLVED:** MoonrakerClient now dispatches via callbacks, MoonrakerAPI owns data
+- ~~Discovery callbacks are domain events in transport layer~~ - **RESOLVED:** Clean callback-based architecture
 
-**Suggested Improvement:**
-- Extract `MoonrakerDomainService` for discovery/parsing
-- Keep `MoonrakerClient` as pure WebSocket JSON-RPC transport
-- Use event bus for discovery events
+**Completed Improvements (2026-01-11 Hardware Discovery Refactor):**
+- MoonrakerClient is now pure transport layer
+- Hardware data (heaters, fans, sensors, LEDs, macros, hostname) flows via callbacks to MoonrakerAPI
+- Bed mesh data moved from MoonrakerClient to MoonrakerAPI
+- `PrinterHardwareDiscovery` is the single source of truth for hardware capabilities
+
+**Remaining:** File size still ~1500 lines, could benefit from further decomposition
 
 ---
 
@@ -231,7 +234,7 @@ MotionPanel& get_global_motion_panel() {
 **Severity:** 🟢 LOW
 
 **Patterns:**
-- Concrete `PrinterCapabilities` struct instead of interface
+- ~~Concrete `PrinterCapabilities` struct instead of interface~~ - **RESOLVED:** PrinterCapabilities deleted, replaced by `PrinterHardwareDiscovery` (2026-01-11)
 - Concrete `MoonrakerAPI*` parameters instead of interface
 - No `IPanel` or `IPanelFactory` interfaces
 
@@ -259,3 +262,4 @@ MotionPanel& get_global_motion_panel() {
 | Date | Change |
 |------|--------|
 | 2026-01-01 | Initial audit - documented all findings from multi-agent analysis |
+| 2026-01-11 | Updated for Hardware Discovery Refactor: PrinterCapabilities deleted, MoonrakerClient mixed concerns partially resolved |

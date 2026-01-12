@@ -1,10 +1,12 @@
 # Moonraker Layer Architecture
 
-This document describes the architecture of the Moonraker integration layer after the 2025-11 refactor.
+This document describes the architecture of the Moonraker integration layer.
+
+> **Last Updated:** 2026-01-11 (Hardware Discovery Refactor completed)
 
 ## Overview
 
-The Moonraker integration is split into three distinct layers:
+The Moonraker integration is split into three distinct layers with clean separation of concerns:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -15,54 +17,77 @@ The Moonraker integration is split into three distinct layers:
 ┌─────────────────────────────▼───────────────────────────────────┐
 │                      MoonrakerAPI                                │
 │  (Domain Logic Layer)                                           │
+│  ├─ PrinterHardwareDiscovery (SINGLE SOURCE OF TRUTH)           │
+│  │   ├─ heaters, fans, sensors, leds                            │
+│  │   ├─ macros, hostname, printer_info                          │
+│  │   └─ capability queries (has_qgl, has_probe, etc.)           │
+│  ├─ Bed mesh data (active_bed_mesh_, bed_mesh_profiles_)        │
 │  ├─ Hardware guessing (guess_bed_heater, guess_hotend_sensor)   │
-│  ├─ Bed mesh access (get_active_bed_mesh, get_bed_mesh_profiles)│
 │  ├─ G-code execution (execute_gcode)                            │
 │  ├─ Temperature control (set_temperature)                       │
 │  └─ Object exclusion (get_excluded_objects, get_available_objects)│
 └─────────────────────────────┬───────────────────────────────────┘
-                              │ delegates to
+                              │ uses (JSON-RPC calls)
+                              │ receives (discovery callbacks)
 ┌─────────────────────────────▼───────────────────────────────────┐
 │                    MoonrakerClient                               │
 │  (Transport Layer)                                               │
 │  ├─ WebSocket connection/reconnection                           │
-│  ├─ JSON-RPC request/response handling                          │
+│  ├─ JSON-RPC 2.0 request/response handling                      │
 │  ├─ Event emission (CONNECTION_FAILED, KLIPPY_DISCONNECTED...)  │
 │  ├─ Printer state subscriptions                                 │
-│  └─ Hardware discovery (get_heaters, get_fans, etc.)            │
+│  └─ Dispatches discovery data via callbacks (NO storage)        │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Key Architectural Principle:** MoonrakerClient is pure transport. It does NOT store hardware data. All discovered hardware information flows via callbacks to MoonrakerAPI, which owns the `PrinterHardwareDiscovery` instance as the single source of truth.
 
 ## Layer Responsibilities
 
 ### MoonrakerClient (Transport Layer)
 
-**Location:** `include/moonraker_client.h`, `src/moonraker_client.cpp`
+**Location:** `include/moonraker_client.h`, `src/api/moonraker_client.cpp`
 
 **Responsibilities:**
 - WebSocket connection management (connect, disconnect, reconnect)
 - JSON-RPC 2.0 protocol handling
 - Request timeout management
 - Event emission for transport events
-- Raw hardware discovery (`get_heaters()`, `get_fans()`, `get_sensors()`)
 - Printer state subscriptions (`register_notify_update()`)
+- **Dispatches discovery data via callbacks** (heaters, fans, sensors, LEDs, macros, hostname, printer info, bed mesh)
 
 **Does NOT do:**
 - UI notifications (replaced with event emission)
 - Business logic decisions
 - Hardware "guessing" logic
+- **Store hardware discovery data** (moved to MoonrakerAPI)
 
 ### MoonrakerAPI (Domain Logic Layer)
 
-**Location:** `include/moonraker_api.h`, `src/moonraker_api.cpp`
+**Location:** `include/moonraker_api.h`, `src/api/moonraker_api.cpp`
 
 **Responsibilities:**
+- **Owns `PrinterHardwareDiscovery`** - single source of truth for all hardware info
+- **Owns bed mesh data** (`active_bed_mesh_`, `bed_mesh_profiles_`)
 - Hardware guessing (`guess_bed_heater()`, `guess_hotend_sensor()`, etc.)
-- Bed mesh access and profile management
 - G-code command execution
 - Temperature control
 - Object exclusion state queries
 - Print control (pause, resume, cancel)
+
+### PrinterHardwareDiscovery (Hardware Data)
+
+**Location:** `include/printer_hardware_discovery.h`, `src/printer/printer_hardware_discovery.cpp`
+
+**Responsibilities:**
+- Store discovered hardware: heaters, fans, sensors, LEDs
+- Store macros and capability flags (has_qgl, has_probe, etc.)
+- Store printer metadata: hostname, klipper_version, mcu_version
+- Provide unified query interface for all hardware capabilities
+
+**Accessed via:** `MoonrakerAPI::hardware_discovery()`
+
+**Note:** `PrinterCapabilities` class has been DELETED. All its functionality is now in `PrinterHardwareDiscovery`.
 
 **Key Pattern:** All async methods use callback pattern:
 ```cpp
@@ -153,28 +178,41 @@ client.gcode_script("EXCLUDE_OBJECT NAME=Part_1", ...);
 // api.get_excluded_objects_from_mock() returns {"Part_1"}
 ```
 
-## Deprecated Methods
+## Removed/Migrated Methods
 
-The following `MoonrakerClient` methods are deprecated in favor of `MoonrakerAPI`:
+The following methods have been removed from `MoonrakerClient` and are now in `MoonrakerAPI`:
 
-| Deprecated Method | Use Instead |
-|-------------------|-------------|
-| `MoonrakerClient::guess_bed_heater()` | `MoonrakerAPI::guess_bed_heater()` |
-| `MoonrakerClient::guess_hotend_heater()` | `MoonrakerAPI::guess_hotend_heater()` |
-| `MoonrakerClient::guess_bed_sensor()` | `MoonrakerAPI::guess_bed_sensor()` |
-| `MoonrakerClient::guess_hotend_sensor()` | `MoonrakerAPI::guess_hotend_sensor()` |
-| `MoonrakerClient::get_active_bed_mesh()` | `MoonrakerAPI::get_active_bed_mesh()` |
-| `MoonrakerClient::get_bed_mesh_profiles()` | `MoonrakerAPI::get_bed_mesh_profiles()` |
-| `MoonrakerClient::has_bed_mesh()` | `MoonrakerAPI::has_bed_mesh()` |
+| Removed from MoonrakerClient | Now in MoonrakerAPI |
+|------------------------------|---------------------|
+| `get_heaters()` | `hardware_discovery().heaters()` |
+| `get_fans()` | `hardware_discovery().fans()` |
+| `get_sensors()` | `hardware_discovery().sensors()` |
+| `get_leds()` | `hardware_discovery().leds()` |
+| `get_hostname()` | `hardware_discovery().hostname()` |
+| `get_active_bed_mesh()` | `get_active_bed_mesh()` |
+| `get_bed_mesh_profiles()` | `get_bed_mesh_profiles()` |
+| `has_bed_mesh()` | `has_bed_mesh()` |
+| `guess_bed_heater()` | `guess_bed_heater()` |
+| `guess_hotend_heater()` | `guess_hotend_heater()` |
+| `guess_bed_sensor()` | `guess_bed_sensor()` |
+| `guess_hotend_sensor()` | `guess_hotend_sensor()` |
 
-**Note:** Deprecated methods will emit compiler warnings. Migrate callers to `MoonrakerAPI` methods.
+### Deleted Classes
+
+| Deleted Class | Replacement |
+|---------------|-------------|
+| `PrinterCapabilities` | `PrinterHardwareDiscovery` (accessed via `MoonrakerAPI::hardware_discovery()`) |
+
+**Migration:** Replace `PrinterCapabilities` usage with `api->hardware_discovery().has_qgl()`, `api->hardware_discovery().macros()`, etc.
 
 ## Key Differences: API vs Client
 
 | Aspect | MoonrakerAPI | MoonrakerClient |
 |--------|--------------|-----------------|
-| Return types | Pointers (nullable) | References |
-| Bed mesh | `const BedMeshProfile*` | `const BedMeshProfile&` |
+| **Purpose** | Domain logic + data ownership | Transport only |
+| **Hardware data** | Owns `PrinterHardwareDiscovery` | Dispatches via callbacks |
+| **Bed mesh** | Owns `active_bed_mesh_`, `bed_mesh_profiles_` | Dispatches via callbacks |
+| Return types | Pointers (nullable) | N/A for hardware data |
 | G-code | `execute_gcode()` (async) | `gcode_script()` (sync-ish) |
 | Thread safety | Delegates to client | Internal mutexes |
 | UI coupling | None | None (events only) |
@@ -245,28 +283,49 @@ The following `MoonrakerClient` methods are deprecated in favor of `MoonrakerAPI
 
 ### Migrating from MoonrakerClient to MoonrakerAPI
 
-**Before:**
+**Before (OLD - no longer works):**
 ```cpp
 MoonrakerClient* client = get_moonraker_client();
-std::string bed_heater = client->guess_bed_heater();  // Deprecated!
-const BedMeshProfile& mesh = client->get_active_bed_mesh();  // Deprecated!
+std::string bed_heater = client->guess_bed_heater();  // REMOVED
+const std::vector<std::string>& heaters = client->get_heaters();  // REMOVED
+const BedMeshProfile& mesh = client->get_active_bed_mesh();  // REMOVED
 ```
 
-**After:**
+**After (CURRENT):**
 ```cpp
 MoonrakerAPI* api = get_moonraker_api();
 std::string bed_heater = api->guess_bed_heater();
+const std::vector<std::string>& heaters = api->hardware_discovery().heaters();
 const BedMeshProfile* mesh = api->get_active_bed_mesh();  // Note: pointer!
 if (mesh) {
     // Use mesh data
 }
 ```
 
+### Migrating from PrinterCapabilities
+
+**Before (OLD - class deleted):**
+```cpp
+PrinterCapabilities caps;
+caps.parse_objects(printer_objects);
+bool has_qgl = caps.has_qgl();
+const auto& macros = caps.macros();
+```
+
+**After (CURRENT):**
+```cpp
+MoonrakerAPI* api = get_moonraker_api();
+bool has_qgl = api->hardware_discovery().has_qgl();
+const auto& macros = api->hardware_discovery().macros();
+```
+
 ### Key Changes
 
-1. **Null checks:** `MoonrakerAPI` returns pointers, not references
-2. **Async pattern:** Use callbacks for operations that communicate with printer
-3. **Global accessor:** Use `get_moonraker_api()` instead of `get_moonraker_client()` for domain ops
+1. **Hardware data:** All hardware queries go through `api->hardware_discovery()`
+2. **Bed mesh:** Owned by MoonrakerAPI, accessed via `api->get_active_bed_mesh()`
+3. **Null checks:** `MoonrakerAPI` returns pointers for bed mesh, not references
+4. **PrinterCapabilities deleted:** Use `PrinterHardwareDiscovery` via `api->hardware_discovery()`
+5. **Global accessor:** Use `get_moonraker_api()` for domain operations
 
 ## See Also
 

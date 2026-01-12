@@ -66,8 +66,9 @@ class StandardMacros {
 public:
     static StandardMacros& instance();
 
-    // Initialize with printer capabilities (call after discovery)
-    void init(const PrinterCapabilities& caps);
+    // Initialize with printer hardware discovery (call after discovery)
+    // NOTE: PrinterCapabilities was deleted 2026-01-11, use PrinterHardwareDiscovery instead
+    void init(const PrinterHardwareDiscovery& discovery);
 
     // Get info for a slot
     const StandardMacroInfo& get(StandardMacroSlot slot) const;
@@ -89,7 +90,7 @@ public:
 
 private:
     std::vector<StandardMacroInfo> slots_;
-    void auto_detect(const PrinterCapabilities& caps);
+    void auto_detect(const PrinterHardwareDiscovery& discovery);
 };
 ```
 
@@ -220,7 +221,9 @@ void FilamentPanel::execute_load() {
 ## Related Files
 
 ### Existing Infrastructure
-- `include/printer_capabilities.h` - Macro discovery (`has_macro()`, `macros()`)
+- `include/printer_hardware_discovery.h` - Macro discovery (`has_macro()`, `macros()`)
+  - NOTE: `PrinterCapabilities` was deleted 2026-01-11, replaced by `PrinterHardwareDiscovery`
+  - Access via `MoonrakerAPI::hardware_discovery()`
 - `src/helix_macro_manager.cpp` - HELIX_* macro definitions
 - `include/config.h` - `MacroConfig` struct, `get_macro()` method
 - `ui_xml/display_settings_overlay.xml` - Reference overlay pattern

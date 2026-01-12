@@ -2,8 +2,8 @@
 
 > **Document Purpose**: Reference guide for refactoring work and progress tracking
 > **Created**: 2026-01-08
-> **Last Updated**: 2026-01-09
-> **Version**: 1.2 (Observer Factory Phase 4 complete - all target files migrated)
+> **Last Updated**: 2026-01-11
+> **Version**: 1.3 (Hardware Discovery Refactor completed)
 
 ## Table of Contents
 
@@ -654,9 +654,9 @@ PrinterState (coordinator/facade)
 │   ├── led_r_, led_g_, led_b_, led_w_
 │   └── led_brightness_
 │
-├── PrinterCapabilitiesState
-│   ├── capabilities_{}
-│   ├── capability_overrides_{}
+├── PrinterCapabilitiesState (NOTE: PrinterCapabilities deleted 2026-01-11)
+│   ├── capabilities_{}           → Now in PrinterHardwareDiscovery
+│   ├── capability_overrides_{}   → Now in PrinterHardwareDiscovery
 │   └── can_show_*, can_perform_* (composite subjects)
 │
 ├── PrinterHardwareState
@@ -701,7 +701,7 @@ PrinterState (coordinator/facade)
 - [ ] Create `PrinterLEDState` class with extracted subjects
 - [ ] Verify all characterization tests still pass
 - [ ] **✅ Code review: PrinterLEDState**
-- [ ] Create `PrinterCapabilitiesState` class with extracted subjects
+- [ ] Create `PrinterCapabilitiesState` class with extracted subjects (NOTE: PrinterCapabilities deleted 2026-01-11, capabilities now in PrinterHardwareDiscovery)
 - [ ] Verify all characterization tests still pass
 - [ ] **✅ Code review: PrinterCapabilitiesState**
 - [ ] Create `PrinterHardwareState` class with extracted subjects
@@ -1093,7 +1093,12 @@ src/ui/ui_nav_manager.cpp          - Register new overlays
 
 ### 1.4 SubjectManagedPanel Universal Adoption
 
-**Status**: [ ] Not Started  [ ] In Progress  [ ] Complete
+**Status**: [ ] Not Started  [ ] In Progress  [x] Complete
+
+> **Completed 2026-01-10**: All panels migrated to use `SubjectManager` RAII pattern.
+> 83 files changed, ~340+ subjects migrated. Added `UI_MANAGED_SUBJECT_*` macros
+> (INT, STRING, STRING_N, POINTER, COLOR) that combine init, XML registration,
+> manager registration, and debug registry in single calls. Net -148 lines.
 
 #### Problem Statement
 `SubjectManagedPanel` base class exists to manage subject lifecycle but has **<50% adoption**. The remaining panels implement ~135-216 lines each of duplicated init/deinit boilerplate, totaling **~4000 lines** of duplicated code.
@@ -1660,8 +1665,7 @@ MoonrakerClient (orchestrator, ~300 lines)
 | Observer factory implementation | 1d | | [x] Complete |
 | Observer factory pilot migration | 1d | | [x] Complete (3 panels) |
 | Observer factory full migration | 0.5d | | [x] Complete (9 files) |
-| SubjectManagedPanel audit | 0.5d | | [ ] |
-| SubjectManagedPanel high-priority migration | 2d | | [ ] |
+| SubjectManagedPanel universal adoption | 1d | | [x] Complete (83 files, 340+ subjects) |
 
 ### Phase 3: Architecture (2-3 weeks)
 | Item | Effort | Owner | Status |
@@ -1687,24 +1691,25 @@ MoonrakerClient (orchestrator, ~300 lines)
 ### Overall Progress
 | Phase | Items | Complete | Progress |
 |-------|-------|----------|----------|
-| Phase 1: Quick Wins | 5 | 0 | 0% |
-| Phase 2: Foundation | 4 | 0 | 0% |
+| Phase 1: Quick Wins | 5 | 1 | 20% |
+| Phase 2: Foundation | 4 | 4 | 100% |
 | Phase 3: Architecture | 5 | 0 | 0% |
 | Phase 4: Polish | 4 | 0 | 0% |
-| **Total** | **18** | **0** | **0%** |
+| **Total** | **18** | **5** | **28%** |
 
 ### Metrics Dashboard
 | Metric | Current | Target | Progress |
 |--------|---------|--------|----------|
-| Lines of duplicated code | ~8000 | <1000 | 0% |
+| Lines of duplicated code | ~4000 | <1000 | 50% |
 | PrinterState lines | 2808 | <500 | 0% |
 | PrintStatusPanel lines | 3782 | <1000 | 0% |
-| Panels using SubjectManagedPanel | ~50% | 100% | 50% |
+| Panels using SubjectManagedPanel | 100% | 100% | 100% |
 | Observer boilerplate instances | ~90 | <20 | 30% |
 | Modal cleanup boilerplate instances | 74 | <10 | 0% |
 
-> **Note (2026-01-09)**: Observer Factory Phase 4 complete. Migrated ~39 observers across 9 files
-> (3 pilot panels + 6 Phase 4 files) using `observe_int_sync<T>()` lambda pattern.
+> **Note (2026-01-10)**: SubjectManagedPanel universal adoption complete. 83 files migrated,
+> ~340+ subjects now use `UI_MANAGED_SUBJECT_*` macros with automatic RAII cleanup.
+> Observer Factory Phase 4 also complete (9 files migrated).
 
 ---
 
@@ -1857,3 +1862,5 @@ private:
 |------|--------|---------|
 | 2026-01-08 | Claude | Initial document creation |
 | 2026-01-09 | Claude | Observer factory: Phase 1-3 complete. Factory implemented (466 lines, 12 tests), 3 pilot panels migrated (FilamentPanel, ControlsPanel, ExtrusionPanel). Net -146 lines. 6 files/13 observers remaining. |
+| 2026-01-10 | Claude | SubjectManagedPanel universal adoption complete. 83 files migrated, ~340+ subjects using RAII. Added UI_MANAGED_SUBJECT_* macros (INT, STRING, STRING_N, POINTER, COLOR). Phase 2: Foundation now 100% complete. |
+| 2026-01-11 | Claude | **Hardware Discovery Refactor complete** (separate effort from this plan). Created `PrinterHardwareDiscovery` as single source of truth. Deleted `PrinterCapabilities`. Moved bed mesh to MoonrakerAPI. Clean architecture: MoonrakerClient (transport) -> callbacks -> MoonrakerAPI (domain). See `docs/HARDWARE_DISCOVERY_REFACTOR.md`. |
