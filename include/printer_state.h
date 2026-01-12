@@ -11,6 +11,7 @@
 #include "printer_hardware_discovery.h"
 #include "printer_led_state.h"
 #include "printer_motion_state.h"
+#include "printer_print_state.h"
 #include "printer_temperature_state.h"
 #include "spdlog/spdlog.h"
 #include "subject_managed_panel.h"
@@ -236,15 +237,15 @@ class PrinterState {
         return temperature_state_.get_bed_target_subject();
     }
 
-    // Print progress subjects
+    // Print progress subjects - delegated to PrinterPrintState component
     lv_subject_t* get_print_progress_subject() {
-        return &print_progress_;
+        return print_domain_.get_print_progress_subject();
     } // 0-100
     lv_subject_t* get_print_filename_subject() {
-        return &print_filename_;
+        return print_domain_.get_print_filename_subject();
     }
     lv_subject_t* get_print_state_subject() {
-        return &print_state_;
+        return print_domain_.get_print_state_subject();
     } // "standby", "printing", "paused", "complete" (string for UI display)
 
     /**
@@ -257,7 +258,7 @@ class PrinterState {
      * @return Pointer to string subject
      */
     lv_subject_t* get_print_thumbnail_path_subject() {
-        return &print_thumbnail_path_;
+        return print_domain_.get_print_thumbnail_path_subject();
     }
 
     /**
@@ -280,7 +281,7 @@ class PrinterState {
      * @return Pointer to integer subject (cast value to PrintJobState)
      */
     lv_subject_t* get_print_state_enum_subject() {
-        return &print_state_enum_;
+        return print_domain_.get_print_state_enum_subject();
     }
 
     /**
@@ -293,7 +294,7 @@ class PrinterState {
      * @return Pointer to integer subject (0 or 1)
      */
     lv_subject_t* get_print_active_subject() {
-        return &print_active_;
+        return print_domain_.get_print_active_subject();
     }
 
     /**
@@ -309,7 +310,7 @@ class PrinterState {
      * @return Pointer to integer subject (cast value to PrintOutcome)
      */
     lv_subject_t* get_print_outcome_subject() {
-        return &print_outcome_;
+        return print_domain_.get_print_outcome_subject();
     }
 
     /**
@@ -331,7 +332,7 @@ class PrinterState {
      * @return Pointer to integer subject (0 or 1)
      */
     lv_subject_t* get_print_show_progress_subject() {
-        return &print_show_progress_;
+        return print_domain_.get_print_show_progress_subject();
     }
 
     /**
@@ -343,7 +344,7 @@ class PrinterState {
      * @return Pointer to string subject
      */
     lv_subject_t* get_print_display_filename_subject() {
-        return &print_display_filename_;
+        return print_domain_.get_print_display_filename_subject();
     }
 
     /**
@@ -401,7 +402,7 @@ class PrinterState {
      * even though the printer's physical state may still be STANDBY.
      */
     [[nodiscard]] bool is_print_in_progress() const {
-        return lv_subject_get_int(const_cast<lv_subject_t*>(&print_in_progress_)) != 0;
+        return print_domain_.is_print_in_progress();
     }
 
     /**
@@ -418,15 +419,16 @@ class PrinterState {
      * Value is 1 when print preparation is in progress, 0 otherwise.
      */
     lv_subject_t* get_print_in_progress_subject() {
-        return &print_in_progress_;
+        return print_domain_.get_print_in_progress_subject();
     }
 
     // Layer tracking subjects (from print_stats.info.current_layer/total_layer)
+    // Delegated to PrinterPrintState component
     lv_subject_t* get_print_layer_current_subject() {
-        return &print_layer_current_;
+        return print_domain_.get_print_layer_current_subject();
     }
     lv_subject_t* get_print_layer_total_subject() {
-        return &print_layer_total_;
+        return print_domain_.get_print_layer_total_subject();
     }
 
     /**
@@ -436,15 +438,15 @@ class PrinterState {
      * Moonraker notifications may update this later via SET_PRINT_STATS_INFO.
      */
     void set_print_layer_total(int total) {
-        lv_subject_set_int(&print_layer_total_, total);
+        print_domain_.set_print_layer_total(total);
     }
 
-    // Print time tracking subjects (in seconds)
+    // Print time tracking subjects (in seconds) - delegated to PrinterPrintState
     lv_subject_t* get_print_duration_subject() {
-        return &print_duration_;
+        return print_domain_.get_print_duration_subject();
     }
     lv_subject_t* get_print_time_left_subject() {
-        return &print_time_left_;
+        return print_domain_.get_print_time_left_subject();
     }
 
     // ========================================================================
@@ -458,7 +460,7 @@ class PrinterState {
      * Use with bind_flag_if_eq/not_eq in XML to show/hide progress overlay.
      */
     lv_subject_t* get_print_start_phase_subject() {
-        return &print_start_phase_;
+        return print_domain_.get_print_start_phase_subject();
     }
 
     /**
@@ -468,7 +470,7 @@ class PrinterState {
      * Use with bind_text in XML.
      */
     lv_subject_t* get_print_start_message_subject() {
-        return &print_start_message_;
+        return print_domain_.get_print_start_message_subject();
     }
 
     /**
@@ -478,7 +480,7 @@ class PrinterState {
      * Use with bind_value on lv_bar in XML.
      */
     lv_subject_t* get_print_start_progress_subject() {
-        return &print_start_progress_;
+        return print_domain_.get_print_start_progress_subject();
     }
 
     /**
@@ -1208,33 +1210,15 @@ class PrinterState {
     /// Fan state component (fan speed, multi-fan tracking)
     helix::PrinterFanState fan_state_;
 
-    // Print progress subjects
-    lv_subject_t print_progress_;         // Integer 0-100
-    lv_subject_t print_filename_;         // String buffer
-    lv_subject_t print_state_;            // String buffer (for UI display binding)
-    lv_subject_t print_state_enum_;       // Integer: PrintJobState enum (for type-safe logic)
-    lv_subject_t print_outcome_;          // Integer: PrintOutcome enum (terminal state persistence)
-    lv_subject_t print_active_;           // Integer: 1 when PRINTING/PAUSED, 0 otherwise
-    lv_subject_t print_show_progress_;    // Integer: 1 when active AND not in start phase
-    lv_subject_t print_display_filename_; // String: clean filename for UI display
-    lv_subject_t print_thumbnail_path_;   // String: LVGL path to current print thumbnail
+    /// Print state component (progress, state, timing, layers, print start)
+    helix::PrinterPrintState print_domain_;
 
-    // Layer tracking subjects (from Moonraker print_stats.info)
-    lv_subject_t print_layer_current_; // Current layer (0-based)
-    lv_subject_t print_layer_total_;   // Total layers from file metadata
-
-    // Print time tracking subjects (in seconds)
-    lv_subject_t print_duration_;  // Elapsed print time in seconds
-    lv_subject_t print_time_left_; // Estimated remaining time in seconds
-
-    // Print start progress subjects (for PRINT_START macro tracking)
-    lv_subject_t print_start_phase_;    // Integer: PrintStartPhase enum value
-    lv_subject_t print_start_message_;  // String: human-readable phase message
-    lv_subject_t print_start_progress_; // Integer: 0-100% estimated progress
-
-    // Double-tap prevention: 1 while print workflow is executing, 0 otherwise
-    // (G-code downloading/modifying/uploading - may take 20+ seconds for large files)
-    lv_subject_t print_in_progress_;
+    // Note: Print subjects are now managed by print_domain_ component
+    // (print_progress_, print_filename_, print_state_, print_state_enum_,
+    //  print_outcome_, print_active_, print_show_progress_, print_display_filename_,
+    //  print_thumbnail_path_, print_layer_current_, print_layer_total_,
+    //  print_duration_, print_time_left_, print_start_phase_, print_start_message_,
+    //  print_start_progress_, print_in_progress_)
 
     // Note: Motion subjects (position_x_, position_y_, position_z_, homed_axes_,
     // speed_factor_, flow_factor_, gcode_z_offset_, pending_z_offset_delta_)
@@ -1327,14 +1311,10 @@ class PrinterState {
 
     // String buffers for subject storage
     // Note: homed_axes_buf_ is now in motion_state_ component
-    char print_filename_buf_[256];
-    char print_display_filename_buf_[128]; // Clean filename for UI display
-    char print_thumbnail_path_buf_[512];   // LVGL path to current print thumbnail
-    char print_state_buf_[32];
+    // Note: print-related buffers are now in print_domain_ component
     char printer_connection_message_buf_[128];
     char klipper_version_buf_[64];
     char moonraker_version_buf_[64];
-    char print_start_message_buf_[64]; // "Heating Nozzle...", "Homing...", etc.
     char hardware_status_title_buf_[64];
     char hardware_status_detail_buf_[128];
     char hardware_issues_label_buf_[48]; // "1 Hardware Issue" / "5 Hardware Issues"
@@ -1374,7 +1354,6 @@ class PrinterState {
     void set_klipper_version_internal(const std::string& version);
     void set_moonraker_version_internal(const std::string& version);
     void set_klippy_state_internal(KlippyState state);
-    void set_print_in_progress_internal(bool in_progress);
     void set_printer_type_internal(const std::string& type);
 
     /**
@@ -1393,13 +1372,4 @@ class PrinterState {
      * Must be called from main thread (typically via async callbacks).
      */
     void update_gcode_modification_visibility();
-
-    /**
-     * @brief Update print_show_progress_ combined subject
-     *
-     * Sets print_show_progress_ to 1 only when print_active==1 AND print_start_phase==IDLE.
-     * Called whenever either component subject changes.
-     * Must be called from main thread.
-     */
-    void update_print_show_progress();
 };
