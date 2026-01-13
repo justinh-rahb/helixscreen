@@ -118,6 +118,10 @@ PrintStatusPanel::PrintStatusPanel(PrinterState& printer_state, MoonrakerAPI* ap
             spdlog::debug("[{}] Configured LED: {} (observing state)", get_name(), configured_led);
         }
     }
+
+    // Create filament runout handler (extracted from PrintStatusPanel)
+    runout_handler_ = std::make_unique<helix::ui::FilamentRunoutHandler>(api_);
+    spdlog::debug("[{}] Created filament runout handler", get_name());
 }
 
 PrintStatusPanel::~PrintStatusPanel() {
@@ -475,7 +479,9 @@ void PrintStatusPanel::on_deactivate() {
     }
 
     // Hide runout guidance modal if panel is deactivated (e.g., navbar navigation)
-    hide_runout_guidance_modal();
+    if (runout_handler_) {
+        runout_handler_->hide_modal();
+    }
 }
 
 void PrintStatusPanel::cleanup() {
@@ -1269,19 +1275,15 @@ void PrintStatusPanel::on_print_state_changed(PrintJobState job_state) {
         bool show_viewer = want_viewer && gcode_loaded_;
         show_gcode_viewer(show_viewer);
 
-        // Check for runout condition when entering Paused state
-        if (new_state == PrintState::Paused) {
-            check_and_show_runout_guidance();
+        // Delegate runout guidance handling to the handler
+        if (runout_handler_) {
+            runout_handler_->on_print_state_changed(old_state, new_state);
         }
 
-        // Reset runout modal flag when resuming print
         if (new_state == PrintState::Printing) {
-            runout_modal_shown_for_pause_ = false;
-            hide_runout_guidance_modal();
-
             // Reset progress bar on new print start (not resume from pause).
             // Without this, the bar animates from its old position to the new value,
-            // showing only a partial segment (e.g., 50%→75% instead of 0%→75%).
+            // showing only a partial segment (e.g., 50%->75% instead of 0%->75%).
             if (old_state != PrintState::Paused && progress_bar_) {
                 lv_bar_set_value(progress_bar_, 0, LV_ANIM_OFF);
                 spdlog::debug("[{}] Reset progress bar for new print", get_name());
@@ -2121,166 +2123,4 @@ void PrintStatusPanel::end_preparing(bool success) {
         set_state(PrintState::Idle);
         spdlog::warn("[{}] Preparation cancelled or failed", get_name());
     }
-}
-
-// ============================================================================
-// Runout Guidance Modal
-// ============================================================================
-
-void PrintStatusPanel::check_and_show_runout_guidance() {
-    // Only show once per pause event
-    if (runout_modal_shown_for_pause_) {
-        return;
-    }
-
-    // Skip if AMS/MMU present and not forced (runout during swaps is normal)
-    if (!get_runtime_config()->should_show_runout_modal()) {
-        return;
-    }
-
-    auto& sensor_mgr = helix::FilamentSensorManager::instance();
-
-    // Check if any runout sensor shows no filament
-    if (sensor_mgr.has_any_runout()) {
-        spdlog::info("[{}] Runout detected during pause - showing guidance modal", get_name());
-        show_runout_guidance_modal();
-        runout_modal_shown_for_pause_ = true;
-    }
-}
-
-void PrintStatusPanel::show_runout_guidance_modal() {
-    if (runout_modal_.is_visible()) {
-        // Already showing
-        return;
-    }
-
-    spdlog::info("[{}] Showing runout guidance modal", get_name());
-
-    // Configure callbacks for the three options
-    runout_modal_.set_on_load_filament([this]() {
-        spdlog::info("[{}] User chose to load filament after runout", get_name());
-        // Navigate to filament panel for loading
-        ui_nav_set_active(UI_PANEL_FILAMENT);
-    });
-
-    runout_modal_.set_on_resume([this]() {
-        // Check if filament is now present before allowing resume
-        auto& sensor_mgr = helix::FilamentSensorManager::instance();
-        if (sensor_mgr.has_any_runout()) {
-            spdlog::warn("[{}] User attempted resume but filament still not detected", get_name());
-            NOTIFY_WARNING("Insert filament before resuming");
-            return; // Modal stays open - user needs to load filament first
-        }
-
-        // Check if resume slot is available
-        const auto& resume_info = StandardMacros::instance().get(StandardMacroSlot::Resume);
-        if (resume_info.is_empty()) {
-            spdlog::warn("[{}] Resume macro slot is empty", get_name());
-            NOTIFY_WARNING("Resume macro not configured");
-            return;
-        }
-
-        spdlog::info("[{}] User chose to resume print after runout", get_name());
-
-        // Resume the print via StandardMacros
-        if (api_) {
-            spdlog::info("[{}] Using StandardMacros resume: {}", get_name(),
-                         resume_info.get_macro());
-            StandardMacros::instance().execute(
-                StandardMacroSlot::Resume, api_,
-                []() { spdlog::info("[PrintStatusPanel] Print resumed after runout"); },
-                [](const MoonrakerError& err) {
-                    spdlog::error("[PrintStatusPanel] Failed to resume print: {}", err.message);
-                    NOTIFY_ERROR("Failed to resume: {}", err.user_message());
-                });
-        }
-    });
-
-    runout_modal_.set_on_cancel_print([this]() {
-        spdlog::info("[{}] User chose to cancel print after runout", get_name());
-
-        // Check if cancel slot is available
-        const auto& cancel_info = StandardMacros::instance().get(StandardMacroSlot::Cancel);
-        if (cancel_info.is_empty()) {
-            spdlog::warn("[{}] Cancel macro slot is empty", get_name());
-            NOTIFY_WARNING("Cancel macro not configured");
-            return;
-        }
-
-        // Cancel the print via StandardMacros
-        if (api_) {
-            spdlog::info("[{}] Using StandardMacros cancel: {}", get_name(),
-                         cancel_info.get_macro());
-            StandardMacros::instance().execute(
-                StandardMacroSlot::Cancel, api_,
-                []() { spdlog::info("[PrintStatusPanel] Print cancelled after runout"); },
-                [](const MoonrakerError& err) {
-                    spdlog::error("[PrintStatusPanel] Failed to cancel print: {}", err.message);
-                    NOTIFY_ERROR("Failed to cancel: {}", err.user_message());
-                });
-        }
-    });
-
-    runout_modal_.set_on_unload_filament([this]() {
-        spdlog::info("[{}] User chose to unload filament after runout", get_name());
-
-        const auto& unload_info = StandardMacros::instance().get(StandardMacroSlot::UnloadFilament);
-        if (unload_info.is_empty()) {
-            spdlog::warn("[{}] Unload filament macro slot is empty", get_name());
-            NOTIFY_WARNING("Unload macro not configured");
-            return;
-        }
-
-        if (api_) {
-            spdlog::info("[{}] Using StandardMacros unload: {}", get_name(),
-                         unload_info.get_macro());
-            StandardMacros::instance().execute(
-                StandardMacroSlot::UnloadFilament, api_,
-                []() { spdlog::info("[PrintStatusPanel] Unload filament started"); },
-                [](const MoonrakerError& err) {
-                    spdlog::error("[PrintStatusPanel] Failed to unload filament: {}", err.message);
-                    NOTIFY_ERROR("Failed to unload: {}", err.user_message());
-                });
-        }
-    });
-
-    runout_modal_.set_on_purge([this]() {
-        spdlog::info("[{}] User chose to purge after runout", get_name());
-
-        const auto& purge_info = StandardMacros::instance().get(StandardMacroSlot::Purge);
-        if (purge_info.is_empty()) {
-            spdlog::warn("[{}] Purge macro slot is empty", get_name());
-            NOTIFY_WARNING("Purge macro not configured");
-            return;
-        }
-
-        if (api_) {
-            spdlog::info("[{}] Using StandardMacros purge: {}", get_name(), purge_info.get_macro());
-            StandardMacros::instance().execute(
-                StandardMacroSlot::Purge, api_,
-                []() { spdlog::info("[PrintStatusPanel] Purge started"); },
-                [](const MoonrakerError& err) {
-                    spdlog::error("[PrintStatusPanel] Failed to purge: {}", err.message);
-                    NOTIFY_ERROR("Failed to purge: {}", err.user_message());
-                });
-        }
-    });
-
-    runout_modal_.set_on_ok_dismiss([this]() {
-        spdlog::info("[{}] User dismissed runout modal (idle mode)", get_name());
-        // Just hide the modal - no action needed
-    });
-
-    if (!runout_modal_.show(lv_screen_active())) {
-        spdlog::error("[{}] Failed to create runout guidance modal", get_name());
-    }
-}
-
-void PrintStatusPanel::hide_runout_guidance_modal() {
-    if (!runout_modal_.is_visible()) {
-        return;
-    }
-
-    spdlog::debug("[{}] Hiding runout guidance modal", get_name());
-    runout_modal_.hide();
 }

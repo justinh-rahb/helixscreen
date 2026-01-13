@@ -3,13 +3,13 @@
 
 #pragma once
 
+#include "ui_filament_runout_handler.h"
 #include "ui_modal.h"
 #include "ui_observer_guard.h"
 #include "ui_print_cancel_modal.h"
 #include "ui_print_exclude_object_manager.h"
 #include "ui_print_light_timelapse.h"
 #include "ui_print_tune_overlay.h"
-#include "ui_runout_guidance_modal.h"
 #include "ui_save_z_offset_modal.h"
 
 #include "overlay_base.h"
@@ -152,6 +152,9 @@ class PrintStatusPanel : public OverlayBase {
         api_ = api;
         if (exclude_manager_) {
             exclude_manager_->set_api(api);
+        }
+        if (runout_handler_) {
+            runout_handler_->set_api(api);
         }
     }
 
@@ -508,37 +511,12 @@ class PrintStatusPanel : public OverlayBase {
     /// Print cancel confirmation modal (RAII - auto-hides when destroyed)
     PrintCancelModal cancel_modal_;
 
-    /// Runout guidance modal (RAII - auto-hides when destroyed)
-    RunoutGuidanceModal runout_modal_;
-
-    /// Flag to track if runout modal was shown for current pause
-    /// Reset when print resumes or ends, prevents repeated modal popups
-    bool runout_modal_shown_for_pause_ = false;
-
     //
-    // === Runout Guidance Modal ===
+    // === Filament Runout Handler ===
     //
 
-    /**
-     * @brief Show the runout guidance modal
-     *
-     * Called when print pauses and runout sensor shows no filament.
-     * Shows three options: Load Filament, Resume Print, Cancel Print.
-     */
-    void show_runout_guidance_modal();
-
-    /**
-     * @brief Hide and cleanup the runout guidance modal
-     */
-    void hide_runout_guidance_modal();
-
-    /**
-     * @brief Check if runout condition exists and show guidance modal if appropriate
-     *
-     * Called when print transitions to Paused state. Checks if runout sensor
-     * is available and shows no filament - if so, displays guidance modal.
-     */
-    void check_and_show_runout_guidance();
+    /// Manages filament runout guidance (extracted from PrintStatusPanel)
+    std::unique_ptr<helix::ui::FilamentRunoutHandler> runout_handler_;
 };
 
 // Global instance accessor (needed by main.cpp)
