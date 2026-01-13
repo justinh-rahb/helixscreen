@@ -1,6 +1,6 @@
 # Input Shaping Panel/Wizard Implementation Plan
 
-**Status**: 🟡 In Progress - Phase 2 Complete
+**Status**: 🟡 In Progress - Phase 3 Complete
 **Created**: 2026-01-13
 **Last Updated**: 2026-01-13
 
@@ -14,7 +14,7 @@
 |-------|--------|---------|-------|
 | **Phase 1**: Core Types & API | ✅ Complete | 2 | ShaperOption, InputShaperConfig, NoiseCheckCollector, all_shapers |
 | **Phase 2**: InputShaperCalibrator | ✅ Complete | 3 | State machine, API integration, 35 tests |
-| **Phase 3**: Platform Detection | ⬜ Not Started | - | |
+| **Phase 3**: Platform Detection | ✅ Complete | 4 | PlatformCapabilities, meminfo/cpuinfo parsing, 33 tests |
 | **Phase 4**: UI Panel Rewrite | ⬜ Not Started | - | |
 | **Phase 5**: Frequency Chart | ⬜ Not Started | - | |
 | **Phase 6**: First-Run Wizard | ⬜ Not Started | - | |
@@ -465,20 +465,20 @@ class InputShaperCalibrator {
 
 ### Phase 3: Platform Detection (Chunk C4)
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 #### Checkpoints:
-- [ ] Tests written for RAM detection
-- [ ] Tests written for CPU core count detection
-- [ ] Tests written for tier classification
-- [ ] `PlatformCapabilities` header created
-- [ ] `/proc/meminfo` parsing implemented
-- [ ] `/proc/cpuinfo` parsing implemented
-- [ ] Tier classification logic implemented
-- [ ] All tests pass
-- [ ] Code reviewed
+- [x] Tests written for RAM detection
+- [x] Tests written for CPU core count detection
+- [x] Tests written for tier classification
+- [x] `PlatformCapabilities` header created
+- [x] `/proc/meminfo` parsing implemented
+- [x] `/proc/cpuinfo` parsing implemented
+- [x] Tier classification logic implemented
+- [x] All tests pass (33 tests, 67 assertions)
+- [x] Code reviewed
 
-**Files to create:**
+**Files created:**
 - `include/platform_capabilities.h`
 - `src/system/platform_capabilities.cpp`
 - `tests/unit/test_platform_capabilities.cpp`
@@ -811,3 +811,22 @@ _Log each session here for continuity_
   - `src/calibration/input_shaper_calibrator.cpp`
   - `tests/unit/test_input_shaper_calibrator.cpp`
 - Next: Phase 3 - Platform Detection
+
+### Session 4 (Phase 3 Implementation)
+- Date: 2026-01-13
+- Branch: `feature/input-shaping` in worktree `helixscreen-input-shaping`
+- Completed:
+  - Created `PlatformCapabilities` class for hardware tier detection
+  - Test-first: wrote 33 test cases before implementation
+  - Implemented `/proc/meminfo` parsing for RAM detection
+  - Implemented `/proc/cpuinfo` parsing for CPU cores and BogoMIPS
+  - Tier classification: EMBEDDED (<512MB or single core), BASIC, STANDARD (>=2GB and 4+ cores)
+  - Derived capabilities: supports_charts, supports_animations, max_chart_points
+  - Integration test marked [!mayfail] for non-Linux systems
+  - Code reviewed - added edge case tests and clarifying comments
+  - All 33 tests pass (67 assertions)
+- Files created:
+  - `include/platform_capabilities.h`
+  - `src/system/platform_capabilities.cpp`
+  - `tests/unit/test_platform_capabilities.cpp`
+- Next: Phase 4 - UI Panel Rewrite
