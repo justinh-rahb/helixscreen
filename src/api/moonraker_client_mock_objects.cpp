@@ -113,6 +113,24 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
                 }
                 status_obj["idle_timeout"] = {{"state", idle_state}};
             }
+
+            // input_shaper (for get_input_shaper_config)
+            if (objects.contains("input_shaper")) {
+                // Return mock input shaper configuration
+                // Check if input shaper is configured (for testing unconfigured state)
+                if (self->is_input_shaper_configured()) {
+                    // Simulates a configured input shaper with typical values
+                    status_obj["input_shaper"] = {
+                        {"shaper_type_x", "mzv"}, {"shaper_freq_x", 36.7},
+                        {"shaper_type_y", "ei"},  {"shaper_freq_y", 47.6},
+                        {"damping_ratio_x", 0.1}, {"damping_ratio_y", 0.1}};
+                } else {
+                    // Unconfigured state - empty types and zero frequencies
+                    status_obj["input_shaper"] = {
+                        {"shaper_type_x", ""},  {"shaper_freq_x", 0.0},   {"shaper_type_y", ""},
+                        {"shaper_freq_y", 0.0}, {"damping_ratio_x", 0.1}, {"damping_ratio_y", 0.1}};
+                }
+            }
         }
 
         if (success_cb) {

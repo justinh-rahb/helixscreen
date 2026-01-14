@@ -1,6 +1,6 @@
 # Input Shaping Panel/Wizard Implementation Plan
 
-**Status**: 🔵 Planning Complete - Ready for Implementation
+**Status**: 🟡 In Progress - Phase 6 Complete
 **Created**: 2026-01-13
 **Last Updated**: 2026-01-13
 
@@ -8,16 +8,16 @@
 
 ## Progress Tracking
 
-### Overall Progress: Phase 0 of 7 Complete
+### Overall Progress: Phase 6 of 7 Complete
 
 | Phase | Status | Session | Notes |
 |-------|--------|---------|-------|
-| **Phase 1**: Core Types & API | ⬜ Not Started | - | |
-| **Phase 2**: InputShaperCalibrator | ⬜ Not Started | - | |
-| **Phase 3**: Platform Detection | ⬜ Not Started | - | |
-| **Phase 4**: UI Panel Rewrite | ⬜ Not Started | - | |
-| **Phase 5**: Frequency Chart | ⬜ Not Started | - | |
-| **Phase 6**: First-Run Wizard | ⬜ Not Started | - | |
+| **Phase 1**: Core Types & API | ✅ Complete | 2 | ShaperOption, InputShaperConfig, NoiseCheckCollector, all_shapers |
+| **Phase 2**: InputShaperCalibrator | ✅ Complete | 3 | State machine, API integration, 35 tests |
+| **Phase 3**: Platform Detection | ✅ Complete | 4 | PlatformCapabilities, meminfo/cpuinfo parsing, 33 tests |
+| **Phase 4**: UI Panel Rewrite | ✅ Complete | 5 | Panel delegates to calibrator, 78 tests total |
+| **Phase 5**: Frequency Chart | ✅ Complete | 6 | FrequencyResponseChart widget, downsampling, 193 assertions |
+| **Phase 6**: First-Run Wizard | ✅ Complete | 7 | WizardInputShaperStep, thread-safe callbacks, 17 tests (82 assertions) |
 | **Phase 7**: Cache & Test Print | ⬜ Not Started | - | |
 
 **Legend**: ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Blocked
@@ -392,22 +392,22 @@ ui_xml/
 
 ### Phase 1: Core Types & API (Chunks C2, C3)
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 #### Checkpoints:
-- [ ] Tests written for `measure_axes_noise()`
-- [ ] Tests written for `get_input_shaper_config()`
-- [ ] Tests written for enhanced `InputShaperCollector` (all shapers)
-- [ ] `ShaperOption` struct added to `calibration_types.h`
-- [ ] `InputShaperConfig` struct added to `calibration_types.h`
-- [ ] `InputShaperResult` enhanced with `all_shapers` vector
-- [ ] `measure_axes_noise()` method added to `MoonrakerAPI`
-- [ ] `get_input_shaper_config()` method added to `MoonrakerAPI`
-- [ ] `NoiseCheckCollector` implemented
-- [ ] `InputShaperCollector` enhanced to return all shapers
-- [ ] Mock implementations added
-- [ ] All tests pass
-- [ ] Code reviewed
+- [x] Tests written for `measure_axes_noise()`
+- [x] Tests written for `get_input_shaper_config()`
+- [x] Tests written for enhanced `InputShaperCollector` (all shapers)
+- [x] `ShaperOption` struct added to `calibration_types.h`
+- [x] `InputShaperConfig` struct added to `calibration_types.h`
+- [x] `InputShaperResult` enhanced with `all_shapers` vector
+- [x] `measure_axes_noise()` method added to `MoonrakerAPI`
+- [x] `get_input_shaper_config()` method added to `MoonrakerAPI`
+- [x] `NoiseCheckCollector` implemented
+- [x] `InputShaperCollector` enhanced to return all shapers
+- [x] Mock implementations added
+- [x] All tests pass (15 test cases, 75 assertions)
+- [x] Code reviewed (no blocking issues)
 
 **Files to modify:**
 - `include/calibration_types.h`
@@ -420,22 +420,22 @@ ui_xml/
 
 ### Phase 2: InputShaperCalibrator (Chunk C1)
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 #### Checkpoints:
-- [ ] Tests written for calibrator state machine
-- [ ] Tests written for check_accelerometer flow
-- [ ] Tests written for run_calibration flow
-- [ ] Tests written for apply_settings
-- [ ] Tests written for error handling
-- [ ] `InputShaperCalibrator` header created
-- [ ] State machine implemented
-- [ ] Accelerometer check flow implemented
-- [ ] Calibration run flow implemented
-- [ ] Apply settings implemented
-- [ ] Error handling implemented
-- [ ] All tests pass
-- [ ] Code reviewed
+- [x] Tests written for calibrator state machine
+- [x] Tests written for check_accelerometer flow
+- [x] Tests written for run_calibration flow
+- [x] Tests written for apply_settings
+- [x] Tests written for error handling
+- [x] `InputShaperCalibrator` header created
+- [x] State machine implemented
+- [x] Accelerometer check flow implemented
+- [x] Calibration run flow implemented
+- [x] Apply settings implemented
+- [x] Error handling implemented
+- [x] All tests pass (35 test cases, 65 assertions)
+- [x] Code reviewed
 
 **Files to create:**
 - `include/input_shaper_calibrator.h`
@@ -465,20 +465,20 @@ class InputShaperCalibrator {
 
 ### Phase 3: Platform Detection (Chunk C4)
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 #### Checkpoints:
-- [ ] Tests written for RAM detection
-- [ ] Tests written for CPU core count detection
-- [ ] Tests written for tier classification
-- [ ] `PlatformCapabilities` header created
-- [ ] `/proc/meminfo` parsing implemented
-- [ ] `/proc/cpuinfo` parsing implemented
-- [ ] Tier classification logic implemented
-- [ ] All tests pass
-- [ ] Code reviewed
+- [x] Tests written for RAM detection
+- [x] Tests written for CPU core count detection
+- [x] Tests written for tier classification
+- [x] `PlatformCapabilities` header created
+- [x] `/proc/meminfo` parsing implemented
+- [x] `/proc/cpuinfo` parsing implemented
+- [x] Tier classification logic implemented
+- [x] All tests pass (33 tests, 67 assertions)
+- [x] Code reviewed
 
-**Files to create:**
+**Files created:**
 - `include/platform_capabilities.h`
 - `src/system/platform_capabilities.cpp`
 - `tests/unit/test_platform_capabilities.cpp`
@@ -487,81 +487,86 @@ class InputShaperCalibrator {
 
 ### Phase 4: UI Panel Rewrite (Chunk C5)
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 #### Checkpoints:
-- [ ] Integration tests written with mock calibrator
-- [ ] `InputShaperPanel` header updated
-- [ ] State machine simplified (delegates to calibrator)
-- [ ] XML files created for all states
-- [ ] IDLE state UI working
-- [ ] CHECKING_ADXL state UI working
-- [ ] TESTING state UI working (with progress)
-- [ ] RESULTS state UI working
-- [ ] REVIEW state UI working
-- [ ] COMPLETE state UI working
-- [ ] Mock mode testing passes
-- [ ] Code reviewed
+- [x] Integration tests written with mock calibrator
+- [x] `InputShaperPanel` header updated
+- [x] State machine simplified (delegates to calibrator)
+- [x] XML files created for all states (kept existing unified XML approach)
+- [x] IDLE state UI working
+- [x] MEASURING state UI working (with calibrator delegation)
+- [x] RESULTS state UI working
+- [x] ERROR state UI working
+- [x] Mock mode testing passes
+- [x] Code reviewed - fixed async callback safety [L012]
 
-**Files to modify:**
-- `include/ui_panel_input_shaper.h`
-- `src/ui/ui_panel_input_shaper.cpp`
+**Files modified:**
+- `include/ui_panel_input_shaper.h` - Added calibrator member, getter for testing
+- `src/ui/ui_panel_input_shaper.cpp` - Delegates to calibrator instead of direct API calls
 
-**Files to create:**
-- `ui_xml/input_shaper_panel.xml`
-- `ui_xml/input_shaper_idle.xml`
-- `ui_xml/input_shaper_preflight.xml`
-- `ui_xml/input_shaper_testing.xml`
-- `ui_xml/input_shaper_results.xml`
-- `ui_xml/input_shaper_review.xml`
-- `ui_xml/input_shaper_complete.xml`
+**Files created:**
+- `tests/unit/test_input_shaper_panel_integration.cpp` - Mock calibrator and contract tests
+
+**Design decision:** Kept existing unified `input_shaper_panel.xml` with subject-bound visibility
+instead of creating separate XML files per state. This is simpler and already works well.
 
 ---
 
 ### Phase 5: Frequency Chart (Chunk C6)
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 #### Checkpoints:
-- [ ] Chart widget header created
-- [ ] LVGL chart implementation done
-- [ ] Downsampling for BASIC tier implemented
-- [ ] Table fallback for EMBEDDED tier implemented
-- [ ] XML component created
-- [ ] Screenshot tests pass
-- [ ] Code reviewed
+- [x] Chart widget header created
+- [x] LVGL chart implementation done
+- [x] Downsampling for BASIC tier implemented
+- [x] Table fallback for EMBEDDED tier implemented
+- [x] XML container added to input_shaper_panel.xml
+- [x] Tests pass (193 assertions in 23 test cases)
+- [x] Code reviewed (9/10 quality rating)
 
-**Files to create:**
-- `include/ui_frequency_chart.h`
-- `src/ui/ui_frequency_chart.cpp`
-- `ui_xml/components/frequency_chart.xml`
+**Files created:**
+- `include/ui_frequency_response_chart.h`
+- `src/ui/ui_frequency_response_chart.cpp`
+- `tests/unit/test_frequency_response_chart.cpp`
+
+**Files modified:**
+- `ui_xml/input_shaper_panel.xml` - Added chart_container element
 
 ---
 
 ### Phase 6: First-Run Wizard Integration (Chunk C7)
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 #### Checkpoints:
-- [ ] Tests written for skip logic
-- [ ] Tests written for wizard flow
-- [ ] `WizardInputShaperStep` header created
-- [ ] Step implementation using calibrator
-- [ ] XML template created
-- [ ] Integration with `ui_wizard.cpp`
-- [ ] Skip logic works when no accelerometer
-- [ ] Full flow works with accelerometer
-- [ ] All tests pass
-- [ ] Code reviewed
+- [x] Tests written for skip logic
+- [x] Tests written for wizard flow
+- [x] `WizardInputShaperStep` header created
+- [x] Step implementation using calibrator
+- [x] XML template created
+- [x] Integration with `ui_wizard.cpp`
+- [x] Skip logic works when no accelerometer
+- [x] Full flow works with accelerometer
+- [x] All tests pass (309 assertions in 63 test cases)
+- [x] Code reviewed
 
-**Files to create:**
+**Files created:**
 - `include/ui_wizard_input_shaper.h`
 - `src/ui/ui_wizard_input_shaper.cpp`
 - `ui_xml/wizard_input_shaper.xml`
 - `tests/unit/test_wizard_input_shaper_step.cpp`
 
-**Files to modify:**
-- `src/ui/ui_wizard.cpp`
+**Files modified:**
+- `src/ui/ui_wizard.cpp` - Added step 9 (input shaper), renumbered summary to step 10
+- `src/xml_registration.cpp` - Registered wizard_input_shaper.xml component
+
+**Design decisions:**
+- Wizard step is skippable when no accelerometer detected
+- Uses existing InputShaperCalibrator for calibration workflow
+- User can "Skip for now" to configure later in Settings
+- Step validated when calibration complete OR user explicitly skips
 
 ---
 
@@ -773,3 +778,106 @@ _Log each session here for continuity_
 - Date: 2026-01-13
 - Completed: Initial plan creation, tracking document
 - Next: Phase 1 - Core Types & API
+
+### Session 2 (Phase 1 Implementation)
+- Date: 2026-01-13
+- Branch: `feature/input-shaping` in worktree `helixscreen-input-shaping`
+- Commit: `9df8822f` - feat(input-shaper): complete Phase 1 - Core Types & API
+- Completed:
+  - Created worktree from origin/main
+  - Wrote tests first (10 new test cases)
+  - Added `ShaperOption`, `InputShaperConfig` structs
+  - Added `all_shapers` vector to `InputShaperResult`
+  - Implemented `measure_axes_noise()` with `NoiseCheckCollector`
+  - Implemented `get_input_shaper_config()`
+  - Enhanced `InputShaperCollector` to populate all_shapers
+  - Mock support: `set_accelerometer_available()`, `set_input_shaper_configured()`
+  - All 15 input shaper tests pass (75 assertions)
+  - Code reviewed - no blocking issues
+- Next: Phase 2 - InputShaperCalibrator coordinator class
+
+### Session 3 (Phase 2 Implementation)
+- Date: 2026-01-13
+- Branch: `feature/input-shaping` in worktree `helixscreen-input-shaping`
+- Commit: `8f1de83e` - feat(input-shaper): complete Phase 2 - InputShaperCalibrator
+- Completed:
+  - Created `InputShaperCalibrator` class with state machine (IDLE, CHECKING_ADXL, TESTING_X, TESTING_Y, READY)
+  - Test-first: wrote 35 test cases before implementation
+  - Implemented `check_accelerometer()` using `api_->measure_axes_noise()`
+  - Implemented `run_calibration()` using `api_->start_resonance_test()`
+  - Implemented `apply_settings()` using `api_->set_input_shaper()`
+  - Implemented `save_to_config()` using `api_->save_config()`
+  - Input validation (axis, frequency, shaper_type)
+  - Concurrent run protection (guard against double calibration)
+  - All 35 calibrator tests pass (65 assertions)
+  - Code reviewed - clean implementation
+- Files created:
+  - `include/input_shaper_calibrator.h`
+  - `src/calibration/input_shaper_calibrator.cpp`
+  - `tests/unit/test_input_shaper_calibrator.cpp`
+- Next: Phase 3 - Platform Detection
+
+### Session 4 (Phase 3 Implementation)
+- Date: 2026-01-13
+- Branch: `feature/input-shaping` in worktree `helixscreen-input-shaping`
+- Completed:
+  - Created `PlatformCapabilities` class for hardware tier detection
+  - Test-first: wrote 33 test cases before implementation
+  - Implemented `/proc/meminfo` parsing for RAM detection
+  - Implemented `/proc/cpuinfo` parsing for CPU cores and BogoMIPS
+  - Tier classification: EMBEDDED (<512MB or single core), BASIC, STANDARD (>=2GB and 4+ cores)
+  - Derived capabilities: supports_charts, supports_animations, max_chart_points
+  - Integration test marked [!mayfail] for non-Linux systems
+  - Code reviewed - added edge case tests and clarifying comments
+  - All 33 tests pass (67 assertions)
+- Files created:
+  - `include/platform_capabilities.h`
+  - `src/system/platform_capabilities.cpp`
+  - `tests/unit/test_platform_capabilities.cpp`
+- Next: Phase 4 - UI Panel Rewrite
+
+### Session 5 (Phase 4 Implementation)
+- Date: 2026-01-13
+- Branch: `feature/input-shaping` in worktree `helixscreen-input-shaping`
+- Completed:
+  - Refactored `InputShaperPanel` to delegate to `InputShaperCalibrator`
+  - Test-first: wrote integration tests with mock calibrator (28 new tests)
+  - Added `calibrator_` unique_ptr member to panel
+  - Added `get_calibrator()` accessor for testing
+  - Delegated: start_calibration -> calibrator_->run_calibration()
+  - Delegated: measure_noise -> calibrator_->check_accelerometer()
+  - Delegated: apply_recommendation -> calibrator_->apply_settings()
+  - Delegated: save_configuration -> calibrator_->save_to_config()
+  - Delegated: cancel_calibration -> calibrator_->cancel()
+  - Code reviewed: fixed missing `alive_` checks in async callbacks [L012]
+  - All 78 input shaper tests pass (152 assertions)
+- Files modified:
+  - `include/ui_panel_input_shaper.h`
+  - `src/ui/ui_panel_input_shaper.cpp`
+- Files created:
+  - `tests/unit/test_input_shaper_panel_integration.cpp`
+- Design decision: Kept existing unified XML approach instead of separate files per state
+- Next: Phase 5 - Frequency Chart
+
+### Session 6 (Phase 5 Implementation)
+- Date: 2026-01-13
+- Branch: `feature/input-shaping` in worktree `helixscreen-input-shaping`
+- Completed:
+  - Created `FrequencyResponseChart` widget following `ui_temp_graph` pattern
+  - Test-first: wrote 23 test cases (193 assertions) before implementation
+  - C-style procedural API with opaque struct
+  - Series management (add, remove, show/hide, up to 8 series)
+  - Data downsampling for BASIC tier (50 points) and STANDARD tier (200 points)
+  - Table mode fallback for EMBEDDED tier (is_chart_mode = false)
+  - Peak frequency marking per series
+  - Frequency and amplitude range configuration
+  - Platform tier switching (creates/destroys LVGL chart widget dynamically)
+  - Code reviewed: 9/10 quality rating, fixed division-by-zero edge case
+  - All tests pass
+- Files created:
+  - `include/ui_frequency_response_chart.h`
+  - `src/ui/ui_frequency_response_chart.cpp`
+  - `tests/unit/test_frequency_response_chart.cpp`
+- Files modified:
+  - `ui_xml/input_shaper_panel.xml` - Added chart_container element
+- Next: Phase 6 - First-Run Wizard

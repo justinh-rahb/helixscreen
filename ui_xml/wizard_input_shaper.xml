@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2025-2026 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<component>
+  <!-- First-Run Wizard: Input Shaper Calibration (Optional) -->
+  <!-- Offers accelerometer-based input shaper calibration when available -->
+  <consts>
+    <!-- Step metadata (read by wizard orchestrator) -->
+    <str name="step_title" value="Printer Setup: Input Shaping"/>
+    <str name="step_subtitle" value="Calibrate input shaping to reduce ringing artifacts in prints"/>
+    <int name="step_order" value="9"/>
+  </consts>
+  <view name="wizard_input_shaper_root"
+        extends="lv_obj" width="100%" height="100%" style_bg_opa="0" style_border_width="0" style_pad_all="0"
+        flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
+
+    <!-- Main content card -->
+    <ui_card width="100%"
+             flex_grow="1" style_radius="#border_radius" style_pad_all="#space_lg" style_pad_gap="#space_lg"
+             flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
+
+      <!-- Info section -->
+      <lv_obj width="100%" flex_flow="column" style_bg_opa="0" style_pad_gap="#space_sm">
+        <text_body width="100%"
+                   text="Input shaping reduces vibration artifacts (ringing) in your prints." style_text_align="center"/>
+        <text_small width="100%"
+                    text="An accelerometer was detected on your printer." style_text_align="center"
+                    style_text_color="#text_secondary"/>
+      </lv_obj>
+
+      <!-- Status display -->
+      <lv_obj width="100%" flex_flow="column" style_bg_opa="0" style_pad_gap="#space_sm" style_pad_top="#space_lg">
+        <text_body width="100%" bind_text="wizard_input_shaper_status" style_text_align="center"/>
+
+        <!-- Progress bar (visible during calibration) -->
+        <lv_bar name="calibration_progress_bar"
+                width="80%" height="16" bind_int="wizard_input_shaper_progress" range_min="0" range_max="100"
+                style_bg_color="#card_bg" style_radius="#border_radius">
+          <lv_bar-bind_flag_if_eq subject="wizard_input_shaper_progress" flag="hidden" ref_value="0"/>
+        </lv_bar>
+      </lv_obj>
+
+      <!-- Spacer -->
+      <lv_obj flex_grow="1" style_bg_opa="0"/>
+
+      <!-- Action buttons -->
+      <lv_obj width="100%" flex_flow="row" style_bg_opa="0" style_pad_gap="#space_md" style_flex_main_place="center">
+
+        <!-- Skip button -->
+        <lv_button name="skip_calibration_btn"
+                   width="#wizard_button_width" height="#button_height" style_bg_color="#card_bg"
+                   style_radius="#border_radius">
+          <text_body text="Skip for now" style_text_color="#text_primary"/>
+          <event_cb trigger="clicked" callback="on_skip_is_calibration"/>
+        </lv_button>
+
+        <!-- Start calibration button -->
+        <lv_button name="start_calibration_btn"
+                   width="#wizard_button_width" height="#button_height" style_bg_color="#primary_color"
+                   style_radius="#border_radius">
+          <text_body text="Start Calibration" style_text_color="#text_primary"/>
+          <event_cb trigger="clicked" callback="on_start_is_calibration"/>
+        </lv_button>
+
+      </lv_obj>
+
+    </ui_card>
+  </view>
+</component>

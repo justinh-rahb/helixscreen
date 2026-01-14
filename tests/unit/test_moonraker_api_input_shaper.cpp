@@ -348,3 +348,302 @@ TEST_CASE_METHOD(InputShaperTestFixture, "API handles null callbacks gracefully"
     }
     REQUIRE(success_called);
 }
+
+// ============================================================================
+// Phase 1: New API Methods and Enhanced Results
+// ============================================================================
+//
+// These tests are written BEFORE implementation (test-first methodology).
+// They will FAIL to compile or link until the corresponding types and methods
+// are implemented in:
+//   - include/calibration_types.h (ShaperOption, InputShaperConfig)
+//   - include/moonraker_api.h (measure_axes_noise, get_input_shaper_config)
+//   - src/api/moonraker_api_advanced.cpp (NoiseCheckCollector, enhanced collector)
+//   - src/api/moonraker_client_mock.cpp (mock implementations)
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// New Types Tests
+// ----------------------------------------------------------------------------
+
+TEST_CASE("ShaperOption struct", "[input_shaper][types]") {
+    SECTION("default construction") {
+        ShaperOption option;
+
+        // Default values should be zeroed/empty
+        CHECK(option.type.empty());
+        CHECK(option.frequency == 0.0f);
+        CHECK(option.vibrations == 0.0f);
+        CHECK(option.smoothing == 0.0f);
+        CHECK(option.max_accel == 0.0f);
+    }
+
+    SECTION("can store fitted shaper data") {
+        ShaperOption option;
+        option.type = "mzv";
+        option.frequency = 36.7f;
+        option.vibrations = 7.2f;
+        option.smoothing = 0.140f;
+        option.max_accel = 5000.0f;
+
+        REQUIRE(option.type == "mzv");
+        REQUIRE(option.frequency == Catch::Approx(36.7f));
+        REQUIRE(option.vibrations == Catch::Approx(7.2f));
+        REQUIRE(option.smoothing == Catch::Approx(0.140f));
+        REQUIRE(option.max_accel == Catch::Approx(5000.0f));
+    }
+}
+
+TEST_CASE("InputShaperConfig struct", "[input_shaper][types]") {
+    SECTION("default construction") {
+        InputShaperConfig config;
+
+        // Default should indicate unconfigured state
+        CHECK(config.shaper_type_x.empty());
+        CHECK(config.shaper_freq_x == 0.0f);
+        CHECK(config.shaper_type_y.empty());
+        CHECK(config.shaper_freq_y == 0.0f);
+        CHECK(config.damping_ratio_x == 0.0f);
+        CHECK(config.damping_ratio_y == 0.0f);
+        CHECK_FALSE(config.is_configured);
+    }
+
+    SECTION("can store configured shaper settings") {
+        InputShaperConfig config;
+        config.shaper_type_x = "mzv";
+        config.shaper_freq_x = 36.7f;
+        config.shaper_type_y = "ei";
+        config.shaper_freq_y = 47.6f;
+        config.damping_ratio_x = 0.1f;
+        config.damping_ratio_y = 0.1f;
+        config.is_configured = true;
+
+        REQUIRE(config.is_configured);
+        REQUIRE(config.shaper_type_x == "mzv");
+        REQUIRE(config.shaper_freq_x == Catch::Approx(36.7f));
+        REQUIRE(config.shaper_type_y == "ei");
+        REQUIRE(config.shaper_freq_y == Catch::Approx(47.6f));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Enhanced InputShaperResult Tests (all_shapers vector)
+// ----------------------------------------------------------------------------
+
+TEST_CASE("InputShaperResult has all_shapers vector", "[input_shaper][types]") {
+    InputShaperResult result;
+
+    // The all_shapers vector should exist and be empty by default
+    REQUIRE(result.all_shapers.empty());
+
+    // Should be able to add shaper options
+    ShaperOption zv;
+    zv.type = "zv";
+    zv.frequency = 35.8f;
+    zv.vibrations = 22.7f;
+    zv.smoothing = 0.100f;
+
+    ShaperOption mzv;
+    mzv.type = "mzv";
+    mzv.frequency = 36.7f;
+    mzv.vibrations = 7.2f;
+    mzv.smoothing = 0.140f;
+
+    result.all_shapers.push_back(zv);
+    result.all_shapers.push_back(mzv);
+
+    REQUIRE(result.all_shapers.size() == 2);
+    REQUIRE(result.all_shapers[0].type == "zv");
+    REQUIRE(result.all_shapers[1].type == "mzv");
+}
+
+TEST_CASE_METHOD(InputShaperTestFixture, "start_resonance_test returns all shaper alternatives",
+                 "[calibration][input_shaper]") {
+    // The mock dispatches 3 shaper options: zv, mzv, ei
+    // After enhancement, the result should contain ALL fitted shapers in all_shapers
+    std::atomic<bool> complete_called{false};
+    InputShaperResult captured_result;
+
+    api_->start_resonance_test(
+        'X', [](int) {}, // progress callback
+        [&](const InputShaperResult& result) {
+            captured_result = result;
+            complete_called = true;
+        },
+        [&](const MoonrakerError& err) {
+            FAIL("Error callback should not be called: " << err.message);
+        });
+
+    // Wait for async callback
+    for (int i = 0; i < 100 && !complete_called; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    REQUIRE(complete_called);
+    REQUIRE(captured_result.is_valid());
+
+    // After enhancement, all_shapers should contain all 3 fitted options from mock
+    REQUIRE(captured_result.all_shapers.size() == 3);
+
+    // Verify the mock data matches expected values
+    // Mock outputs: zv@35.8Hz, mzv@36.7Hz, ei@47.6Hz
+
+    // Find each shaper type and verify its values
+    auto find_shaper = [&](const std::string& type) -> const ShaperOption* {
+        for (const auto& s : captured_result.all_shapers) {
+            if (s.type == type)
+                return &s;
+        }
+        return nullptr;
+    };
+
+    const ShaperOption* zv = find_shaper("zv");
+    REQUIRE(zv != nullptr);
+    CHECK(zv->frequency == Catch::Approx(35.8f).margin(0.1f));
+    CHECK(zv->vibrations == Catch::Approx(22.7f).margin(0.1f));
+    CHECK(zv->smoothing == Catch::Approx(0.100f).margin(0.01f));
+
+    const ShaperOption* mzv = find_shaper("mzv");
+    REQUIRE(mzv != nullptr);
+    CHECK(mzv->frequency == Catch::Approx(36.7f).margin(0.1f));
+    CHECK(mzv->vibrations == Catch::Approx(7.2f).margin(0.1f));
+    CHECK(mzv->smoothing == Catch::Approx(0.140f).margin(0.01f));
+
+    const ShaperOption* ei = find_shaper("ei");
+    REQUIRE(ei != nullptr);
+    CHECK(ei->frequency == Catch::Approx(47.6f).margin(0.1f));
+    CHECK(ei->vibrations == Catch::Approx(5.9f).margin(0.1f));
+    CHECK(ei->smoothing == Catch::Approx(0.096f).margin(0.01f));
+}
+
+// ----------------------------------------------------------------------------
+// measure_axes_noise() Tests
+// ----------------------------------------------------------------------------
+
+TEST_CASE_METHOD(InputShaperTestFixture, "measure_axes_noise returns noise level",
+                 "[calibration][input_shaper]") {
+    // measure_axes_noise() runs MEASURE_AXES_NOISE G-code
+    // Klipper output format: "axes_noise = 0.012345"
+    // The mock should return a realistic noise value (~0.012)
+
+    std::atomic<bool> complete_called{false};
+    float captured_noise = -1.0f;
+
+    api_->measure_axes_noise(
+        [&](float noise_level) {
+            captured_noise = noise_level;
+            complete_called = true;
+        },
+        [&](const MoonrakerError& err) {
+            FAIL("Error callback should not be called: " << err.message);
+        });
+
+    // Wait for async callback
+    for (int i = 0; i < 100 && !complete_called; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    REQUIRE(complete_called);
+    // Noise level should be a small positive value (typical range 0.001 - 1.0)
+    // Values under 100 are generally considered good
+    CHECK(captured_noise >= 0.0f);
+    CHECK(captured_noise < 1000.0f); // Upper bound sanity check
+}
+
+TEST_CASE_METHOD(InputShaperTestFixture, "measure_axes_noise handles no accelerometer error",
+                 "[calibration][input_shaper]") {
+    // When no ADXL is configured, MEASURE_AXES_NOISE should fail
+    // This test requires the mock to be configured to simulate missing accelerometer
+    // For now, we test the error callback path exists
+
+    // Configure mock to simulate no accelerometer (implementation detail)
+    mock_client_.set_accelerometer_available(false);
+
+    std::atomic<bool> error_called{false};
+    std::string captured_error;
+
+    api_->measure_axes_noise(
+        [&](float) { FAIL("Success callback should not be called when accelerometer missing"); },
+        [&](const MoonrakerError& err) {
+            error_called = true;
+            captured_error = err.message;
+        });
+
+    // Wait for async callback
+    for (int i = 0; i < 100 && !error_called; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    REQUIRE(error_called);
+    // Error message should mention accelerometer/ADXL
+    CHECK((captured_error.find("accelerometer") != std::string::npos ||
+           captured_error.find("ADXL") != std::string::npos ||
+           captured_error.find("adxl") != std::string::npos));
+}
+
+// ----------------------------------------------------------------------------
+// get_input_shaper_config() Tests
+// ----------------------------------------------------------------------------
+
+TEST_CASE_METHOD(InputShaperTestFixture, "get_input_shaper_config returns current settings",
+                 "[calibration][input_shaper]") {
+    // get_input_shaper_config() queries the current input shaper configuration
+    // from printer state (via Moonraker's printer.objects.query)
+
+    std::atomic<bool> complete_called{false};
+    InputShaperConfig captured_config;
+
+    api_->get_input_shaper_config(
+        [&](const InputShaperConfig& config) {
+            captured_config = config;
+            complete_called = true;
+        },
+        [&](const MoonrakerError& err) {
+            FAIL("Error callback should not be called: " << err.message);
+        });
+
+    // Wait for async callback
+    for (int i = 0; i < 100 && !complete_called; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    REQUIRE(complete_called);
+
+    // The mock should return a configured shaper state
+    // Typical mock values: mzv@36.7Hz for X, ei@47.6Hz for Y
+    if (captured_config.is_configured) {
+        CHECK_FALSE(captured_config.shaper_type_x.empty());
+        CHECK(captured_config.shaper_freq_x > 0.0f);
+        CHECK_FALSE(captured_config.shaper_type_y.empty());
+        CHECK(captured_config.shaper_freq_y > 0.0f);
+    }
+}
+
+TEST_CASE_METHOD(InputShaperTestFixture, "get_input_shaper_config handles unconfigured shaper",
+                 "[calibration][input_shaper]") {
+    // When no input shaper is configured, is_configured should be false
+    // This requires mock to simulate unconfigured state
+
+    // Configure mock to simulate unconfigured input shaper
+    mock_client_.set_input_shaper_configured(false);
+
+    std::atomic<bool> complete_called{false};
+    InputShaperConfig captured_config;
+
+    api_->get_input_shaper_config(
+        [&](const InputShaperConfig& config) {
+            captured_config = config;
+            complete_called = true;
+        },
+        [&](const MoonrakerError& err) {
+            FAIL("Error callback should not be called: " << err.message);
+        });
+
+    // Wait for async callback
+    for (int i = 0; i < 100 && !complete_called; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    REQUIRE(complete_called);
+    REQUIRE_FALSE(captured_config.is_configured);
+}

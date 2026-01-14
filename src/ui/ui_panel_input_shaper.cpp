@@ -247,6 +247,15 @@ void InputShaperPanel::setup_widgets() {
 // SHOW
 // ============================================================================
 
+void InputShaperPanel::set_api(MoonrakerClient* client, MoonrakerAPI* api) {
+    client_ = client;
+    api_ = api;
+
+    // Create calibrator with API for delegated operations
+    calibrator_ = std::make_unique<helix::calibration::InputShaperCalibrator>(api_);
+    spdlog::debug("[InputShaper] Calibrator created");
+}
+
 void InputShaperPanel::show() {
     if (!overlay_root_) {
         spdlog::error("[InputShaper] Cannot show: overlay not created");
@@ -288,10 +297,11 @@ void InputShaperPanel::on_activate() {
 void InputShaperPanel::on_deactivate() {
     spdlog::debug("[InputShaper] on_deactivate()");
 
-    // If calibration is in progress, cancel it
-    if (state_ == State::MEASURING) {
+    // Cancel any in-progress calibration
+    if (state_ == State::MEASURING && calibrator_) {
         spdlog::info("[InputShaper] Cancelling calibration on deactivate");
-        cancel_calibration();
+        calibrator_->cancel();
+        set_state(State::IDLE);
     }
 
     // Call base class
@@ -338,13 +348,14 @@ void InputShaperPanel::set_state(State new_state) {
 // ============================================================================
 
 void InputShaperPanel::start_calibration(char axis) {
-    if (!api_) {
-        spdlog::error("[InputShaper] No API - cannot calibrate");
-        on_calibration_error("Internal error: API not available");
+    if (!calibrator_) {
+        spdlog::error("[InputShaper] No calibrator - cannot calibrate");
+        on_calibration_error("Internal error: calibrator not available");
         return;
     }
 
     current_axis_ = axis;
+    last_calibrated_axis_ = axis;
     shaper_results_.clear();
     recommended_type_.clear();
     recommended_freq_ = 0.0f;
@@ -360,8 +371,8 @@ void InputShaperPanel::start_calibration(char axis) {
     // Capture alive flag for destruction detection [L012]
     auto alive = alive_;
 
-    // Use the API - collector handles all the G-code response parsing
-    api_->start_resonance_test(
+    // Delegate to calibrator
+    calibrator_->run_calibration(
         axis,
         nullptr, // on_progress (not used currently)
         [this, alive](const InputShaperResult& result) {
@@ -369,87 +380,113 @@ void InputShaperPanel::start_calibration(char axis) {
                 return;
             on_calibration_result(result);
         },
-        [this, alive](const MoonrakerError& err) {
+        [this, alive](const std::string& err) {
             if (!alive->load())
                 return;
-            on_calibration_error(err.message);
+            on_calibration_error(err);
         });
 }
 
 void InputShaperPanel::measure_noise() {
-    if (!api_) {
-        spdlog::error("[InputShaper] No API - cannot measure noise");
-        on_calibration_error("Internal error: API not available");
+    if (!calibrator_) {
+        spdlog::error("[InputShaper] No calibrator - cannot measure noise");
+        on_calibration_error("Internal error: calibrator not available");
         return;
     }
 
     update_status_label("Measuring accelerometer noise...");
     set_state(State::MEASURING);
-    spdlog::info("[InputShaper] Starting MEASURE_AXES_NOISE");
+    spdlog::info("[InputShaper] Starting accelerometer check via calibrator");
 
     // Capture alive flag for destruction detection [L012]
     auto alive = alive_;
 
-    api_->execute_gcode(
-        "MEASURE_AXES_NOISE",
-        [this, alive]() {
+    calibrator_->check_accelerometer(
+        [this, alive](float noise_level) {
             if (!alive->load())
                 return;
-            spdlog::debug("[InputShaper] MEASURE_AXES_NOISE command accepted");
-            // Note: This fires when command is accepted, not when complete
-            // Results appear in console output
-            ui_toast_show(ToastSeverity::INFO, "Noise measurement started. Check console.", 3000);
+            spdlog::debug("[InputShaper] Accelerometer check complete, noise={:.4f}", noise_level);
+            char msg[64];
+            snprintf(msg, sizeof(msg), "Noise level: %.4f", noise_level);
+            ui_toast_show(ToastSeverity::INFO, msg, 3000);
             set_state(State::IDLE);
         },
-        [this, alive](const MoonrakerError& err) {
+        [this, alive](const std::string& err) {
             if (!alive->load())
                 return;
-            spdlog::error("[InputShaper] Failed to measure noise: {}", err.message);
-            on_calibration_error(err.message);
+            spdlog::error("[InputShaper] Failed to measure noise: {}", err);
+            on_calibration_error(err);
         });
 }
 
 void InputShaperPanel::cancel_calibration() {
     spdlog::info("[InputShaper] Calibration cancelled by user");
-    // Note: The API collector will continue running but we just ignore its results
-    // by checking state in the callback
+
+    // Cancel calibrator operations
+    if (calibrator_) {
+        calibrator_->cancel();
+    }
+
     set_state(State::IDLE);
 }
 
 void InputShaperPanel::apply_recommendation() {
-    if (!api_ || recommended_type_.empty() || recommended_freq_ <= 0) {
+    if (!calibrator_ || recommended_type_.empty() || recommended_freq_ <= 0) {
         spdlog::error("[InputShaper] Cannot apply - no valid recommendation");
         return;
     }
 
-    spdlog::info("[InputShaper] Applying {} axis shaper: {} @ {:.1f} Hz", current_axis_,
+    spdlog::info("[InputShaper] Applying {} axis shaper: {} @ {:.1f} Hz", last_calibrated_axis_,
                  recommended_type_, recommended_freq_);
 
-    api_->set_input_shaper(
-        current_axis_, recommended_type_, recommended_freq_,
-        []() {
+    // Construct ApplyConfig from stored recommendation
+    helix::calibration::ApplyConfig config;
+    config.axis = last_calibrated_axis_;
+    config.shaper_type = recommended_type_;
+    config.frequency = recommended_freq_;
+
+    // Capture alive for async callback safety [L012]
+    auto alive = alive_;
+
+    calibrator_->apply_settings(
+        config,
+        [alive]() {
+            if (!alive->load())
+                return;
             spdlog::info("[InputShaper] Settings applied successfully");
             ui_toast_show(ToastSeverity::SUCCESS, "Input shaper settings applied!", 2500);
         },
-        [](const MoonrakerError& err) {
-            spdlog::error("[InputShaper] Failed to apply settings: {}", err.message);
+        [alive](const std::string& err) {
+            if (!alive->load())
+                return;
+            spdlog::error("[InputShaper] Failed to apply settings: {}", err);
             ui_toast_show(ToastSeverity::ERROR, "Failed to apply settings", 3000);
         });
 }
 
 void InputShaperPanel::save_configuration() {
-    if (!api_) {
+    if (!calibrator_) {
         return;
     }
 
     spdlog::info("[InputShaper] Saving configuration (SAVE_CONFIG)");
     ui_toast_show(ToastSeverity::WARNING, "Saving config... Klipper will restart.", 3000);
 
-    api_->save_config([]() { spdlog::info("[InputShaper] SAVE_CONFIG sent - Klipper restarting"); },
-                      [](const MoonrakerError& err) {
-                          spdlog::error("[InputShaper] SAVE_CONFIG failed: {}", err.message);
-                          ui_toast_show(ToastSeverity::ERROR, "Failed to save configuration", 3000);
-                      });
+    // Capture alive for async callback safety [L012]
+    auto alive = alive_;
+
+    calibrator_->save_to_config(
+        [alive]() {
+            if (!alive->load())
+                return;
+            spdlog::info("[InputShaper] SAVE_CONFIG sent - Klipper restarting");
+        },
+        [alive](const std::string& err) {
+            if (!alive->load())
+                return;
+            spdlog::error("[InputShaper] SAVE_CONFIG failed: {}", err);
+            ui_toast_show(ToastSeverity::ERROR, "Failed to save configuration", 3000);
+        });
 }
 
 // ============================================================================

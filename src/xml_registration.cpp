@@ -237,6 +237,7 @@ void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/wizard_ams_identify.xml");
     lv_xml_register_component_from_file("A:ui_xml/wizard_led_select.xml");
     lv_xml_register_component_from_file("A:ui_xml/wizard_filament_sensor_select.xml");
+    lv_xml_register_component_from_file("A:ui_xml/wizard_input_shaper.xml");
     lv_xml_register_component_from_file("A:ui_xml/wizard_summary.xml");
 
     spdlog::debug("[XML Registration] XML component registration complete");

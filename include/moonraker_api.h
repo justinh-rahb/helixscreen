@@ -45,6 +45,7 @@
 #pragma once
 
 #include "advanced_panel_types.h"
+#include "calibration_types.h"
 #include "moonraker_client.h"
 #include "moonraker_domain_service.h"
 #include "moonraker_error.h"
@@ -1041,6 +1042,39 @@ class MoonrakerAPI {
      */
     virtual void set_input_shaper(char axis, const std::string& shaper_type, double freq_hz,
                                   SuccessCallback on_success, ErrorCallback on_error);
+
+    /// Callback for accelerometer noise level check (noise value 0-1000+, <100 is good)
+    using NoiseCheckCallback = std::function<void(float noise_level)>;
+
+    /// Callback for input shaper configuration query
+    using InputShaperConfigCallback = std::function<void(const InputShaperConfig&)>;
+
+    /**
+     * @brief Check accelerometer noise level
+     *
+     * Runs MEASURE_AXES_NOISE G-code command to measure the ambient noise
+     * level of the accelerometer. Used to verify ADXL345 is working correctly
+     * before running resonance tests.
+     *
+     * Output format from Klipper: "axes_noise = 0.012345"
+     * Values < 100 are considered good.
+     *
+     * @param on_complete Called with noise level on success
+     * @param on_error Called on failure (e.g., no accelerometer configured)
+     */
+    virtual void measure_axes_noise(NoiseCheckCallback on_complete, ErrorCallback on_error);
+
+    /**
+     * @brief Get current input shaper configuration
+     *
+     * Queries the printer state to retrieve the currently active input
+     * shaper settings for both X and Y axes.
+     *
+     * @param on_success Called with current InputShaperConfig
+     * @param on_error Called on failure
+     */
+    virtual void get_input_shaper_config(InputShaperConfigCallback on_success,
+                                         ErrorCallback on_error);
 
     // ========================================================================
     // Advanced Panel Operations - Spoolman

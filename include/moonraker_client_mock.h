@@ -404,6 +404,46 @@ class MoonrakerClientMock : public MoonrakerClient {
     }
 
     /**
+     * @brief Set accelerometer availability for testing
+     *
+     * When false, MEASURE_AXES_NOISE will dispatch an error response
+     * simulating missing accelerometer configuration.
+     *
+     * @param available True if accelerometer should be available (default: true)
+     */
+    void set_accelerometer_available(bool available) {
+        accelerometer_available_ = available;
+    }
+
+    /**
+     * @brief Set input shaper configuration state for testing
+     *
+     * When false, get_input_shaper_config will return unconfigured state
+     * (empty shaper types and zero frequencies).
+     *
+     * @param configured True if input shaper is configured (default: true)
+     */
+    void set_input_shaper_configured(bool configured) {
+        input_shaper_configured_ = configured;
+    }
+
+    /**
+     * @brief Check if mock accelerometer is enabled
+     * @return true if accelerometer should be reported as available
+     */
+    [[nodiscard]] bool is_accelerometer_available() const {
+        return accelerometer_available_;
+    }
+
+    /**
+     * @brief Check if mock input shaper is configured
+     * @return true if input shaper should be reported as configured
+     */
+    [[nodiscard]] bool is_input_shaper_configured() const {
+        return input_shaper_configured_;
+    }
+
+    /**
      * @brief Check if mock Spoolman is enabled
      *
      * Controlled by HELIX_MOCK_SPOOLMAN env var (default: true).
@@ -674,6 +714,15 @@ class MoonrakerClientMock : public MoonrakerClient {
     void dispatch_shaper_calibrate_response(char axis);
 
     /**
+     * @brief Dispatch MEASURE_AXES_NOISE response
+     *
+     * Simulates the G-code response output from Klipper's MEASURE_AXES_NOISE
+     * command, returning a mock accelerometer noise level.
+     * Used to enable input shaper noise check tests.
+     */
+    void dispatch_measure_axes_noise_response();
+
+    /**
      * @brief Advance PRINT_START simulation based on temperature progress
      *
      * Called during PREHEAT phase to dispatch simulated G-code responses
@@ -814,7 +863,9 @@ class MoonrakerClientMock : public MoonrakerClient {
     static constexpr int SIMULATION_INTERVAL_MS = 250; // Match real Moonraker ~250ms
 
     // Mock service availability flags (initialized from env vars in constructor)
-    bool mock_spoolman_enabled_{true}; ///< Controlled by HELIX_MOCK_SPOOLMAN env var
+    bool mock_spoolman_enabled_{true};   ///< Controlled by HELIX_MOCK_SPOOLMAN env var
+    bool accelerometer_available_{true}; ///< Accelerometer available for input shaper tests
+    bool input_shaper_configured_{true}; ///< Input shaper configured for config query tests
 };
 
 // ============================================================================

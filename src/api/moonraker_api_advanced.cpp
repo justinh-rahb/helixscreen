@@ -581,13 +581,22 @@ class InputShaperCollector : public std::enable_shared_from_this<InputShaperColl
             result.shaper_type = recommended_type_;
             result.shaper_freq = recommended_freq_;
 
-            // Find the recommended shaper's details
+            // Find the recommended shaper's details and populate all_shapers
             for (const auto& fit : shaper_fits_) {
+                // Populate recommended shaper's additional details
                 if (fit.type == recommended_type_) {
                     result.smoothing = fit.smoothing;
                     result.vibrations = fit.vibrations;
-                    break;
                 }
+
+                // Add to all_shapers vector for comparison display
+                ShaperOption option;
+                option.type = fit.type;
+                option.frequency = fit.frequency;
+                option.vibrations = fit.vibrations;
+                option.smoothing = fit.smoothing;
+                // max_accel not provided by Klipper's standard output
+                result.all_shapers.push_back(option);
             }
 
             on_success_(result);
@@ -630,6 +639,143 @@ class InputShaperCollector : public std::enable_shared_from_this<InputShaperColl
     std::vector<ShaperFitData> shaper_fits_;
     std::string recommended_type_;
     float recommended_freq_ = 0.0f;
+};
+
+/**
+ * @brief State machine for collecting MEASURE_AXES_NOISE responses
+ *
+ * Klipper sends noise measurement results as console output lines via notify_gcode_response.
+ * This class collects and parses those lines to extract the noise level.
+ *
+ * Expected output format:
+ *   "axes_noise = 0.012345"
+ *
+ * Error handling:
+ *   - "Unknown command" - MEASURE_AXES_NOISE not available (no accelerometer)
+ *   - "Error"/"error"/"!! " - Klipper error messages
+ */
+class NoiseCheckCollector : public std::enable_shared_from_this<NoiseCheckCollector> {
+  public:
+    NoiseCheckCollector(MoonrakerClient& client, MoonrakerAPI::NoiseCheckCallback on_success,
+                        MoonrakerAPI::ErrorCallback on_error)
+        : client_(client), on_success_(std::move(on_success)), on_error_(std::move(on_error)) {}
+
+    ~NoiseCheckCollector() {
+        unregister();
+    }
+
+    void start() {
+        static std::atomic<uint64_t> s_collector_id{0};
+        handler_name_ = "noise_check_collector_" + std::to_string(++s_collector_id);
+
+        auto self = shared_from_this();
+        client_.register_method_callback("notify_gcode_response", handler_name_,
+                                         [self](const json& msg) { self->on_gcode_response(msg); });
+
+        registered_.store(true);
+        spdlog::debug("[NoiseCheckCollector] Started collecting responses (handler: {})",
+                      handler_name_);
+    }
+
+    void unregister() {
+        bool was_registered = registered_.exchange(false);
+        if (was_registered) {
+            client_.unregister_method_callback("notify_gcode_response", handler_name_);
+            spdlog::debug("[NoiseCheckCollector] Unregistered callback");
+        }
+    }
+
+    void mark_completed() {
+        completed_.store(true);
+    }
+
+    void on_gcode_response(const json& msg) {
+        if (completed_.load()) {
+            return;
+        }
+
+        if (!msg.contains("params") || !msg["params"].is_array() || msg["params"].empty()) {
+            return;
+        }
+
+        const std::string& line = msg["params"][0].get_ref<const std::string&>();
+        spdlog::trace("[NoiseCheckCollector] Received: {}", line);
+
+        // Check for unknown command error (no accelerometer configured)
+        if (line.find("Unknown command") != std::string::npos &&
+            line.find("MEASURE_AXES_NOISE") != std::string::npos) {
+            complete_error("MEASURE_AXES_NOISE requires [adxl345] accelerometer in printer.cfg");
+            return;
+        }
+
+        // Parse noise level line: "axes_noise = 0.012345"
+        if (line.find("axes_noise") != std::string::npos) {
+            parse_noise_line(line);
+            return;
+        }
+
+        // Error detection
+        if (line.rfind("!! ", 0) == 0 ||                // Emergency errors
+            line.rfind("Error:", 0) == 0 ||             // Standard errors
+            line.find("error:") != std::string::npos) { // Python traceback
+            complete_error(line);
+        }
+    }
+
+  private:
+    void parse_noise_line(const std::string& line) {
+        // Format: "axes_noise = 0.012345"
+        static const std::regex noise_regex(R"(axes_noise\s*=\s*([\d.]+))");
+
+        std::smatch match;
+        if (std::regex_search(line, match, noise_regex) && match.size() == 2) {
+            try {
+                float noise = std::stof(match[1].str());
+                spdlog::info("[NoiseCheckCollector] Noise level: {:.6f}", noise);
+                complete_success(noise);
+            } catch (const std::exception& e) {
+                spdlog::warn("[NoiseCheckCollector] Failed to parse noise value: {}", e.what());
+                complete_error("Failed to parse noise measurement");
+            }
+        }
+    }
+
+    void complete_success(float noise_level) {
+        if (completed_.exchange(true)) {
+            return;
+        }
+
+        spdlog::info("[NoiseCheckCollector] Complete with noise level: {:.6f}", noise_level);
+        unregister();
+
+        if (on_success_) {
+            on_success_(noise_level);
+        }
+    }
+
+    void complete_error(const std::string& message) {
+        if (completed_.exchange(true)) {
+            return;
+        }
+
+        spdlog::error("[NoiseCheckCollector] Error: {}", message);
+        unregister();
+
+        if (on_error_) {
+            MoonrakerError err;
+            err.type = MoonrakerErrorType::JSON_RPC_ERROR;
+            err.message = message;
+            err.method = "MEASURE_AXES_NOISE";
+            on_error_(err);
+        }
+    }
+
+    MoonrakerClient& client_;
+    MoonrakerAPI::NoiseCheckCallback on_success_;
+    MoonrakerAPI::ErrorCallback on_error_;
+    std::string handler_name_;
+    std::atomic<bool> registered_{false};
+    std::atomic<bool> completed_{false};
 };
 
 /**
@@ -922,6 +1068,80 @@ void MoonrakerAPI::set_input_shaper(char axis, const std::string& shaper_type, d
         << "=" << shaper_type;
 
     execute_gcode(cmd.str(), on_success, on_error);
+}
+
+void MoonrakerAPI::measure_axes_noise(NoiseCheckCallback on_complete, ErrorCallback on_error) {
+    spdlog::info("[Moonraker API] Starting MEASURE_AXES_NOISE");
+
+    // Create collector to handle async response parsing
+    auto collector = std::make_shared<NoiseCheckCollector>(client_, on_complete, on_error);
+    collector->start();
+
+    // Send the G-code command
+    execute_gcode(
+        "MEASURE_AXES_NOISE",
+        []() { spdlog::debug("[Moonraker API] MEASURE_AXES_NOISE command accepted"); },
+        [collector, on_error](const MoonrakerError& err) {
+            spdlog::error("[Moonraker API] Failed to send MEASURE_AXES_NOISE: {}", err.message);
+            collector->mark_completed();
+            collector->unregister();
+            if (on_error) {
+                on_error(err);
+            }
+        });
+}
+
+void MoonrakerAPI::get_input_shaper_config(InputShaperConfigCallback on_success,
+                                           ErrorCallback on_error) {
+    spdlog::debug("[Moonraker API] Querying input shaper configuration");
+
+    // Query input_shaper object from Klipper
+    json params = {{"objects", {{"input_shaper", nullptr}}}};
+
+    client_.send_jsonrpc(
+        "printer.objects.query", params,
+        [on_success, on_error](json response) {
+            try {
+                InputShaperConfig config;
+
+                if (response.contains("result") && response["result"].contains("status") &&
+                    response["result"]["status"].contains("input_shaper")) {
+                    const auto& shaper = response["result"]["status"]["input_shaper"];
+
+                    config.shaper_type_x = shaper.value("shaper_type_x", "");
+                    config.shaper_freq_x = shaper.value("shaper_freq_x", 0.0f);
+                    config.shaper_type_y = shaper.value("shaper_type_y", "");
+                    config.shaper_freq_y = shaper.value("shaper_freq_y", 0.0f);
+                    config.damping_ratio_x = shaper.value("damping_ratio_x", 0.1f);
+                    config.damping_ratio_y = shaper.value("damping_ratio_y", 0.1f);
+
+                    // Input shaper is configured if at least one axis has a type set
+                    config.is_configured =
+                        !config.shaper_type_x.empty() || !config.shaper_type_y.empty();
+
+                    spdlog::info(
+                        "[Moonraker API] Input shaper config: X={}@{:.1f}Hz, Y={}@{:.1f}Hz",
+                        config.shaper_type_x, config.shaper_freq_x, config.shaper_type_y,
+                        config.shaper_freq_y);
+                } else {
+                    spdlog::debug("[Moonraker API] Input shaper object not found in response");
+                    config.is_configured = false;
+                }
+
+                if (on_success) {
+                    on_success(config);
+                }
+            } catch (const std::exception& e) {
+                spdlog::error("[Moonraker API] Failed to parse input shaper config: {}", e.what());
+                if (on_error) {
+                    MoonrakerError err;
+                    err.type = MoonrakerErrorType::UNKNOWN;
+                    err.message = std::string("Failed to parse input shaper config: ") + e.what();
+                    on_error(err);
+                }
+            }
+        },
+        on_error);
 }
 
 // Helper to parse a Spoolman spool JSON object into SpoolInfo

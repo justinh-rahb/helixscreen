@@ -4,6 +4,7 @@
 #pragma once
 
 #include "calibration_types.h" // For InputShaperResult
+#include "input_shaper_calibrator.h"
 #include "overlay_base.h"
 #include "subject_managed_panel.h"
 
@@ -133,13 +134,12 @@ class InputShaperPanel : public OverlayBase {
     /**
      * @brief Set Moonraker client and API for G-code commands
      *
+     * Creates InputShaperCalibrator instance with the API.
+     *
      * @param client MoonrakerClient (kept for potential future use)
      * @param api MoonrakerAPI for G-code execution
      */
-    void set_api(MoonrakerClient* client, MoonrakerAPI* api) {
-        client_ = client;
-        api_ = api;
-    }
+    void set_api(MoonrakerClient* client, MoonrakerAPI* api);
 
     /**
      * @brief Get current panel state
@@ -217,12 +217,25 @@ class InputShaperPanel : public OverlayBase {
 
     // Results data
     char current_axis_ = 'X';
+    char last_calibrated_axis_ = 'X'; ///< Axis most recently calibrated (for apply)
     std::vector<ShaperFit> shaper_results_;
     std::string recommended_type_;
     float recommended_freq_ = 0.0f;
 
+    // Calibrator for delegating operations
+    std::unique_ptr<helix::calibration::InputShaperCalibrator> calibrator_;
+
     // Destruction flag for async callback safety [L012]
     std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
+
+  public:
+    /**
+     * @brief Get calibrator for testing
+     * @return Pointer to calibrator, or nullptr if not created yet
+     */
+    [[nodiscard]] helix::calibration::InputShaperCalibrator* get_calibrator() const {
+        return calibrator_.get();
+    }
 };
 
 // Global instance accessor

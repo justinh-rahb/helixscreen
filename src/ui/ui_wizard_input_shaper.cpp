@@ -1,0 +1,439 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "ui_wizard_input_shaper.h"
+
+#include "ui_update_queue.h"
+#include "ui_wizard_helpers.h"
+
+#include "calibration_types.h"
+#include "input_shaper_calibrator.h"
+#include "lvgl/lvgl.h"
+#include "printer_state.h"
+#include "static_panel_registry.h"
+
+#include <spdlog/spdlog.h>
+
+#include <cstring>
+#include <memory>
+#include <string>
+
+using helix::calibration::InputShaperCalibrator;
+
+// ============================================================================
+// Global Instance
+// ============================================================================
+
+static std::unique_ptr<WizardInputShaperStep> g_wizard_input_shaper_step;
+
+WizardInputShaperStep* get_wizard_input_shaper_step() {
+    if (!g_wizard_input_shaper_step) {
+        g_wizard_input_shaper_step = std::make_unique<WizardInputShaperStep>();
+        StaticPanelRegistry::instance().register_destroy(
+            "WizardInputShaperStep", []() { g_wizard_input_shaper_step.reset(); });
+    }
+    return g_wizard_input_shaper_step.get();
+}
+
+void destroy_wizard_input_shaper_step() {
+    g_wizard_input_shaper_step.reset();
+}
+
+// ============================================================================
+// Constructor / Destructor
+// ============================================================================
+
+WizardInputShaperStep::WizardInputShaperStep()
+    : calibrator_(std::make_unique<InputShaperCalibrator>()) {
+    spdlog::debug("[{}] Instance created", get_name());
+}
+
+WizardInputShaperStep::~WizardInputShaperStep() {
+    // Mark as dead to prevent any pending callbacks from executing
+    if (alive_) {
+        alive_->store(false, std::memory_order_release);
+    }
+
+    // Deinitialize subjects to disconnect observers before destruction
+    // NOTE: lv_subject_deinit() is safe to call even during shutdown
+    if (subjects_initialized_) {
+        lv_subject_deinit(&calibration_status_);
+        lv_subject_deinit(&calibration_progress_);
+        subjects_initialized_ = false;
+    }
+
+    // NOTE: Do NOT log here - spdlog may be destroyed first
+    screen_root_ = nullptr;
+}
+
+// ============================================================================
+// Move Semantics
+// ============================================================================
+
+WizardInputShaperStep::WizardInputShaperStep(WizardInputShaperStep&& other) noexcept
+    : screen_root_(other.screen_root_),
+      // NOTE: Do NOT copy lv_subject_t members - they contain internal pointers.
+      // Leave calibration_status_ and calibration_progress_ default-initialized.
+      // The moved-to object should call init_subjects() if needed.
+      calibrator_(std::move(other.calibrator_)),
+      subjects_initialized_(false), // Subjects stay with moved-from object
+      calibration_complete_(other.calibration_complete_), user_skipped_(other.user_skipped_),
+      alive_(std::move(other.alive_)) {
+    std::memcpy(status_buffer_, other.status_buffer_, sizeof(status_buffer_));
+    other.screen_root_ = nullptr;
+    other.calibration_complete_ = false;
+    other.user_skipped_ = false;
+    other.alive_ = std::make_shared<std::atomic<bool>>(false); // Moved-from has dead flag
+}
+
+WizardInputShaperStep& WizardInputShaperStep::operator=(WizardInputShaperStep&& other) noexcept {
+    if (this != &other) {
+        // Deinit our subjects if they were initialized
+        if (subjects_initialized_) {
+            lv_subject_deinit(&calibration_status_);
+            lv_subject_deinit(&calibration_progress_);
+            subjects_initialized_ = false;
+        }
+
+        screen_root_ = other.screen_root_;
+        // NOTE: Do NOT copy lv_subject_t members - they contain internal pointers.
+        // Our subjects are already deinitialized above; moved-to should call init_subjects()
+        std::memcpy(status_buffer_, other.status_buffer_, sizeof(status_buffer_));
+        calibrator_ = std::move(other.calibrator_);
+        // subjects_initialized_ stays false - subjects need to be re-initialized
+        calibration_complete_ = other.calibration_complete_;
+        user_skipped_ = other.user_skipped_;
+        alive_ = std::move(other.alive_);
+
+        other.screen_root_ = nullptr;
+        other.calibration_complete_ = false;
+        other.user_skipped_ = false;
+        other.alive_ = std::make_shared<std::atomic<bool>>(false); // Moved-from has dead flag
+    }
+    return *this;
+}
+
+// ============================================================================
+// Subject Initialization
+// ============================================================================
+
+void WizardInputShaperStep::init_subjects() {
+    if (subjects_initialized_) {
+        spdlog::debug("[{}] Subjects already initialized", get_name());
+        return;
+    }
+
+    spdlog::debug("[{}] Initializing subjects", get_name());
+
+    // Initialize status subject with string buffer
+    strncpy(status_buffer_, "Ready to calibrate", sizeof(status_buffer_) - 1);
+    status_buffer_[sizeof(status_buffer_) - 1] = '\0';
+    lv_subject_init_string(&calibration_status_, status_buffer_, nullptr, sizeof(status_buffer_),
+                           status_buffer_);
+    lv_xml_register_subject(nullptr, "wizard_input_shaper_status", &calibration_status_);
+
+    // Initialize progress subject
+    helix::ui::wizard::init_int_subject(&calibration_progress_, 0, "wizard_input_shaper_progress");
+
+    subjects_initialized_ = true;
+    spdlog::debug("[{}] Subjects initialized", get_name());
+}
+
+// ============================================================================
+// Callback Registration
+// ============================================================================
+
+// Helper to safely update subjects from async callbacks
+// Captures alive flag and queues update to UI thread
+static void safe_update_status(std::weak_ptr<std::atomic<bool>> alive_weak,
+                               const std::string& msg) {
+    ui_queue_update([alive_weak, msg]() {
+        if (auto alive = alive_weak.lock()) {
+            if (!alive->load(std::memory_order_acquire)) {
+                return; // Step was cleaned up
+            }
+        } else {
+            return; // Alive flag destroyed
+        }
+        WizardInputShaperStep* step = get_wizard_input_shaper_step();
+        if (step) {
+            lv_subject_copy_string(step->get_status_subject(), msg.c_str());
+        }
+    });
+}
+
+static void safe_update_progress(std::weak_ptr<std::atomic<bool>> alive_weak, int progress) {
+    ui_queue_update([alive_weak, progress]() {
+        if (auto alive = alive_weak.lock()) {
+            if (!alive->load(std::memory_order_acquire)) {
+                return; // Step was cleaned up
+            }
+        } else {
+            return; // Alive flag destroyed
+        }
+        WizardInputShaperStep* step = get_wizard_input_shaper_step();
+        if (step) {
+            lv_subject_set_int(step->get_progress_subject(), progress);
+        }
+    });
+}
+
+static void safe_set_complete(std::weak_ptr<std::atomic<bool>> alive_weak) {
+    ui_queue_update([alive_weak]() {
+        if (auto alive = alive_weak.lock()) {
+            if (!alive->load(std::memory_order_acquire)) {
+                return; // Step was cleaned up
+            }
+        } else {
+            return; // Alive flag destroyed
+        }
+        WizardInputShaperStep* step = get_wizard_input_shaper_step();
+        if (step) {
+            lv_subject_copy_string(step->get_status_subject(), "Calibration complete!");
+            lv_subject_set_int(step->get_progress_subject(), 100);
+            step->set_calibration_complete(true);
+        }
+    });
+}
+
+static void safe_reenable_buttons(std::weak_ptr<std::atomic<bool>> alive_weak) {
+    ui_queue_update([alive_weak]() {
+        if (auto alive = alive_weak.lock()) {
+            if (!alive->load(std::memory_order_acquire)) {
+                return;
+            }
+        } else {
+            return;
+        }
+        WizardInputShaperStep* step = get_wizard_input_shaper_step();
+        if (step) {
+            lv_obj_t* screen = step->get_screen_root();
+            if (screen) {
+                lv_obj_t* start_btn = lv_obj_find_by_name(screen, "start_calibration_btn");
+                lv_obj_t* skip_btn = lv_obj_find_by_name(screen, "skip_calibration_btn");
+                if (start_btn)
+                    lv_obj_clear_state(start_btn, LV_STATE_DISABLED);
+                if (skip_btn)
+                    lv_obj_clear_state(skip_btn, LV_STATE_DISABLED);
+            }
+        }
+    });
+}
+
+// Static trampolines for LVGL callbacks
+static void on_start_calibration_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Wizard Input Shaper] Start calibration clicked");
+    WizardInputShaperStep* step = get_wizard_input_shaper_step();
+    if (!step) {
+        return;
+    }
+
+    // Disable buttons during calibration
+    lv_obj_t* screen = step->get_screen_root();
+    if (screen) {
+        lv_obj_t* start_btn = lv_obj_find_by_name(screen, "start_calibration_btn");
+        lv_obj_t* skip_btn = lv_obj_find_by_name(screen, "skip_calibration_btn");
+        if (start_btn)
+            lv_obj_add_state(start_btn, LV_STATE_DISABLED);
+        if (skip_btn)
+            lv_obj_add_state(skip_btn, LV_STATE_DISABLED);
+    }
+
+    // Update status (already on UI thread, so direct call is safe)
+    lv_subject_copy_string(step->get_status_subject(), "Checking accelerometer...");
+    lv_subject_set_int(step->get_progress_subject(), 0);
+
+    // Capture alive flag as weak_ptr for async callbacks
+    std::weak_ptr<std::atomic<bool>> alive_weak = step->get_alive_flag();
+
+    // Start calibration via calibrator
+    InputShaperCalibrator* calibrator = step->get_calibrator();
+    if (calibrator) {
+        calibrator->check_accelerometer(
+            [alive_weak](float noise_level) {
+                // Noise check passed - continue to X axis calibration
+                spdlog::info("[Wizard Input Shaper] Noise check passed: {:.2f}", noise_level);
+                safe_update_status(alive_weak, "Calibrating X axis...");
+
+                WizardInputShaperStep* step = get_wizard_input_shaper_step();
+                if (!step) {
+                    return;
+                }
+                InputShaperCalibrator* cal = step->get_calibrator();
+                if (cal) {
+                    cal->run_calibration(
+                        'X',
+                        [alive_weak](int percent) {
+                            safe_update_progress(alive_weak, percent / 2);
+                        },
+                        [alive_weak](const InputShaperResult& result) {
+                            (void)result;
+                            spdlog::info("[Wizard Input Shaper] X axis complete");
+                            safe_update_status(alive_weak, "Calibrating Y axis...");
+
+                            // Run Y axis calibration
+                            WizardInputShaperStep* step = get_wizard_input_shaper_step();
+                            if (!step) {
+                                return;
+                            }
+                            InputShaperCalibrator* cal2 = step->get_calibrator();
+                            if (cal2) {
+                                cal2->run_calibration(
+                                    'Y',
+                                    [alive_weak](int percent) {
+                                        safe_update_progress(alive_weak, 50 + percent / 2);
+                                    },
+                                    [alive_weak](const InputShaperResult& result) {
+                                        (void)result;
+                                        spdlog::info("[Wizard Input Shaper] Y axis complete");
+                                        safe_set_complete(alive_weak);
+                                        safe_reenable_buttons(alive_weak);
+                                    },
+                                    [alive_weak](const std::string& error) {
+                                        spdlog::error("[Wizard Input Shaper] Y axis error: {}",
+                                                      error);
+                                        safe_update_status(alive_weak, error);
+                                        safe_update_progress(alive_weak, 0);
+                                        safe_reenable_buttons(alive_weak);
+                                    });
+                            }
+                        },
+                        [alive_weak](const std::string& error) {
+                            spdlog::error("[Wizard Input Shaper] X axis error: {}", error);
+                            safe_update_status(alive_weak, error);
+                            safe_update_progress(alive_weak, 0);
+                            safe_reenable_buttons(alive_weak);
+                        });
+                }
+            },
+            [alive_weak](const std::string& error) {
+                spdlog::error("[Wizard Input Shaper] Accelerometer check failed: {}", error);
+                safe_update_status(alive_weak, error);
+                safe_update_progress(alive_weak, 0);
+                safe_reenable_buttons(alive_weak);
+            });
+    }
+}
+
+static void on_skip_calibration_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Wizard Input Shaper] Skip calibration clicked");
+    WizardInputShaperStep* step = get_wizard_input_shaper_step();
+    if (step) {
+        // Cancel any in-progress calibration
+        InputShaperCalibrator* cal = step->get_calibrator();
+        if (cal) {
+            cal->cancel();
+        }
+        step->set_user_skipped(true);
+        lv_subject_copy_string(step->get_status_subject(), "Skipped - configure later in Settings");
+    }
+}
+
+void WizardInputShaperStep::register_callbacks() {
+    spdlog::debug("[{}] Registering callbacks", get_name());
+
+    lv_xml_register_event_cb(nullptr, "on_start_is_calibration", on_start_calibration_clicked);
+    lv_xml_register_event_cb(nullptr, "on_skip_is_calibration", on_skip_calibration_clicked);
+}
+
+// ============================================================================
+// Screen Creation
+// ============================================================================
+
+lv_obj_t* WizardInputShaperStep::create(lv_obj_t* parent) {
+    spdlog::debug("[{}] Creating input shaper screen", get_name());
+
+    // Safety check: cleanup should have been called by wizard navigation
+    if (screen_root_) {
+        spdlog::warn("[{}] Screen pointer not null - cleanup may not have been called properly",
+                     get_name());
+        screen_root_ = nullptr; // Reset pointer, wizard framework handles deletion
+    }
+
+    // Create screen from XML
+    screen_root_ = static_cast<lv_obj_t*>(lv_xml_create(parent, "wizard_input_shaper", nullptr));
+    if (!screen_root_) {
+        spdlog::error("[{}] Failed to create screen from XML", get_name());
+        return nullptr;
+    }
+
+    spdlog::debug("[{}] Screen created successfully", get_name());
+    return screen_root_;
+}
+
+// ============================================================================
+// Cleanup
+// ============================================================================
+
+void WizardInputShaperStep::cleanup() {
+    spdlog::debug("[{}] Cleaning up resources", get_name());
+
+    // Mark as dead FIRST to prevent callbacks from updating subjects
+    if (alive_) {
+        alive_->store(false, std::memory_order_release);
+    }
+
+    // Cancel any in-progress calibration
+    if (calibrator_) {
+        calibrator_->cancel();
+    }
+
+    // Reset UI references
+    // Note: Do NOT call lv_obj_del() here - the wizard framework handles
+    // object deletion when clearing wizard_content container
+    screen_root_ = nullptr;
+
+    spdlog::debug("[{}] Cleanup complete", get_name());
+}
+
+// ============================================================================
+// Validation
+// ============================================================================
+
+bool WizardInputShaperStep::is_validated() const {
+    // Validated if calibration completed OR user explicitly skipped
+    return calibration_complete_ || user_skipped_;
+}
+
+// ============================================================================
+// Skip Logic
+// ============================================================================
+
+bool WizardInputShaperStep::should_skip() const {
+    bool has_accel = has_accelerometer();
+
+    if (!has_accel) {
+        spdlog::info("[{}] No accelerometer detected, skipping step", get_name());
+    } else {
+        spdlog::debug("[{}] Accelerometer detected, showing step", get_name());
+    }
+
+    return !has_accel;
+}
+
+// ============================================================================
+// Accelerometer Detection
+// ============================================================================
+
+bool WizardInputShaperStep::has_accelerometer() const {
+    // Query the printer_has_accelerometer subject
+    lv_subject_t* subject = lv_xml_get_subject(nullptr, "printer_has_accelerometer");
+    if (!subject) {
+        spdlog::debug("[{}] printer_has_accelerometer subject not found", get_name());
+        return false;
+    }
+
+    return lv_subject_get_int(subject) != 0;
+}
+
+// ============================================================================
+// Calibrator Access
+// ============================================================================
+
+InputShaperCalibrator* WizardInputShaperStep::get_calibrator() {
+    if (!calibrator_) {
+        calibrator_ = std::make_unique<InputShaperCalibrator>();
+    }
+    return calibrator_.get();
+}

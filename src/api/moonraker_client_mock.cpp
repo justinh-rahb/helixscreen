@@ -1158,6 +1158,12 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
         // No additional action needed - execute_gcode path already invokes success callback
     }
 
+    // MEASURE_AXES_NOISE - Check accelerometer noise level
+    if (gcode.find("MEASURE_AXES_NOISE") != std::string::npos) {
+        spdlog::info("[MoonrakerClientMock] MEASURE_AXES_NOISE");
+        dispatch_measure_axes_noise_response();
+    }
+
     // Pressure advance (NOT IMPLEMENTED)
     if (gcode.find("SET_PRESSURE_ADVANCE") != std::string::npos) {
         spdlog::warn("[MoonrakerClientMock] STUB: SET_PRESSURE_ADVANCE NOT IMPLEMENTED");
@@ -2506,6 +2512,25 @@ void MoonrakerClientMock::dispatch_shaper_calibrate_response(char axis) {
     dispatch_gcode_response("Recommended shaper is mzv @ 36.7 Hz");
 
     spdlog::info("[MoonrakerClientMock] Dispatched SHAPER_CALIBRATE response for axis {}", axis);
+}
+
+void MoonrakerClientMock::dispatch_measure_axes_noise_response() {
+    // Check if accelerometer is available
+    if (!accelerometer_available_) {
+        // Dispatch error response simulating missing accelerometer
+        dispatch_gcode_response(
+            "!! Unknown command:\"MEASURE_AXES_NOISE\". Check [adxl345] config.");
+        spdlog::info(
+            "[MoonrakerClientMock] Dispatched MEASURE_AXES_NOISE error (no accelerometer)");
+        return;
+    }
+
+    // Dispatch realistic noise measurement response matching Klipper output format
+    // Simulates MEASURE_AXES_NOISE command output
+    // A typical good noise level is around 0.01 (< 100 is considered acceptable)
+    dispatch_gcode_response("axes_noise = 0.012345");
+
+    spdlog::info("[MoonrakerClientMock] Dispatched MEASURE_AXES_NOISE response");
 }
 
 void MoonrakerClientMock::advance_print_start_simulation() {

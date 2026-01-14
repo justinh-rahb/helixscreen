@@ -141,10 +141,14 @@ enum class BedLevelingMethod {
 // Input Shaping Types
 // ============================================================================
 
+// Forward declaration for all_shapers vector
+struct ShaperOption;
+
 /**
  * @brief Result from resonance testing (TEST_RESONANCES or Klippain)
  *
- * Contains the recommended shaper configuration for one axis.
+ * Contains the recommended shaper configuration for one axis, plus
+ * all fitted shaper alternatives for comparison.
  */
 struct InputShaperResult {
     char axis = 'X';          ///< Axis tested ('X' or 'Y')
@@ -157,6 +161,9 @@ struct InputShaperResult {
     /// Frequency response data for graphing (frequency Hz, amplitude)
     std::vector<std::pair<float, float>> freq_response;
 
+    /// All fitted shaper options from calibration (not just recommended)
+    std::vector<ShaperOption> all_shapers;
+
     /**
      * @brief Check if result contains valid data
      */
@@ -166,7 +173,38 @@ struct InputShaperResult {
 };
 
 /**
+ * @brief Single shaper option with all metrics
+ *
+ * Represents one fitted shaper from resonance testing, with complete
+ * metrics for comparison. Used in the all_shapers vector of InputShaperResult.
+ */
+struct ShaperOption {
+    std::string type;        ///< Shaper type (e.g., "zv", "mzv", "ei", "2hump_ei", "3hump_ei")
+    float frequency = 0.0f;  ///< Fitted frequency in Hz
+    float vibrations = 0.0f; ///< Remaining vibrations percentage (lower is better)
+    float smoothing = 0.0f;  ///< Smoothing value (lower is sharper corners)
+    float max_accel = 0.0f;  ///< Maximum recommended acceleration in mm/s²
+};
+
+/**
+ * @brief Current input shaper configuration from printer state
+ *
+ * Represents the currently active input shaper settings as configured
+ * in Klipper. Retrieved via printer.objects.query for input_shaper.
+ */
+struct InputShaperConfig {
+    std::string shaper_type_x;    ///< Active shaper type for X axis (empty if not configured)
+    float shaper_freq_x = 0.0f;   ///< Active frequency for X axis in Hz
+    std::string shaper_type_y;    ///< Active shaper type for Y axis (empty if not configured)
+    float shaper_freq_y = 0.0f;   ///< Active frequency for Y axis in Hz
+    float damping_ratio_x = 0.0f; ///< Damping ratio for X axis (default 0.1)
+    float damping_ratio_y = 0.0f; ///< Damping ratio for Y axis (default 0.1)
+    bool is_configured = false;   ///< True if input shaper is actively configured
+};
+
+/**
  * @brief Alternative shaper recommendation
+ * @deprecated Use ShaperOption instead for new code
  */
 struct ShaperAlternative {
     std::string shaper_type;
