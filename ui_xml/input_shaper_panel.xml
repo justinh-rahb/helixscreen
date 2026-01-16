@@ -259,6 +259,15 @@
             <event_cb trigger="clicked" callback="input_shaper_save_config_cb"/>
           </lv_button>
         </lv_obj>
+        <!-- Test Print button (enables tuning tower for visual comparison) -->
+        <lv_button name="btn_test_print"
+                   width="100%" height="#button_height_normal" style_radius="#border_radius" style_border_width="1"
+                   style_border_color="#text_secondary" style_bg_color="#app_bg_color" flex_flow="row"
+                   style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
+          <icon src="printer_3d" size="sm" color="#text_secondary"/>
+          <text_body text="Test Print" style_text_color="#text_secondary"/>
+          <event_cb trigger="clicked" callback="input_shaper_print_test_cb"/>
+        </lv_button>
       </lv_obj>
       <!-- ============================================================ -->
       <!-- STATE: ERROR - Error message and retry -->

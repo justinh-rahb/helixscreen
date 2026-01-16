@@ -137,6 +137,10 @@ void ui_panel_input_shaper_register_callbacks() {
         get_global_input_shaper_panel().handle_save_config_clicked();
     });
 
+    lv_xml_register_event_cb(nullptr, "input_shaper_print_test_cb", [](lv_event_t* /*e*/) {
+        get_global_input_shaper_panel().handle_print_test_pattern_clicked();
+    });
+
     lv_xml_register_event_cb(nullptr, "input_shaper_help_cb", [](lv_event_t* /*e*/) {
         get_global_input_shaper_panel().handle_help_clicked();
     });
@@ -639,6 +643,43 @@ void InputShaperPanel::handle_retry_clicked() {
 void InputShaperPanel::handle_save_config_clicked() {
     spdlog::debug("[InputShaper] Save Config clicked");
     save_configuration();
+}
+
+void InputShaperPanel::handle_print_test_pattern_clicked() {
+    if (!api_) {
+        spdlog::warn("[InputShaper] Cannot print test: API not set");
+        return;
+    }
+
+    // TUNING_TOWER enables acceleration ramping during print
+    // This allows user to visually compare ringing at different accelerations
+    const std::string tuning_tower_cmd =
+        "TUNING_TOWER COMMAND=SET_VELOCITY_LIMIT PARAMETER=ACCEL START=1500 FACTOR=500 BAND=5";
+
+    spdlog::info("[InputShaper] Enabling tuning tower for test print");
+
+    std::weak_ptr<std::atomic<bool>> alive_weak = alive_;
+
+    api_->execute_gcode(
+        tuning_tower_cmd,
+        [alive_weak]() {
+            if (auto alive = alive_weak.lock()) {
+                if (*alive) {
+                    spdlog::info(
+                        "[InputShaper] Tuning tower enabled - start a print to test calibration");
+                    ui_toast_show(ToastSeverity::INFO,
+                                  "Tuning tower enabled - start a print to test", 3000);
+                }
+            }
+        },
+        [alive_weak](const MoonrakerError& err) {
+            if (auto alive = alive_weak.lock()) {
+                if (*alive) {
+                    spdlog::error("[InputShaper] Failed to enable tuning tower: {}", err.message);
+                    ui_toast_show(ToastSeverity::ERROR, "Failed to enable tuning tower", 3000);
+                }
+            }
+        });
 }
 
 void InputShaperPanel::handle_help_clicked() {

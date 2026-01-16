@@ -1,14 +1,14 @@
 # Input Shaping Panel/Wizard Implementation Plan
 
-**Status**: 🟡 In Progress - Phase 6 Complete
+**Status**: ✅ Complete - All 7 Phases Done
 **Created**: 2026-01-13
-**Last Updated**: 2026-01-13
+**Last Updated**: 2026-01-16
 
 ---
 
 ## Progress Tracking
 
-### Overall Progress: Phase 6 of 7 Complete
+### Overall Progress: Phase 7 of 7 Complete ✅
 
 | Phase | Status | Session | Notes |
 |-------|--------|---------|-------|
@@ -18,7 +18,7 @@
 | **Phase 4**: UI Panel Rewrite | ✅ Complete | 5 | Panel delegates to calibrator, 78 tests total |
 | **Phase 5**: Frequency Chart | ✅ Complete | 6 | FrequencyResponseChart widget, downsampling, 193 assertions |
 | **Phase 6**: First-Run Wizard | ✅ Complete | 7 | WizardInputShaperStep, thread-safe callbacks, 17 tests (82 assertions) |
-| **Phase 7**: Cache & Test Print | ⬜ Not Started | - | |
+| **Phase 7**: Cache & Test Print | ✅ Complete | 8 | InputShaperCache, TUNING_TOWER button, 56 tests (1286 assertions) |
 
 **Legend**: ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Blocked
 
@@ -572,21 +572,27 @@ instead of creating separate XML files per state. This is simpler and already wo
 
 ### Phase 7: Persistent Cache & Test Print (Chunk C8)
 
-**Status**: ⬜ Not Started
+**Status**: ✅ Complete
 
 #### Checkpoints:
-- [ ] Tests written for cache save/load
-- [ ] Cache functionality added to calibrator
-- [ ] Test print gcode embedded in assets
-- [ ] "Print Test Pattern" button working
-- [ ] Cache persists across sessions
-- [ ] All tests pass
-- [ ] Code reviewed
+- [x] Tests written for cache save/load
+- [x] Cache functionality added (InputShaperCache class)
+- [x] "Print Test Pattern" button working (uses TUNING_TOWER)
+- [x] Cache persists across sessions
+- [x] All tests pass (56 cache tests, 93 total input shaper tests)
+- [x] Code reviewed
 
-**Files to create:**
-- `assets/test_gcodes/ringing_test.gcode`
+**Files created:**
+- `include/input_shaper_cache.h`
+- `src/calibration/input_shaper_cache.cpp`
+- `tests/unit/test_input_shaper_cache.cpp`
 
-**Cache location:** `~/.config/helix-screen/input_shaper_results.json`
+**Cache location:** `~/.cache/helix/input_shaper_cache.json` (XDG-compliant)
+
+**Design decisions:**
+- Uses TUNING_TOWER command instead of embedded gcode (no file upload needed)
+- 30-day TTL with printer ID validation
+- Follows ThumbnailCache pattern for directory resolution
 
 ---
 
@@ -881,3 +887,29 @@ _Log each session here for continuity_
 - Files modified:
   - `ui_xml/input_shaper_panel.xml` - Added chart_container element
 - Next: Phase 6 - First-Run Wizard
+
+### Session 8 (Phase 7 Implementation)
+- Date: 2026-01-16
+- Branch: `feature/input-shaping-phase7` in worktree `helixscreen-input-shaping-phase7`
+- Commit: `d2a9aeb6` - feat(input-shaper): complete Phase 7 - Cache and Test Print
+- Completed:
+  - Created `InputShaperCache` class for persistent calibration results
+  - Test-first: wrote 56 test cases (1286 assertions) for cache functionality
+  - JSON serialization for InputShaperResult, ShaperOption, CalibrationResults
+  - XDG-compliant cache directory resolution (following ThumbnailCache pattern)
+  - 30-day TTL with printer ID validation
+  - Added "Test Print" button using TUNING_TOWER command (no embedded gcode)
+  - Async-safe callbacks with alive_ guard [L012]
+  - Toast notifications for user feedback
+  - Code reviewed: no issues found
+  - All tests pass (93 input shaper tests, 444 total)
+- Files created:
+  - `include/input_shaper_cache.h`
+  - `src/calibration/input_shaper_cache.cpp`
+  - `tests/unit/test_input_shaper_cache.cpp`
+- Files modified:
+  - `include/ui_panel_input_shaper.h` - Added handle_print_test_pattern_clicked()
+  - `src/ui/ui_panel_input_shaper.cpp` - Implementation and callback registration
+  - `ui_xml/input_shaper_panel.xml` - Added Test Print button
+  - `tests/unit/test_input_shaper_panel_integration.cpp` - Added test case
+- **Input Shaping Feature Complete!**

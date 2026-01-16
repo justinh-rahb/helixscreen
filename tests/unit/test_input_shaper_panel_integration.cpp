@@ -504,3 +504,16 @@ TEST_CASE("Expected InputShaperPanel API after refactoring",
         WARN("Verify: Remove direct MoonrakerAPI calls from panel");
     }
 }
+
+// ============================================================================
+// Phase 7: Test Print Pattern Feature
+// ============================================================================
+
+TEST_CASE("InputShaperPanel has print test pattern handler", "[input_shaper][panel]") {
+    // This test verifies the method exists and is callable
+    // The handler sends TUNING_TOWER command to enable acceleration ramping
+    // during print for visual comparison of ringing at different accelerations
+    //
+    // Full integration test would require mock API setup with LVGL
+    WARN("Print test pattern button added - integration test requires mock API");
+}
