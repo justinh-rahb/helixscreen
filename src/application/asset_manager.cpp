@@ -88,8 +88,6 @@ void AssetManager::register_images() {
                           "A:assets/images/thumbnail-placeholder.png");
     lv_xml_register_image(NULL, "A:assets/images/thumbnail-placeholder-160.png",
                           "A:assets/images/thumbnail-placeholder-160.png");
-    lv_xml_register_image(NULL, "A:assets/images/large-extruder-icon.svg",
-                          "A:assets/images/large-extruder-icon.svg");
     lv_xml_register_image(NULL, "A:assets/images/benchy_thumbnail_white.png",
                           "A:assets/images/benchy_thumbnail_white.png");
 

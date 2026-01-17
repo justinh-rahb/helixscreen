@@ -885,18 +885,20 @@
 #define LV_USE_RLOTTIE 0
 
 /*Enable Vector Graphic APIs
- *Requires `LV_USE_MATRIX = 1`*/
-#define LV_USE_VECTOR_GRAPHIC  1
+ *Requires `LV_USE_MATRIX = 1`
+ *DISABLED: Not using vector graphics - saves significant binary size */
+#define LV_USE_VECTOR_GRAPHIC  0
 
-/* Enable ThorVG (vector graphics library) from the src/libs folder */
-#define LV_USE_THORVG_INTERNAL 1
+/* Enable ThorVG (vector graphics library) from the src/libs folder
+ * DISABLED: Not using SVG files - saves ~15MB compile time */
+#define LV_USE_THORVG_INTERNAL 0
 
 /* Enable ThorVG by assuming that its installed and linked to the project */
 #define LV_USE_THORVG_EXTERNAL 0
 
 /*Enable SVG file support with ThorVG rendering
  *Requires LV_USE_VECTOR_GRAPHIC = 1 and LV_USE_THORVG_INTERNAL = 1*/
-#define LV_USE_SVG 1
+#define LV_USE_SVG 0
 #define LV_USE_SVG_ANIMATION 0
 #define LV_USE_SVG_DEBUG 0
 

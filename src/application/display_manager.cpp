@@ -17,7 +17,6 @@
 #include "ui_update_queue.h"
 
 #include "config.h"
-#include "lvgl/src/libs/svg/lv_svg_decoder.h"
 #include "settings_manager.h"
 
 #include <spdlog/spdlog.h>
@@ -118,9 +117,6 @@ bool DisplayManager::init(const Config& config) {
         setup_keyboard_group();
         spdlog::debug("[DisplayManager] Physical keyboard input enabled");
     }
-
-    // Initialize SVG decoder for loading .svg files
-    lv_svg_decoder_init();
 
     // Create backlight backend (auto-detects hardware)
     m_backlight = BacklightBackend::create();

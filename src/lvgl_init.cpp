@@ -7,7 +7,6 @@
 
 #include "config.h"
 
-#include <lvgl/src/libs/svg/lv_svg_decoder.h>
 #include <spdlog/spdlog.h>
 
 #include <lvgl.h>
@@ -90,9 +89,6 @@ bool init_lvgl(int width, int height, LvglContext& ctx) {
     }
 
     spdlog::debug("[LVGL] Initialized: {}x{}", width, height);
-
-    // Initialize SVG decoder for loading .svg files
-    lv_svg_decoder_init();
 
     return true;
 }
