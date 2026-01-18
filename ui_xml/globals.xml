@@ -353,9 +353,10 @@
     -->
     <!-- ===================================================================== -->
 
-    <!-- PRIMARY/SECONDARY - Full Nord (same in both themes) -->
-    <color name="primary_color" value="#5e81ac"/>     <!-- nord10 - Frost blue -->
-    <color name="secondary_color" value="#ebcb8b"/>   <!-- nord13 - Aurora yellow -->
+    <!-- PRIMARY/SECONDARY/TERTIARY - Full Nord (same in both themes) -->
+    <color name="primary_color" value="#88c0d0"/>     <!-- nord8 - Frost cyan -->
+    <color name="secondary_color" value="#81a1c1"/>   <!-- nord9 - Frost blue -->
+    <color name="tertiary_color" value="#5e81ac"/>    <!-- nord10 - Frost deep blue -->
 
     <!-- Semantic feedback colors - Aurora colors (same in both themes) -->
     <color name="error_color" value="#bf616a"/>    <!-- nord11 - red -->
