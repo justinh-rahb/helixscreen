@@ -431,6 +431,68 @@ static void draw_x_axis_labels_cb(lv_event_t* e) {
     }
 }
 
+// Draw custom grid lines constrained to content area (not extending into label areas)
+// Uses LV_EVENT_DRAW_MAIN to draw before chart content
+static void draw_grid_lines_cb(lv_event_t* e) {
+    lv_obj_t* chart = lv_event_get_target_obj(e);
+    lv_layer_t* layer = lv_event_get_layer(e);
+    ui_temp_graph_t* graph = static_cast<ui_temp_graph_t*>(lv_event_get_user_data(e));
+
+    if (!layer || !graph) {
+        return;
+    }
+
+    // Get chart bounds
+    lv_area_t coords;
+    lv_obj_get_coords(chart, &coords);
+
+    // Calculate content area (where data is drawn, excluding label areas)
+    int32_t pad_top = lv_obj_get_style_pad_top(chart, LV_PART_MAIN);
+    int32_t pad_left = lv_obj_get_style_pad_left(chart, LV_PART_MAIN);
+    int32_t pad_right = lv_obj_get_style_pad_right(chart, LV_PART_MAIN);
+    int32_t pad_bottom = lv_obj_get_style_pad_bottom(chart, LV_PART_MAIN);
+
+    int32_t content_x1 = coords.x1 + pad_left;
+    int32_t content_x2 = coords.x2 - pad_right;
+    int32_t content_y1 = coords.y1 + pad_top;
+    int32_t content_y2 = coords.y2 - pad_bottom;
+    int32_t content_width = content_x2 - content_x1;
+    int32_t content_height = content_y2 - content_y1;
+
+    if (content_width <= 0 || content_height <= 0) {
+        return; // Chart not laid out yet
+    }
+
+    // Setup line style - match LVGL chart division line styling
+    lv_draw_line_dsc_t line_dsc;
+    lv_draw_line_dsc_init(&line_dsc);
+    line_dsc.color = lv_obj_get_style_line_color(chart, LV_PART_MAIN);
+    line_dsc.width = lv_obj_get_style_line_width(chart, LV_PART_MAIN);
+    line_dsc.opa = lv_obj_get_style_line_opa(chart, LV_PART_MAIN);
+
+    // Draw horizontal grid lines (5 lines = 4 divisions)
+    constexpr int H_DIVISIONS = 5;
+    for (int i = 0; i <= H_DIVISIONS; i++) {
+        int32_t y = content_y1 + (content_height * i) / H_DIVISIONS;
+        line_dsc.p1.x = content_x1;
+        line_dsc.p1.y = y;
+        line_dsc.p2.x = content_x2;
+        line_dsc.p2.y = y;
+        lv_draw_line(layer, &line_dsc);
+    }
+
+    // Draw vertical grid lines (10 lines = 9 divisions)
+    constexpr int V_DIVISIONS = 10;
+    for (int i = 0; i <= V_DIVISIONS; i++) {
+        int32_t x = content_x1 + (content_width * i) / V_DIVISIONS;
+        line_dsc.p1.x = x;
+        line_dsc.p1.y = content_y1;
+        line_dsc.p2.x = x;
+        line_dsc.p2.y = content_y2;
+        lv_draw_line(layer, &line_dsc);
+    }
+}
+
 // Draw Y-axis temperature labels (rendered directly on graph canvas)
 // Uses LV_EVENT_DRAW_POST to draw after chart content is rendered
 static void draw_y_axis_labels_cb(lv_event_t* e) {
@@ -588,8 +650,8 @@ ui_temp_graph_t* ui_temp_graph_create(lv_obj_t* parent) {
     lv_obj_set_style_width(graph->chart, 0, LV_PART_CURSOR);           // No point marker
     lv_obj_set_style_height(graph->chart, 0, LV_PART_CURSOR);          // No point marker
 
-    // Configure division line count
-    lv_chart_set_div_line_count(graph->chart, 5, 10); // 5 horizontal, 10 vertical division lines
+    // Disable LVGL's built-in division lines - we draw custom ones constrained to content area
+    lv_chart_set_div_line_count(graph->chart, 0, 0);
 
     // Enable LVGL 9 draw task events for gradient fills under chart lines
     lv_obj_add_flag(graph->chart, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
@@ -600,6 +662,9 @@ ui_temp_graph_t* ui_temp_graph_create(lv_obj_t* parent) {
 
     // Register resize callback to recalculate value-based cursor positions
     lv_obj_add_event_cb(graph->chart, chart_resize_cb, LV_EVENT_SIZE_CHANGED, nullptr);
+
+    // Register custom grid drawing callback (draws lines constrained to content area)
+    lv_obj_add_event_cb(graph->chart, draw_grid_lines_cb, LV_EVENT_DRAW_MAIN, graph);
 
     // Register X-axis label draw callback (renders time labels directly on canvas)
     lv_obj_add_event_cb(graph->chart, draw_x_axis_labels_cb, LV_EVENT_DRAW_POST, graph);
@@ -692,6 +757,7 @@ int ui_temp_graph_add_series(ui_temp_graph_t* graph, const char* name, lv_color_
     meta->target_temp = 0.0f;
     meta->gradient_bottom_opa = UI_TEMP_GRAPH_GRADIENT_BOTTOM_OPA;
     meta->gradient_top_opa = UI_TEMP_GRAPH_GRADIENT_TOP_OPA;
+    meta->first_value_received = false;
 
     // Create target temperature cursor (horizontal dashed line, initially hidden)
     // Note: We don't use lv_chart_set_cursor_point because that binds the cursor
@@ -778,11 +844,13 @@ void ui_temp_graph_update_series_with_time(ui_temp_graph_t* graph, int series_id
         return;
     }
 
-    // Debug: Log first few data points to trace garbage data issue
-    static int debug_count = 0;
-    if (debug_count < 10) {
-        spdlog::debug("[TempGraph] Adding point #{} to series {}: temp={:.1f}°C (int32={})",
-                      debug_count++, series_id, temp, static_cast<int32_t>(temp));
+    // On first real value, backfill all points to avoid spike from 0/uninitialized
+    // This makes the graph start at the actual temperature instead of showing a ramp from 0
+    if (!meta->first_value_received) {
+        meta->first_value_received = true;
+        lv_chart_set_all_values(graph->chart, meta->chart_series, static_cast<int32_t>(temp));
+        spdlog::debug("[TempGraph] Series {} '{}' backfilled with initial temp {:.1f}°C", series_id,
+                      meta->name, temp);
     }
 
     // Track timestamp for X-axis label rendering
@@ -802,7 +870,7 @@ void ui_temp_graph_update_series_with_time(ui_temp_graph_t* graph, int series_id
     }
 
     // Add point to series (shifts old data left)
-    lv_chart_set_next_value(graph->chart, meta->chart_series, (int32_t)temp);
+    lv_chart_set_next_value(graph->chart, meta->chart_series, static_cast<int32_t>(temp));
 
     // Update max visible temperature for gradient rendering
     update_max_visible_temp(graph);

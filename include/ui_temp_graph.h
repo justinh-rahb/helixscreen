@@ -64,6 +64,7 @@ struct ui_temp_series_meta_t {
     float target_temp;                // Target temperature for cursor
     lv_opa_t gradient_bottom_opa;     // Bottom gradient opacity
     lv_opa_t gradient_top_opa;        // Top gradient opacity
+    bool first_value_received;        // True after first real data point (for backfill)
 };
 
 /**
