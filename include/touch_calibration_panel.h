@@ -50,6 +50,13 @@ class TouchCalibrationPanel {
      */
     using CompletionCallback = std::function<void(const TouchCalibration* cal)>;
 
+    /**
+     * @brief Callback invoked when calibration fails (e.g., degenerate points)
+     *
+     * @param reason Human-readable failure reason
+     */
+    using FailureCallback = std::function<void(const char* reason)>;
+
     TouchCalibrationPanel();
     ~TouchCalibrationPanel();
 
@@ -66,6 +73,12 @@ class TouchCalibrationPanel {
      * @param cb Callback to invoke when calibration completes or is cancelled
      */
     void set_completion_callback(CompletionCallback cb);
+
+    /**
+     * @brief Set the failure callback
+     * @param cb Callback to invoke when calibration fails (degenerate points, etc.)
+     */
+    void set_failure_callback(FailureCallback cb);
 
     /**
      * @brief Set the screen dimensions for target position calculations
@@ -144,6 +157,7 @@ class TouchCalibrationPanel {
     int screen_width_ = 800;
     int screen_height_ = 480;
     CompletionCallback callback_;
+    FailureCallback failure_callback_;
 
     Point screen_points_[3]; ///< Target screen positions
     Point touch_points_[3];  ///< Captured raw touch positions
@@ -154,12 +168,13 @@ class TouchCalibrationPanel {
 
     // Calibration target positions as screen ratios
     // These form a well-distributed triangle for accurate affine transform
+    // Y ratios adjusted to 25%-75% to avoid header/footer in wizard/overlay UI
     static constexpr float TARGET_0_X_RATIO = 0.15f; ///< 15% from left edge
     static constexpr float TARGET_0_Y_RATIO = 0.30f; ///< 30% from top edge
     static constexpr float TARGET_1_X_RATIO = 0.50f; ///< Center X
-    static constexpr float TARGET_1_Y_RATIO = 0.85f; ///< 85% from top
+    static constexpr float TARGET_1_Y_RATIO = 0.75f; ///< 75% from top (was 85%)
     static constexpr float TARGET_2_X_RATIO = 0.85f; ///< 85% from left
-    static constexpr float TARGET_2_Y_RATIO = 0.15f; ///< 15% from top
+    static constexpr float TARGET_2_Y_RATIO = 0.25f; ///< 25% from top (was 15%)
 };
 
 } // namespace helix

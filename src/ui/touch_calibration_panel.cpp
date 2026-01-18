@@ -24,6 +24,10 @@ void TouchCalibrationPanel::set_completion_callback(CompletionCallback cb) {
     callback_ = std::move(cb);
 }
 
+void TouchCalibrationPanel::set_failure_callback(FailureCallback cb) {
+    failure_callback_ = std::move(cb);
+}
+
 void TouchCalibrationPanel::set_screen_size(int width, int height) {
     // Validate screen dimensions - reject zero or negative values
     if (width <= 0 || height <= 0) {
@@ -84,6 +88,10 @@ void TouchCalibrationPanel::capture_point(Point raw) {
                 "[TouchCalibrationPanel] Calibration failed (degenerate points), restarting");
             state_ = State::POINT_1;
             calibration_.valid = false;
+            // Notify caller about the failure
+            if (failure_callback_) {
+                failure_callback_("Touch points too close together. Please try again.");
+            }
         }
         break;
     default:

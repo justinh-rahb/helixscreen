@@ -115,8 +115,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <signal.h>
-#include <tuple>
 #include <unistd.h>
 
 #ifdef __APPLE__
@@ -846,6 +844,19 @@ bool Application::init_moonraker() {
     // Initialize macro modification manager (for PRINT_START wizard)
     m_moonraker->init_macro_analysis(m_config);
 
+    // Validate screen before keyboard init (debugging potential race condition)
+    if (!m_screen) {
+        spdlog::error("[Application] m_screen is NULL before keyboard init!");
+        return false;
+    }
+    lv_obj_t* active_screen = lv_screen_active();
+    if (m_screen != active_screen) {
+        spdlog::error("[Application] m_screen ({:p}) differs from active screen ({:p})!",
+                      static_cast<void*>(m_screen), static_cast<void*>(active_screen));
+        // Use the current active screen instead
+        m_screen = active_screen;
+    }
+
     // Initialize global keyboard
     ui_keyboard_init(m_screen);
 
@@ -958,6 +969,12 @@ bool Application::run_wizard() {
 
     // Determine initial wizard step (step 0 = touch calibration, auto-skipped if not needed)
     int initial_step = (m_args.wizard_step >= 0) ? m_args.wizard_step : 0;
+
+    // If step 0 was explicitly requested, force-show touch calibration (for visual testing)
+    if (m_args.wizard_step == 0) {
+        force_touch_calibration_step(true);
+    }
+
     ui_wizard_navigate_to_step(initial_step);
 
     // Move keyboard above wizard

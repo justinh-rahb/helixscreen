@@ -19,6 +19,7 @@
 #include "ui_severity_card.h"
 #include "ui_theme.h"
 #include "ui_toast.h"
+#include "ui_touch_calibration_overlay.h"
 #include "ui_update_queue.h"
 
 #include "app_globals.h"
@@ -663,6 +664,22 @@ void SettingsPanel::handle_network_clicked() {
     overlay.show();
 }
 
+void SettingsPanel::handle_touch_calibration_clicked() {
+    spdlog::debug("[{}] Touch Calibration clicked", get_name());
+
+    auto& overlay = helix::ui::get_touch_calibration_overlay();
+
+    if (!overlay.is_created()) {
+        overlay.init_subjects();
+        overlay.register_callbacks();
+        overlay.create(parent_screen_);
+    }
+
+    // Settings panel doesn't allow skip - only wizard does
+    overlay.set_allow_skip(false);
+    overlay.show();
+}
+
 void SettingsPanel::handle_factory_reset_clicked() {
     spdlog::debug("[{}] Factory Reset clicked - showing confirmation dialog", get_name());
 
@@ -838,6 +855,12 @@ void SettingsPanel::on_network_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void SettingsPanel::on_touch_calibration_clicked(lv_event_t* /*e*/) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_touch_calibration_clicked");
+    get_global_settings_panel().handle_touch_calibration_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
 void SettingsPanel::on_factory_reset_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_factory_reset_clicked");
     get_global_settings_panel().handle_factory_reset_clicked();
@@ -928,6 +951,8 @@ void register_settings_panel_callbacks() {
     lv_xml_register_event_cb(nullptr, "on_machine_limits_clicked",
                              SettingsPanel::on_machine_limits_clicked);
     lv_xml_register_event_cb(nullptr, "on_network_clicked", SettingsPanel::on_network_clicked);
+    lv_xml_register_event_cb(nullptr, "on_touch_calibration_clicked",
+                             SettingsPanel::on_touch_calibration_clicked);
     lv_xml_register_event_cb(nullptr, "on_factory_reset_clicked",
                              SettingsPanel::on_factory_reset_clicked);
     lv_xml_register_event_cb(nullptr, "on_hardware_health_clicked",

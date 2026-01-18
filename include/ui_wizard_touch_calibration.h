@@ -62,10 +62,9 @@ class WizardTouchCalibrationStep {
      * @brief Register event callbacks with lv_xml system
      *
      * Registers callbacks:
-     * - on_touch_cal_start_clicked
      * - on_touch_cal_accept_clicked
      * - on_touch_cal_retry_clicked
-     * - on_touch_cal_skip_clicked
+     * - on_touch_cal_screen_touched
      */
     void register_callbacks();
 
@@ -105,29 +104,32 @@ class WizardTouchCalibrationStep {
 
   private:
     lv_obj_t* screen_root_ = nullptr;
+    lv_obj_t* crosshair_ = nullptr;           // Reparented to screen for absolute positioning
+    lv_obj_t* test_area_container_ = nullptr; // Container for test area (shown in COMPLETE state)
+    lv_obj_t* test_touch_area_ = nullptr;     // Touch area for testing calibration
     std::unique_ptr<helix::TouchCalibrationPanel> panel_;
 
-    // Subjects for UI state
-    lv_subject_t instruction_text_;
+    // Subjects for UI state (instruction text uses wizard_subtitle instead)
     lv_subject_t current_step_; // 0, 1, 2, 3 (3 = verify)
     lv_subject_t calibration_valid_;
 
-    // Persistent buffer
-    char instruction_buffer_[256];
-
     bool subjects_initialized_ = false;
+    bool calibration_failed_ = false; // True after failed attempt, cleared on first point capture
 
     // Event handlers (static trampolines)
-    static void on_start_clicked_static(lv_event_t* e);
     static void on_accept_clicked_static(lv_event_t* e);
     static void on_retry_clicked_static(lv_event_t* e);
-    static void on_skip_clicked_static(lv_event_t* e);
+    static void on_screen_touched_static(lv_event_t* e);
+    static void on_test_area_touched_static(lv_event_t* e);
 
     // Instance method handlers
-    void handle_start_clicked();
     void handle_accept_clicked();
     void handle_retry_clicked();
-    void handle_skip_clicked();
+    void handle_screen_touched(lv_event_t* e);
+    void handle_test_area_touched(lv_event_t* e);
+
+    // Ripple animation for touch feedback
+    void create_ripple_at(lv_coord_t x, lv_coord_t y);
 
     // Panel callback
     void on_calibration_complete(const helix::TouchCalibration* cal);
@@ -161,3 +163,13 @@ WizardTouchCalibrationStep* get_wizard_touch_calibration_step();
  * Call during application shutdown to ensure proper cleanup.
  */
 void destroy_wizard_touch_calibration_step();
+
+/**
+ * @brief Force touch calibration step to show (for visual testing)
+ *
+ * When set to true, should_skip() returns false even on non-fbdev displays.
+ * Use with --wizard-step 0 to test the touch calibration UI on SDL.
+ *
+ * @param force true to force-show the step, false for normal behavior
+ */
+void force_touch_calibration_step(bool force);

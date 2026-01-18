@@ -92,6 +92,10 @@
     <setting_action_row name="row_network"
                         label="Network Settings" icon="wifi" description="WiFi and Ethernet configuration"
                         callback="on_network_clicked"/>
+    <!-- Touch Calibration -->
+    <setting_action_row name="row_touch_calibration"
+                        label="Touch Calibration" icon="cursor_move" description="Calibrate touchscreen input"
+                        callback="on_touch_calibration_clicked"/>
     <!-- Hardware Issues (hidden when no issues) -->
     <lv_obj name="container_hardware_health"
             width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false">

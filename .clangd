@@ -37,3 +37,10 @@ If:
   PathMatch: lib/.*
 Diagnostics:
   Suppress: "*"
+
+---
+# Suppress unused-includes in files with heavy macro usage
+If:
+  PathMatch: src/ui/ui_wizard.cpp
+Diagnostics:
+  UnusedIncludes: None

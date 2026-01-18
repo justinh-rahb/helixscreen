@@ -10,6 +10,8 @@
 #include <spdlog/spdlog.h>
 
 // LVGL SDL driver
+#include "lvgl/src/drivers/sdl/lv_sdl_window.h"
+
 #include <lvgl.h>
 
 // SDL2 headers
@@ -30,6 +32,12 @@ lv_display_t* DisplayBackendSDL::create_display(int width, int height) {
     if (display_ == nullptr) {
         spdlog::error("[SDL Backend] Failed to create SDL display");
         return nullptr;
+    }
+
+    // Raise window to foreground (macOS SDL windows start behind other windows)
+    SDL_Window* window = lv_sdl_window_get_window(display_);
+    if (window) {
+        SDL_RaiseWindow(window);
     }
 
     spdlog::info("[SDL Backend] SDL display created: {}x{}", width, height);

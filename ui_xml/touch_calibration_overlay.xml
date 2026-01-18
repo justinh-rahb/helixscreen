@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2025-2026 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Touch Calibration Overlay Panel -->
+<!-- 3-point touchscreen calibration accessed from Settings -->
+<!-- States: 0=IDLE, 1=POINT_1, 2=POINT_2, 3=POINT_3, 4=VERIFY, 5=COMPLETE -->
+<component>
+  <subjects>
+    <subject name="touch_cal_state" type="int" value="0"/>
+    <subject name="touch_cal_instruction" type="string" value="Tap Start to begin calibration"/>
+    <subject name="touch_cal_skip_visible" type="int" value="0"/>
+  </subjects>
+
+  <view name="touch_calibration_overlay"
+        extends="overlay_panel" width="#overlay_panel_width_full" title="Touch Calibration" bg_color="#app_bg_color">
+
+    <!-- Main content area - full screen for touch capture -->
+    <lv_obj name="calibration_content"
+            width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0"
+            scrollable="false">
+
+      <!-- Instruction text (centered, top area) -->
+      <text_body name="instruction_label"
+                 bind_text="touch_cal_instruction"
+                 width="100%"
+                 style_text_align="center"
+                 style_pad_top="#space_xl"
+                 style_pad_left="#space_lg"
+                 style_pad_right="#space_lg"/>
+
+      <!-- Crosshair target - positioned dynamically by C++ code -->
+      <!-- Uses MDI crosshairs-gps icon (U+F0785) -->
+      <!-- Visible only during POINT_1, POINT_2, POINT_3 (states 1, 2, 3) -->
+      <lv_label name="crosshair"
+                text="&#xF0785;"
+                style_text_font="mdi_icons_48"
+                style_text_color="#primary_color"
+                width="50"
+                height="50"
+                style_text_align="center"
+                align="top_left">
+        <!-- Bindings control visibility: hidden in states 0, 4, 5 (visible in 1, 2, 3) -->
+        <!-- NOTE: Do NOT add hidden="true" base attribute - bindings handle it -->
+        <lv_obj-bind_flag_if_eq subject="touch_cal_state" flag="hidden" ref_value="0"/>
+        <lv_obj-bind_flag_if_eq subject="touch_cal_state" flag="hidden" ref_value="4"/>
+        <lv_obj-bind_flag_if_eq subject="touch_cal_state" flag="hidden" ref_value="5"/>
+      </lv_label>
+
+      <!-- Verify marker - shows where transformed touch lands during VERIFY state -->
+      <!-- Visibility controlled by C++ code (shown temporarily on touch) -->
+      <lv_obj name="verify_marker"
+              width="24" height="24"
+              style_bg_color="#success_color"
+              style_radius="12"
+              style_bg_opa="200"
+              style_border_width="0"
+              align="top_left"
+              hidden="true"
+              scrollable="false"/>
+
+      <!-- Touch capture overlay - invisible but captures all touches -->
+      <!-- Visible during POINT_1/2/3 (calibration) and VERIFY (accuracy test) -->
+      <lv_obj name="touch_capture_overlay"
+              width="100%" height="100%"
+              align="top_left"
+              style_bg_opa="0"
+              style_border_width="0"
+              flag_clickable="true">
+        <event_cb trigger="clicked" callback="on_touch_cal_overlay_touched"/>
+        <!-- Bindings control visibility: hidden in states 0, 5 (visible in 1, 2, 3, 4) -->
+        <lv_obj-bind_flag_if_eq subject="touch_cal_state" flag="hidden" ref_value="0"/>
+        <lv_obj-bind_flag_if_eq subject="touch_cal_state" flag="hidden" ref_value="5"/>
+      </lv_obj>
+
+      <!-- Button container (bottom center) -->
+      <lv_obj name="button_container"
+              align="bottom_mid"
+              width="content" height="content"
+              style_pad_bottom="#space_xl"
+              style_bg_opa="0"
+              style_border_width="0"
+              flex_flow="row"
+              style_flex_main_place="center"
+              style_flex_cross_place="center"
+              style_pad_gap="#space_md"
+              scrollable="false">
+
+        <!-- Start button - visible only in IDLE (state=0) -->
+        <lv_button name="btn_start" width="200" height="#button_height">
+          <event_cb trigger="clicked" callback="on_touch_cal_start_clicked"/>
+          <lv_obj-bind_flag_if_not_eq subject="touch_cal_state" flag="hidden" ref_value="0"/>
+          <text_body text="Start Calibration" align="center"/>
+        </lv_button>
+
+        <!-- Accept button - visible only in VERIFY (state=4) -->
+        <lv_button name="btn_accept" width="150" height="#button_height">
+          <event_cb trigger="clicked" callback="on_touch_cal_accept_clicked"/>
+          <lv_obj-bind_flag_if_not_eq subject="touch_cal_state" flag="hidden" ref_value="4"/>
+          <text_body text="Accept" align="center"/>
+        </lv_button>
+
+        <!-- Retry button - visible only in VERIFY (state=4) -->
+        <lv_button name="btn_retry" width="150" height="#button_height" style_bg_color="#card_bg">
+          <event_cb trigger="clicked" callback="on_touch_cal_retry_clicked"/>
+          <lv_obj-bind_flag_if_not_eq subject="touch_cal_state" flag="hidden" ref_value="4"/>
+          <text_body text="Retry" align="center"/>
+        </lv_button>
+
+        <!-- Skip button - visible only in IDLE when skip is allowed -->
+        <lv_button name="btn_skip" width="100" height="#button_height" style_bg_color="#card_bg">
+          <event_cb trigger="clicked" callback="on_touch_cal_skip_clicked"/>
+          <!-- Hidden if state != 0 OR skip not allowed (skip_visible == 0) -->
+          <lv_obj-bind_flag_if_not_eq subject="touch_cal_state" flag="hidden" ref_value="0"/>
+          <lv_obj-bind_flag_if_eq subject="touch_cal_skip_visible" flag="hidden" ref_value="0"/>
+          <text_body text="Skip" align="center"/>
+        </lv_button>
+      </lv_obj>
+    </lv_obj>
+  </view>
+</component>

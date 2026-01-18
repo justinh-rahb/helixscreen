@@ -513,6 +513,7 @@
     <str name="icon_spoolman" value="󰈯"/>
     <str name="icon_stop" value="󰓛"/>
     <str name="icon_sysinfo" value="󰋼"/>
+    <str name="icon_target" value="󰓾"/>
     <str name="icon_thermometer" value="󰔏"/>
     <str name="icon_thermometer_minus" value="󰸄"/>
     <str name="icon_thermometer_plus" value="󰸅"/>

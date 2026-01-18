@@ -20,6 +20,7 @@
 
 #include <functional>
 #include <memory>
+#include <string>
 
 #include "../catch_amalgamated.hpp"
 
@@ -410,18 +411,18 @@ TEST_CASE_METHOD(TouchCalibrationPanelTestFixture,
         REQUIRE(target.y == 144);
     }
 
-    SECTION("Step 1: center X, 85% from top") {
-        // 800 * 0.50 = 400, 480 * 0.85 = 408
+    SECTION("Step 1: center X, 75% from top") {
+        // 800 * 0.50 = 400, 480 * 0.75 = 360
         Point target = panel_->get_target_position(1);
         REQUIRE(target.x == 400);
-        REQUIRE(target.y == 408);
+        REQUIRE(target.y == 360);
     }
 
-    SECTION("Step 2: 85% from left, 15% from top") {
-        // 800 * 0.85 = 680, 480 * 0.15 = 72
+    SECTION("Step 2: 85% from left, 25% from top") {
+        // 800 * 0.85 = 680, 480 * 0.25 = 120
         Point target = panel_->get_target_position(2);
         REQUIRE(target.x == 680);
-        REQUIRE(target.y == 72);
+        REQUIRE(target.y == 120);
     }
 }
 
@@ -557,14 +558,14 @@ TEST_CASE_METHOD(TouchCalibrationPanelTestFixture,
     REQUIRE(target0.y == 180);
 
     // 1024 * 0.50 = 512
-    // 600 * 0.85 = 510
+    // 600 * 0.75 = 450
     REQUIRE(target1.x == 512);
-    REQUIRE(target1.y == 510);
+    REQUIRE(target1.y == 450);
 
     // 1024 * 0.85 = 870.4 -> 870
-    // 600 * 0.15 = 90
+    // 600 * 0.25 = 150
     REQUIRE(target2.x == 870);
-    REQUIRE(target2.y == 90);
+    REQUIRE(target2.y == 150);
 }
 
 TEST_CASE_METHOD(TouchCalibrationPanelTestFixture,
@@ -585,4 +586,120 @@ TEST_CASE_METHOD(TouchCalibrationPanelTestFixture,
     Point new0 = panel_->get_target_position(0);
     REQUIRE(new0.x == 288); // 1920 * 0.15
     REQUIRE(new0.y == 324); // 1080 * 0.30
+}
+
+// ============================================================================
+// Failure Callback Tests (Degenerate Points)
+// ============================================================================
+
+/**
+ * @brief Test fixture with failure callback tracking
+ */
+class TouchCalibrationPanelFailureFixture {
+  public:
+    TouchCalibrationPanelFailureFixture() {
+        panel_ = std::make_unique<TouchCalibrationPanel>();
+        panel_->set_screen_size(800, 480);
+
+        panel_->set_completion_callback([this](const TouchCalibration* cal) {
+            completion_called_ = true;
+            completion_valid_ = (cal != nullptr && cal->valid);
+        });
+
+        panel_->set_failure_callback([this](const char* reason) {
+            failure_called_ = true;
+            failure_reason_ = reason ? reason : "";
+        });
+    }
+
+  protected:
+    std::unique_ptr<TouchCalibrationPanel> panel_;
+    bool completion_called_ = false;
+    bool completion_valid_ = false;
+    bool failure_called_ = false;
+    std::string failure_reason_;
+};
+
+TEST_CASE_METHOD(TouchCalibrationPanelFailureFixture,
+                 "TouchCalibrationPanel: collinear points trigger failure callback",
+                 "[touch-calibration][degenerate][failure]") {
+    panel_->start();
+
+    // Capture 3 collinear points (all on a straight line)
+    panel_->capture_point(Point{100, 100});
+    panel_->capture_point(Point{200, 200});
+    panel_->capture_point(Point{300, 300}); // Third point triggers calibration
+
+    // Should restart at POINT_1 due to degenerate points
+    REQUIRE(panel_->get_state() == TouchCalibrationPanel::State::POINT_1);
+
+    // Failure callback should have been invoked
+    REQUIRE(failure_called_ == true);
+    REQUIRE(failure_reason_.find("close together") != std::string::npos);
+
+    // Completion callback should NOT have been called
+    REQUIRE(completion_called_ == false);
+}
+
+TEST_CASE_METHOD(TouchCalibrationPanelFailureFixture,
+                 "TouchCalibrationPanel: duplicate points trigger failure callback",
+                 "[touch-calibration][degenerate][failure]") {
+    panel_->start();
+
+    // Capture same point 3 times
+    panel_->capture_point(Point{200, 200});
+    panel_->capture_point(Point{200, 200});
+    panel_->capture_point(Point{200, 200});
+
+    // Should restart at POINT_1 due to degenerate points
+    REQUIRE(panel_->get_state() == TouchCalibrationPanel::State::POINT_1);
+    REQUIRE(failure_called_ == true);
+}
+
+TEST_CASE_METHOD(TouchCalibrationPanelFailureFixture,
+                 "TouchCalibrationPanel: valid points do not trigger failure callback",
+                 "[touch-calibration][degenerate][failure]") {
+    panel_->start();
+
+    // Capture 3 well-distributed points (form a triangle)
+    panel_->capture_point(Point{100, 120});
+    panel_->capture_point(Point{380, 390});
+    panel_->capture_point(Point{660, 60});
+
+    // Should be in VERIFY state
+    REQUIRE(panel_->get_state() == TouchCalibrationPanel::State::VERIFY);
+
+    // Failure callback should NOT have been invoked
+    REQUIRE(failure_called_ == false);
+}
+
+TEST_CASE_METHOD(TouchCalibrationPanelFailureFixture,
+                 "TouchCalibrationPanel: recovery after degenerate points",
+                 "[touch-calibration][degenerate][recovery]") {
+    panel_->start();
+
+    // First attempt: degenerate points
+    panel_->capture_point(Point{100, 100});
+    panel_->capture_point(Point{200, 200});
+    panel_->capture_point(Point{300, 300});
+
+    REQUIRE(panel_->get_state() == TouchCalibrationPanel::State::POINT_1);
+    REQUIRE(failure_called_ == true);
+
+    // Reset failure flag
+    failure_called_ = false;
+
+    // Second attempt: valid points (already at POINT_1 from auto-restart)
+    panel_->capture_point(Point{100, 120});
+    panel_->capture_point(Point{380, 390});
+    panel_->capture_point(Point{660, 60});
+
+    // Should now be in VERIFY state
+    REQUIRE(panel_->get_state() == TouchCalibrationPanel::State::VERIFY);
+    REQUIRE(failure_called_ == false);
+
+    // Accept and verify completion
+    panel_->accept();
+    REQUIRE(completion_called_ == true);
+    REQUIRE(completion_valid_ == true);
 }

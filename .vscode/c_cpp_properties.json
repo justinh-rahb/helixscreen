@@ -18,12 +18,16 @@
                 "${workspaceFolder}/lib/tinygl/include-demo",
                 "${workspaceFolder}/lib/wpa_supplicant/src/common",
                 "${workspaceFolder}/lib/wpa_supplicant/src/utils",
+                "${workspaceFolder}/lib/sdl2/include",
+                "${workspaceFolder}/lib/sdl2/include/SDL2",
                 "/opt/homebrew/include",
                 "/opt/homebrew/include/SDL2"
             ],
             "defines": [
                 "LV_CONF_INCLUDE_SIMPLE",
-                "LV_LVGL_H_INCLUDE_SIMPLE"
+                "LV_LVGL_H_INCLUDE_SIMPLE",
+                "HELIX_DISPLAY_SDL",
+                "ENABLE_TINYGL_3D"
             ],
             "macFrameworkPath": [
                 "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"

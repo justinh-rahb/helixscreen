@@ -198,6 +198,7 @@ static const IconMapping ICON_MAP[] = {
     {"spoolman",           "\xF3\xB0\x88\xAF"},  // F022F film (same as filament)
     {"stop",               "\xF3\xB0\x93\x9B"},  // F04DB stop
     {"sysinfo",            "\xF3\xB0\x8B\xBC"},  // F02FC information
+    {"target",             "\xF3\xB0\x93\xBE"},  // F04FE target (touch calibration)
 
     // Temperature
     {"thermometer",        "\xF3\xB0\x94\x8F"},  // F050F thermometer

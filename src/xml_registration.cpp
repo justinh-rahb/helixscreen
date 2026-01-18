@@ -206,6 +206,7 @@ void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/retraction_settings_overlay.xml");
     lv_xml_register_component_from_file("A:ui_xml/machine_limits_overlay.xml");
     lv_xml_register_component_from_file("A:ui_xml/timelapse_settings_overlay.xml");
+    lv_xml_register_component_from_file("A:ui_xml/touch_calibration_overlay.xml");
     lv_xml_register_component_from_file("A:ui_xml/hidden_network_modal.xml");
     lv_xml_register_component_from_file("A:ui_xml/network_test_modal.xml");
     lv_xml_register_component_from_file("A:ui_xml/filament_preset_edit_modal.xml");
@@ -225,6 +226,7 @@ void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/app_layout.xml");
 
     // Wizard components
+    lv_xml_register_component_from_file("A:ui_xml/wizard_touch_calibration.xml");
     lv_xml_register_component_from_file("A:ui_xml/wizard_header_bar.xml");
     lv_xml_register_component_from_file("A:ui_xml/wizard_container.xml");
     lv_xml_register_component_from_file("A:ui_xml/network_list_item.xml");

@@ -244,6 +244,9 @@ MDI_ICONS+=",0xF005F"    # arrow-up-bold-circle
 MDI_ICONS+=",0xF0E73"    # arrow-left-right (bidirectional horizontal)
 MDI_ICONS+=",0xF0E79"    # arrow-up-down (bidirectional vertical)
 
+# Touch calibration
+MDI_ICONS+=",0xF04FE"    # target (touch calibration target)
+
 # Keyboard icons (for on-screen keyboard special keys)
 MDI_ICONS+=",0xF030F"    # keyboard-close (dismiss keyboard)
 MDI_ICONS+=",0xF0311"    # keyboard-return (enter key)

@@ -41,11 +41,12 @@ static lv_subject_t current_step;
 static lv_subject_t total_steps;
 static lv_subject_t wizard_title;
 static lv_subject_t wizard_progress;
-static lv_subject_t wizard_next_button_text;
-static lv_subject_t wizard_subtitle;
+static lv_subject_t wizard_back_visible;
 
-// Non-static: accessible from ui_wizard_connection.cpp
-lv_subject_t connection_test_passed; // Global: 0=connection not validated, 1=validated or N/A
+// Non-static: accessible from other wizard step files
+lv_subject_t connection_test_passed;  // Global: 0=connection not validated, 1=validated or N/A
+lv_subject_t wizard_next_button_text; // Global: accessible from touch calibration step
+lv_subject_t wizard_subtitle;         // Global: accessible for dynamic subtitle updates
 
 // SubjectManager for RAII cleanup of wizard subjects
 static SubjectManager wizard_subjects_;
@@ -187,6 +188,10 @@ void ui_wizard_init_subjects() {
     // Initialize connection_test_passed to 1 (enabled by default for all steps)
     // Step 2 (connection) will set it to 0 until test passes
     UI_MANAGED_SUBJECT_INT(connection_test_passed, 1, "connection_test_passed", wizard_subjects_);
+
+    // Initialize wizard_back_visible to 1 (visible by default)
+    // Step navigation will hide it when at first visible step
+    UI_MANAGED_SUBJECT_INT(wizard_back_visible, 1, "wizard_back_visible", wizard_subjects_);
 
     wizard_subjects_initialized = true;
     spdlog::debug("[Wizard] Subjects initialized ({} subjects registered)",
@@ -372,6 +377,10 @@ void ui_wizard_navigate_to_step(int step) {
 
     // Update current_step subject (internal step number for UI bindings)
     lv_subject_set_int(&current_step, step);
+
+    // Update Back button visibility based on whether we can go back
+    int min_step = touch_cal_step_skipped ? 1 : 0;
+    lv_subject_set_int(&wizard_back_visible, (step > min_step) ? 1 : 0);
 
     // Determine if this is the last step (summary is always step 10 internally)
     bool is_last_step = (step == 10);
