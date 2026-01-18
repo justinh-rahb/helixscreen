@@ -72,7 +72,13 @@ void NotificationHistoryPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     ui_overlay_panel_setup_standard(panel_, parent_screen_, "overlay_header", "overlay_content");
 
     // Wire action button ("Clear All") to clear callback
-    ui_overlay_panel_wire_action_button(panel_, on_clear_clicked, "overlay_header", this);
+    lv_obj_t* action_btn =
+        ui_overlay_panel_wire_action_button(panel_, on_clear_clicked, "overlay_header", this);
+
+    // Hide Clear All button when there are no notifications
+    if (action_btn) {
+        lv_obj_bind_flag_if_eq(action_btn, &has_entries_subject_, LV_OBJ_FLAG_HIDDEN, 0);
+    }
 
     // Populate list
     refresh();
