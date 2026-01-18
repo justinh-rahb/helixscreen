@@ -4,6 +4,7 @@
 #include "bed_mesh_renderer.h"
 
 #include "ui_fonts.h"
+#include "ui_theme.h"
 
 #include "bed_mesh_coordinate_transform.h"
 #include "bed_mesh_geometry.h"
@@ -38,7 +39,6 @@ namespace {
 // Canvas rendering
 constexpr double CANVAS_PADDING_FACTOR = 0.85; // Margin for axis labels and tick marks at edges
 constexpr double INITIAL_FOV_SCALE = 150.0;    // Starting point for auto-scale (gets adjusted)
-const lv_color_t CANVAS_BG_COLOR = lv_color_make(40, 40, 40); // Dark gray background
 
 // ========== Geometry & Visibility Constants (Phase 1 refactoring) ==========
 // Wall height factor (Mainsail-style: extends to 2x the mesh Z range above z_min)
@@ -486,7 +486,7 @@ bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer, 
     // LVGL will clip this to the dirty region during partial redraws
     lv_draw_rect_dsc_t bg_dsc;
     lv_draw_rect_dsc_init(&bg_dsc);
-    bg_dsc.bg_color = CANVAS_BG_COLOR;
+    bg_dsc.bg_color = ui_theme_get_color("graph_bg");
     bg_dsc.bg_opa = LV_OPA_COVER;
     lv_draw_rect(layer, &bg_dsc, clip_area);
 
@@ -1362,7 +1362,7 @@ static void render_2d_heatmap(lv_layer_t* layer, bed_mesh_renderer_t* renderer, 
     lv_draw_rect_dsc_t border_dsc;
     lv_draw_rect_dsc_init(&border_dsc);
     border_dsc.bg_opa = LV_OPA_TRANSP;
-    border_dsc.border_color = lv_color_make(60, 60, 60);
+    border_dsc.border_color = ui_theme_get_color("theme_grey");
     border_dsc.border_width = 1;
     border_dsc.border_opa = LV_OPA_60;
     border_dsc.radius = 2;
@@ -1408,10 +1408,10 @@ static void render_2d_heatmap(lv_layer_t* layer, bed_mesh_renderer_t* renderer, 
         // Draw tooltip background with shadow effect
         lv_draw_rect_dsc_t tooltip_bg;
         lv_draw_rect_dsc_init(&tooltip_bg);
-        tooltip_bg.bg_color = lv_color_make(30, 30, 30);
+        tooltip_bg.bg_color = ui_theme_get_color("card_bg");
         tooltip_bg.bg_opa = LV_OPA_90;
         tooltip_bg.radius = 6;
-        tooltip_bg.border_color = lv_color_make(80, 80, 80);
+        tooltip_bg.border_color = ui_theme_get_color("theme_grey");
         tooltip_bg.border_width = 1;
         tooltip_bg.border_opa = LV_OPA_60;
 
