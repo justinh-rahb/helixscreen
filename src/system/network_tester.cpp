@@ -30,9 +30,14 @@ NetworkTester::~NetworkTester() {
     // NOTE: Don't use spdlog here - during exit(), spdlog may already be destroyed
     // which causes a crash. Just silently clean up.
 
-    // Cancel any running test
-    if (running_) {
-        cancel();
+    // Signal cancellation to any running test
+    cancelled_ = true;
+
+    // MUST join thread if joinable, regardless of running_ state.
+    // A completed test (running_=false) still has a joinable thread.
+    // Destroying a joinable std::thread without join() calls std::terminate()!
+    if (worker_thread_.joinable()) {
+        worker_thread_.join();
     }
 }
 
