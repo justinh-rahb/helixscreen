@@ -42,7 +42,8 @@ HelixScreen is a printer control interface built with LVGL 9's declarative XML s
 |---------|-------------|-------------|---------------|
 | UI Framework | LVGL 9 XML | LVGL 8 C | GTK 3 (Python) |
 | Declarative UI | Full XML | C only | Python only |
-| Memory | ~50-80MB | ~60-80MB | ~150-200MB |
+| Disk Size | ~50-80MB | ~60-80MB | ~150-200MB |
+| RAM Usage | ~12MB | ~15-20MB | ~40MB |
 | Reactive Binding | Built-in | Manual | Manual |
 | Status | Beta | Stable | Mature |
 | Language | C++17 | C | Python 3 |
@@ -112,7 +113,7 @@ AFC (Box Turtle), Happy Hare (ERCF, 3MS, Tradrack), tool changers, and ValgACE.
 
 | Issue | Solution |
 |-------|----------|
-| CMake/SDL2 not found | `make install-deps` |
+| SDL2 or build tools missing | `make install-deps` |
 | Submodule empty | `git submodule update --init --recursive` |
 | Can't connect to Moonraker | Check IP/port in helixconfig.json |
 | Wizard not showing | Delete helixconfig.json to trigger it |
@@ -135,6 +136,6 @@ GPL v3 — See individual source files for copyright headers.
 
 ## Acknowledgments
 
-**Built upon:** [GuppyScreen](https://github.com/ballaswag/guppyscreen) (architecture, Moonraker integration), [KlipperScreen](https://github.com/KlipperScreen/KlipperScreen) (feature inspiration)
+**Inspired by:** [GuppyScreen](https://github.com/ballaswag/guppyscreen) (general architecture, LVGL-based approach), [KlipperScreen](https://github.com/KlipperScreen/KlipperScreen) (feature inspiration)
 
 **Stack:** [LVGL 9.4](https://lvgl.io/), [Klipper](https://www.klipper3d.org/), [Moonraker](https://github.com/Arksine/moonraker), [libhv](https://github.com/ithewei/libhv), [spdlog](https://github.com/gabime/spdlog), [SDL2](https://www.libsdl.org/)
