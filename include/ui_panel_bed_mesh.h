@@ -189,7 +189,6 @@ class BedMeshPanel : public OverlayBase {
     void execute_calibration(const std::string& profile_name);
     void execute_save_config();
 
-    static void on_panel_delete(lv_event_t* e);
     static void on_profile_dropdown_changed(lv_event_t* e);
 };
 

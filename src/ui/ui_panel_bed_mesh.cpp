@@ -86,6 +86,10 @@ BedMeshPanel::~BedMeshPanel() {
     // Must happen BEFORE any cleanup that callbacks might reference
     alive_->store(false);
 
+    // During shutdown, MoonrakerClient may already be destroyed - release subscription
+    // guard WITHOUT trying to unsubscribe (matches pattern in ams_backend_*.cpp)
+    subscription_.release();
+
     // CRITICAL: Check if LVGL is still initialized before calling LVGL functions.
     // During static destruction, LVGL may already be torn down.
     if (lv_is_initialized()) {
@@ -272,9 +276,6 @@ lv_obj_t* BedMeshPanel::create(lv_obj_t* parent) {
     // Evaluate render mode based on FPS history from previous sessions
     // This decides whether to use 3D or 2D fallback mode for AUTO mode
     ui_bed_mesh_evaluate_render_mode(canvas_);
-
-    // Register cleanup handler
-    lv_obj_add_event_cb(overlay_root_, on_panel_delete, LV_EVENT_DELETE, this);
 
     // Initially hidden
     lv_obj_add_flag(overlay_root_, LV_OBJ_FLAG_HIDDEN);
@@ -1035,17 +1036,6 @@ void BedMeshPanel::save_profile_with_name(const std::string& name) {
 // ============================================================================
 // Static Event Callbacks
 // ============================================================================
-
-void BedMeshPanel::on_panel_delete(lv_event_t* e) {
-    auto* self = static_cast<BedMeshPanel*>(lv_event_get_user_data(e));
-    if (!self)
-        return;
-
-    spdlog::debug("[{}] Panel delete event - cleaning up resources", self->get_name());
-    self->canvas_ = nullptr;
-    self->calibrate_name_input_ = nullptr;
-    self->rename_name_input_ = nullptr;
-}
 
 // Helper to extract profile index from callback name
 static int get_profile_index_from_event(lv_event_t* e) {
