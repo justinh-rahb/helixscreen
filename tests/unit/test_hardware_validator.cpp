@@ -778,6 +778,7 @@ TEST_CASE_METHOD(MmuDetectionFixture,
     SECTION("No warning when has_mmu() is true with AFC type") {
         // Setup: printer has AFC (Armored Turtle / BoxTurtle)
         client.set_heaters({"extruder", "heater_bed"});
+        client.set_mmu_enabled(false);          // Disable default Happy Hare MMU
         client.set_additional_objects({"AFC"}); // This sets has_mmu() = true, mmu_type = AFC
 
         // Verify capability flags

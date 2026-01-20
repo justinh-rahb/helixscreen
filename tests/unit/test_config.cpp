@@ -663,16 +663,16 @@ TEST_CASE_METHOD(ConfigTestFixture, "Config: display section exists with default
                  "[config][display][migration]") {
     // Populate with display section using test helper
     // Note: calibration and touch_device are now under /input/, not /display/
-    set_data_for_plural_test({{"printer", {{"moonraker_host", "127.0.0.1"}}},
-                              {"display",
-                               {{"rotate", 0},
-                                {"sleep_sec", 600},
-                                {"dim_sec", 300},
-                                {"dim_brightness", 30},
-                                {"drm_device", ""}}},
-                              {"input",
-                               {{"touch_device", ""},
-                                {"calibration", {{"valid", false}, {"a", 1.0}, {"b", 0.0}}}}}});
+    set_data_for_plural_test(
+        {{"printer", {{"moonraker_host", "127.0.0.1"}}},
+         {"display",
+          {{"rotate", 0},
+           {"sleep_sec", 600},
+           {"dim_sec", 300},
+           {"dim_brightness", 30},
+           {"drm_device", ""}}},
+         {"input",
+          {{"touch_device", ""}, {"calibration", {{"valid", false}, {"a", 1.0}, {"b", 0.0}}}}}});
 
     // Verify display section has expected structure (no calibration - that's in /input/)
     auto display = config.get<json>("/display");
@@ -739,7 +739,7 @@ TEST_CASE_METHOD(ConfigTestFixture, "Config: display settings accessible via get
 
 TEST_CASE_METHOD(ConfigTestFixture, "Config: display settings readable when populated",
                  "[config][display][migration]") {
-    // Populate display section
+    // Populate display section with calibration at old location
     set_data_for_plural_test({{"display",
                                {{"rotate", 180},
                                 {"sleep_sec", 300},
@@ -747,6 +747,9 @@ TEST_CASE_METHOD(ConfigTestFixture, "Config: display settings readable when popu
                                 {"dim_brightness", 50},
                                 {"gcode_3d_enabled", false},
                                 {"calibration", {{"valid", true}, {"a", 2.0}}}}}});
+
+    // Run migration to move calibration from /display/ to /input/
+    migrate_to_input();
 
     // Verify values are accessible
     REQUIRE(config.get<int>("/display/rotate") == 180);
@@ -776,8 +779,7 @@ TEST_CASE_METHOD(ConfigTestFixture, "Config: display settings can be set and upd
     REQUIRE(config.get<double>("/input/calibration/a") == Catch::Approx(1.1));
 }
 
-TEST_CASE_METHOD(ConfigTestFixture,
-                 "Config: migrates /display/calibration to /input/calibration",
+TEST_CASE_METHOD(ConfigTestFixture, "Config: migrates /display/calibration to /input/calibration",
                  "[config][input][migration]") {
     // Set up calibration under old location (/display/)
     // Migration should move it to /input/
@@ -790,6 +792,9 @@ TEST_CASE_METHOD(ConfigTestFixture,
                                   {"d", 0.0},
                                   {"e", 1.0},
                                   {"f", 0.0}}}}}});
+
+    // Run migration to move calibration from /display/ to /input/
+    migrate_to_input();
 
     // Verify migration moved calibration to /input/
     auto cal = config.get<json>("/input/calibration");
@@ -900,8 +905,7 @@ TEST_CASE_METHOD(ConfigTestFixture,
     REQUIRE(config.get<int>("/display/dim_brightness") == 50);
 }
 
-TEST_CASE_METHOD(ConfigTestFixture,
-                 "Config: migrates touch_calibrated to /input/calibration/valid",
+TEST_CASE_METHOD(ConfigTestFixture, "Config: migrates touch_calibrated to /input/calibration/valid",
                  "[config][display][migration]") {
     json old_format = {{"display_rotate", 0}, {"touch_calibrated", true}};
 

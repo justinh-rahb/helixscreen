@@ -6,6 +6,7 @@
  *
  * Parses /proc/meminfo and /proc/cpuinfo on Linux systems to detect
  * hardware metrics and classify the platform tier.
+ * On macOS, uses sysctl for hardware detection.
  */
 
 #include "platform_capabilities.h"
@@ -15,6 +16,11 @@
 #include <fstream>
 #include <regex>
 #include <sstream>
+
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#endif
 
 namespace helix {
 
@@ -84,6 +90,38 @@ void set_derived_capabilities(PlatformCapabilities& caps) {
         break;
     }
 }
+
+// ============================================================================
+// macOS-specific detection
+// ============================================================================
+
+#ifdef __APPLE__
+/**
+ * @brief Get total RAM in MB on macOS using sysctl
+ * @return Total RAM in MB, or 0 on failure
+ */
+size_t get_macos_ram_mb() {
+    int64_t memsize = 0;
+    size_t len = sizeof(memsize);
+    if (sysctlbyname("hw.memsize", &memsize, &len, nullptr, 0) == 0) {
+        return static_cast<size_t>(memsize / (1024 * 1024)); // bytes to MB
+    }
+    return 0;
+}
+
+/**
+ * @brief Get CPU core count on macOS using sysctl
+ * @return Number of CPU cores, or 0 on failure
+ */
+int get_macos_cpu_cores() {
+    int ncpu = 0;
+    size_t len = sizeof(ncpu);
+    if (sysctlbyname("hw.ncpu", &ncpu, &len, nullptr, 0) == 0) {
+        return ncpu;
+    }
+    return 0;
+}
+#endif
 
 } // namespace
 
@@ -165,7 +203,13 @@ CpuInfo parse_cpuinfo(const std::string& content) {
 PlatformCapabilities PlatformCapabilities::detect() {
     PlatformCapabilities caps;
 
-    // Read /proc/meminfo
+#ifdef __APPLE__
+    // macOS: use sysctl for detection
+    caps.total_ram_mb = get_macos_ram_mb();
+    caps.cpu_cores = get_macos_cpu_cores();
+    // bogomips not available on macOS
+#else
+    // Linux: read /proc/meminfo
     std::string meminfo_content = read_file_content("/proc/meminfo");
     if (!meminfo_content.empty()) {
         caps.total_ram_mb = parse_meminfo_total_mb(meminfo_content);
@@ -178,6 +222,7 @@ PlatformCapabilities PlatformCapabilities::detect() {
         caps.cpu_cores = cpu_info.core_count;
         caps.bogomips = cpu_info.bogomips;
     }
+#endif
 
     // Classify tier and set derived capabilities
     caps.tier = classify_tier(caps.total_ram_mb, caps.cpu_cores);

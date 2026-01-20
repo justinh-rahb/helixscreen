@@ -93,15 +93,15 @@ class FullStackTestFixture {
         // Initialize printer state for reactive data
         printer_state_.init_subjects(false);
 
+        // Create API mock BEFORE discovery so it can receive hardware callbacks
+        api_ = std::make_unique<MoonrakerAPIMock>(client_, printer_state_);
+        api_->set_mock_state(shared_state_);
+
         // Connect mock client (required for discovery)
         client_.connect("ws://mock/websocket", []() {}, []() {});
 
-        // Run discovery to populate hardware lists
+        // Run discovery to populate hardware lists (API receives hardware via callback)
         client_.discover_printer([]() {});
-
-        // Create API mock with shared state
-        api_ = std::make_unique<MoonrakerAPIMock>(client_, printer_state_);
-        api_->set_mock_state(shared_state_);
     }
 
     ~FullStackTestFixture() {
@@ -490,11 +490,14 @@ TEST_CASE("Full stack: All printer types work correctly",
 
             MoonrakerClientMock client(printer_type, 1000.0);
             client.set_mock_state(shared_state);
-            client.connect("ws://mock/websocket", []() {}, []() {});
-            client.discover_printer([]() {});
 
+            // Create API BEFORE discovery so it can receive hardware callbacks
             MoonrakerAPIMock api(client, state);
             api.set_mock_state(shared_state);
+
+            // Now connect and discover (API receives hardware via callback)
+            client.connect("ws://mock/websocket", []() {}, []() {});
+            client.discover_printer([]() {});
 
             // Verify basic operations work via PrinterHardware
             PrinterHardware hw(api.hardware().heaters(), api.hardware().sensors(),

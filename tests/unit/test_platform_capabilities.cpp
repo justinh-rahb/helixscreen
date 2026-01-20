@@ -396,11 +396,12 @@ TEST_CASE("Tier to string: STANDARD", "[platform][string]") {
 }
 
 // ============================================================================
-// Integration Test (if running on real Linux system)
+// Integration Test (on supported platforms: Linux and macOS)
 // ============================================================================
 
-TEST_CASE("detect(): returns valid capabilities on Linux", "[platform][integration][!mayfail]") {
-    // This test may fail on non-Linux systems (macOS, Windows)
+TEST_CASE("detect(): returns valid capabilities on supported platforms",
+          "[platform][integration][!mayfail]") {
+    // This test may fail on unsupported systems (Windows)
     // That's expected and acceptable
     auto caps = PlatformCapabilities::detect();
 

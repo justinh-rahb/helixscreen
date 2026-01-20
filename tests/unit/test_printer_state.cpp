@@ -363,9 +363,10 @@ TEST_CASE("PrinterState: Update toolhead position", "[state][motion]") {
 
     state.update_from_status(notification["params"][0]);
 
-    REQUIRE(lv_subject_get_int(state.get_position_x_subject()) == 125);
-    REQUIRE(lv_subject_get_int(state.get_position_y_subject()) == 87);
-    REQUIRE(lv_subject_get_int(state.get_position_z_subject()) == 45);
+    // Positions are stored as centimillimeters (×100) for 0.01mm precision
+    REQUIRE(lv_subject_get_int(state.get_position_x_subject()) == 12550); // 125.5mm
+    REQUIRE(lv_subject_get_int(state.get_position_y_subject()) == 8730);  // 87.3mm
+    REQUIRE(lv_subject_get_int(state.get_position_z_subject()) == 4520);  // 45.2mm
 
     const char* homed = lv_subject_get_string(state.get_homed_axes_subject());
     REQUIRE(std::string(homed) == "xyz");
@@ -826,9 +827,10 @@ TEST_CASE("PrinterState: Complete printing state update", "[state][integration]"
     REQUIRE(std::string(lv_subject_get_string(state.get_print_state_subject())) == "printing");
     REQUIRE(std::string(lv_subject_get_string(state.get_print_filename_subject())) ==
             "model.gcode");
-    REQUIRE(lv_subject_get_int(state.get_position_x_subject()) == 125);
-    REQUIRE(lv_subject_get_int(state.get_position_y_subject()) == 87);
-    REQUIRE(lv_subject_get_int(state.get_position_z_subject()) == 45);
+    // Positions are stored as centimillimeters (×100) for 0.01mm precision
+    REQUIRE(lv_subject_get_int(state.get_position_x_subject()) == 12500); // 125.0mm
+    REQUIRE(lv_subject_get_int(state.get_position_y_subject()) == 8700);  // 87.0mm
+    REQUIRE(lv_subject_get_int(state.get_position_z_subject()) == 4500);  // 45.0mm
     REQUIRE(std::string(lv_subject_get_string(state.get_homed_axes_subject())) == "xyz");
     REQUIRE(lv_subject_get_int(state.get_speed_factor_subject()) == 100);
     REQUIRE(lv_subject_get_int(state.get_flow_factor_subject()) == 100);
