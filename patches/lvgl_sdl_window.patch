@@ -1,8 +1,22 @@
 diff --git a/src/drivers/sdl/lv_sdl_window.c b/src/drivers/sdl/lv_sdl_window.c
-index fe19304d3..3f5d5505a 100644
+index fe19304d3..53f88837a 100644
 --- a/src/drivers/sdl/lv_sdl_window.c
 +++ b/src/drivers/sdl/lv_sdl_window.c
-@@ -373,9 +373,10 @@ static void sdl_event_handler(lv_timer_t * t)
+@@ -174,7 +174,13 @@ void lv_sdl_window_set_zoom(lv_display_t * disp, float zoom)
+ 
+ float lv_sdl_window_get_zoom(lv_display_t * disp)
+ {
++    if(disp == NULL) {
++        return 1.0f;
++    }
+     lv_sdl_window_t * dsc = lv_display_get_driver_data(disp);
++    if(dsc == NULL) {
++        return 1.0f;
++    }
+     return dsc->zoom;
+ }
+ 
+@@ -373,9 +379,10 @@ static void sdl_event_handler(lv_timer_t * t)
              }
          }
          if(event.type == SDL_QUIT) {
@@ -16,7 +30,7 @@ index fe19304d3..3f5d5505a 100644
  #if LV_SDL_DIRECT_EXIT
              exit(0);
  #endif
-@@ -395,10 +396,60 @@ static void window_create(lv_display_t * disp)
+@@ -395,10 +402,60 @@ static void window_create(lv_display_t * disp)
  
      int32_t hor_res = (int32_t)((float)(disp->hor_res) * dsc->zoom);
      int32_t ver_res = (int32_t)((float)(disp->ver_res) * dsc->zoom);
