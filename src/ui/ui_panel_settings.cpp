@@ -231,6 +231,9 @@ void SettingsPanel::init_subjects() {
     UI_MANAGED_SUBJECT_STRING(printer_value_subject_, printer_value_buf_, "—", "printer_value",
                               subjects_);
 
+    UI_MANAGED_SUBJECT_STRING(printer_host_value_subject_, printer_host_value_buf_, "—",
+                              "printer_host_value", subjects_);
+
     // Register XML event callbacks for dropdowns (already in XML)
     lv_xml_register_event_cb(nullptr, "on_completion_alert_changed",
                              on_completion_alert_dropdown_changed);
@@ -498,6 +501,23 @@ void SettingsPanel::populate_info_rows() {
             // Update subject (label binding happens in XML)
             lv_subject_copy_string(&printer_value_subject_, printer_name.c_str());
             spdlog::debug("[{}]   ✓ Printer: {}", get_name(), printer_name);
+        }
+    }
+
+    // === Printer Host (from config - shows IP/hostname:port) ===
+    lv_obj_t* host_row = lv_obj_find_by_name(panel_, "row_printer_host");
+    if (host_row) {
+        lv_obj_t* host_value = lv_obj_find_by_name(host_row, "value");
+        if (host_value) {
+            Config* config = Config::get_instance();
+            std::string host = config->get<std::string>(config->df() + "moonraker_host", "");
+            int port = config->get<int>(config->df() + "moonraker_port", 7125);
+
+            if (!host.empty()) {
+                std::string host_display = host + ":" + std::to_string(port);
+                lv_subject_copy_string(&printer_host_value_subject_, host_display.c_str());
+                spdlog::debug("[{}]   ✓ Printer Host: {}", get_name(), host_display);
+            }
         }
     }
 

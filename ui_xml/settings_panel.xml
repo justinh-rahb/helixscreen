@@ -130,19 +130,26 @@
         <text_body name="label"
                    text="Version" style_text_color="#text_primary" flex_grow="1" clickable="false" event_bubble="true"/>
         <text_body name="value"
-                   bind_text="version_value" style_text_color="#text_secondary" clickable="false" event_bubble="true"/>
+                   bind_text="version_value" style_text_color="#text_primary" clickable="false" event_bubble="true"/>
       </lv_obj>
       <event_cb trigger="clicked" callback="on_version_clicked"/>
     </lv_button>
     <!-- Printer Name -->
     <setting_info_row name="row_printer" label="Printer" icon="printer_3d">
-      <!-- Bind value to subject for reactive updates -->
-      <text_body name="value" bind_text="printer_value" style_text_color="#text_secondary"/>
+      <text_body name="value" bind_text="printer_value" style_text_color="#text_primary"/>
+    </setting_info_row>
+    <!-- Printer Host -->
+    <setting_info_row name="row_printer_host" label="Host" icon="lan">
+      <text_body name="value" bind_text="printer_host_value" style_text_color="#text_primary"/>
     </setting_info_row>
     <!-- Klipper Version -->
-    <setting_info_row name="row_klipper" label="Klipper" icon="toy_brick_outline" value="—"/>
+    <setting_info_row name="row_klipper" label="Klipper" icon="toy_brick_outline">
+      <text_body name="value" text="—" style_text_color="#text_primary"/>
+    </setting_info_row>
     <!-- Moonraker Version -->
-    <setting_info_row name="row_moonraker" label="Moonraker" icon="toy_brick_outline" value="—"/>
+    <setting_info_row name="row_moonraker" label="Moonraker" icon="toy_brick_outline">
+      <text_body name="value" text="—" style_text_color="#text_primary"/>
+    </setting_info_row>
     <!-- Bottom padding for scroll -->
     <lv_obj width="100%" height="#space_lg" style_bg_opa="0" style_border_width="0" scrollable="false"/>
   </view>
