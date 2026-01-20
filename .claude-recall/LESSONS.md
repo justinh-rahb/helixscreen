@@ -152,3 +152,8 @@
 ### [L055] [**---|-----] LVGL pad_all excludes flex gaps
 - **Uses**: 3 | **Velocity**: 0.01 | **Learned**: 2026-01-10 | **Last**: 2026-01-10 | **Category**: gotcha | **Type**: constraint
 > `style_pad_all` only sets edge padding (top/bottom/left/right), NOT inter-item spacing. For zero-gap flex layouts, also need `style_pad_row="0"` (column) or `style_pad_column="0"` (row), or `style_pad_gap="0"` for both.
+
+
+### [L056] [*----|-----] Re-stage clang-formatted files after commit
+- **Uses**: 1 | **Velocity**: 0.0 | **Learned**: 2026-01-19 | **Last**: 2026-01-19 | **Category**: workflow | **Type**: informational
+> Pre-commit hook auto-formats files but doesn't re-stage them. After committing, check git status for modified files and amend if they're just formatting changes.
