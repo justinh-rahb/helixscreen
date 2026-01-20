@@ -23,22 +23,20 @@
   <view name="controls_panel"
         extends="lv_obj" width="100%" height="100%" style_pad_all="#space_md" style_border_width="0" flex_flow="column"
         style_bg_color="#app_bg_color" style_pad_gap="#space_md" scrollable="false">
-    <!-- Z-Offset Adjustment Banner (reactive: hidden when pending_z_offset_delta == 0) -->
-    <!-- Uses absolute positioning via align to avoid affecting flex layout -->
+    <!-- Z-Offset Adjustment Banner (reactive: hidden when gcode_z_offset == 0) -->
+    <!-- Uses absolute positioning via align to overlay without affecting flex layout -->
     <lv_obj name="z_offset_banner"
-            width="content" height="content" hidden="true" align="top_mid" style_bg_color="#info_color"
-            style_bg_opa="200" style_radius="#border_radius" style_pad_all="#space_sm" style_border_width="0"
-            scrollable="false" flex_flow="row" style_flex_main_place="space_between" style_flex_cross_place="center">
+            width="content" height="content" hidden="true" align="top_mid"
+            style_bg_color="#tertiary_color" style_bg_opa="230" style_radius="#border_radius"
+            style_pad_hor="#space_sm" style_pad_ver="#space_xs" style_border_width="0"
+            scrollable="false" flex_flow="row" style_flex_cross_place="center"
+            style_pad_gap="#space_sm">
       <bind_flag_if_eq subject="gcode_z_offset" flag="hidden" ref_value="0"/>
-      <lv_obj width="content"
-              height="content" style_bg_opa="0" style_border_width="0" scrollable="false" flex_flow="column"
-              style_pad_gap="#space_xxs">
-        <text_small text="Z-Offset Adjusted" style_text_color="#text_primary"/>
-        <text_small name="z_offset_delta_label" bind_text="controls_z_offset" style_text_color="#text_secondary"/>
-      </lv_obj>
+      <text_small text="Z-Offset:" style_text_color="#text_primary"/>
+      <text_small bind_text="controls_z_offset" style_text_color="#text_primary"/>
       <lv_button name="btn_save_z_offset"
-                 height="content" style_radius="#border_radius" style_bg_color="#success_color" style_border_width="0"
-                 style_pad_left="#space_sm" style_pad_right="#space_sm" style_margin_left="#space_md">
+                 height="28" style_radius="#border_radius" style_bg_color="#success_color"
+                 style_border_width="0" style_pad_hor="#space_sm">
         <event_cb trigger="clicked" callback="on_controls_save_z_offset"/>
         <text_small text="Save" style_text_color="#text_primary"/>
       </lv_button>
@@ -98,58 +96,19 @@
             </lv_obj>
           </lv_obj>
         </lv_obj>
-        <!-- Z-Offset section -->
-        <lv_obj width="100%"
-                height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
-                flex_flow="column" style_pad_gap="#space_xxs" style_pad_top="#space_xs">
-          <!-- Z-Offset display -->
-          <lv_obj width="100%"
-                  height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
-                  flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
-            <text_body text="Z-Offset:" style_text_color="#text_secondary"/>
+        <!-- Z-Offset display (clickable to open Print Tune overlay) -->
+        <lv_button name="btn_zoffset_tune" width="100%" height="content"
+                   style_bg_opa="0" style_border_width="0" style_pad_all="0"
+                   flex_flow="row" style_flex_main_place="space_between" style_flex_cross_place="center"
+                   style_margin_top="#space_xs">
+          <event_cb trigger="clicked" callback="on_zoffset_tune"/>
+          <text_body text="Z-Offset:" style_text_color="#text_secondary"/>
+          <lv_obj flex_flow="row" style_flex_cross_place="center" style_pad_gap="#space_xs"
+                  style_bg_opa="0" style_border_width="0" width="content" height="content">
             <text_body bind_text="controls_z_offset" style_text_color="#text_primary"/>
+            <icon src="chevron_right" size="xs" variant="secondary"/>
           </lv_obj>
-          <!-- Z-Offset step selector (toggle buttons) -->
-          <lv_obj width="100%"
-                  height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
-                  flex_flow="row" style_flex_main_place="center" style_pad_gap="#space_sm">
-            <lv_button name="btn_zoffset_step_005" style_min_width="55" style_height="36"
-                       style_radius="#border_radius" style_bg_color="#secondary_color" style_bg_opa="60"
-                       style_border_width="0">
-              <event_cb trigger="clicked" callback="on_zoffset_step_005"/>
-              <text_small text="0.005" align="center"/>
-            </lv_button>
-            <lv_button name="btn_zoffset_step_01" style_min_width="50" style_height="36"
-                       style_radius="#border_radius" style_bg_color="#secondary_color" style_bg_opa="60"
-                       style_border_width="0">
-              <event_cb trigger="clicked" callback="on_zoffset_step_01"/>
-              <text_small text="0.01" align="center"/>
-            </lv_button>
-            <lv_button name="btn_zoffset_step_05" style_min_width="50" style_height="36"
-                       style_radius="#border_radius" style_bg_color="#secondary_color" style_bg_opa="60"
-                       style_border_width="0">
-              <event_cb trigger="clicked" callback="on_zoffset_step_05"/>
-              <text_small text="0.05" align="center"/>
-            </lv_button>
-          </lv_obj>
-          <!-- Z-Offset up/down arrows -->
-          <lv_obj width="100%"
-                  height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false"
-                  flex_flow="row" style_flex_main_place="center" style_pad_gap="#space_md">
-            <lv_button name="btn_zoffset_up" style_min_width="60" style_height="48"
-                       style_radius="#border_radius" style_bg_color="#secondary_color" style_bg_opa="60"
-                       style_border_width="0">
-              <event_cb trigger="clicked" callback="on_zoffset_up"/>
-              <lv_label name="icon_zoffset_up" text="\xF3\xB0\x81\x9D" style_text_font="icon24" align="center"/>
-            </lv_button>
-            <lv_button name="btn_zoffset_down" style_min_width="60" style_height="48"
-                       style_radius="#border_radius" style_bg_color="#secondary_color" style_bg_opa="60"
-                       style_border_width="0">
-              <event_cb trigger="clicked" callback="on_zoffset_down"/>
-              <lv_label name="icon_zoffset_down" text="\xF3\xB0\x81\x85" style_text_font="icon24" align="center"/>
-            </lv_button>
-          </lv_obj>
-        </lv_obj>
+        </lv_button>
         <!-- Motion panel navigation button -->
         <lv_button name="btn_motion"
                    width="100%" height="#button_height_sm" style_radius="#border_radius" style_pad_left="#space_sm"

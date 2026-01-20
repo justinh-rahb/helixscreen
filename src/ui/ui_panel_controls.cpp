@@ -99,6 +99,12 @@ ControlsPanel::~ControlsPanel() {
         lv_obj_del(screws_panel_);
         screws_panel_ = nullptr;
     }
+    if (print_tune_panel_) {
+        // Clear global accessor before deleting
+        set_global_print_tune_overlay(nullptr);
+        lv_obj_del(print_tune_panel_);
+        print_tune_panel_ = nullptr;
+    }
     // Modal dialogs: use ui_modal_hide() - NOT lv_obj_del()!
     // See docs/DEVELOPER_QUICK_REFERENCE.md "Modal Dialog Lifecycle"
     if (motors_confirmation_dialog_) {
@@ -273,7 +279,10 @@ void ControlsPanel::init_subjects() {
     // Z-Offset banner: Save button
     lv_xml_register_event_cb(nullptr, "on_controls_save_z_offset", on_save_z_offset);
 
-    // Z-Offset live tuning step buttons
+    // Z-Offset clickable row: Opens Print Tune overlay
+    lv_xml_register_event_cb(nullptr, "on_zoffset_tune", on_zoffset_tune);
+
+    // Z-Offset live tuning step buttons (kept for backwards compatibility)
     lv_xml_register_event_cb(nullptr, "on_zoffset_step_005", on_zoffset_step_005);
     lv_xml_register_event_cb(nullptr, "on_zoffset_step_01", on_zoffset_step_01);
     lv_xml_register_event_cb(nullptr, "on_zoffset_step_05", on_zoffset_step_05);
@@ -363,15 +372,6 @@ void ControlsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 
     // Populate secondary fans on initial setup (will be empty until discovery)
     populate_secondary_fans();
-
-    // Set default step button (0.01) as checked for Z-offset controls
-    lv_obj_t* btn_01 = lv_obj_find_by_name(panel_, "btn_zoffset_step_01");
-    if (btn_01) {
-        lv_obj_set_state(btn_01, LV_STATE_CHECKED, true);
-    }
-
-    // Update Z-offset icons based on printer kinematics
-    update_zoffset_icons();
 
     spdlog::info("[{}] Setup complete", get_name());
 }
@@ -753,6 +753,38 @@ void ControlsPanel::update_controls_z_offset_display(int offset_microns) {
     double offset_mm = static_cast<double>(offset_microns) / 1000.0;
     std::snprintf(controls_z_offset_buf_, sizeof(controls_z_offset_buf_), "%+.3fmm", offset_mm);
     lv_subject_copy_string(&controls_z_offset_subject_, controls_z_offset_buf_);
+}
+
+void ControlsPanel::handle_zoffset_tune() {
+    spdlog::debug("[{}] Z-offset tune clicked - opening Print Tune overlay", get_name());
+
+    // Create print tune overlay on first access (lazy initialization)
+    if (!print_tune_panel_ && parent_screen_) {
+        // Initialize subjects if not already done
+        if (!print_tune_overlay_.are_subjects_initialized()) {
+            print_tune_overlay_.init_subjects(printer_state_);
+        }
+
+        // Create overlay UI
+        print_tune_panel_ =
+            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "print_tune_panel", nullptr));
+        if (!print_tune_panel_) {
+            NOTIFY_ERROR("Failed to load print tune panel");
+            return;
+        }
+
+        // Setup the overlay with dependencies
+        print_tune_overlay_.setup(print_tune_panel_, parent_screen_, api_, printer_state_);
+
+        // Register as global so XML event callbacks work
+        set_global_print_tune_overlay(&print_tune_overlay_);
+
+        spdlog::info("[{}] Print Tune panel created for Z-offset tuning", get_name());
+    }
+
+    if (print_tune_panel_) {
+        ui_nav_push_overlay(print_tune_panel_);
+    }
 }
 
 void ControlsPanel::handle_zoffset_step(double step) {
@@ -1592,6 +1624,13 @@ void ControlsPanel::on_flow_down(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_flow_down");
     (void)e;
     get_global_controls_panel().handle_flow_down();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void ControlsPanel::on_zoffset_tune(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_zoffset_tune");
+    (void)e;
+    get_global_controls_panel().handle_zoffset_tune();
     LVGL_SAFE_EVENT_CB_END();
 }
 

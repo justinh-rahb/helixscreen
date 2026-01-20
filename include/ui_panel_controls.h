@@ -5,6 +5,7 @@
 
 #include "ui_observer_guard.h"
 #include "ui_panel_base.h"
+#include "ui_print_tune_overlay.h"
 
 #include "config.h"
 #include "standard_macros.h"
@@ -196,6 +197,13 @@ class ControlsPanel : public PanelBase {
     lv_obj_t* bed_mesh_panel_ = nullptr;
     lv_obj_t* zoffset_panel_ = nullptr;
     lv_obj_t* screws_panel_ = nullptr;
+    lv_obj_t* print_tune_panel_ = nullptr;
+
+    //
+    // === Print Tune Overlay (for Z-offset live tuning) ===
+    //
+
+    PrintTuneOverlay print_tune_overlay_;
 
     //
     // === Modal Dialog State ===
@@ -340,6 +348,7 @@ class ControlsPanel : public PanelBase {
     // === Z-Offset Control Handlers ===
     //
 
+    void handle_zoffset_tune(); ///< Open Print Tune overlay for live Z-offset tuning
     void handle_zoffset_step(double step);
     void handle_zoffset_up();
     void handle_zoffset_down();
@@ -410,6 +419,7 @@ class ControlsPanel : public PanelBase {
     // === Z-Offset Trampolines (XML event_cb - global accessor) ===
     //
 
+    static void on_zoffset_tune(lv_event_t* e);
     static void on_zoffset_step_005(lv_event_t* e);
     static void on_zoffset_step_01(lv_event_t* e);
     static void on_zoffset_step_05(lv_event_t* e);
