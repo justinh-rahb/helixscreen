@@ -117,13 +117,7 @@ ACTIVE_DAYS=$(wc -l < "$TMP_DIR/active_days.txt" | tr -d ' ')
 
 # Session analysis
 cut -d'|' -f2 "$TMP_DIR/commits.txt" | sort -n > "$TMP_DIR/timestamps.txt"
-read sessions avg_min total_hrs <<< $(python3 << 'PYEOF'
-with open('/tmp/ts_temp.txt', 'w') as f:
-    import sys
-    for line in open(sys.argv[1] if len(sys.argv) > 1 else '/dev/stdin'):
-        f.write(line)
-PYEOF
-python3 << PYEOF
+read sessions avg_min total_hrs <<< $(python3 << PYEOF
 import sys
 with open("$TMP_DIR/timestamps.txt") as f:
     times = [int(line.strip()) for line in f if line.strip()]
@@ -152,6 +146,10 @@ total_hours = int(total_coded / 3600)
 print(f"{sessions} {avg_session_min} {total_hours}")
 PYEOF
 )
+# Ensure session variables have defaults if read failed (sessions min 1 for division)
+sessions=${sessions:-1}
+avg_min=${avg_min:-0}
+total_hrs=${total_hrs:-0}
 
 # Longest streak
 LONGEST_STREAK=$(cat "$TMP_DIR/active_days.txt" | python3 -c "
@@ -242,6 +240,12 @@ if [[ -d "$REPO_ROOT/tests" ]]; then
     TEST_LOC=$(find "$REPO_ROOT/tests" \( -name "*.cpp" -o -name "*.h" -o -name "*.py" \) -exec cat {} + 2>/dev/null | wc -l | tr -d ' ')
 fi
 
+# Ensure all counts default to 0 for arithmetic (handles empty wc -l output)
+CPP_LOC=${CPP_LOC:-0}; H_LOC=${H_LOC:-0}; XML_LOC=${XML_LOC:-0}
+PY_LOC=${PY_LOC:-0}; SH_LOC=${SH_LOC:-0}; MK_LOC=${MK_LOC:-0}; TEST_LOC=${TEST_LOC:-0}
+CPP_COUNT=${CPP_COUNT:-0}; H_COUNT=${H_COUNT:-0}; XML_COUNT=${XML_COUNT:-0}
+PY_COUNT=${PY_COUNT:-0}; SH_COUNT=${SH_COUNT:-0}; MK_COUNT=${MK_COUNT:-0}; TEST_COUNT=${TEST_COUNT:-0}
+
 TOTAL_LOC=$((CPP_LOC + H_LOC + XML_LOC + PY_LOC + SH_LOC + MK_LOC + TEST_LOC))
 TOTAL_FILES=$((CPP_COUNT + H_COUNT + XML_COUNT + PY_COUNT + SH_COUNT + MK_COUNT + TEST_COUNT))
 
@@ -251,6 +255,12 @@ cut -d'|' -f5 "$TMP_DIR/commits.txt" | tr '[:upper:]' '[:lower:]' | tr -cs '[:al
 # ============================================================================
 # OUTPUT
 # ============================================================================
+
+# Ensure key metrics have defaults for arithmetic (avoid division by zero)
+ACTIVE_DAYS=${ACTIVE_DAYS:-1}
+PROJECT_DAYS=${PROJECT_DAYS:-1}
+PROJECT_WEEKS=${PROJECT_WEEKS:-1}
+LONGEST_STREAK=${LONGEST_STREAK:-0}
 
 # Calculate derived metrics
 COMMITS_PER_DAY=$(echo "scale=1; $TOTAL_COMMITS / $ACTIVE_DAYS" | bc)
