@@ -11,6 +11,7 @@
 #include <string>
 
 class MoonrakerClient;
+class MoonrakerAPI;
 
 /** @brief Print completion notification mode (Off=0, Notification=1, Alert=2) */
 enum class CompletionAlertMode { OFF = 0, NOTIFICATION = 1, ALERT = 2 };
@@ -88,6 +89,31 @@ class SettingsManager {
      * @param client Pointer to active MoonrakerClient (can be nullptr to disable)
      */
     void set_moonraker_client(MoonrakerClient* client);
+
+    /**
+     * @brief Set MoonrakerAPI reference for LED control
+     *
+     * Required for DRY LED control using set_led_on/off API (same as Home/PrintStatus panels).
+     * Call after MoonrakerAPI is initialized.
+     *
+     * @param api Pointer to active MoonrakerAPI (can be nullptr to disable)
+     */
+    void set_moonraker_api(MoonrakerAPI* api);
+
+    /**
+     * @brief Set the configured LED name from wizard config
+     *
+     * @param led LED name from config (e.g., "caselight", "chamber_light")
+     */
+    void set_configured_led(const std::string& led);
+
+    /**
+     * @brief Get the configured LED name
+     * @return Configured LED name (empty if not configured)
+     */
+    const std::string& get_configured_led() const {
+        return configured_led_;
+    }
 
     // =========================================================================
     // APPEARANCE SETTINGS
@@ -492,6 +518,10 @@ class SettingsManager {
 
     // External references
     MoonrakerClient* moonraker_client_ = nullptr;
+    MoonrakerAPI* moonraker_api_ = nullptr;
+
+    // Configured LED name from wizard (e.g., "caselight", "chamber_light")
+    std::string configured_led_;
 
     // State
     bool subjects_initialized_ = false;

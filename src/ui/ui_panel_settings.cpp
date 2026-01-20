@@ -33,6 +33,7 @@
 #include "sound_manager.h"
 #include "standard_macros.h"
 #include "static_panel_registry.h"
+#include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
 
@@ -213,6 +214,8 @@ void SettingsPanel::init_subjects() {
     // Initialize SettingsManager subjects (for reactive binding)
     SettingsManager::instance().init_subjects();
 
+    // Note: LED config loading moved to MoonrakerManager::create_api() for centralized init
+
     // Note: brightness_value subject is now managed by DisplaySettingsOverlay
     // See ui_settings_display.cpp
 
@@ -358,16 +361,28 @@ void SettingsPanel::setup_toggle_handlers() {
     }
 
     // === LED Light Toggle ===
-    // Event handler wired via XML <event_cb>, just set initial state here
+    // Event handler wired via XML <event_cb>, sync toggle with actual printer LED state
     lv_obj_t* led_light_row = lv_obj_find_by_name(panel_, "row_led_light");
     if (led_light_row) {
         led_light_switch_ = lv_obj_find_by_name(led_light_row, "toggle");
         if (led_light_switch_) {
-            // LED state from SettingsManager (ephemeral, starts off)
-            if (settings.get_led_enabled()) {
-                lv_obj_add_state(led_light_switch_, LV_STATE_CHECKED);
-            }
-            spdlog::debug("[{}]   ✓ LED light toggle", get_name());
+            // Sync toggle with actual printer LED state via observer
+            // Applying [L020]: Use ObserverGuard for cleanup
+            led_state_observer_ = ObserverGuard(
+                printer_state_.get_led_state_subject(),
+                [](lv_observer_t* obs, lv_subject_t* subj) {
+                    auto* self = static_cast<SettingsPanel*>(lv_observer_get_user_data(obs));
+                    if (self && self->led_light_switch_) {
+                        bool on = lv_subject_get_int(subj) != 0;
+                        if (on) {
+                            lv_obj_add_state(self->led_light_switch_, LV_STATE_CHECKED);
+                        } else {
+                            lv_obj_remove_state(self->led_light_switch_, LV_STATE_CHECKED);
+                        }
+                    }
+                },
+                this);
+            spdlog::debug("[{}]   ✓ LED light toggle (observing printer state)", get_name());
         }
     }
 

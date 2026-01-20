@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "ui_observer_guard.h" // For ObserverGuard RAII wrapper
 #include "ui_panel_base.h"
 
 #include "subject_managed_panel.h" // For SubjectManager
@@ -112,6 +113,9 @@ class SettingsPanel : public PanelBase {
     // Observers for reactive bindings (must be removed before labels are destroyed)
     lv_observer_t* klipper_version_observer_ = nullptr;
     lv_observer_t* moonraker_version_observer_ = nullptr;
+
+    // LED state observer (syncs toggle with printer LED state)
+    ObserverGuard led_state_observer_;
 
     //
     // === Reactive Subjects ===

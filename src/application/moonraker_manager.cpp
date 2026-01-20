@@ -33,6 +33,7 @@
 #include "printer_state.h"
 #include "settings_manager.h"
 #include "sound_manager.h"
+#include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
 
@@ -385,6 +386,19 @@ void MoonrakerManager::create_api(const RuntimeConfig& runtime_config) {
 
     // Set API for AmsState Spoolman integration
     AmsState::instance().set_moonraker_api(m_api.get());
+
+    // Set API for SettingsManager LED control (DRY with Home/PrintStatus panels)
+    SettingsManager::instance().set_moonraker_api(m_api.get());
+
+    // Load configured LED for SettingsManager (centralized initialization)
+    Config* config = Config::get_instance();
+    if (config) {
+        std::string led = config->get<std::string>(helix::wizard::LED_STRIP, "");
+        if (!led.empty()) {
+            SettingsManager::instance().set_configured_led(led);
+            spdlog::debug("[MoonrakerManager] Configured LED for SettingsManager: {}", led);
+        }
+    }
 
     // Note: EmergencyStopOverlay::init() and create() are called from Application
     // after both MoonrakerManager and SubjectInitializer are ready

@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "display_manager.h"
+#include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "runtime_config.h"
 #include "spdlog/spdlog.h"
@@ -152,6 +153,16 @@ void SettingsManager::deinit_subjects() {
 void SettingsManager::set_moonraker_client(MoonrakerClient* client) {
     moonraker_client_ = client;
     spdlog::debug("[SettingsManager] Moonraker client set: {}", client ? "connected" : "nullptr");
+}
+
+void SettingsManager::set_moonraker_api(MoonrakerAPI* api) {
+    moonraker_api_ = api;
+    spdlog::debug("[SettingsManager] MoonrakerAPI set: {}", api ? "connected" : "nullptr");
+}
+
+void SettingsManager::set_configured_led(const std::string& led) {
+    configured_led_ = led;
+    spdlog::debug("[SettingsManager] Configured LED set: {}", led.empty() ? "(none)" : led);
 }
 
 // =============================================================================
@@ -341,34 +352,44 @@ bool SettingsManager::get_led_enabled() const {
 void SettingsManager::set_led_enabled(bool enabled) {
     spdlog::info("[SettingsManager] set_led_enabled({})", enabled);
 
+    // Guard: Don't update local subject if command can't be sent
+    // This prevents UI/printer state divergence
+    if (!moonraker_api_ || configured_led_.empty()) {
+        spdlog::warn("[SettingsManager] LED toggle ignored - {}",
+                     !moonraker_api_ ? "no API" : "no LED configured");
+        return;
+    }
+
     // 1. Update subject (UI reacts)
     lv_subject_set_int(&led_enabled_subject_, enabled ? 1 : 0);
 
-    // 2. Send command to printer (if connected)
+    // 2. Send command to printer
     send_led_command(enabled);
 
     // Note: LED state is NOT persisted - it's ephemeral
 }
 
 void SettingsManager::send_led_command(bool enabled) {
-    if (!moonraker_client_) {
-        spdlog::warn("[SettingsManager] Cannot send LED command - no Moonraker client");
+    if (!moonraker_api_) {
+        spdlog::warn("[SettingsManager] Cannot send LED command - no MoonrakerAPI");
         return;
     }
 
-    // Use common LED pin name - this should be configurable in the future
-    // Common names: caselight, chamber_light, led, status_led
-    std::string gcode = enabled ? "SET_PIN PIN=caselight VALUE=1" : "SET_PIN PIN=caselight VALUE=0";
+    if (configured_led_.empty()) {
+        spdlog::warn("[SettingsManager] Cannot send LED command - no LED configured");
+        return;
+    }
 
-    // gcode_script returns request_id (>0) on success, -1 on failure
-    int result = moonraker_client_->gcode_script(gcode);
-    if (result > 0) {
-        spdlog::debug("[SettingsManager] LED {} command sent (request_id={})",
-                      enabled ? "on" : "off", result);
+    auto on_success = []() { spdlog::debug("[SettingsManager] LED command sent successfully"); };
+
+    auto on_error = [](const MoonrakerError& err) {
+        spdlog::error("[SettingsManager] LED command failed: {}", err.message);
+    };
+
+    if (enabled) {
+        moonraker_api_->set_led_on(configured_led_, on_success, on_error);
     } else {
-        spdlog::warn(
-            "[SettingsManager] Failed to send LED command - printer may not have caselight "
-            "pin or not connected");
+        moonraker_api_->set_led_off(configured_led_, on_success, on_error);
     }
 }
 
