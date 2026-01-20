@@ -23,6 +23,127 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <vector>
+
+// ============================================================================
+// HTML Span Parsing (for AFC/Happy Hare colored output)
+// ============================================================================
+
+namespace {
+
+/**
+ * @brief Parsed text segment with optional color class
+ */
+struct TextSegment {
+    std::string text;
+    std::string color_class; // empty = default, "success", "info", "warning", "error"
+};
+
+/**
+ * @brief Check if a message contains HTML spans we can parse
+ *
+ * Looks for Mainsail-style spans from AFC/Happy Hare plugins:
+ * <span class=success--text>LOADED</span>
+ */
+bool contains_html_spans(const std::string& message) {
+    return message.find("<span class=") != std::string::npos &&
+           (message.find("success--text") != std::string::npos ||
+            message.find("info--text") != std::string::npos ||
+            message.find("warning--text") != std::string::npos ||
+            message.find("error--text") != std::string::npos);
+}
+
+/**
+ * @brief Parse HTML span tags into text segments with color classes
+ *
+ * Parses Mainsail-style spans: <span class=XXX--text>content</span>
+ * Returns vector of segments, each with text and optional color class.
+ */
+std::vector<TextSegment> parse_html_spans(const std::string& message) {
+    std::vector<TextSegment> segments;
+
+    size_t pos = 0;
+    const size_t len = message.size();
+
+    while (pos < len) {
+        // Look for next <span class=
+        size_t span_start = message.find("<span class=", pos);
+
+        if (span_start == std::string::npos) {
+            // No more spans - add remaining text as plain segment
+            if (pos < len) {
+                TextSegment seg;
+                seg.text = message.substr(pos);
+                if (!seg.text.empty()) {
+                    segments.push_back(seg);
+                }
+            }
+            break;
+        }
+
+        // Add any text before the span as a plain segment
+        if (span_start > pos) {
+            TextSegment seg;
+            seg.text = message.substr(pos, span_start - pos);
+            segments.push_back(seg);
+        }
+
+        // Parse the span: <span class=XXX--text>content</span>
+        // Find the class value (ends at >)
+        size_t class_start = span_start + 12; // strlen("<span class=")
+        size_t class_end = message.find('>', class_start);
+
+        if (class_end == std::string::npos) {
+            // Malformed - add rest as plain text
+            TextSegment seg;
+            seg.text = message.substr(span_start);
+            segments.push_back(seg);
+            break;
+        }
+
+        // Extract color class from "success--text", "info--text", etc.
+        std::string class_attr = message.substr(class_start, class_end - class_start);
+        std::string color_class;
+
+        if (class_attr.find("success--text") != std::string::npos) {
+            color_class = "success";
+        } else if (class_attr.find("info--text") != std::string::npos) {
+            color_class = "info";
+        } else if (class_attr.find("warning--text") != std::string::npos) {
+            color_class = "warning";
+        } else if (class_attr.find("error--text") != std::string::npos) {
+            color_class = "error";
+        }
+
+        // Find the closing </span>
+        size_t content_start = class_end + 1;
+        size_t span_close = message.find("</span>", content_start);
+
+        if (span_close == std::string::npos) {
+            // No closing tag - add rest as plain text
+            TextSegment seg;
+            seg.text = message.substr(content_start);
+            seg.color_class = color_class;
+            segments.push_back(seg);
+            break;
+        }
+
+        // Extract content between > and </span>
+        TextSegment seg;
+        seg.text = message.substr(content_start, span_close - content_start);
+        seg.color_class = color_class;
+        if (!seg.text.empty()) {
+            segments.push_back(seg);
+        }
+
+        // Move past </span>
+        pos = span_close + 7; // strlen("</span>")
+    }
+
+    return segments;
+}
+
+} // namespace
 
 // ============================================================================
 // Global Instance
@@ -275,25 +396,58 @@ void ConsolePanel::create_entry_widget(const GcodeEntry& entry) {
         return;
     }
 
-    // Create a simple label (not XML component for better performance with many entries)
-    lv_obj_t* label = lv_label_create(console_container_);
-    lv_label_set_text(label, entry.message.c_str());
-    lv_obj_set_width(label, LV_PCT(100));
+    const lv_font_t* font = ui_theme_get_font("font_small");
 
-    // Apply color based on entry type (same pattern as ui_icon.cpp)
-    lv_color_t color;
-    if (entry.is_error) {
-        color = ui_theme_get_color("error_color");
-    } else if (entry.type == GcodeEntry::Type::RESPONSE) {
-        color = ui_theme_get_color("success_color");
+    if (contains_html_spans(entry.message)) {
+        // Create spangroup for rich text with colored segments
+        lv_obj_t* spangroup = lv_spangroup_create(console_container_);
+        lv_obj_set_width(spangroup, LV_PCT(100));
+        lv_obj_set_style_text_font(spangroup, font, 0);
+
+        auto segments = parse_html_spans(entry.message);
+        for (const auto& seg : segments) {
+            lv_span_t* span = lv_spangroup_add_span(spangroup);
+            lv_span_set_text(span, seg.text.c_str());
+
+            // Determine color based on segment's color class
+            lv_color_t color;
+            if (seg.color_class == "success") {
+                color = ui_theme_get_color("success_color");
+            } else if (seg.color_class == "info") {
+                color = ui_theme_get_color("info_color");
+            } else if (seg.color_class == "warning") {
+                color = ui_theme_get_color("warning_color");
+            } else if (seg.color_class == "error") {
+                color = ui_theme_get_color("error_color");
+            } else {
+                // Default color based on entry type
+                color = entry.is_error ? ui_theme_get_color("error_color")
+                        : entry.type == GcodeEntry::Type::RESPONSE
+                            ? ui_theme_get_color("success_color")
+                            : ui_theme_get_color("text_primary");
+            }
+            lv_style_set_text_color(lv_span_get_style(span), color);
+        }
+        lv_spangroup_refresh(spangroup);
     } else {
-        // Commands use primary text color
-        color = ui_theme_get_color("text_primary");
-    }
-    lv_obj_set_style_text_color(label, color, 0);
+        // Plain label for non-HTML messages (faster, simpler)
+        lv_obj_t* label = lv_label_create(console_container_);
+        lv_label_set_text(label, entry.message.c_str());
+        lv_obj_set_width(label, LV_PCT(100));
 
-    // Use small font from theme (responsive)
-    lv_obj_set_style_text_font(label, ui_theme_get_font("font_small"), 0);
+        // Apply color based on entry type
+        lv_color_t color;
+        if (entry.is_error) {
+            color = ui_theme_get_color("error_color");
+        } else if (entry.type == GcodeEntry::Type::RESPONSE) {
+            color = ui_theme_get_color("success_color");
+        } else {
+            // Commands use primary text color
+            color = ui_theme_get_color("text_primary");
+        }
+        lv_obj_set_style_text_color(label, color, 0);
+        lv_obj_set_style_text_font(label, font, 0);
+    }
 }
 
 void ConsolePanel::clear_entries() {

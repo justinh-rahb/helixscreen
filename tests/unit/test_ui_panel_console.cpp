@@ -10,6 +10,7 @@
  */
 
 #include <string>
+#include <vector>
 
 #include "../catch_amalgamated.hpp"
 
@@ -199,4 +200,257 @@ TEST_CASE("Console: is_temp_message() edge cases", "[ui][temp_filter]") {
     // Edge cases that might have slashes but no temp
     REQUIRE(is_temp_message("path/to/file") == false); // No T: or B:
     REQUIRE(is_temp_message("50/50 complete") == false);
+}
+
+// ============================================================================
+// HTML Span Parsing
+// (Replicated from ui_panel_console.cpp since it's in anonymous namespace)
+// ============================================================================
+
+/**
+ * @brief Parsed text segment with optional color class
+ */
+struct TextSegment {
+    std::string text;
+    std::string color_class; // empty = default, "success", "info", "warning", "error"
+};
+
+/**
+ * @brief Check if a message contains HTML spans we can parse
+ *
+ * Looks for Mainsail-style spans from AFC/Happy Hare plugins:
+ * <span class=success--text>LOADED</span>
+ */
+static bool contains_html_spans(const std::string& message) {
+    return message.find("<span class=") != std::string::npos &&
+           (message.find("success--text") != std::string::npos ||
+            message.find("info--text") != std::string::npos ||
+            message.find("warning--text") != std::string::npos ||
+            message.find("error--text") != std::string::npos);
+}
+
+/**
+ * @brief Parse HTML span tags into text segments with color classes
+ *
+ * Parses Mainsail-style spans: <span class=XXX--text>content</span>
+ * Returns vector of segments, each with text and optional color class.
+ */
+static std::vector<TextSegment> parse_html_spans(const std::string& message) {
+    std::vector<TextSegment> segments;
+
+    size_t pos = 0;
+    const size_t len = message.size();
+
+    while (pos < len) {
+        // Look for next <span class=
+        size_t span_start = message.find("<span class=", pos);
+
+        if (span_start == std::string::npos) {
+            // No more spans - add remaining text as plain segment
+            if (pos < len) {
+                TextSegment seg;
+                seg.text = message.substr(pos);
+                if (!seg.text.empty()) {
+                    segments.push_back(seg);
+                }
+            }
+            break;
+        }
+
+        // Add any text before the span as a plain segment
+        if (span_start > pos) {
+            TextSegment seg;
+            seg.text = message.substr(pos, span_start - pos);
+            segments.push_back(seg);
+        }
+
+        // Parse the span: <span class=XXX--text>content</span>
+        // Find the class value (ends at >)
+        size_t class_start = span_start + 12; // strlen("<span class=")
+        size_t class_end = message.find('>', class_start);
+
+        if (class_end == std::string::npos) {
+            // Malformed - add rest as plain text
+            TextSegment seg;
+            seg.text = message.substr(span_start);
+            segments.push_back(seg);
+            break;
+        }
+
+        // Extract color class from "success--text", "info--text", etc.
+        std::string class_attr = message.substr(class_start, class_end - class_start);
+        std::string color_class;
+
+        if (class_attr.find("success--text") != std::string::npos) {
+            color_class = "success";
+        } else if (class_attr.find("info--text") != std::string::npos) {
+            color_class = "info";
+        } else if (class_attr.find("warning--text") != std::string::npos) {
+            color_class = "warning";
+        } else if (class_attr.find("error--text") != std::string::npos) {
+            color_class = "error";
+        }
+
+        // Find the closing </span>
+        size_t content_start = class_end + 1;
+        size_t span_close = message.find("</span>", content_start);
+
+        if (span_close == std::string::npos) {
+            // No closing tag - add rest as plain text
+            TextSegment seg;
+            seg.text = message.substr(content_start);
+            seg.color_class = color_class;
+            segments.push_back(seg);
+            break;
+        }
+
+        // Extract content between > and </span>
+        TextSegment seg;
+        seg.text = message.substr(content_start, span_close - content_start);
+        seg.color_class = color_class;
+        if (!seg.text.empty()) {
+            segments.push_back(seg);
+        }
+
+        // Move past </span>
+        pos = span_close + 7; // strlen("</span>")
+    }
+
+    return segments;
+}
+
+// ============================================================================
+// HTML Span Detection Tests
+// ============================================================================
+
+TEST_CASE("Console: contains_html_spans() with no HTML", "[ui][html_parse]") {
+    REQUIRE(contains_html_spans("") == false);
+    REQUIRE(contains_html_spans("ok") == false);
+    REQUIRE(contains_html_spans("Normal text message") == false);
+    REQUIRE(contains_html_spans("!! Error message") == false);
+}
+
+TEST_CASE("Console: contains_html_spans() with HTML spans", "[ui][html_parse]") {
+    REQUIRE(contains_html_spans("<span class=success--text>LOADED</span>") == true);
+    REQUIRE(contains_html_spans("Text <span class=error--text>ERROR</span> more") == true);
+    REQUIRE(contains_html_spans("lane1: <span class=info--text>ready</span>") == true);
+}
+
+TEST_CASE("Console: contains_html_spans() with partial/invalid HTML", "[ui][html_parse]") {
+    REQUIRE(contains_html_spans("<span>no class</span>") == false);
+    REQUIRE(contains_html_spans("<span class=other>unknown</span>") == false);
+    REQUIRE(contains_html_spans("<div>not a span</div>") == false);
+}
+
+// ============================================================================
+// HTML Span Parsing Tests
+// ============================================================================
+
+TEST_CASE("Console: parse_html_spans() plain text only", "[ui][html_parse]") {
+    auto segments = parse_html_spans("Hello world");
+    REQUIRE(segments.size() == 1);
+    REQUIRE(segments[0].text == "Hello world");
+    REQUIRE(segments[0].color_class.empty());
+}
+
+TEST_CASE("Console: parse_html_spans() single span", "[ui][html_parse]") {
+    auto segments = parse_html_spans("<span class=success--text>LOADED</span>");
+    REQUIRE(segments.size() == 1);
+    REQUIRE(segments[0].text == "LOADED");
+    REQUIRE(segments[0].color_class == "success");
+}
+
+TEST_CASE("Console: parse_html_spans() mixed content", "[ui][html_parse]") {
+    auto segments = parse_html_spans("lane1: <span class=success--text>LOCKED</span> done");
+    REQUIRE(segments.size() == 3);
+    REQUIRE(segments[0].text == "lane1: ");
+    REQUIRE(segments[0].color_class.empty());
+    REQUIRE(segments[1].text == "LOCKED");
+    REQUIRE(segments[1].color_class == "success");
+    REQUIRE(segments[2].text == " done");
+    REQUIRE(segments[2].color_class.empty());
+}
+
+TEST_CASE("Console: parse_html_spans() multiple spans", "[ui][html_parse]") {
+    auto segments =
+        parse_html_spans("<span class=success--text>OK</span><span class=error--text>FAIL</span>");
+    REQUIRE(segments.size() == 2);
+    REQUIRE(segments[0].text == "OK");
+    REQUIRE(segments[0].color_class == "success");
+    REQUIRE(segments[1].text == "FAIL");
+    REQUIRE(segments[1].color_class == "error");
+}
+
+TEST_CASE("Console: parse_html_spans() all color classes", "[ui][html_parse]") {
+    auto seg1 = parse_html_spans("<span class=success--text>a</span>");
+    REQUIRE(seg1[0].color_class == "success");
+
+    auto seg2 = parse_html_spans("<span class=info--text>b</span>");
+    REQUIRE(seg2[0].color_class == "info");
+
+    auto seg3 = parse_html_spans("<span class=warning--text>c</span>");
+    REQUIRE(seg3[0].color_class == "warning");
+
+    auto seg4 = parse_html_spans("<span class=error--text>d</span>");
+    REQUIRE(seg4[0].color_class == "error");
+}
+
+TEST_CASE("Console: parse_html_spans() preserves newlines", "[ui][html_parse]") {
+    auto segments = parse_html_spans("<span class=success--text>line1\nline2</span>");
+    REQUIRE(segments.size() == 1);
+    REQUIRE(segments[0].text == "line1\nline2");
+}
+
+TEST_CASE("Console: parse_html_spans() real AFC output", "[ui][html_parse]") {
+    // Real example from printer
+    auto segments = parse_html_spans("lane1 tool cmd: T0  <span class=success--text>LOCKED</span>"
+                                     "<span class=success--text> AND LOADED</span>");
+    REQUIRE(segments.size() == 3);
+    REQUIRE(segments[0].text == "lane1 tool cmd: T0  ");
+    REQUIRE(segments[1].text == "LOCKED");
+    REQUIRE(segments[1].color_class == "success");
+    REQUIRE(segments[2].text == " AND LOADED");
+    REQUIRE(segments[2].color_class == "success");
+}
+
+// ============================================================================
+// Edge Case Tests
+// ============================================================================
+
+TEST_CASE("Console: parse_html_spans() empty span content", "[ui][html_parse]") {
+    // Span with empty content should be skipped
+    auto segments = parse_html_spans("<span class=success--text></span>");
+    REQUIRE(segments.empty());
+}
+
+TEST_CASE("Console: parse_html_spans() malformed no closing bracket", "[ui][html_parse]") {
+    // Missing > should return rest as plain text
+    auto segments = parse_html_spans("<span class=success--text");
+    REQUIRE(segments.size() == 1);
+    REQUIRE(segments[0].text == "<span class=success--text");
+    REQUIRE(segments[0].color_class.empty());
+}
+
+TEST_CASE("Console: parse_html_spans() malformed no closing tag", "[ui][html_parse]") {
+    // Missing </span> should still extract content with color
+    auto segments = parse_html_spans("<span class=success--text>content");
+    REQUIRE(segments.size() == 1);
+    REQUIRE(segments[0].text == "content");
+    REQUIRE(segments[0].color_class == "success");
+}
+
+TEST_CASE("Console: parse_html_spans() unknown class extracts text plain", "[ui][html_parse]") {
+    // Unknown class should still parse, just with empty color_class
+    auto segments = parse_html_spans("<span class=unknown--text>text</span>");
+    REQUIRE(segments.size() == 1);
+    REQUIRE(segments[0].text == "text");
+    REQUIRE(segments[0].color_class.empty());
+}
+
+TEST_CASE("Console: parse_html_spans() quoted class attribute", "[ui][html_parse]") {
+    // Quoted class attribute - class name includes quotes but still matches
+    auto segments = parse_html_spans("<span class=\"success--text\">OK</span>");
+    REQUIRE(segments.size() == 1);
+    REQUIRE(segments[0].text == "OK");
+    REQUIRE(segments[0].color_class == "success");
 }
