@@ -672,7 +672,7 @@ void ControlsPanel::populate_secondary_fans() {
         }
         lv_obj_t* speed_label = lv_label_create(row);
         lv_label_set_text(speed_label, speed_buf);
-        lv_obj_set_style_text_color(speed_label, ui_theme_get_color("text_secondary"), 0);
+        lv_obj_set_style_text_color(speed_label, ui_theme_get_color("text_primary"), 0);
         lv_obj_set_style_text_font(speed_label, ui_theme_get_font("font_small"), 0);
 
         // Track this row for reactive speed updates
@@ -937,9 +937,7 @@ void ControlsPanel::handle_qgl() {
     if (api_) {
         api_->execute_gcode(
             "QUAD_GANTRY_LEVEL", []() { NOTIFY_SUCCESS("Quad Gantry Level started"); },
-            [](const MoonrakerError& err) {
-                NOTIFY_ERROR("QGL failed: {}", err.user_message());
-            });
+            [](const MoonrakerError& err) { NOTIFY_ERROR("QGL failed: {}", err.user_message()); });
     }
 }
 

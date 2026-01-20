@@ -42,7 +42,8 @@ struct TempDisplayData {
     uint32_t magic = TEMP_DISPLAY_MAGIC;
     int current_temp = 0;
     int target_temp = 0;
-    bool show_target = false; // Default: hide target (opt-in via prop)
+    bool show_target = false;        // Default: hide target (opt-in via prop)
+    bool has_target_binding = false; // True if bind_target was set (heater mode)
 
     // Child label pointers for efficient updates
     lv_obj_t* current_label = nullptr;
@@ -93,10 +94,21 @@ static constexpr int AT_TEMP_TOLERANCE = 2;
  *
  * Uses the shared get_heating_state_color() utility for consistent
  * color-coding across all temperature displays.
+ *
+ * For sensor-only displays (no bind_target), keeps text_primary color
+ * since there's no heating state to indicate.
  */
 static void update_heating_color(TempDisplayData* data) {
     if (!data || !data->current_label)
         return;
+
+    // Sensor-only mode: no target binding, so no heating state to show
+    // Keep text_primary for readability (e.g., chamber temp sensor)
+    if (!data->has_target_binding) {
+        lv_obj_set_style_text_color(data->current_label, ui_theme_get_color("text_primary"),
+                                    LV_PART_MAIN);
+        return;
+    }
 
     lv_color_t color =
         get_heating_state_color(data->current_temp, data->target_temp, AT_TEMP_TOLERANCE);
@@ -355,6 +367,7 @@ static void ui_temp_display_apply_cb(lv_xml_parser_state_t* state, const char** 
             // Bind target temperature to a subject (NULL = global scope)
             lv_subject_t* subject = lv_xml_get_subject(NULL, value);
             if (subject && data && data->target_label) {
+                data->has_target_binding = true; // Mark as heater mode (not sensor-only)
                 lv_subject_add_observer_obj(subject, target_temp_observer_cb, data->target_label,
                                             nullptr);
                 // Set initial value
