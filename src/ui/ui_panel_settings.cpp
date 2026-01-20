@@ -66,6 +66,15 @@ SettingsPanel::~SettingsPanel() {
             lv_observer_remove(moonraker_version_observer_);
             moonraker_version_observer_ = nullptr;
         }
+
+        // Unregister overlay callbacks to prevent dangling 'this' in callbacks
+        auto& nav = NavigationManager::instance();
+        if (factory_reset_dialog_) {
+            nav.unregister_overlay_close_callback(factory_reset_dialog_);
+        }
+        if (theme_restart_dialog_) {
+            nav.unregister_overlay_close_callback(theme_restart_dialog_);
+        }
     }
     // Note: Don't log here - spdlog may be destroyed during static destruction
 }
@@ -181,9 +190,7 @@ static void on_theme_restart_dismiss(lv_event_t* e) {
     spdlog::info("[SettingsPanel] User dismissed theme restart");
     auto& panel = get_global_settings_panel();
     if (panel.theme_restart_dialog_) {
-        ui_nav_go_back(); // Pop the modal
-        lv_obj_delete(panel.theme_restart_dialog_);
-        panel.theme_restart_dialog_ = nullptr;
+        ui_nav_go_back(); // Animation + callback will handle cleanup
     }
 }
 
@@ -199,9 +206,7 @@ static void on_factory_reset_cancel(lv_event_t* e) {
     spdlog::info("[SettingsPanel] User cancelled factory reset");
     auto& panel = get_global_settings_panel();
     if (panel.factory_reset_dialog_) {
-        ui_nav_go_back(); // Pop the modal
-        lv_obj_delete(panel.factory_reset_dialog_);
-        panel.factory_reset_dialog_ = nullptr;
+        ui_nav_go_back(); // Animation + callback will handle cleanup
     }
 }
 
@@ -560,6 +565,16 @@ void SettingsPanel::show_theme_restart_dialog() {
         if (theme_restart_dialog_) {
             // Start hidden
             lv_obj_add_flag(theme_restart_dialog_, LV_OBJ_FLAG_HIDDEN);
+
+            // Register close callback to delete dialog when animation completes
+            NavigationManager::instance().register_overlay_close_callback(
+                theme_restart_dialog_, [this]() {
+                    if (theme_restart_dialog_) {
+                        lv_obj_delete(theme_restart_dialog_);
+                        theme_restart_dialog_ = nullptr;
+                    }
+                });
+
             spdlog::info("[{}] Theme restart dialog created", get_name());
         } else {
             spdlog::error("[{}] Failed to create theme restart dialog", get_name());
@@ -710,6 +725,16 @@ void SettingsPanel::handle_factory_reset_clicked() {
         if (factory_reset_dialog_) {
             // Start hidden
             lv_obj_add_flag(factory_reset_dialog_, LV_OBJ_FLAG_HIDDEN);
+
+            // Register close callback to delete dialog when animation completes
+            NavigationManager::instance().register_overlay_close_callback(
+                factory_reset_dialog_, [this]() {
+                    if (factory_reset_dialog_) {
+                        lv_obj_delete(factory_reset_dialog_);
+                        factory_reset_dialog_ = nullptr;
+                    }
+                });
+
             spdlog::info("[{}] Factory reset dialog created", get_name());
         } else {
             spdlog::error("[{}] Failed to create factory reset dialog", get_name());
@@ -751,11 +776,9 @@ void SettingsPanel::perform_factory_reset() {
         spdlog::info("[{}] Config reset to defaults", get_name());
     }
 
-    // Hide the dialog
+    // Hide the dialog - animation + callback will handle cleanup
     if (factory_reset_dialog_) {
-        ui_nav_go_back(); // Pop the modal
-        lv_obj_delete(factory_reset_dialog_);
-        factory_reset_dialog_ = nullptr;
+        ui_nav_go_back();
     }
 
     // Show confirmation toast
