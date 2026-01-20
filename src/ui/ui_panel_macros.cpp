@@ -10,6 +10,7 @@
 #include "ui_nav_manager.h"
 #include "ui_panel_common.h"
 #include "ui_subject_registry.h"
+#include "ui_utils.h"
 
 #include "app_globals.h"
 #include "device_display_name.h"
@@ -61,19 +62,11 @@ MacrosPanel::~MacrosPanel() {
 // ============================================================================
 
 void MacrosPanel::init_subjects() {
-    if (subjects_initialized_) {
-        spdlog::debug("[{}] Subjects already initialized", get_name());
-        return;
-    }
-
-    spdlog::debug("[{}] Initializing subjects", get_name());
-
-    // Initialize status subject for reactive binding
-    UI_MANAGED_SUBJECT_STRING(status_subject_, status_buf_, status_buf_, "macros_status",
-                              subjects_);
-
-    subjects_initialized_ = true;
-    spdlog::debug("[{}] Subjects initialized: macros_status", get_name());
+    init_subjects_guarded([this]() {
+        // Initialize status subject for reactive binding
+        UI_MANAGED_SUBJECT_STRING(status_subject_, status_buf_, status_buf_, "macros_status",
+                                  subjects_);
+    });
 }
 
 void MacrosPanel::deinit_subjects() {
@@ -109,29 +102,9 @@ void MacrosPanel::register_callbacks() {
 // ============================================================================
 
 lv_obj_t* MacrosPanel::create(lv_obj_t* parent) {
-    if (!parent) {
-        spdlog::error("[{}] Cannot create: null parent", get_name());
+    if (!create_overlay_from_xml(parent, "macro_panel")) {
         return nullptr;
     }
-
-    spdlog::debug("[{}] Creating overlay from XML", get_name());
-
-    parent_screen_ = parent;
-
-    // Reset cleanup flag when (re)creating
-    cleanup_called_ = false;
-
-    // Create overlay from XML
-    overlay_root_ = static_cast<lv_obj_t*>(lv_xml_create(parent, "macro_panel", nullptr));
-
-    if (!overlay_root_) {
-        spdlog::error("[{}] Failed to create from XML", get_name());
-        return nullptr;
-    }
-
-    // Use standard overlay panel setup (wires header, back button, handles responsive padding)
-    ui_overlay_panel_setup_standard(overlay_root_, parent_screen_, "overlay_header",
-                                    "overlay_content");
 
     // Find widget references
     lv_obj_t* overlay_content = lv_obj_find_by_name(overlay_root_, "overlay_content");
@@ -149,9 +122,6 @@ lv_obj_t* MacrosPanel::create(lv_obj_t* parent) {
 
     // Populate macros from capabilities
     populate_macro_list();
-
-    // Initially hidden
-    lv_obj_add_flag(overlay_root_, LV_OBJ_FLAG_HIDDEN);
 
     spdlog::info("[{}] Overlay created successfully", get_name());
     return overlay_root_;
@@ -224,21 +194,7 @@ void MacrosPanel::populate_macro_list() {
 
     // Toggle visibility: show macro list OR empty state
     bool has_macros = visible_count > 0;
-
-    if (macro_list_container_) {
-        if (has_macros) {
-            lv_obj_remove_flag(macro_list_container_, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(macro_list_container_, LV_OBJ_FLAG_HIDDEN);
-        }
-    }
-    if (empty_state_container_) {
-        if (has_macros) {
-            lv_obj_add_flag(empty_state_container_, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_remove_flag(empty_state_container_, LV_OBJ_FLAG_HIDDEN);
-        }
-    }
+    ui_toggle_list_empty_state(macro_list_container_, empty_state_container_, has_macros);
 
     // Update status
     if (has_macros) {

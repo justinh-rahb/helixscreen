@@ -124,84 +124,73 @@ BedMeshPanel::~BedMeshPanel() {
 // ============================================================================
 
 void BedMeshPanel::init_subjects() {
-    if (subjects_initialized_) {
-        spdlog::warn("[{}] init_subjects() called twice - ignoring", get_name());
-        return;
-    }
+    init_subjects_guarded([this]() {
+        // Current mesh stats subjects
+        UI_MANAGED_SUBJECT_INT(bed_mesh_available_, 0, "bed_mesh_available", subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_profile_name_, profile_name_buf_, "",
+                                  "bed_mesh_profile_name", subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_dimensions_, dimensions_buf_, "No mesh data",
+                                  "bed_mesh_dimensions", subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_max_label_, max_label_buf_, "Max", "bed_mesh_max_label",
+                                  subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_max_value_, max_value_buf_, "--", "bed_mesh_max_value",
+                                  subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_min_label_, min_label_buf_, "Min", "bed_mesh_min_label",
+                                  subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_min_value_, min_value_buf_, "--", "bed_mesh_min_value",
+                                  subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_variance_, variance_buf_, "", "bed_mesh_variance",
+                                  subjects_);
 
-    // Current mesh stats subjects
-    UI_MANAGED_SUBJECT_INT(bed_mesh_available_, 0, "bed_mesh_available", subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_profile_name_, profile_name_buf_, "",
-                              "bed_mesh_profile_name", subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_dimensions_, dimensions_buf_, "No mesh data",
-                              "bed_mesh_dimensions", subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_max_label_, max_label_buf_, "Max", "bed_mesh_max_label",
-                              subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_max_value_, max_value_buf_, "--", "bed_mesh_max_value",
-                              subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_min_label_, min_label_buf_, "Min", "bed_mesh_min_label",
-                              subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_min_value_, min_value_buf_, "--", "bed_mesh_min_value",
-                              subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_variance_, variance_buf_, "", "bed_mesh_variance",
-                              subjects_);
+        // Profile count
+        UI_MANAGED_SUBJECT_INT(bed_mesh_profile_count_, 0, "bed_mesh_profile_count", subjects_);
 
-    // Profile count
-    UI_MANAGED_SUBJECT_INT(bed_mesh_profile_count_, 0, "bed_mesh_profile_count", subjects_);
+        // Profile list subjects (5 profiles)
+        for (int i = 0; i < BED_MESH_MAX_PROFILES; i++) {
+            std::string name_key = "bed_mesh_profile_" + std::to_string(i) + "_name";
+            std::string range_key = "bed_mesh_profile_" + std::to_string(i) + "_range";
+            std::string active_key = "bed_mesh_profile_" + std::to_string(i) + "_active";
 
-    // Profile list subjects (5 profiles)
-    for (int i = 0; i < BED_MESH_MAX_PROFILES; i++) {
-        std::string name_key = "bed_mesh_profile_" + std::to_string(i) + "_name";
-        std::string range_key = "bed_mesh_profile_" + std::to_string(i) + "_range";
-        std::string active_key = "bed_mesh_profile_" + std::to_string(i) + "_active";
+            auto idx = static_cast<size_t>(i);
+            char* name_buf = profile_name_bufs_[idx].data();
+            char* range_buf = profile_range_bufs_[idx].data();
 
-        auto idx = static_cast<size_t>(i);
-        char* name_buf = profile_name_bufs_[idx].data();
-        char* range_buf = profile_range_bufs_[idx].data();
+            // Initialize with 5-arg form: (subject, buf, prev_buf, size, initial_value)
+            lv_subject_init_string(&profile_name_subjects_[idx], name_buf, nullptr,
+                                   profile_name_bufs_[idx].size(), "");
+            lv_xml_register_subject(nullptr, name_key.c_str(), &profile_name_subjects_[idx]);
+            subjects_.register_subject(&profile_name_subjects_[idx]);
 
-        // Initialize with 5-arg form: (subject, buf, prev_buf, size, initial_value)
-        lv_subject_init_string(&profile_name_subjects_[idx], name_buf, nullptr,
-                               profile_name_bufs_[idx].size(), "");
-        lv_xml_register_subject(nullptr, name_key.c_str(), &profile_name_subjects_[idx]);
-        subjects_.register_subject(&profile_name_subjects_[idx]);
+            lv_subject_init_string(&profile_range_subjects_[idx], range_buf, nullptr,
+                                   profile_range_bufs_[idx].size(), "");
+            lv_xml_register_subject(nullptr, range_key.c_str(), &profile_range_subjects_[idx]);
+            subjects_.register_subject(&profile_range_subjects_[idx]);
 
-        lv_subject_init_string(&profile_range_subjects_[idx], range_buf, nullptr,
-                               profile_range_bufs_[idx].size(), "");
-        lv_xml_register_subject(nullptr, range_key.c_str(), &profile_range_subjects_[idx]);
-        subjects_.register_subject(&profile_range_subjects_[idx]);
+            lv_subject_init_int(&profile_active_subjects_[idx], 0);
+            lv_xml_register_subject(nullptr, active_key.c_str(), &profile_active_subjects_[idx]);
+            subjects_.register_subject(&profile_active_subjects_[idx]);
+        }
 
-        lv_subject_init_int(&profile_active_subjects_[idx], 0);
-        lv_xml_register_subject(nullptr, active_key.c_str(), &profile_active_subjects_[idx]);
-        subjects_.register_subject(&profile_active_subjects_[idx]);
-    }
+        // Modal state subjects (NOT visibility - internal state only)
+        UI_MANAGED_SUBJECT_INT(bed_mesh_calibrating_, 0, "bed_mesh_calibrating", subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_rename_old_name_, rename_old_name_buf_, "",
+                                  "bed_mesh_rename_old_name", subjects_);
+        // Note: All modals now use ui_modal_show() pattern instead of visibility subjects
 
-    // Modal state subjects (NOT visibility - internal state only)
-    UI_MANAGED_SUBJECT_INT(bed_mesh_calibrating_, 0, "bed_mesh_calibrating", subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_rename_old_name_, rename_old_name_buf_, "",
-                              "bed_mesh_rename_old_name", subjects_);
-    // Note: All modals now use ui_modal_show() pattern instead of visibility subjects
+        // Calibration state machine subjects
+        UI_MANAGED_SUBJECT_INT(bed_mesh_calibrate_state_, 0, "bed_mesh_calibrate_state", subjects_);
+        UI_MANAGED_SUBJECT_INT(bed_mesh_probe_progress_, 0, "bed_mesh_probe_progress", subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_probe_text_, probe_text_buf_, "Preparing...",
+                                  "bed_mesh_probe_text", subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_mesh_error_message_, error_message_buf_, "",
+                                  "bed_mesh_error_message", subjects_);
 
-    // Calibration state machine subjects
-    UI_MANAGED_SUBJECT_INT(bed_mesh_calibrate_state_, 0, "bed_mesh_calibrate_state", subjects_);
-    UI_MANAGED_SUBJECT_INT(bed_mesh_probe_progress_, 0, "bed_mesh_probe_progress", subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_probe_text_, probe_text_buf_, "Preparing...",
-                              "bed_mesh_probe_text", subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_mesh_error_message_, error_message_buf_, "",
-                              "bed_mesh_error_message", subjects_);
-
-    subjects_initialized_ = true;
-    spdlog::debug("[{}] Subjects initialized and registered", get_name());
+        spdlog::debug("[{}] Subjects registered", get_name());
+    });
 }
 
 void BedMeshPanel::deinit_subjects() {
-    if (!subjects_initialized_)
-        return;
-
-    // Deinitialize all subjects via SubjectManager (RAII cleanup)
-    subjects_.deinit_all();
-
-    subjects_initialized_ = false;
-    spdlog::debug("[{}] Subjects deinitialized", get_name());
+    deinit_subjects_base(subjects_);
 }
 
 // ============================================================================

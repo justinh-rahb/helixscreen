@@ -142,13 +142,10 @@
     <lv_obj name="empty_state_container"
             width="100%" height="100%" style_border_width="0" style_pad_all="0" align="center" flex_grow="1"
             hidden="true">
-      <lv_obj width="content"
-              height="content" style_bg_opa="0" style_border_width="0" style_pad_all="#space_xl" align="center"
-              flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center"
-              style_pad_gap="#space_sm">
+      <centered_column width="content" height="content" style_pad_all="#space_xl" align="center" pad_gap="#space_sm">
         <text_heading text="No files available for printing" style_text_align="center"/>
         <text_body text="Upload gcode files to get started" style_text_align="center"/>
-      </lv_obj>
+      </centered_column>
     </lv_obj>
   </view>
 </component>

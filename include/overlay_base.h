@@ -68,6 +68,11 @@
 #include "lvgl/lvgl.h"
 #include "panel_lifecycle.h"
 
+#include <spdlog/spdlog.h>
+
+// Include for SubjectManager (needed for deinit_subjects_base)
+#include "subject_managed_panel.h"
+
 /**
  * @class OverlayBase
  * @brief Abstract base class for overlay panels with lifecycle management
@@ -201,12 +206,96 @@ class OverlayBase : public IPanelLifecycle {
      */
     OverlayBase() = default;
 
+    /**
+     * @brief Create overlay from XML with standard setup
+     *
+     * Helper method that consolidates common overlay creation boilerplate:
+     * - Sets parent_screen_ and resets cleanup_called_
+     * - Creates overlay from XML using lv_xml_create()
+     * - Applies standard overlay setup (header, content padding)
+     * - Hides overlay initially
+     *
+     * @param parent Parent widget to attach overlay to (usually screen)
+     * @param component_name XML component name to create (e.g., "console_panel")
+     * @return Root object of overlay, or nullptr on failure
+     *
+     * @code
+     * lv_obj_t* MyOverlay::create(lv_obj_t* parent) {
+     *     if (!create_overlay_from_xml(parent, "my_overlay")) {
+     *         return nullptr;
+     *     }
+     *     // Find additional widgets and setup panel-specific state...
+     *     return overlay_root_;
+     * }
+     * @endcode
+     */
+    lv_obj_t* create_overlay_from_xml(lv_obj_t* parent, const char* component_name);
+
     //
     // === Protected State ===
     //
 
     lv_obj_t* overlay_root_ = nullptr;  ///< Root widget of overlay UI
+    lv_obj_t* parent_screen_ = nullptr; ///< Parent screen (for overlay setup)
     bool subjects_initialized_ = false; ///< True after init_subjects() called
     bool visible_ = false;              ///< True when overlay is visible
     bool cleanup_called_ = false;       ///< True after cleanup() called
+
+    //
+    // === Subject Init/Deinit Guards ===
+    //
+
+    /**
+     * @brief Execute init function with guard against double initialization
+     *
+     * Wraps the actual subject initialization code with a guard that prevents
+     * double initialization and logs appropriately.
+     *
+     * @tparam Func Callable type (typically lambda)
+     * @param init_func Function to execute if not already initialized
+     * @return true if initialization was performed, false if already initialized
+     *
+     * Example:
+     * @code
+     * void MyOverlay::init_subjects() {
+     *     init_subjects_guarded([this]() {
+     *         UI_MANAGED_SUBJECT_INT(my_subject_, 0, "my_subject", subjects_);
+     *     });
+     * }
+     * @endcode
+     */
+    template <typename Func> bool init_subjects_guarded(Func&& init_func) {
+        if (subjects_initialized_) {
+            spdlog::warn("[{}] init_subjects() called twice - ignoring", get_name());
+            return false;
+        }
+        init_func();
+        subjects_initialized_ = true;
+        spdlog::debug("[{}] Subjects initialized", get_name());
+        return true;
+    }
+
+    /**
+     * @brief Deinitialize subjects via SubjectManager with guard
+     *
+     * Checks subjects_initialized_ flag before deinitializing.
+     * Resets the flag after cleanup.
+     *
+     * @param subjects Reference to the overlay's SubjectManager
+     *
+     * Example:
+     * @code
+     * void MyOverlay::deinit_subjects() {
+     *     deinit_subjects_base(subjects_);
+     * }
+     * @endcode
+     */
+    void deinit_subjects_base(SubjectManager& subjects) {
+        if (!subjects_initialized_) {
+            return;
+        }
+        subjects.deinit_all();
+        subjects_initialized_ = false;
+        spdlog::debug("[{}] Subjects deinitialized", get_name());
+    }
 };

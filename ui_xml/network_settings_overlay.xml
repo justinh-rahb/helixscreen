@@ -230,22 +230,16 @@
           <!-- wifi_network_item components are created here dynamically by C++ -->
           <!-- Placeholder when hardware unavailable (shown when wifi_hardware_available == 0) -->
           <lv_obj name="wifi_hardware_unavailable_placeholder"
-                  width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="#space_lg"
-                  scrollable="false" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center"
-                  style_flex_track_place="center">
+                  width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" scrollable="false">
             <bind_flag_if_eq subject="wifi_hardware_available" flag="hidden" ref_value="1"/>
-            <icon src="wifi_off" size="md" variant="secondary"/>
-            <text_small text="WiFi control unavailable" style_text_color="#text_secondary" style_margin_top="#space_sm"/>
+            <empty_state icon="wifi_off" text="WiFi control unavailable" icon_size="md"/>
           </lv_obj>
           <!-- Placeholder when no networks (shown when WiFi disabled AND hardware available) -->
           <lv_obj name="wifi_disabled_placeholder"
-                  width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="#space_lg"
-                  scrollable="false" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center"
-                  style_flex_track_place="center">
+                  width="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" scrollable="false">
             <bind_flag_if_eq subject="wifi_enabled" flag="hidden" ref_value="1"/>
             <bind_flag_if_eq subject="wifi_hardware_available" flag="hidden" ref_value="0"/>
-            <icon src="wifi_off" size="md" variant="secondary"/>
-            <text_small text="Enable WiFi to scan" style_text_color="#text_secondary" style_margin_top="#space_sm"/>
+            <empty_state icon="wifi_off" text="Enable WiFi to scan" icon_size="md"/>
           </lv_obj>
           <!-- Scanning indicator (shown when scanning) -->
           <lv_obj name="scanning_placeholder"

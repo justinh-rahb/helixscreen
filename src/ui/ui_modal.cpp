@@ -6,6 +6,7 @@
 #include "ui_event_safety.h"
 #include "ui_keyboard.h"
 #include "ui_update_queue.h"
+#include "ui_utils.h"
 
 #include "settings_manager.h"
 
@@ -348,16 +349,12 @@ lv_obj_t* Modal::show(const char* component_name, const char** attrs) {
 
     lv_obj_t* parent = lv_screen_active();
 
-    // Create backdrop programmatically (the key insight from the plan!)
-    lv_obj_t* backdrop = lv_obj_create(parent);
-    lv_obj_set_size(backdrop, LV_PCT(100), LV_PCT(100));
-    lv_obj_align(backdrop, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(backdrop, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(backdrop, MODAL_BACKDROP_OPACITY, LV_PART_MAIN);
-    lv_obj_set_style_border_width(backdrop, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(backdrop, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(backdrop, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(backdrop, LV_OBJ_FLAG_SCROLLABLE);
+    // Create backdrop using shared utility
+    lv_obj_t* backdrop = ui_create_fullscreen_backdrop(parent, MODAL_BACKDROP_OPACITY);
+    if (!backdrop) {
+        spdlog::error("[Modal] Failed to create backdrop");
+        return nullptr;
+    }
 
     // Create XML component inside backdrop
     lv_obj_t* dialog = static_cast<lv_obj_t*>(lv_xml_create(backdrop, component_name, attrs));
@@ -544,64 +541,33 @@ lv_obj_t* Modal::find_widget(const char* name) {
     return lv_obj_find_by_name(dialog_, name);
 }
 
+void Modal::wire_button(const char* name, const char* role_name) {
+    lv_obj_t* btn = find_widget(name);
+    if (btn) {
+        lv_obj_set_user_data(btn, this);
+        spdlog::trace("[{}] Wired {} button '{}'", get_name(), role_name, name);
+    } else {
+        spdlog::warn("[{}] {} button '{}' not found", get_name(), role_name, name);
+    }
+}
+
 void Modal::wire_ok_button(const char* name) {
-    lv_obj_t* btn = find_widget(name);
-    if (btn) {
-        lv_obj_set_user_data(btn, this);
-        spdlog::trace("[{}] Wired Ok button '{}'", get_name(), name);
-    } else {
-        spdlog::warn("[{}] Ok button '{}' not found", get_name(), name);
-    }
+    wire_button(name, "OK");
 }
-
 void Modal::wire_cancel_button(const char* name) {
-    lv_obj_t* btn = find_widget(name);
-    if (btn) {
-        lv_obj_set_user_data(btn, this);
-        spdlog::trace("[{}] Wired Cancel button '{}'", get_name(), name);
-    } else {
-        spdlog::warn("[{}] Cancel button '{}' not found", get_name(), name);
-    }
+    wire_button(name, "Cancel");
 }
-
 void Modal::wire_tertiary_button(const char* name) {
-    lv_obj_t* btn = find_widget(name);
-    if (btn) {
-        lv_obj_set_user_data(btn, this);
-        spdlog::trace("[{}] Wired Tertiary button '{}'", get_name(), name);
-    } else {
-        spdlog::warn("[{}] Tertiary button '{}' not found", get_name(), name);
-    }
+    wire_button(name, "Tertiary");
 }
-
 void Modal::wire_quaternary_button(const char* name) {
-    lv_obj_t* btn = find_widget(name);
-    if (btn) {
-        lv_obj_set_user_data(btn, this);
-        spdlog::trace("[{}] Wired Quaternary button '{}'", get_name(), name);
-    } else {
-        spdlog::warn("[{}] Quaternary button '{}' not found", get_name(), name);
-    }
+    wire_button(name, "Quaternary");
 }
-
 void Modal::wire_quinary_button(const char* name) {
-    lv_obj_t* btn = find_widget(name);
-    if (btn) {
-        lv_obj_set_user_data(btn, this);
-        spdlog::trace("[{}] Wired Quinary button '{}'", get_name(), name);
-    } else {
-        spdlog::warn("[{}] Quinary button '{}' not found", get_name(), name);
-    }
+    wire_button(name, "Quinary");
 }
-
 void Modal::wire_senary_button(const char* name) {
-    lv_obj_t* btn = find_widget(name);
-    if (btn) {
-        lv_obj_set_user_data(btn, this);
-        spdlog::trace("[{}] Wired Senary button '{}'", get_name(), name);
-    } else {
-        spdlog::warn("[{}] Senary button '{}' not found", get_name(), name);
-    }
+    wire_button(name, "Senary");
 }
 
 // ============================================================================
@@ -609,16 +575,12 @@ void Modal::wire_senary_button(const char* name) {
 // ============================================================================
 
 bool Modal::create_and_show(lv_obj_t* parent, const char* comp_name, const char** attrs) {
-    // Create backdrop programmatically
-    backdrop_ = lv_obj_create(parent);
-    lv_obj_set_size(backdrop_, LV_PCT(100), LV_PCT(100));
-    lv_obj_align(backdrop_, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(backdrop_, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(backdrop_, MODAL_BACKDROP_OPACITY, LV_PART_MAIN);
-    lv_obj_set_style_border_width(backdrop_, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(backdrop_, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(backdrop_, 0, LV_PART_MAIN);
-    lv_obj_remove_flag(backdrop_, LV_OBJ_FLAG_SCROLLABLE);
+    // Create backdrop using shared utility
+    backdrop_ = ui_create_fullscreen_backdrop(parent, MODAL_BACKDROP_OPACITY);
+    if (!backdrop_) {
+        spdlog::error("[{}] Failed to create backdrop", get_name());
+        return false;
+    }
 
     // Create XML component inside backdrop
     dialog_ = static_cast<lv_obj_t*>(lv_xml_create(backdrop_, comp_name, attrs));

@@ -69,8 +69,7 @@ class SpoolmanPanel : public OverlayBase {
     // ========== UI Widget Pointers ==========
     lv_obj_t* spool_list_ = nullptr; // Still needed for populate_spool_list()
 
-    // ========== Parent Screen ==========
-    lv_obj_t* parent_screen_ = nullptr;
+    // ========== Flags ==========
     bool callbacks_registered_ = false;
 
     // ========== State ==========

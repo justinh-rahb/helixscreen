@@ -8,15 +8,7 @@
         extends="ui_dialog" width="70%" height="content" align="center" flex_flow="column" style_flex_main_place="start"
         style_pad_gap="0">
     <!-- Header row with icon + title -->
-    <lv_obj width="100%"
-            height="content" style_bg_opa="0" style_border_width="0" style_pad_left="#space_lg"
-            style_pad_right="#space_lg" style_pad_top="#space_lg" style_pad_bottom="#space_sm" flex_flow="row"
-            style_flex_cross_place="center" style_pad_gap="#space_sm">
-      <!-- ERROR icon for destructive action -->
-      <icon name="icon_error" src="alert_octagon" size="md" variant="error"/>
-      <!-- Title -->
-      <text_heading name="dialog_title" text="Factory Reset" style_text_align="left" flex_grow="1"/>
-    </lv_obj>
+    <modal_header icon_src="alert_octagon" icon_variant="error" title="Factory Reset"/>
     <!-- Message content area -->
     <lv_obj name="content_container"
             width="100%" height="content" style_min_height="60" style_bg_opa="0" style_border_width="0"

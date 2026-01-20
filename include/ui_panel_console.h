@@ -217,9 +217,6 @@ class ConsolePanel : public OverlayBase {
     char status_buf_[128] = {};
     lv_subject_t status_subject_{};
 
-    // Parent screen reference for overlay setup
-    lv_obj_t* parent_screen_ = nullptr;
-
     // Callback registration tracking
     bool callbacks_registered_ = false;
 };

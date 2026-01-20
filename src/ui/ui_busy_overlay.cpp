@@ -4,6 +4,7 @@
 #include "ui_busy_overlay.h"
 
 #include "ui_theme.h"
+#include "ui_utils.h"
 
 #include "lvgl/lvgl.h"
 #include "lvgl/src/xml/lv_xml.h"
@@ -56,19 +57,13 @@ void create_overlay_internal() {
     // This prevents dangling pointer if user navigates while overlay is visible
     lv_obj_t* parent = lv_layer_top();
 
-    // Create full-screen backdrop
-    g_overlay = lv_obj_create(parent);
-    lv_obj_set_size(g_overlay, LV_PCT(100), LV_PCT(100));
-    lv_obj_align(g_overlay, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(g_overlay, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(g_overlay, OVERLAY_BACKDROP_OPACITY, LV_PART_MAIN);
-    lv_obj_set_style_border_width(g_overlay, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(g_overlay, 0, LV_PART_MAIN);
-    lv_obj_set_style_pad_all(g_overlay, 0, LV_PART_MAIN);
-
-    // Block input - this is the key difference from modal (we don't want dismissal)
-    lv_obj_add_flag(g_overlay, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(g_overlay, LV_OBJ_FLAG_SCROLLABLE);
+    // Create full-screen backdrop using shared utility
+    g_overlay = ui_create_fullscreen_backdrop(parent, OVERLAY_BACKDROP_OPACITY);
+    if (!g_overlay) {
+        spdlog::error("[BusyOverlay] Failed to create backdrop");
+        g_pending_show = false;
+        return;
+    }
 
     // Create container for centered content (spinner + label)
     lv_obj_t* container = lv_obj_create(g_overlay);

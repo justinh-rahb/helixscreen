@@ -116,10 +116,15 @@ void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/overlay_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/toast_notification.xml");
 
-    // Utility components (dividers, button rows - used by modals and other components)
+    // Utility components (dividers, button rows, headers - used by modals and other components)
+    lv_xml_register_component_from_file("A:ui_xml/centered_column.xml");
     lv_xml_register_component_from_file("A:ui_xml/divider_horizontal.xml");
     lv_xml_register_component_from_file("A:ui_xml/divider_vertical.xml");
     lv_xml_register_component_from_file("A:ui_xml/modal_button_row.xml");
+    lv_xml_register_component_from_file("A:ui_xml/modal_header.xml");
+    lv_xml_register_component_from_file("A:ui_xml/empty_state.xml");
+    lv_xml_register_component_from_file("A:ui_xml/connecting_state.xml");
+    lv_xml_register_component_from_file("A:ui_xml/info_note.xml");
 
     // emergency_stop_button.xml removed - E-Stop buttons are now embedded in panels
     lv_xml_register_component_from_file("A:ui_xml/estop_confirmation_dialog.xml");

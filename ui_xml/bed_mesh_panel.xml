@@ -10,8 +10,8 @@
         style_bg_color="#card_bg" style_pad_all="0" style_border_width="0" scrollable="false" flex_flow="column">
     <!-- Header Bar with CALIBRATE action button -->
     <header_bar name="overlay_header"
-                title="Bed Mesh" action_button_text="Probe"
-                action_button_height="#button_height" action_button_pad="#space_md" hide_action_button="false">
+                title="Bed Mesh" action_button_text="Probe" action_button_height="#button_height"
+                action_button_pad="#space_md" hide_action_button="false">
       <event_cb trigger="clicked" callback="on_bed_mesh_calibrate_clicked"/>
     </header_bar>
     <!-- Content Area: Horizontal split (Left=Canvas, Right=Cards) -->
@@ -19,16 +19,15 @@
             width="100%" flex_grow="1" style_bg_opa="0" style_pad_all="#space_md" scrollable="false"
             style_border_width="0" flex_flow="row" style_pad_gap="#space_md">
       <!-- Left: 3D Mesh Canvas wrapper (fills remaining space) -->
-      <lv_obj name="canvas_wrapper" height="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false">
+      <lv_obj name="canvas_wrapper"
+              height="100%" flex_grow="1" style_bg_opa="0" style_border_width="0" style_pad_all="0" scrollable="false">
         <bed_mesh name="bed_mesh_canvas" width="100%" height="100%" clickable="true" style_border_width="0"/>
         <!-- Empty state overlay - absolutely positioned centered over canvas -->
-        <lv_obj name="no_mesh_overlay" align="center"
-                flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center" style_flex_track_place="center"
-                style_bg_opa="0" style_border_width="0" scrollable="false">
+        <centered_column name="no_mesh_overlay" width="content" height="content" align="center">
           <bind_flag_if_eq subject="bed_mesh_available" flag="hidden" ref_value="1"/>
           <icon src="grid_off" size="lg" color="#text_secondary"/>
           <text_body text="No mesh loaded" style_text_color="#text_secondary" style_pad_top="#space_md"/>
-        </lv_obj>
+        </centered_column>
       </lv_obj>
       <!-- Right: Info column with two cards -->
       <lv_obj name="info_column"

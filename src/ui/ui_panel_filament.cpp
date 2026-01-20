@@ -153,69 +153,64 @@ FilamentPanel::~FilamentPanel() {
 // ============================================================================
 
 void FilamentPanel::init_subjects() {
-    if (subjects_initialized_) {
-        spdlog::warn("[{}] init_subjects() called twice - ignoring", get_name());
-        return;
-    }
+    init_subjects_guarded([this]() {
+        // Initialize subjects with default values
+        UI_MANAGED_SUBJECT_STRING(temp_display_subject_, temp_display_buf_, temp_display_buf_,
+                                  "filament_temp_display", subjects_);
+        UI_MANAGED_SUBJECT_STRING(status_subject_, status_buf_, status_buf_, "filament_status",
+                                  subjects_);
+        UI_MANAGED_SUBJECT_INT(material_selected_subject_, -1, "filament_material_selected",
+                               subjects_);
+        UI_MANAGED_SUBJECT_INT(extrusion_allowed_subject_, 0, "filament_extrusion_allowed",
+                               subjects_); // false (cold at start)
+        UI_MANAGED_SUBJECT_INT(safety_warning_visible_subject_, 1,
+                               "filament_safety_warning_visible",
+                               subjects_); // true (cold at start)
+        UI_MANAGED_SUBJECT_STRING(warning_temps_subject_, warning_temps_buf_, warning_temps_buf_,
+                                  "filament_warning_temps", subjects_);
+        UI_MANAGED_SUBJECT_STRING(safety_warning_text_subject_, safety_warning_text_buf_,
+                                  safety_warning_text_buf_, "filament_safety_warning_text",
+                                  subjects_);
 
-    // Initialize subjects with default values
-    UI_MANAGED_SUBJECT_STRING(temp_display_subject_, temp_display_buf_, temp_display_buf_,
-                              "filament_temp_display", subjects_);
-    UI_MANAGED_SUBJECT_STRING(status_subject_, status_buf_, status_buf_, "filament_status",
-                              subjects_);
-    UI_MANAGED_SUBJECT_INT(material_selected_subject_, -1, "filament_material_selected", subjects_);
-    UI_MANAGED_SUBJECT_INT(extrusion_allowed_subject_, 0, "filament_extrusion_allowed",
-                           subjects_); // false (cold at start)
-    UI_MANAGED_SUBJECT_INT(safety_warning_visible_subject_, 1, "filament_safety_warning_visible",
-                           subjects_); // true (cold at start)
-    UI_MANAGED_SUBJECT_STRING(warning_temps_subject_, warning_temps_buf_, warning_temps_buf_,
-                              "filament_warning_temps", subjects_);
-    UI_MANAGED_SUBJECT_STRING(safety_warning_text_subject_, safety_warning_text_buf_,
-                              safety_warning_text_buf_, "filament_safety_warning_text", subjects_);
+        // Material temperature display subjects (for right side preset displays)
+        UI_MANAGED_SUBJECT_STRING(material_nozzle_temp_subject_, material_nozzle_buf_,
+                                  material_nozzle_buf_, "filament_material_nozzle_temp", subjects_);
+        UI_MANAGED_SUBJECT_STRING(material_bed_temp_subject_, material_bed_buf_, material_bed_buf_,
+                                  "filament_material_bed_temp", subjects_);
 
-    // Material temperature display subjects (for right side preset displays)
-    UI_MANAGED_SUBJECT_STRING(material_nozzle_temp_subject_, material_nozzle_buf_,
-                              material_nozzle_buf_, "filament_material_nozzle_temp", subjects_);
-    UI_MANAGED_SUBJECT_STRING(material_bed_temp_subject_, material_bed_buf_, material_bed_buf_,
-                              "filament_material_bed_temp", subjects_);
+        // Left card temperature subjects (current and target for nozzle/bed)
+        UI_MANAGED_SUBJECT_STRING(nozzle_current_subject_, nozzle_current_buf_, nozzle_current_buf_,
+                                  "filament_nozzle_current", subjects_);
+        UI_MANAGED_SUBJECT_STRING(nozzle_target_subject_, nozzle_target_buf_, nozzle_target_buf_,
+                                  "filament_nozzle_target", subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_current_subject_, bed_current_buf_, bed_current_buf_,
+                                  "filament_bed_current", subjects_);
+        UI_MANAGED_SUBJECT_STRING(bed_target_subject_, bed_target_buf_, bed_target_buf_,
+                                  "filament_bed_target", subjects_);
 
-    // Left card temperature subjects (current and target for nozzle/bed)
-    UI_MANAGED_SUBJECT_STRING(nozzle_current_subject_, nozzle_current_buf_, nozzle_current_buf_,
-                              "filament_nozzle_current", subjects_);
-    UI_MANAGED_SUBJECT_STRING(nozzle_target_subject_, nozzle_target_buf_, nozzle_target_buf_,
-                              "filament_nozzle_target", subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_current_subject_, bed_current_buf_, bed_current_buf_,
-                              "filament_bed_current", subjects_);
-    UI_MANAGED_SUBJECT_STRING(bed_target_subject_, bed_target_buf_, bed_target_buf_,
-                              "filament_bed_target", subjects_);
+        // Operation in progress subject (for disabling buttons during filament ops)
+        UI_MANAGED_SUBJECT_INT(operation_in_progress_subject_, 0, "filament_operation_in_progress",
+                               subjects_);
 
-    // Operation in progress subject (for disabling buttons during filament ops)
-    UI_MANAGED_SUBJECT_INT(operation_in_progress_subject_, 0, "filament_operation_in_progress",
-                           subjects_);
+        // Cooldown button visibility (1 when nozzle target > 0)
+        UI_MANAGED_SUBJECT_INT(nozzle_heating_subject_, 0, "filament_nozzle_heating", subjects_);
 
-    // Cooldown button visibility (1 when nozzle target > 0)
-    UI_MANAGED_SUBJECT_INT(nozzle_heating_subject_, 0, "filament_nozzle_heating", subjects_);
+        // Purge amount button active states (boolean: 0=inactive, 1=active)
+        // Using separate subjects because bind_style doesn't work well with multiple ref_values
+        UI_MANAGED_SUBJECT_INT(purge_5mm_active_subject_, 0, "filament_purge_5mm_active",
+                               subjects_);
+        UI_MANAGED_SUBJECT_INT(purge_10mm_active_subject_, 1, "filament_purge_10mm_active",
+                               subjects_);
+        UI_MANAGED_SUBJECT_INT(purge_25mm_active_subject_, 0, "filament_purge_25mm_active",
+                               subjects_);
 
-    // Purge amount button active states (boolean: 0=inactive, 1=active)
-    // Using separate subjects because bind_style doesn't work well with multiple ref_values
-    UI_MANAGED_SUBJECT_INT(purge_5mm_active_subject_, 0, "filament_purge_5mm_active", subjects_);
-    UI_MANAGED_SUBJECT_INT(purge_10mm_active_subject_, 1, "filament_purge_10mm_active", subjects_);
-    UI_MANAGED_SUBJECT_INT(purge_25mm_active_subject_, 0, "filament_purge_25mm_active", subjects_);
-
-    subjects_initialized_ = true;
-    spdlog::debug("[{}] Subjects initialized: temp={}/{}°C, material={}", get_name(),
-                  nozzle_current_, nozzle_target_, selected_material_);
+        spdlog::debug("[{}] temp={}/{}°C, material={}", get_name(), nozzle_current_, nozzle_target_,
+                      selected_material_);
+    });
 }
 
 void FilamentPanel::deinit_subjects() {
-    if (!subjects_initialized_) {
-        return;
-    }
-
-    subjects_.deinit_all();
-
-    subjects_initialized_ = false;
-    spdlog::debug("[{}] Subjects deinitialized", get_name());
+    deinit_subjects_base(subjects_);
 }
 
 void FilamentPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {

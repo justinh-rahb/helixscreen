@@ -122,8 +122,7 @@ class MacrosPanel : public OverlayBase {
     lv_obj_t* status_label_ = nullptr;          ///< Status message label
     lv_obj_t* system_toggle_ = nullptr;         ///< Toggle for showing system macros
 
-    // Parent screen reference
-    lv_obj_t* parent_screen_ = nullptr;
+    // Flags
     bool callbacks_registered_ = false;
 
     // Data

@@ -260,3 +260,49 @@ bool ui_image_scale_to_cover(lv_obj_t* image_widget, lv_coord_t target_width,
 bool ui_image_scale_to_contain(lv_obj_t* image_widget, lv_coord_t target_width,
                                lv_coord_t target_height,
                                lv_image_align_t align = LV_IMAGE_ALIGN_CENTER);
+
+// ============================================================================
+// List/Empty State Visibility
+// ============================================================================
+
+/**
+ * @brief Toggle visibility between a list container and its empty state
+ *
+ * Common pattern for panels that show either a populated list or an empty
+ * state placeholder. When has_items is true, the list is shown and empty
+ * state is hidden; when false, the opposite.
+ *
+ * @param list The list/content container widget (may be nullptr)
+ * @param empty_state The empty state placeholder widget (may be nullptr)
+ * @param has_items Whether the list has items to display
+ */
+inline void ui_toggle_list_empty_state(lv_obj_t* list, lv_obj_t* empty_state, bool has_items) {
+    if (list)
+        lv_obj_set_flag(list, LV_OBJ_FLAG_HIDDEN, !has_items);
+    if (empty_state)
+        lv_obj_set_flag(empty_state, LV_OBJ_FLAG_HIDDEN, has_items);
+}
+
+// ============================================================================
+// Backdrop Utilities
+// ============================================================================
+
+/**
+ * @brief Create a fullscreen backdrop for modals and overlays
+ *
+ * Creates a fullscreen object that covers the parent with a semi-transparent
+ * black background. Used by Modal and BusyOverlay for dimming content behind
+ * dialogs and blocking input to underlying UI.
+ *
+ * The backdrop is configured with:
+ * - 100% width and height, centered alignment
+ * - Black background with specified opacity
+ * - No border, radius, or padding
+ * - Clickable flag set (to capture/block input)
+ * - Scrollable flag removed
+ *
+ * @param parent Parent object (typically lv_screen_active() or lv_layer_top())
+ * @param opacity Background opacity (0-255, default 180 = ~70%)
+ * @return Newly created backdrop object, or nullptr on failure
+ */
+lv_obj_t* ui_create_fullscreen_backdrop(lv_obj_t* parent, lv_opa_t opacity = 180);

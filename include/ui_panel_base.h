@@ -16,12 +16,17 @@
 #include "lvgl/lvgl.h"
 #include "panel_lifecycle.h"
 
+#include <spdlog/spdlog.h>
+
 #include <string>
 #include <vector>
 
 // Forward declarations
 class PrinterState;
 class MoonrakerAPI;
+
+// Include for SubjectManager (needed for deinit_subjects_base)
+#include "subject_managed_panel.h"
 
 /**
  * @brief Abstract base class for all UI panels
@@ -202,6 +207,64 @@ class PanelBase : public IPanelLifecycle {
     lv_obj_t* panel_ = nullptr;
     lv_obj_t* parent_screen_ = nullptr;
     bool subjects_initialized_ = false;
+
+    //
+    // === Subject Init/Deinit Guards ===
+    //
+
+    /**
+     * @brief Execute init function with guard against double initialization
+     *
+     * Wraps the actual subject initialization code with a guard that prevents
+     * double initialization and logs appropriately.
+     *
+     * @tparam Func Callable type (typically lambda)
+     * @param init_func Function to execute if not already initialized
+     * @return true if initialization was performed, false if already initialized
+     *
+     * Example:
+     * @code
+     * void MyPanel::init_subjects() {
+     *     init_subjects_guarded([this]() {
+     *         UI_MANAGED_SUBJECT_INT(my_subject_, 0, "my_subject", subjects_);
+     *     });
+     * }
+     * @endcode
+     */
+    template <typename Func> bool init_subjects_guarded(Func&& init_func) {
+        if (subjects_initialized_) {
+            spdlog::warn("[{}] init_subjects() called twice - ignoring", get_name());
+            return false;
+        }
+        init_func();
+        subjects_initialized_ = true;
+        spdlog::debug("[{}] Subjects initialized", get_name());
+        return true;
+    }
+
+    /**
+     * @brief Deinitialize subjects via SubjectManager with guard
+     *
+     * Checks subjects_initialized_ flag before deinitializing.
+     * Resets the flag after cleanup.
+     *
+     * @param subjects Reference to the panel's SubjectManager
+     *
+     * Example:
+     * @code
+     * void MyPanel::deinit_subjects() {
+     *     deinit_subjects_base(subjects_);
+     * }
+     * @endcode
+     */
+    void deinit_subjects_base(class SubjectManager& subjects) {
+        if (!subjects_initialized_) {
+            return;
+        }
+        subjects.deinit_all();
+        subjects_initialized_ = false;
+        spdlog::debug("[{}] Subjects deinitialized", get_name());
+    }
 
     //
     // === Observer Management ===
