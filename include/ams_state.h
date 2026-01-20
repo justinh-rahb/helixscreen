@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "ui_observer_guard.h"
+
 #include "ams_backend.h"
 #include "ams_types.h"
 #include "lvgl/lvgl.h"
@@ -550,6 +552,36 @@ class AmsState {
      */
     void sync_current_loaded_from_backend();
 
+    // ========================================================================
+    // Spoolman Weight Polling
+    // ========================================================================
+
+    /**
+     * @brief Refresh weights from Spoolman for all linked slots
+     *
+     * Queries Spoolman for updated weight info for each slot that has a
+     * spoolman_id > 0. Updates remaining_weight_g and total_weight_g in
+     * the backend's slot data.
+     */
+    void refresh_spoolman_weights();
+
+    /**
+     * @brief Start periodic Spoolman weight polling
+     *
+     * Uses a reference count pattern - multiple panels can call start_spoolman_polling()
+     * and the timer is only created on the first call. The timer will refresh weights
+     * every 30 seconds.
+     */
+    void start_spoolman_polling();
+
+    /**
+     * @brief Stop periodic Spoolman weight polling
+     *
+     * Decrements the reference count. The timer is only deleted when the count
+     * reaches zero (all panels that started polling have stopped).
+     */
+    void stop_spoolman_polling();
+
   private:
     AmsState();
     ~AmsState();
@@ -595,6 +627,10 @@ class AmsState {
     // Moonraker API for Spoolman integration
     MoonrakerAPI* api_ = nullptr;
     int last_synced_spoolman_id_ = 0; ///< Track to avoid duplicate set_active_spool calls
+
+    // Spoolman weight polling
+    lv_timer_t* spoolman_poll_timer_ = nullptr;
+    int spoolman_poll_refcount_ = 0;
 
     // Subject manager for automatic cleanup
     SubjectManager subjects_;
@@ -662,4 +698,7 @@ class AmsState {
     // Per-slot subjects (color and status)
     lv_subject_t slot_colors_[MAX_SLOTS];
     lv_subject_t slot_statuses_[MAX_SLOTS];
+
+    // Observer for print state changes to auto-refresh Spoolman weights
+    ObserverGuard print_state_observer_;
 };

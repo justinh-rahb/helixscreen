@@ -11,6 +11,7 @@
 #include "ui_theme.h"
 #include "ui_toast.h"
 
+#include "ams_state.h"
 #include "app_globals.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
@@ -164,9 +165,14 @@ void SpoolmanPanel::on_activate() {
 
     // Refresh spool list when panel becomes visible
     refresh_spools();
+
+    // Start Spoolman polling for weight updates
+    AmsState::instance().start_spoolman_polling();
 }
 
 void SpoolmanPanel::on_deactivate() {
+    AmsState::instance().stop_spoolman_polling();
+
     spdlog::debug("[{}] on_deactivate()", get_name());
 
     // Call base class

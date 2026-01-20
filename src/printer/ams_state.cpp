@@ -15,9 +15,12 @@
 
 #include "ui_update_queue.h"
 
+#include "app_globals.h"
 #include "format_utils.h"
 #include "moonraker_api.h"
+#include "observer_factory.h"
 #include "printer_discovery.h"
+#include "printer_state.h"
 #include "runtime_config.h"
 
 #include <spdlog/spdlog.h>
@@ -32,6 +35,9 @@ namespace {
 
 // Shutdown flag to prevent async callbacks from accessing destroyed singleton
 static std::atomic<bool> s_shutdown_flag{false};
+
+// Polling interval for Spoolman weight updates (30 seconds)
+static constexpr uint32_t SPOOLMAN_POLL_INTERVAL_MS = 30000;
 
 struct AsyncSyncData {
     bool full_sync;
@@ -109,6 +115,13 @@ AmsState::AmsState() {
 AmsState::~AmsState() {
     // Signal shutdown to prevent async callbacks from accessing this instance
     s_shutdown_flag.store(true, std::memory_order_release);
+
+    // Clean up Spoolman poll timer if still active (check LVGL is initialized
+    // to avoid crash during static destruction order issues)
+    if (spoolman_poll_timer_ && lv_is_initialized()) {
+        lv_timer_delete(spoolman_poll_timer_);
+        spoolman_poll_timer_ = nullptr;
+    }
 
     // Note: During static destruction, the MoonrakerClient may already be destroyed.
     // We just release the backend without calling stop() to avoid accessing
@@ -317,6 +330,21 @@ void AmsState::init_subjects(bool register_xml) {
                          lv_subject_get_int(&slot_count_));
         }
     }
+
+    // Create observer for print state changes to auto-refresh Spoolman weights.
+    // Refreshes when print starts, ends, or pauses to keep weight data current.
+    using helix::ui::observe_int_sync;
+    print_state_observer_ = observe_int_sync<AmsState>(
+        get_printer_state().get_print_state_enum_subject(), this, [](AmsState* self, int state) {
+            auto print_state = static_cast<PrintJobState>(state);
+            // Refresh on: PRINTING (start), COMPLETE (end), PAUSED (pause/resume)
+            if (print_state == PrintJobState::PRINTING || print_state == PrintJobState::COMPLETE ||
+                print_state == PrintJobState::PAUSED) {
+                spdlog::debug("[AmsState] Print state changed to {}, refreshing Spoolman weights",
+                              static_cast<int>(print_state));
+                self->refresh_spoolman_weights();
+            }
+        });
 
     initialized_ = true;
 }
@@ -529,6 +557,10 @@ void AmsState::sync_from_backend() {
                   ams_type_to_string(info.type), info.total_slots,
                   ams_action_to_string(info.action),
                   path_segment_to_string(backend_->get_filament_segment()));
+
+    // Refresh Spoolman weights now that slot data is available
+    // (this catches initial load and any re-syncs)
+    refresh_spoolman_weights();
 }
 
 void AmsState::update_slot(int slot_index) {
@@ -801,4 +833,132 @@ void AmsState::update_modal_text_subjects() {
     snprintf(dryer_modal_duration_text_buf_, sizeof(dryer_modal_duration_text_buf_), "%s",
              duration.c_str());
     lv_subject_copy_string(&dryer_modal_duration_text_, dryer_modal_duration_text_buf_);
+}
+
+// ============================================================================
+// Spoolman Weight Polling
+// ============================================================================
+
+void AmsState::refresh_spoolman_weights() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
+    if (!api_) {
+        return;
+    }
+
+    if (!backend_) {
+        return;
+    }
+
+    int slot_count = backend_->get_system_info().total_slots;
+    int linked_count = 0;
+
+    for (int i = 0; i < slot_count; ++i) {
+        SlotInfo slot = backend_->get_slot_info(i);
+        if (slot.spoolman_id > 0) {
+            ++linked_count;
+            int slot_index = i;
+            int spoolman_id = slot.spoolman_id;
+
+            api_->get_spoolman_spool(
+                spoolman_id,
+                [slot_index, spoolman_id](const std::optional<SpoolInfo>& spool_opt) {
+                    if (!spool_opt.has_value()) {
+                        spdlog::warn("[AmsState] Spoolman spool {} not found", spoolman_id);
+                        return;
+                    }
+
+                    const SpoolInfo& spool = spool_opt.value();
+
+                    // Data to pass to UI thread
+                    struct WeightUpdate {
+                        int slot_index;
+                        int expected_spoolman_id; // To verify slot wasn't reassigned
+                        float remaining_weight_g;
+                        float total_weight_g;
+                    };
+
+                    auto update_data = std::make_unique<WeightUpdate>(WeightUpdate{
+                        slot_index, spoolman_id, static_cast<float>(spool.remaining_weight_g),
+                        static_cast<float>(spool.initial_weight_g)});
+
+                    ui_queue_update<WeightUpdate>(std::move(update_data), [](WeightUpdate* d) {
+                        // Skip if shutdown is in progress
+                        if (s_shutdown_flag.load(std::memory_order_acquire)) {
+                            return;
+                        }
+
+                        AmsState& state = AmsState::instance();
+                        std::lock_guard<std::recursive_mutex> lock(state.mutex_);
+
+                        if (!state.backend_) {
+                            return;
+                        }
+
+                        // Get current slot info and verify it wasn't reassigned
+                        SlotInfo slot = state.backend_->get_slot_info(d->slot_index);
+                        if (slot.spoolman_id != d->expected_spoolman_id) {
+                            spdlog::debug(
+                                "[AmsState] Slot {} spoolman_id changed ({} -> {}), skipping stale "
+                                "weight update",
+                                d->slot_index, d->expected_spoolman_id, slot.spoolman_id);
+                            return;
+                        }
+
+                        // Update weights and set back
+                        slot.remaining_weight_g = d->remaining_weight_g;
+                        slot.total_weight_g = d->total_weight_g;
+                        state.backend_->set_slot_info(d->slot_index, slot);
+                        state.bump_slots_version();
+
+                        spdlog::trace("[AmsState] Updated slot {} weights: {:.0f}g / {:.0f}g",
+                                      d->slot_index, d->remaining_weight_g, d->total_weight_g);
+                    });
+                },
+                [spoolman_id](const MoonrakerError& err) {
+                    spdlog::warn("[AmsState] Failed to fetch Spoolman spool {}: {}", spoolman_id,
+                                 err.message);
+                });
+        }
+    }
+
+    if (linked_count > 0) {
+        spdlog::debug("[AmsState] Refreshing Spoolman weights for {} linked slots", linked_count);
+    }
+}
+
+void AmsState::start_spoolman_polling() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
+    ++spoolman_poll_refcount_;
+    spdlog::debug("[AmsState] Starting Spoolman polling (refcount: {})", spoolman_poll_refcount_);
+
+    // Only create timer on first reference
+    if (spoolman_poll_refcount_ == 1 && !spoolman_poll_timer_) {
+        spoolman_poll_timer_ = lv_timer_create(
+            [](lv_timer_t* timer) {
+                auto* self = static_cast<AmsState*>(lv_timer_get_user_data(timer));
+                self->refresh_spoolman_weights();
+            },
+            SPOOLMAN_POLL_INTERVAL_MS, this);
+
+        // Also do an immediate refresh
+        refresh_spoolman_weights();
+    }
+}
+
+void AmsState::stop_spoolman_polling() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
+    if (spoolman_poll_refcount_ > 0) {
+        --spoolman_poll_refcount_;
+    }
+
+    spdlog::debug("[AmsState] Stopping Spoolman polling (refcount: {})", spoolman_poll_refcount_);
+
+    // Only delete timer when refcount reaches zero
+    if (spoolman_poll_refcount_ == 0 && spoolman_poll_timer_) {
+        lv_timer_delete(spoolman_poll_timer_);
+        spoolman_poll_timer_ = nullptr;
+    }
 }

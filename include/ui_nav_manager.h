@@ -151,6 +151,16 @@ class NavigationManager {
     void register_panel_instance(ui_panel_id_t id, PanelBase* panel);
 
     /**
+     * @brief Activate the initial panel after all panels are registered
+     *
+     * Calls on_activate() on the current active panel. This should be called
+     * once after all panel instances have been registered via register_panel_instance().
+     * This is needed because set_panels() doesn't call on_activate() (instances
+     * aren't registered yet at that point).
+     */
+    void activate_initial_panel();
+
+    /**
      * @brief Register C++ overlay instance for lifecycle callbacks
      *
      * Associates an IPanelLifecycle-implementing instance with its root widget.

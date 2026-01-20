@@ -70,6 +70,10 @@ void PanelFactory::setup_panels(lv_obj_t* screen) {
     nav.register_panel_instance(UI_PANEL_SETTINGS, &get_global_settings_panel());
     nav.register_panel_instance(UI_PANEL_ADVANCED, &get_global_advanced_panel());
 
+    // Activate initial panel now that all instances are registered
+    // (set_panels() couldn't do this because instances weren't registered yet)
+    nav.activate_initial_panel();
+
     spdlog::debug("[PanelFactory] All panels set up");
 }
 

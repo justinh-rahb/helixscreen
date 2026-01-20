@@ -288,6 +288,9 @@ void AmsPanel::on_activate() {
 
     // Sync Spoolman active spool with currently loaded slot
     sync_spoolman_active_spool();
+
+    // Start Spoolman polling for slot weight updates
+    AmsState::instance().start_spoolman_polling();
 }
 
 void AmsPanel::sync_spoolman_active_spool() {
@@ -318,6 +321,8 @@ void AmsPanel::sync_spoolman_active_spool() {
 }
 
 void AmsPanel::on_deactivate() {
+    AmsState::instance().stop_spoolman_polling();
+
     spdlog::debug("[{}] Deactivated", get_name());
     // Note: UI destruction is handled by NavigationManager close callback
     // registered in get_global_ams_panel()

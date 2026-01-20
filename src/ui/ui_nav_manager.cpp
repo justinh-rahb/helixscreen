@@ -750,6 +750,14 @@ void NavigationManager::register_panel_instance(ui_panel_id_t id, PanelBase* pan
     spdlog::debug("[NavigationManager] Registered panel instance for ID {}", static_cast<int>(id));
 }
 
+void NavigationManager::activate_initial_panel() {
+    if (panel_instances_[active_panel_]) {
+        spdlog::debug("[NavigationManager] Activating initial panel {}",
+                      static_cast<int>(active_panel_));
+        panel_instances_[active_panel_]->on_activate();
+    }
+}
+
 void NavigationManager::register_overlay_instance(lv_obj_t* widget, IPanelLifecycle* overlay) {
     if (!widget || !overlay) {
         spdlog::error("[NavigationManager] Cannot register NULL overlay instance");

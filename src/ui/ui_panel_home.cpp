@@ -327,9 +327,14 @@ void HomePanel::on_activate() {
         tip_rotation_timer_ = lv_timer_create(tip_rotation_timer_cb, 60000, this);
         spdlog::debug("[{}] Resumed tip rotation timer", get_name());
     }
+
+    // Start Spoolman polling for AMS mini status updates
+    AmsState::instance().start_spoolman_polling();
 }
 
 void HomePanel::on_deactivate() {
+    AmsState::instance().stop_spoolman_polling();
+
     // Stop signal polling timer when panel is hidden (saves CPU)
     if (signal_poll_timer_) {
         lv_timer_delete(signal_poll_timer_);
