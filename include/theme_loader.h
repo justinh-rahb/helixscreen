@@ -81,4 +81,33 @@ struct ThemeInfo {
     std::string display_name; // e.g., "Nord"
 };
 
+/**
+ * @brief Load theme from JSON file
+ * @param filepath Full path to theme JSON file
+ * @return ThemeData with parsed values, or empty ThemeData on error
+ */
+ThemeData load_theme_from_file(const std::string& filepath);
+
+/**
+ * @brief Parse theme from JSON string
+ * @param json_str JSON content
+ * @param filename Source filename for error messages
+ * @return ThemeData with parsed values
+ */
+ThemeData parse_theme_json(const std::string& json_str, const std::string& filename);
+
+/**
+ * @brief Save theme to JSON file
+ * @param theme Theme data to save
+ * @param filepath Full path to output file
+ * @return true on success, false on error
+ */
+bool save_theme_to_file(const ThemeData& theme, const std::string& filepath);
+
+/**
+ * @brief Get default Nord theme (fallback)
+ * @return ThemeData with Nord color values
+ */
+ThemeData get_default_nord_theme();
+
 } // namespace helix

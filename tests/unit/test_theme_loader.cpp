@@ -53,3 +53,48 @@ TEST_CASE("ThemePalette::at throws on invalid index", "[theme]") {
     REQUIRE_THROWS_AS(palette.at(16), std::out_of_range);
     REQUIRE_THROWS_AS(palette.at(100), std::out_of_range);
 }
+
+TEST_CASE("parse_theme_json parses valid theme", "[theme]") {
+    const char* json = R"({
+        "name": "Test Theme",
+        "colors": {
+            "bg_darkest": "#2e3440",
+            "bg_dark": "#3b4252",
+            "bg_dark_highlight": "#434c5e",
+            "border_muted": "#4c566a",
+            "text_light": "#d8dee9",
+            "bg_light": "#e5e9f0",
+            "bg_lightest": "#eceff4",
+            "accent_highlight": "#8fbcbb",
+            "accent_primary": "#88c0d0",
+            "accent_secondary": "#81a1c1",
+            "accent_tertiary": "#5e81ac",
+            "status_error": "#bf616a",
+            "status_danger": "#d08770",
+            "status_warning": "#ebcb8b",
+            "status_success": "#a3be8c",
+            "status_special": "#b48ead"
+        },
+        "border_radius": 8,
+        "border_width": 2,
+        "border_opacity": 50,
+        "shadow_intensity": 10
+    })";
+
+    auto theme = helix::parse_theme_json(json, "test.json");
+
+    REQUIRE(theme.name == "Test Theme");
+    REQUIRE(theme.colors.bg_darkest == "#2e3440");
+    REQUIRE(theme.colors.status_special == "#b48ead");
+    REQUIRE(theme.properties.border_radius == 8);
+    REQUIRE(theme.properties.shadow_intensity == 10);
+    REQUIRE(theme.is_valid());
+}
+
+TEST_CASE("get_default_nord_theme returns valid theme", "[theme]") {
+    auto theme = helix::get_default_nord_theme();
+
+    REQUIRE(theme.name == "Nord");
+    REQUIRE(theme.is_valid());
+    REQUIRE(theme.colors.bg_darkest == "#2e3440");
+}
