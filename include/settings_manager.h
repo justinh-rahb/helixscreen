@@ -19,6 +19,9 @@ enum class CompletionAlertMode { OFF = 0, NOTIFICATION = 1, ALERT = 2 };
 /** @brief Time display format (12-hour with AM/PM or 24-hour) */
 enum class TimeFormat { HOUR_12 = 0, HOUR_24 = 1 };
 
+/** @brief Theme preset selection for accent colors (0=Nord) */
+enum class ThemePreset { NORD = 0 };
+
 /**
  * @brief Application settings manager with reactive UI binding
  *
@@ -134,6 +137,33 @@ class SettingsManager {
      * @param enabled true for dark mode, false for light mode
      */
     void set_dark_mode(bool enabled);
+
+    /**
+     * @brief Get theme preset selection
+     * @return Current theme preset
+     */
+    ThemePreset get_theme_preset() const;
+
+    /**
+     * @brief Set theme preset selection
+     *
+     * Updates subject and persists. Theme changes require restart to apply.
+     *
+     * @param preset Theme preset selection
+     */
+    void set_theme_preset(ThemePreset preset);
+
+    /** @brief Number of available theme presets */
+    static int theme_preset_count();
+
+    /** @brief Get display name for theme preset index */
+    static const char* get_theme_preset_name(int preset);
+
+    /** @brief Get dropdown options string for theme presets */
+    static const char* get_theme_preset_options();
+
+    /** @brief Get color token name for theme preset index */
+    static const char* get_theme_preset_color_token(int preset);
 
     /**
      * @brief Get display sleep timeout in seconds
@@ -395,6 +425,11 @@ class SettingsManager {
         return &dark_mode_subject_;
     }
 
+    /** @brief Theme preset subject (integer: preset index) */
+    lv_subject_t* subject_theme_preset() {
+        return &theme_preset_subject_;
+    }
+
     /** @brief Display sleep subject (integer: seconds, 0=disabled) */
     lv_subject_t* subject_display_sleep() {
         return &display_sleep_subject_;
@@ -501,6 +536,7 @@ class SettingsManager {
 
     // LVGL subjects
     lv_subject_t dark_mode_subject_;
+    lv_subject_t theme_preset_subject_;
     lv_subject_t display_sleep_subject_;
     lv_subject_t brightness_subject_;
     lv_subject_t has_backlight_subject_;

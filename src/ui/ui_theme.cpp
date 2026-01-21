@@ -6,10 +6,12 @@
 #include "ui_error_reporting.h"
 #include "ui_fonts.h"
 
+#include "config.h"
 #include "helix_theme.h"
 #include "lvgl/lvgl.h"
 #include "lvgl/src/libs/expat/expat.h"
 #include "lvgl/src/xml/lv_xml.h"
+#include "settings_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -29,6 +31,31 @@
 static lv_theme_t* current_theme = nullptr;
 static bool use_dark_mode = true;
 static lv_display_t* theme_display = nullptr;
+
+static int ui_theme_get_preset_index() {
+    Config* config = Config::get_instance();
+    int preset = config ? config->get<int>("/theme/preset", 0) : 0;
+    int max_preset = SettingsManager::theme_preset_count() - 1;
+    return std::clamp(preset, 0, max_preset);
+}
+
+static std::unordered_map<std::string, std::string>
+ui_theme_get_theme_preset_overrides(const std::unordered_map<std::string, std::string>& colors) {
+    std::unordered_map<std::string, std::string> overrides;
+    int preset = ui_theme_get_preset_index();
+    const char* token = SettingsManager::get_theme_preset_color_token(preset);
+    const char* name = SettingsManager::get_theme_preset_name(preset);
+    auto color_it = colors.find(token ? token : "");
+    if (color_it != colors.end()) {
+        overrides.emplace("primary_color", color_it->second);
+        overrides.emplace("secondary_color", color_it->second);
+        overrides.emplace("tertiary_color", color_it->second);
+        spdlog::info("[Theme] Applying theme preset {} ({})", name, token);
+    } else {
+        spdlog::warn("[Theme] Missing theme preset color token: {}", token ? token : "(null)");
+    }
+    return overrides;
+}
 
 // Parse hex color string "#FF4444" -> lv_color_hex(0xFF4444)
 lv_color_t ui_theme_parse_hex_color(const char* hex_str) {
@@ -93,9 +120,15 @@ static void ui_theme_register_static_constants(lv_xml_component_scope_t* scope) 
 
     int color_count = 0, px_count = 0, string_count = 0;
 
-    for (const auto& [name, value] : ui_theme_parse_all_xml_for_element("ui_xml", "color")) {
+    auto color_tokens = ui_theme_parse_all_xml_for_element("ui_xml", "color");
+    auto color_overrides = ui_theme_get_theme_preset_overrides(color_tokens);
+
+    for (const auto& [name, value] : color_tokens) {
         if (!has_dynamic_suffix(name)) {
-            lv_xml_register_const(scope, name.c_str(), value.c_str());
+            auto override_it = color_overrides.find(name);
+            const std::string& resolved =
+                override_it != color_overrides.end() ? override_it->second : value;
+            lv_xml_register_const(scope, name.c_str(), resolved.c_str());
             color_count++;
         }
     }

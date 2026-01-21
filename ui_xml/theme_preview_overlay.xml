@@ -1,0 +1,147 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2025-2026 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Theme Preview Overlay -->
+<component>
+  <view name="theme_preview_overlay"
+        extends="overlay_panel" width="#overlay_panel_width_full" title="Theme Preview" bg_color="#app_bg_color">
+    <lv_obj name="overlay_content"
+            width="100%" flex_grow="1" style_bg_opa="0" style_pad_all="#space_lg" style_border_width="0"
+            flex_flow="column" style_pad_gap="#space_md" scrollable="true" scroll_dir="ver">
+      <text_body text="Explore how the Nord palette shapes text, controls, and status colors."
+                 style_text_color="#text_secondary" long_mode="wrap"/>
+      <lv_obj name="preview_row"
+              width="100%" height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_md" style_bg_opa="0"
+              style_border_width="0" scrollable="false">
+        <lv_obj name="preview_typography_card"
+                width="0" height="content" flex_grow="3" flex_flow="column" style_bg_color="#card_bg" style_bg_opa="255"
+                style_radius="#border_radius" style_pad_all="#space_md" style_pad_gap="#space_md" style_border_width="1"
+                style_border_color="#theme_grey" style_border_opa="40" scrollable="false">
+          <lv_obj width="100%"
+                  height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                  style_border_width="0" style_flex_cross_place="center" scrollable="false">
+            <icon src="tune" size="sm" variant="accent"/>
+            <text_heading text="Typography"/>
+          </lv_obj>
+          <text_heading text="Heading"/>
+          <text_body width="100%" text="Body text supports longer guidance while staying readable." long_mode="wrap"/>
+          <text_small text="Small labels help keep controls calm and focused." style_text_color="#text_secondary"/>
+          <divider_horizontal opacity="30"/>
+          <lv_obj width="100%"
+                  height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_md" style_bg_opa="0"
+                  style_border_width="0" style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_bg_opa="0" style_border_width="0"
+                    style_pad_all="0" style_pad_gap="#space_xs" scrollable="false">
+              <text_small text="Mode" style_text_color="#text_secondary"/>
+              <lv_dropdown name="preview_dropdown"
+                           width="100%" height="#input_height" options="Standard Quiet Focused"
+                           style_radius="#border_radius" style_border_width="0"/>
+            </lv_obj>
+            <lv_obj width="content"
+                    height="content" flex_flow="column" style_bg_opa="0" style_border_width="0" style_pad_all="0"
+                    style_pad_gap="#space_xs" scrollable="false">
+              <text_small text="Auto" style_text_color="#text_secondary"/>
+              <ui_switch name="preview_switch" size="small" checked="true"/>
+            </lv_obj>
+          </lv_obj>
+          <text_small text="Intensity" style_text_color="#text_secondary"/>
+          <lv_obj width="100%"
+                  height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                  style_border_width="0" style_flex_cross_place="center" scrollable="false">
+            <icon src="light_off" size="xs" variant="secondary"/>
+            <lv_slider name="preview_intensity_slider"
+                       height="#input_height" flex_grow="1" min_value="0" max_value="100" value="60"/>
+            <icon src="light" size="xs" variant="primary"/>
+          </lv_obj>
+        </lv_obj>
+        <lv_obj name="preview_actions_card"
+                width="0" height="content" flex_grow="2" flex_flow="column" style_bg_color="#card_bg" style_bg_opa="255"
+                style_radius="#border_radius" style_pad_all="#space_md" style_pad_gap="#space_md" style_border_width="1"
+                style_border_color="#theme_grey" style_border_opa="40" scrollable="false">
+          <lv_obj width="100%"
+                  height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                  style_border_width="0" style_flex_cross_place="center" scrollable="false">
+            <icon src="check_circle" size="sm" variant="accent"/>
+            <text_heading text="Actions"/>
+          </lv_obj>
+          <lv_obj width="100%"
+                  height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                  style_border_width="0" style_flex_cross_place="center" scrollable="false">
+            <lv_button width="0"
+                       height="#button_height_sm" flex_grow="1" style_radius="#border_radius_small"
+                       style_bg_color="#primary_color" style_border_width="0" style_shadow_width="0">
+              <text_body text="Primary" align="center" style_text_color="#text_primary"/>
+            </lv_button>
+            <lv_button width="0"
+                       height="#button_height_sm" flex_grow="1" style_radius="#border_radius_small"
+                       style_bg_color="#secondary_color" style_border_width="0" style_shadow_width="0">
+              <text_body text="Secondary" align="center" style_text_color="#text_primary"/>
+            </lv_button>
+          </lv_obj>
+          <lv_obj width="100%"
+                  height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                  style_border_width="0" style_flex_cross_place="center" scrollable="false">
+            <lv_button width="0"
+                       height="#button_height_sm" flex_grow="1" style_radius="#border_radius_small"
+                       style_bg_color="#warning_color" style_border_width="0" style_shadow_width="0">
+              <text_body text="Warning" align="center" style_text_color="#text_primary"/>
+            </lv_button>
+            <lv_button width="0"
+                       height="#button_height_sm" flex_grow="1" style_radius="#border_radius_small"
+                       style_bg_color="#error_color" style_border_width="0" style_shadow_width="0">
+              <text_body text="Danger" align="center" style_text_color="#text_primary"/>
+            </lv_button>
+          </lv_obj>
+          <divider_horizontal opacity="20"/>
+          <lv_obj width="100%"
+                  height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                  style_border_width="0" style_flex_cross_place="center" scrollable="false">
+            <icon src="info" size="sm" variant="info"/>
+            <icon src="check_circle" size="sm" variant="success"/>
+            <icon src="alert" size="sm" variant="warning"/>
+            <icon src="alert_octagon" size="sm" variant="error"/>
+            <text_small text="Status icons" style_text_color="#text_secondary"/>
+          </lv_obj>
+          <lv_obj width="100%"
+                  height="content" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs" style_bg_opa="0"
+                  style_border_width="0" scrollable="false">
+            <text_small text="Aurora" style_text_color="#text_secondary"/>
+            <lv_obj width="100%"
+                    height="content" flex_flow="row" style_pad_all="0" style_flex_main_place="space_between"
+                    style_flex_cross_place="center" style_bg_opa="0" style_border_width="0" scrollable="false">
+              <lv_obj width="#color_preview_size_small"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord11"
+                      style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                      scrollable="false"/>
+              <lv_obj width="#color_preview_size_small"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord12"
+                      style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                      scrollable="false"/>
+              <lv_obj width="#color_preview_size_small"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord13"
+                      style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                      scrollable="false"/>
+              <lv_obj width="#color_preview_size_small"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord14"
+                      style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                      scrollable="false"/>
+              <lv_obj width="#color_preview_size_small"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord15"
+                      style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                      scrollable="false"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+      </lv_obj>
+      <lv_obj name="preview_background"
+              width="100%" height="content" style_bg_color="#app_bg_color" style_bg_opa="255" style_border_width="1"
+              style_border_color="#theme_grey" style_radius="#border_radius" style_pad_all="#space_md"
+              style_pad_gap="#space_xs" flex_flow="column" scrollable="false">
+        <text_body text="App Background" style_text_color="#text_primary"/>
+        <text_small text="Surfaces inherit app background tokens for light and dark modes."
+                    style_text_color="#text_secondary" long_mode="wrap"/>
+      </lv_obj>
+    </lv_obj>
+  </view>
+</component>

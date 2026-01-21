@@ -18,6 +18,12 @@
                           label="Dark Mode" icon="light_off" description="Switch between light and dark themes"
                           subject="settings_dark_mode" callback="on_dark_mode_changed"/>
       <!-- ================================================================== -->
+      <!-- THEME COLORS -->
+      <!-- ================================================================== -->
+      <setting_action_row name="row_theme_settings"
+                          label="Theme Colors" icon="tune" description="Explore palette and preview"
+                          callback="on_theme_settings_clicked"/>
+      <!-- ================================================================== -->
       <!-- BRIGHTNESS (conditional - hidden when no hardware backlight) -->
       <!-- ================================================================== -->
       <lv_obj name="brightness_section"

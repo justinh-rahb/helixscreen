@@ -198,6 +198,7 @@ json get_default_config(const std::string& moonraker_host, bool include_user_pre
     // log_level intentionally absent - test_mode provides fallback to DEBUG
     json config = {{"log_path", "/tmp/helixscreen.log"},
                    {"dark_mode", true},
+                   {"theme", {{"preset", 0}}},
                    {"display", get_default_display_config()},
                    {"gcode_viewer", {{"shading_model", "phong"}, {"tube_sides", 4}}},
                    {"input",
@@ -290,7 +291,7 @@ void Config::init(const std::string& config_path) {
 
         // Migrate touch settings from /display/ to /input/
         if (migrate_config_keys(data, {{"/display/calibration", "/input/calibration"},
-                                        {"/display/touch_device", "/input/touch_device"}})) {
+                                       {"/display/touch_device", "/input/touch_device"}})) {
             config_modified = true;
         }
     } else {
@@ -414,20 +415,14 @@ void Config::init(const std::string& config_path) {
 
         // Ensure calibration subsection exists with all required fields
         if (!input.contains("calibration")) {
-            input["calibration"] = {{"valid", false},
-                                    {"a", 1.0},
-                                    {"b", 0.0},
-                                    {"c", 0.0},
-                                    {"d", 0.0},
-                                    {"e", 1.0},
-                                    {"f", 0.0}};
+            input["calibration"] = {{"valid", false}, {"a", 1.0}, {"b", 0.0}, {"c", 0.0},
+                                    {"d", 0.0},       {"e", 1.0}, {"f", 0.0}};
             config_modified = true;
         } else {
             // Ensure all calibration fields exist
             auto& cal = input["calibration"];
-            const json cal_defaults = {{"valid", false}, {"a", 1.0}, {"b", 0.0},
-                                       {"c", 0.0},       {"d", 0.0}, {"e", 1.0},
-                                       {"f", 0.0}};
+            const json cal_defaults = {{"valid", false}, {"a", 1.0}, {"b", 0.0}, {"c", 0.0},
+                                       {"d", 0.0},       {"e", 1.0}, {"f", 0.0}};
             for (auto& [key, value] : cal_defaults.items()) {
                 if (!cal.contains(key)) {
                     cal[key] = value;

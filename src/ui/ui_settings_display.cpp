@@ -10,6 +10,7 @@
 
 #include "ui_event_safety.h"
 #include "ui_nav_manager.h"
+#include "ui_utils.h"
 
 #include "settings_manager.h"
 #include "static_panel_registry.h"
@@ -73,6 +74,9 @@ void DisplaySettingsOverlay::init_subjects() {
 void DisplaySettingsOverlay::register_callbacks() {
     // Brightness slider callback
     lv_xml_register_event_cb(nullptr, "on_brightness_changed", on_brightness_changed);
+    lv_xml_register_event_cb(nullptr, "on_theme_preset_changed", on_theme_preset_changed);
+    lv_xml_register_event_cb(nullptr, "on_theme_preview_clicked", on_theme_preview_clicked);
+    lv_xml_register_event_cb(nullptr, "on_theme_settings_clicked", on_theme_settings_clicked);
 
     spdlog::debug("[{}] Callbacks registered", get_name());
 }
@@ -108,9 +112,10 @@ void DisplaySettingsOverlay::show(lv_obj_t* parent_screen) {
 
     parent_screen_ = parent_screen;
 
-    // Ensure subjects are initialized
+    // Ensure subjects and callbacks are initialized
     if (!subjects_initialized_) {
         init_subjects();
+        register_callbacks();
     }
 
     // Lazy create overlay
@@ -218,6 +223,27 @@ void DisplaySettingsOverlay::init_gcode_dropdown() {
     }
 }
 
+void DisplaySettingsOverlay::init_theme_preset_dropdown(lv_obj_t* root) {
+    if (!root)
+        return;
+
+    lv_obj_t* theme_preset_row = lv_obj_find_by_name(root, "row_theme_preset");
+    lv_obj_t* theme_preset_dropdown =
+        theme_preset_row ? lv_obj_find_by_name(theme_preset_row, "dropdown") : nullptr;
+    if (theme_preset_dropdown) {
+        // Set dropdown options
+        lv_dropdown_set_options(theme_preset_dropdown, SettingsManager::get_theme_preset_options());
+
+        // Set initial selection based on current setting
+        auto current_preset = SettingsManager::instance().get_theme_preset();
+        lv_dropdown_set_selected(theme_preset_dropdown, static_cast<uint32_t>(current_preset));
+
+        spdlog::debug("[{}] Theme preset dropdown initialized to {} ({})", get_name(),
+                      static_cast<int>(current_preset),
+                      SettingsManager::get_theme_preset_name(static_cast<int>(current_preset)));
+    }
+}
+
 void DisplaySettingsOverlay::init_time_format_dropdown() {
     if (!overlay_)
         return;
@@ -251,6 +277,62 @@ void DisplaySettingsOverlay::handle_brightness_changed(int value) {
     lv_subject_copy_string(&brightness_value_subject_, brightness_value_buf_);
 }
 
+void DisplaySettingsOverlay::handle_theme_preset_changed(int index) {
+    SettingsManager::instance().set_theme_preset(static_cast<ThemePreset>(index));
+
+    int preset = static_cast<int>(SettingsManager::instance().get_theme_preset());
+
+    spdlog::info("[{}] Theme preset changed to {} ({})", get_name(), preset,
+                 SettingsManager::get_theme_preset_name(preset));
+}
+
+void DisplaySettingsOverlay::handle_theme_preview_clicked() {
+    if (!parent_screen_) {
+        spdlog::warn("[{}] Theme preview clicked without parent screen", get_name());
+        return;
+    }
+
+    if (!theme_preview_overlay_) {
+        spdlog::debug("[{}] Creating theme preview overlay...", get_name());
+        theme_preview_overlay_ =
+            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "theme_preview_overlay", nullptr));
+        if (!theme_preview_overlay_) {
+            spdlog::error("[{}] Failed to create theme preview overlay", get_name());
+            return;
+        }
+
+        lv_obj_add_flag(theme_preview_overlay_, LV_OBJ_FLAG_HIDDEN);
+        NavigationManager::instance().register_overlay_close_callback(
+            theme_preview_overlay_, [this]() { lv_obj_safe_delete(theme_preview_overlay_); });
+    }
+
+    ui_nav_push_overlay(theme_preview_overlay_);
+}
+
+void DisplaySettingsOverlay::handle_theme_settings_clicked() {
+    if (!parent_screen_) {
+        spdlog::warn("[{}] Theme settings clicked without parent screen", get_name());
+        return;
+    }
+
+    if (!theme_settings_overlay_) {
+        spdlog::debug("[{}] Creating theme settings overlay...", get_name());
+        theme_settings_overlay_ = static_cast<lv_obj_t*>(
+            lv_xml_create(parent_screen_, "theme_settings_overlay", nullptr));
+        if (!theme_settings_overlay_) {
+            spdlog::error("[{}] Failed to create theme settings overlay", get_name());
+            return;
+        }
+
+        lv_obj_add_flag(theme_settings_overlay_, LV_OBJ_FLAG_HIDDEN);
+        NavigationManager::instance().register_overlay_close_callback(
+            theme_settings_overlay_, [this]() { lv_obj_safe_delete(theme_settings_overlay_); });
+    }
+
+    init_theme_preset_dropdown(theme_settings_overlay_);
+    ui_nav_push_overlay(theme_settings_overlay_);
+}
+
 // ============================================================================
 // STATIC CALLBACKS
 // ============================================================================
@@ -260,6 +342,28 @@ void DisplaySettingsOverlay::on_brightness_changed(lv_event_t* e) {
     auto* slider = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
     int value = lv_slider_get_value(slider);
     get_display_settings_overlay().handle_brightness_changed(value);
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void DisplaySettingsOverlay::on_theme_preset_changed(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[DisplaySettingsOverlay] on_theme_preset_changed");
+    auto* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = lv_dropdown_get_selected(dropdown);
+    get_display_settings_overlay().handle_theme_preset_changed(index);
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void DisplaySettingsOverlay::on_theme_preview_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[DisplaySettingsOverlay] on_theme_preview_clicked");
+    static_cast<void>(lv_event_get_current_target(e));
+    get_display_settings_overlay().handle_theme_preview_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void DisplaySettingsOverlay::on_theme_settings_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[DisplaySettingsOverlay] on_theme_settings_clicked");
+    static_cast<void>(lv_event_get_current_target(e));
+    get_display_settings_overlay().handle_theme_settings_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 

@@ -7,6 +7,7 @@
  *
  * This overlay allows users to configure:
  * - Dark mode toggle
+ * - Theme colors action (preset, preview)
  * - Screen brightness (when hardware backlight available)
  * - Display sleep timeout
  * - Bed mesh render mode (Auto/3D/2D)
@@ -29,6 +30,8 @@ namespace helix::settings {
  * @brief Overlay for configuring display-related settings
  *
  * This overlay provides controls for:
+     * - Theme colors action row
+
  * - Brightness slider with percentage label
  * - Sleep timeout dropdown (Never/1m/5m/10m/30m)
  * - Bed mesh and G-code render mode dropdowns
@@ -137,6 +140,22 @@ class DisplaySettingsOverlay {
      */
     void handle_brightness_changed(int value);
 
+    /**
+     * @brief Handle theme preset dropdown change
+     * @param index Selected preset index
+     */
+    void handle_theme_preset_changed(int index);
+
+    /**
+     * @brief Handle theme preview action click
+     */
+    void handle_theme_preview_clicked();
+
+    /**
+     * @brief Handle theme settings action click
+     */
+    void handle_theme_settings_clicked();
+
   private:
     //
     // === Internal Methods ===
@@ -163,6 +182,11 @@ class DisplaySettingsOverlay {
     void init_gcode_dropdown();
 
     /**
+     * @brief Initialize theme preset dropdown
+     */
+    void init_theme_preset_dropdown(lv_obj_t* root);
+
+    /**
      * @brief Initialize time format dropdown
      */
     void init_time_format_dropdown();
@@ -173,10 +197,13 @@ class DisplaySettingsOverlay {
 
     lv_obj_t* overlay_{nullptr};
     lv_obj_t* parent_screen_{nullptr};
+    lv_obj_t* theme_settings_overlay_{nullptr};
+    lv_obj_t* theme_preview_overlay_{nullptr};
 
     /// Subject for brightness value label binding
     lv_subject_t brightness_value_subject_;
     char brightness_value_buf_[8]; // e.g., "100%"
+
     bool subjects_initialized_{false};
 
     //
@@ -184,6 +211,9 @@ class DisplaySettingsOverlay {
     //
 
     static void on_brightness_changed(lv_event_t* e);
+    static void on_theme_preset_changed(lv_event_t* e);
+    static void on_theme_preview_clicked(lv_event_t* e);
+    static void on_theme_settings_clicked(lv_event_t* e);
 };
 
 /**

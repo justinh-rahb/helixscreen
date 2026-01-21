@@ -31,6 +31,12 @@ static const char* GCODE_RENDER_MODE_OPTIONS_TEXT = "Auto\n3D View\n2D Layers";
 // Time format options (12H=0, 24H=1)
 static const char* TIME_FORMAT_OPTIONS_TEXT = "12 Hour\n24 Hour";
 
+// Theme preset options (accent colors)
+static constexpr int THEME_PRESET_COUNT = 1;
+static const char* THEME_PRESET_NAMES[THEME_PRESET_COUNT] = {"Nord"};
+static const char* THEME_PRESET_OPTIONS_TEXT = "Nord";
+static const char* THEME_PRESET_COLOR_TOKENS[THEME_PRESET_COUNT] = {"nord8"};
+
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;
     return instance;
@@ -54,6 +60,11 @@ void SettingsManager::init_subjects() {
     // Dark mode (default: true = dark)
     bool dark_mode = config->get<bool>("/dark_mode", true);
     UI_MANAGED_SUBJECT_INT(dark_mode_subject_, dark_mode ? 1 : 0, "settings_dark_mode", subjects_);
+
+    // Theme preset (default: 0 = Nord)
+    int theme_preset = config->get<int>("/theme/preset", 0);
+    theme_preset = std::clamp(theme_preset, 0, THEME_PRESET_COUNT - 1);
+    UI_MANAGED_SUBJECT_INT(theme_preset_subject_, theme_preset, "settings_theme_preset", subjects_);
 
     // Display sleep (default: 1800 seconds = 30 minutes)
     int sleep_sec = config->get<int>("/display/sleep_sec", 1800);
@@ -130,10 +141,11 @@ void SettingsManager::init_subjects() {
     UI_MANAGED_SUBJECT_INT(time_format_subject_, time_format, "settings_time_format", subjects_);
 
     subjects_initialized_ = true;
-    spdlog::info("[SettingsManager] Subjects initialized: dark_mode={}, sleep={}s, sounds={}, "
+    spdlog::info("[SettingsManager] Subjects initialized: dark_mode={}, theme_preset={}, "
+                 "sleep={}s, sounds={}, "
                  "completion_alert_mode={}, scroll_throw={}, scroll_limit={}, animations={}",
-                 dark_mode, sleep_sec, sounds, completion_mode, scroll_throw, scroll_limit,
-                 animations);
+                 dark_mode, theme_preset, sleep_sec, sounds, completion_mode, scroll_throw,
+                 scroll_limit, animations);
 }
 
 void SettingsManager::deinit_subjects() {
@@ -186,6 +198,48 @@ void SettingsManager::set_dark_mode(bool enabled) {
 
     spdlog::debug("[SettingsManager] Dark mode {} saved (restart required)",
                   enabled ? "enabled" : "disabled");
+}
+
+ThemePreset SettingsManager::get_theme_preset() const {
+    int preset = lv_subject_get_int(const_cast<lv_subject_t*>(&theme_preset_subject_));
+    preset = std::clamp(preset, 0, THEME_PRESET_COUNT - 1);
+    return static_cast<ThemePreset>(preset);
+}
+
+void SettingsManager::set_theme_preset(ThemePreset preset) {
+    int value = std::clamp(static_cast<int>(preset), 0, THEME_PRESET_COUNT - 1);
+    spdlog::info("[SettingsManager] set_theme_preset({})", THEME_PRESET_NAMES[value]);
+
+    // 1. Update subject (UI reacts)
+    lv_subject_set_int(&theme_preset_subject_, value);
+
+    // 2. Persist to config
+    Config* config = Config::get_instance();
+    config->set<int>("/theme/preset", value);
+    config->save();
+
+    // Theme changes require restart to take effect
+    restart_pending_ = true;
+}
+
+int SettingsManager::theme_preset_count() {
+    return THEME_PRESET_COUNT;
+}
+
+const char* SettingsManager::get_theme_preset_name(int preset) {
+    if (preset < 0 || preset >= THEME_PRESET_COUNT) {
+        return "Unknown";
+    }
+    return THEME_PRESET_NAMES[preset];
+}
+
+const char* SettingsManager::get_theme_preset_options() {
+    return THEME_PRESET_OPTIONS_TEXT;
+}
+
+const char* SettingsManager::get_theme_preset_color_token(int preset) {
+    int clamped = std::clamp(preset, 0, THEME_PRESET_COUNT - 1);
+    return THEME_PRESET_COLOR_TOKENS[clamped];
 }
 
 int SettingsManager::get_display_sleep_sec() const {

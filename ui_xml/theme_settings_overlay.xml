@@ -1,0 +1,318 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2025-2026 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Theme Settings Overlay -->
+<component>
+  <view name="theme_settings_overlay"
+        extends="overlay_panel" width="#overlay_panel_width_full" title="Theme Colors" bg_color="#app_bg_color">
+    <!-- Content Area - no padding, rows handle their own -->
+    <lv_obj name="overlay_content"
+            width="100%" flex_grow="1" style_bg_opa="0" style_pad_all="0" scrollable="true" scroll_dir="ver"
+            style_border_width="0" flex_flow="column">
+      <!-- ================================================================== -->
+      <!-- THEME COLORS -->
+      <!-- ================================================================== -->
+      <setting_section_header title="THEME COLORS"
+                              icon="tune" hide_action_button="false" hide_action_button_icon="true"
+                              action_button_text="Preview" action_button_callback="on_theme_preview_clicked"/>
+      <setting_dropdown_row name="row_theme_preset"
+                            label="Theme Preset" icon="tune" description="Select the palette used for accents"
+                            callback="on_theme_preset_changed"/>
+      <lv_obj name="theme_swatch_list"
+              width="100%" height="content" style_bg_opa="0" style_border_width="0" scrollable="false"
+              style_pad_left="#space_lg" style_pad_right="#space_lg" style_pad_top="#space_xs"
+              style_pad_bottom="#space_md" flex_flow="column" style_pad_gap="#space_sm">
+        <lv_obj width="100%"
+                height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                style_border_width="0" scrollable="false">
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord0"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Dark Background" style_text_color="#text_primary"/>
+              <text_small text="Dark mode app background" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord1"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Card Surface" style_text_color="#text_primary"/>
+              <text_small text="Elevated surfaces and cards" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+        <lv_obj width="100%"
+                height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                style_border_width="0" scrollable="false">
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord2"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Selection Highlight" style_text_color="#text_primary"/>
+              <text_small text="Selection/highlight background" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord3"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Borders &amp; Muted" style_text_color="#text_primary"/>
+              <text_small text="Borders, dividers, and muted text" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+        <lv_obj width="100%"
+                height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                style_border_width="0" scrollable="false">
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord4"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Light Text" style_text_color="#text_primary"/>
+              <text_small text="Primary text on dark surfaces" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord5"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Light Surface" style_text_color="#text_primary"/>
+              <text_small text="Light mode cards and panels" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+        <lv_obj width="100%"
+                height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                style_border_width="0" scrollable="false">
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord6"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Light Background" style_text_color="#text_primary"/>
+              <text_small text="Light mode app background" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord7"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Soft Accent" style_text_color="#text_primary"/>
+              <text_small text="Subtle accents and highlights" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+        <lv_obj width="100%"
+                height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                style_border_width="0" scrollable="false">
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord8"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Primary Accent" style_text_color="#text_primary"/>
+              <text_small text="Primary accents and links" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord9"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Secondary Accent" style_text_color="#text_primary"/>
+              <text_small text="Secondary accents" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+        <lv_obj width="100%"
+                height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                style_border_width="0" scrollable="false">
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord10"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Tertiary Accent" style_text_color="#text_primary"/>
+              <text_small text="Tertiary accents and icons" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord11"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Error Accent" style_text_color="#text_primary"/>
+              <text_small text="Error states and critical alerts" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+        <lv_obj width="100%"
+                height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                style_border_width="0" scrollable="false">
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord12"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Warning Accent" style_text_color="#text_primary"/>
+              <text_small text="Warning banners and caution cues" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord13"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Attention Accent" style_text_color="#text_primary"/>
+              <text_small text="Attention highlights and prompts" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+        <lv_obj width="100%"
+                height="content" flex_flow="row" style_pad_all="0" style_pad_gap="#space_sm" style_bg_opa="0"
+                style_border_width="0" scrollable="false">
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord14"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Success Accent" style_text_color="#text_primary"/>
+              <text_small text="Success confirmations and positive states" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+          <lv_obj width="0"
+                  height="content" flex_grow="1" flex_flow="row" style_pad_all="#space_sm" style_pad_gap="#space_sm"
+                  style_bg_color="#card_bg" style_bg_opa="255" style_radius="#border_radius_small"
+                  style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
+                  style_flex_cross_place="center" scrollable="false">
+            <lv_obj width="#color_preview_size"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord15"
+                    style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
+                    scrollable="false"/>
+            <lv_obj width="0"
+                    height="content" flex_grow="1" flex_flow="column" style_pad_all="0" style_pad_gap="#space_xs"
+                    style_bg_opa="0" style_border_width="0" scrollable="false">
+              <text_body text="Special Accent" style_text_color="#text_primary"/>
+              <text_small text="Special accents and highlights" style_text_color="#text_secondary"/>
+            </lv_obj>
+          </lv_obj>
+        </lv_obj>
+      </lv_obj>
+      <info_note icon="info"
+                 text="Theme changes apply after restart." style_pad_left="#space_lg" style_pad_right="#space_lg"/>
+    </lv_obj>
+  </view>
+</component>

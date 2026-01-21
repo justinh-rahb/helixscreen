@@ -21,6 +21,7 @@
 #include "ui_toast.h"
 #include "ui_touch_calibration_overlay.h"
 #include "ui_update_queue.h"
+#include "ui_utils.h"
 
 #include "app_globals.h"
 #include "config.h"
@@ -270,7 +271,6 @@ void SettingsPanel::init_subjects() {
 
     // Note: Display Settings overlay callbacks are now handled by DisplaySettingsOverlay
     // See ui_settings_display.h
-    helix::settings::get_display_settings_overlay().register_callbacks();
 
     lv_xml_register_event_cb(nullptr, "on_macro_buttons_clicked", on_macro_buttons_clicked);
 
@@ -596,10 +596,8 @@ void SettingsPanel::show_theme_restart_dialog() {
             // Register close callback to delete dialog when animation completes
             NavigationManager::instance().register_overlay_close_callback(
                 theme_restart_dialog_, [this]() {
-                    if (theme_restart_dialog_) {
-                        lv_obj_delete(theme_restart_dialog_);
-                        theme_restart_dialog_ = nullptr;
-                    }
+                    lv_obj_safe_delete(theme_restart_dialog_);
+                    theme_restart_dialog_ = nullptr;
                 });
 
             spdlog::info("[{}] Theme restart dialog created", get_name());
@@ -756,10 +754,8 @@ void SettingsPanel::handle_factory_reset_clicked() {
             // Register close callback to delete dialog when animation completes
             NavigationManager::instance().register_overlay_close_callback(
                 factory_reset_dialog_, [this]() {
-                    if (factory_reset_dialog_) {
-                        lv_obj_delete(factory_reset_dialog_);
-                        factory_reset_dialog_ = nullptr;
-                    }
+                    lv_obj_safe_delete(factory_reset_dialog_);
+                    factory_reset_dialog_ = nullptr;
                 });
 
             spdlog::info("[{}] Factory reset dialog created", get_name());
