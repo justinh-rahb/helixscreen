@@ -609,6 +609,23 @@ const helix::ThemeData& ui_theme_get_active_theme() {
     return active_theme;
 }
 
+void ui_theme_preview(const helix::ThemeData& theme) {
+    const char* colors[16];
+    for (size_t i = 0; i < 16; ++i) {
+        colors[i] = theme.colors.at(i).c_str();
+    }
+
+    helix_theme_preview_colors(use_dark_mode, colors, theme.properties.border_radius);
+    ui_theme_refresh_widget_tree(lv_screen_active());
+
+    spdlog::debug("[Theme] Previewing theme: {}", theme.name);
+}
+
+void ui_theme_revert_preview() {
+    ui_theme_preview(active_theme);
+    spdlog::debug("[Theme] Reverted to active theme: {}", active_theme.name);
+}
+
 /**
  * Get theme-appropriate color variant with fallback for static colors
  *

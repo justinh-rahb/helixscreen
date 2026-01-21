@@ -148,6 +148,21 @@ bool ui_theme_is_dark_mode();
 const helix::ThemeData& ui_theme_get_active_theme();
 
 /**
+ * @brief Preview theme colors without restart
+ *
+ * Applies theme colors for live preview. Call ui_theme_revert_preview()
+ * to restore original colors, or restart to apply permanently.
+ *
+ * @param theme Theme data to preview
+ */
+void ui_theme_preview(const helix::ThemeData& theme);
+
+/**
+ * @brief Revert to active theme (cancel preview)
+ */
+void ui_theme_revert_preview();
+
+/**
  * @brief Parse hex color string to lv_color_t
  *
  * Supports both "#RRGGBB" and "RRGGBB" formats.
