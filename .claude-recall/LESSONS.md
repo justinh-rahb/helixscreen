@@ -9,11 +9,6 @@
 ## Active Lessons
 
 
-### [L003] [***--|-----] Component names explicit
-- **Uses**: 10 | **Velocity**: 0.01 | **Learned**: 2025-12-14 | **Last**: 2025-12-30 | **Category**: pattern | **Type**: constraint
-> Always add name='component_name' on XML component tags. Internal view names don't propagate, causing lv_obj_find_by_name to return NULL
-
-
 ### [L004] [****-|-----] Subject init before create
 - **Uses**: 16 | **Velocity**: 0.01 | **Learned**: 2025-12-14 | **Last**: 2026-01-08 | **Category**: pattern | **Type**: informational
 > 
@@ -34,8 +29,8 @@
 > Avoid mutex locks in destructors during static destruction phase. Other objects may already be destroyed, causing deadlock or crash on exit
 
 
-### [L014] [****-|-----] Register all XML components
-- **Uses**: 19 | **Velocity**: 0.01 | **Learned**: 2025-12-14 | **Last**: 2026-01-20 | **Category**: gotcha | **Type**: constraint
+### [L014] [****-|**---] Register all XML components
+- **Uses**: 24 | **Velocity**: 2.81 | **Learned**: 2025-12-14 | **Last**: 2026-01-20 | **Category**: gotcha | **Type**: constraint
 > When adding new XML components, must add lv_xml_component_register_from_file() call in main.cpp. Forgetting causes silent failures
 
 
@@ -65,7 +60,7 @@
 
 
 ### [L031] [****-|-----] XML no recompile
-- **Uses**: 14 | **Velocity**: 0.01 | **Learned**: 2025-12-27 | **Last**: 2026-01-09 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 15 | **Velocity**: 0.01 | **Learned**: 2025-12-27 | **Last**: 2026-01-20 | **Category**: gotcha | **Type**: constraint
 > 
 
 
@@ -155,5 +150,10 @@
 
 
 ### [L056] [*----|-----] Re-stage clang-formatted files after commit
-- **Uses**: 1 | **Velocity**: 0.0 | **Learned**: 2026-01-19 | **Last**: 2026-01-19 | **Category**: workflow | **Type**: informational
+- **Uses**: 2 | **Velocity**: 0.01 | **Learned**: 2026-01-19 | **Last**: 2026-01-20 | **Category**: workflow | **Type**: informational
 > Pre-commit hook auto-formats files but doesn't re-stage them. After committing, check git status for modified files and amend if they're just formatting changes.
+
+
+### [L057] [*----|-----] Use lv_obj_safe_delete for LVGL cleanup
+- **Uses**: 1 | **Velocity**: 0.0 | **Learned**: 2026-01-20 | **Last**: 2026-01-20 | **Category**: pattern | **Type**: constraint
+> Always use lv_obj_safe_delete() instead of raw lv_obj_delete() - it guards against shutdown race conditions by checking lv_is_initialized() and lv_display_get_next() before deletion, and auto-nulls the pointer to prevent use-after-free
