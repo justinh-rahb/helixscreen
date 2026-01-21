@@ -16,6 +16,11 @@
 
 #include "lvgl/lvgl.h"
 
+// Forward declare
+namespace helix {
+struct ThemeData;
+}
+
 // Theme colors: Use ui_theme_get_color() to retrieve from globals.xml
 // Available tokens: primary_color, text_primary, text_secondary, success_color, etc.
 
@@ -135,6 +140,12 @@ void ui_theme_refresh_widget_tree(lv_obj_t* root);
  * @return true if dark mode enabled, false if light mode
  */
 bool ui_theme_is_dark_mode();
+
+/**
+ * @brief Get currently active theme data
+ * @return Reference to active theme (valid after ui_theme_init)
+ */
+const helix::ThemeData& ui_theme_get_active_theme();
 
 /**
  * @brief Parse hex color string to lv_color_t

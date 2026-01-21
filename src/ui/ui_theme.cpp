@@ -12,6 +12,7 @@
 #include "lvgl/src/libs/expat/expat.h"
 #include "lvgl/src/xml/lv_xml.h"
 #include "settings_manager.h"
+#include "theme_loader.h"
 
 #include <spdlog/spdlog.h>
 
@@ -31,6 +32,8 @@
 static lv_theme_t* current_theme = nullptr;
 static bool use_dark_mode = true;
 static lv_display_t* theme_display = nullptr;
+
+static helix::ThemeData active_theme;
 
 static int ui_theme_get_preset_index() {
     Config* config = Config::get_instance();
@@ -322,6 +325,51 @@ void ui_theme_register_responsive_fonts(lv_display_t* display) {
                   greater_res, registered);
 }
 
+/**
+ * @brief Register theme palette colors as LVGL constants
+ *
+ * Registers all 16 palette colors from the active theme.
+ * Must be called BEFORE ui_theme_register_static_constants() so
+ * palette colors are available for semantic mapping.
+ */
+static void ui_theme_register_palette_colors(lv_xml_component_scope_t* scope,
+                                             const helix::ThemeData& theme) {
+    auto& names = helix::ThemePalette::color_names();
+    for (size_t i = 0; i < 16; ++i) {
+        lv_xml_register_const(scope, names[i], theme.colors.at(i).c_str());
+    }
+    spdlog::debug("[Theme] Registered 16 palette colors from theme '{}'", theme.name);
+}
+
+/**
+ * @brief Load active theme from config
+ *
+ * Reads /display/theme from config, loads corresponding JSON file.
+ * Falls back to Nord if not found.
+ */
+static helix::ThemeData ui_theme_load_active_theme() {
+    std::string themes_dir = helix::get_themes_directory();
+
+    // Ensure themes directory exists with default theme
+    helix::ensure_themes_directory(themes_dir);
+
+    // Read theme name from config
+    Config* config = Config::get_instance();
+    std::string theme_name = config ? config->get<std::string>("/display/theme", "nord") : "nord";
+
+    // Load theme file
+    std::string theme_path = themes_dir + "/" + theme_name + ".json";
+    auto theme = helix::load_theme_from_file(theme_path);
+
+    if (!theme.is_valid()) {
+        spdlog::warn("[Theme] Theme '{}' not found or invalid, using Nord", theme_name);
+        theme = helix::get_default_nord_theme();
+    }
+
+    spdlog::info("[Theme] Loaded theme: {} ({})", theme.name, theme.filename);
+    return theme;
+}
+
 void ui_theme_init(lv_display_t* display, bool use_dark_mode_param) {
     theme_display = display;
     use_dark_mode = use_dark_mode_param;
@@ -333,6 +381,12 @@ void ui_theme_init(lv_display_t* display, bool use_dark_mode_param) {
             "[Theme] FATAL: Failed to get globals scope for runtime constant registration");
         std::exit(EXIT_FAILURE);
     }
+
+    // Load active theme from config/themes directory
+    active_theme = ui_theme_load_active_theme();
+
+    // Register palette colors FIRST (before static constants)
+    ui_theme_register_palette_colors(scope, active_theme);
 
     // Register static constants first (colors, px, strings without dynamic suffixes)
     ui_theme_register_static_constants(scope);
@@ -504,6 +558,10 @@ void ui_theme_toggle_dark_mode() {
 
 bool ui_theme_is_dark_mode() {
     return use_dark_mode;
+}
+
+const helix::ThemeData& ui_theme_get_active_theme() {
+    return active_theme;
 }
 
 /**
