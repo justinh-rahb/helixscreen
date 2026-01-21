@@ -111,23 +111,23 @@
                     height="content" flex_flow="row" style_pad_all="0" style_flex_main_place="space_between"
                     style_flex_cross_place="center" style_bg_opa="0" style_border_width="0" scrollable="false">
               <lv_obj width="#color_preview_size_small"
-                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord11"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#status_error"
                       style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                       scrollable="false"/>
               <lv_obj width="#color_preview_size_small"
-                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord12"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#status_danger"
                       style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                       scrollable="false"/>
               <lv_obj width="#color_preview_size_small"
-                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord13"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#status_warning"
                       style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                       scrollable="false"/>
               <lv_obj width="#color_preview_size_small"
-                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord14"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#status_success"
                       style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                       scrollable="false"/>
               <lv_obj width="#color_preview_size_small"
-                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#nord15"
+                      height="#color_preview_size_small" style_radius="#border_radius_small" style_bg_color="#status_special"
                       style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                       scrollable="false"/>
             </lv_obj>

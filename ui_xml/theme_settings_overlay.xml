@@ -31,7 +31,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord0"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#bg_darkest"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -47,7 +47,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord1"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#bg_dark"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -67,7 +67,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord2"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#bg_dark_highlight"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -83,7 +83,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord3"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#border_muted"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -103,7 +103,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord4"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#text_light"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -119,7 +119,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord5"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#bg_light"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -139,7 +139,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord6"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#bg_lightest"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -155,7 +155,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord7"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#accent_highlight"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -175,7 +175,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord8"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#accent_primary"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -191,7 +191,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord9"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#accent_secondary"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -211,7 +211,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord10"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#accent_tertiary"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -227,7 +227,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord11"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#status_error"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -247,7 +247,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord12"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#status_danger"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -263,7 +263,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord13"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#status_warning"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -283,7 +283,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord14"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#status_success"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"
@@ -299,7 +299,7 @@
                   style_border_width="1" style_border_color="#theme_grey" style_border_opa="40"
                   style_flex_cross_place="center" scrollable="false">
             <lv_obj width="#color_preview_size"
-                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#nord15"
+                    height="#color_preview_size" style_radius="#border_radius_small" style_bg_color="#status_special"
                     style_bg_opa="255" style_border_width="1" style_border_color="#theme_grey" style_border_opa="80"
                     scrollable="false"/>
             <lv_obj width="0"

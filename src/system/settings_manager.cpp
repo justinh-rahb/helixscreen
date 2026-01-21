@@ -35,7 +35,7 @@ static const char* TIME_FORMAT_OPTIONS_TEXT = "12 Hour\n24 Hour";
 static constexpr int THEME_PRESET_COUNT = 1;
 static const char* THEME_PRESET_NAMES[THEME_PRESET_COUNT] = {"Nord"};
 static const char* THEME_PRESET_OPTIONS_TEXT = "Nord";
-static const char* THEME_PRESET_COLOR_TOKENS[THEME_PRESET_COUNT] = {"nord8"};
+static const char* THEME_PRESET_COLOR_TOKENS[THEME_PRESET_COUNT] = {"accent_primary"};
 
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;

@@ -124,6 +124,13 @@ static void ui_theme_register_static_constants(lv_xml_component_scope_t* scope) 
     int color_count = 0, px_count = 0, string_count = 0;
 
     auto color_tokens = ui_theme_parse_all_xml_for_element("ui_xml", "color");
+
+    // Merge palette colors into color_tokens so preset overrides can find them
+    auto& names = helix::ThemePalette::color_names();
+    for (size_t i = 0; i < 16; ++i) {
+        color_tokens[names[i]] = active_theme.colors.at(i);
+    }
+
     auto color_overrides = ui_theme_get_theme_preset_overrides(color_tokens);
 
     for (const auto& [name, value] : color_tokens) {
