@@ -53,7 +53,7 @@ for sub in $SUBMODULES; do
     # Properly deinit before removing to clean up git metadata (fixes worktree issues)
     git submodule deinit -f "$sub" 2>/dev/null || true
     rm -rf "$sub" 2>/dev/null || true
-    git submodule update --init --force "$sub"
+    git submodule update --init --force --depth 1 "$sub"
 done
 
 # Step 2b: Apply required patches
