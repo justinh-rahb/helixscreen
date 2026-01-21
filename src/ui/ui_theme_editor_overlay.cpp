@@ -3,6 +3,7 @@
 
 #include "ui_theme_editor_overlay.h"
 
+#include "ui_ams_color_picker.h"
 #include "ui_event_safety.h"
 #include "ui_global_panel_helper.h"
 #include "ui_nav.h"
@@ -86,6 +87,9 @@ lv_obj_t* ThemeEditorOverlay::create(lv_obj_t* parent) {
 }
 
 void ThemeEditorOverlay::register_callbacks() {
+    // Swatch click callback for color editing
+    lv_xml_register_event_cb(nullptr, "on_theme_swatch_clicked", on_swatch_clicked);
+
     // Slider callbacks for property adjustments
     lv_xml_register_event_cb(nullptr, "on_border_radius_changed", on_border_radius_changed);
     lv_xml_register_event_cb(nullptr, "on_border_width_changed", on_border_width_changed);
@@ -113,6 +117,12 @@ void ThemeEditorOverlay::on_deactivate() {
 
 void ThemeEditorOverlay::cleanup() {
     spdlog::debug("[{}] Cleanup", get_name());
+
+    // Clean up color picker (may be showing a modal)
+    if (color_picker_) {
+        color_picker_.reset();
+    }
+    editing_color_index_ = -1;
 
     // Clear swatch references (widgets will be destroyed by LVGL)
     swatch_objects_.fill(nullptr);
@@ -297,8 +307,29 @@ void ThemeEditorOverlay::on_theme_revert_clicked(lv_event_t* e) {
 // CALLBACK STUBS (to be implemented in tasks 6.4-6.6)
 // ============================================================================
 
-void ThemeEditorOverlay::on_swatch_clicked(lv_event_t* /* e */) {
-    // Will be implemented in task 6.4 (color picker integration)
+void ThemeEditorOverlay::on_swatch_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[ThemeEditorOverlay] on_swatch_clicked");
+
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    if (target) {
+        // Determine which swatch was clicked by checking against our stored references
+        auto& overlay = get_theme_editor_overlay();
+        bool found = false;
+        for (size_t i = 0; i < overlay.swatch_objects_.size(); ++i) {
+            if (overlay.swatch_objects_[i] == target) {
+                overlay.handle_swatch_click(static_cast<int>(i));
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            spdlog::warn("[ThemeEditorOverlay] on_swatch_clicked: unknown swatch target");
+        }
+    } else {
+        spdlog::warn("[ThemeEditorOverlay] on_swatch_clicked: no target");
+    }
+
+    LVGL_SAFE_EVENT_CB_END();
 }
 
 void ThemeEditorOverlay::on_slider_changed(lv_event_t* /* e */) {
@@ -391,16 +422,86 @@ void ThemeEditorOverlay::handle_revert_clicked() {
 // STUBS (to be implemented in future tasks)
 // ============================================================================
 
-void ThemeEditorOverlay::handle_swatch_click(int /* palette_index */) {
-    // Will be implemented in task 6.4 (color picker integration)
+void ThemeEditorOverlay::handle_swatch_click(int palette_index) {
+    if (palette_index < 0 || palette_index >= static_cast<int>(swatch_objects_.size())) {
+        spdlog::warn("[{}] handle_swatch_click: invalid index {}", get_name(), palette_index);
+        return;
+    }
+
+    spdlog::debug("[{}] Swatch {} clicked, opening color picker", get_name(), palette_index);
+    show_color_picker(palette_index);
 }
 
 void ThemeEditorOverlay::handle_slider_change(const char* /* slider_name */, int /* value */) {
     // Generic handler - individual property handlers are used instead
 }
 
-void ThemeEditorOverlay::show_color_picker(int /* palette_index */) {
-    // Will be implemented in task 6.4 (color picker integration)
+void ThemeEditorOverlay::show_color_picker(int palette_index) {
+    if (palette_index < 0 || palette_index >= static_cast<int>(editing_theme_.colors.color_names().size())) {
+        spdlog::error("[{}] Invalid palette index {} for color picker", get_name(), palette_index);
+        return;
+    }
+
+    // Store which color we're editing
+    editing_color_index_ = palette_index;
+
+    // Get current color hex from the editing theme
+    const std::string& current_hex = editing_theme_.colors.at(palette_index);
+    uint32_t current_rgb = 0x808080; // Default gray if parsing fails
+
+    // Parse hex color (handle both "#RRGGBB" and "RRGGBB" formats)
+    if (!current_hex.empty()) {
+        const char* hex_ptr = current_hex.c_str();
+        if (hex_ptr[0] == '#') {
+            hex_ptr++;
+        }
+        current_rgb = static_cast<uint32_t>(std::strtoul(hex_ptr, nullptr, 16));
+    }
+
+    // Create color picker if not already created
+    if (!color_picker_) {
+        color_picker_ = std::make_unique<helix::ui::AmsColorPicker>();
+    }
+
+    // Set callback to handle color selection
+    color_picker_->set_color_callback([this](uint32_t color_rgb, const std::string& /* color_name */) {
+        if (editing_color_index_ < 0 ||
+            editing_color_index_ >= static_cast<int>(editing_theme_.colors.color_names().size())) {
+            spdlog::warn("[{}] Color picker callback: invalid editing_color_index_ {}",
+                         get_name(), editing_color_index_);
+            return;
+        }
+
+        // Format color as hex string
+        char hex_buf[8];
+        std::snprintf(hex_buf, sizeof(hex_buf), "#%06X", color_rgb);
+
+        // Update the editing theme color
+        editing_theme_.colors.at(editing_color_index_) = hex_buf;
+
+        // Update the swatch visual if it exists
+        if (editing_color_index_ < static_cast<int>(swatch_objects_.size()) &&
+            swatch_objects_[editing_color_index_]) {
+            lv_color_t lv_color = lv_color_hex(color_rgb);
+            lv_obj_set_style_bg_color(swatch_objects_[editing_color_index_], lv_color, LV_PART_MAIN);
+        }
+
+        // Mark dirty and preview
+        mark_dirty();
+        ui_theme_preview(editing_theme_);
+
+        spdlog::info("[{}] Color {} updated to {}", get_name(), editing_color_index_, hex_buf);
+
+        // Reset editing index
+        editing_color_index_ = -1;
+    });
+
+    // Show the color picker with current color
+    lv_obj_t* screen = lv_screen_active();
+    if (!color_picker_->show_with_color(screen, current_rgb)) {
+        spdlog::error("[{}] Failed to show color picker", get_name());
+        editing_color_index_ = -1;
+    }
 }
 
 void ThemeEditorOverlay::show_save_as_dialog() {

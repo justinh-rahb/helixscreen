@@ -10,9 +10,11 @@
 
 #include "overlay_base.h"
 #include "theme_loader.h"
+#include "ui_ams_color_picker.h"
 
 #include <array>
 #include <functional>
+#include <memory>
 
 /**
  * @brief Theme editor overlay with live preview
@@ -140,6 +142,9 @@ class ThemeEditorOverlay : public OverlayBase {
 
     lv_obj_t* panel_ = nullptr;
     std::array<lv_obj_t*, 16> swatch_objects_{};
+
+    // Color picker for swatch editing
+    std::unique_ptr<helix::ui::AmsColorPicker> color_picker_;
 };
 
 /**
