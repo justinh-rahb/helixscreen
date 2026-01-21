@@ -44,7 +44,7 @@
 | Timer deletes | 25+ | ≥ creates ✅ |
 | Manual `delete` | 0 | 0 ✅ |
 | `lv_malloc` in src/ | 1 | 0 |
-| Hardcoded padding | 16 | 0 |
+| Hardcoded padding | 8 | 0 |
 | Event handlers | 140 | Documented |
 | Inline styles | 533 | <100 |
 | Files >1500 LOC | 2 | 0 |
@@ -503,9 +503,11 @@ make -j
 
 ## 5. Priority 3: XML Design Token Migration
 
-**Status:** [~] 80% Complete
+**Status:** [~] ~95% Complete
 **Estimated Time:** 1-2 hours remaining
 **Risk if Skipped:** Maintenance burden, inconsistent theming
+
+> **Note:** Test panels (`test_panel.xml`, `step_test_panel.xml`) are excluded from metrics - they are development/debugging utilities.
 
 > **2025-12-18 Status:** Major migration completed. Only 16 hardcoded padding values remain (down from 85+ files). Most violations are in edge cases or intentional overrides.
 
@@ -513,19 +515,19 @@ make -j
 
 ```bash
 echo "=== Hardcoded padding (exclude 0) ==="
-grep -rn 'style_pad[^=]*="[1-9]' ui_xml/ --include="*.xml" | wc -l
+grep -rn 'style_pad[^=]*="[1-9]' ui_xml/ --include="*.xml" | grep -v "test_panel\|step_test" | wc -l
 
 echo ""
 echo "=== Hardcoded margins ==="
-grep -rn 'style_margin[^=]*="[1-9]' ui_xml/ --include="*.xml" | wc -l
+grep -rn 'style_margin[^=]*="[1-9]' ui_xml/ --include="*.xml" | grep -v "test_panel\|step_test" | wc -l
 
 echo ""
 echo "=== Hardcoded gaps ==="
-grep -rn 'style_gap[^=]*="[1-9]' ui_xml/ --include="*.xml" | wc -l
+grep -rn 'style_gap[^=]*="[1-9]' ui_xml/ --include="*.xml" | grep -v "test_panel\|step_test" | wc -l
 
 echo ""
 echo "=== Files with hardcoded spacing ==="
-grep -l 'style_pad[^=]*="[1-9]' ui_xml/*.xml | wc -l
+grep -l 'style_pad[^=]*="[1-9]' ui_xml/*.xml | grep -v "test_panel\|step_test" | wc -l
 
 echo ""
 echo "=== Available spacing tokens ==="
@@ -1319,7 +1321,7 @@ Update this table as work progresses:
 |----------|--------|----------|----------------|-------|
 | P1: Critical Safety | [x] | 100% | | Timer leak fix done; `LvglTimerGuard` RAII wrapper created; all timer deletions guarded |
 | P2: RAII Compliance | [~] | 15% | | `ui_hsv_picker.cpp` migrated; 3 files remaining (8 deletes) |
-| P3: XML Tokens | [~] | 80% | | Down from 85+ files to 16 occurrences |
+| P3: XML Tokens | [~] | ~95% | | 8 violations remaining (test panels excluded) |
 | P4: Declarative UI | [~] | 20% | | 140 event handlers (many legitimate); 533 inline styles |
 | P5: File Splitting | [~] | 33% | | `ui_panel_ams.cpp` now <1500; 2 files remain over limit |
 | P6: Documentation | [~] | 50% | | Timer docs + doc consolidation in progress |
