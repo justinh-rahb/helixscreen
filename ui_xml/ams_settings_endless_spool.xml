@@ -29,8 +29,9 @@
       <!-- Capabilities Info Row (shown when supported)                       -->
       <!-- ================================================================== -->
       <lv_obj name="capabilities_row"
-              width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="#space_md" flex_flow="row"
-              style_flex_main_place="start" style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
+              width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="#space_md"
+              flex_flow="row" style_flex_main_place="start" style_flex_cross_place="center" style_pad_gap="#space_sm"
+              scrollable="false">
         <bind_flag_if_eq subject="ams_endless_spool_supported" flag="hidden" ref_value="0"/>
         <icon src="info" size="sm" variant="secondary"/>
         <lv_obj width="content"
@@ -39,7 +40,8 @@
           <text_body bind_text="ams_endless_spool_description" style_text_color="#text_primary"/>
           <text_small text="Configure backup slots for automatic filament switching when a spool runs out."
                       style_text_color="#text_secondary"/>
-          <text_small name="editable_hint" style_text_color="#text_secondary" bind_text="ams_endless_spool_editable_text">
+          <text_small name="editable_hint"
+                      style_text_color="#text_secondary" bind_text="ams_endless_spool_editable_text">
             <bind_flag_if_eq subject="ams_endless_spool_editable" flag="hidden" ref_value="1"/>
           </text_small>
         </lv_obj>
@@ -58,12 +60,12 @@
       <!-- ================================================================== -->
       <lv_obj name="reset_button_container"
               width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_top="#space_md"
-              style_pad_bottom="0" style_pad_left="0" style_pad_right="0" flex_flow="row"
-              style_flex_main_place="end" scrollable="false">
+              style_pad_bottom="0" style_pad_left="0" style_pad_right="0" flex_flow="row" style_flex_main_place="end"
+              scrollable="false">
         <bind_flag_if_eq subject="ams_endless_spool_editable" flag="hidden" ref_value="0"/>
-        <lv_button name="reset_mappings_btn" style_bg_color="#card_bg" style_radius="#border_radius"
-                   style_pad_left="#space_md" style_pad_right="#space_md" style_pad_top="#space_sm"
-                   style_pad_bottom="#space_sm">
+        <lv_button name="reset_mappings_btn"
+                   style_bg_color="#card_bg" style_radius="#border_radius" style_pad_left="#space_md"
+                   style_pad_right="#space_md" style_pad_top="#space_sm" style_pad_bottom="#space_sm">
           <text_body text="Reset Mappings" style_text_color="#text_primary"/>
           <event_cb trigger="clicked" callback="on_endless_spool_reset_clicked"/>
         </lv_button>

@@ -239,6 +239,19 @@ void AmsSlotEditPopup::handle_tool_changed() {
                  tool_number >= 0 ? tool_number : -1);
 
     if (tool_number >= 0) {
+        // Check for duplicate mapping (another tool already using this slot)
+        auto mapping = backend_->get_tool_mapping();
+        for (size_t i = 0; i < mapping.size(); ++i) {
+            if (static_cast<int>(i) != tool_number && mapping[i] == slot_index_) {
+                spdlog::warn("[AmsSlotEditPopup] Tool {} will share slot {} with tool {}",
+                             tool_number, slot_index_, i);
+                std::string msg =
+                    "T" + std::to_string(tool_number) + " shares slot with T" + std::to_string(i);
+                ui_toast_show(ToastSeverity::WARNING, msg.c_str());
+                break;
+            }
+        }
+
         auto result = backend_->set_tool_mapping(tool_number, slot_index_);
         if (!result.success()) {
             spdlog::warn("[AmsSlotEditPopup] Failed to set tool mapping: {}", result.user_msg);

@@ -766,8 +766,7 @@ AmsError AmsBackendMock::resume() {
 
         // Can only resume from PAUSED state
         if (system_info_.action != AmsAction::PAUSED) {
-            return AmsError(AmsResult::WRONG_STATE,
-                            "Cannot resume - not in PAUSED state",
+            return AmsError(AmsResult::WRONG_STATE, "Cannot resume - not in PAUSED state",
                             "System is " + std::string(ams_action_to_string(system_info_.action)),
                             "Wait for current operation to complete or use cancel");
         }
@@ -1233,7 +1232,7 @@ void AmsBackendMock::execute_unload_operation(InterruptibleSleep interruptible_s
 }
 
 void AmsBackendMock::execute_tool_change_operation(int target_slot,
-                                                    InterruptibleSleep interruptible_sleep) {
+                                                   InterruptibleSleep interruptible_sleep) {
     // Phase 1: Unload current filament
     execute_unload_operation(interruptible_sleep);
     if (shutdown_requested_ || cancel_requested_)

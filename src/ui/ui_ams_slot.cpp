@@ -71,6 +71,8 @@ struct AmsSlotData {
     lv_point_precise_t leader_points[2]; // Points for leader line (per-slot storage)
     lv_obj_t* status_badge_bg = nullptr; // Status badge background (colored circle)
     lv_obj_t* slot_badge = nullptr;      // Slot number label inside status badge
+    lv_obj_t* tool_badge_bg = nullptr;   // Tool badge background (top-left corner)
+    lv_obj_t* tool_badge = nullptr;      // Tool badge label (T0, T1, etc.)
     lv_obj_t* container = nullptr;       // The ams_slot widget itself
 
     // Subjects and buffers for declarative text binding
@@ -81,6 +83,10 @@ struct AmsSlotData {
     lv_subject_t slot_badge_subject;
     char slot_badge_buf[8] = {0};
     lv_observer_t* slot_badge_observer = nullptr;
+
+    lv_subject_t tool_badge_subject;
+    char tool_badge_buf[8] = {0};
+    lv_observer_t* tool_badge_observer = nullptr;
 
     // Fill level for Spoolman integration (0.0 = empty, 1.0 = full)
     float fill_level = 1.0f;
@@ -125,6 +131,10 @@ static void unregister_slot_data(lv_obj_t* obj) {
             if (data->slot_badge_observer) {
                 lv_observer_remove(data->slot_badge_observer);
                 data->slot_badge_observer = nullptr;
+            }
+            if (data->tool_badge_observer) {
+                lv_observer_remove(data->tool_badge_observer);
+                data->tool_badge_observer = nullptr;
             }
 
             // Release ObserverGuard observers before delete to prevent destructors
@@ -314,6 +324,31 @@ static void apply_current_slot_highlight(AmsSlotData* data, int current_slot) {
 
     spdlog::trace("[AmsSlot] Slot {} active={} (current_slot={}, loaded={})", data->slot_index,
                   is_active, current_slot, filament_loaded);
+}
+
+/**
+ * @brief Update tool badge based on slot's mapped_tool value
+ *
+ * Shows "T0", "T1", etc. when a tool is mapped to this slot.
+ * Hidden when mapped_tool == -1 (no tool assigned).
+ */
+static void apply_tool_badge(AmsSlotData* data, int mapped_tool) {
+    if (!data || !data->tool_badge_bg) {
+        return;
+    }
+
+    if (mapped_tool >= 0) {
+        // Tool is mapped - show badge with tool number
+        char tool_text[8];
+        snprintf(tool_text, sizeof(tool_text), "T%d", mapped_tool);
+        lv_subject_copy_string(&data->tool_badge_subject, tool_text);
+        lv_obj_remove_flag(data->tool_badge_bg, LV_OBJ_FLAG_HIDDEN);
+        spdlog::trace("[AmsSlot] Slot {} tool badge: {}", data->slot_index, tool_text);
+    } else {
+        // No tool mapped - hide badge
+        lv_obj_add_flag(data->tool_badge_bg, LV_OBJ_FLAG_HIDDEN);
+        spdlog::trace("[AmsSlot] Slot {} tool badge: hidden", data->slot_index);
+    }
 }
 
 // ============================================================================
@@ -545,6 +580,38 @@ static void create_slot_children(lv_obj_t* container, AmsSlotData* data) {
                            sizeof(data->slot_badge_buf), "?");
     data->slot_badge_observer = lv_label_bind_text(slot_label, &data->slot_badge_subject, "%s");
 
+    // ========================================================================
+    // TOOL BADGE (overlaid on top-left of spool)
+    // Shows tool assignment (T0, T1, etc.) when a tool is mapped to this slot.
+    // Hidden when no tool assigned (mapped_tool == -1).
+    // ========================================================================
+    lv_obj_t* tool_badge = lv_obj_create(data->spool_container);
+    lv_obj_set_size(tool_badge, 22, 16);
+    // Position badge at top-left of the canvas area
+    lv_obj_align(tool_badge, LV_ALIGN_TOP_LEFT, 2, 2);
+    lv_obj_set_style_radius(tool_badge, 4, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(tool_badge, ui_theme_get_color("text_secondary"), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(tool_badge, LV_OPA_80, LV_PART_MAIN);
+    lv_obj_set_style_border_width(tool_badge, 0, LV_PART_MAIN);
+    lv_obj_remove_flag(tool_badge, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_pad_all(tool_badge, 0, LV_PART_MAIN);
+    lv_obj_add_flag(tool_badge, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_add_flag(tool_badge, LV_OBJ_FLAG_HIDDEN); // Hidden by default until tool assigned
+    data->tool_badge_bg = tool_badge;
+
+    // Tool label inside badge (T0, T1, etc.)
+    lv_obj_t* tool_label = lv_label_create(tool_badge);
+    lv_obj_set_style_text_font(tool_label, font_xs, LV_PART_MAIN);
+    lv_obj_set_style_text_color(tool_label, lv_color_white(), LV_PART_MAIN);
+    lv_obj_center(tool_label);
+    lv_obj_add_flag(tool_label, LV_OBJ_FLAG_EVENT_BUBBLE);
+    data->tool_badge = tool_label;
+
+    // Initialize tool badge subject and bind to label (save observer for cleanup)
+    lv_subject_init_string(&data->tool_badge_subject, data->tool_badge_buf, nullptr,
+                           sizeof(data->tool_badge_buf), "");
+    data->tool_badge_observer = lv_label_bind_text(tool_label, &data->tool_badge_subject, "%s");
+
     data->container = container;
 }
 
@@ -615,13 +682,15 @@ static void setup_slot_observers(AmsSlotData* data) {
         apply_current_slot_highlight(data, lv_subject_get_int(current_slot_subject));
     }
 
-    // Update material label from backend if available
+    // Update material label and tool badge from backend if available
     AmsBackend* backend = state.get_backend();
     if (backend) {
         SlotInfo slot = backend->get_slot_info(data->slot_index);
         if (!slot.material.empty()) {
             lv_subject_copy_string(&data->material_subject, slot.material.c_str());
         }
+        // Update tool badge based on slot's mapped_tool
+        apply_tool_badge(data, slot.mapped_tool);
     }
 
     spdlog::trace("[AmsSlot] Created observers for slot {}", data->slot_index);
@@ -795,15 +864,19 @@ void ui_ams_slot_refresh(lv_obj_t* obj) {
         apply_current_slot_highlight(data, lv_subject_get_int(current_slot_subject));
     }
 
-    // Update material from backend
+    // Update material and tool badge from backend
     AmsBackend* backend = state.get_backend();
-    if (backend && data->material_label) {
+    if (backend) {
         SlotInfo slot = backend->get_slot_info(data->slot_index);
-        if (!slot.material.empty()) {
-            lv_subject_copy_string(&data->material_subject, slot.material.c_str());
-        } else {
-            lv_subject_copy_string(&data->material_subject, "--");
+        if (data->material_label) {
+            if (!slot.material.empty()) {
+                lv_subject_copy_string(&data->material_subject, slot.material.c_str());
+            } else {
+                lv_subject_copy_string(&data->material_subject, "--");
+            }
         }
+        // Update tool badge based on slot's mapped_tool
+        apply_tool_badge(data, slot.mapped_tool);
     }
 
     spdlog::debug("[AmsSlot] Refreshed slot {}", data->slot_index);

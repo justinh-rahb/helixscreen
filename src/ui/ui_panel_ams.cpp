@@ -1051,6 +1051,9 @@ void AmsPanel::update_slot_colors() {
                 float fill_level = slot_info.remaining_weight_g / slot_info.total_weight_g;
                 ui_ams_slot_set_fill_level(slot_widgets_[i], fill_level);
             }
+
+            // Refresh slot to update tool badge and other dynamic state
+            ui_ams_slot_refresh(slot_widgets_[i]);
         }
 
         // Update status indicator
