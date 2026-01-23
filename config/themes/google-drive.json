@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 8,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#4285f4",
+    "accent_primary": "#1a73e8",
+    "accent_secondary": "#185abc",
+    "accent_tertiary": "#34a853",
+    "bg_dark": "#2d2d2d",
+    "bg_dark_highlight": "#3c3c3c",
+    "bg_darkest": "#1f1f1f",
+    "bg_light": "#e8eaed",
+    "bg_lightest": "#ffffff",
+    "border_muted": "#5f6368",
+    "status_danger": "#f9ab00",
+    "status_error": "#ea4335",
+    "status_special": "#a142f4",
+    "status_success": "#34a853",
+    "status_warning": "#fbbc04",
+    "text_light": "#bdc1c6"
+  },
+  "name": "Google Drive",
+  "shadow_intensity": 0
+}

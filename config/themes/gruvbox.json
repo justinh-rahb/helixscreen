@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 12,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#8ec07c",
+    "accent_primary": "#83a598",
+    "accent_secondary": "#d3869b",
+    "accent_tertiary": "#8ec07c",
+    "bg_dark": "#3c3836",
+    "bg_dark_highlight": "#504945",
+    "bg_darkest": "#282828",
+    "bg_light": "#ebdbb2",
+    "bg_lightest": "#fbf1c7",
+    "border_muted": "#665c54",
+    "status_danger": "#fe8019",
+    "status_error": "#fb4934",
+    "status_special": "#d3869b",
+    "status_success": "#b8bb26",
+    "status_warning": "#fabd2f",
+    "text_light": "#bdae93"
+  },
+  "name": "Gruvbox",
+  "shadow_intensity": 0
+}

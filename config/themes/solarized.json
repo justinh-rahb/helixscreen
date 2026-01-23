@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 12,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#2aa198",
+    "accent_primary": "#268bd2",
+    "accent_secondary": "#6c71c4",
+    "accent_tertiary": "#2aa198",
+    "bg_dark": "#073642",
+    "bg_dark_highlight": "#094555",
+    "bg_darkest": "#002b36",
+    "bg_light": "#eee8d5",
+    "bg_lightest": "#fdf6e3",
+    "border_muted": "#586e75",
+    "status_danger": "#cb4b16",
+    "status_error": "#dc322f",
+    "status_special": "#6c71c4",
+    "status_success": "#859900",
+    "status_warning": "#b58900",
+    "text_light": "#93a1a1"
+  },
+  "name": "Solarized",
+  "shadow_intensity": 0
+}

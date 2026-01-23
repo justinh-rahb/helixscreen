@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 12,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#7c8aff",
+    "accent_primary": "#425aff",
+    "accent_secondary": "#3448db",
+    "accent_tertiary": "#00bfa5",
+    "bg_dark": "#1e1e2e",
+    "bg_dark_highlight": "#2a2a3c",
+    "bg_darkest": "#131320",
+    "bg_light": "#e3e3f3",
+    "bg_lightest": "#f5f5ff",
+    "border_muted": "#3f3f5f",
+    "status_danger": "#ff9100",
+    "status_error": "#f44336",
+    "status_special": "#ab47bc",
+    "status_success": "#00c853",
+    "status_warning": "#ffea00",
+    "text_light": "#b8b8d0"
+  },
+  "name": "Google NotebookLM",
+  "shadow_intensity": 0
+}

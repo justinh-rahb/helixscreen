@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 16,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#2a9d8f",
+    "accent_primary": "#10a37f",
+    "accent_secondary": "#0d8a6a",
+    "accent_tertiary": "#5b9bd5",
+    "bg_dark": "#343541",
+    "bg_dark_highlight": "#40414f",
+    "bg_darkest": "#202123",
+    "bg_light": "#e5e5e5",
+    "bg_lightest": "#f7f7f8",
+    "border_muted": "#4d4d4f",
+    "status_danger": "#e67e22",
+    "status_error": "#ef4444",
+    "status_special": "#9f7aea",
+    "status_success": "#10a37f",
+    "status_warning": "#f59e0b",
+    "text_light": "#c5c5d2"
+  },
+  "name": "ChatGPT Classic",
+  "shadow_intensity": 0
+}

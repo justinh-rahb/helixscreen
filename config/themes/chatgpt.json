@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 16,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#2dd4bf",
+    "accent_primary": "#19c37d",
+    "accent_secondary": "#10a37f",
+    "accent_tertiary": "#6366f1",
+    "bg_dark": "#2f2f2f",
+    "bg_dark_highlight": "#3a3a3a",
+    "bg_darkest": "#212121",
+    "bg_light": "#ececec",
+    "bg_lightest": "#ffffff",
+    "border_muted": "#454545",
+    "status_danger": "#f97316",
+    "status_error": "#ef4444",
+    "status_special": "#a855f7",
+    "status_success": "#19c37d",
+    "status_warning": "#eab308",
+    "text_light": "#d1d5db"
+  },
+  "name": "ChatGPT",
+  "shadow_intensity": 0
+}

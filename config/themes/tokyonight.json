@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 12,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#7dcfff",
+    "accent_primary": "#7aa2f7",
+    "accent_secondary": "#bb9af7",
+    "accent_tertiary": "#2ac3de",
+    "bg_dark": "#1a1b26",
+    "bg_dark_highlight": "#24283b",
+    "bg_darkest": "#16161e",
+    "bg_light": "#c0caf5",
+    "bg_lightest": "#d5d6db",
+    "border_muted": "#414868",
+    "status_danger": "#ff9e64",
+    "status_error": "#f7768e",
+    "status_special": "#bb9af7",
+    "status_success": "#9ece6a",
+    "status_warning": "#e0af68",
+    "text_light": "#a9b1d6"
+  },
+  "name": "Tokyo Night",
+  "shadow_intensity": 0
+}

@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 12,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#56b6c2",
+    "accent_primary": "#61afef",
+    "accent_secondary": "#c678dd",
+    "accent_tertiary": "#56b6c2",
+    "bg_dark": "#282c34",
+    "bg_dark_highlight": "#2c323c",
+    "bg_darkest": "#21252b",
+    "bg_light": "#dcdfe4",
+    "bg_lightest": "#fafafa",
+    "border_muted": "#3e4451",
+    "status_danger": "#d19a66",
+    "status_error": "#e06c75",
+    "status_special": "#c678dd",
+    "status_success": "#98c379",
+    "status_warning": "#e5c07b",
+    "text_light": "#abb2bf"
+  },
+  "name": "One Dark",
+  "shadow_intensity": 0
+}

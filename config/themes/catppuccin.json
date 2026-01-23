@@ -1,0 +1,25 @@
+{
+  "border_opacity": 40,
+  "border_radius": 12,
+  "border_width": 1,
+  "colors": {
+    "accent_highlight": "#94e2d5",
+    "accent_primary": "#89b4fa",
+    "accent_secondary": "#cba6f7",
+    "accent_tertiary": "#74c7ec",
+    "bg_dark": "#1e1e2e",
+    "bg_dark_highlight": "#313244",
+    "bg_darkest": "#11111b",
+    "bg_light": "#cdd6f4",
+    "bg_lightest": "#eff1f5",
+    "border_muted": "#45475a",
+    "status_danger": "#fab387",
+    "status_error": "#f38ba8",
+    "status_special": "#cba6f7",
+    "status_success": "#a6e3a1",
+    "status_warning": "#f9e2af",
+    "text_light": "#bac2de"
+  },
+  "name": "Catppuccin",
+  "shadow_intensity": 0
+}
