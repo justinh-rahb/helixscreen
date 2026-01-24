@@ -175,7 +175,7 @@ class AmsBackendMock : public AmsBackend {
      *
      * When enabled, operations show realistic phase progression:
      * - Load: HEATING → LOADING (segment animation) → CHECKING → IDLE
-     * - Unload: HEATING → FORMING_TIP → UNLOADING (animation) → IDLE
+     * - Unload: HEATING → CUTTING → UNLOADING (animation) → IDLE
      *
      * Can also be set via HELIX_MOCK_AMS_REALISTIC environment variable.
      * Timing respects --sim-speed flag with ±20-30% variance.

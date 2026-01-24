@@ -205,7 +205,7 @@ inline int slot_status_to_happy_hare(SlotStatus status) {
  * @brief Current AMS action/operation
  *
  * Maps to Happy Hare's action strings:
- * "Idle", "Loading", "Unloading", "Forming Tip", "Heating", etc.
+ * "Idle", "Loading", "Unloading", "Forming Tip", "Cutting", "Heating", etc.
  */
 enum class AmsAction {
     IDLE = 0,        ///< No operation in progress
@@ -213,11 +213,12 @@ enum class AmsAction {
     UNLOADING = 2,   ///< Unloading filament from extruder
     SELECTING = 3,   ///< Selecting tool/slot
     RESETTING = 4,   ///< Resetting system (MMU_HOME for HH, AFC_RESET for AFC)
-    FORMING_TIP = 5, ///< Forming filament tip for retraction
+    FORMING_TIP = 5, ///< Forming filament tip (legacy, some systems still use)
     HEATING = 6,     ///< Heating for operation
     CHECKING = 7,    ///< Checking slots
     PAUSED = 8,      ///< Operation paused (requires attention)
-    ERROR = 9        ///< Error state
+    ERROR = 9,       ///< Error state
+    CUTTING = 10     ///< Cutting filament before retraction (modern AMS)
 };
 
 /**
@@ -239,6 +240,8 @@ inline const char* ams_action_to_string(AmsAction action) {
         return "Resetting";
     case AmsAction::FORMING_TIP:
         return "Forming Tip";
+    case AmsAction::CUTTING:
+        return "Cutting";
     case AmsAction::HEATING:
         return "Heating";
     case AmsAction::CHECKING:
@@ -268,6 +271,8 @@ inline AmsAction ams_action_from_string(std::string_view action_str) {
         return AmsAction::SELECTING;
     if (action_str == "Homing" || action_str == "Resetting")
         return AmsAction::RESETTING;
+    if (action_str == "Cutting")
+        return AmsAction::CUTTING;
     if (action_str == "Forming Tip")
         return AmsAction::FORMING_TIP;
     if (action_str == "Heating")

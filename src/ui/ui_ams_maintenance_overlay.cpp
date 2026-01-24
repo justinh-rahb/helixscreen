@@ -179,6 +179,8 @@ const char* AmsMaintenanceOverlay::action_to_string(int action) {
         return "Resetting...";
     case AmsAction::FORMING_TIP:
         return "Forming tip...";
+    case AmsAction::CUTTING:
+        return "Cutting filament...";
     case AmsAction::HEATING:
         return "Heating...";
     case AmsAction::CHECKING:

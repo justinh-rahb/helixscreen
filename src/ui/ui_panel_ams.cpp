@@ -926,7 +926,8 @@ void AmsPanel::update_step_progress(AmsAction action) {
 
     // Show/hide container based on action
     bool show_progress = (action == AmsAction::HEATING || action == AmsAction::LOADING ||
-                          action == AmsAction::CHECKING || action == AmsAction::FORMING_TIP);
+                          action == AmsAction::CHECKING || action == AmsAction::CUTTING ||
+                          action == AmsAction::FORMING_TIP);
 
     if (show_progress) {
         lv_obj_remove_flag(step_progress_container_, LV_OBJ_FLAG_HIDDEN);
@@ -947,8 +948,9 @@ void AmsPanel::update_step_progress(AmsAction action) {
         break;
 
     case AmsAction::CHECKING:
+    case AmsAction::CUTTING:
     case AmsAction::FORMING_TIP:
-        // Step 2: Verify extrusion
+        // Step 2: Cutting/Tip forming/Verify
         ui_step_progress_set_current(step_progress_, 2);
         break;
 

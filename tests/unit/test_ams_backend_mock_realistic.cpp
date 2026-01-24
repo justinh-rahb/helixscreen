@@ -21,7 +21,7 @@
  * Note: These tests set RuntimeConfig::sim_speedup to 1000x so operations
  * complete quickly. Base timing constants are:
  * - HEATING: 3000ms -> 3ms at 1000x
- * - FORMING_TIP: 4000ms -> 4ms at 1000x
+ * - CUTTING: 2000ms -> 2ms at 1000x
  * - CHECKING: 1500ms -> 1.5ms at 1000x
  * - SEGMENT_ANIMATION: 5000ms -> 5ms at 1000x
  */
@@ -148,7 +148,7 @@ TEST_CASE("AmsBackendMock realistic mode unload operation phases",
         }
     });
 
-    SECTION("unload shows HEATING then FORMING_TIP then UNLOADING sequence") {
+    SECTION("unload shows HEATING then CUTTING then UNLOADING sequence") {
         // Slot 0 is pre-loaded, so we can unload directly
         auto result = backend.unload_filament();
         REQUIRE(result);
@@ -159,25 +159,25 @@ TEST_CASE("AmsBackendMock realistic mode unload operation phases",
         // Verify phase sequence
         REQUIRE(observed_actions.size() >= 3);
 
-        // Find the HEATING -> FORMING_TIP -> UNLOADING sequence
+        // Find the HEATING -> CUTTING -> UNLOADING sequence
         bool found_heating = false;
-        bool found_forming_tip = false;
+        bool found_cutting = false;
         bool found_unloading = false;
 
         for (size_t i = 0; i < observed_actions.size(); ++i) {
             if (observed_actions[i] == AmsAction::HEATING) {
                 found_heating = true;
             }
-            if (found_heating && observed_actions[i] == AmsAction::FORMING_TIP) {
-                found_forming_tip = true;
+            if (found_heating && observed_actions[i] == AmsAction::CUTTING) {
+                found_cutting = true;
             }
-            if (found_forming_tip && observed_actions[i] == AmsAction::UNLOADING) {
+            if (found_cutting && observed_actions[i] == AmsAction::UNLOADING) {
                 found_unloading = true;
             }
         }
 
         CHECK(found_heating);
-        CHECK(found_forming_tip);
+        CHECK(found_cutting);
         CHECK(found_unloading);
     }
 
@@ -210,22 +210,22 @@ TEST_CASE("AmsBackendMock simple mode skips extra phases", "[ams][mock][realisti
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        // Should NOT see HEATING or FORMING_TIP in simple mode
+        // Should NOT see HEATING or CUTTING in simple mode
         bool found_heating = false;
-        bool found_forming_tip = false;
+        bool found_cutting = false;
         bool found_unloading = false;
 
         for (const auto& action : observed_actions) {
             if (action == AmsAction::HEATING)
                 found_heating = true;
-            if (action == AmsAction::FORMING_TIP)
-                found_forming_tip = true;
+            if (action == AmsAction::CUTTING)
+                found_cutting = true;
             if (action == AmsAction::UNLOADING)
                 found_unloading = true;
         }
 
         CHECK_FALSE(found_heating);
-        CHECK_FALSE(found_forming_tip);
+        CHECK_FALSE(found_cutting);
         CHECK(found_unloading);
     }
 

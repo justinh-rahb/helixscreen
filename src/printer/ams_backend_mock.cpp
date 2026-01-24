@@ -38,7 +38,7 @@ constexpr int NUM_SAMPLE_FILAMENTS = sizeof(SAMPLE_FILAMENTS) / sizeof(SAMPLE_FI
 // Timing constants for realistic mode (milliseconds at 1x speed)
 // These values simulate real AMS/MMU timing behavior
 constexpr int HEATING_BASE_MS = 3000;           // 3 seconds to heat nozzle
-constexpr int FORMING_TIP_BASE_MS = 4000;       // 4 seconds for tip forming
+constexpr int CUTTING_BASE_MS = 2000;           // 2 seconds for filament cut
 constexpr int CHECKING_BASE_MS = 1500;          // 1.5 seconds for sensor check
 constexpr int SELECTING_BASE_MS = 1000;         // 1 second for slot/tool selection
 constexpr int SEGMENT_ANIMATION_BASE_MS = 5000; // 5 seconds for full segment animation
@@ -1198,20 +1198,20 @@ void AmsBackendMock::execute_load_operation(int slot_index,
 
 void AmsBackendMock::execute_unload_operation(InterruptibleSleep interruptible_sleep) {
     if (realistic_mode_) {
-        // Phase 1: HEATING (shorter - just for clean tip forming)
+        // Phase 1: HEATING (shorter - just for clean cut)
         spdlog::debug("[AmsBackendMock] Unload phase: HEATING");
-        set_action(AmsAction::HEATING, "Heating for tip forming");
+        set_action(AmsAction::HEATING, "Heating for cut");
         emit_event(EVENT_STATE_CHANGED);
         if (!interruptible_sleep(get_effective_delay_ms(HEATING_BASE_MS / 2, HEATING_VARIANCE)))
             return;
         if (shutdown_requested_ || cancel_requested_)
             return;
 
-        // Phase 2: FORMING_TIP
-        spdlog::debug("[AmsBackendMock] Unload phase: FORMING_TIP");
-        set_action(AmsAction::FORMING_TIP, "Forming filament tip");
+        // Phase 2: CUTTING
+        spdlog::debug("[AmsBackendMock] Unload phase: CUTTING");
+        set_action(AmsAction::CUTTING, "Cutting filament");
         emit_event(EVENT_STATE_CHANGED);
-        if (!interruptible_sleep(get_effective_delay_ms(FORMING_TIP_BASE_MS, TIP_VARIANCE)))
+        if (!interruptible_sleep(get_effective_delay_ms(CUTTING_BASE_MS, TIP_VARIANCE)))
             return;
         if (shutdown_requested_ || cancel_requested_)
             return;
