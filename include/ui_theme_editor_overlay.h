@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "ui_ams_color_picker.h"
+#include "ui_color_picker.h"
 
 #include "overlay_base.h"
 #include "theme_loader.h"
@@ -187,7 +187,7 @@ class ThemeEditorOverlay : public OverlayBase {
     std::array<lv_obj_t*, 16> swatch_objects_{};
 
     // Color picker for swatch editing
-    std::unique_ptr<helix::ui::AmsColorPicker> color_picker_;
+    std::unique_ptr<helix::ui::ColorPicker> color_picker_;
 
     // Discard confirmation dialog tracking
     lv_obj_t* discard_dialog_ = nullptr;

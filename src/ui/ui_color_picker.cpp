@@ -1,7 +1,7 @@
 // Copyright (C) 2025-2026 356C LLC
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "ui_ams_color_picker.h"
+#include "ui_color_picker.h"
 
 #include "color_utils.h"
 #include "theme_manager.h"
@@ -37,23 +37,24 @@ std::string get_color_name_from_hex(uint32_t rgb) {
 namespace helix::ui {
 
 // Static member initialization
-bool AmsColorPicker::callbacks_registered_ = false;
+bool ColorPicker::callbacks_registered_ = false;
+ColorPicker* ColorPicker::active_instance_ = nullptr;
 
 // ============================================================================
 // Construction / Destruction
 // ============================================================================
 
-AmsColorPicker::AmsColorPicker() {
-    spdlog::debug("[AmsColorPicker] Constructed");
+ColorPicker::ColorPicker() {
+    spdlog::debug("[ColorPicker] Constructed");
 }
 
-AmsColorPicker::~AmsColorPicker() {
+ColorPicker::~ColorPicker() {
     // Modal destructor will call hide() if visible
     deinit_subjects();
-    spdlog::debug("[AmsColorPicker] Destroyed");
+    spdlog::debug("[ColorPicker] Destroyed");
 }
 
-AmsColorPicker::AmsColorPicker(AmsColorPicker&& other) noexcept
+ColorPicker::ColorPicker(ColorPicker&& other) noexcept
     : Modal(std::move(other)), selected_color_(other.selected_color_),
       color_callback_(std::move(other.color_callback_)),
       dismiss_callback_(std::move(other.dismiss_callback_)),
@@ -66,7 +67,7 @@ AmsColorPicker::AmsColorPicker(AmsColorPicker&& other) noexcept
     other.subjects_initialized_ = false;
 }
 
-AmsColorPicker& AmsColorPicker::operator=(AmsColorPicker&& other) noexcept {
+ColorPicker& ColorPicker::operator=(ColorPicker&& other) noexcept {
     if (this != &other) {
         Modal::operator=(std::move(other));
         selected_color_ = other.selected_color_;
@@ -84,15 +85,15 @@ AmsColorPicker& AmsColorPicker::operator=(AmsColorPicker&& other) noexcept {
 // Public API
 // ============================================================================
 
-void AmsColorPicker::set_color_callback(ColorCallback callback) {
+void ColorPicker::set_color_callback(ColorCallback callback) {
     color_callback_ = std::move(callback);
 }
 
-void AmsColorPicker::set_dismiss_callback(std::function<void()> callback) {
+void ColorPicker::set_dismiss_callback(std::function<void()> callback) {
     dismiss_callback_ = std::move(callback);
 }
 
-bool AmsColorPicker::show_with_color(lv_obj_t* parent, uint32_t initial_color) {
+bool ColorPicker::show_with_color(lv_obj_t* parent, uint32_t initial_color) {
     // Register callbacks once (idempotent)
     register_callbacks();
 
@@ -107,10 +108,10 @@ bool AmsColorPicker::show_with_color(lv_obj_t* parent, uint32_t initial_color) {
         return false;
     }
 
-    // Store 'this' in modal's user_data for callback traversal
-    lv_obj_set_user_data(dialog_, this);
+    // Track active instance for static callbacks
+    active_instance_ = this;
 
-    spdlog::info("[AmsColorPicker] Shown with initial color #{:06X}", initial_color);
+    spdlog::info("[ColorPicker] Shown with initial color #{:06X}", initial_color);
     return true;
 }
 
@@ -118,7 +119,7 @@ bool AmsColorPicker::show_with_color(lv_obj_t* parent, uint32_t initial_color) {
 // Modal Hooks
 // ============================================================================
 
-void AmsColorPicker::on_show() {
+void ColorPicker::on_show() {
     // Get hex input field
     hex_input_ = find_widget("hex_input");
 
@@ -138,21 +139,22 @@ void AmsColorPicker::on_show() {
         ui_hsv_picker_set_callback(
             hsv_picker,
             [](uint32_t rgb, void* user_data) {
-                auto* self = static_cast<AmsColorPicker*>(user_data);
+                auto* self = static_cast<ColorPicker*>(user_data);
                 self->update_preview(rgb, true); // from HSV picker
             },
             this);
-        spdlog::debug("[AmsColorPicker] HSV picker initialized with color #{:06X}",
+        spdlog::debug("[ColorPicker] HSV picker initialized with color #{:06X}",
                       selected_color_);
     }
 }
 
-void AmsColorPicker::on_hide() {
-    // Observer cleanup is handled by SubjectManager::deinit_all() in deinit_subjects()
-    // which calls lv_subject_deinit() on each subject. We avoid manual lv_observer_remove()
-    // because the destructor calls deinit_subjects() before the Modal base destructor
-    // calls on_hide(), which would leave us with stale observer pointers.
-    spdlog::debug("[AmsColorPicker] on_hide()");
+void ColorPicker::on_hide() {
+    // Clear active instance
+    if (active_instance_ == this) {
+        active_instance_ = nullptr;
+    }
+
+    spdlog::debug("[ColorPicker] on_hide()");
 
     // Call dismiss callback if set (fires on any close - select, cancel, or backdrop)
     if (dismiss_callback_) {
@@ -160,8 +162,8 @@ void AmsColorPicker::on_hide() {
     }
 }
 
-void AmsColorPicker::on_cancel() {
-    spdlog::debug("[AmsColorPicker] Cancelled");
+void ColorPicker::on_cancel() {
+    spdlog::debug("[ColorPicker] Cancelled");
     Modal::on_cancel(); // Calls hide()
 }
 
@@ -169,7 +171,7 @@ void AmsColorPicker::on_cancel() {
 // Subject Management
 // ============================================================================
 
-void AmsColorPicker::init_subjects() {
+void ColorPicker::init_subjects() {
     if (subjects_initialized_) {
         return;
     }
@@ -185,24 +187,24 @@ void AmsColorPicker::init_subjects() {
     subjects_.register_subject(&name_subject_);
 
     subjects_initialized_ = true;
-    spdlog::debug("[AmsColorPicker] Subjects initialized");
+    spdlog::debug("[ColorPicker] Subjects initialized");
 }
 
-void AmsColorPicker::deinit_subjects() {
+void ColorPicker::deinit_subjects() {
     if (!subjects_initialized_) {
         return;
     }
     // SubjectManager handles all lv_subject_deinit() calls via RAII
     subjects_.deinit_all();
     subjects_initialized_ = false;
-    spdlog::debug("[AmsColorPicker] Subjects deinitialized");
+    spdlog::debug("[ColorPicker] Subjects deinitialized");
 }
 
 // ============================================================================
 // Internal Methods
 // ============================================================================
 
-void AmsColorPicker::update_preview(uint32_t color_rgb, bool from_hsv_picker,
+void ColorPicker::update_preview(uint32_t color_rgb, bool from_hsv_picker,
                                     bool from_hex_input) {
     if (!dialog_) {
         return;
@@ -240,7 +242,7 @@ void AmsColorPicker::update_preview(uint32_t color_rgb, bool from_hsv_picker,
     }
 }
 
-void AmsColorPicker::handle_swatch_clicked(lv_obj_t* swatch) {
+void ColorPicker::handle_swatch_clicked(lv_obj_t* swatch) {
     if (!swatch || !dialog_) {
         return;
     }
@@ -252,9 +254,9 @@ void AmsColorPicker::handle_swatch_clicked(lv_obj_t* swatch) {
     update_preview(rgb);
 }
 
-void AmsColorPicker::handle_select() {
+void ColorPicker::handle_select() {
     std::string color_name = helix::get_color_name_from_hex(selected_color_);
-    spdlog::info("[AmsColorPicker] Color selected: #{:06X} ({})", selected_color_, color_name);
+    spdlog::info("[ColorPicker] Color selected: #{:06X} ({})", selected_color_, color_name);
 
     // Invoke callback before hiding
     if (color_callback_) {
@@ -265,7 +267,7 @@ void AmsColorPicker::handle_select() {
     hide();
 }
 
-void AmsColorPicker::handle_hex_input_changed() {
+void ColorPicker::handle_hex_input_changed() {
     if (hex_input_updating_ || !hex_input_) {
         return;
     }
@@ -285,7 +287,7 @@ void AmsColorPicker::handle_hex_input_changed() {
     }
 }
 
-void AmsColorPicker::handle_hex_input_defocused() {
+void ColorPicker::handle_hex_input_defocused() {
     if (!hex_input_) {
         return;
     }
@@ -308,7 +310,7 @@ void AmsColorPicker::handle_hex_input_defocused() {
 // Static Callback Registration
 // ============================================================================
 
-void AmsColorPicker::register_callbacks() {
+void ColorPicker::register_callbacks() {
     if (callbacks_registered_) {
         return;
     }
@@ -321,38 +323,26 @@ void AmsColorPicker::register_callbacks() {
     lv_xml_register_event_cb(nullptr, "hex_input_defocused_cb", on_hex_input_defocused_cb);
 
     callbacks_registered_ = true;
-    spdlog::debug("[AmsColorPicker] Callbacks registered");
+    spdlog::debug("[ColorPicker] Callbacks registered");
 }
 
 // ============================================================================
 // Static Callbacks (Instance Lookup via User Data)
 // ============================================================================
 
-AmsColorPicker* AmsColorPicker::get_instance_from_event(lv_event_t* e) {
-    auto* target = static_cast<lv_obj_t*>(lv_event_get_target(e));
-
-    // Traverse parent chain to find modal root with user_data
-    lv_obj_t* obj = target;
-    while (obj) {
-        void* user_data = lv_obj_get_user_data(obj);
-        if (user_data) {
-            return static_cast<AmsColorPicker*>(user_data);
-        }
-        obj = lv_obj_get_parent(obj);
-    }
-
-    spdlog::warn("[AmsColorPicker] Could not find instance from event target");
-    return nullptr;
+ColorPicker* ColorPicker::get_instance_from_event(lv_event_t* e) {
+    (void)e; // Not needed - we use static instance tracking
+    return active_instance_;
 }
 
-void AmsColorPicker::on_close_cb(lv_event_t* e) {
+void ColorPicker::on_close_cb(lv_event_t* e) {
     auto* self = get_instance_from_event(e);
     if (self) {
         self->hide();
     }
 }
 
-void AmsColorPicker::on_swatch_cb(lv_event_t* e) {
+void ColorPicker::on_swatch_cb(lv_event_t* e) {
     auto* self = get_instance_from_event(e);
     if (self) {
         auto* swatch = static_cast<lv_obj_t*>(lv_event_get_target(e));
@@ -360,28 +350,28 @@ void AmsColorPicker::on_swatch_cb(lv_event_t* e) {
     }
 }
 
-void AmsColorPicker::on_cancel_cb(lv_event_t* e) {
+void ColorPicker::on_cancel_cb(lv_event_t* e) {
     auto* self = get_instance_from_event(e);
     if (self) {
         self->on_cancel();
     }
 }
 
-void AmsColorPicker::on_select_cb(lv_event_t* e) {
+void ColorPicker::on_select_cb(lv_event_t* e) {
     auto* self = get_instance_from_event(e);
     if (self) {
         self->handle_select();
     }
 }
 
-void AmsColorPicker::on_hex_input_changed_cb(lv_event_t* e) {
+void ColorPicker::on_hex_input_changed_cb(lv_event_t* e) {
     auto* self = get_instance_from_event(e);
     if (self) {
         self->handle_hex_input_changed();
     }
 }
 
-void AmsColorPicker::on_hex_input_defocused_cb(lv_event_t* e) {
+void ColorPicker::on_hex_input_defocused_cb(lv_event_t* e) {
     auto* self = get_instance_from_event(e);
     if (self) {
         self->handle_hex_input_defocused();

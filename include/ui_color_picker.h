@@ -29,22 +29,22 @@ std::string get_color_name_from_hex(uint32_t rgb);
 namespace helix::ui {
 
 /**
- * @file ui_ams_color_picker.h
- * @brief Color picker modal for AMS filament color selection
+ * @file ui_color_picker.h
+ * @brief Color picker modal for filament and theme color selection
  *
  * Displays preset swatches and HSV picker for custom colors.
  * Extends ModalBase for RAII lifecycle and backdrop handling.
  *
  * ## Usage:
  * @code
- * helix::ui::AmsColorPicker picker;
+ * helix::ui::ColorPicker picker;
  * picker.set_color_callback([](uint32_t rgb, const std::string& name) {
  *     // Handle color selection
  * });
  * picker.show_with_color(parent, initial_color_rgb);
  * @endcode
  */
-class AmsColorPicker : public Modal {
+class ColorPicker : public Modal {
   public:
     /**
      * @brief Callback type for color selection
@@ -53,16 +53,16 @@ class AmsColorPicker : public Modal {
      */
     using ColorCallback = std::function<void(uint32_t color_rgb, const std::string& color_name)>;
 
-    AmsColorPicker();
-    ~AmsColorPicker() override;
+    ColorPicker();
+    ~ColorPicker() override;
 
     // Non-copyable
-    AmsColorPicker(const AmsColorPicker&) = delete;
-    AmsColorPicker& operator=(const AmsColorPicker&) = delete;
+    ColorPicker(const ColorPicker&) = delete;
+    ColorPicker& operator=(const ColorPicker&) = delete;
 
     // Movable
-    AmsColorPicker(AmsColorPicker&& other) noexcept;
-    AmsColorPicker& operator=(AmsColorPicker&& other) noexcept;
+    ColorPicker(ColorPicker&& other) noexcept;
+    ColorPicker& operator=(ColorPicker&& other) noexcept;
 
     /**
      * @brief Show color picker with initial color
@@ -133,6 +133,7 @@ class AmsColorPicker : public Modal {
     // === Static Callback Registration ===
     static void register_callbacks();
     static bool callbacks_registered_;
+    static ColorPicker* active_instance_;
 
     // === Static Callbacks (traverse widget tree to find modal instance) ===
     static void on_close_cb(lv_event_t* e);
@@ -143,13 +144,14 @@ class AmsColorPicker : public Modal {
     static void on_hex_input_defocused_cb(lv_event_t* e);
 
     /**
-     * @brief Find AmsColorPicker instance from event target
+     * @brief Get the currently active ColorPicker instance
      *
-     * Traverses parent chain looking for modal root with user_data set.
-     * @param e LVGL event
-     * @return AmsColorPicker pointer, or nullptr if not found
+     * Returns the static active instance pointer. Only one ColorPicker
+     * can be visible at a time.
+     * @param e LVGL event (unused, kept for callback signature compatibility)
+     * @return ColorPicker pointer, or nullptr if none active
      */
-    static AmsColorPicker* get_instance_from_event(lv_event_t* e);
+    static ColorPicker* get_instance_from_event(lv_event_t* e);
 };
 
 } // namespace helix::ui

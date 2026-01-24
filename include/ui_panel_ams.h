@@ -3,13 +3,13 @@
 
 #pragma once
 
-#include "ui_ams_color_picker.h"
 #include "ui_ams_context_menu.h"
 #include "ui_ams_dryer_card.h"
 #include "ui_ams_edit_modal.h"
 #include "ui_ams_loading_error_modal.h"
 #include "ui_ams_slot_edit_popup.h"
 #include "ui_ams_spoolman_picker.h"
+#include "ui_color_picker.h"
 #include "ui_observer_guard.h"
 #include "ui_panel_base.h"
 

@@ -3,7 +3,7 @@
 
 #include "ui_theme_editor_overlay.h"
 
-#include "ui_ams_color_picker.h"
+#include "ui_color_picker.h"
 #include "ui_event_safety.h"
 #include "ui_global_panel_helper.h"
 #include "ui_keyboard_manager.h"
@@ -321,11 +321,20 @@ void ThemeEditorOverlay::update_title_dirty_indicator() {
         return;
     }
 
-    // Update title text with dirty indicator
+    // Find save button to enable/disable based on dirty state
+    lv_obj_t* save_btn = lv_obj_find_by_name(overlay_root_, "btn_save");
+
+    // Update title text and save button state
     if (dirty_) {
-        lv_label_set_text(title_label, "Theme Colors *");
+        lv_label_set_text(title_label, "Edit Theme Colors (Modified)");
+        if (save_btn) {
+            lv_obj_remove_state(save_btn, LV_STATE_DISABLED);
+        }
     } else {
-        lv_label_set_text(title_label, "Theme Colors");
+        lv_label_set_text(title_label, "Edit Theme Colors");
+        if (save_btn) {
+            lv_obj_add_state(save_btn, LV_STATE_DISABLED);
+        }
     }
 }
 
@@ -607,7 +616,7 @@ void ThemeEditorOverlay::show_color_picker(int palette_index) {
 
     // Create color picker if not already created
     if (!color_picker_) {
-        color_picker_ = std::make_unique<helix::ui::AmsColorPicker>();
+        color_picker_ = std::make_unique<helix::ui::ColorPicker>();
     }
 
     // Set callback to handle color selection

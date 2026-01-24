@@ -563,7 +563,7 @@ void AmsEditModal::show_color_picker() {
 
     // Create picker on first use (lazy initialization)
     if (!color_picker_) {
-        color_picker_ = std::make_unique<AmsColorPicker>();
+        color_picker_ = std::make_unique<ColorPicker>();
     }
 
     // Set callback to update edit modal when color is selected

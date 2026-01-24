@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "ui_ams_color_picker.h"
+#include "ui_color_picker.h"
 #include "ui_modal.h"
 
 #include "ams_types.h"
@@ -99,7 +99,7 @@ class AmsEditModal : public Modal {
     int remaining_pre_edit_pct_ = 0; ///< Remaining % before edit mode
 
     // === Owned color picker ===
-    std::unique_ptr<AmsColorPicker> color_picker_;
+    std::unique_ptr<ColorPicker> color_picker_;
 
     // === Subjects for XML binding ===
     SubjectManager subjects_;
