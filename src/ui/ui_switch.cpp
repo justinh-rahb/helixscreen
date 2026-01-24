@@ -203,8 +203,8 @@ static void ui_switch_xml_apply(lv_xml_parser_state_t* state, const char** attrs
     lv_color_t track_color = lv_obj_get_style_bg_color(obj, LV_PART_MAIN);
     bool is_dark = theme_manager_is_dark_mode();
 
-    const char* elevated_str = lv_xml_get_const(NULL, "surface_elevated");
-    const char* dim_str = lv_xml_get_const(NULL, "surface_dim");
+    const char* elevated_str = lv_xml_get_const(NULL, "card_bg");
+    const char* dim_str = lv_xml_get_const(NULL, "card_alt");
 
     lv_color_t knob_color;
     if (is_dark && elevated_str) {
@@ -227,8 +227,8 @@ static void ui_switch_xml_apply(lv_xml_parser_state_t* state, const char** attrs
     // (is_dark already defined above)
 
     // Get theme colors for mixing (preserves theme warmth/coolness)
-    const char* dark_color_str = lv_xml_get_const(NULL, "surface_dim");
-    const char* light_color_str = lv_xml_get_const(NULL, "text_light");
+    const char* dark_color_str = lv_xml_get_const(NULL, "card_alt");
+    const char* light_color_str = lv_xml_get_const(NULL, "text_subtle");
 
     if (dark_color_str && light_color_str) {
         lv_color_t dark_color = theme_manager_parse_hex_color(dark_color_str);

@@ -45,7 +45,7 @@ static lv_style_transition_dsc_t button_press_transition;
  * @param is_dark Dark mode flag
  * @return Computed input background color
  */
-// Input widgets (dropdowns, textareas, etc.) use surface_dim color
+// Input widgets (dropdowns, textareas, etc.) use card_alt color
 // This is passed directly rather than computed from card_bg
 
 /**
@@ -130,7 +130,7 @@ static void helix_theme_apply(lv_theme_t* theme, lv_obj_t* obj) {
     // LVGL defaults to cyan - we want the theme's primary/accent color
     if (lv_obj_check_type(obj, &lv_switch_class)) {
         lv_obj_add_style(obj, &helix->switch_indicator_style, LV_PART_INDICATOR | LV_STATE_CHECKED);
-        // Apply text_light color to switch knob for visibility against track
+        // Apply text_subtle color to switch knob for visibility against track
         lv_obj_add_style(obj, &helix->switch_knob_style, LV_PART_KNOB);
         // Focus ring for accessibility
         lv_obj_add_style(obj, &helix->focus_ring_style, LV_STATE_FOCUSED);
@@ -148,7 +148,8 @@ static void helix_theme_apply(lv_theme_t* theme, lv_obj_t* obj) {
 lv_theme_t* theme_core_init(lv_display_t* display, lv_color_t primary_color,
                             lv_color_t secondary_color, lv_color_t text_primary_color, bool is_dark,
                             const lv_font_t* base_font, lv_color_t screen_bg, lv_color_t card_bg,
-                            lv_color_t surface_control, lv_color_t focus_color, int32_t border_radius) {
+                            lv_color_t surface_control, lv_color_t focus_color,
+                            int32_t border_radius) {
     // Clean up previous theme instance if exists
     if (helix_theme_instance) {
         lv_style_reset(&helix_theme_instance->input_bg_style);
@@ -195,7 +196,7 @@ lv_theme_t* theme_core_init(lv_display_t* display, lv_color_t primary_color,
     helix_theme_instance->base.flags = 0;
     helix_theme_instance->is_dark_mode = is_dark;
 
-    // Input widgets use surface_dim color (surface_control) for background
+    // Input widgets use card_alt color (surface_control) for background
     // This provides consistent contrast in both light and dark modes
 
     // Initialize custom input background style
@@ -329,7 +330,7 @@ void theme_core_update_colors(bool is_dark, lv_color_t screen_bg, lv_color_t car
     // Update our custom styles in-place
     helix_theme_instance->is_dark_mode = is_dark;
 
-    // Input widgets use surface_dim color (surface_control) and text_primary for text
+    // Input widgets use card_alt color (surface_control) and text_primary for text
     lv_style_set_bg_color(&helix_theme_instance->input_bg_style, surface_control);
     lv_style_set_text_color(&helix_theme_instance->input_bg_style, text_primary_color);
 
@@ -396,8 +397,8 @@ void theme_core_preview_colors(bool is_dark, const char* colors[16], int32_t bor
     }
 
     // Parse palette colors
-    // 0: bg_darkest, 1: bg_dark, 2: bg_dark_highlight, 3: surface_dim
-    // 4: text_light, 5: bg_light, 6: bg_lightest, 7: accent_highlight
+    // 0: bg_darkest, 1: bg_dark, 2: bg_dark_highlight, 3: card_alt
+    // 4: text_subtle, 5: bg_light, 6: bg_lightest, 7: accent_highlight
     // 8-10: accents, 11-15: status
 
     lv_color_t screen_bg = is_dark ? lv_color_hex(strtoul(colors[0] + 1, NULL, 16)) : // bg_darkest
@@ -406,8 +407,8 @@ void theme_core_preview_colors(bool is_dark, const char* colors[16], int32_t bor
     lv_color_t card_bg = is_dark ? lv_color_hex(strtoul(colors[1] + 1, NULL, 16)) : // bg_dark
                              lv_color_hex(strtoul(colors[5] + 1, NULL, 16));        // bg_light
 
-    // surface_dim used for both light and dark (consistent input field backgrounds)
-    lv_color_t surface_dim = lv_color_hex(strtoul(colors[3] + 1, NULL, 16));
+    // card_alt used for both light and dark (consistent input field backgrounds)
+    lv_color_t card_alt = lv_color_hex(strtoul(colors[3] + 1, NULL, 16));
 
     lv_color_t text_primary = is_dark ? lv_color_hex(strtoul(colors[6] + 1, NULL, 16))
                                       :                                           // bg_lightest
@@ -416,12 +417,12 @@ void theme_core_preview_colors(bool is_dark, const char* colors[16], int32_t bor
     // Update the helix_theme instance
     helix_theme_instance->is_dark_mode = is_dark;
 
-    // Input widgets use surface_dim color and text_primary for text
-    lv_style_set_bg_color(&helix_theme_instance->input_bg_style, surface_dim);
+    // Input widgets use card_alt color and text_primary for text
+    lv_style_set_bg_color(&helix_theme_instance->input_bg_style, card_alt);
     lv_style_set_text_color(&helix_theme_instance->input_bg_style, text_primary);
 
     // Update button style
-    lv_style_set_bg_color(&helix_theme_instance->button_style, surface_dim);
+    lv_style_set_bg_color(&helix_theme_instance->button_style, card_alt);
     lv_style_set_text_color(&helix_theme_instance->button_style, text_primary);
     lv_style_set_radius(&helix_theme_instance->button_style, border_radius);
     lv_style_set_radius(&helix_theme_instance->pressed_style, border_radius);
@@ -462,13 +463,13 @@ void theme_core_preview_colors(bool is_dark, const char* colors[16], int32_t bor
 
     def_theme->color_scr = screen_bg;
     def_theme->color_card = card_bg;
-    def_theme->color_grey = surface_dim;
+    def_theme->color_grey = card_alt;
     def_theme->color_text = text_primary;
 
     lv_style_set_bg_color(&def_theme->styles.scr, screen_bg);
     lv_style_set_text_color(&def_theme->styles.scr, text_primary);
     lv_style_set_bg_color(&def_theme->styles.card, card_bg);
-    lv_style_set_bg_color(&def_theme->styles.btn, surface_dim);
+    lv_style_set_bg_color(&def_theme->styles.btn, card_alt);
     lv_style_set_radius(&def_theme->styles.btn, border_radius);
 
     // Trigger style refresh
