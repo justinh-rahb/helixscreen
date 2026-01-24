@@ -8,13 +8,13 @@
 
 #include "ui_settings_display.h"
 
-#include "helix_theme.h"
 #include "ui_event_safety.h"
 #include "ui_nav_manager.h"
 #include "ui_theme.h"
 #include "ui_theme_editor_overlay.h"
 #include "ui_utils.h"
 
+#include "helix_theme.h"
 #include "settings_manager.h"
 #include "static_panel_registry.h"
 
@@ -400,7 +400,8 @@ void DisplaySettingsOverlay::on_preview_dark_mode_toggled(lv_event_t* e) {
     helix_theme_preview_colors(is_dark, colors, theme.properties.border_radius);
     ui_theme_refresh_widget_tree(lv_screen_active());
 
-    spdlog::debug("[DisplaySettingsOverlay] Preview dark mode toggled to {}", is_dark ? "dark" : "light");
+    spdlog::debug("[DisplaySettingsOverlay] Preview dark mode toggled to {}",
+                  is_dark ? "dark" : "light");
     LVGL_SAFE_EVENT_CB_END();
 }
 

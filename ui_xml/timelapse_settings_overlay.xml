@@ -26,8 +26,7 @@
       <setting_dropdown_row name="row_timelapse_mode"
                             label="Recording Mode" icon="layers"
                             description="Choose how frames are captured during printing"
-                            options="Layer&#10;Hyperlapse"
-                            callback="on_timelapse_mode_changed"/>
+                            options="Layer&#10;Hyperlapse" callback="on_timelapse_mode_changed"/>
       <!-- Mode info box -->
       <lv_obj name="mode_info_container"
               width="100%" height="content" style_bg_color="#panel_bg" style_radius="#border_radius"
@@ -43,8 +42,7 @@
       <!-- ================================================================== -->
       <setting_dropdown_row name="row_timelapse_framerate"
                             label="Framerate" icon="animation_play" description="Video playback speed"
-                            options="15 fps&#10;24 fps&#10;30 fps&#10;60 fps"
-                            callback="on_timelapse_framerate_changed"/>
+                            options="15 fps&#10;24 fps&#10;30 fps&#10;60 fps" callback="on_timelapse_framerate_changed"/>
       <!-- ================================================================== -->
       <!-- AUTO-RENDER -->
       <!-- ================================================================== -->

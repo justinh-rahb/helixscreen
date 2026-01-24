@@ -83,8 +83,7 @@
     <!-- Completion Alert Dropdown (Off/Notification/Alert) -->
     <setting_dropdown_row name="row_completion_alert"
                           label="Print Completion Alert" icon="notifications" description="Notify when print finishes"
-                          options="Off&#10;Notification&#10;Alert"
-                          callback="on_completion_alert_changed"/>
+                          options="Off&#10;Notification&#10;Alert" callback="on_completion_alert_changed"/>
     <!-- ================================================================== -->
     <!-- MOTION SECTION -->
     <!-- ================================================================== -->
