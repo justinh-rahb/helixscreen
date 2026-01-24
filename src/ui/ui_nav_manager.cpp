@@ -912,13 +912,19 @@ bool NavigationManager::go_back() {
             mgr.overlay_animate_slide_out(current_top);
         }
 
-        // Hide stale overlays
+        // Determine the previous panel (what will be visible after pop)
+        lv_obj_t* previous_panel = nullptr;
+        if (mgr.panel_stack_.size() >= 2) {
+            previous_panel = mgr.panel_stack_[mgr.panel_stack_.size() - 2];
+        }
+
+        // Hide stale overlays (but skip current_top, previous panel, and system widgets)
         lv_obj_t* screen = lv_screen_active();
         if (screen) {
             for (uint32_t i = 0; i < lv_obj_get_child_count(screen); i++) {
                 lv_obj_t* child = lv_obj_get_child(screen, static_cast<int32_t>(i));
                 if (child == mgr.app_layout_widget_ || child == mgr.overlay_backdrop_ ||
-                    child == current_top) {
+                    child == current_top || child == previous_panel) {
                     continue;
                 }
                 bool is_main = false;
