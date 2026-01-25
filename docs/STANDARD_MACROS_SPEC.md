@@ -20,12 +20,13 @@ The Standard Macros system provides a unified registry that maps semantic operat
 |------|---------|---------------------|----------------|
 | `load_filament` | Load filament | LOAD_FILAMENT, M701 | — |
 | `unload_filament` | Unload filament | UNLOAD_FILAMENT, M702 | — |
-| `purge` | Purge/prime | PURGE, PURGE_LINE, PRIME_LINE | — |
+| `purge` | Purge/prime | PURGE, PURGE_LINE, PRIME_LINE, PURGE_FILAMENT, LINE_PURGE | — |
 | `pause` | Pause print | PAUSE, M601 | — |
 | `resume` | Resume print | RESUME, M602 | — |
 | `cancel` | Cancel print | CANCEL_PRINT | — |
-| `bed_level` | Bed mesh calibration | BED_MESH_CALIBRATE, Z_TILT_ADJUST, QGL | HELIX_BED_LEVEL_IF_NEEDED |
-| `clean_nozzle` | Nozzle cleaning | CLEAN_NOZZLE, NOZZLE_WIPE, WIPE_NOZZLE | HELIX_CLEAN_NOZZLE |
+| `bed_mesh` | Bed mesh calibration | BED_MESH_CALIBRATE, G29 | HELIX_BED_MESH_IF_NEEDED |
+| `bed_level` | Physical bed leveling | QUAD_GANTRY_LEVEL, QGL, Z_TILT_ADJUST | — |
+| `clean_nozzle` | Nozzle cleaning | CLEAN_NOZZLE, NOZZLE_WIPE, WIPE_NOZZLE, CLEAR_NOZZLE | HELIX_CLEAN_NOZZLE |
 | `heat_soak` | Chamber/bed soak | HEAT_SOAK, CHAMBER_SOAK, SOAK | — |
 
 ### Slot States
@@ -48,7 +49,7 @@ Each slot can be in one of four states:
 enum class StandardMacroSlot {
     LoadFilament, UnloadFilament, Purge,
     Pause, Resume, Cancel,
-    BedLevel, CleanNozzle, HeatSoak
+    BedMesh, BedLevel, CleanNozzle, HeatSoak
 };
 
 struct StandardMacroInfo {
@@ -119,6 +120,7 @@ When executing a macro, the system checks in order:
     "pause": "",
     "resume": "",
     "cancel": "",
+    "bed_mesh": "",
     "bed_level": "",
     "clean_nozzle": "",
     "heat_soak": ""
