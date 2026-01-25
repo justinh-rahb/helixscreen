@@ -121,6 +121,24 @@ The installer automatically detects which firmware you're running and configures
 
 **Memory Savings:** On Klipper Mod, HelixScreen (~12MB) replaces KlipperScreen (~36MB + 4.6MB X Server), freeing ~29MB RAM on the memory-constrained AD5M.
 
+#### Forge-X Prerequisites
+
+**Important:** ForgeX must be installed and configured for GuppyScreen mode **before** installing HelixScreen. HelixScreen uses ForgeX's infrastructure (Klipper, Moonraker, backlight control) but replaces the GuppyScreen UI.
+
+1. Install ForgeX following [their instructions](https://github.com/DrA1ex/ff5m)
+2. Configure ForgeX with `display = 'GUPPY'` in variables.cfg
+3. Verify GuppyScreen works on the touchscreen
+4. Then run the HelixScreen installer
+
+The HelixScreen installer will:
+- Keep ForgeX in GUPPY display mode (required for backlight control)
+- Disable GuppyScreen's init scripts (so HelixScreen takes over)
+- Disable the stock FlashForge UI in auto_run.sh
+- Patch ForgeX's `screen.sh` to prevent backlight dimming conflicts
+- Install HelixScreen as the replacement touchscreen UI
+
+On uninstall, all ForgeX changes are reversed and GuppyScreen is restored.
+
 ---
 
 ## MainsailOS Installation
@@ -205,6 +223,20 @@ The install script automatically detects your firmware (Forge-X or Klipper Mod) 
 ssh root@<printer-ip>
 curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | bash
 ```
+
+**What the installer does on Forge-X:**
+- Verifies ForgeX is installed and sets display mode to `GUPPY`
+- Stops and disables GuppyScreen (`chmod -x` on init scripts)
+- Disables stock FlashForge UI in `/opt/auto_run.sh`
+- Patches `/opt/config/mod/.shell/screen.sh` to skip backlight commands when HelixScreen is running (prevents ForgeX's delayed_gcode from dimming the screen)
+- Installs HelixScreen to `/opt/helixscreen/`
+- Creates init script at `/etc/init.d/S90helixscreen`
+
+**What the installer does on Klipper Mod:**
+- Stops Xorg and KlipperScreen
+- Disables their init scripts (`chmod -x`)
+- Installs HelixScreen to `/root/printer_software/helixscreen/`
+- Creates init script at `/etc/init.d/S80helixscreen`
 
 ### Manual Installation
 
@@ -576,10 +608,20 @@ rm -rf /opt/helixscreen
 
 # Re-enable GuppyScreen
 chmod +x /opt/config/mod/.root/S80guppyscreen 2>/dev/null || true
+chmod +x /opt/config/mod/.root/S35tslib 2>/dev/null || true
+
+# Restore stock FlashForge UI in auto_run.sh (if it was disabled)
+sed -i 's|^# Disabled by HelixScreen: /opt/PROGRAM/ffstartup-arm|/opt/PROGRAM/ffstartup-arm|' /opt/auto_run.sh 2>/dev/null || true
+
+# Remove HelixScreen patch from screen.sh (restores backlight control)
+# The automated uninstaller handles this; for manual removal, edit:
+# /opt/config/mod/.shell/screen.sh and remove the helixscreen_active check
 
 # Reboot to restore GuppyScreen
 reboot
 ```
+
+> **Note:** The automated uninstaller (`install.sh --uninstall`) handles all ForgeX restoration automatically, including unpatching `screen.sh`.
 </details>
 
 <details>
