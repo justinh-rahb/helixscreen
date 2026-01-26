@@ -176,8 +176,8 @@ void calibrated_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
         ctx->original_read_cb(indev, data);
     }
 
-    // Apply affine calibration if valid and touch is active
-    if (ctx->calibration.valid && data->state == LV_INDEV_STATE_PRESSED) {
+    // Apply affine calibration if valid (for both PRESSED and RELEASED states)
+    if (ctx->calibration.valid) {
         helix::Point raw{static_cast<int>(data->point.x), static_cast<int>(data->point.y)};
         helix::Point transformed = helix::transform_point(
             ctx->calibration, raw, ctx->screen_width - 1, ctx->screen_height - 1);

@@ -70,7 +70,7 @@ bool init_lvgl(int width, int height, LvglContext& ctx) {
     if (ctx.pointer) {
         Config* cfg = Config::get_instance();
         int scroll_throw = cfg->get<int>("/input/scroll_throw", 25);
-        int scroll_limit = cfg->get<int>("/input/scroll_limit", 5);
+        int scroll_limit = cfg->get<int>("/input/scroll_limit", 15);
         lv_indev_set_scroll_throw(ctx.pointer, static_cast<uint8_t>(scroll_throw));
         lv_indev_set_scroll_limit(ctx.pointer, static_cast<uint8_t>(scroll_limit));
         spdlog::debug("[LVGL] Scroll config: throw={}, limit={}", scroll_throw, scroll_limit);
