@@ -5,16 +5,19 @@
 
 #include "ui_toast_manager.h"
 
+#include "app_globals.h"
 #include "config.h"
 #include "display_manager.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
+#include "printer_state.h"
 #include "runtime_config.h"
 #include "spdlog/spdlog.h"
 #include "theme_loader.h"
 #include "theme_manager.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 // Display dim option values (seconds) - time before screen dims to lower brightness
@@ -35,6 +38,33 @@ static const char* COMPLETION_ALERT_OPTIONS_TEXT = "Off\nNotification\nAlert";
 // Bed mesh render mode options (Auto=0, 3D=1, 2D=2)
 static const char* BED_MESH_RENDER_MODE_OPTIONS_TEXT = "Auto\n3D View\n2D Heatmap";
 static const char* GCODE_RENDER_MODE_OPTIONS_TEXT = "Auto\n3D View\n2D Layers";
+
+// Helper: Validate a timeout value against allowed options, snapping to nearest valid value
+template <size_t N>
+static int validate_timeout_option(int value, const int (&options)[N], int default_value,
+                                   const char* setting_name) {
+    // Check if value is exactly one of the valid options
+    for (size_t i = 0; i < N; ++i) {
+        if (options[i] == value) {
+            return value; // Valid
+        }
+    }
+
+    // Invalid value - find the nearest valid option
+    int nearest = default_value;
+    int min_diff = std::abs(value - default_value);
+    for (size_t i = 0; i < N; ++i) {
+        int diff = std::abs(value - options[i]);
+        if (diff < min_diff) {
+            min_diff = diff;
+            nearest = options[i];
+        }
+    }
+
+    spdlog::warn("[SettingsManager] Invalid {} value {} - snapping to nearest valid: {}",
+                 setting_name, value, nearest);
+    return nearest;
+}
 
 // Time format options (12H=0, 24H=1)
 static const char* TIME_FORMAT_OPTIONS_TEXT = "12 Hour\n24 Hour";
@@ -73,11 +103,21 @@ void SettingsManager::init_subjects() {
     UI_MANAGED_SUBJECT_INT(theme_preset_subject_, theme_index, "settings_theme_preset", subjects_);
 
     // Display dim (default: 300 seconds = 5 minutes)
+    // Validate against allowed options to catch corrupt config values
     int dim_sec = config->get<int>("/display/dim_sec", 300);
+    dim_sec = validate_timeout_option(dim_sec, DIM_OPTIONS, 300, "dim_sec");
     UI_MANAGED_SUBJECT_INT(display_dim_subject_, dim_sec, "settings_display_dim", subjects_);
 
+    // Sync validated dim timeout to DisplayManager (it reads config directly at init,
+    // so we need to push the corrected value if validation changed it)
+    if (auto* dm = DisplayManager::instance()) {
+        dm->set_dim_timeout(dim_sec);
+    }
+
     // Display sleep (default: 1800 seconds = 30 minutes)
+    // Validate against allowed options to catch corrupt config values
     int sleep_sec = config->get<int>("/display/sleep_sec", 1800);
+    sleep_sec = validate_timeout_option(sleep_sec, SLEEP_OPTIONS, 1800, "sleep_sec");
     UI_MANAGED_SUBJECT_INT(display_sleep_subject_, sleep_sec, "settings_display_sleep", subjects_);
 
     // Brightness: Read from config (DisplayManager handles hardware)
@@ -544,14 +584,49 @@ void SettingsManager::apply_led_startup_preference() {
     Config* config = Config::get_instance();
     bool led_on_at_start = config->get<bool>("/output/led_on_at_start", false);
 
-    if (led_on_at_start) {
-        spdlog::info("[SettingsManager] Applying LED startup preference: ON");
-        // Update subject to reflect state
+    if (!led_on_at_start) {
+        spdlog::debug("[SettingsManager] LED startup preference: OFF (no action needed)");
+        return;
+    }
+
+    // Check if Klipper is ready to accept commands
+    auto* klippy_subject = get_printer_state().get_klippy_state_subject();
+    auto klippy_state = static_cast<KlippyState>(lv_subject_get_int(klippy_subject));
+
+    if (klippy_state == KlippyState::READY) {
+        // Klipper is ready - apply immediately
+        spdlog::info("[SettingsManager] Applying LED startup preference: ON (Klipper ready)");
         lv_subject_set_int(&led_enabled_subject_, 1);
-        // Send command to turn LED on
         send_led_command(true);
     } else {
-        spdlog::debug("[SettingsManager] LED startup preference: OFF (no action needed)");
+        // Klipper not ready yet - set up observer to trigger when it becomes ready
+        spdlog::info("[SettingsManager] Deferring LED startup until Klipper is ready "
+                     "(current state: {})",
+                     static_cast<int>(klippy_state));
+
+        // Use static flag to ensure we only apply once
+        static bool led_startup_applied = false;
+        if (led_startup_applied) {
+            return;
+        }
+
+        // Create one-shot observer (using static flag to ensure single execution)
+        lv_observer_t* obs = lv_subject_add_observer(
+            klippy_subject,
+            [](lv_observer_t* /*observer*/, lv_subject_t* subject) {
+                auto state = static_cast<KlippyState>(lv_subject_get_int(subject));
+                if (state == KlippyState::READY) {
+                    static bool led_startup_applied = false;
+                    if (!led_startup_applied) {
+                        led_startup_applied = true;
+                        spdlog::info("[SettingsManager] Klipper now ready - applying LED startup "
+                                     "preference");
+                        SettingsManager::instance().set_led_enabled(true);
+                    }
+                }
+            },
+            nullptr);
+        (void)obs; // Observer will persist until subject is destroyed
     }
 }
 

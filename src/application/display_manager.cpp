@@ -281,6 +281,18 @@ void DisplayManager::check_display_sleep() {
     uint32_t sleep_timeout_ms =
         (sleep_timeout_sec > 0) ? static_cast<uint32_t>(sleep_timeout_sec) * 1000U : UINT32_MAX;
 
+    // Periodic debug logging (every 30 seconds when inactive > 10s)
+    static uint32_t last_log_time = 0;
+    uint32_t now = get_ticks();
+    if (inactive_ms > 10000 && (now - last_log_time) >= 30000) {
+        spdlog::debug(
+            "[DisplayManager] Sleep check: inactive={}s, dim_timeout={}s, sleep_timeout={}s, "
+            "dimmed={}, sleeping={}, backlight={}",
+            inactive_ms / 1000, m_dim_timeout_sec, sleep_timeout_sec, m_display_dimmed,
+            m_display_sleeping, m_backlight ? "yes" : "no");
+        last_log_time = now;
+    }
+
     // Check for activity (touch detected within last 500ms)
     bool activity_detected = (inactive_ms < 500);
 

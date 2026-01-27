@@ -120,6 +120,10 @@
       "_comment": "Touch calibration coefficients. Set by calibration wizard or manually."
     }
   },
+  "output": {
+    "led_on_at_start": false,
+    "_led_on_at_start_comment": "Automatically turn on the configured LED when Klipper becomes ready. Default: false."
+  },
   "ams": {
     "spool_style": "3d",
     "_spool_style_comment": "Filament spool visualization style. Options: '3d' (Bambu-style pseudo-3D canvas with gradients), 'flat' (concentric rings). Default is '3d'."
