@@ -1433,7 +1433,8 @@ void theme_apply_palette_to_widget(lv_obj_t* obj, const helix::ModePalette& pale
         lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_PART_MAIN);
         lv_obj_set_style_text_color(obj, text_primary, LV_PART_MAIN);
         lv_obj_set_style_bg_color(obj, dropdown_accent, LV_PART_SELECTED);
-        lv_obj_set_style_bg_color(obj, dropdown_accent, LV_PART_MAIN | LV_STATE_PRESSED);
+        // Note: LVGL handles pressed item styling internally via LV_PART_SELECTED with states
+        // Don't set LV_PART_MAIN | LV_STATE_PRESSED - that colors the entire list background
         return;
     }
 
@@ -1498,7 +1499,7 @@ void theme_apply_palette_to_screen_dropdowns(const helix::ModePalette& palette) 
             lv_obj_set_style_bg_color(child, dropdown_accent, LV_PART_SELECTED);
             lv_obj_set_style_bg_opa(child, LV_OPA_COVER, LV_PART_SELECTED);
             lv_obj_set_style_text_color(child, selected_text, LV_PART_SELECTED);
-            lv_obj_set_style_bg_color(child, dropdown_accent, LV_PART_MAIN | LV_STATE_PRESSED);
+            // Note: LVGL handles pressed item styling internally via LV_PART_SELECTED
         }
     }
 }
