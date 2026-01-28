@@ -26,7 +26,7 @@
 
 // Subject initialization
 #include "ui_nav_manager.h"
-#include "ui_status_bar_manager.h"
+#include "ui_notification_manager.h"
 #include "ui_wizard.h"
 
 #include "app_globals.h"

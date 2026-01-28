@@ -45,6 +45,7 @@
 #include "ui_keyboard.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
+#include "ui_notification_manager.h"
 #include "ui_panel_ams.h"
 #include "ui_panel_bed_mesh.h"
 #include "ui_panel_calibration_pid.h"
@@ -65,9 +66,9 @@
 #include "ui_panel_step_test.h"
 #include "ui_panel_temp_control.h"
 #include "ui_panel_test.h"
+#include "ui_printer_status_icon.h"
 #include "ui_settings_display.h"
 #include "ui_severity_card.h"
-#include "ui_status_bar.h"
 #include "ui_switch.h"
 #include "ui_temp_display.h"
 #include "ui_theme_editor_overlay.h"
@@ -786,7 +787,10 @@ bool Application::init_ui() {
     // Register app_layout with navigation
     ui_nav_set_app_layout(m_app_layout);
 
-    // Initialize status bar
+    // Initialize printer status icon (sets up observers on PrinterState)
+    ui_printer_status_icon_init();
+
+    // Initialize notification system (status bar without printer icon)
     ui_status_bar_init();
 
     // Initialize toast system

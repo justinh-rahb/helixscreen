@@ -84,7 +84,8 @@ TEST_PLATFORM_DEPS := $(WPA_DEPS)
 # Group 2: Files where ui_test_utils.o provides stub implementations
 # - ui_notification.o: Needs get_notification_subject() from app_globals.o
 # - ui_toast.o, ui_toast_manager.o: ui_test_utils.o provides stub toast functions
-# - ui_status_bar_manager.o: ui_test_utils.o stubs ui_status_bar_set_backdrop_visible()
+# - ui_notification_manager.o: ui_test_utils.o stubs notification functions
+# - ui_printer_status_icon.o: ui_test_utils.o stubs printer icon functions
 # - ui_text_input.o: ui_test_utils.o stubs ui_text_input_get_keyboard_hint()
 # - ui_emergency_stop.o: ui_test_utils.o stubs EmergencyStopOverlay
 #
@@ -100,7 +101,8 @@ TEST_APP_OBJS := $(filter-out \
     $(OBJ_DIR)/ui/ui_notification.o \
     $(OBJ_DIR)/ui/ui_toast.o \
     $(OBJ_DIR)/ui/ui_toast_manager.o \
-    $(OBJ_DIR)/ui/ui_status_bar_manager.o \
+    $(OBJ_DIR)/ui/ui_notification_manager.o \
+    $(OBJ_DIR)/ui/ui_printer_status_icon.o \
     $(OBJ_DIR)/ui/ui_text_input.o \
     $(OBJ_DIR)/ui/ui_emergency_stop.o \
     $(OBJ_DIR)/ui/ui_switch.o \

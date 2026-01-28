@@ -492,19 +492,16 @@ KeyboardHint ui_text_input_get_keyboard_hint(lv_obj_t* /* textarea */) {
     return KeyboardHint::TEXT;
 }
 
-// Stub for ui_status_bar functions (tests don't have status bar)
+// Stub for notification manager functions (tests don't have notification UI)
 #include "ui_notification.h"
-#include "ui_status_bar.h"
+#include "ui_notification_manager.h"
+#include "ui_printer_status_icon.h"
 
-void ui_status_bar_set_backdrop_visible(bool /* visible */) {
+void ui_notification_update(NotificationStatus /* status */) {
     // No-op in tests
 }
 
-void ui_status_bar_update_notification(NotificationStatus /* status */) {
-    // No-op in tests
-}
-
-void ui_status_bar_update_notification_count(size_t /* count */) {
+void ui_notification_update_count(size_t /* count */) {
     // No-op in tests
 }
 
@@ -586,33 +583,43 @@ lv_subject_t& get_notification_subject() {
     return s_test_notification_subject;
 }
 
-// Stub for ui_status_bar_init_subjects (creates test subjects for status bar)
-static lv_subject_t s_test_printer_icon_subject;
-static lv_subject_t s_test_network_icon_subject;
-static bool s_test_status_bar_subjects_initialized = false;
+// Stub for ui_notification_init_subjects (creates test subjects for notification badge)
+static lv_subject_t s_test_notification_count_subject;
+static bool s_test_notification_subjects_initialized = false;
 
-void ui_status_bar_init_subjects() {
-    if (!s_test_status_bar_subjects_initialized) {
-        lv_subject_init_int(&s_test_printer_icon_subject, 0);
-        lv_subject_init_int(&s_test_network_icon_subject, 0);
-        s_test_status_bar_subjects_initialized = true;
-        spdlog::debug("[Test Stub] ui_status_bar_init_subjects: subjects initialized");
+void ui_notification_init_subjects() {
+    if (!s_test_notification_subjects_initialized) {
+        lv_subject_init_int(&s_test_notification_count_subject, 0);
+        s_test_notification_subjects_initialized = true;
+        spdlog::debug("[Test Stub] ui_notification_init_subjects: subjects initialized");
     }
 }
 
-void ui_status_bar_deinit_subjects() {
-    if (s_test_status_bar_subjects_initialized) {
-        lv_subject_deinit(&s_test_printer_icon_subject);
-        lv_subject_deinit(&s_test_network_icon_subject);
-        s_test_status_bar_subjects_initialized = false;
-        spdlog::debug("[Test Stub] ui_status_bar_deinit_subjects: subjects deinitialized");
+void ui_notification_deinit_subjects() {
+    if (s_test_notification_subjects_initialized) {
+        lv_subject_deinit(&s_test_notification_count_subject);
+        s_test_notification_subjects_initialized = false;
+        spdlog::debug("[Test Stub] ui_notification_deinit_subjects: subjects deinitialized");
     }
 }
 
-void ui_status_bar_register_callbacks() {
-    spdlog::debug("[Test Stub] ui_status_bar_register_callbacks: no-op in tests");
+void ui_notification_register_callbacks() {
+    spdlog::debug("[Test Stub] ui_notification_register_callbacks: no-op in tests");
 }
 
-void ui_status_bar_init() {
-    spdlog::debug("[Test Stub] ui_status_bar_init: no-op in tests");
+void ui_notification_manager_init() {
+    spdlog::debug("[Test Stub] ui_notification_manager_init: no-op in tests");
+}
+
+// Stub for PrinterStatusIcon functions
+void ui_printer_status_icon_init_subjects() {
+    spdlog::debug("[Test Stub] ui_printer_status_icon_init_subjects: no-op in tests");
+}
+
+void ui_printer_status_icon_init() {
+    spdlog::debug("[Test Stub] ui_printer_status_icon_init: no-op in tests");
+}
+
+void ui_printer_status_icon_deinit_subjects() {
+    spdlog::debug("[Test Stub] ui_printer_status_icon_deinit_subjects: no-op in tests");
 }

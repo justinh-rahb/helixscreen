@@ -259,6 +259,16 @@ class NavigationManager {
      */
     void deinit_subjects();
 
+    /**
+     * @brief Set overlay backdrop visibility
+     *
+     * Updates the overlay_backdrop_visible subject which controls the
+     * modal dimming backdrop visibility via XML binding.
+     *
+     * @param visible true to show backdrop, false to hide
+     */
+    void set_backdrop_visible(bool visible);
+
   private:
     // Private constructor/destructor for singleton
     NavigationManager() = default;
@@ -343,6 +353,9 @@ class NavigationManager {
     // Subject management via RAII
     SubjectManager subjects_;
     bool subjects_initialized_ = false;
+
+    // Overlay backdrop visibility subject (for modal dimming)
+    lv_subject_t overlay_backdrop_visible_subject_{};
 };
 
 // ============================================================================

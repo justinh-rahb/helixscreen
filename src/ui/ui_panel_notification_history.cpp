@@ -5,9 +5,9 @@
 
 #include "ui_event_safety.h"
 #include "ui_nav.h"
+#include "ui_notification_manager.h"
 #include "ui_panel_common.h"
 #include "ui_severity_card.h"
-#include "ui_status_bar.h"
 #include "ui_subject_registry.h"
 
 #include "app_globals.h"

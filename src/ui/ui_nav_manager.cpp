@@ -7,7 +7,6 @@
 #include "ui_event_safety.h"
 #include "ui_fonts.h"
 #include "ui_panel_base.h"
-#include "ui_status_bar.h"
 #include "ui_update_queue.h"
 
 #include "app_globals.h"
@@ -101,7 +100,7 @@ void NavigationManager::clear_overlay_stack() {
 
     // Hide primary backdrop
     if (overlay_backdrop_) {
-        ui_status_bar_set_backdrop_visible(false);
+        set_backdrop_visible(false);
     }
 
     spdlog::debug("[NavigationManager] Overlay stack cleared (connection gating)");
@@ -503,7 +502,7 @@ void NavigationManager::switch_to_panel_impl(int panel_id) {
 
     // Hide primary backdrop since all overlays are being cleared
     if (overlay_backdrop_) {
-        ui_status_bar_set_backdrop_visible(false);
+        set_backdrop_visible(false);
     }
 
     // Show the clicked panel
@@ -532,6 +531,10 @@ void NavigationManager::init() {
     spdlog::debug("[NavigationManager] Initializing navigation reactive subjects...");
 
     UI_MANAGED_SUBJECT_INT(active_panel_subject_, UI_PANEL_HOME, "active_panel", subjects_);
+
+    // Overlay backdrop starts hidden
+    UI_MANAGED_SUBJECT_INT(overlay_backdrop_visible_subject_, 0, "overlay_backdrop_visible",
+                           subjects_);
 
     active_panel_observer_ = observe_int_sync<NavigationManager>(
         &active_panel_subject_, this,
@@ -827,7 +830,7 @@ void NavigationManager::push_overlay(lv_obj_t* overlay_panel, bool hide_previous
         lv_obj_t* screen = lv_obj_get_screen(overlay_panel);
         if (screen) {
             if (is_first_overlay && mgr.overlay_backdrop_) {
-                ui_status_bar_set_backdrop_visible(true);
+                mgr.set_backdrop_visible(true);
                 lv_obj_move_foreground(mgr.overlay_backdrop_);
             } else if (!is_first_overlay) {
                 lv_obj_t* backdrop =
@@ -967,7 +970,7 @@ bool NavigationManager::go_back() {
 
         // Hide backdrop if no more overlays
         if (mgr.panel_stack_.size() <= 1 && mgr.overlay_backdrop_) {
-            ui_status_bar_set_backdrop_visible(false);
+            mgr.set_backdrop_visible(false);
         }
 
         // Fallback to home if empty
@@ -1037,6 +1040,17 @@ void NavigationManager::shutdown() {
     panel_stack_.clear();
 
     spdlog::debug("[NavigationManager] Shutdown complete");
+}
+
+void NavigationManager::set_backdrop_visible(bool visible) {
+    if (!subjects_initialized_) {
+        spdlog::warn(
+            "[NavigationManager] Subjects not initialized, cannot set backdrop visibility");
+        return;
+    }
+
+    lv_subject_set_int(&overlay_backdrop_visible_subject_, visible ? 1 : 0);
+    spdlog::trace("[NavigationManager] Overlay backdrop visibility set to: {}", visible);
 }
 
 void NavigationManager::deinit_subjects() {

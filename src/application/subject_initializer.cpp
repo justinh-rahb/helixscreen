@@ -10,6 +10,7 @@
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
 #include "ui_notification.h"
+#include "ui_notification_manager.h"
 #include "ui_overlay_retraction_settings.h"
 #include "ui_overlay_timelapse_settings.h"
 #include "ui_panel_advanced.h"
@@ -31,7 +32,7 @@
 #include "ui_panel_settings.h"
 #include "ui_panel_spoolman.h"
 #include "ui_panel_temp_control.h"
-#include "ui_status_bar.h"
+#include "ui_printer_status_icon.h"
 #include "ui_wizard.h"
 
 #include "abort_manager.h"
@@ -113,9 +114,10 @@ void SubjectInitializer::init_post(const RuntimeConfig& runtime_config) {
 
 void SubjectInitializer::init_core_subjects() {
     spdlog::trace("[SubjectInitializer] Initializing core subjects");
-    app_globals_init_subjects();   // Global subjects (notification subject, etc.)
-    ui_nav_init();                 // Navigation system (icon colors, active panel)
-    ui_status_bar_init_subjects(); // Status bar subjects (printer/network icon states)
+    app_globals_init_subjects();            // Global subjects (notification subject, etc.)
+    ui_nav_init();                          // Navigation system (icon colors, active panel)
+    ui_printer_status_icon_init_subjects(); // Printer icon state
+    ui_status_bar_init_subjects();          // Notification badge subjects
 }
 
 void SubjectInitializer::init_printer_state_subjects() {
@@ -219,6 +221,8 @@ void SubjectInitializer::init_panel_subjects(MoonrakerAPI* api) {
     StaticSubjectRegistry::instance().register_deinit("XmlSubjects", helix::deinit_xml_subjects);
 
     // UI component subjects cleanup (StaticPanelRegistry - UI components)
+    StaticPanelRegistry::instance().register_destroy("PrinterStatusIconSubjects",
+                                                     ui_printer_status_icon_deinit_subjects);
     StaticPanelRegistry::instance().register_destroy("StatusBarSubjects",
                                                      ui_status_bar_deinit_subjects);
 
