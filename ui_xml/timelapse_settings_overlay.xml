@@ -25,8 +25,8 @@
       <!-- ================================================================== -->
       <setting_dropdown_row name="row_timelapse_mode"
                             label="Recording Mode" icon="layers"
-                            description="Choose how frames are captured during printing"
-                            options="Layer&#10;Hyperlapse" callback="on_timelapse_mode_changed"/>
+                            description="Choose how frames are captured during printing" options="Layer&#10;Hyperlapse"
+                            callback="on_timelapse_mode_changed"/>
       <!-- Mode info box -->
       <lv_obj name="mode_info_container"
               width="100%" height="content" style_bg_color="#panel_bg" style_radius="#border_radius"

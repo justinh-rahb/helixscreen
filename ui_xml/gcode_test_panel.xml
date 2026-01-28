@@ -21,8 +21,7 @@
                       style_text_color="#text_muted" style_text_font="#font_small" style_pad_right="#space_md"/>
             <lv_slider name="specular_slider" flex_grow="1" min_value="0" max_value="20" value="5"/>
             <lv_label name="specular_value_label"
-                      text="0.05" style_text_color="#text" style_text_font="#font_small"
-                      style_pad_left="#space_md"/>
+                      text="0.05" style_text_color="#text" style_text_font="#font_small" style_pad_left="#space_md"/>
           </lv_obj>
           <!-- Shininess -->
           <lv_obj height="content"
