@@ -35,10 +35,15 @@
 #include "ui_wizard.h"
 
 #include "abort_manager.h"
+#include "accel_sensor_manager.h"
 #include "active_print_media_manager.h"
 #include "ams_state.h"
 #include "app_globals.h"
+#include "color_sensor_manager.h"
 #include "filament_sensor_manager.h"
+#include "humidity_sensor_manager.h"
+#include "probe_sensor_manager.h"
+#include "width_sensor_manager.h"
 #include "lvgl/lvgl.h"
 #include "print_completion.h"
 #include "print_start_navigation.h"
@@ -150,6 +155,32 @@ void SubjectInitializer::init_ams_subjects() {
     // Register FilamentSensorManager cleanup (StaticSubjectRegistry - core state singleton)
     StaticSubjectRegistry::instance().register_deinit("FilamentSensorManager", []() {
         helix::FilamentSensorManager::instance().deinit_subjects();
+    });
+
+    // Initialize additional sensor manager subjects BEFORE panels so XML bindings can work
+    helix::sensors::HumiditySensorManager::instance().init_subjects();
+    StaticSubjectRegistry::instance().register_deinit("HumiditySensorManager", []() {
+        helix::sensors::HumiditySensorManager::instance().deinit_subjects();
+    });
+
+    helix::sensors::WidthSensorManager::instance().init_subjects();
+    StaticSubjectRegistry::instance().register_deinit("WidthSensorManager", []() {
+        helix::sensors::WidthSensorManager::instance().deinit_subjects();
+    });
+
+    helix::sensors::ProbeSensorManager::instance().init_subjects();
+    StaticSubjectRegistry::instance().register_deinit("ProbeSensorManager", []() {
+        helix::sensors::ProbeSensorManager::instance().deinit_subjects();
+    });
+
+    helix::sensors::AccelSensorManager::instance().init_subjects();
+    StaticSubjectRegistry::instance().register_deinit("AccelSensorManager", []() {
+        helix::sensors::AccelSensorManager::instance().deinit_subjects();
+    });
+
+    helix::sensors::ColorSensorManager::instance().init_subjects();
+    StaticSubjectRegistry::instance().register_deinit("ColorSensorManager", []() {
+        helix::sensors::ColorSensorManager::instance().deinit_subjects();
     });
 }
 
