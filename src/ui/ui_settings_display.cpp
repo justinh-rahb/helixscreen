@@ -866,14 +866,8 @@ void DisplaySettingsOverlay::show_theme_preview(lv_obj_t* parent_screen) {
     // Register callbacks (idempotent - safe to call multiple times)
     register_callbacks();
 
-    // Use the same flow as handle_theme_settings_clicked()
+    // handle_theme_settings_clicked() creates, initializes, and pushes the overlay
     handle_theme_settings_clicked();
-
-    // Show and push the overlay (handle_theme_settings_clicked creates it hidden)
-    if (theme_explorer_overlay_) {
-        lv_obj_remove_flag(theme_explorer_overlay_, LV_OBJ_FLAG_HIDDEN);
-        ui_nav_push_overlay(theme_explorer_overlay_);
-    }
 }
 
 } // namespace helix::settings
