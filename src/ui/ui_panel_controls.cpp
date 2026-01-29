@@ -30,6 +30,7 @@
 #include "static_panel_registry.h"
 #include "subject_managed_panel.h"
 #include "theme_manager.h"
+#include "ui/ui_event_trampoline.h"
 
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
@@ -1331,218 +1332,48 @@ void ControlsPanel::handle_calibration_motors() {
 // V2 CARD CLICK TRAMPOLINES (XML event_cb - use global accessor)
 // ============================================================================
 
-void ControlsPanel::on_quick_actions_clicked(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_quick_actions_clicked");
-    (void)e;
-    get_global_controls_panel().handle_quick_actions_clicked();
-    LVGL_SAFE_EVENT_CB_END();
-}
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, quick_actions_clicked)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, temperatures_clicked)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, nozzle_temp_clicked)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, bed_temp_clicked)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, cooling_clicked)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, secondary_fans_clicked)
 
-void ControlsPanel::on_temperatures_clicked(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_temperatures_clicked");
-    (void)e;
-    get_global_controls_panel().handle_temperatures_clicked();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_nozzle_temp_clicked(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_nozzle_temp_clicked");
-    (void)e;
-    get_global_controls_panel().handle_nozzle_temp_clicked();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_bed_temp_clicked(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_bed_temp_clicked");
-    (void)e;
-    get_global_controls_panel().handle_bed_temp_clicked();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_cooling_clicked(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_cooling_clicked");
-    (void)e;
-    get_global_controls_panel().handle_cooling_clicked();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_secondary_fans_clicked(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_secondary_fans_clicked");
-    (void)e;
-    get_global_controls_panel().handle_secondary_fans_clicked();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_motors_confirm(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_motors_confirm");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_motors_confirm();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_motors_cancel(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_motors_cancel");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_motors_cancel();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_save_z_offset_confirm(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_save_z_offset_confirm");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_save_z_offset_confirm();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_save_z_offset_cancel(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_save_z_offset_cancel");
-    auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-    if (self) {
-        self->handle_save_z_offset_cancel();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
+PANEL_TRAMPOLINE_USERDATA(ControlsPanel, motors_confirm)
+PANEL_TRAMPOLINE_USERDATA(ControlsPanel, motors_cancel)
+PANEL_TRAMPOLINE_USERDATA(ControlsPanel, save_z_offset_confirm)
+PANEL_TRAMPOLINE_USERDATA(ControlsPanel, save_z_offset_cancel)
 
 // ============================================================================
 // CALIBRATION BUTTON TRAMPOLINES (XML event_cb - use global accessor)
 // ============================================================================
 
-void ControlsPanel::on_calibration_bed_mesh(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_calibration_bed_mesh");
-    (void)e;
-    get_global_controls_panel().handle_calibration_bed_mesh();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_calibration_zoffset(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_calibration_zoffset");
-    (void)e;
-    get_global_controls_panel().handle_calibration_zoffset();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_calibration_screws(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_calibration_screws");
-    (void)e;
-    get_global_controls_panel().handle_calibration_screws();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_calibration_motors(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_calibration_motors");
-    (void)e;
-    get_global_controls_panel().handle_calibration_motors();
-    LVGL_SAFE_EVENT_CB_END();
-}
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, calibration_bed_mesh)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, calibration_zoffset)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, calibration_screws)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, calibration_motors)
 
 // ============================================================================
 // V2 BUTTON TRAMPOLINES (XML event_cb - use global accessor)
 // ============================================================================
 
-void ControlsPanel::on_home_all(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_home_all");
-    (void)e;
-    get_global_controls_panel().handle_home_all();
-    LVGL_SAFE_EVENT_CB_END();
-}
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, home_all)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, home_xy)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, home_z)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, qgl)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, z_tilt)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, macro_1)
 
-void ControlsPanel::on_home_xy(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_home_xy");
-    (void)e;
-    get_global_controls_panel().handle_home_xy();
-    LVGL_SAFE_EVENT_CB_END();
-}
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, macro_2)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, macro_3)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, macro_4)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, speed_up)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, speed_down)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, flow_up)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, flow_down)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, zoffset_tune)
 
-void ControlsPanel::on_home_z(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_home_z");
-    (void)e;
-    get_global_controls_panel().handle_home_z();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_qgl(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_qgl");
-    (void)e;
-    get_global_controls_panel().handle_qgl();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_z_tilt(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_z_tilt");
-    (void)e;
-    get_global_controls_panel().handle_z_tilt();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_macro_1(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_macro_1");
-    (void)e;
-    get_global_controls_panel().handle_macro_1();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_macro_2(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_macro_2");
-    (void)e;
-    get_global_controls_panel().handle_macro_2();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_macro_3(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_macro_3");
-    (void)e;
-    get_global_controls_panel().handle_macro_3();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_macro_4(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_macro_4");
-    (void)e;
-    get_global_controls_panel().handle_macro_4();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_speed_up(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_speed_up");
-    (void)e;
-    get_global_controls_panel().handle_speed_up();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_speed_down(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_speed_down");
-    (void)e;
-    get_global_controls_panel().handle_speed_down();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_flow_up(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_flow_up");
-    (void)e;
-    get_global_controls_panel().handle_flow_up();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_flow_down(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_flow_down");
-    (void)e;
-    get_global_controls_panel().handle_flow_down();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void ControlsPanel::on_zoffset_tune(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_zoffset_tune");
-    (void)e;
-    get_global_controls_panel().handle_zoffset_tune();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
+// Cannot use macro - has extra logic to extract slider value
 void ControlsPanel::on_fan_slider_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_fan_slider_changed");
     auto* slider = static_cast<lv_obj_t*>(lv_event_get_target(e));
@@ -1551,12 +1382,7 @@ void ControlsPanel::on_fan_slider_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void ControlsPanel::on_save_z_offset(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[ControlsPanel] on_save_z_offset");
-    (void)e;
-    get_global_controls_panel().handle_save_z_offset();
-    LVGL_SAFE_EVENT_CB_END();
-}
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, save_z_offset)
 
 // ============================================================================
 // OBSERVER CALLBACKS (Static - only for complex cases not using factory)

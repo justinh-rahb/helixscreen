@@ -5,6 +5,10 @@
 
 #include "lvgl.h"
 
+#include <spdlog/spdlog.h>
+
+#include <exception>
+
 /**
  * @file ui_event_trampoline.h
  * @brief Macros to reduce boilerplate for LVGL event callback trampolines
@@ -72,4 +76,75 @@
     static void callback_name(lv_event_t* e) {                                                     \
         auto& self = getter_func();                                                                \
         self.handler_method(e);                                                                    \
+    }
+
+// =============================================================================
+// PANEL TRAMPOLINE MACROS (with exception safety)
+// =============================================================================
+// These macros combine the trampoline pattern with LVGL_SAFE_EVENT_CB_BEGIN/END
+// for use in panel classes. They reduce the common 5-line pattern to a single line.
+
+/**
+ * @brief Define a panel trampoline for XML event callbacks using global accessor
+ *
+ * Replaces the repetitive pattern:
+ *   void PanelClass::on_foo_clicked(lv_event_t* e) {
+ *       LVGL_SAFE_EVENT_CB_BEGIN("[PanelClass] on_foo_clicked");
+ *       (void)e;
+ *       get_global_panel().handle_foo_clicked();
+ *       LVGL_SAFE_EVENT_CB_END();
+ *   }
+ *
+ * With a single line:
+ *   PANEL_TRAMPOLINE(PanelClass, get_global_panel, foo_clicked)
+ *
+ * Naming convention: callback is on_<name>, handler is handle_<name>
+ *
+ * @param PanelClass The panel class type
+ * @param getter_func Global accessor function that returns PanelClass&
+ * @param name Base name without on_/handle_ prefix (e.g., "foo_clicked")
+ */
+#define PANEL_TRAMPOLINE(PanelClass, getter_func, name)                                            \
+    void PanelClass::on_##name(lv_event_t* e) {                                                    \
+        try {                                                                                      \
+            (void)e;                                                                               \
+            getter_func().handle_##name();                                                         \
+        } catch (const std::exception& ex) {                                                       \
+            spdlog::error("[" #PanelClass "] Exception in on_" #name ": {}", ex.what());           \
+        } catch (...) {                                                                            \
+            spdlog::error("[" #PanelClass "] Unknown exception in on_" #name);                     \
+        }                                                                                          \
+    }
+
+/**
+ * @brief Define a panel trampoline using user_data for instance lookup
+ *
+ * Replaces the pattern used for modal/dialog callbacks:
+ *   void PanelClass::on_foo_confirm(lv_event_t* e) {
+ *       LVGL_SAFE_EVENT_CB_BEGIN("[PanelClass] on_foo_confirm");
+ *       auto* self = static_cast<PanelClass*>(lv_event_get_user_data(e));
+ *       if (self) { self->handle_foo_confirm(); }
+ *       LVGL_SAFE_EVENT_CB_END();
+ *   }
+ *
+ * With a single line:
+ *   PANEL_TRAMPOLINE_USERDATA(PanelClass, foo_confirm)
+ *
+ * @param PanelClass The panel class type
+ * @param name Base name without on_/handle_ prefix
+ */
+#define PANEL_TRAMPOLINE_USERDATA(PanelClass, name)                                                \
+    void PanelClass::on_##name(lv_event_t* e) {                                                    \
+        try {                                                                                      \
+            if (!e)                                                                                \
+                return;                                                                            \
+            auto* self = static_cast<PanelClass*>(lv_event_get_user_data(e));                      \
+            if (self) {                                                                            \
+                self->handle_##name();                                                             \
+            }                                                                                      \
+        } catch (const std::exception& ex) {                                                       \
+            spdlog::error("[" #PanelClass "] Exception in on_" #name ": {}", ex.what());           \
+        } catch (...) {                                                                            \
+            spdlog::error("[" #PanelClass "] Unknown exception in on_" #name);                     \
+        }                                                                                          \
     }
