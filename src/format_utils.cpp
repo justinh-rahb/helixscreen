@@ -139,4 +139,40 @@ std::string duration_padded(int total_seconds) {
     return std::string(buf);
 }
 
+HeaterDisplayResult heater_display(int current_centi, int target_centi) {
+    HeaterDisplayResult result;
+
+    // Convert centi-degrees to degrees (integer division is fine for display)
+    int current_deg = current_centi / 100;
+    int target_deg = target_centi / 100;
+
+    // Format temperature string
+    char buf[32];
+    if (target_centi > 0) {
+        std::snprintf(buf, sizeof(buf), "%d / %d°C", current_deg, target_deg);
+    } else {
+        std::snprintf(buf, sizeof(buf), "%d°C", current_deg);
+    }
+    result.temp = buf;
+
+    // Calculate percentage (clamped to 0-100)
+    if (target_centi <= 0) {
+        result.pct = 0;
+    } else {
+        int pct = (current_centi * 100) / target_centi;
+        result.pct = std::clamp(pct, 0, 100);
+    }
+
+    // Determine status
+    if (target_centi <= 0) {
+        result.status = "Off";
+    } else if (result.pct >= 98) {
+        result.status = "Ready";
+    } else {
+        result.status = "Heating...";
+    }
+
+    return result;
+}
+
 } // namespace helix::fmt

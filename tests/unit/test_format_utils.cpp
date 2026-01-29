@@ -298,3 +298,77 @@ TEST_CASE("duration_padded() zero-pads minutes for hours", "[format_utils][durat
         REQUIRE(duration_padded(7200) == "2h 00m");
     }
 }
+
+// ============================================================================
+// heater_display() tests
+// ============================================================================
+
+TEST_CASE("heater_display() cold heater shows temperature only", "[format_utils][heater_display]") {
+    // 2500 centi-degrees = 25.00°C, target 0 = off
+    auto result = heater_display(2500, 0);
+    REQUIRE(result.temp == "25°C");
+    REQUIRE(result.status == "Off");
+    REQUIRE(result.pct == 0);
+}
+
+TEST_CASE("heater_display() heating shows current/target and percentage",
+          "[format_utils][heater_display]") {
+    // 15000 centi = 150°C, target 20000 centi = 200°C -> 75%
+    auto result = heater_display(15000, 20000);
+    REQUIRE(result.temp == "150 / 200°C");
+    REQUIRE(result.status == "Heating...");
+    REQUIRE(result.pct == 75);
+}
+
+TEST_CASE("heater_display() at temperature shows Ready", "[format_utils][heater_display]") {
+    // 19800 centi = 198°C / 20000 centi = 200°C target -> 99%
+    auto result = heater_display(19800, 20000);
+    REQUIRE(result.temp == "198 / 200°C");
+    REQUIRE(result.status == "Ready");
+    REQUIRE(result.pct == 99);
+}
+
+TEST_CASE("heater_display() percentage clamps to 0-100", "[format_utils][heater_display]") {
+    SECTION("over target clamps to 100") {
+        // 21000 centi = 210°C with 200°C target -> should clamp to 100%
+        auto result = heater_display(21000, 20000);
+        REQUIRE(result.pct == 100);
+        REQUIRE(result.status == "Ready");
+    }
+
+    SECTION("negative temperature clamps to 0") {
+        // Edge case: negative temp (shouldn't happen but be safe)
+        auto result = heater_display(-100, 20000);
+        REQUIRE(result.pct == 0);
+    }
+}
+
+TEST_CASE("heater_display() edge cases", "[format_utils][heater_display]") {
+    SECTION("exactly at 98% threshold shows Ready") {
+        // 19600 / 20000 = 98%
+        auto result = heater_display(19600, 20000);
+        REQUIRE(result.pct == 98);
+        REQUIRE(result.status == "Ready");
+    }
+
+    SECTION("just below 98% threshold shows Heating") {
+        // 19400 / 20000 = 97%
+        auto result = heater_display(19400, 20000);
+        REQUIRE(result.pct == 97);
+        REQUIRE(result.status == "Heating...");
+    }
+
+    SECTION("very low target temperature") {
+        // 4000 centi = 40°C with 50°C target
+        auto result = heater_display(4000, 5000);
+        REQUIRE(result.temp == "40 / 50°C");
+        REQUIRE(result.pct == 80);
+    }
+
+    SECTION("zero current temperature") {
+        auto result = heater_display(0, 20000);
+        REQUIRE(result.temp == "0 / 200°C");
+        REQUIRE(result.pct == 0);
+        REQUIRE(result.status == "Heating...");
+    }
+}

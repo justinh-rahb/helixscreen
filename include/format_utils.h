@@ -72,4 +72,35 @@ size_t duration_to_buffer(char* buf, size_t buf_size, int total_seconds);
  */
 std::string duration_padded(int total_seconds);
 
+/**
+ * @brief Result of formatting a heater display
+ *
+ * Contains all the information needed to display a heater status:
+ * - temp: formatted temperature string (e.g., "150°C" or "150 / 200°C")
+ * - status: semantic status ("Off", "Heating...", or "Ready")
+ * - pct: percentage towards target (0-100, clamped)
+ */
+struct HeaterDisplayResult {
+    std::string temp;
+    std::string status;
+    int pct;
+};
+
+/**
+ * @brief Format heater display information from centi-degree values
+ *
+ * Takes current and target temperatures in centi-degrees (100 = 1°C) and
+ * produces a consistent display result used across all heater displays.
+ *
+ * Status logic:
+ * - target <= 0: "Off"
+ * - pct >= 98: "Ready"
+ * - else: "Heating..."
+ *
+ * @param current_centi Current temperature in centi-degrees
+ * @param target_centi Target temperature in centi-degrees (0 = off)
+ * @return HeaterDisplayResult with formatted temp, status, and percentage
+ */
+HeaterDisplayResult heater_display(int current_centi, int target_centi);
+
 } // namespace helix::fmt
