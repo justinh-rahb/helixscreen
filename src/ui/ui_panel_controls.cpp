@@ -20,7 +20,6 @@
 #include "ui_panel_temp_control.h"
 #include "ui_position_utils.h"
 #include "ui_subject_registry.h"
-#include "ui_temperature_utils.h"
 
 #include "app_globals.h"
 #include "format_utils.h"
@@ -50,7 +49,6 @@ class ExtrusionPanel;
 ExtrusionPanel& get_global_extrusion_panel();
 
 using helix::ui::position::format_position;
-using helix::ui::temperature::centi_to_degrees_f;
 
 // ============================================================================
 // CONSTRUCTOR
@@ -472,64 +470,26 @@ void ControlsPanel::register_observers() {
 // ============================================================================
 
 void ControlsPanel::update_nozzle_temp_display() {
-    float current = centi_to_degrees_f(cached_extruder_temp_);
-    float target = centi_to_degrees_f(cached_extruder_target_);
+    auto result = helix::fmt::heater_display(cached_extruder_temp_, cached_extruder_target_);
 
-    // HERO display: Large temperature value
-    if (cached_extruder_target_ > 0) {
-        std::snprintf(nozzle_temp_buf_, sizeof(nozzle_temp_buf_), "%.0f / %.0f°C", current, target);
-    } else {
-        std::snprintf(nozzle_temp_buf_, sizeof(nozzle_temp_buf_), "%.0f°C", current);
-    }
+    std::snprintf(nozzle_temp_buf_, sizeof(nozzle_temp_buf_), "%s", result.temp.c_str());
     lv_subject_copy_string(&nozzle_temp_subject_, nozzle_temp_buf_);
 
-    // Compute percentage for progress bar (0-100)
-    int pct = 0;
-    if (cached_extruder_target_ > 0) {
-        pct = (cached_extruder_temp_ * 100) / cached_extruder_target_;
-        pct = std::clamp(pct, 0, 100);
-    }
-    lv_subject_set_int(&nozzle_pct_subject_, pct);
+    lv_subject_set_int(&nozzle_pct_subject_, result.pct);
 
-    // Status text with semantic meaning
-    if (cached_extruder_target_ <= 0) {
-        std::snprintf(nozzle_status_buf_, sizeof(nozzle_status_buf_), "Off");
-    } else if (pct >= 98) {
-        std::snprintf(nozzle_status_buf_, sizeof(nozzle_status_buf_), "Ready");
-    } else {
-        std::snprintf(nozzle_status_buf_, sizeof(nozzle_status_buf_), "Heating...");
-    }
+    std::snprintf(nozzle_status_buf_, sizeof(nozzle_status_buf_), "%s", result.status.c_str());
     lv_subject_copy_string(&nozzle_status_subject_, nozzle_status_buf_);
 }
 
 void ControlsPanel::update_bed_temp_display() {
-    float current = centi_to_degrees_f(cached_bed_temp_);
-    float target = centi_to_degrees_f(cached_bed_target_);
+    auto result = helix::fmt::heater_display(cached_bed_temp_, cached_bed_target_);
 
-    // HERO display: Large temperature value
-    if (cached_bed_target_ > 0) {
-        std::snprintf(bed_temp_buf_, sizeof(bed_temp_buf_), "%.0f / %.0f°C", current, target);
-    } else {
-        std::snprintf(bed_temp_buf_, sizeof(bed_temp_buf_), "%.0f°C", current);
-    }
+    std::snprintf(bed_temp_buf_, sizeof(bed_temp_buf_), "%s", result.temp.c_str());
     lv_subject_copy_string(&bed_temp_subject_, bed_temp_buf_);
 
-    // Compute percentage for progress bar
-    int pct = 0;
-    if (cached_bed_target_ > 0) {
-        pct = (cached_bed_temp_ * 100) / cached_bed_target_;
-        pct = std::clamp(pct, 0, 100);
-    }
-    lv_subject_set_int(&bed_pct_subject_, pct);
+    lv_subject_set_int(&bed_pct_subject_, result.pct);
 
-    // Status text with semantic meaning
-    if (cached_bed_target_ <= 0) {
-        std::snprintf(bed_status_buf_, sizeof(bed_status_buf_), "Off");
-    } else if (pct >= 98) {
-        std::snprintf(bed_status_buf_, sizeof(bed_status_buf_), "Ready");
-    } else {
-        std::snprintf(bed_status_buf_, sizeof(bed_status_buf_), "Heating...");
-    }
+    std::snprintf(bed_status_buf_, sizeof(bed_status_buf_), "%s", result.status.c_str());
     lv_subject_copy_string(&bed_status_subject_, bed_status_buf_);
 }
 
