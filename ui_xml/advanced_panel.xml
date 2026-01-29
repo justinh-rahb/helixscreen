@@ -20,7 +20,7 @@
                  width="100%" height="#button_height_normal" style_radius="#border_radius" style_border_width="0"
                  style_bg_color="#danger" flex_flow="row" style_flex_main_place="center" style_flex_cross_place="center"
                  style_pad_gap="#space_md">
-        <icon src="alert_octagon" size="md" color="#text"/>
+        <icon src="alert_octagon" size="md" variant="text"/>
         <text_body text="Emergency Stop (M112)"/>
         <event_cb trigger="clicked" callback="advanced_estop_clicked"/>
       </lv_button>
@@ -35,7 +35,7 @@
                  height="#button_height_sm" flex_grow="1" style_radius="#border_radius" style_border_width="0"
                  style_bg_color="#warning" style_pad_ver="#button_padding" flex_flow="row"
                  style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
-        <icon src="refresh" size="sm" color="#text"/>
+        <icon src="refresh" size="sm" variant="text"/>
         <text_body text="Restart Klipper"/>
         <event_cb trigger="clicked" callback="advanced_restart_klipper_clicked"/>
       </lv_button>

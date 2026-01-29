@@ -16,7 +16,7 @@
               style_pad_right="#space_lg" style_pad_top="#space_lg" style_pad_bottom="#space_lg" flex_flow="column"
               style_flex_cross_place="center" style_pad_gap="#space_md">
         <!-- Warning icon -->
-        <icon src="alert_octagon" size="lg" color="#danger"/>
+        <icon src="alert_octagon" size="lg" variant="danger"/>
         <!-- Title -->
         <text_heading width="100%" text="Emergency Stop?" style_text_align="center"/>
         <!-- Warning message -->

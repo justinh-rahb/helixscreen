@@ -26,14 +26,14 @@
           <lv_obj width="100%"
                   height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" flex_flow="row"
                   style_flex_main_place="center" style_flex_cross_place="center" scrollable="false">
-            <icon src="sine_wave" size="lg" color="#primary"/>
+            <icon src="sine_wave" size="lg" variant="primary"/>
             <!-- Spacer to push help button right -->
             <lv_obj height="1" flex_grow="1" style_bg_opa="0" style_border_width="0" scrollable="false"/>
             <!-- Help button -->
             <lv_button name="btn_help"
                        width="36" height="36" style_radius="#space_lg" style_border_width="0" style_bg_color="#app_bg"
                        style_bg_opa="128" style_pad_all="0">
-              <icon src="help_circle" size="sm" color="#text_muted"/>
+              <icon src="help_circle" size="sm" variant="muted"/>
               <event_cb trigger="clicked" callback="input_shaper_help_cb"/>
             </lv_button>
           </lv_obj>
@@ -49,7 +49,7 @@
                      height="72" flex_grow="1" style_radius="#border_radius" style_border_width="0"
                      style_bg_color="#primary" flex_flow="column" style_flex_main_place="center"
                      style_flex_cross_place="center" style_pad_gap="#space_xs">
-            <icon src="axis_x_arrow" size="md" color="#text"/>
+            <icon src="axis_x_arrow" size="md" variant="text"/>
             <text_body text="Calibrate X"/>
             <event_cb trigger="clicked" callback="input_shaper_calibrate_x_cb"/>
           </lv_button>
@@ -58,7 +58,7 @@
                      height="72" flex_grow="1" style_radius="#border_radius" style_border_width="0"
                      style_bg_color="#primary" flex_flow="column" style_flex_main_place="center"
                      style_flex_cross_place="center" style_pad_gap="#space_xs">
-            <icon src="axis_y_arrow" size="md" color="#text"/>
+            <icon src="axis_y_arrow" size="md" variant="text"/>
             <text_body text="Calibrate Y"/>
             <event_cb trigger="clicked" callback="input_shaper_calibrate_y_cb"/>
           </lv_button>
@@ -96,7 +96,7 @@
                    width="100%" height="#button_height_normal" style_radius="#border_radius" style_border_width="1"
                    style_border_color="#text_muted" style_bg_color="#app_bg" flex_flow="row"
                    style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm">
-          <icon src="close" size="sm" color="#danger"/>
+          <icon src="close" size="sm" variant="danger"/>
           <text_body text="Cancel"/>
           <event_cb trigger="clicked" callback="input_shaper_cancel_cb"/>
         </lv_button>
@@ -207,7 +207,7 @@
                      height="#button_height_normal" flex_grow="1" style_radius="#border_radius" style_border_width="0"
                      style_bg_color="#success" flex_flow="row" style_flex_main_place="center"
                      style_flex_cross_place="center" style_pad_gap="#space_sm">
-            <icon src="check" size="sm" color="#text"/>
+            <icon src="check" size="sm" variant="text"/>
             <text_body text="Apply"/>
             <event_cb trigger="clicked" callback="input_shaper_apply_cb"/>
           </lv_button>
@@ -250,7 +250,7 @@
                 style_border_width="1" style_border_color="#danger" style_pad_all="#space_lg" flex_flow="column"
                 style_flex_main_place="center" style_flex_cross_place="center" style_pad_gap="#space_sm"
                 scrollable="false">
-          <icon src="alert" size="lg" color="#danger"/>
+          <icon src="alert" size="lg" variant="danger"/>
           <text_heading text="Calibration Failed" style_text_align="center" style_text_color="#danger"/>
           <text_body name="error_message"
                      text="An error occurred during calibration." style_text_align="center"
@@ -283,7 +283,7 @@
                      height="#button_height_normal" flex_grow="1" style_radius="#border_radius" style_border_width="0"
                      style_bg_color="#primary" flex_flow="row" style_flex_main_place="center"
                      style_flex_cross_place="center" style_pad_gap="#space_sm">
-            <icon src="refresh" size="sm" color="#text"/>
+            <icon src="refresh" size="sm" variant="text"/>
             <text_body text="Retry"/>
             <event_cb trigger="clicked" callback="input_shaper_retry_cb"/>
           </lv_button>

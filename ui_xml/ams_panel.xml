@@ -160,7 +160,7 @@
                 <bind_flag_if_eq subject="ams_current_has_weight" flag="hidden" ref_value="0"/>
               </text_small>
               <!-- Weight - hidden when not available -->
-              <text_small name="current_weight_label" bind_text="ams_current_weight_text" style_text_color="#text_muted">
+              <text_small name="current_weight_label" bind_text="ams_current_weight_text">
                 <bind_flag_if_eq subject="ams_current_has_weight" flag="hidden" ref_value="0"/>
               </text_small>
             </lv_obj>

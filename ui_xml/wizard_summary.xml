@@ -49,7 +49,7 @@
                 height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_top="#space_xs"
                 flex_flow="column" style_pad_gap="0">
           <text_small text="Moonraker"/>
-          <text_body name="summary_moonraker_label" bind_text="summary_moonraker_connection" style_text_color="#text"/>
+          <text_body name="summary_moonraker_label" bind_text="summary_moonraker_connection"/>
         </lv_obj>
       </lv_obj>
       <!-- Right column: Hardware mapping -->
@@ -100,7 +100,7 @@
                 width="100%" height="content" style_bg_opa="0" style_border_width="0" style_pad_all="0"
                 style_pad_top="#space_xs" flex_flow="column" style_pad_gap="0">
           <text_small text="Filament Sensor"/>
-          <text_body name="summary_filament_sensor_label" bind_text="summary_filament_sensor" style_text_color="#text"/>
+          <text_body name="summary_filament_sensor_label" bind_text="summary_filament_sensor"/>
           <bind_flag_if_eq subject="summary_filament_sensor_visible" flag="hidden" ref_value="0"/>
         </lv_obj>
         <!-- AMS/Multi-Material System (conditionally visible) -->

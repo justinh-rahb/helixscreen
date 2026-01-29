@@ -46,7 +46,7 @@
             <bind_style name="image_dimmed" subject="klippy_state" ref_value="3"/>
           </lv_image>
           <!-- Disconnected overlay - shown when NOT connected (state != 2) -->
-          <icon name="disconnected_overlay" src="prohibited" size="xl" align="center" color="#danger">
+          <icon name="disconnected_overlay" src="prohibited" size="xl" align="center" variant="danger">
             <bind_flag_if_eq subject="printer_connection_state" flag="hidden" ref_value="2"/>
           </icon>
           <!-- Shutdown overlay - shown when klippy is SHUTDOWN (state 2) -->
@@ -283,7 +283,7 @@
                        width="#button_height_sm" height="#button_height_sm" style_radius="24" style_bg_color="#danger"
                        style_border_width="2" style_border_color="#text" style_shadow_width="0" style_pad_all="0"
                        align="center">
-              <icon src="alert_octagon" size="sm" color="#text" align="center"/>
+              <icon src="alert_octagon" size="sm" variant="text" align="center"/>
               <event_cb trigger="clicked" callback="emergency_stop_clicked"/>
             </lv_button>
           </lv_obj>
@@ -303,7 +303,7 @@
                        width="#button_height_sm" height="#button_height_sm" style_radius="24" style_bg_color="#primary"
                        style_border_width="2" style_border_color="#text" style_shadow_width="0" style_pad_all="0"
                        align="center">
-              <icon src="refresh" size="sm" color="#text" align="center"/>
+              <icon src="refresh" size="sm" variant="text" align="center"/>
               <event_cb trigger="clicked" callback="firmware_restart_clicked"/>
             </lv_button>
           </lv_obj>

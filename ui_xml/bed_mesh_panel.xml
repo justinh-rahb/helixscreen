@@ -25,7 +25,7 @@
         <!-- Empty state overlay - absolutely positioned centered over canvas -->
         <centered_column name="no_mesh_overlay" width="content" height="content" align="center">
           <bind_flag_if_eq subject="bed_mesh_available" flag="hidden" ref_value="1"/>
-          <icon src="grid_off" size="lg" color="#text_muted"/>
+          <icon src="grid_off" size="lg" variant="muted"/>
           <text_body text="No mesh loaded" style_text_color="#text_muted" style_pad_top="#space_md"/>
         </centered_column>
       </lv_obj>
@@ -142,13 +142,13 @@
               </icon>
               <!-- Load icon (only when NOT active) -->
               <icon name="profile_0_load"
-                    src="arrow_up_circle" size="sm" color="#text_muted" clickable="true" style_pad_all="#space_xs">
+                    src="arrow_up_circle" size="sm" variant="muted" clickable="true" style_pad_all="#space_xs">
                 <bind_flag_if_eq subject="bed_mesh_profile_0_active" flag="hidden" ref_value="1"/>
                 <event_cb trigger="clicked" callback="on_profile_0_clicked"/>
               </icon>
               <!-- Delete icon (always visible) -->
               <icon name="profile_0_delete"
-                    src="trash_can_outline" size="sm" color="#danger" clickable="true" style_pad_all="#space_xs">
+                    src="trash_can_outline" size="sm" variant="danger" clickable="true" style_pad_all="#space_xs">
                 <event_cb trigger="clicked" callback="on_profile_0_delete"/>
               </icon>
             </lv_obj>
@@ -170,12 +170,12 @@
                 <event_cb trigger="clicked" callback="on_profile_1_rename"/>
               </icon>
               <icon name="profile_1_load"
-                    src="arrow_up_circle" size="sm" color="#text_muted" clickable="true" style_pad_all="#space_xs">
+                    src="arrow_up_circle" size="sm" variant="muted" clickable="true" style_pad_all="#space_xs">
                 <bind_flag_if_eq subject="bed_mesh_profile_1_active" flag="hidden" ref_value="1"/>
                 <event_cb trigger="clicked" callback="on_profile_1_clicked"/>
               </icon>
               <icon name="profile_1_delete"
-                    src="trash_can_outline" size="sm" color="#danger" clickable="true" style_pad_all="#space_xs">
+                    src="trash_can_outline" size="sm" variant="danger" clickable="true" style_pad_all="#space_xs">
                 <event_cb trigger="clicked" callback="on_profile_1_delete"/>
               </icon>
             </lv_obj>
@@ -197,12 +197,12 @@
                 <event_cb trigger="clicked" callback="on_profile_2_rename"/>
               </icon>
               <icon name="profile_2_load"
-                    src="arrow_up_circle" size="sm" color="#text_muted" clickable="true" style_pad_all="#space_xs">
+                    src="arrow_up_circle" size="sm" variant="muted" clickable="true" style_pad_all="#space_xs">
                 <bind_flag_if_eq subject="bed_mesh_profile_2_active" flag="hidden" ref_value="1"/>
                 <event_cb trigger="clicked" callback="on_profile_2_clicked"/>
               </icon>
               <icon name="profile_2_delete"
-                    src="trash_can_outline" size="sm" color="#danger" clickable="true" style_pad_all="#space_xs">
+                    src="trash_can_outline" size="sm" variant="danger" clickable="true" style_pad_all="#space_xs">
                 <event_cb trigger="clicked" callback="on_profile_2_delete"/>
               </icon>
             </lv_obj>
@@ -224,12 +224,12 @@
                 <event_cb trigger="clicked" callback="on_profile_3_rename"/>
               </icon>
               <icon name="profile_3_load"
-                    src="arrow_up_circle" size="sm" color="#text_muted" clickable="true" style_pad_all="#space_xs">
+                    src="arrow_up_circle" size="sm" variant="muted" clickable="true" style_pad_all="#space_xs">
                 <bind_flag_if_eq subject="bed_mesh_profile_3_active" flag="hidden" ref_value="1"/>
                 <event_cb trigger="clicked" callback="on_profile_3_clicked"/>
               </icon>
               <icon name="profile_3_delete"
-                    src="trash_can_outline" size="sm" color="#danger" clickable="true" style_pad_all="#space_xs">
+                    src="trash_can_outline" size="sm" variant="danger" clickable="true" style_pad_all="#space_xs">
                 <event_cb trigger="clicked" callback="on_profile_3_delete"/>
               </icon>
             </lv_obj>
@@ -251,12 +251,12 @@
                 <event_cb trigger="clicked" callback="on_profile_4_rename"/>
               </icon>
               <icon name="profile_4_load"
-                    src="arrow_up_circle" size="sm" color="#text_muted" clickable="true" style_pad_all="#space_xs">
+                    src="arrow_up_circle" size="sm" variant="muted" clickable="true" style_pad_all="#space_xs">
                 <bind_flag_if_eq subject="bed_mesh_profile_4_active" flag="hidden" ref_value="1"/>
                 <event_cb trigger="clicked" callback="on_profile_4_clicked"/>
               </icon>
               <icon name="profile_4_delete"
-                    src="trash_can_outline" size="sm" color="#danger" clickable="true" style_pad_all="#space_xs">
+                    src="trash_can_outline" size="sm" variant="danger" clickable="true" style_pad_all="#space_xs">
                 <event_cb trigger="clicked" callback="on_profile_4_delete"/>
               </icon>
             </lv_obj>

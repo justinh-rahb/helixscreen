@@ -33,7 +33,7 @@
     <!-- Click handler registered in C++ -->
     <event_cb trigger="clicked" callback="on_ams_current_tool_clicked"/>
     <!-- Filament/spool icon -->
-    <icon src="filament" size="sm" color="#text_muted"/>
+    <icon src="filament" size="sm" variant="muted"/>
     <!-- Tool label (T0, T1, etc.) -->
     <text_small name="tool_label" text="T0" bind_text="ams_current_tool_text"/>
     <!-- Color swatch showing current filament color (color set via C++) -->

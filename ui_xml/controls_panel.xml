@@ -123,7 +123,7 @@
                    style_flex_cross_place="center" style_pad_gap="#space_sm">
           <bind_flag_if_eq subject="estop_visible" flag="hidden" ref_value="0"/>
           <event_cb trigger="clicked" callback="emergency_stop_clicked"/>
-          <icon src="alert_octagon" size="sm" color="#text"/>
+          <icon src="alert_octagon" size="sm" variant="text"/>
           <text_body text="Emergency Stop"/>
         </lv_button>
 

@@ -121,7 +121,7 @@
             style_pad_bottom="#space_xl" flex_flow="column" style_flex_cross_place="center" style_pad_gap="#space_md">
       <!-- Only visible when show_error == 1 (hide when 0) -->
       <bind_flag_if_eq subject="macro_enhance_show_error" flag="hidden" ref_value="0"/>
-      <icon src="alert_circle" size="xl" color="#danger"/>
+      <icon src="alert_circle" size="xl" variant="danger"/>
       <text_heading text="Enhancement Failed" style_text_align="center"/>
       <text_body name="error_message"
                  width="100%" bind_text="macro_enhance_description" long_mode="wrap" style_text_align="center"/>
