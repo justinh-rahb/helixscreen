@@ -6,8 +6,9 @@
 # Usage: ./scripts/init-worktree.sh <worktree-path>
 #
 # This script handles the git worktree + submodule dance:
-# 1. Initializes all required submodules (skips SDL2 - uses system)
-# 2. Copies generated libhv headers (they're built, not in repo)
+# 1. Symlinks submodules from main repo (fast! no re-clone or re-patch)
+# 2. Copies pre-built static libraries from main repo
+# 3. Sets up npm/python dependencies
 #
 # Example:
 #   ./scripts/init-worktree.sh ../helixscreen-feature-parity
@@ -39,38 +40,39 @@ echo ""
 
 cd "$WORKTREE_PATH"
 
-# Step 1: Deinit SDL2 (we use system SDL2 on macOS, and the commit is stale)
+# Step 1: Verify main repo submodules are initialized and patched
+echo "→ Checking main repo submodules..."
+SUBMODULES="lib/lvgl lib/spdlog lib/libhv lib/glm lib/cpp-terminal lib/wpa_supplicant"
+for sub in $SUBMODULES; do
+    if [ ! -d "$MAIN_REPO/$sub/.git" ] && [ ! -f "$MAIN_REPO/$sub/.git" ]; then
+        echo "  ✗ Main repo submodule not initialized: $sub"
+        echo "    Run 'git submodule update --init' in main repo first."
+        exit 1
+    fi
+done
+echo "  ✓ All submodules present in main repo"
+
+# Step 2: Symlink submodules from main repo (much faster than cloning)
+# This works because submodules are read-only dependencies with patches already applied
+echo "→ Symlinking submodules from main repo..."
+for sub in $SUBMODULES; do
+    # Clean up any existing submodule state
+    git submodule deinit -f "$sub" 2>/dev/null || true
+    rm -rf "$sub" 2>/dev/null || true
+    # Create symlink to main repo's submodule
+    ln -s "$MAIN_REPO/$sub" "$sub"
+    echo "  ✓ $sub → main repo"
+done
+
+# Step 2b: Handle SDL2 (we use system SDL2, just need empty dir)
 echo "→ Skipping SDL2 submodule (using system SDL2)..."
 git submodule deinit lib/sdl2 2>/dev/null || true
 rm -rf lib/sdl2 2>/dev/null || true
 mkdir -p lib/sdl2
 
-# Step 2: Initialize required submodules
-SUBMODULES="lib/lvgl lib/spdlog lib/libhv lib/glm lib/cpp-terminal lib/wpa_supplicant"
-echo "→ Initializing submodules..."
-for sub in $SUBMODULES; do
-    echo "  - $sub"
-    # Properly deinit before removing to clean up git metadata (fixes worktree issues)
-    git submodule deinit -f "$sub" 2>/dev/null || true
-    rm -rf "$sub" 2>/dev/null || true
-    git submodule update --init --force --depth 1 "$sub"
-done
+# Note: Patches are already applied in main repo, no need to re-apply
 
-# Step 2b: Apply required patches
-echo "→ Applying required patches..."
-make apply-patches 2>/dev/null || {
-    echo "  ⚠ Warning: Could not apply patches. Run 'make apply-patches' manually."
-}
-
-# Step 3: Copy generated libhv headers (they're created during build, not in git)
-echo "→ Copying libhv generated headers from main repo..."
-if [ -d "$MAIN_REPO/lib/libhv/include/hv" ]; then
-    mkdir -p lib/libhv/include
-    cp -r "$MAIN_REPO/lib/libhv/include/hv" lib/libhv/include/
-    echo "  ✓ Copied $(ls lib/libhv/include/hv | wc -l | tr -d ' ') headers"
-else
-    echo "  ⚠ Warning: Main repo libhv headers not found. Run 'make' in main repo first."
-fi
+# Step 3: libhv headers are now available via symlink (no copy needed)
 
 # Step 4: Copy pre-built static libraries (saves significant build time)
 # Note: We exclude libTinyGL.a because it builds in-tree and may have architecture
