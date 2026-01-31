@@ -17,11 +17,31 @@
 namespace {
 
 /**
+ * @brief User data stored on badge to track label reference
+ *
+ * NOTE: Magic number required for safety during style broadcasts.
+ * When lv_obj_report_style_change(NULL) fires, the STYLE_CHANGED event
+ * goes to all objects - including badges that may have been deleted
+ * but whose observers haven't been cleaned up yet. The magic check
+ * prevents crashes by detecting stale/invalid user_data.
+ */
+struct BadgeData {
+    static constexpr uint32_t MAGIC = 0x42444745; // "BDGE"
+    uint32_t magic{MAGIC};
+    lv_obj_t* label; // Label widget for count display
+};
+
+/**
  * @brief Update badge text color based on background luminance
  */
 void update_badge_text_contrast(lv_obj_t* badge) {
-    // Find the text label child
-    lv_obj_t* label = lv_obj_get_child(badge, 0);
+    // Check magic to ensure user_data is valid (not stale/overwritten)
+    BadgeData* data = static_cast<BadgeData*>(lv_obj_get_user_data(badge));
+    if (!data || data->magic != BadgeData::MAGIC) {
+        return;
+    }
+
+    lv_obj_t* label = data->label;
     if (!label) {
         return;
     }
@@ -42,6 +62,21 @@ void update_badge_text_contrast(lv_obj_t* badge) {
 void badge_style_changed_cb(lv_event_t* e) {
     lv_obj_t* badge = lv_event_get_target_obj(e);
     update_badge_text_contrast(badge);
+}
+
+/**
+ * @brief Event callback for LV_EVENT_DELETE
+ *
+ * Called when badge is deleted. Frees the BadgeData user data.
+ */
+void badge_delete_cb(lv_event_t* e) {
+    lv_obj_t* badge = lv_event_get_target_obj(e);
+    BadgeData* data = static_cast<BadgeData*>(lv_obj_get_user_data(badge));
+    // Only delete if magic matches - user_data may be invalid
+    if (data && data->magic == BadgeData::MAGIC) {
+        delete data;
+        lv_obj_set_user_data(badge, nullptr);
+    }
 }
 
 /**
@@ -111,6 +146,10 @@ void* notification_badge_create(lv_xml_parser_state_t* state, const char** attrs
     lv_obj_set_style_text_font(label, theme_manager_get_font("font_small"), LV_PART_MAIN);
     lv_obj_center(label);
 
+    // Allocate user data to track label reference (for safe style change handling)
+    BadgeData* data = new BadgeData{.magic = BadgeData::MAGIC, .label = label};
+    lv_obj_set_user_data(badge, data);
+
     // Handle bind_text - connect subject to internal label
     const char* bind_text = lv_xml_get_value_of(attrs, "bind_text");
     if (bind_text && strlen(bind_text) > 0) {
@@ -134,6 +173,9 @@ void* notification_badge_create(lv_xml_parser_state_t* state, const char** attrs
 
     // Register for style changes to update contrast when bg changes
     lv_obj_add_event_cb(badge, badge_style_changed_cb, LV_EVENT_STYLE_CHANGED, nullptr);
+
+    // Register delete callback to free BadgeData
+    lv_obj_add_event_cb(badge, badge_delete_cb, LV_EVENT_DELETE, nullptr);
 
     spdlog::trace("[notification_badge] Created badge variant='{}' text='{}'", variant, text);
     return badge;

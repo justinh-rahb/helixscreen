@@ -1057,7 +1057,32 @@ void NavigationManager::deinit_subjects() {
     if (!subjects_initialized_) {
         return;
     }
+
+    // Reset observer guards BEFORE deiniting subjects - they hold references
+    // to subjects that will become invalid. Also handles observers attached
+    // to external subjects (PrinterState) that may be reset separately.
+    active_panel_observer_.reset();
+    connection_state_observer_.reset();
+    klippy_state_observer_.reset();
+
     subjects_.deinit_all();
+
+    // Reset widget pointers - they become invalid when LVGL is reinitialized
+    for (int i = 0; i < UI_PANEL_COUNT; i++) {
+        panel_widgets_[i] = nullptr;
+        panel_instances_[i] = nullptr;
+    }
+    overlay_instances_.clear();
+    overlay_close_callbacks_.clear();
+    overlay_backdrops_.clear();
+    panel_stack_.clear();
+    app_layout_widget_ = nullptr;
+    overlay_backdrop_ = nullptr;
+    navbar_widget_ = nullptr;
+    active_panel_ = UI_PANEL_HOME;
+    previous_connection_state_ = -1;
+    previous_klippy_state_ = -1;
+
     subjects_initialized_ = false;
     spdlog::debug("[NavigationManager] Subjects deinitialized");
 }

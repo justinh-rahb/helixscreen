@@ -209,10 +209,12 @@ void LVGLUITestFixture::cleanup() {
         // PrinterState subjects
         get_printer_state().reset_for_testing();
 
-        // Core subjects - note: these are singletons, so we only deinit
-        // the ones we explicitly initialized
-        // (app_globals, nav, status_bar are managed by static registries
-        // in production, but for tests we just reset PrinterState)
+        // Core singleton subjects - must be deinitialized to clear observers
+        // before widgets are destroyed, otherwise style broadcasts will hit
+        // stale observers pointing to deleted objects
+        ui_status_bar_deinit_subjects();
+        app_globals_deinit_subjects();
+        NavigationManager::instance().deinit_subjects();
 
         m_subjects_initialized = false;
     }
