@@ -115,15 +115,14 @@ all: apply-patches generate-fonts splash watchdog $(TARGET)
 	$(ECHO) "$(GREEN)$(BOLD)✓ Build complete!$(RESET)"
 	$(ECHO) "$(CYAN)Run with: $(YELLOW)./$(TARGET)$(RESET)"
 ifndef SKIP_COMPILE_COMMANDS
-	@# Auto-generate compile_commands.json from fragments (fast, <1s)
+	@# Auto-generate compile_commands.json from fragments (fast, <0.3s)
+	@# Uses Python to produce properly indented JSON that VS Code can parse
 	@# Skip with SKIP_COMPILE_COMMANDS=1 (used by pre-commit to avoid LSP churn)
 	@if [ -d "$(BUILD_DIR)" ]; then \
 		CCJ_COUNT=$$(find $(BUILD_DIR) -name '*.ccj' 2>/dev/null | wc -l | tr -d ' '); \
 		if [ "$$CCJ_COUNT" -gt 0 ]; then \
-			echo "[" > compile_commands.json; \
 			find $(BUILD_DIR) -name '*.ccj' -print0 2>/dev/null | xargs -0 cat | \
-				sed 's/}$$/},/' | sed '$$ s/,$$//' >> compile_commands.json; \
-			echo "]" >> compile_commands.json; \
+				python3 -c "import sys,json; entries=[json.loads(l) for l in sys.stdin if l.strip()]; json.dump(entries, open('compile_commands.json','w'), indent=2)"; \
 			echo "$(CYAN)→ compile_commands.json updated ($$CCJ_COUNT entries)$(RESET)"; \
 		fi; \
 	fi
