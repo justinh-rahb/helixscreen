@@ -28,7 +28,7 @@ This plan addresses hardcoded colors and imperative styling calls in C++ that sh
 
 ### Tasks
 - [ ] Add crash dialog color tokens to theme_core (crash_bg, crash_text, crash_accent)
-- [ ] Refactor `show_crash_dialog()` to use `ui_theme_get_color()` instead of hardcoded hex
+- [ ] Refactor `show_crash_dialog()` to use `theme_manager_get_color()` instead of hardcoded hex
 - [ ] Replace imperative styling with theme-aware approach
 - [ ] Test crash dialog in both light and dark themes
 
@@ -50,7 +50,7 @@ This plan addresses hardcoded colors and imperative styling calls in C++ that sh
   - `toolhead_housing` (#121212)
   - `toolhead_detail` (#100C0B)
   - `toolhead_highlight` (#FFFFFF)
-- [ ] Refactor nozzle_renderer_faceted.cpp to use `ui_theme_get_color()`
+- [ ] Refactor nozzle_renderer_faceted.cpp to use `theme_manager_get_color()`
 - [ ] Consider adding to theme editor for user customization
 
 ### Verification

@@ -108,6 +108,14 @@ class NotificationHistory {
      */
     bool load_from_disk(const char* path);
 
+    /**
+     * @brief Seed test notifications for --test mode debugging
+     *
+     * Adds a variety of test notifications with different severities
+     * for UI testing and debugging purposes.
+     */
+    void seed_test_data();
+
   private:
     NotificationHistory() = default;
     ~NotificationHistory() = default;

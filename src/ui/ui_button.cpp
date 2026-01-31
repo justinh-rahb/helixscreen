@@ -56,14 +56,7 @@ void update_button_text_contrast(lv_obj_t* btn) {
     }
 
     lv_color_t bg = lv_obj_get_style_bg_color(btn, LV_PART_MAIN);
-    // LVGL 9: lv_color_t has direct .red, .green, .blue members
-    uint8_t r = bg.red;
-    uint8_t g = bg.green;
-    uint8_t b = bg.blue;
-    uint32_t lum = (299 * r + 587 * g + 114 * b) / 1000;
-
-    lv_color_t text_color =
-        (lum < 128) ? theme_core_get_text_for_dark_bg() : theme_core_get_text_for_light_bg();
+    lv_color_t text_color = theme_core_get_contrast_text_color(bg);
 
     // Apply to label
     lv_obj_set_style_text_color(data->label, text_color, LV_PART_MAIN);
@@ -73,9 +66,8 @@ void update_button_text_contrast(lv_obj_t* btn) {
         lv_obj_set_style_text_color(data->icon, text_color, LV_PART_MAIN);
     }
 
-    spdlog::trace("[ui_button] text contrast: bg=0x{:06X} lum={} -> {} text=0x{:06X}",
-                  lv_color_to_u32(bg) & 0xFFFFFF, lum, (lum < 128) ? "light" : "dark",
-                  lv_color_to_u32(text_color) & 0xFFFFFF);
+    spdlog::trace("[ui_button] text contrast: bg=0x{:06X} text=0x{:06X}",
+                  lv_color_to_u32(bg) & 0xFFFFFF, lv_color_to_u32(text_color) & 0xFFFFFF);
 }
 
 /**

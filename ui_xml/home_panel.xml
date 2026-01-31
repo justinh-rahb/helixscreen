@@ -231,22 +231,16 @@
                     src="notifications" size="#icon_size_card" variant="secondary" align="center" clickable="true">
                 <event_cb trigger="clicked" callback="status_notification_history_clicked"/>
               </icon>
-              <!-- Notification Count Badge - wrapper provides fixed sizing, label inside uses bind_style -->
-              <lv_obj name="notification_badge"
-                      width="18" height="18" align="top_right" x="-#space_xxs" y="#space_xxs" style_radius="9"
-                      style_pad_all="0" hidden="true" scrollable="false" clickable="true">
+              <!-- Notification Count Badge - auto-contrast text color based on severity bg -->
+              <notification_badge name="notification_badge"
+                                  align="top_right" x="-#space_xxs" y="#space_xxs" hidden="true" clickable="true"
+                                  bind_text="notification_count_text">
                 <bind_flag_if_eq subject="notification_count" flag="hidden" ref_value="0"/>
+                <bind_style name="badge_info" subject="notification_severity" ref_value="0"/>
+                <bind_style name="badge_warning" subject="notification_severity" ref_value="1"/>
+                <bind_style name="badge_error" subject="notification_severity" ref_value="2"/>
                 <event_cb trigger="clicked" callback="status_notification_history_clicked"/>
-                <!-- Background with severity-bound color -->
-                <lv_obj name="badge_bg" width="100%" height="100%" style_radius="9" style_bg_color="#info">
-                  <bind_style name="badge_info" subject="notification_severity" ref_value="0"/>
-                  <bind_style name="badge_warning" subject="notification_severity" ref_value="1"/>
-                  <bind_style name="badge_error" subject="notification_severity" ref_value="2"/>
-                </lv_obj>
-                <text_small name="notification_badge_count"
-                            bind_text="notification_count_text" style_pad_top="0" align="center"
-                            style_text_color="#text"/>
-              </lv_obj>
+              </notification_badge>
             </lv_obj>
           </lv_obj>
 

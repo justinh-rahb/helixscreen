@@ -45,6 +45,7 @@
 #include "ui_keyboard.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
+#include "ui_notification_history.h"
 #include "ui_notification_manager.h"
 #include "ui_overlay_network_settings.h"
 #include "ui_panel_ams.h"
@@ -799,6 +800,25 @@ bool Application::init_ui() {
 
     // Initialize notification system (status bar without printer icon)
     ui_status_bar_init();
+
+    // Seed test notifications in --test mode for debugging
+    if (get_runtime_config()->is_test_mode()) {
+        auto& history = NotificationHistory::instance();
+        history.seed_test_data();
+        // Update status bar to show unread count and severity
+        ui_status_bar_update_notification_count(history.get_unread_count());
+        // Map ToastSeverity to NotificationStatus for bell color
+        auto severity = history.get_highest_unread_severity();
+        NotificationStatus status = NotificationStatus::NONE;
+        if (severity == ToastSeverity::ERROR) {
+            status = NotificationStatus::ERROR;
+        } else if (severity == ToastSeverity::WARNING) {
+            status = NotificationStatus::WARNING;
+        } else if (severity == ToastSeverity::INFO || severity == ToastSeverity::SUCCESS) {
+            status = NotificationStatus::INFO;
+        }
+        ui_status_bar_update_notification(status);
+    }
 
     // Initialize toast system
     ui_toast_init();

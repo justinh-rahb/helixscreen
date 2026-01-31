@@ -1230,3 +1230,14 @@ lv_color_t theme_core_get_text_for_light_bg(void) {
     // Fallback for themes without light mode defined
     return lv_color_hex(0x212121);
 }
+
+lv_color_t theme_core_get_contrast_text_color(lv_color_t bg_color) {
+    // Standard luminance formula: L = (299*R + 587*G + 114*B) / 1000
+    uint8_t r = bg_color.red;
+    uint8_t g = bg_color.green;
+    uint8_t b = bg_color.blue;
+    uint32_t lum = (299 * r + 587 * g + 114 * b) / 1000;
+
+    // Dark backgrounds (lum < 128) need light text, and vice versa
+    return (lum < 128) ? theme_core_get_text_for_dark_bg() : theme_core_get_text_for_light_bg();
+}

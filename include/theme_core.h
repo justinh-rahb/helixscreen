@@ -419,6 +419,21 @@ lv_color_t theme_core_get_text_for_dark_bg(void);
  */
 lv_color_t theme_core_get_text_for_light_bg(void);
 
+/**
+ * @brief Get contrasting text color for a given background color
+ *
+ * Computes luminance of the background color and returns an appropriate
+ * text color for readability. Uses standard luminance formula:
+ *   L = (299*R + 587*G + 114*B) / 1000
+ *
+ * If L < 128 (dark bg): returns light text color
+ * If L >= 128 (light bg): returns dark text color
+ *
+ * @param bg_color Background color to contrast against
+ * @return Contrasting text color for readability
+ */
+lv_color_t theme_core_get_contrast_text_color(lv_color_t bg_color);
+
 #ifdef __cplusplus
 }
 #endif

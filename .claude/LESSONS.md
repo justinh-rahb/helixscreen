@@ -22,7 +22,7 @@
 
 ### [L006] [*----/-----] get_color vs parse_color
 - **Uses**: 2 | **Learned**: 2025-12-14 | **Last**: 2025-12-18 | **Category**: correction
-> ui_theme_get_color('token') looks up theme tokens. ui_theme_parse_color('#hex') parses literal hex only. Using parse_color with token names returns garbage
+> theme_manager_get_color('token') looks up theme tokens. ui_theme_parse_color('#hex') parses literal hex only. Using parse_color with token names returns garbage
 
 
 ### [L007] [**---/-----] XML event callbacks only
@@ -67,7 +67,7 @@
 
 ### [L015] [*----/-----] No hardcoded colors in C++
 - **Uses**: 2 | **Learned**: 2025-12-14 | **Last**: 2025-12-18 | **Category**: correction
-> Use ui_theme_get_color() for all colors in C++. Hardcoded lv_color_hex() values break dark mode and violate design token system
+> Use theme_manager_get_color() for all colors in C++. Hardcoded lv_color_hex() values break dark mode and violate design token system
 
 
 ### [L016] [*----/-----] Test flag required

@@ -10,6 +10,7 @@
 #include "ui_fonts.h"
 #include "ui_gcode_viewer.h"
 #include "ui_hsv_picker.h"
+#include "ui_notification_badge.h"
 #include "ui_panel_settings.h"
 #include "ui_spinner.h"
 #include "ui_spool_canvas.h"
@@ -92,9 +93,10 @@ void register_xml_components() {
 
     // Register semantic text widgets (AFTER theme init, BEFORE components that use them)
     ui_text_init();
-    ui_text_input_init(); // <text_input> with bind_text support
-    ui_spinner_init();    // <spinner> with responsive sizing
-    ui_button_init();     // <ui_button> with variant styles and auto-contrast
+    ui_text_input_init();         // <text_input> with bind_text support
+    ui_spinner_init();            // <spinner> with responsive sizing
+    ui_button_init();             // <ui_button> with variant styles and auto-contrast
+    ui_notification_badge_init(); // <notification_badge> with auto-contrast text
 
     // Register no-op callback and subject for optional handlers in XML components
     // This silences warnings when components use callback/subject props with default=""

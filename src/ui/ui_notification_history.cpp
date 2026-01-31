@@ -209,6 +209,69 @@ bool NotificationHistory::save_to_disk(const char* path) const {
     }
 }
 
+void NotificationHistory::seed_test_data() {
+    // Add test notifications with varied severities and timestamps
+    // Timestamps are offset from current tick to simulate "time ago" display
+    uint64_t now = lv_tick_get();
+
+    // Error from 2 hours ago
+    NotificationHistoryEntry error_entry = {};
+    error_entry.timestamp_ms = now - (2 * 60 * 60 * 1000); // 2 hours ago
+    error_entry.severity = ToastSeverity::ERROR;
+    strncpy(error_entry.title, "Thermal Runaway", sizeof(error_entry.title) - 1);
+    strncpy(error_entry.message, "Hotend temperature exceeded safety threshold. Heater disabled.",
+            sizeof(error_entry.message) - 1);
+    error_entry.was_modal = true;
+    error_entry.was_read = false;
+    add(error_entry);
+
+    // Warning from 45 minutes ago
+    NotificationHistoryEntry warning_entry = {};
+    warning_entry.timestamp_ms = now - (45 * 60 * 1000); // 45 min ago
+    warning_entry.severity = ToastSeverity::WARNING;
+    strncpy(warning_entry.title, "Filament Low", sizeof(warning_entry.title) - 1);
+    strncpy(warning_entry.message, "AMS slot 1 has less than 10m of filament remaining.",
+            sizeof(warning_entry.message) - 1);
+    warning_entry.was_modal = false;
+    warning_entry.was_read = false;
+    add(warning_entry);
+
+    // Success from 20 minutes ago
+    NotificationHistoryEntry success_entry = {};
+    success_entry.timestamp_ms = now - (20 * 60 * 1000); // 20 min ago
+    success_entry.severity = ToastSeverity::SUCCESS;
+    strncpy(success_entry.title, "Print Complete", sizeof(success_entry.title) - 1);
+    strncpy(success_entry.message, "benchy_v2.gcode finished successfully in 1h 23m.",
+            sizeof(success_entry.message) - 1);
+    success_entry.was_modal = false;
+    success_entry.was_read = false;
+    add(success_entry);
+
+    // Info from 5 minutes ago
+    NotificationHistoryEntry info_entry = {};
+    info_entry.timestamp_ms = now - (5 * 60 * 1000); // 5 min ago
+    info_entry.severity = ToastSeverity::INFO;
+    strncpy(info_entry.title, "Firmware Update", sizeof(info_entry.title) - 1);
+    strncpy(info_entry.message, "Klipper v0.12.1 is available. Current: v0.12.0",
+            sizeof(info_entry.message) - 1);
+    info_entry.was_modal = false;
+    info_entry.was_read = false;
+    add(info_entry);
+
+    // Another warning from just now
+    NotificationHistoryEntry warning2_entry = {};
+    warning2_entry.timestamp_ms = now - (30 * 1000); // 30 sec ago
+    warning2_entry.severity = ToastSeverity::WARNING;
+    strncpy(warning2_entry.title, "Bed Leveling", sizeof(warning2_entry.title) - 1);
+    strncpy(warning2_entry.message, "Bed mesh is outdated. Consider re-calibrating.",
+            sizeof(warning2_entry.message) - 1);
+    warning2_entry.was_modal = false;
+    warning2_entry.was_read = false;
+    add(warning2_entry);
+
+    spdlog::info("[Notification History] Seeded {} test notifications", 5);
+}
+
 bool NotificationHistory::load_from_disk(const char* path) {
     std::lock_guard<std::mutex> lock(mutex_);
 

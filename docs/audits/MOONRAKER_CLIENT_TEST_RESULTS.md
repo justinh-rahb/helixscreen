@@ -317,7 +317,7 @@ RequestId id = request_id_.fetch_add(1) + 1;  // Atomic read-and-increment
    - Fixed linking error
 
 3. **`/Users/pbrown/code/helixscreen/tests/unit/test_ui_icon.cpp`** (fixed)
-   - Corrected `get_theme_color` to `ui_theme_get_color`
+   - Corrected `get_theme_color` to `theme_manager_get_color`
 
 4. **`/Users/pbrown/code/helixscreen/tests/unit/test_wifi_manager.cpp`** (fixed)
    - Commented out failing Ethernet tests (API changed)
