@@ -379,21 +379,10 @@ void WizardPrinterIdentifyStep::handle_printer_name_changed(lv_event_t* event) {
     printer_identify_validated_ = is_valid;
     lv_subject_set_int(&connection_test_passed, printer_identify_validated_ ? 1 : 0);
 
-    // Apply error state to textarea for validation feedback
+    // Log validation issues for debugging (Next button state is the user-facing feedback)
     if (is_too_long) {
-        lv_color_t error_color = theme_manager_get_color("danger");
-        lv_obj_set_style_border_color(ta, error_color, LV_PART_MAIN);
-        lv_obj_set_style_border_width(ta, 2, LV_PART_MAIN);
         spdlog::debug("[{}] Validation: name too long ({} > {})", get_name(), trimmed.length(),
                       max_length);
-    } else if (!is_empty) {
-        const char* sec_color_str = lv_xml_get_const(NULL, "success");
-        lv_color_t valid_color = sec_color_str ? theme_manager_parse_hex_color(sec_color_str)
-                                               : theme_manager_get_color("success");
-        lv_obj_set_style_border_color(ta, valid_color, LV_PART_MAIN);
-        lv_obj_set_style_border_width(ta, 1, LV_PART_MAIN);
-    } else {
-        lv_obj_remove_style(ta, nullptr, LV_PART_MAIN | LV_STATE_ANY);
     }
 
     LVGL_SAFE_EVENT_CB_END();
@@ -592,13 +581,12 @@ void WizardPrinterIdentifyStep::populate_printer_type_list() {
         lv_obj_set_style_radius(btn, theme_manager_get_spacing("border_radius"), LV_PART_MAIN);
         lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
 
-        // Style based on selection state
+        // Style based on selection state - non-selected items are transparent
         if (static_cast<int>(i) == selected) {
             lv_obj_set_style_bg_color(btn, theme_manager_get_color("primary"), LV_PART_MAIN);
             lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
         } else {
-            lv_obj_set_style_bg_color(btn, theme_manager_get_color("elevated_bg"), LV_PART_MAIN);
-            lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_PART_MAIN);
         }
 
         // Create label inside button
@@ -647,6 +635,7 @@ void WizardPrinterIdentifyStep::update_list_selection(int selected_index) {
 
         if (is_selected) {
             lv_obj_set_style_bg_color(btn, theme_manager_get_color("primary"), LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, LV_PART_MAIN);
             if (label) {
                 lv_color_t primary = theme_manager_get_color("primary");
                 uint8_t lum = lv_color_luminance(primary);
@@ -654,7 +643,7 @@ void WizardPrinterIdentifyStep::update_list_selection(int selected_index) {
                 lv_obj_set_style_text_color(label, text_color, LV_PART_MAIN);
             }
         } else {
-            lv_obj_set_style_bg_color(btn, theme_manager_get_color("elevated_bg"), LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, LV_PART_MAIN);
             if (label) {
                 lv_obj_set_style_text_color(label, theme_manager_get_color("text"), LV_PART_MAIN);
             }
