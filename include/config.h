@@ -216,6 +216,22 @@ class Config {
     void set_wifi_expected(bool expected);
 
     /**
+     * @brief Get the current language code
+     *
+     * @return Language code (e.g., "en", "de", "fr", "es", "ru")
+     */
+    std::string get_language();
+
+    /**
+     * @brief Set the current language
+     *
+     * Call save() after this to persist the setting.
+     *
+     * @param lang Language code (e.g., "en", "de", "fr", "es", "ru")
+     */
+    void set_language(const std::string& lang);
+
+    /**
      * @brief Reset configuration to factory defaults
      *
      * Clears all user settings and restores the config to initial state.

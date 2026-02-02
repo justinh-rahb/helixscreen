@@ -100,7 +100,9 @@
 #include "gcode_file_modifier.h"
 #include "hv/hlog.h" // libhv logging - sync level with spdlog
 #include "logging_init.h"
+#include "lvgl/src/others/translation/lv_translation.h"
 #include "lvgl/src/xml/lv_xml.h"
+#include "lvgl/src/xml/lv_xml_translation.h"
 #include "lvgl_log_handler.h"
 #include "memory_monitor.h"
 #include "memory_profiling.h"
@@ -231,6 +233,12 @@ int Application::run(int argc, char** argv) {
 
     // Phase 8: Register XML components
     if (!register_xml_components()) {
+        shutdown();
+        return 1;
+    }
+
+    // Phase 8b: Load translations (must be before UI creation for hot-reload support)
+    if (!init_translations()) {
         shutdown();
         return 1;
     }
@@ -728,6 +736,26 @@ bool Application::register_widgets() {
 bool Application::register_xml_components() {
     helix::register_xml_components();
     spdlog::debug("[Application] XML components registered");
+    return true;
+}
+
+bool Application::init_translations() {
+    // Load translation strings from XML
+    // This must happen before UI creation but after the XML system is initialized
+    lv_result_t result =
+        lv_xml_register_translation_from_file("A:ui_xml/translations/translations.xml");
+    if (result != LV_RESULT_OK) {
+        spdlog::warn("[Application] Failed to load translations - UI will use English defaults");
+        // Not fatal - English will work via fallback (tag = English text)
+    } else {
+        spdlog::info("[Application] Translations loaded successfully");
+    }
+
+    // Set initial language from config
+    std::string lang = m_config->get_language();
+    lv_translation_set_language(lang.c_str());
+    spdlog::info("[Application] Language set to '{}'", lang);
+
     return true;
 }
 

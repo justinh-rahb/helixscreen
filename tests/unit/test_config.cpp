@@ -1475,3 +1475,37 @@ TEST_CASE("Config::init() should NOT write log_level to new config file",
     // Cleanup
     std::filesystem::remove_all(temp_dir);
 }
+
+// ============================================================================
+// LANGUAGE CONFIG TESTS
+// ============================================================================
+
+TEST_CASE_METHOD(ConfigTestFixture, "Config: get_language returns default 'en' for new config",
+                 "[config][language]") {
+    // Empty config should return default "en"
+    set_data_empty();
+    REQUIRE(config.get_language() == "en");
+}
+
+TEST_CASE_METHOD(ConfigTestFixture, "Config: get_language returns stored value",
+                 "[config][language]") {
+    get_data()["language"] = "de";
+    REQUIRE(config.get_language() == "de");
+}
+
+TEST_CASE_METHOD(ConfigTestFixture, "Config: set_language stores value", "[config][language]") {
+    set_data_empty();
+
+    config.set_language("fr");
+    REQUIRE(get_data()["language"] == "fr");
+}
+
+TEST_CASE_METHOD(ConfigTestFixture, "Config: language supports all planned languages",
+                 "[config][language]") {
+    std::vector<std::string> languages = {"en", "de", "fr", "es", "ru"};
+
+    for (const auto& lang : languages) {
+        config.set_language(lang);
+        REQUIRE(config.get_language() == lang);
+    }
+}

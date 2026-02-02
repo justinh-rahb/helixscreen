@@ -8,6 +8,7 @@
 #include "app_globals.h"
 #include "config.h"
 #include "display_manager.h"
+#include "lvgl/src/others/translation/lv_translation.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "printer_state.h"
@@ -68,6 +69,12 @@ static int validate_timeout_option(int value, const int (&options)[N], int defau
 
 // Time format options (12H=0, 24H=1)
 static const char* TIME_FORMAT_OPTIONS_TEXT = "12 Hour\n24 Hour";
+
+// Language options - codes and display names
+// Order: en, de, fr, es, ru (indices 0-4)
+static const char* LANGUAGE_CODES[] = {"en", "de", "fr", "es", "ru"};
+static const int LANGUAGE_COUNT = sizeof(LANGUAGE_CODES) / sizeof(LANGUAGE_CODES[0]);
+static const char* LANGUAGE_OPTIONS_TEXT = "English\nDeutsch\nFrançais\nEspañol\nРусский";
 
 SettingsManager& SettingsManager::instance() {
     static SettingsManager instance;
@@ -189,6 +196,12 @@ void SettingsManager::init_subjects() {
     int time_format = config->get<int>("/time_format", 0);
     time_format = std::clamp(time_format, 0, 1);
     UI_MANAGED_SUBJECT_INT(time_format_subject_, time_format, "settings_time_format", subjects_);
+
+    // Language (default: "en" = English, index 0)
+    std::string lang_code = config->get_language();
+    int lang_index = language_code_to_index(lang_code);
+    UI_MANAGED_SUBJECT_INT(language_subject_, lang_index, "settings_language", subjects_);
+    spdlog::info("[SettingsManager] Language initialized to {} (index {})", lang_code, lang_index);
 
     subjects_initialized_ = true;
     spdlog::info("[SettingsManager] Subjects initialized: dark_mode={}, theme={}, "
@@ -554,6 +567,61 @@ void SettingsManager::set_time_format(TimeFormat format) {
 
 const char* SettingsManager::get_time_format_options() {
     return TIME_FORMAT_OPTIONS_TEXT;
+}
+
+// =============================================================================
+// LANGUAGE SETTINGS
+// =============================================================================
+
+std::string SettingsManager::get_language() const {
+    int index = lv_subject_get_int(const_cast<lv_subject_t*>(&language_subject_));
+    return language_index_to_code(index);
+}
+
+void SettingsManager::set_language(const std::string& lang) {
+    int index = language_code_to_index(lang);
+    spdlog::info("[SettingsManager] set_language({}) -> index {}", lang, index);
+
+    // 1. Update subject (UI reacts)
+    lv_subject_set_int(&language_subject_, index);
+
+    // 2. Call LVGL translation API for hot-reload
+    // This sends LV_EVENT_TRANSLATION_LANGUAGE_CHANGED to all widgets
+    lv_translation_set_language(lang.c_str());
+
+    // 3. Persist to config
+    Config* config = Config::get_instance();
+    config->set_language(lang);
+    config->save();
+}
+
+void SettingsManager::set_language_by_index(int index) {
+    std::string code = language_index_to_code(index);
+    set_language(code);
+}
+
+int SettingsManager::get_language_index() const {
+    return lv_subject_get_int(const_cast<lv_subject_t*>(&language_subject_));
+}
+
+const char* SettingsManager::get_language_options() {
+    return LANGUAGE_OPTIONS_TEXT;
+}
+
+std::string SettingsManager::language_index_to_code(int index) {
+    if (index < 0 || index >= LANGUAGE_COUNT) {
+        return "en"; // Default to English
+    }
+    return LANGUAGE_CODES[index];
+}
+
+int SettingsManager::language_code_to_index(const std::string& code) {
+    for (int i = 0; i < LANGUAGE_COUNT; ++i) {
+        if (code == LANGUAGE_CODES[i]) {
+            return i;
+        }
+    }
+    return 0; // Default to English (index 0)
 }
 
 // =============================================================================

@@ -221,6 +221,7 @@ json get_default_config(const std::string& moonraker_host, bool include_user_pre
         config["completion_alert"] = true;
         config["wizard_completed"] = false;
         config["wifi_expected"] = false;
+        config["language"] = "en";
     }
 
     return config;
@@ -512,6 +513,14 @@ bool Config::is_wifi_expected() {
 
 void Config::set_wifi_expected(bool expected) {
     set("/wifi_expected", expected);
+}
+
+std::string Config::get_language() {
+    return get<std::string>("/language", "en");
+}
+
+void Config::set_language(const std::string& lang) {
+    set("/language", lang);
 }
 
 void Config::reset_to_defaults() {

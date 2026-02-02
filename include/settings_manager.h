@@ -320,6 +320,47 @@ class SettingsManager {
     static const char* get_time_format_options();
 
     // =========================================================================
+    // LANGUAGE SETTINGS
+    // =========================================================================
+
+    /**
+     * @brief Get current language code
+     * @return Language code (e.g., "en", "de", "fr", "es", "ru")
+     */
+    std::string get_language() const;
+
+    /**
+     * @brief Set language and apply translations
+     *
+     * Updates subject, calls lv_translation_set_language() for hot-reload,
+     * and persists to Config. UI automatically updates via LVGL events.
+     *
+     * @param lang Language code (e.g., "en", "de", "fr", "es", "ru")
+     */
+    void set_language(const std::string& lang);
+
+    /**
+     * @brief Set language by dropdown index
+     * @param index Index in language options dropdown (0=English, 1=German, etc.)
+     */
+    void set_language_by_index(int index);
+
+    /**
+     * @brief Get current language dropdown index
+     * @return Index of current language in dropdown options
+     */
+    int get_language_index() const;
+
+    /** @brief Get dropdown options string "English\nDeutsch\nFrançais\nEspañol\nРусский" */
+    static const char* get_language_options();
+
+    /** @brief Get language code for dropdown index */
+    static std::string language_index_to_code(int index);
+
+    /** @brief Get dropdown index for language code */
+    static int language_code_to_index(const std::string& code);
+
+    // =========================================================================
     // PRINTER SETTINGS
     // =========================================================================
 
@@ -509,6 +550,11 @@ class SettingsManager {
         return &time_format_subject_;
     }
 
+    /** @brief Language subject (integer: index into language options) */
+    lv_subject_t* subject_language() {
+        return &language_subject_;
+    }
+
     /** @brief LED enabled subject (integer: 0=off, 1=on) */
     lv_subject_t* subject_led_enabled() {
         return &led_enabled_subject_;
@@ -610,6 +656,7 @@ class SettingsManager {
     lv_subject_t bed_mesh_render_mode_subject_;
     lv_subject_t gcode_render_mode_subject_;
     lv_subject_t time_format_subject_;
+    lv_subject_t language_subject_;
     lv_subject_t led_enabled_subject_;
     lv_subject_t sounds_enabled_subject_;
     lv_subject_t completion_alert_subject_;

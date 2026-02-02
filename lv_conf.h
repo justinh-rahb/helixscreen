@@ -1022,6 +1022,9 @@
 /** Enable loading XML UIs runtime */
 #define LV_USE_XML    1
 
+/** Enable translation/i18n support for runtime language switching */
+#define LV_USE_TRANSLATION    1
+
 /*==================
  * DEVICES
  *==================*/

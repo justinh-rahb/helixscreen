@@ -75,6 +75,7 @@ class Application {
     bool init_assets();
     bool register_widgets();
     bool register_xml_components();
+    bool init_translations();
     bool init_core_subjects();
     bool init_panel_subjects();
     bool init_ui();
