@@ -1079,6 +1079,15 @@ void theme_manager_toggle_dark_mode() {
     // Update helix theme styles in-place (triggers lv_obj_report_style_change)
     theme_update_colors(new_use_dark_mode, &palette, active_theme.properties.border_opacity);
 
+    // Re-register XML color constants with new dark mode value
+    // This updates #screen_bg, #card_bg, etc. before the widget tree refresh
+    theme_manager_register_color_pairs(nullptr, new_use_dark_mode);
+
+    // Explicitly update screen background - XML inline styles are baked at parse time
+    // so we need to directly set the bg color on the active screen
+    lv_color_t screen_bg = theme_manager_parse_hex_color(mode_palette.screen_bg.c_str());
+    lv_obj_set_style_bg_color(lv_screen_active(), screen_bg, LV_PART_MAIN);
+
     // Force style refresh on entire widget tree for local/inline styles
     theme_manager_refresh_widget_tree(lv_screen_active());
 
