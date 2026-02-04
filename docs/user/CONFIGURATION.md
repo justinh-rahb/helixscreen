@@ -9,14 +9,21 @@ Complete reference for HelixScreen configuration options.
 - [Configuration File Location](#configuration-file-location)
 - [Configuration Structure](#configuration-structure)
 - [General Settings](#general-settings)
+- [Theme Settings](#theme-settings)
+- [Logging Settings](#logging-settings)
 - [Display Settings](#display-settings)
 - [Input Settings](#input-settings)
+- [Output Settings](#output-settings)
 - [Network Settings](#network-settings)
 - [Printer Settings](#printer-settings)
 - [Moonraker Settings](#moonraker-settings)
 - [G-code Viewer Settings](#g-code-viewer-settings)
-- [Cache Settings](#cache-settings)
 - [AMS Settings](#ams-settings)
+- [Cache Settings](#cache-settings)
+- [Streaming Settings](#streaming-settings)
+- [Safety Settings](#safety-settings)
+- [Filament Sensor Settings](#filament-sensor-settings)
+- [Plugin Settings](#plugin-settings)
 - [Safety Limits](#safety-limits)
 - [Capability Overrides](#capability-overrides)
 - [Resetting Configuration](#resetting-configuration)
@@ -51,20 +58,30 @@ The configuration file is JSON format with several top-level sections:
 
 ```json
 {
-  "config_path": "config/helixconfig.json",
-  "animations_enabled": true,
-  "dark_mode": true,
-  "display_rotate": 0,
-  "display_sleep_sec": 600,
+  "dark_mode": false,
+  "brightness": 50,
+  "sounds_enabled": true,
+  "completion_alert": true,
+  "wizard_completed": false,
+  "wifi_expected": false,
+  "language": "en",
   "log_dest": "auto",
   "log_path": "",
+  "log_level": "warn",
 
+  "theme": { ... },
   "display": { ... },
   "input": { ... },
+  "output": { ... },
   "network": { ... },
   "printer": { ... },
   "gcode_viewer": { ... },
-  "ams": { ... }
+  "ams": { ... },
+  "cache": { ... },
+  "streaming": { ... },
+  "safety": { ... },
+  "filament_sensors": { ... },
+  "plugins": { ... }
 }
 ```
 
@@ -72,48 +89,66 @@ The configuration file is JSON format with several top-level sections:
 
 ## General Settings
 
-### `config_path`
-**Type:** string
-**Default:** `"helixconfig.json"`
-**Description:** Path to this config file (for self-reference).
-
-### `animations_enabled`
-**Type:** boolean
-**Default:** `true`
-**Description:** Enable UI animations and transitions. Disable for lower-end hardware.
-
 ### `dark_mode`
 **Type:** boolean
 **Default:** `false`
-**Description:** Use dark theme (`true`) or light theme (`false`). Can also be set via Settings panel.
+**Description:** Use dark theme (`true`) or light theme (`false`). Can also be set via Settings panel or `--dark`/`--light` CLI flags.
 
-### `display_rotate`
+### `brightness`
 **Type:** integer
-**Default:** `0`
-**Values:** `0`, `90`, `180`, `270`
-**Description:** Rotate the entire display by specified degrees.
-
-### `display_sleep_sec`
-**Type:** integer
-**Default:** `600`
-**Description:** Seconds of inactivity before screen turns off. Set to `0` to disable.
-
-### `display_dim_sec`
-**Type:** integer
-**Default:** `300`
-**Description:** Seconds of inactivity before screen dims (must be less than `display_sleep_sec`). Set to `0` to disable dimming.
-
-### `display_dim_brightness`
-**Type:** integer
-**Default:** `30`
+**Default:** `50`
 **Range:** `1` - `100`
-**Description:** Brightness percentage when screen is dimmed.
+**Description:** Screen brightness percentage. Adjustable via Settings panel.
 
-### `time_format`
+### `sounds_enabled`
+**Type:** boolean
+**Default:** `true`
+**Description:** Enable UI sound effects (button clicks, navigation sounds).
+
+### `completion_alert`
+**Type:** boolean
+**Default:** `true`
+**Description:** Play an alert sound when a print completes. Useful for getting notified when away from the printer.
+
+### `wizard_completed`
+**Type:** boolean
+**Default:** `false`
+**Description:** Whether the setup wizard has been completed. Set automatically after first-run wizard. Set to `false` to re-trigger the wizard on next startup.
+
+### `wifi_expected`
+**Type:** boolean
+**Default:** `false`
+**Description:** Whether WiFi connectivity is expected. When `true`, HelixScreen shows connection warnings if WiFi is unavailable. Set during the wizard based on your network configuration choice.
+
+### `language`
+**Type:** string
+**Default:** `"en"`
+**Values:** `"en"` (English)
+**Description:** UI language code. Currently only English is supported.
+
+---
+
+## Theme Settings
+
+Located in the `theme` section:
+
+```json
+{
+  "theme": {
+    "preset": 0
+  }
+}
+```
+
+### `preset`
 **Type:** integer
 **Default:** `0`
-**Values:** `0` (12-hour), `1` (24-hour)
-**Description:** Time display format. `0` shows "2:30 PM", `1` shows "14:30".
+**Values:** `0` (Nord)
+**Description:** Theme accent color preset. **Requires restart to take effect.**
+
+---
+
+## Logging Settings
 
 ### `log_dest`
 **Type:** string
@@ -133,6 +168,18 @@ The configuration file is JSON format with several top-level sections:
 - `/var/log/helix-screen.log` (if writable)
 - `~/.local/share/helix-screen/helix.log` (fallback)
 
+### `log_level`
+**Type:** string
+**Default:** `"warn"`
+**Values:** `"warn"`, `"info"`, `"debug"`, `"trace"`
+**Description:** Log verbosity level:
+- `warn` - Quiet, only warnings and errors (default)
+- `info` - General operational information
+- `debug` - Detailed debugging information
+- `trace` - Extremely verbose, all internal operations
+
+**Note:** CLI `-v` flags override this setting (`-v`=info, `-vv`=debug, `-vvv`=trace).
+
 ---
 
 ## Display Settings
@@ -142,11 +189,57 @@ Located in the `display` section:
 ```json
 {
   "display": {
+    "animations_enabled": true,
+    "time_format": 0,
+    "rotate": 0,
+    "sleep_sec": 1800,
+    "dim_sec": 300,
+    "dim_brightness": 30,
     "drm_device": "",
-    "touch_device": ""
+    "touch_device": "",
+    "gcode_render_mode": 2,
+    "gcode_3d_enabled": true,
+    "bed_mesh_render_mode": 0,
+    "bed_mesh_show_zero_plane": true,
+    "calibration": {
+      "valid": false
+    }
   }
 }
 ```
+
+### `animations_enabled`
+**Type:** boolean
+**Default:** `true`
+**Description:** Enable UI animations and transitions. Disable for better performance on slow devices.
+
+### `time_format`
+**Type:** integer
+**Default:** `0`
+**Values:** `0` (12-hour), `1` (24-hour)
+**Description:** Time display format. `0` shows "2:30 PM", `1` shows "14:30".
+
+### `rotate`
+**Type:** integer
+**Default:** `0`
+**Values:** `0`, `90`, `180`, `270`
+**Description:** Rotate the entire display by specified degrees.
+
+### `sleep_sec`
+**Type:** integer
+**Default:** `1800`
+**Description:** Seconds of inactivity before screen turns OFF. Set to `0` to disable sleep. Default is 30 minutes.
+
+### `dim_sec`
+**Type:** integer
+**Default:** `300`
+**Description:** Seconds of inactivity before screen dims. Set to `0` to disable dimming. Must be less than `sleep_sec`. Default is 5 minutes.
+
+### `dim_brightness`
+**Type:** integer
+**Default:** `30`
+**Range:** `1` - `100`
+**Description:** Brightness percentage when screen is dimmed.
 
 ### `drm_device`
 **Type:** string
@@ -159,11 +252,45 @@ Located in the `display` section:
 - `/dev/dri/card1` - DSI touchscreen
 - `/dev/dri/card2` - HDMI (vc4)
 
+Auto-detection finds the first device with dumb buffer support and a connected display.
+
 ### `touch_device`
 **Type:** string
 **Default:** `""` (auto-detect)
 **Example:** `"/dev/input/event1"`
 **Description:** Override touch/pointer input device. Leave empty for auto-detection via libinput.
+
+### `gcode_render_mode`
+**Type:** integer
+**Default:** `2`
+**Values:** `0` (Auto/2D), `1` (3D TinyGL), `2` (2D Layer)
+**Description:** G-code visualization mode:
+- `0` - Auto (currently uses 2D)
+- `1` - 3D TinyGL (development only, ~3 FPS)
+- `2` - 2D Layer view (default, recommended)
+
+Can also be overridden via `HELIX_GCODE_MODE` env var (`3D` or `2D`).
+
+### `gcode_3d_enabled`
+**Type:** boolean
+**Default:** `true`
+**Description:** Enable 3D G-code preview capability. When `false`, only 2D layer view is available.
+
+### `bed_mesh_render_mode`
+**Type:** integer
+**Default:** `0`
+**Values:** `0` (3D surface), `1` (2D heatmap)
+**Description:** Bed mesh visualization mode. 3D surface shows the mesh as a 3D plot, 2D heatmap shows it as a flat color grid.
+
+### `bed_mesh_show_zero_plane`
+**Type:** boolean
+**Default:** `true`
+**Description:** Show translucent reference plane at Z=0 in bed mesh 3D view. Helps visualize where the nozzle touches the bed.
+
+### `calibration`
+**Type:** object
+**Default:** `{"valid": false}`
+**Description:** Touch calibration coefficients. Set by the calibration wizard or manually. Contains calibration matrix values when valid.
 
 ---
 
@@ -194,6 +321,25 @@ Located in the `input` section:
 
 ---
 
+## Output Settings
+
+Located in the `output` section:
+
+```json
+{
+  "output": {
+    "led_on_at_start": false
+  }
+}
+```
+
+### `led_on_at_start`
+**Type:** boolean
+**Default:** `false`
+**Description:** Automatically turn on the configured LED strip when Klipper becomes ready. Useful for printers with chamber lights that should always be on.
+
+---
+
 ## Network Settings
 
 Located in the `network` section:
@@ -201,8 +347,8 @@ Located in the `network` section:
 ```json
 {
   "network": {
-    "connection_type": "wifi",
-    "wifi_ssid": "MyNetwork",
+    "connection_type": "None",
+    "wifi_ssid": "",
     "eth_ip": ""
   }
 }
@@ -233,42 +379,50 @@ Located in the `printer` section:
 ```json
 {
   "printer": {
-    "name": "My Printer",
-    "type": "Voron 2.4",
+    "name": "Unnamed Printer",
+    "type": "Unknown",
+    "moonraker_host": "192.168.1.112",
+    "moonraker_port": 7125,
+    "moonraker_api_key": false,
     "heaters": {
-      "hotend": "extruder",
-      "bed": "heater_bed"
+      "bed": "heater_bed",
+      "hotend": "extruder"
     },
     "temp_sensors": {
-      "hotend": "extruder",
-      "bed": "heater_bed"
+      "bed": "temperature_sensor bed",
+      "hotend": "temperature_sensor extruder"
     },
     "fans": {
-      "part": "fan",
-      "hotend": "heater_fan hotend_fan"
+      "hotend": "heater_fan hotend_fan",
+      "part": "fan"
     },
     "leds": {
-      "strip": "neopixel chamber_light"
+      "strip": "None"
     },
     "extra_sensors": {},
     "hardware": {
       "optional": [],
       "expected": [],
       "last_snapshot": {}
-    }
+    },
+    "default_macros": { ... },
+    "safety_limits": { ... },
+    "capability_overrides": { ... }
   }
 }
 ```
 
-> **Breaking Change (Jan 2026):** The config schema has changed from singular keys (`heater`, `sensor`, `fan`, `led`) to plural keys (`heaters`, `temp_sensors`, `fans`, `leds`). If upgrading from an older version, delete your config file and re-run the first-run wizard.
+> **Breaking Change (Jan 2026):** The config schema changed from singular keys (`heater`, `sensor`, `fan`, `led`) to plural keys (`heaters`, `temp_sensors`, `fans`, `leds`). If upgrading from an older version, delete your config file and re-run the first-run wizard.
 
 ### `name`
 **Type:** string
+**Default:** `"Unnamed Printer"`
 **Description:** Display name for your printer.
 
 ### `type`
 **Type:** string
-**Description:** Printer model/type for feature detection.
+**Default:** `"Unknown"`
+**Description:** Printer model/type for feature detection (e.g., "Voron 2.4", "AD5M", "K1").
 
 ### `heaters.hotend`
 **Type:** string
@@ -282,11 +436,11 @@ Located in the `printer` section:
 
 ### `temp_sensors.hotend`
 **Type:** string
-**Description:** Temperature sensor for hotend (typically same as heater name).
+**Description:** Temperature sensor for hotend (may differ from heater name if using separate sensor).
 
 ### `temp_sensors.bed`
 **Type:** string
-**Description:** Temperature sensor for bed (typically same as heater name).
+**Description:** Temperature sensor for bed (may differ from heater name if using separate sensor).
 
 ### `fans.part`
 **Type:** string
@@ -314,6 +468,26 @@ Located in the `printer` section:
 - `expected` - List of expected hardware based on printer type
 - `last_snapshot` - Last hardware state snapshot for change detection
 
+### `default_macros`
+**Type:** object
+**Description:** Custom macros for quick actions:
+
+```json
+{
+  "default_macros": {
+    "cooldown": "SET_HEATER_TEMPERATURE HEATER=extruder TARGET=0\nSET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=0",
+    "load_filament": { "label": "Load", "gcode": "LOAD_FILAMENT" },
+    "unload_filament": { "label": "Unload", "gcode": "UNLOAD_FILAMENT" },
+    "macro_1": { "label": "Clean Nozzle", "gcode": "HELIX_CLEAN_NOZZLE" },
+    "macro_2": { "label": "Bed Level", "gcode": "HELIX_BED_LEVEL_IF_NEEDED" }
+  }
+}
+```
+
+- `cooldown` - G-code string for the cooldown button
+- `load_filament` / `unload_filament` - Object with `label` and `gcode` for filament operations
+- `macro_1` / `macro_2` - Custom macro buttons with `label` and `gcode`
+
 ---
 
 ## Moonraker Settings
@@ -323,7 +497,7 @@ Connection settings are in the `printer` section:
 ```json
 {
   "printer": {
-    "moonraker_host": "192.168.1.100",
+    "moonraker_host": "192.168.1.112",
     "moonraker_port": 7125,
     "moonraker_api_key": false,
     "moonraker_connection_timeout_ms": 10000,
@@ -338,7 +512,7 @@ Connection settings are in the `printer` section:
 
 ### `moonraker_host`
 **Type:** string
-**Default:** `"localhost"`
+**Default:** `"192.168.1.112"` (template default, usually `"localhost"`)
 **Description:** Moonraker hostname or IP address.
 
 ### `moonraker_port`
@@ -376,6 +550,11 @@ Connection settings are in the `printer` section:
 **Default:** `2000`
 **Description:** Maximum delay before reconnection attempt (exponential backoff cap).
 
+### `moonraker_timeout_check_interval_ms`
+**Type:** integer
+**Default:** `2000`
+**Description:** Interval for checking request timeouts.
+
 ---
 
 ## G-code Viewer Settings
@@ -388,7 +567,9 @@ Located in the `gcode_viewer` section:
     "shading_model": "smooth",
     "tube_sides": 4,
     "streaming_mode": "auto",
-    "streaming_threshold_percent": 40
+    "streaming_threshold_percent": 40,
+    "layers_per_frame": 0,
+    "adaptive_layer_target_ms": 16
   }
 }
 ```
@@ -420,11 +601,50 @@ Located in the `gcode_viewer` section:
 - `on` - Always stream (lowest memory)
 - `off` - Always load full file (fastest viewing)
 
+Can be overridden via `HELIX_GCODE_STREAMING` env var.
+
 ### `streaming_threshold_percent`
 **Type:** integer
 **Default:** `40`
 **Range:** `1` - `90`
 **Description:** Percent of available RAM that triggers streaming mode. Lower values stream smaller files. Only used when `streaming_mode` is `"auto"`.
+
+### `layers_per_frame`
+**Type:** integer
+**Default:** `0` (auto)
+**Range:** `0` - `100`
+**Description:** Number of layers to render per frame during progressive 2D visualization:
+- `0` - Auto (adaptive based on render time, default)
+- `1-100` - Fixed value
+
+Higher values = faster caching, but may cause UI stutter on slow devices.
+
+### `adaptive_layer_target_ms`
+**Type:** integer
+**Default:** `16`
+**Description:** Target render time in milliseconds when using adaptive `layers_per_frame` (only used when `layers_per_frame=0`). Lower = smoother UI, higher = faster caching. Default 16ms targets ~60 FPS.
+
+---
+
+## AMS Settings
+
+Located in the `ams` section:
+
+```json
+{
+  "ams": {
+    "spool_style": "3d"
+  }
+}
+```
+
+### `spool_style`
+**Type:** string
+**Default:** `"3d"`
+**Values:** `"3d"`, `"flat"`
+**Description:** Filament spool visualization style:
+- `3d` - Bambu-style pseudo-3D canvas with gradients
+- `flat` - Simple concentric rings
 
 ---
 
@@ -455,29 +675,120 @@ Located in the `cache` section:
 ### `disk_low_mb`
 **Type:** integer
 **Default:** `20`
-**Description:** Evict cache aggressively when available disk falls below this threshold (MB).
+**Description:** Evict cache aggressively when available disk falls below this threshold (MB). Reduces cache to half normal limit.
 
 ---
 
-## AMS Settings
+## Streaming Settings
 
-Located in the `ams` section:
+Located in the `streaming` section:
 
 ```json
 {
-  "ams": {
-    "spool_style": "3d"
+  "streaming": {
+    "threshold_mb": 0,
+    "force_streaming": false
   }
 }
 ```
 
-### `spool_style`
-**Type:** string
-**Default:** `"3d"`
-**Values:** `"3d"`, `"flat"`
-**Description:** Filament spool visualization style:
-- `3d` - Bambu-style pseudo-3D canvas with gradients
-- `flat` - Simple concentric rings
+### `threshold_mb`
+**Type:** integer
+**Default:** `0` (auto-detect)
+**Description:** File size threshold in MB for using streaming (disk-based) operations instead of buffered (in-memory). `0` = auto-detect based on 10% of available RAM.
+
+Can be overridden via `HELIX_FORCE_STREAMING=1` env var to force streaming for all files.
+
+### `force_streaming`
+**Type:** boolean
+**Default:** `false`
+**Description:** Always use streaming operations regardless of file size. Useful for memory-constrained devices or testing. Can also be set via `HELIX_FORCE_STREAMING=1` env var.
+
+---
+
+## Safety Settings
+
+Located in the `safety` section:
+
+```json
+{
+  "safety": {
+    "estop_require_confirmation": false
+  }
+}
+```
+
+### `estop_require_confirmation`
+**Type:** boolean
+**Default:** `false`
+**Description:** Require confirmation dialog before emergency stop. When `false`, E-Stop triggers immediately. Default is `false` for faster emergency response.
+
+---
+
+## Filament Sensor Settings
+
+Located in the `filament_sensors` section:
+
+```json
+{
+  "filament_sensors": {
+    "master_enabled": true,
+    "sensors": []
+  }
+}
+```
+
+### `master_enabled`
+**Type:** boolean
+**Default:** `true`
+**Description:** Global toggle to enable/disable all filament sensor monitoring. When `false`, sensor states are ignored and no runout detection occurs.
+
+### `sensors`
+**Type:** array
+**Default:** `[]`
+**Description:** Array of sensor configurations. Sensors are auto-discovered from Moonraker. Each sensor object has:
+- `klipper_name` - Full Klipper object name (e.g., `"filament_switch_sensor fsensor"`)
+- `role` - Sensor role: `"none"`, `"runout"`, `"toolhead"`, `"entry"`
+- `enabled` - Boolean to enable/disable individual sensor
+
+**Example:**
+```json
+{
+  "sensors": [
+    {
+      "klipper_name": "filament_switch_sensor fsensor",
+      "role": "runout",
+      "enabled": true
+    }
+  ]
+}
+```
+
+---
+
+## Plugin Settings
+
+Located in the `plugins` section:
+
+```json
+{
+  "plugins": {
+    "enabled": []
+  }
+}
+```
+
+### `enabled`
+**Type:** array
+**Default:** `[]`
+**Description:** List of plugin IDs to load. Plugins must be explicitly enabled.
+
+**Example:**
+```json
+{
+  "enabled": ["led-effects", "custom-macros"]
+}
+```
 
 ---
 
@@ -489,15 +800,15 @@ Located in `printer.safety_limits`:
 {
   "printer": {
     "safety_limits": {
-    "max_temperature_celsius": 400.0,
-    "min_temperature_celsius": 0.0,
-    "max_fan_speed_percent": 100.0,
-    "min_fan_speed_percent": 0.0,
-    "max_feedrate_mm_min": 50000.0,
-    "min_feedrate_mm_min": 0.0,
-    "max_relative_distance_mm": 1000.0,
-    "min_relative_distance_mm": -1000.0,
-    "max_absolute_position_mm": 1000.0,
+      "max_temperature_celsius": 400.0,
+      "min_temperature_celsius": 0.0,
+      "max_fan_speed_percent": 100.0,
+      "min_fan_speed_percent": 0.0,
+      "max_feedrate_mm_min": 50000.0,
+      "min_feedrate_mm_min": 0.0,
+      "max_relative_distance_mm": 1000.0,
+      "min_relative_distance_mm": -1000.0,
+      "max_absolute_position_mm": 1000.0,
       "min_absolute_position_mm": 0.0
     }
   }
@@ -521,11 +832,11 @@ Located in `printer.capability_overrides`:
 {
   "printer": {
     "capability_overrides": {
-    "bed_leveling": "auto",
-    "qgl": "auto",
-    "z_tilt": "auto",
-    "nozzle_clean": "auto",
-    "heat_soak": "auto",
+      "bed_mesh": "auto",
+      "qgl": "auto",
+      "z_tilt": "auto",
+      "nozzle_clean": "auto",
+      "heat_soak": "auto",
       "chamber": "auto"
     }
   }
@@ -540,7 +851,7 @@ Located in `printer.capability_overrides`:
 **Use cases:**
 - Enable `heat_soak` when you have a chamber but no chamber heater (soak macro works without)
 - Disable `qgl` on a printer where it's defined but not used
-- Enable `bed_leveling` if detection failed
+- Enable `bed_mesh` if detection failed
 
 ---
 
@@ -549,7 +860,7 @@ Located in `printer.capability_overrides`:
 ### Full Reset
 Delete the config file and restart:
 ```bash
-sudo rm /opt/helixscreen/helixconfig.json
+sudo rm /opt/helixscreen/config/helixconfig.json
 sudo systemctl restart helixscreen
 ```
 
@@ -558,12 +869,12 @@ This triggers the first-run wizard.
 ### Partial Reset
 Edit the config file directly:
 ```bash
-sudo nano /opt/helixscreen/helixconfig.json
+sudo nano /opt/helixscreen/config/helixconfig.json
 ```
 
 Or copy fresh from template:
 ```bash
-sudo cp /opt/helixscreen/config/helixconfig.json.template /opt/helixscreen/helixconfig.json
+sudo cp /opt/helixscreen/config/helixconfig.json.template /opt/helixscreen/config/helixconfig.json
 ```
 
 ---
@@ -641,6 +952,9 @@ These can be set in the systemd service file or before running the binary:
 | `HELIX_DRM_DEVICE` | Override DRM device path (e.g., `/dev/dri/card1`) |
 | `HELIX_TOUCH_DEVICE` | Override touch input device (e.g., `/dev/input/event1`) |
 | `HELIX_DISPLAY_BACKEND` | Override display backend (`drm`, `fbdev`, `sdl`) |
+| `HELIX_GCODE_MODE` | Override G-code render mode (`3D` or `2D`) |
+| `HELIX_GCODE_STREAMING` | Override G-code streaming mode |
+| `HELIX_FORCE_STREAMING` | Force streaming for all file operations (`1` to enable) |
 
 **Example in service file:**
 ```ini
@@ -649,7 +963,7 @@ Environment="HELIX_DRM_DEVICE=/dev/dri/card1"
 Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
 ```
 
-> **Note:** Most users won't need environment variables. The config file options for `display.drm_device` and `display.touch_device` are preferred. Environment variables are mainly for debugging when the config file isn't accessible.
+> **Note:** Most users won't need environment variables. The config file options are preferred. Environment variables are mainly for debugging when the config file isn't accessible.
 
 ---
 
@@ -657,22 +971,46 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
 
 ```json
 {
-  "config_path": "config/helixconfig.json",
-  "animations_enabled": true,
   "dark_mode": true,
-  "display_rotate": 0,
-  "display_sleep_sec": 300,
+  "brightness": 70,
+  "sounds_enabled": true,
+  "completion_alert": true,
+  "wizard_completed": true,
+  "wifi_expected": true,
+  "language": "en",
   "log_dest": "journal",
   "log_path": "",
+  "log_level": "warn",
+
+  "theme": {
+    "preset": 0
+  },
 
   "display": {
+    "animations_enabled": true,
+    "time_format": 0,
+    "rotate": 0,
+    "sleep_sec": 1800,
+    "dim_sec": 300,
+    "dim_brightness": 30,
     "drm_device": "",
-    "touch_device": ""
+    "touch_device": "",
+    "gcode_render_mode": 2,
+    "gcode_3d_enabled": true,
+    "bed_mesh_render_mode": 0,
+    "bed_mesh_show_zero_plane": true,
+    "calibration": {
+      "valid": false
+    }
   },
 
   "input": {
     "scroll_throw": 25,
     "scroll_limit": 5
+  },
+
+  "output": {
+    "led_on_at_start": false
   },
 
   "network": {
@@ -689,6 +1027,10 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
     "moonraker_api_key": false,
     "moonraker_connection_timeout_ms": 10000,
     "moonraker_request_timeout_ms": 30000,
+    "moonraker_keepalive_interval_ms": 10000,
+    "moonraker_reconnect_min_delay_ms": 200,
+    "moonraker_reconnect_max_delay_ms": 2000,
+    "moonraker_timeout_check_interval_ms": 2000,
     "heaters": {
       "hotend": "extruder",
       "bed": "heater_bed"
@@ -709,16 +1051,71 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
       "optional": [],
       "expected": [],
       "last_snapshot": {}
+    },
+    "default_macros": {
+      "cooldown": "SET_HEATER_TEMPERATURE HEATER=extruder TARGET=0\nSET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=0",
+      "load_filament": { "label": "Load", "gcode": "LOAD_FILAMENT" },
+      "unload_filament": { "label": "Unload", "gcode": "UNLOAD_FILAMENT" },
+      "macro_1": { "label": "Clean Nozzle", "gcode": "HELIX_CLEAN_NOZZLE" },
+      "macro_2": { "label": "Bed Level", "gcode": "HELIX_BED_LEVEL_IF_NEEDED" }
+    },
+    "safety_limits": {
+      "max_temperature_celsius": 400.0,
+      "min_temperature_celsius": 0.0,
+      "max_fan_speed_percent": 100.0,
+      "min_fan_speed_percent": 0.0,
+      "max_feedrate_mm_min": 50000.0,
+      "min_feedrate_mm_min": 0.0,
+      "max_relative_distance_mm": 1000.0,
+      "min_relative_distance_mm": -1000.0,
+      "max_absolute_position_mm": 1000.0,
+      "min_absolute_position_mm": 0.0
+    },
+    "capability_overrides": {
+      "bed_mesh": "auto",
+      "qgl": "auto",
+      "z_tilt": "auto",
+      "nozzle_clean": "auto",
+      "heat_soak": "auto",
+      "chamber": "auto"
     }
   },
 
   "gcode_viewer": {
     "shading_model": "smooth",
-    "tube_sides": 8
+    "tube_sides": 8,
+    "streaming_mode": "auto",
+    "streaming_threshold_percent": 40,
+    "layers_per_frame": 0,
+    "adaptive_layer_target_ms": 16
   },
 
   "ams": {
     "spool_style": "3d"
+  },
+
+  "cache": {
+    "thumbnail_max_mb": 20,
+    "disk_critical_mb": 5,
+    "disk_low_mb": 20
+  },
+
+  "streaming": {
+    "threshold_mb": 0,
+    "force_streaming": false
+  },
+
+  "safety": {
+    "estop_require_confirmation": false
+  },
+
+  "filament_sensors": {
+    "master_enabled": true,
+    "sensors": []
+  },
+
+  "plugins": {
+    "enabled": []
   }
 }
 ```
