@@ -9,7 +9,7 @@ This directory contains a KIAUH (Klipper Installation And Update Helper) extensi
 The simplest way to install HelixScreen is using our bundled installer directly:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh
+curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh
 ```
 
 This works on any platform (MainsailOS, KIAUH, manual installs, AD5M) and doesn't require KIAUH.
@@ -62,7 +62,7 @@ The KIAUH extension is a thin wrapper around our bundled installer. It provides:
 - Same installation process as the direct installer
 - Consistent update and removal experience
 
-Under the hood, it downloads and runs the same `install-bundled.sh` script that the direct installation uses.
+Under the hood, it downloads and runs the same `install.sh` script that the direct installation uses.
 
 ## Troubleshooting
 

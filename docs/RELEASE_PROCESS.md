@@ -167,7 +167,7 @@ The workflow auto-generates basic release notes if no annotation is provided.
 3. Verify checksums in release notes
 4. Test installation:
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh
    ```
 
 ---
@@ -241,7 +241,7 @@ git push origin v1.3.0-rc.1
 - Not shown as "latest" release
 - Users must explicitly choose to install:
   ```bash
-  curl -sSL .../install-bundled.sh | sh -s -- --version v1.3.0-beta
+  curl -sSL .../install.sh | sh -s -- --version v1.3.0-beta
   ```
 
 ### Graduating Pre-releases

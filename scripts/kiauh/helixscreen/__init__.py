@@ -21,7 +21,7 @@ HELIXSCREEN_INSTALL_PATHS = [
     Path("/root/printer_software/helixscreen"),  # AD5M Klipper Mod
 ]
 HELIXSCREEN_INSTALLER_URL = (
-    "https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh"
+    "https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh"
 )
 
 

@@ -25,11 +25,11 @@ Built on LVGL 9's modern declarative XML system, HelixScreen delivers a fast, po
 >
 > **Tested on:** Voron 2.4 (Raspberry Pi 5), FlashForge Adventurer 5M Pro ([Forge-X](https://github.com/DrA1ex/ff5m) firmware)
 >
-> **Ready to help?** See [Quick Start](#quick-start). Issues and feedback welcome!
+> **Ready to help?** See [Installation](#installation). Issues and feedback welcome!
 
 ---
 
-**Quick Links:** [Features](#features) · [Screenshots](#screenshots) · [Quick Start](#quick-start) · [FAQ](#faq) · [Contributing](docs/DEVELOPMENT.md#contributing) · [Roadmap](docs/ROADMAP.md)
+**Quick Links:** [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) · [FAQ](#faq) · [Contributing](docs/DEVELOPMENT.md#contributing) · [Roadmap](docs/ROADMAP.md)
 
 ---
 
@@ -78,7 +78,18 @@ See [docs/GALLERY.md](docs/GALLERY.md) for all screenshots.
 
 **System** — First-run wizard, 30 panels, light/dark themes, responsive 480×320 to 1024×600+
 
-## Quick Start
+## Installation
+
+**Raspberry Pi / Creality K1:**
+```bash
+curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh
+```
+
+**Adventurer 5M:** Requires downloading to your computer first, then copying to the printer (BusyBox lacks HTTPS support).
+
+See [Installation Guide](docs/user/INSTALL.md) for detailed instructions, display configuration, and troubleshooting.
+
+## Development
 
 ```bash
 # Check/install dependencies

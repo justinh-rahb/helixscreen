@@ -356,7 +356,8 @@ The installation system is modular for maintainability and BusyBox compatibility
 
 ```
 scripts/
-├── install.sh                    # Main orchestrator (~220 lines)
+├── install.sh                    # Auto-generated for curl|sh (user-facing)
+├── install-dev.sh                # Modular version (requires lib/installer/)
 ├── uninstall.sh                  # Standalone uninstaller
 ├── lib/installer/                # Shared modules
 │   ├── common.sh                 # Logging, colors, error handling
@@ -368,8 +369,7 @@ scripts/
 │   ├── release.sh                # Download and extract
 │   ├── service.sh                # Systemd/SysV service management
 │   └── uninstall.sh              # Uninstall/clean functions
-├── bundle-installer.sh           # Generate single-file version
-└── install-bundled.sh            # Auto-generated for curl|sh
+└── bundle-installer.sh           # Generate install.sh from modules
 ```
 
 ### BusyBox Compatibility
@@ -383,7 +383,7 @@ All modules use POSIX `#!/bin/sh` (not bash) for AD5M's BusyBox environment:
 ### Generating Bundled Installer
 
 ```bash
-./scripts/bundle-installer.sh -o ./scripts/install-bundled.sh
+./scripts/bundle-installer.sh -o ./scripts/install.sh
 ```
 
 The bundled version inlines all modules for curl|sh usage.
@@ -391,8 +391,8 @@ The bundled version inlines all modules for curl|sh usage.
 ### Testing Installers
 
 ```bash
-./scripts/install.sh --help           # Test modular version
-./scripts/install-bundled.sh --help   # Test bundled version
+./scripts/install-dev.sh --help       # Test modular version (from repo)
+./scripts/install.sh --help           # Test bundled version (for users)
 ./scripts/uninstall.sh --help         # Test uninstaller
 sh -n scripts/install.sh              # Check POSIX syntax
 ```

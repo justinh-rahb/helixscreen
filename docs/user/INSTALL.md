@@ -26,7 +26,7 @@ This guide walks you through installing HelixScreen on your 3D printer's touchsc
 
 **Raspberry Pi (MainsailOS) or Creality K1:**
 ```bash
-curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh
+curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh
 ```
 
 The installer automatically detects your platform and downloads the correct release.
@@ -230,7 +230,7 @@ The AD5M uses BusyBox which doesn't support HTTPS downloads directly. You'll nee
 ```bash
 # Download the latest release and installer
 wget https://github.com/prestonbrown/helixscreen/releases/latest/download/helixscreen-ad5m.tar.gz
-wget https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh
+wget https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh
 ```
 
 Or download manually from: https://github.com/prestonbrown/helixscreen/releases/latest
@@ -240,14 +240,14 @@ Or download manually from: https://github.com/prestonbrown/helixscreen/releases/
 ```bash
 # AD5M requires -O flag for scp (BusyBox lacks sftp-server)
 # Note: Use /data/ not /tmp/ - AD5M's /tmp is a tiny tmpfs (~54MB)
-scp -O helixscreen-ad5m.tar.gz install-bundled.sh root@<printer-ip>:/data/
+scp -O helixscreen-ad5m.tar.gz install.sh root@<printer-ip>:/data/
 ```
 
 **Step 3: Run the installer**
 
 ```bash
 ssh root@<printer-ip>
-sh /data/install-bundled.sh --local /data/helixscreen-ad5m.tar.gz
+sh /data/install.sh --local /data/helixscreen-ad5m.tar.gz
 ```
 
 The install script automatically detects your firmware (Forge-X or Klipper Mod) and installs to the correct location.
@@ -575,7 +575,7 @@ The easiest way to update is using the install script with `--update`:
 
 ```bash
 # All platforms (Pi, AD5M, K1)
-curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --update
+curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --update
 ```
 
 This preserves your configuration and updates to the latest version.
@@ -583,7 +583,7 @@ This preserves your configuration and updates to the latest version.
 ### Update to Specific Version
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --update --version v1.2.0
+curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --update --version v1.2.0
 ```
 
 ### Preserving Configuration
@@ -630,7 +630,7 @@ The install script with `--uninstall` removes HelixScreen and **restores your pr
 
 ```bash
 # All platforms (Pi, AD5M, K1)
-curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --uninstall
+curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --uninstall
 ```
 
 ### Manual Uninstall

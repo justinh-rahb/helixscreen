@@ -166,7 +166,7 @@ HelixScreen is an **add-on** to existing Klipper installations. We don't ship cu
 
 3. **Run installer:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh
    ```
 
 4. **Verify installation:**
@@ -202,7 +202,7 @@ HelixScreen is an **add-on** to existing Klipper installations. We don't ship cu
 
 1. **With existing HelixScreen installed, run:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --update
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --update
    ```
 
 2. **Verify config preserved:**
@@ -217,7 +217,7 @@ HelixScreen is an **add-on** to existing Klipper installations. We don't ship cu
 
 1. **Run uninstaller:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --uninstall
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --uninstall
    ```
 
 2. **Verify removal:**
@@ -276,7 +276,7 @@ ps --no-headers -o comm 1
 
 3. **Run installer:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh
    ```
 
 4. **Verify installation:**
@@ -327,7 +327,7 @@ ps --no-headers -o comm 1
 
 1. **Run with --update:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --update
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --update
    ```
 
 2. **Verify config preserved:**
@@ -339,7 +339,7 @@ ps --no-headers -o comm 1
 
 1. **Run uninstaller:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --uninstall
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --uninstall
    ```
 
 2. **Verify removal and GuppyScreen restoration:**
@@ -379,7 +379,7 @@ ps --no-headers -o comm 1
 
 3. **Run installer:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh
    ```
 
 4. **Verify installation:**
@@ -421,7 +421,7 @@ ps --no-headers -o comm 1
 
 1. **Run uninstaller:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --uninstall
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --uninstall
    ```
 
 2. **Verify removal and KlipperScreen restoration:**
@@ -459,7 +459,7 @@ ps --no-headers -o comm 1
 
 3. **Run installer:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh
    ```
 
 4. **Verify installation:**
@@ -499,7 +499,7 @@ ps --no-headers -o comm 1
 
 1. **Run with --update:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --update
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --update
    ```
 
 2. **Verify config preserved:**
@@ -511,7 +511,7 @@ ps --no-headers -o comm 1
 
 1. **Run uninstaller:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install-bundled.sh | sh -s -- --uninstall
+   curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/scripts/install.sh | sh -s -- --uninstall
    ```
 
 2. **Verify removal and GuppyScreen restoration:**

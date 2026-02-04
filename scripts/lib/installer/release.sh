@@ -90,12 +90,12 @@ show_manual_install_instructions() {
         echo "     ${CYAN}scp -O helixscreen-${platform}.tar.gz root@<this-ip>:/data/${NC}"
         echo ""
         echo "  4. Run the installer with the local file:"
-        echo "     ${CYAN}sh /data/install-bundled.sh --local /data/helixscreen-${platform}.tar.gz${NC}"
+        echo "     ${CYAN}sh /data/install.sh --local /data/helixscreen-${platform}.tar.gz${NC}"
     else
         echo "     ${CYAN}scp helixscreen-${platform}.tar.gz root@<this-ip>:/tmp/${NC}"
         echo ""
         echo "  4. Run the installer with the local file:"
-        echo "     ${CYAN}sh /tmp/install-bundled.sh --local /tmp/helixscreen-${platform}.tar.gz${NC}"
+        echo "     ${CYAN}sh /tmp/install.sh --local /tmp/helixscreen-${platform}.tar.gz${NC}"
     fi
     echo ""
     exit 1
