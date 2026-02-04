@@ -408,8 +408,7 @@ bool Application::parse_args(int argc, char** argv) {
     }
 
     // HELIX_BENCHMARK: benchmark mode
-    m_benchmark_mode = EnvConfig::get_benchmark_mode();
-    if (m_benchmark_mode) {
+    if (EnvConfig::get_benchmark_mode()) {
         spdlog::info("[Application] Benchmark mode enabled");
     }
 
@@ -1512,35 +1511,37 @@ int Application::main_loop() {
     m_running = true;
 
     // Initialize timing
-    m_start_time = DisplayManager::get_ticks();
-    m_screenshot_time = m_start_time + (static_cast<uint32_t>(m_args.screenshot_delay_sec) * 1000U);
-    m_last_timeout_check = m_start_time;
+    uint32_t start_time = DisplayManager::get_ticks();
+    m_last_timeout_check = start_time;
     m_timeout_check_interval = static_cast<uint32_t>(
         m_config->get<int>(m_config->df() + "moonraker_timeout_check_interval_ms", 2000));
 
-    if (m_benchmark_mode) {
-        m_benchmark_start_time = m_start_time;
-        m_benchmark_last_report = m_start_time;
-    }
+    // Configure main loop handler
+    helix::application::MainLoopHandler::Config loop_config;
+    loop_config.screenshot_enabled = m_args.screenshot_enabled;
+    loop_config.screenshot_delay_ms = static_cast<uint32_t>(m_args.screenshot_delay_sec) * 1000U;
+    loop_config.timeout_sec = m_args.timeout_sec;
+    loop_config.benchmark_mode = helix::config::EnvironmentConfig::get_benchmark_mode();
+    loop_config.benchmark_report_interval_ms = 5000;
+    m_loop_handler.init(loop_config, start_time);
 
     // Main event loop
     while (lv_display_get_next(nullptr) && !app_quit_requested()) {
+        uint32_t current_tick = DisplayManager::get_ticks();
+        m_loop_handler.on_frame(current_tick);
+
         handle_keyboard_shortcuts();
 
         // Auto-screenshot
-        if (m_args.screenshot_enabled && !m_screenshot_taken &&
-            DisplayManager::get_ticks() >= m_screenshot_time) {
+        if (m_loop_handler.should_take_screenshot()) {
             helix::save_screenshot();
-            m_screenshot_taken = true;
+            m_loop_handler.mark_screenshot_taken();
         }
 
         // Auto-quit timeout
-        if (m_args.timeout_sec > 0) {
-            uint32_t elapsed = DisplayManager::get_ticks() - m_start_time;
-            if (elapsed >= static_cast<uint32_t>(m_args.timeout_sec) * 1000U) {
-                spdlog::info("[Application] Timeout reached ({} seconds)", m_args.timeout_sec);
-                break;
-            }
+        if (m_loop_handler.should_quit()) {
+            spdlog::info("[Application] Timeout reached ({} seconds)", m_args.timeout_sec);
+            break;
         }
 
         // Process timeouts
@@ -1572,17 +1573,12 @@ int Application::main_loop() {
             m_splash_manager.mark_refresh_done();
         }
 
-        // Benchmark mode
-        if (m_benchmark_mode) {
+        // Benchmark mode - force redraws and report FPS
+        if (loop_config.benchmark_mode) {
             lv_obj_invalidate(lv_screen_active());
-            m_benchmark_frame_count++;
-            uint32_t now = DisplayManager::get_ticks();
-            if (now - m_benchmark_last_report >= 5000) {
-                float elapsed_sec = (now - m_benchmark_last_report) / 1000.0f;
-                float fps = m_benchmark_frame_count / elapsed_sec;
-                spdlog::info("[Application] Benchmark FPS: {:.1f}", fps);
-                m_benchmark_frame_count = 0;
-                m_benchmark_last_report = now;
+            if (m_loop_handler.benchmark_should_report()) {
+                auto report = m_loop_handler.benchmark_get_report();
+                spdlog::info("[Application] Benchmark FPS: {:.1f}", report.fps);
             }
         }
 
@@ -1591,9 +1587,10 @@ int Application::main_loop() {
 
     m_running = false;
 
-    if (m_benchmark_mode) {
-        uint32_t total_time = DisplayManager::get_ticks() - m_benchmark_start_time;
-        spdlog::info("[Application] Benchmark total runtime: {:.1f}s", total_time / 1000.0f);
+    if (loop_config.benchmark_mode) {
+        auto final_report = m_loop_handler.benchmark_get_final_report();
+        spdlog::info("[Application] Benchmark total runtime: {:.1f}s",
+                     final_report.total_runtime_sec);
     }
 
     return 0;

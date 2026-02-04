@@ -7,6 +7,7 @@
 
 #include "cli_args.h"
 #include "lvgl/lvgl.h"
+#include "main_loop_handler.h"
 #include "splash_screen_manager.h"
 
 #include <memory>
@@ -141,18 +142,12 @@ class Application {
     // NOTE: Print start collector and observers are kept in main.cpp
     // until the observer pattern is refactored to support capturing lambdas.
 
-    // Timing for auto-screenshot and timeout
-    uint32_t m_screenshot_time = 0;
-    bool m_screenshot_taken = false;
-    uint32_t m_start_time = 0;
+    // Periodic timeout checking (Moonraker connection health)
     uint32_t m_last_timeout_check = 0;
     uint32_t m_timeout_check_interval = 2000;
 
-    // Benchmark mode
-    bool m_benchmark_mode = false;
-    uint32_t m_benchmark_frame_count = 0;
-    uint32_t m_benchmark_start_time = 0;
-    uint32_t m_benchmark_last_report = 0;
+    // Main loop timing handler (screenshot, auto-quit, benchmark)
+    helix::application::MainLoopHandler m_loop_handler;
 
     // State
     bool m_running = false;
