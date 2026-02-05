@@ -291,11 +291,26 @@ void ZOffsetCalibrationPanel::send_probe_calibrate() {
         return;
     }
 
+    // Auto-home if needed - probe calibration requires all axes homed
+    PrinterState& ps = get_printer_state();
+    const char* homed = lv_subject_get_string(ps.get_homed_axes_subject());
+    bool all_homed = homed && std::string(homed).find("xyz") != std::string::npos;
+
+    if (!all_homed) {
+        spdlog::info("[ZOffsetCal] Axes not homed (homed_axes='{}'), homing first",
+                     homed ? homed : "");
+        int home_result = client_->gcode_script("G28");
+        if (home_result != 0) {
+            spdlog::error("[ZOffsetCal] Failed to home axes (error {})", home_result);
+            on_calibration_result(false, "Failed to home axes");
+            return;
+        }
+    }
+
     // Auto-detect calibration method based on printer capabilities:
     // - Printers with probe (BLTouch, inductive, etc.) use PROBE_CALIBRATE
     // - Printers with only mechanical endstop use Z_ENDSTOP_CALIBRATE
     // Both commands enter manual_probe mode and work identically from UI perspective
-    PrinterState& ps = get_printer_state();
     const char* calibrate_cmd = ps.has_probe() ? "PROBE_CALIBRATE" : "Z_ENDSTOP_CALIBRATE";
 
     spdlog::info("[ZOffsetCal] Sending {} (has_probe={})", calibrate_cmd, ps.has_probe());
