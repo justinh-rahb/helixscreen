@@ -14,7 +14,7 @@ namespace helix {
  *
  * Tracks hardware capabilities (probe, heater bed, LED, accelerometer, etc.)
  * and feature availability (spoolman, timelapse, firmware retraction, etc.)
- * Provides 14 subjects for reactive UI updates based on printer capabilities.
+ * Provides 15 subjects for reactive UI updates based on printer capabilities.
  * Extracted from PrinterState as part of god class decomposition.
  *
  * @note Capability values are set from hardware discovery on connect, with
@@ -88,7 +88,7 @@ class PrinterCapabilitiesState {
     void set_bed_moves(bool bed_moves);
 
     // ========================================================================
-    // Subject accessors (14 subjects)
+    // Subject accessors (15 subjects)
     // ========================================================================
 
     /// 1 if printer has quad_gantry_level
@@ -166,6 +166,11 @@ class PrinterCapabilitiesState {
         return const_cast<lv_subject_t*>(&printer_has_chamber_sensor_);
     }
 
+    /// 1 if printer has screws_tilt_adjust
+    lv_subject_t* get_printer_has_screws_tilt_subject() const {
+        return const_cast<lv_subject_t*>(&printer_has_screws_tilt_);
+    }
+
     // ========================================================================
     // Convenience methods
     // ========================================================================
@@ -199,6 +204,7 @@ class PrinterCapabilitiesState {
     lv_subject_t printer_has_firmware_retraction_{}; // firmware retraction (G10/G11)
     lv_subject_t printer_bed_moves_{};               // 0=gantry moves on Z, 1=bed moves on Z
     lv_subject_t printer_has_chamber_sensor_{};      // chamber temperature sensor
+    lv_subject_t printer_has_screws_tilt_{};         // screws_tilt_adjust
 };
 
 } // namespace helix
