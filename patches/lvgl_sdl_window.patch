@@ -1,5 +1,5 @@
 diff --git a/src/drivers/sdl/lv_sdl_window.c b/src/drivers/sdl/lv_sdl_window.c
-index fe19304d3..53f88837a 100644
+index fe19304d3..6a26a5b84 100644
 --- a/src/drivers/sdl/lv_sdl_window.c
 +++ b/src/drivers/sdl/lv_sdl_window.c
 @@ -174,7 +174,13 @@ void lv_sdl_window_set_zoom(lv_display_t * disp, float zoom)
@@ -34,6 +34,8 @@ index fe19304d3..53f88837a 100644
  
      int32_t hor_res = (int32_t)((float)(disp->hor_res) * dsc->zoom);
      int32_t ver_res = (int32_t)((float)(disp->ver_res) * dsc->zoom);
+-    dsc->window = SDL_CreateWindow("LVGL Simulator",
+-                                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 +
 +    /* Check environment variables for window position */
 +    int x_pos = SDL_WINDOWPOS_UNDEFINED;
@@ -77,8 +79,7 @@ index fe19304d3..53f88837a 100644
 +        LV_LOG_USER("Window position set to exact coordinates (%d, %d)", x_pos, y_pos);
 +    }
 +
-     dsc->window = SDL_CreateWindow("LVGL Simulator",
--                                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
++    dsc->window = SDL_CreateWindow("HelixScreen",
 +                                   x_pos, y_pos,
                                     hor_res, ver_res, flag);       /*last param. SDL_WINDOW_BORDERLESS to hide borders*/
  
