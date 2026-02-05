@@ -268,6 +268,8 @@ void SettingsPanel::init_subjects() {
     subjects_.register_subject(&show_touch_calibration_subject_);
     lv_xml_register_subject(nullptr, "show_touch_calibration", &show_touch_calibration_subject_);
 
+    // Note: show_beta_features subject is initialized globally in app_globals.cpp
+
     // Touch calibration status - show "Calibrated" or "Not calibrated" in row description
     Config* config = Config::get_instance();
     bool is_calibrated = config && config->get<bool>("/input/calibration/valid", false);

@@ -16,6 +16,7 @@
 
 #include "ui_modal.h"
 
+#include "config.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "printer_state.h"
@@ -45,6 +46,7 @@ static TemperatureHistoryManager* g_temp_history_manager = nullptr;
 // Global reactive subjects with RAII cleanup
 static SubjectManager g_subjects;
 static lv_subject_t g_notification_subject;
+static lv_subject_t g_show_beta_features_subject;
 
 // Application quit flag
 static bool g_quit_requested = false;
@@ -115,6 +117,13 @@ void app_globals_init_subjects() {
     // programmatically via get_notification_subject(), not through XML bindings
     lv_subject_init_pointer(&g_notification_subject, nullptr);
     g_subjects.register_subject(&g_notification_subject);
+
+    // Initialize beta features visibility subject (config-driven, used by multiple panels)
+    Config* config = Config::get_instance();
+    bool beta_enabled = config && config->is_beta_features_enabled();
+    lv_subject_init_int(&g_show_beta_features_subject, beta_enabled ? 1 : 0);
+    g_subjects.register_subject(&g_show_beta_features_subject);
+    lv_xml_register_subject(nullptr, "show_beta_features", &g_show_beta_features_subject);
 
     // Initialize modal dialog subjects (for modal_dialog.xml binding)
     ui_modal_init_subjects();
