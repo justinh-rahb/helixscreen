@@ -69,8 +69,8 @@ else ifeq ($(PLATFORM_TARGET),ad5m)
     # This avoids glibc version mismatch (binary needs 2.33, system has 2.25)
     # -lstdc++fs: Required for std::experimental::filesystem on GCC 10.x
     TARGET_LDFLAGS := -Wl,--gc-sections -flto -static -lstdc++fs
-    # SSL disabled for embedded - Moonraker communication is local/plaintext
-    ENABLE_SSL := no
+    # SSL enabled for HTTPS/WSS support with Moonraker
+    ENABLE_SSL := yes
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
     # Disable TinyGL for AD5M - CPU too weak for software 3D (3-4 FPS)

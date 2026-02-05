@@ -17,8 +17,6 @@
 # Trade-off: Larger binary (~5-8MB vs ~2MB dynamic) but guaranteed compatibility
 # on any armv7-a Linux system regardless of glibc version.
 #
-# Note: SSL/TLS is disabled for embedded targets - Moonraker communication is local
-#
 # Multi-arch support: Automatically uses native toolchain on both x86_64 and aarch64 hosts
 
 FROM debian:bookworm-slim
@@ -73,6 +71,27 @@ RUN HOSTARCH=$(case "$TARGETARCH" in \
     tar xf "${TOOLCHAIN_NAME}.tar.xz" && \
     rm "${TOOLCHAIN_NAME}.tar.xz" && \
     mv "${TOOLCHAIN_NAME}" arm-toolchain
+
+# ==============================================================================
+# OpenSSL 1.1.1w - Static Cross-Compiled Libraries
+# ==============================================================================
+# Build OpenSSL for ARM with static linking. The libraries install directly into
+# the toolchain's sysroot so cross-compilation finds them automatically.
+#
+# Note: linux-armv4 is OpenSSL's generic ARM target (covers armv7-a and above)
+# Must set PATH here since ENV PATH comes later in the Dockerfile
+WORKDIR /tmp
+RUN export PATH="/opt/arm-toolchain/bin:$PATH" && \
+    wget -q https://www.openssl.org/source/openssl-1.1.1w.tar.gz && \
+    tar xzf openssl-1.1.1w.tar.gz && \
+    cd openssl-1.1.1w && \
+    ./Configure linux-armv4 no-shared \
+        --cross-compile-prefix=arm-none-linux-gnueabihf- \
+        --prefix=/opt/arm-toolchain/arm-none-linux-gnueabihf && \
+    make -j$(nproc) && \
+    make install_sw && \
+    cd .. && \
+    rm -rf openssl-1.1.1w openssl-1.1.1w.tar.gz
 
 # ==============================================================================
 # Cross-Compilation Environment

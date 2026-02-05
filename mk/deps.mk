@@ -328,11 +328,13 @@ ifneq ($(CROSS_COMPILE),)
 	$(Q)echo "$(YELLOW)→ Cleaning libhv for cross-compilation...$(RESET)"
 	$(Q)find $(LIBHV_DIR) -type f \( -name '*.o' -o -name '*.a' -o -name '*.so' -o -name '*.dylib' \) -delete 2>/dev/null || true
 	# Pass cross-compiler to configure and make
+	# SSL support: when ENABLE_SSL=yes, add --with-openssl and point to toolchain sysroot
 	$(Q)cd $(LIBHV_DIR) && \
 		CC=$(CC) CXX=$(CXX) AR=$(AR) \
-		CFLAGS="$(TARGET_CFLAGS)" \
-		CXXFLAGS="$(TARGET_CFLAGS)" \
-		./configure --with-http-client
+		CFLAGS="$(TARGET_CFLAGS)$(if $(filter yes,$(ENABLE_SSL)), -I/opt/arm-toolchain/arm-none-linux-gnueabihf/include)" \
+		CXXFLAGS="$(TARGET_CFLAGS)$(if $(filter yes,$(ENABLE_SSL)), -I/opt/arm-toolchain/arm-none-linux-gnueabihf/include)" \
+		LDFLAGS="$(if $(filter yes,$(ENABLE_SSL)),-L/opt/arm-toolchain/arm-none-linux-gnueabihf/lib)" \
+		./configure --with-http-client $(if $(filter yes,$(ENABLE_SSL)),--with-openssl)
 	$(Q)CC=$(CC) CXX=$(CXX) AR=$(AR) $(MAKE) -C $(LIBHV_DIR) libhv
 else ifeq ($(UNAME_S),Darwin)
 	$(Q)cd $(LIBHV_DIR) && \
