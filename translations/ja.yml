@@ -184,6 +184,7 @@ translations:
   "Connecting...": "接続中..."
   "Connection": "接続"
   Connection failed. Check password.: "接続に失敗しました。パスワードを確認してください。"
+  "Connection successful!": "接続成功！"
   "Connection must be tested successfully to continue": "続行するには接続テストに成功する必要があります"
   "Console": "コンソール"
   "Control optional print start features": "オプションの印刷開始機能を制御"

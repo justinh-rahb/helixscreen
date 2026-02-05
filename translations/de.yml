@@ -180,6 +180,7 @@ translations:
   "Connecting...": "Verbinde..."
   "Connection": "Verbindung"
   Connection failed. Check password.: Verbindung fehlgeschlagen. Passwort prüfen.
+  "Connection successful!": "Verbindung erfolgreich!"
   "Connection must be tested successfully to continue": "Verbindung muss erfolgreich getestet werden, um fortzufahren"
   "Console": "Konsole"
   "Control optional print start features": "Optionale Druckstartfunktionen steuern"

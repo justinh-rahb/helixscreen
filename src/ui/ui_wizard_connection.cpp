@@ -429,7 +429,7 @@ void WizardConnectionStep::on_connection_success() {
                                 // NOW enable Next button - discovery is complete
                                 lv_subject_set_int(&self2->connection_discovering_, 0);
                                 self2->set_status("icon_check_circle", StatusVariant::Success,
-                                                  "Connection successful!");
+                                                  lv_tr("Connection successful!"));
                                 self2->connection_validated_ = true;
                                 lv_subject_set_int(&connection_test_passed, 1);
                             },
@@ -754,7 +754,7 @@ void WizardConnectionStep::on_auto_probe_success() {
                                 // NOW enable Next button - discovery is complete
                                 lv_subject_set_int(&self2->connection_discovering_, 0);
                                 self2->set_status("icon_check_circle", StatusVariant::Success,
-                                                  "Connection successful!");
+                                                  lv_tr("Connection successful!"));
                                 self2->connection_validated_ = true;
                                 lv_subject_set_int(&connection_test_passed, 1);
                             },
@@ -801,7 +801,7 @@ void WizardConnectionStep::on_auto_probe_success() {
                 // No client - still show success
                 lv_subject_set_int(&self->connection_discovering_, 0);
                 self->set_status("icon_check_circle", StatusVariant::Success,
-                                 "Connection successful!");
+                                 lv_tr("Connection successful!"));
                 self->connection_validated_ = true;
                 lv_subject_set_int(&connection_test_passed, 1);
             }

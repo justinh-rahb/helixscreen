@@ -181,6 +181,7 @@ translations:
   "Connection": "Connexion"
   Connection failed. Check password.: Connexion échouée. Vérifiez le mot de passe.
   "Connection must be tested successfully to continue": "La connexion doit être testée avec succès pour continuer"
+  "Connection successful!": "Connexion réussie !"
   "Console": "Console"
   "Control optional print start features": "Contrôler les fonctionnalités optionnelles de démarrage d'impression"
   "Cool Down": "Refroidir"

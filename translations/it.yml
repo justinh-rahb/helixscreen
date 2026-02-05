@@ -188,6 +188,7 @@ translations:
   "Connection": "Connessione"
   Connection failed. Check password.: Connessione fallita. Verificare la password.
   "Connection must be tested successfully to continue": "La connessione deve essere testata con successo per continuare"
+  "Connection successful!": "Connessione riuscita!"
   "Connection timeout": "Timeout connessione"
   "Console": "Console"
   "Control optional print start features": "Controlla funzionalità opzionali avvio stampa"

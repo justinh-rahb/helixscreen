@@ -179,6 +179,7 @@ translations:
   "Connecting to network...": "Подключение к сети..."
   "Connecting...": "Подключение..."
   "Connection": "Соединение"
+  "Connection successful!": "Подключение успешно!"
   Connection failed. Check password.: Ошибка подключения. Проверьте пароль.
   "Connected (%s)": "Подключено (%s)"
   "Connected (no discovery)": "Подключено (без обнаружения)"
