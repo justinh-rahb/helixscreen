@@ -5,12 +5,13 @@
 **HelixScreen**: LVGL 9.4 touchscreen UI for Klipper 3D printers. Pattern: XML → Subjects → C++.
 
 ```bash
-make -j                              # Build (pure Makefile, NOT cmake/ninja)
+make -j                              # Build ONLY the program binary (NOT tests)
 ./build/bin/helix-screen --test -vv  # Mock printer + DEBUG logs
 # ALWAYS use verbosity: -v=INFO, -vv=DEBUG, -vvv=TRACE (default=WARN)
 
-make test-run                        # Parallel tests
-./build/bin/helix-tests "[tag]"      # Specific tests
+make test                            # Build tests only (does NOT run them)
+make test-run                        # Build AND run tests in parallel
+./build/bin/helix-tests "[tag]"      # Run specific test tags
 make pi-test                         # Build on thelio + deploy + run
 ```
 
