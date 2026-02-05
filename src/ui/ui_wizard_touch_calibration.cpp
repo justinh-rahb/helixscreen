@@ -202,9 +202,28 @@ lv_obj_t* WizardTouchCalibrationStep::create(lv_obj_t* parent) {
         spdlog::debug("[{}] Crosshair reparented to screen for absolute positioning", get_name());
     }
 
+    // Reparent touch capture overlay to screen for full-screen touch capture
+    // This allows calibration targets in header/footer areas to be tappable
+    lv_obj_t* touch_overlay = lv_obj_find_by_name(screen_root_, "touch_capture_overlay");
+    if (touch_overlay) {
+        lv_obj_set_parent(touch_overlay, lv_screen_active());
+        lv_obj_set_size(touch_overlay, LV_PCT(100), LV_PCT(100));
+        lv_obj_set_pos(touch_overlay, 0, 0);
+        lv_obj_add_flag(touch_overlay, LV_OBJ_FLAG_FLOATING);
+        lv_obj_move_foreground(touch_overlay); // Ensure it's on top for click capture
+        spdlog::debug("[{}] Touch overlay reparented to screen for full-screen capture",
+                      get_name());
+    }
+
     // Find test area widgets (shown in COMPLETE state)
     test_area_container_ = lv_obj_find_by_name(screen_root_, "test_area_container");
     test_touch_area_ = lv_obj_find_by_name(screen_root_, "test_touch_area");
+
+    // Center the wizard subtitle for this step (keeps it clear of crosshair targets)
+    lv_obj_t* subtitle = lv_obj_find_by_name(lv_screen_active(), "wizard_subtitle");
+    if (subtitle) {
+        lv_obj_set_style_text_align(subtitle, LV_TEXT_ALIGN_CENTER, 0);
+    }
 
     // Auto-start calibration immediately
     if (panel_) {
@@ -234,8 +253,18 @@ void WizardTouchCalibrationStep::cleanup() {
     // Reset button text to "Next" (in case user skipped without completing)
     lv_subject_set_int(&wizard_show_skip, 0);
 
+    // Reset wizard subtitle alignment back to left (was centered for this step)
+    lv_obj_t* subtitle = lv_obj_find_by_name(lv_screen_active(), "wizard_subtitle");
+    if (subtitle) {
+        lv_obj_set_style_text_align(subtitle, LV_TEXT_ALIGN_LEFT, 0);
+    }
+
     // Delete crosshair (it was reparented to screen, not part of screen_root_)
     lv_obj_safe_delete(crosshair_);
+
+    // Delete touch overlay (it was also reparented to screen)
+    lv_obj_t* touch_overlay = lv_obj_find_by_name(lv_screen_active(), "touch_capture_overlay");
+    lv_obj_safe_delete(touch_overlay);
 
     // Clear widget pointers FIRST to prevent UI updates during cleanup
     // (test area widgets are children of screen_root_, so they're deleted with it)
@@ -567,9 +596,8 @@ void WizardTouchCalibrationStep::update_crosshair_position() {
         return;
     }
 
-    // Touch overlay remains in screen_root_ for event capture
-    lv_obj_t* touch_overlay =
-        screen_root_ ? lv_obj_find_by_name(screen_root_, "touch_capture_overlay") : nullptr;
+    // Touch overlay was reparented to screen for full-screen capture
+    lv_obj_t* touch_overlay = lv_obj_find_by_name(lv_screen_active(), "touch_capture_overlay");
 
     auto state = panel_->get_state();
 
@@ -592,6 +620,7 @@ void WizardTouchCalibrationStep::update_crosshair_position() {
     }
     if (touch_overlay) {
         lv_obj_remove_flag(touch_overlay, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(touch_overlay); // Keep on top for click capture
     }
 
     int step = 0;

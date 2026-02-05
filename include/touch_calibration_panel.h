@@ -167,9 +167,9 @@ class TouchCalibrationPanel {
      * Returns (0, 0) for out-of-range step values.
      *
      * Default target positions (for 800x480 screen):
-     *   Step 0: (120, 144) - 15% from left, 30% from top
+     *   Step 0: (120, 86)  - 15% from left, 18% from top
      *   Step 1: (400, 408) - center X, 85% from top
-     *   Step 2: (680, 72)  - 85% from left, 15% from top
+     *   Step 2: (680, 86)  - 85% from left, 18% from top
      */
     Point get_target_position(int step) const;
 
@@ -209,13 +209,14 @@ class TouchCalibrationPanel {
 
     // Calibration target positions as screen ratios
     // These form a well-distributed triangle for accurate affine transform
-    // Y ratios adjusted to 25%-75% to avoid header/footer in wizard/overlay UI
+    // Y ratios pushed to 18%-85% for maximum spread within wizard content area
+    // (Content area is ~16%-87% of screen height, between header and footer)
     static constexpr float TARGET_0_X_RATIO = 0.15f; ///< 15% from left edge
-    static constexpr float TARGET_0_Y_RATIO = 0.30f; ///< 30% from top edge
+    static constexpr float TARGET_0_Y_RATIO = 0.18f; ///< 18% from top (near content top)
     static constexpr float TARGET_1_X_RATIO = 0.50f; ///< Center X
-    static constexpr float TARGET_1_Y_RATIO = 0.75f; ///< 75% from top (was 85%)
+    static constexpr float TARGET_1_Y_RATIO = 0.85f; ///< 85% from top (near content bottom)
     static constexpr float TARGET_2_X_RATIO = 0.85f; ///< 85% from left
-    static constexpr float TARGET_2_Y_RATIO = 0.25f; ///< 25% from top (was 15%)
+    static constexpr float TARGET_2_Y_RATIO = 0.18f; ///< 18% from top (near content top)
 };
 
 } // namespace helix
