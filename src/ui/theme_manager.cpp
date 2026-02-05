@@ -227,7 +227,7 @@ lv_color_t theme_manager_get_contrast_text(lv_color_t bg_color) {
     auto& tm = ThemeManager::instance();
     // Dark background needs light text (dark palette has light-colored text for readability)
     // Light background needs dark text (light palette has dark-colored text for readability)
-    return (brightness < 128) ? tm.dark_palette().text : tm.light_palette().text;
+    return (brightness < 140) ? tm.dark_palette().text : tm.light_palette().text;
 }
 
 // ============================================================================
