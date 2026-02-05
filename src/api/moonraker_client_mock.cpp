@@ -2195,10 +2195,25 @@ void MoonrakerClientMock::dispatch_initial_state() {
         }
     }
 
-    // Add chamber temperature for printers with chamber sensor
-    if (has_chamber_sensor()) {
-        double chamber = chamber_temp_.load();
-        initial_status["temperature_sensor chamber"] = {{"temperature", chamber}};
+    // Add temperature sensor data for all sensors in the sensors_ list
+    for (const auto& s : sensors_) {
+        if (s.rfind("temperature_sensor ", 0) == 0) {
+            std::string sensor_name = s.substr(19);
+            double temp = 25.0;
+            if (sensor_name.find("chamber") != std::string::npos) {
+                temp = chamber_temp_.load();
+            } else if (sensor_name.find("mcu") != std::string::npos) {
+                temp = mcu_temp_.load();
+            } else if (sensor_name.find("raspberry") != std::string::npos ||
+                       sensor_name.find("host") != std::string::npos || sensor_name == "rpi") {
+                temp = host_temp_.load();
+            } else {
+                temp = 30.0; // Generic sensor initial value
+            }
+            initial_status[s] = {{"temperature", temp}};
+        } else if (s.rfind("temperature_fan ", 0) == 0) {
+            initial_status[s] = {{"temperature", 35.0}, {"target", 40.0}, {"speed", 0.0}};
+        }
     }
 
     // Add filament sensor states
@@ -2350,19 +2365,30 @@ void MoonrakerClientMock::dispatch_historical_temperatures() {
         json status_obj = {{"extruder", {{"temperature", ext_with_noise}, {"target", 0.0}}},
                            {"heater_bed", {{"temperature", bed_with_noise}, {"target", 0.0}}}};
 
-        // Add chamber temperature if sensor is available (slow variation 25-45°C)
-        if (has_chamber_sensor()) {
-            // Chamber temp varies slowly between 25-45°C with 120s period
-            constexpr double CHAMBER_MIN = 25.0;
-            constexpr double CHAMBER_MAX = 45.0;
-            constexpr double CHAMBER_PERIOD = 120.0; // Slow variation
-            double chamber_mid = (CHAMBER_MIN + CHAMBER_MAX) / 2.0;
-            double chamber_amp = (CHAMBER_MAX - CHAMBER_MIN) / 2.0;
-            double chamber_temp =
-                chamber_mid + chamber_amp * std::sin(2.0 * M_PI * timestamp_sec / CHAMBER_PERIOD);
-            double chamber_noise = pseudo_random(i * 3) * 0.5;
-            status_obj["temperature_sensor chamber"] = {
-                {"temperature", chamber_temp + chamber_noise}};
+        // Add historical temperature data for all temperature sensors
+        for (const auto& s : sensors_) {
+            if (s.rfind("temperature_sensor ", 0) == 0) {
+                std::string sensor_name = s.substr(19);
+                double temp = 25.0;
+                double noise = pseudo_random(i * 3) * 0.5;
+                if (sensor_name.find("chamber") != std::string::npos) {
+                    constexpr double CHAMBER_MIN = 25.0, CHAMBER_MAX = 45.0, CHAMBER_PERIOD = 120.0;
+                    double mid = (CHAMBER_MIN + CHAMBER_MAX) / 2.0;
+                    double amp = (CHAMBER_MAX - CHAMBER_MIN) / 2.0;
+                    temp = mid + amp * std::sin(2.0 * M_PI * timestamp_sec / CHAMBER_PERIOD);
+                } else if (sensor_name.find("mcu") != std::string::npos) {
+                    temp = 42.0 + 3.0 * std::sin(2.0 * M_PI * timestamp_sec / 120.0);
+                } else if (sensor_name.find("raspberry") != std::string::npos ||
+                           sensor_name.find("host") != std::string::npos || sensor_name == "rpi") {
+                    temp = 52.0 + 4.0 * std::sin(2.0 * M_PI * timestamp_sec / 75.0);
+                } else {
+                    temp = 30.0 + 2.0 * std::sin(2.0 * M_PI * timestamp_sec / 100.0);
+                }
+                status_obj[s] = {{"temperature", temp + noise}};
+            } else if (s.rfind("temperature_fan ", 0) == 0) {
+                double temp = 35.0 + 3.0 * std::sin(2.0 * M_PI * timestamp_sec / 80.0);
+                status_obj[s] = {{"temperature", temp}, {"target", 40.0}, {"speed", 0.5}};
+            }
         }
 
         json notification = {{"method", "notify_status_update"},
@@ -2552,6 +2578,42 @@ void MoonrakerClientMock::temperature_simulation_loop() {
                 }
             }
             chamber_temp_.store(chamber);
+        }
+
+        // Simulate MCU temperature (stable 40-55°C, slight load correlation)
+        {
+            constexpr double MCU_BASE = 42.0;
+            constexpr double MCU_WAVE_PERIOD = 120.0;
+            constexpr double MCU_AMPLITUDE = 3.0;
+            constexpr double MCU_PRINT_OFFSET = 5.0; // Higher during printing
+
+            double mcu = MCU_BASE;
+            MockPrintPhase current_phase = print_phase_.load();
+            if (current_phase == MockPrintPhase::PRINTING ||
+                current_phase == MockPrintPhase::PREHEAT) {
+                mcu += MCU_PRINT_OFFSET;
+            }
+            double wave = std::sin(2.0 * M_PI * sim_time / MCU_WAVE_PERIOD);
+            mcu += MCU_AMPLITUDE * wave;
+            mcu_temp_.store(mcu);
+        }
+
+        // Simulate host/RPi temperature (45-65°C, higher under load)
+        {
+            constexpr double HOST_BASE = 52.0;
+            constexpr double HOST_WAVE_PERIOD = 75.0;
+            constexpr double HOST_AMPLITUDE = 4.0;
+            constexpr double HOST_PRINT_OFFSET = 8.0;
+
+            double host = HOST_BASE;
+            MockPrintPhase current_phase = print_phase_.load();
+            if (current_phase == MockPrintPhase::PRINTING ||
+                current_phase == MockPrintPhase::PREHEAT) {
+                host += HOST_PRINT_OFFSET;
+            }
+            double wave = std::sin(2.0 * M_PI * sim_time / HOST_WAVE_PERIOD + 1.0);
+            host += HOST_AMPLITUDE * wave;
+            host_temp_.store(host);
         }
 
         // ========== Phase-Based Print Simulation ==========
@@ -2776,9 +2838,28 @@ void MoonrakerClientMock::temperature_simulation_loop() {
             }
         }
 
-        // Add chamber temperature for printers with chamber sensor
-        if (has_chamber_sensor()) {
-            status_obj["temperature_sensor chamber"] = {{"temperature", chamber_temp_.load()}};
+        // Add temperature sensor data for all sensors in the sensors_ list
+        for (const auto& s : sensors_) {
+            if (s.rfind("temperature_sensor ", 0) == 0) {
+                std::string sensor_name = s.substr(19);
+                double temp = 25.0;
+                if (sensor_name.find("chamber") != std::string::npos) {
+                    temp = chamber_temp_.load();
+                } else if (sensor_name.find("mcu") != std::string::npos) {
+                    temp = mcu_temp_.load();
+                } else if (sensor_name.find("raspberry") != std::string::npos ||
+                           sensor_name.find("host") != std::string::npos || sensor_name == "rpi") {
+                    temp = host_temp_.load();
+                } else {
+                    // Generic sensor: slow drift around 30°C
+                    temp = 30.0 + 2.0 * std::sin(2.0 * M_PI * sim_time / 100.0);
+                }
+                status_obj[s] = {{"temperature", temp}};
+            } else if (s.rfind("temperature_fan ", 0) == 0) {
+                // Temperature fans have temp, target, and speed
+                double temp = 35.0 + 3.0 * std::sin(2.0 * M_PI * sim_time / 80.0);
+                status_obj[s] = {{"temperature", temp}, {"target", 40.0}, {"speed", 0.5}};
+            }
         }
 
         json notification = {{"method", "notify_status_update"},

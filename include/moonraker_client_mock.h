@@ -853,6 +853,8 @@ class MoonrakerClientMock : public MoonrakerClient {
     std::atomic<double> bed_temp_{25.0};       // Current temperature
     std::atomic<double> bed_target_{0.0};      // Target temperature (0 = off)
     std::atomic<double> chamber_temp_{25.0};   // Chamber temp (25-45°C, passive sensor)
+    std::atomic<double> mcu_temp_{42.0};       // MCU temp (40-55°C, stable with small variation)
+    std::atomic<double> host_temp_{52.0};      // Host/RPi temp (45-65°C, correlates with load)
 
     // Position simulation state
     std::atomic<double> pos_x_{0.0};
