@@ -204,6 +204,17 @@ void* ui_button_create(lv_xml_parser_state_t* state, const char** attrs) {
     lv_obj_t* btn = lv_button_create(parent);
     lv_obj_set_height(btn, theme_manager_get_spacing("button_height"));
 
+    // If focusable="false", remove from default input group
+    // This prevents keyboard Tab navigation focus (and focus ring)
+    // Separate from click_focusable which only affects click-based focus
+    const char* focusable = lv_xml_get_value_of(attrs, "focusable");
+    if (focusable && strcmp(focusable, "false") == 0) {
+        lv_group_t* group = lv_group_get_default();
+        if (group) {
+            lv_group_remove_obj(btn);
+        }
+    }
+
     // Parse variant attribute (default: primary)
     const char* variant_str = lv_xml_get_value_of(attrs, "variant");
     if (!variant_str) {
