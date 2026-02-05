@@ -119,8 +119,8 @@ for SIZE in $SIZES_REGULAR; do
     if [ "$CJK_AVAILABLE" = true ] && [ -n "$CJKCHARS" ]; then
         lv_font_conv \
             --font "$FONT_REGULAR" --size "$SIZE" --range "$UNICODE_RANGES" \
-            --font "$FONT_CJK_SC" --size "$SIZE" --symbols "$CJKCHARS" \
-            --font "$FONT_CJK_JP" --size "$SIZE" --symbols "$CJKCHARS" \
+            --font "$FONT_CJK_SC" --size "$SIZE" --range "$CJKCHARS" \
+            --font "$FONT_CJK_JP" --size "$SIZE" --range "$CJKCHARS" \
             --bpp 4 --format lvgl \
             --no-compress \
             -o "$OUTPUT"
@@ -143,8 +143,8 @@ for SIZE in $SIZES_LIGHT; do
     if [ "$CJK_AVAILABLE" = true ] && [ -n "$CJKCHARS" ]; then
         lv_font_conv \
             --font "$FONT_LIGHT" --size "$SIZE" --range "$UNICODE_RANGES" \
-            --font "$FONT_CJK_SC" --size "$SIZE" --symbols "$CJKCHARS" \
-            --font "$FONT_CJK_JP" --size "$SIZE" --symbols "$CJKCHARS" \
+            --font "$FONT_CJK_SC" --size "$SIZE" --range "$CJKCHARS" \
+            --font "$FONT_CJK_JP" --size "$SIZE" --range "$CJKCHARS" \
             --bpp 4 --format lvgl \
             --no-compress \
             -o "$OUTPUT"
@@ -167,8 +167,8 @@ for SIZE in $SIZES_BOLD; do
     if [ "$CJK_AVAILABLE" = true ] && [ -n "$CJKCHARS" ]; then
         lv_font_conv \
             --font "$FONT_BOLD" --size "$SIZE" --range "$UNICODE_RANGES" \
-            --font "$FONT_CJK_SC" --size "$SIZE" --symbols "$CJKCHARS" \
-            --font "$FONT_CJK_JP" --size "$SIZE" --symbols "$CJKCHARS" \
+            --font "$FONT_CJK_SC" --size "$SIZE" --range "$CJKCHARS" \
+            --font "$FONT_CJK_JP" --size "$SIZE" --range "$CJKCHARS" \
             --bpp 4 --format lvgl \
             --no-compress \
             -o "$OUTPUT"
