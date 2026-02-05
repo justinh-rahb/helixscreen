@@ -930,3 +930,77 @@ TEST_CASE("Calibration characterization: stepper_enable motor state tracking",
         REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 1);
     }
 }
+
+// ============================================================================
+// Homed Axes Motor State Tests - Primary motor state indicator
+// M84 clears homed_axes on all Klipper printers, making it the most reliable
+// indicator. stepper_enable.steppers is not reported by all firmware (e.g. AD5M).
+// ============================================================================
+
+TEST_CASE("Calibration characterization: homed_axes motor state tracking",
+          "[characterization][calibration][homed_axes]") {
+    lv_init_safe();
+
+    PrinterState& state = get_printer_state();
+    state.reset_for_testing();
+    state.init_subjects(false);
+
+    SECTION("homed_axes 'xyz' sets motors_enabled to 1") {
+        json status = {{"toolhead", {{"homed_axes", "xyz"}}}};
+        state.update_from_status(status);
+
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 1);
+    }
+
+    SECTION("homed_axes empty string sets motors_enabled to 0") {
+        json status = {{"toolhead", {{"homed_axes", ""}}}};
+        state.update_from_status(status);
+
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 0);
+    }
+
+    SECTION("partial homed_axes still means motors enabled") {
+        json status = {{"toolhead", {{"homed_axes", "xy"}}}};
+        state.update_from_status(status);
+
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 1);
+    }
+
+    SECTION("M84 simulation via homed_axes: enabled to disabled") {
+        json homed = {{"toolhead", {{"homed_axes", "xyz"}}}};
+        state.update_from_status(homed);
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 1);
+
+        json m84 = {{"toolhead", {{"homed_axes", ""}}}};
+        state.update_from_status(m84);
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 0);
+    }
+
+    SECTION("homing after M84: disabled to enabled") {
+        json m84 = {{"toolhead", {{"homed_axes", ""}}}};
+        state.update_from_status(m84);
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 0);
+
+        json homed = {{"toolhead", {{"homed_axes", "xyz"}}}};
+        state.update_from_status(homed);
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 1);
+    }
+
+    SECTION("toolhead without homed_axes does not affect motors_enabled") {
+        json m84 = {{"toolhead", {{"homed_axes", ""}}}};
+        state.update_from_status(m84);
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 0);
+
+        json position_only = {{"toolhead", {{"position", {100.0, 200.0, 30.0, 0.0}}}}};
+        state.update_from_status(position_only);
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 0);
+    }
+
+    SECTION("homed_axes takes priority over empty stepper_enable") {
+        // AD5M scenario: stepper_enable is empty but homed_axes works
+        json status = {{"toolhead", {{"homed_axes", ""}}}, {"stepper_enable", json::object()}};
+        state.update_from_status(status);
+
+        REQUIRE(lv_subject_get_int(state.get_motors_enabled_subject()) == 0);
+    }
+}

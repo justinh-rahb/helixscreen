@@ -37,7 +37,7 @@ void PrinterCalibrationState::init_subjects(bool register_xml) {
     INIT_SUBJECT_INT(manual_probe_active, 0, subjects_, register_xml);     // 0=inactive, 1=active
     INIT_SUBJECT_INT(manual_probe_z_position, 0, subjects_, register_xml); // Z position in microns
 
-    // Motor enabled state (from idle_timeout.state - defaults to enabled/Ready)
+    // Motor enabled state (from toolhead.homed_axes - defaults to enabled)
     INIT_SUBJECT_INT(motors_enabled, 1, subjects_,
                      register_xml); // 1=enabled (Ready/Printing), 0=disabled (Idle)
 
@@ -97,9 +97,26 @@ void PrinterCalibrationState::update_from_status(const nlohmann::json& status) {
         }
     }
 
-    // Update motor enabled state from stepper_enable
-    // stepper_enable.steppers: object with boolean values for each stepper
-    // Motors are enabled if ANY stepper is enabled, disabled if ALL are disabled
+    // Update motor enabled state from toolhead.homed_axes (primary) and stepper_enable (fallback)
+    // M84 clears homed_axes on all Klipper printers, making it the most reliable indicator.
+    // stepper_enable.steppers is more precise but not reported by all firmware (e.g. AD5M).
+    if (status.contains("toolhead")) {
+        const auto& toolhead = status["toolhead"];
+
+        if (toolhead.contains("homed_axes") && toolhead["homed_axes"].is_string()) {
+            std::string axes = toolhead["homed_axes"].get<std::string>();
+            int new_enabled = axes.empty() ? 0 : 1;
+            int old_enabled = lv_subject_get_int(&motors_enabled_);
+
+            if (old_enabled != new_enabled) {
+                lv_subject_set_int(&motors_enabled_, new_enabled);
+                spdlog::info("[PrinterCalibrationState] Motors {}: homed_axes='{}'",
+                             new_enabled ? "enabled" : "disabled", axes);
+            }
+        }
+    }
+
+    // Fallback: stepper_enable.steppers (not reported by all firmware)
     if (status.contains("stepper_enable")) {
         const auto& se = status["stepper_enable"];
 

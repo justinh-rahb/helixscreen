@@ -1016,18 +1016,24 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
         spdlog::info("[MoonrakerClientMock] Set relative positioning mode (G91)");
     }
 
-    // M84 - Disable stepper motors (updates stepper_enable.steppers)
+    // M84 - Disable stepper motors (clears homed_axes + updates stepper_enable)
     if (gcode.find("M84") != std::string::npos || gcode.find("M18") != std::string::npos) {
         motors_enabled_.store(false);
-        spdlog::info("[MoonrakerClientMock] Motors disabled (M84/M18)");
-        // Dispatch stepper_enable state change - all steppers disabled
-        json stepper_status = {{"stepper_enable",
-                                {{"steppers",
-                                  {{"stepper_x", false},
-                                   {"stepper_y", false},
-                                   {"stepper_z", false},
-                                   {"extruder", false}}}}}};
-        dispatch_status_update(stepper_status);
+        {
+            std::lock_guard<std::mutex> lock(homed_axes_mutex_);
+            homed_axes_.clear();
+        }
+        spdlog::info("[MoonrakerClientMock] Motors disabled (M84/M18), homed_axes cleared");
+        // Dispatch toolhead with cleared homed_axes (primary motor state indicator)
+        // and stepper_enable state change (fallback for printers that report it)
+        json status = {{"toolhead", {{"homed_axes", ""}}},
+                       {"stepper_enable",
+                        {{"steppers",
+                          {{"stepper_x", false},
+                           {"stepper_y", false},
+                           {"stepper_z", false},
+                           {"extruder", false}}}}}};
+        dispatch_status_update(status);
     }
 
     // Parse homing command (G28)
