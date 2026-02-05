@@ -117,6 +117,17 @@ void AssetManager::register_images() {
     lv_xml_register_image(nullptr, "A:assets/images/prerendered/benchy_thumbnail_white.bin",
                           "A:assets/images/prerendered/benchy_thumbnail_white.bin");
 
+    // Flag icons (language chooser wizard) - pre-rendered ARGB8888 32x24
+    lv_xml_register_image(nullptr, "flag_en", "A:assets/images/flags/flag_en.bin");
+    lv_xml_register_image(nullptr, "flag_de", "A:assets/images/flags/flag_de.bin");
+    lv_xml_register_image(nullptr, "flag_fr", "A:assets/images/flags/flag_fr.bin");
+    lv_xml_register_image(nullptr, "flag_es", "A:assets/images/flags/flag_es.bin");
+    lv_xml_register_image(nullptr, "flag_ru", "A:assets/images/flags/flag_ru.bin");
+    lv_xml_register_image(nullptr, "flag_pt", "A:assets/images/flags/flag_pt.bin");
+    lv_xml_register_image(nullptr, "flag_it", "A:assets/images/flags/flag_it.bin");
+    lv_xml_register_image(nullptr, "flag_zh", "A:assets/images/flags/flag_zh.bin");
+    lv_xml_register_image(nullptr, "flag_ja", "A:assets/images/flags/flag_ja.bin");
+
     s_images_registered = true;
     spdlog::debug("[AssetManager] Images registered successfully");
 }
