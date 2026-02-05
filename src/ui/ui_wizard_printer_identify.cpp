@@ -129,7 +129,7 @@ int WizardPrinterIdentifyStep::find_printer_type_index(const std::string& printe
 /**
  * @brief Detect printer type from hardware discovery data
  *
- * Integrates with PrinterDetector to analyze discovered hardware.
+ * Uses PrinterDetector::auto_detect() and maps result to roller index.
  */
 static PrinterDetectionHint detect_printer_type() {
     MoonrakerAPI* api = get_moonraker_api();
@@ -138,33 +138,8 @@ static PrinterDetectionHint detect_printer_type() {
         return {PrinterDetector::get_unknown_index(), 0, "No printer connection available"};
     }
 
-    // Build hardware data from MoonrakerAPI discovery
-    PrinterHardwareData hardware;
-    hardware.heaters = api->hardware().heaters();
-    hardware.sensors = api->hardware().sensors();
-    hardware.fans = api->hardware().fans();
-    hardware.leds = api->hardware().leds();
-    hardware.hostname = api->hardware().hostname();
-
-    // Additional detection data sources (Phase 1 enhancement)
-    hardware.steppers = api->hardware().steppers();
-    hardware.printer_objects = api->hardware().printer_objects();
-    hardware.kinematics = api->hardware().kinematics();
-    hardware.build_volume = api->hardware().build_volume();
-
-    // MCU detection data (Phase 3.1)
-    hardware.mcu = api->hardware().mcu();
-    hardware.mcu_list = api->hardware().mcu_list();
-
-    spdlog::debug("[Wizard Printer] Detection data: heaters={}, sensors={}, fans={}, leds={}, "
-                  "steppers={}, objects={}, kinematics={}, mcu={}, build=[{:.0f},{:.0f}]",
-                  hardware.heaters.size(), hardware.sensors.size(), hardware.fans.size(),
-                  hardware.leds.size(), hardware.steppers.size(), hardware.printer_objects.size(),
-                  hardware.kinematics, hardware.mcu, hardware.build_volume.x_max,
-                  hardware.build_volume.y_max);
-
-    // Run detection engine
-    PrinterDetectionResult result = PrinterDetector::detect(hardware);
+    // Use shared auto_detect() which handles building PrinterHardwareData
+    PrinterDetectionResult result = PrinterDetector::auto_detect(api->hardware());
 
     if (result.confidence == 0) {
         return {PrinterDetector::get_unknown_index(), 0, result.type_name};

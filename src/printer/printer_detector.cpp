@@ -5,7 +5,12 @@
 
 #include "ui_error_reporting.h"
 
+#include "app_globals.h"
+#include "config.h"
 #include "print_start_analyzer.h"
+#include "printer_discovery.h"
+#include "printer_state.h"
+#include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
 
@@ -948,4 +953,62 @@ PrinterDetector::LoadStatus PrinterDetector::get_load_status() {
     }
 
     return status;
+}
+
+// ============================================================================
+// Auto-Detection on Startup
+// ============================================================================
+
+PrinterDetectionResult PrinterDetector::auto_detect(const helix::PrinterDiscovery& discovery) {
+    // Build PrinterHardwareData from discovery
+    PrinterHardwareData hw_data;
+    hw_data.heaters = discovery.heaters();
+    hw_data.sensors = discovery.sensors();
+    hw_data.fans = discovery.fans();
+    hw_data.leds = discovery.leds();
+    hw_data.hostname = discovery.hostname();
+    hw_data.steppers = discovery.steppers();
+    hw_data.printer_objects = discovery.printer_objects();
+    hw_data.kinematics = discovery.kinematics();
+    hw_data.build_volume = discovery.build_volume();
+    hw_data.mcu = discovery.mcu();
+    hw_data.mcu_list = discovery.mcu_list();
+
+    return detect(hw_data);
+}
+
+bool PrinterDetector::auto_detect_and_save(const helix::PrinterDiscovery& discovery,
+                                           Config* config) {
+    if (!config) {
+        spdlog::warn("[PrinterDetector] auto_detect_and_save called with null config");
+        return false;
+    }
+
+    // Check if printer type is already set
+    std::string saved_type = config->get<std::string>(helix::wizard::PRINTER_TYPE, "");
+    if (!saved_type.empty()) {
+        spdlog::debug("[PrinterDetector] Printer type already set: '{}', skipping auto-detection",
+                      saved_type);
+        return false;
+    }
+
+    // Run detection
+    PrinterDetectionResult result = auto_detect(discovery);
+
+    if (result.confidence > 0) {
+        spdlog::info("[PrinterDetector] Auto-detected printer: '{}' ({}% confidence, reason: {})",
+                     result.type_name, result.confidence, result.reason);
+
+        // Save to config
+        config->set<std::string>(helix::wizard::PRINTER_TYPE, result.type_name);
+        config->save();
+
+        // Update PrinterState so home panel gets correct image and capabilities
+        get_printer_state().set_printer_type_sync(result.type_name);
+
+        return true;
+    }
+
+    spdlog::info("[PrinterDetector] No printer type detected from hardware fingerprints");
+    return false;
 }

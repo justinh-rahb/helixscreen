@@ -89,6 +89,7 @@
 #include "ui_wizard_touch_calibration.h"
 #include "ui_wizard_wifi.h"
 
+#include "printer_detector.h"
 #include "settings_manager.h"
 #include "theme_manager.h"
 #include "wifi_manager.h"
@@ -1356,6 +1357,9 @@ void Application::setup_discovery_callbacks() {
 
             // Save session snapshot for next comparison (even if no issues)
             validator.save_session_snapshot(Config::get_instance(), c->hardware);
+
+            // Auto-detect printer type if not already set (e.g., fresh install with preset)
+            PrinterDetector::auto_detect_and_save(c->hardware, Config::get_instance());
 
             // Detect helix_print plugin during discovery (not UI-initiated)
             // This ensures plugin status is known early for UI gating

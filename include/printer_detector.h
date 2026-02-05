@@ -7,6 +7,12 @@
 #include <string>
 #include <vector>
 
+// Forward declarations for auto_detect_and_save()
+class Config;
+namespace helix {
+class PrinterDiscovery;
+}
+
 /**
  * @brief Printer auto-detection result with confidence and reasoning
  */
@@ -245,4 +251,28 @@ class PrinterDetector {
      * @return LoadStatus with details about loaded files and errors
      */
     static LoadStatus get_load_status();
+
+    /**
+     * @brief Auto-detect printer type from discovery data
+     *
+     * Convenience wrapper that builds PrinterHardwareData from PrinterDiscovery
+     * and runs detection. Use this instead of manually building hardware data.
+     *
+     * @param discovery Hardware discovery data from Moonraker
+     * @return Detection result with type name, confidence, and reasoning
+     */
+    static PrinterDetectionResult auto_detect(const helix::PrinterDiscovery& discovery);
+
+    /**
+     * @brief Auto-detect printer type and save to config if not already set
+     *
+     * Called during Moonraker discovery completion. If printer.type is empty,
+     * runs detection and saves the result to config. Also updates PrinterState
+     * so the home panel gets the correct image and capabilities.
+     *
+     * @param discovery Hardware discovery data from Moonraker
+     * @param config Config instance to check/save printer type
+     * @return true if detection ran and found a match, false if skipped or no match
+     */
+    static bool auto_detect_and_save(const helix::PrinterDiscovery& discovery, Config* config);
 };

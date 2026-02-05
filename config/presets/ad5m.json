@@ -1,0 +1,95 @@
+{
+  "input": {
+    "calibration": {
+      "a": 1.1715481281280518,
+      "b": 0.0,
+      "c": -79.1631851196289,
+      "d": -0.03254300355911255,
+      "e": -1.4074074029922485,
+      "f": 566.1249389648438,
+      "valid": true
+    }
+  },
+  "printer": {
+    "moonraker_host": "127.0.0.1",
+    "moonraker_port": 7125,
+    "heaters": {
+      "bed": "heater_bed",
+      "hotend": "extruder"
+    },
+    "temp_sensors": {
+      "bed": "heater_bed",
+      "hotend": "extruder"
+    },
+    "fans": {
+      "chamber": "fan_generic chamber_fan",
+      "exhaust": "fan_generic external_fan",
+      "hotend": "heater_fan heat_fan",
+      "part": "fan_generic fanM106"
+    },
+    "leds": {
+      "strip": "led chamber_light"
+    },
+    "filament_sensors": {
+      "master_enabled": true,
+      "sensors": [
+        {
+          "enabled": true,
+          "klipper_name": "filament_switch_sensor e1_sensor",
+          "role": "runout",
+          "type": "switch"
+        },
+        {
+          "enabled": false,
+          "klipper_name": "filament_switch_sensor e0_sensor",
+          "role": "z_probe",
+          "type": "switch"
+        }
+      ]
+    },
+    "hardware": {
+      "expected": [
+        "heater_bed",
+        "extruder",
+        "fan_generic fanM106",
+        "heater_fan heat_fan",
+        "filament_switch_sensor e1_sensor"
+      ],
+      "last_snapshot": {
+        "fans": [
+          "heater_fan heat_fan",
+          "fan_generic fanM106",
+          "fan_generic chamber_fan",
+          "fan_generic internal_fan",
+          "fan_generic external_fan",
+          "controller_fan driver_fan"
+        ],
+        "filament_sensors": [
+          "filament_switch_sensor e1_sensor",
+          "filament_switch_sensor e0_sensor"
+        ],
+        "heaters": [
+          "heater_bed",
+          "extruder"
+        ],
+        "leds": [
+          "led chamber_light"
+        ],
+        "sensors": [
+          "temperature_sensor weightValue",
+          "temperature_sensor tvocValue"
+        ],
+        "timestamp": "2026-02-05T20:08:44Z"
+      },
+      "optional": []
+    },
+    "default_macros": {
+      "cooldown": "SET_HEATER_TEMPERATURE HEATER=extruder TARGET=0\nSET_HEATER_TEMPERATURE HEATER=heater_bed TARGET=0",
+      "load_filament": { "label": "Load", "gcode": "LOAD_FILAMENT" },
+      "unload_filament": { "label": "Unload", "gcode": "UNLOAD_FILAMENT" },
+      "macro_1": { "label": "Clean Nozzle", "gcode": "CLEAR_NOZZLE" },
+      "macro_2": { "label": "Bed Level", "gcode": "AUTO_FULL_BED_LEVEL" }
+    }
+  },
+  "wizard_completed": true
+}

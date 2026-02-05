@@ -160,9 +160,19 @@ package_platform() {
     # Copy config files
     cp "${PROJECT_DIR}/config/helixscreen.init" "$pkg_dir/config/"
     cp "${PROJECT_DIR}/config/helixscreen.service" "$pkg_dir/config/"
-    cp "${PROJECT_DIR}/config/helixconfig.json.template" "$pkg_dir/config/" 2>/dev/null || true
     cp "${PROJECT_DIR}/config/printer_database.json" "$pkg_dir/config/" 2>/dev/null || true
     cp "${PROJECT_DIR}/config/printing_tips.json" "$pkg_dir/config/" 2>/dev/null || true
+
+    # Platform-specific default config: use preset for known platforms, template otherwise
+    # Presets skip the wizard with pre-configured hardware mappings and touch calibration
+    # Printer type is left empty for runtime auto-detection (AD5M vs AD5M Pro)
+    # The installer preserves existing configs on upgrade (backup/restore in release.sh)
+    if [ "$platform" = "ad5m" ] && [ -f "${PROJECT_DIR}/config/presets/ad5m.json" ]; then
+        cp "${PROJECT_DIR}/config/presets/ad5m.json" "$pkg_dir/config/helixconfig.json"
+        log_info "  Using AD5M preset as default config"
+    else
+        cp "${PROJECT_DIR}/config/helixconfig.json.template" "$pkg_dir/config/helixconfig.json.template" 2>/dev/null || true
+    fi
 
     # Copy install script
     cp "${PROJECT_DIR}/scripts/install.sh" "$pkg_dir/"
