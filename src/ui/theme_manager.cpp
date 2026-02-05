@@ -1916,7 +1916,7 @@ void theme_apply_palette_to_widget(lv_obj_t* obj, const helix::ModePalette& pale
         if (strstr(obj_name, "divider") != nullptr) {
             // Named dividers (fallback for any that don't match structural detection)
             lv_obj_set_style_bg_color(obj, border, LV_PART_MAIN);
-        } else if (strstr(obj_name, "card") != nullptr) {
+        } else if (strstr(obj_name, "card") != nullptr || strstr(obj_name, "nav") != nullptr) {
             lv_obj_set_style_bg_color(obj, card_bg, LV_PART_MAIN);
             lv_obj_set_style_border_color(obj, border, LV_PART_MAIN);
         } else if (strstr(obj_name, "dialog") != nullptr) {
