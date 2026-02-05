@@ -30,8 +30,8 @@
 
       <!-- Display: Textarea styled input (read-only) with unit label -->
       <lv_obj name="display_container"
-              width="100%" height="content" style_pad_all="#space_lg" scrollable="false" flex_flow="row"
-              style_flex_cross_place="center" style_pad_bottom="0">
+              width="100%" height="content" style_pad_all="0" style_pad_left="#space_xs" scrollable="false" flex_flow="row"
+              style_flex_cross_place="center" style_pad_bottom="#space_md">
         <text_input name="input_display"
                     height="content" flex_grow="1" text="" bind_text="keypad_display" style_text_font="#font_heading"
                     style_text_align="right" style_radius="#border_radius"

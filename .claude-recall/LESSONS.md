@@ -8,8 +8,8 @@
 
 ## Active Lessons
 
-### [L004] [***--|-----] Subject init before create
-- **Uses**: 15 | **Velocity**: 0 | **Learned**: 2025-12-14 | **Last**: 2026-01-08 | **Category**: pattern | **Type**: informational
+### [L004] [***--|***--] Subject init before create
+- **Uses**: 16 | **Velocity**: 1 | **Learned**: 2025-12-14 | **Last**: 2026-02-05 | **Category**: pattern | **Type**: informational
 > 
 
 ### [L008] [**---|*----] Design tokens and semantic widgets
@@ -24,8 +24,8 @@
 - **Uses**: 12 | **Velocity**: 0 | **Learned**: 2025-12-14 | **Last**: 2026-01-08 | **Category**: gotcha | **Type**: constraint
 > Avoid mutex locks in destructors during static destruction phase. Other objects may already be destroyed, causing deadlock or crash on exit
 
-### [L014] [***--|-----] Register all XML components
-- **Uses**: 25 | **Velocity**: 0 | **Learned**: 2025-12-14 | **Last**: 2026-01-20 | **Category**: gotcha | **Type**: constraint
+### [L014] [***--|***--] Register all XML components
+- **Uses**: 26 | **Velocity**: 1 | **Learned**: 2025-12-14 | **Last**: 2026-02-05 | **Category**: gotcha | **Type**: constraint
 > When adding new XML components, must add lv_xml_component_register_from_file() call in main.cpp. Forgetting causes silent failures
 
 ### [L020] [***--|*----] ObserverGuard for cleanup
@@ -44,9 +44,9 @@
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2025-12-25 | **Last**: 2026-01-01 | **Category**: pattern | **Type**: constraint
 > LVGL observer callbacks use C-style function signatures (lv_observer_t*, lv_subject_t*) - NOT lambdas. Must pass user_data via lv_observer_get_user_data(observer). Also: lv_subject_set_*() from non-main threads must use ui_async_call() to avoid render-phase assertions.
 
-### [L031] [***--|*----] XML no recompile
-- **Uses**: 18 | **Velocity**: 0.015 | **Learned**: 2025-12-27 | **Last**: 2026-01-31 | **Category**: gotcha | **Type**: constraint
-> 
+### [L031] [***--|****-] XML no recompile
+- **Uses**: 20 | **Velocity**: 2.0149999999999997 | **Learned**: 2025-12-27 | **Last**: 2026-02-05 | **Category**: gotcha | **Type**: constraint
+> XML files are loaded at RUNTIME - never rebuild after XML-only changes. Just relaunch the app. This includes layout changes, styling, bindings, event callbacks - anything in ui_xml/*.xml. Only rebuild when C++ code changes.
 
 ### [L036] [*----|-----] Header file documentation
 - **Uses**: 2 | **Velocity**: 0 | **Learned**: 2025-12-28 | **Last**: 2026-01-05 | **Category**: pattern | **Type**: informational
