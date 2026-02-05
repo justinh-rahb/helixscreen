@@ -1325,6 +1325,14 @@ void Application::setup_discovery_callbacks() {
                 get_printer_state().set_os_version(c->hardware.os_version());
             }
 
+            // Fetch print hours now that connection is live, and refresh on job changes
+            get_global_settings_panel().fetch_print_hours();
+            c->client->register_method_callback("notify_history_changed",
+                                                "SettingsPanel_print_hours",
+                                                [](const nlohmann::json& /*data*/) {
+                                                    get_global_settings_panel().fetch_print_hours();
+                                                });
+
             // Hardware validation: check config expectations vs discovered hardware
             HardwareValidator validator;
             auto validation_result = validator.validate(Config::get_instance(), c->hardware);
@@ -1504,6 +1512,66 @@ void Application::init_action_prompt() {
                 for (const auto& line : params) {
                     if (line.is_string()) {
                         m_action_prompt_manager->process_line(line.get<std::string>());
+                    }
+                }
+            }
+        });
+
+    // Register global handler to surface Klipper gcode errors as toasts.
+    // Klipper errors come through notify_gcode_response with "!!" or "Error:" prefix.
+    // Multiple handlers per method are supported (unique handler names).
+    client->register_method_callback(
+        "notify_gcode_response", "gcode_error_notifier", [](const nlohmann::json& msg) {
+            if (!msg.contains("params") || !msg["params"].is_array() || msg["params"].empty()) {
+                return;
+            }
+
+            auto process_line = [](const std::string& line) {
+                if (line.empty()) {
+                    return;
+                }
+
+                // Klipper emergency errors: "!! MCU shutdown", "!! Timer too close", etc.
+                if (line.size() >= 2 && line[0] == '!' && line[1] == '!') {
+                    // Strip "!! " prefix for cleaner display
+                    std::string clean =
+                        (line.size() > 3 && line[2] == ' ') ? line.substr(3) : line.substr(2);
+                    spdlog::error("[GcodeError] Emergency: {}", clean);
+                    ui_notification_error("Klipper Error", clean.c_str(), false);
+                    return;
+                }
+
+                // Command errors: "Error: Must home before probe", etc.
+                if (line.size() >= 5) {
+                    std::string prefix = line.substr(0, 5);
+                    for (auto& c : prefix)
+                        c = static_cast<char>(std::tolower(c));
+                    if (prefix == "error") {
+                        // Strip "Error: " prefix if present
+                        std::string clean = line;
+                        if (line.size() > 7 && line[5] == ':' && line[6] == ' ') {
+                            clean = line.substr(7);
+                        } else if (line.size() > 6 && line[5] == ':') {
+                            clean = line.substr(6);
+                        }
+                        spdlog::error("[GcodeError] {}", clean);
+                        ui_notification_error(nullptr, clean.c_str(), false);
+                        return;
+                    }
+                }
+            };
+
+            const auto& params = msg["params"];
+            if (params[0].is_array()) {
+                for (const auto& line : params[0]) {
+                    if (line.is_string()) {
+                        process_line(line.get<std::string>());
+                    }
+                }
+            } else if (params[0].is_string()) {
+                for (const auto& line : params) {
+                    if (line.is_string()) {
+                        process_line(line.get<std::string>());
                     }
                 }
             }

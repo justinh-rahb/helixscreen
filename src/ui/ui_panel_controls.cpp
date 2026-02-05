@@ -1163,6 +1163,8 @@ void ControlsPanel::handle_calibration_bed_mesh() {
 }
 
 void ControlsPanel::handle_calibration_zoffset() {
+    // Set the Moonraker client before lazy creation so it's available when calibration starts
+    get_global_zoffset_cal_panel().set_client(get_moonraker_client());
     helix::ui::lazy_create_and_push_overlay<ZOffsetCalibrationPanel>(
         get_global_zoffset_cal_panel, zoffset_panel_, parent_screen_, "Z-Offset Calibration",
         get_name());
