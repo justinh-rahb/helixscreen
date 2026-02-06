@@ -31,14 +31,14 @@
               flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start">
         <!-- WiFi Card -->
         <ui_card width="100%"
-                 flex_grow="6" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
+                 flex_grow="1" flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
           <!-- Disable card when WiFi hardware unavailable -->
           <bind_state_if_eq subject="wifi_hardware_available" state="disabled" ref_value="0"/>
           <!-- Label + Switch horizontal container -->
           <lv_obj width="100%"
-                  height="content" scrollable="false" style_pad_all="0" style_pad_top="#space_sm"
+                  height="content" scrollable="false" style_pad_all="0"
                   style_pad_right="#space_xs" flex_flow="row" style_flex_main_place="space_between"
-                  style_flex_cross_place="center">
+                  style_flex_cross_place="start">
             <text_heading text="WiFi" translation_tag="WiFi"/>
             <!-- WiFi toggle: wired to wifi_enabled subject via C++ event handler -->
             <ui_switch name="wifi_toggle" size="small">
@@ -58,7 +58,7 @@
         </ui_card>
         <!-- Ethernet Status Card -->
         <ui_card width="100%"
-                 flex_grow="4" style_pad_all="#space_lg" flex_flow="column" style_flex_main_place="start"
+                 flex_grow="1" style_pad_all="#space_lg" flex_flow="column" style_flex_main_place="start"
                  style_flex_cross_place="start">
           <text_heading text="Ethernet" translation_tag="Ethernet" style_pad_bottom="#space_sm"/>
           <!-- Ethernet Status label -->
