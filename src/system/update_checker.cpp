@@ -26,6 +26,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <sys/statvfs.h>
 #include <unistd.h>
 
 #include "hv/json.hpp"
@@ -298,12 +299,97 @@ std::string UpdateChecker::get_download_error() const {
     return download_error_;
 }
 
+// Minimum free space required to attempt download (50 MB)
+static constexpr size_t MIN_DOWNLOAD_SPACE_BYTES = 50ULL * 1024 * 1024;
+
+static const char* const DOWNLOAD_FILENAME = "helixscreen-update.tar.gz";
+
+// Check if a directory is writable and return available bytes (0 on failure)
+static size_t get_available_space(const std::string& dir) {
+    struct statvfs stat{};
+    if (statvfs(dir.c_str(), &stat) != 0) {
+        return 0;
+    }
+    // Use f_bavail (blocks available to unprivileged users) * fragment size
+    return static_cast<size_t>(stat.f_bavail) * stat.f_frsize;
+}
+
+// Check if we can actually write to a directory
+static bool is_writable_dir(const std::string& dir) {
+    return access(dir.c_str(), W_OK) == 0;
+}
+
 std::string UpdateChecker::get_download_path() const {
-#ifdef HELIX_PLATFORM_AD5M
-    return "/data/helixscreen-update.tar.gz";
-#else
-    return "/tmp/helixscreen-update.tar.gz";
-#endif
+    // Candidate directories, checked exhaustively — we pick the one with
+    // the MOST free space so we don't fill up a tiny tmpfs or crowd out
+    // gcode storage on an embedded device.
+    std::vector<std::string> candidates;
+
+    // Environment variables first
+    for (const char* env_name : {"TMPDIR", "TMP", "TEMP"}) {
+        const char* val = std::getenv(env_name);
+        if (val != nullptr && val[0] != '\0') {
+            candidates.emplace_back(val);
+        }
+    }
+
+    // Home directory
+    const char* home = std::getenv("HOME");
+    if (home != nullptr && home[0] != '\0') {
+        candidates.emplace_back(home);
+    }
+
+    // Standard temp locations
+    candidates.emplace_back("/tmp");
+    candidates.emplace_back("/var/tmp");
+    candidates.emplace_back("/mnt/tmp");
+
+    // Persistent storage (embedded devices often have more room here)
+    candidates.emplace_back("/data");
+    candidates.emplace_back("/mnt/data");
+    candidates.emplace_back("/usr/data");
+
+    // Home variants (embedded devices with root user)
+    candidates.emplace_back("/root");
+    candidates.emplace_back("/home/root");
+
+    // Evaluate all candidates — pick the one with the most free space
+    std::string best_dir;
+    size_t best_space = 0;
+
+    for (const auto& dir : candidates) {
+        if (!is_writable_dir(dir)) {
+            continue;
+        }
+
+        auto space = get_available_space(dir);
+        if (space < MIN_DOWNLOAD_SPACE_BYTES) {
+            spdlog::debug("[UpdateChecker] Skipping {} ({:.1f} MB free, need {:.0f} MB)", dir,
+                          static_cast<double>(space) / (1024.0 * 1024.0),
+                          static_cast<double>(MIN_DOWNLOAD_SPACE_BYTES) / (1024.0 * 1024.0));
+            continue;
+        }
+
+        if (space > best_space) {
+            best_space = space;
+            best_dir = dir;
+        }
+    }
+
+    if (best_dir.empty()) {
+        spdlog::error("[UpdateChecker] No writable directory with {} MB free space",
+                      MIN_DOWNLOAD_SPACE_BYTES / (1024 * 1024));
+        return {}; // Caller must handle empty path
+    }
+
+    spdlog::info("[UpdateChecker] Download directory: {} ({:.0f} MB free)", best_dir,
+                 static_cast<double>(best_space) / (1024.0 * 1024.0));
+
+    // Ensure trailing slash
+    if (best_dir.back() != '/') {
+        best_dir += '/';
+    }
+    return best_dir + DOWNLOAD_FILENAME;
 }
 
 std::string UpdateChecker::get_platform_asset_name() const {
@@ -405,6 +491,11 @@ void UpdateChecker::do_download() {
     }
 
     auto download_path = get_download_path();
+    if (download_path.empty()) {
+        report_download_status(DownloadStatus::Error, 0, "Error: No space for download",
+                               "Could not find a writable directory with enough free space");
+        return;
+    }
     spdlog::info("[UpdateChecker] Downloading {} to {}", url, download_path);
 
     // Progress callback -- dispatches to LVGL thread
@@ -487,13 +578,13 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
 
     report_download_status(DownloadStatus::Installing, 100, "Installing update...");
 
-    // Find install.sh in common locations
+    // Find install.sh — production installs put it in the install root,
+    // not in scripts/. Development builds use scripts/install.sh.
     std::string install_script;
     const std::vector<std::string> search_paths = {
-        "/opt/helixscreen/scripts/install.sh",
         "/opt/helixscreen/install.sh",
-        "/root/printer_software/helixscreen/scripts/install.sh",
-        "/usr/data/helixscreen/scripts/install.sh",
+        "/root/printer_software/helixscreen/install.sh",
+        "/usr/data/helixscreen/install.sh",
         "scripts/install.sh", // development fallback
     };
 
