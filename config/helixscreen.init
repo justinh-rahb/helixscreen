@@ -31,104 +31,22 @@ LOGFILE="/tmp/helixscreen.log"
 # HELIX_DATA_DIR="/mnt/data/helixscreen"
 # export HELIX_DATA_DIR
 
-# ForgeX backlight control paths (AD5M with ForgeX firmware)
-FORGEX_BACKLIGHT="/root/printer_data/py/backlight.py"
-
 # Check if binary exists
 [ -x "$DAEMON" ] || exit 0
 
-# Known competing screen UIs to stop
-COMPETING_UIS="guppyscreen GuppyScreen KlipperScreen klipperscreen featherscreen FeatherScreen"
+# Platform hook defaults (no-ops). Platform-specific hook files override these.
+platform_stop_competing_uis() { :; }
+platform_enable_backlight() { :; }
+platform_wait_for_services() { :; }
+platform_pre_start() { :; }
+platform_post_stop() { :; }
 
-# Stop competing screen UIs
-stop_competing_uis() {
-    # Stop stock FlashForge firmware UI (AD5M/Adventurer 5M)
-    # ffstartup-arm is the startup manager that launches firmwareExe (the stock Qt UI)
-    if [ -f /opt/PROGRAM/ffstartup-arm ]; then
-        echo "Stopping stock FlashForge UI..."
-        if command -v killall >/dev/null 2>&1; then
-            killall firmwareExe 2>/dev/null || true
-            killall ffstartup-arm 2>/dev/null || true
-        else
-            for pid in $(pidof firmwareExe 2>/dev/null); do
-                kill "$pid" 2>/dev/null || true
-            done
-            for pid in $(pidof ffstartup-arm 2>/dev/null); do
-                kill "$pid" 2>/dev/null || true
-            done
-        fi
-    fi
-
-    # On Klipper Mod, stop Xorg first (required for framebuffer access)
-    # Xorg takes over /dev/fb0 layer, preventing direct framebuffer rendering
-    if [ -x "/etc/init.d/S40xorg" ]; then
-        echo "Stopping Xorg (Klipper Mod)..."
-        /etc/init.d/S40xorg stop 2>/dev/null || true
-        # Kill any remaining Xorg processes
-        if command -v killall >/dev/null 2>&1; then
-            killall Xorg 2>/dev/null || true
-            killall X 2>/dev/null || true
-        else
-            for pid in $(pidof Xorg 2>/dev/null) $(pidof X 2>/dev/null); do
-                kill "$pid" 2>/dev/null || true
-            done
-        fi
-    fi
-
-    for ui in $COMPETING_UIS; do
-        # Check init.d scripts
-        for initscript in /etc/init.d/S*${ui}* /opt/config/mod/.root/S*${ui}*; do
-            if [ -x "$initscript" ] 2>/dev/null; then
-                echo "Stopping competing UI: $initscript"
-                "$initscript" stop 2>/dev/null || true
-            fi
-        done
-        # Kill any remaining processes (BusyBox compatible - no pkill)
-        if command -v killall >/dev/null 2>&1; then
-            killall "$ui" 2>/dev/null || true
-        else
-            # BusyBox fallback - use pidof + kill
-            for pid in $(pidof "$ui" 2>/dev/null); do
-                kill "$pid" 2>/dev/null || true
-            done
-        fi
-    done
-
-    # Kill python-based KlipperScreen (runs as python3 process)
-    if command -v killall >/dev/null 2>&1; then
-        # Match python processes running screen.py (KlipperScreen entry point)
-        for pid in $(ps 2>/dev/null | grep -E 'python.*screen\.py' | grep -v grep | awk '{print $1}'); do
-            echo "Killing KlipperScreen python process (PID $pid)"
-            kill "$pid" 2>/dev/null || true
-        done
-    fi
-
-    # Brief pause to let processes exit
-    sleep 1
-}
-
-# ForgeX chroot location (AD5M with ForgeX firmware)
-FORGEX_CHROOT="/data/.mod/.forge-x"
-
-# Enable display backlight (for ForgeX firmware on AD5M)
-# ForgeX may leave the backlight off when display mode is STOCK,
-# so we explicitly enable it before starting HelixScreen.
-# NOTE: FORGEX_BACKLIGHT is the path INSIDE the chroot, not the host path!
-enable_backlight() {
-    # ForgeX stores backlight.py inside a chroot environment
-    # Must run via chroot for the ioctl to work
-    # Check the FULL path (chroot + script) for existence
-    local full_backlight_path="${FORGEX_CHROOT}${FORGEX_BACKLIGHT}"
-    if [ -d "$FORGEX_CHROOT" ] && [ -x "$full_backlight_path" ]; then
-        echo "Enabling backlight via ForgeX chroot..."
-        /usr/sbin/chroot "$FORGEX_CHROOT" "$FORGEX_BACKLIGHT" 100 2>/dev/null || true
-        return 0
-    fi
-
-    # Log if we couldn't enable backlight (helps debug boot issues)
-    echo "Warning: Could not enable backlight (chroot=$FORGEX_CHROOT, script=$full_backlight_path)"
-    return 1
-}
+# Source platform hooks if available
+PLATFORM_HOOKS="${DAEMON_DIR}/platform/hooks.sh"
+if [ -f "$PLATFORM_HOOKS" ]; then
+    # shellcheck disable=SC1090  # path depends on DAEMON_DIR set by installer
+    . "$PLATFORM_HOOKS"
+fi
 
 # Start splash screen (if available)
 # Returns the --splash-pid argument on stdout (for capture by caller)
@@ -154,61 +72,17 @@ stop_splash() {
     fi
 }
 
-# Wait for Moonraker to be ready (ForgeX only)
-# On memory-constrained systems like AD5M (107MB RAM), starting helix-screen
-# while moonraker is still initializing causes severe swap thrashing.
-# By waiting here with only the lightweight splash running, moonraker can
-# start without competition, dramatically improving boot time.
-wait_for_moonraker() {
-    # Only wait on ForgeX - it has the memory constraints
-    # Other systems (Klipper Mod on Pi) have plenty of RAM
-    if [ ! -d "$FORGEX_CHROOT" ]; then
-        return 0
-    fi
-
-    # Check if moonraker is even configured to run
-    # ForgeX can disable moonraker via variables.cfg
-    local moonraker_disabled
-    moonraker_disabled=$(/usr/sbin/chroot "$FORGEX_CHROOT" /bin/sh -c \
-        '/opt/config/mod/.shell/commands/zconf.sh /opt/config/mod_data/variables.cfg --get "disable_moonraker" "0"' 2>/dev/null)
-    if [ "$moonraker_disabled" = "1" ]; then
-        echo "Moonraker disabled, skipping wait"
-        return 0
-    fi
-
-    echo "Waiting for Moonraker (reduces memory pressure)..."
-    local timeout=120  # 2 minutes max - moonraker can be slow on first boot
-    local waited=0
-    while [ $waited -lt $timeout ]; do
-        # Check if moonraker is responding
-        # Use wget since curl isn't available on BusyBox base system
-        if wget -q -O /dev/null --timeout=1 http://localhost:7125/server/info 2>/dev/null; then
-            echo "Moonraker ready after ${waited}s"
-            return 0
-        fi
-        sleep 1
-        waited=$((waited + 1))
-        # Progress indicator every 10 seconds
-        if [ $((waited % 10)) -eq 0 ]; then
-            echo "  Still waiting for Moonraker... (${waited}s)"
-        fi
-    done
-
-    echo "Warning: Moonraker not ready after ${timeout}s, starting anyway"
-    return 1
-}
-
 start() {
     echo "Starting $DESC..."
 
-    # Create flag file so ForgeX S99root skips screen output
-    touch /tmp/helixscreen_active
+    # Platform-specific pre-start (e.g., flag files for firmware coordination)
+    platform_pre_start
 
     # Stop any competing UIs first
-    stop_competing_uis
+    platform_stop_competing_uis
 
-    # Enable backlight (ForgeX may leave it off)
-    enable_backlight
+    # Enable backlight (some firmware may leave it off)
+    platform_enable_backlight
 
     # Check if already running
     if [ -f "$PIDFILE" ]; then
@@ -235,14 +109,14 @@ start() {
         echo "Splash screen disabled (HELIX_NO_SPLASH=1)"
     fi
 
-    # Fork the moonraker wait + helix-screen launch into background
-    # This lets S90 exit so S99 can run and actually start moonraker
-    # Without this, we'd deadlock: S90 waits for moonraker, S99 starts moonraker but can't run until S90 finishes
+    # Fork the service wait + helix-screen launch into background
+    # This lets the init script exit so later scripts can run (e.g., S99 starts moonraker)
+    # Without this, we'd deadlock: S90 waits for services, S99 starts them but can't run until S90 finishes
     (
-        # Wait for Moonraker before starting the main UI
-        # This lets moonraker initialize without memory competition from helix-screen
-        if [ "${HELIX_NO_MOONRAKER_WAIT:-0}" != "1" ]; then
-            wait_for_moonraker
+        # Wait for required services before starting the main UI
+        # Platform hooks control what (if anything) to wait for
+        if [ "${HELIX_NO_SERVICE_WAIT:-0}" != "1" ]; then
+            platform_wait_for_services
         fi
 
         # Use launcher script if available (handles watchdog)
@@ -276,9 +150,6 @@ start() {
 
 stop() {
     echo "Stopping $DESC..."
-
-    # Remove flag file
-    rm -f /tmp/helixscreen_active
 
     # Stop splash first
     stop_splash
@@ -319,6 +190,10 @@ stop() {
             kill "$pid" 2>/dev/null || true
         done
     fi
+
+    # Platform-specific post-stop cleanup (e.g., remove flag files)
+    # Runs after daemon is fully stopped so platform can safely reclaim resources
+    platform_post_stop
 
     echo "$NAME stopped"
 }

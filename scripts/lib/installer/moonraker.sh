@@ -13,6 +13,7 @@ _HELIX_MOONRAKER_SOURCED=1
 # Common moonraker.conf locations
 MOONRAKER_CONF_PATHS="
 /home/pi/printer_data/config/moonraker.conf
+/home/biqu/printer_data/config/moonraker.conf
 /home/mks/printer_data/config/moonraker.conf
 /root/printer_data/config/moonraker.conf
 /opt/config/moonraker.conf
@@ -22,6 +23,16 @@ MOONRAKER_CONF_PATHS="
 # Find moonraker.conf
 # Returns: path to moonraker.conf or empty string
 find_moonraker_conf() {
+    # Dynamic: check detected user's home first
+    if [ -n "${KLIPPER_HOME:-}" ]; then
+        local user_conf="${KLIPPER_HOME}/printer_data/config/moonraker.conf"
+        if [ -f "$user_conf" ]; then
+            echo "$user_conf"
+            return 0
+        fi
+    fi
+
+    # Static fallback
     for conf in $MOONRAKER_CONF_PATHS; do
         if [ -f "$conf" ]; then
             echo "$conf"

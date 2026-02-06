@@ -29,15 +29,15 @@ Wants=systemd-udev-settle.service
 [Service]
 Type=simple
 
-# Run as root for framebuffer access (or create udev rules for user access)
-User=root
-Group=root
+# Run as the Klipper ecosystem user (templated by installer)
+User=@@HELIX_USER@@
+Group=@@HELIX_GROUP@@
 
 # Working directory for config/assets
-WorkingDirectory=/opt/helixscreen
+WorkingDirectory=@@INSTALL_DIR@@
 
 # Use launcher script for splash + main app
-ExecStart=/opt/helixscreen/bin/helix-launcher.sh
+ExecStart=@@INSTALL_DIR@@/bin/helix-launcher.sh
 
 # Environment variables
 # Override asset directory if ui_xml/assets/config are not under WorkingDirectory
@@ -55,7 +55,7 @@ LimitNPROC=4096
 
 # Security hardening (can be relaxed if needed)
 ProtectSystem=strict
-ProtectHome=read-only
+ReadWritePaths=@@INSTALL_DIR@@/config /var/log
 PrivateTmp=true
 NoNewPrivileges=true
 

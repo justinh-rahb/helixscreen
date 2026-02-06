@@ -17,7 +17,7 @@ make -j
 
 ### macOS (Homebrew)
 ```bash
-brew install cmake bear imagemagick python3 node
+brew install cmake bear imagemagick python3 node shellcheck bats-core
 npm install         # lv_font_conv and lv_img_conv
 make venv-setup     # Python venv with pypng/lz4
 ```
@@ -26,14 +26,14 @@ make venv-setup     # Python venv with pypng/lz4
 ### Debian/Ubuntu
 ```bash
 sudo apt install cmake bear imagemagick python3 python3-venv clang make npm \
-    libnl-3-dev libnl-genl-3-dev libssl-dev
+    shellcheck bats libnl-3-dev libnl-genl-3-dev libssl-dev
 npm install && make venv-setup
 ```
 
 ### Fedora/RHEL
 ```bash
 sudo dnf install cmake bear ImageMagick python3 clang make npm \
-    libnl3-devel openssl-devel
+    ShellCheck bats libnl3-devel openssl-devel
 npm install && make venv-setup
 ```
 
@@ -44,7 +44,7 @@ npm install && make venv-setup
 | **Required** | clang, cmake 3.16+, make, python3, node/npm | Core build tools |
 | **Auto-built** | SDL2, spdlog, libhv | Built from submodules if not system-installed |
 | **Always submodule** | lvgl, TinyGL | Project-specific patches required |
-| **Optional** | bear, imagemagick | IDE support, screenshots |
+| **Optional** | bear, imagemagick, shellcheck, bats-core | IDE support, screenshots, shell linting/testing |
 
 ```bash
 make check-deps      # Check what's missing

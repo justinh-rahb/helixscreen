@@ -82,11 +82,11 @@ setup_colors() {
 # Initialize colors immediately
 setup_colors
 
-# Logging functions (use printf for BusyBox compatibility)
-log_info() { printf '%b[INFO]%b %s\n' "$CYAN" "$NC" "$1"; }
-log_success() { printf '%b[OK]%b %s\n' "$GREEN" "$NC" "$1"; }
-log_warn() { printf '%b[WARN]%b %s\n' "$YELLOW" "$NC" "$1"; }
-log_error() { printf '%b[ERROR]%b %s\n' "$RED" "$NC" "$1" >&2; }
+# Logging functions
+log_info() { echo "${CYAN}[INFO]${NC} $1"; }
+log_success() { echo "${GREEN}[OK]${NC} $1"; }
+log_warn() { echo "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo "${RED}[ERROR]${NC} $1" >&2; }
 
 # Error handler - cleanup and report what went wrong
 # Usage: trap 'error_handler $LINENO' ERR
@@ -196,6 +196,8 @@ INIT_SCRIPT_DEST=""
 PREVIOUS_UI_SCRIPT=""
 AD5M_FIRMWARE=""
 K1_FIRMWARE=""
+KLIPPER_USER=""
+KLIPPER_HOME=""
 
 # Detect platform
 # Returns: "ad5m", "k1", "pi", or "unsupported"
@@ -243,8 +245,8 @@ detect_platform() {
             echo "pi"
             return
         fi
-        # Also check for MainsailOS
-        if [ -d /home/pi ] || [ -d /home/mks ]; then
+        # Also check for MainsailOS / BTT Pi / MKS
+        if [ -d /home/pi ] || [ -d /home/mks ] || [ -d /home/biqu ]; then
             echo "pi"
             return
         fi
@@ -259,6 +261,69 @@ detect_platform() {
     fi
 
     echo "unsupported"
+}
+
+# Detect the Klipper ecosystem user (who runs klipper/moonraker services)
+# Detection cascade (most reliable first):
+#   1. systemd: systemctl show klipper.service
+#   2. Process table: ps for running klipper
+#   3. printer_data scan: /home/*/printer_data
+#   4. Well-known users: biqu, pi, mks
+#   5. Fallback: root
+# Sets: KLIPPER_USER, KLIPPER_HOME
+detect_klipper_user() {
+    # 1. systemd service owner (most reliable on Pi)
+    if command -v systemctl >/dev/null 2>&1; then
+        local svc_user
+        svc_user=$(systemctl show -p User --value klipper.service 2>/dev/null) || true
+        if [ -n "$svc_user" ] && [ "$svc_user" != "root" ] && id "$svc_user" >/dev/null 2>&1; then
+            KLIPPER_USER="$svc_user"
+            KLIPPER_HOME=$(eval echo "~$svc_user")
+            log_info "Klipper user (systemd): $KLIPPER_USER"
+            return 0
+        fi
+    fi
+
+    # 2. Process table (catches running instances)
+    local ps_user
+    ps_user=$(ps -eo user,comm 2>/dev/null | awk '/klipper$/ && !/grep/ {print $1; exit}') || true
+    if [ -n "$ps_user" ] && [ "$ps_user" != "root" ] && id "$ps_user" >/dev/null 2>&1; then
+        KLIPPER_USER="$ps_user"
+        KLIPPER_HOME=$(eval echo "~$ps_user")
+        log_info "Klipper user (process): $KLIPPER_USER"
+        return 0
+    fi
+
+    # 3. printer_data directory scan
+    local pd_dir
+    for pd_dir in /home/*/printer_data; do
+        [ -d "$pd_dir" ] || continue
+        local pd_user
+        pd_user=$(echo "$pd_dir" | sed 's|^/home/||;s|/printer_data$||')
+        if [ -n "$pd_user" ] && id "$pd_user" >/dev/null 2>&1; then
+            KLIPPER_USER="$pd_user"
+            KLIPPER_HOME="/home/$pd_user"
+            log_info "Klipper user (printer_data): $KLIPPER_USER"
+            return 0
+        fi
+    done
+
+    # 4. Well-known users (checked in priority order)
+    local known_user
+    for known_user in biqu pi mks; do
+        if id "$known_user" >/dev/null 2>&1; then
+            KLIPPER_USER="$known_user"
+            KLIPPER_HOME="/home/$known_user"
+            log_info "Klipper user (well-known): $KLIPPER_USER"
+            return 0
+        fi
+    done
+
+    # 5. Fallback: root (embedded platforms, AD5M, K1)
+    KLIPPER_USER="root"
+    KLIPPER_HOME="/root"
+    log_info "Klipper user (fallback): root"
+    return 0
 }
 
 # Detect AD5M firmware variant (Klipper Mod vs Forge-X)
@@ -349,6 +414,7 @@ set_install_paths() {
         INIT_SCRIPT_DEST="/etc/init.d/S90helixscreen"
         PREVIOUS_UI_SCRIPT=""
         TMP_DIR="/tmp/helixscreen-install"
+        detect_klipper_user
     fi
 }
 
@@ -692,6 +758,40 @@ unpatch_forgex_screen_sh() {
     return 0
 }
 
+# Disable stock FlashForge UI in auto_run.sh
+# The stock firmware UI (ffstartup-arm/firmwareExe) is started by /opt/auto_run.sh
+# which runs AFTER init scripts. We comment out the line to prevent it starting.
+disable_stock_firmware_ui() {
+    auto_run="/opt/auto_run.sh"
+    if [ -f "$auto_run" ]; then
+        # Check if ffstartup-arm line exists and is not already commented
+        if grep -q "^/opt/PROGRAM/ffstartup-arm" "$auto_run"; then
+            log_info "Disabling stock FlashForge UI in auto_run.sh..."
+            # Comment out the ffstartup-arm line
+            $SUDO sed -i 's|^/opt/PROGRAM/ffstartup-arm|# Disabled by HelixScreen: /opt/PROGRAM/ffstartup-arm|' "$auto_run"
+            log_success "Stock FlashForge UI disabled"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Re-enable stock FlashForge UI in auto_run.sh (for uninstall)
+restore_stock_firmware_ui() {
+    auto_run="/opt/auto_run.sh"
+    if [ -f "$auto_run" ]; then
+        # Check if our disabled line exists
+        if grep -q "^# Disabled by HelixScreen: /opt/PROGRAM/ffstartup-arm" "$auto_run"; then
+            log_info "Re-enabling stock FlashForge UI in auto_run.sh..."
+            # Uncomment the ffstartup-arm line
+            $SUDO sed -i 's|^# Disabled by HelixScreen: /opt/PROGRAM/ffstartup-arm|/opt/PROGRAM/ffstartup-arm|' "$auto_run"
+            log_success "Stock FlashForge UI re-enabled"
+            return 0
+        fi
+    fi
+    return 1
+}
+
 # Patch ForgeX screen.sh to skip screen drawing when HelixScreen is active
 # ForgeX's S99root calls draw_splash, draw_loading, and boot_message which write
 # directly to the framebuffer, overwriting our splash screen during boot.
@@ -768,7 +868,6 @@ install_forgex_logged_wrapper() {
 
     # Create the wrapper script
     cat > "$logged_wrapper" << 'WRAPPER_EOF'
-#!/bin/sh
 # Wrapper for logged that strips --send-to-screen when HelixScreen is active
 # The logged binary writes directly to /dev/fb0, bypassing screen.sh patches
 
@@ -833,38 +932,47 @@ uninstall_forgex_logged_wrapper() {
     return 0
 }
 
-# Disable stock FlashForge UI in auto_run.sh
-# The stock firmware UI (ffstartup-arm/firmwareExe) is started by /opt/auto_run.sh
-# which runs AFTER init scripts. We comment out the line to prevent it starting.
-disable_stock_firmware_ui() {
-    auto_run="/opt/auto_run.sh"
-    if [ -f "$auto_run" ]; then
-        # Check if ffstartup-arm line exists and is not already commented
-        if grep -q "^/opt/PROGRAM/ffstartup-arm" "$auto_run"; then
-            log_info "Disabling stock FlashForge UI in auto_run.sh..."
-            # Comment out the ffstartup-arm line
-            $SUDO sed -i 's|^/opt/PROGRAM/ffstartup-arm|# Disabled by HelixScreen: /opt/PROGRAM/ffstartup-arm|' "$auto_run"
-            log_success "Stock FlashForge UI disabled"
-            return 0
+# Uninstall ForgeX-specific configuration (for uninstall)
+# Restores display mode, stock UI, screen.sh, GuppyScreen/tslib init scripts,
+# and cleans up backup files from manual patches.
+# Note: Sets caller's `restored_ui` variable via dynamic scoping.
+uninstall_forgex() {
+    # Restore ForgeX display mode to GUPPY (from HEADLESS or STOCK)
+    if [ -f "/opt/config/mod_data/variables.cfg" ]; then
+        if grep -q "display[[:space:]]*=[[:space:]]*'HEADLESS'" "/opt/config/mod_data/variables.cfg"; then
+            log_info "Restoring ForgeX display mode to GUPPY..."
+            $SUDO sed -i "s/display[[:space:]]*=[[:space:]]*'HEADLESS'/display = 'GUPPY'/" "/opt/config/mod_data/variables.cfg"
+        elif grep -q "display[[:space:]]*=[[:space:]]*'STOCK'" "/opt/config/mod_data/variables.cfg"; then
+            log_info "Restoring ForgeX display mode to GUPPY..."
+            $SUDO sed -i "s/display[[:space:]]*=[[:space:]]*'STOCK'/display = 'GUPPY'/" "/opt/config/mod_data/variables.cfg"
         fi
     fi
-    return 1
-}
 
-# Re-enable stock FlashForge UI in auto_run.sh (for uninstall)
-restore_stock_firmware_ui() {
-    auto_run="/opt/auto_run.sh"
-    if [ -f "$auto_run" ]; then
-        # Check if our disabled line exists
-        if grep -q "^# Disabled by HelixScreen: /opt/PROGRAM/ffstartup-arm" "$auto_run"; then
-            log_info "Re-enabling stock FlashForge UI in auto_run.sh..."
-            # Uncomment the ffstartup-arm line
-            $SUDO sed -i 's|^# Disabled by HelixScreen: /opt/PROGRAM/ffstartup-arm|/opt/PROGRAM/ffstartup-arm|' "$auto_run"
-            log_success "Stock FlashForge UI re-enabled"
-            return 0
-        fi
+    # Restore stock FlashForge UI in auto_run.sh
+    restore_stock_firmware_ui || true
+
+    # Remove HelixScreen patch from screen.sh
+    unpatch_forgex_screen_sh || true
+
+    # Remove logged wrapper
+    uninstall_forgex_logged_wrapper || true
+
+    # Re-enable GuppyScreen and tslib init scripts
+    if [ -f "/opt/config/mod/.root/S80guppyscreen" ]; then
+        $SUDO chmod +x "/opt/config/mod/.root/S80guppyscreen" 2>/dev/null || true
+        restored_ui="GuppyScreen (/opt/config/mod/.root/S80guppyscreen)"
     fi
-    return 1
+    if [ -f "/opt/config/mod/.root/S35tslib" ]; then
+        $SUDO chmod +x "/opt/config/mod/.root/S35tslib" 2>/dev/null || true
+    fi
+
+    # Clean up any leftover backup files from manual patches
+    for backup_file in /opt/config/mod/.shell/*.helix-backup /opt/config/mod/.shell/*.bak; do
+        if [ -f "$backup_file" ] 2>/dev/null; then
+            log_info "Removing leftover backup: $backup_file"
+            $SUDO rm -f "$backup_file"
+        fi
+    done
 }
 
 # ============================================
@@ -876,38 +984,85 @@ restore_stock_firmware_ui() {
 # Includes: GuppyScreen (AD5M/K1), Grumpyscreen (K1/Simple AF), KlipperScreen, FeatherScreen
 COMPETING_UIS="guppyscreen GuppyScreen grumpyscreen Grumpyscreen KlipperScreen klipperscreen featherscreen FeatherScreen"
 
-# Stop competing screen UIs (GuppyScreen, KlipperScreen, Xorg, etc.)
-stop_competing_uis() {
-    log_info "Checking for competing screen UIs..."
+# State file tracking services we disabled (for clean uninstall re-enablement)
+DISABLED_SERVICES_FILE="${INSTALL_DIR}/config/.disabled_services"
 
-    found_any=false
+# Record a disabled service for later re-enablement
+# Args: $1 = type ("systemd" or "sysv-chmod"), $2 = target (service name or script path)
+record_disabled_service() {
+    local type="$1"
+    local target="$2"
+    local entry="${type}:${target}"
 
+    # Ensure config directory exists
+    if [ -n "${INSTALL_DIR:-}" ] && [ ! -d "${INSTALL_DIR}/config" ]; then
+        $SUDO mkdir -p "${INSTALL_DIR}/config"
+    fi
+
+    # Don't duplicate entries
+    if [ -f "$DISABLED_SERVICES_FILE" ] && grep -qF "$entry" "$DISABLED_SERVICES_FILE" 2>/dev/null; then
+        return 0
+    fi
+
+    echo "$entry" | $SUDO tee -a "$DISABLED_SERVICES_FILE" >/dev/null
+}
+
+# Stop ForgeX-specific competing UIs (stock FlashForge firmware UI)
+stop_forgex_competing_uis() {
     # Stop stock FlashForge firmware UI (AD5M/Adventurer 5M)
     # ffstartup-arm is the startup manager that launches firmwareExe (the stock Qt UI)
     if [ -f /opt/PROGRAM/ffstartup-arm ]; then
         log_info "Stopping stock FlashForge UI..."
-        kill_process_by_name firmwareExe ffstartup-arm || true  # Don't fail if processes not running
+        kill_process_by_name firmwareExe ffstartup-arm || true
         found_any=true
     fi
+}
 
-    # On Klipper Mod, stop Xorg first (required for framebuffer access)
+# Stop Klipper Mod-specific competing UIs (Xorg, KlipperScreen)
+stop_kmod_competing_uis() {
+    # Stop Xorg first (required for framebuffer access)
     # Xorg takes over /dev/fb0 layer, preventing direct framebuffer rendering
     if [ -x "/etc/init.d/S40xorg" ]; then
         log_info "Stopping Xorg (Klipper Mod display server)..."
         $SUDO /etc/init.d/S40xorg stop 2>/dev/null || true
         # Disable Xorg init script (non-destructive, reversible)
         $SUDO chmod -x /etc/init.d/S40xorg 2>/dev/null || true
+        record_disabled_service "sysv-chmod" "/etc/init.d/S40xorg"
         # Kill any remaining Xorg processes
-        kill_process_by_name Xorg X || true  # Don't fail if processes not running
+        kill_process_by_name Xorg X || true
         found_any=true
     fi
 
-    # First, handle the specific previous UI if we know it (for clean reversibility)
+    # Kill python processes running KlipperScreen (common on Klipper Mod)
+    # BusyBox ps doesn't support 'aux', use portable approach
+    # shellcheck disable=SC2009
+    for pid in $(ps -ef 2>/dev/null | grep -E 'KlipperScreen.*screen\.py' | grep -v grep | awk '{print $2}'); do
+        log_info "Killing KlipperScreen python process (PID $pid)..."
+        $SUDO kill "$pid" 2>/dev/null || true
+        found_any=true
+    done
+}
+
+# Stop competing screen UIs (GuppyScreen, KlipperScreen, Xorg, etc.)
+# Dispatches platform-specific logic, then runs generic UI stopping
+stop_competing_uis() {
+    log_info "Checking for competing screen UIs..."
+
+    found_any=false
+
+    # Platform-specific competing UI handling
+    case "$AD5M_FIRMWARE" in
+        forge_x)    stop_forgex_competing_uis ;;
+        klipper_mod) stop_kmod_competing_uis ;;
+    esac
+
+    # Handle the specific previous UI if we know it (for clean reversibility)
     if [ -n "$PREVIOUS_UI_SCRIPT" ] && [ -x "$PREVIOUS_UI_SCRIPT" ] 2>/dev/null; then
         log_info "Stopping previous UI: $PREVIOUS_UI_SCRIPT"
         $SUDO "$PREVIOUS_UI_SCRIPT" stop 2>/dev/null || true
         # Disable by removing execute permission (non-destructive, reversible)
         $SUDO chmod -x "$PREVIOUS_UI_SCRIPT" 2>/dev/null || true
+        record_disabled_service "sysv-chmod" "$PREVIOUS_UI_SCRIPT"
         found_any=true
     fi
 
@@ -918,6 +1073,7 @@ stop_competing_uis() {
                 log_info "Stopping $ui (systemd service)..."
                 $SUDO systemctl stop "$ui" 2>/dev/null || true
                 $SUDO systemctl disable "$ui" 2>/dev/null || true
+                record_disabled_service "systemd" "$ui"
                 found_any=true
             fi
         fi
@@ -935,6 +1091,7 @@ stop_competing_uis() {
                 $SUDO "$initscript" stop 2>/dev/null || true
                 # Disable by removing execute permission (non-destructive)
                 $SUDO chmod -x "$initscript" 2>/dev/null || true
+                record_disabled_service "sysv-chmod" "$initscript"
                 found_any=true
             fi
         done
@@ -944,15 +1101,6 @@ stop_competing_uis() {
             log_info "Killed remaining $ui processes"
             found_any=true
         fi
-    done
-
-    # Also kill python processes running KlipperScreen (common on Klipper Mod)
-    # BusyBox ps doesn't support 'aux', use portable approach
-    # shellcheck disable=SC2009
-    for pid in $(ps -ef 2>/dev/null | grep -E 'KlipperScreen.*screen\.py' | grep -v grep | awk '{print $2}'); do
-        log_info "Killing KlipperScreen python process (PID $pid)..."
-        $SUDO kill "$pid" 2>/dev/null || true
-        found_any=true
     done
 
     if [ "$found_any" = true ]; then
@@ -1035,25 +1183,25 @@ show_manual_install_instructions() {
     echo ""
     echo "  1. Download the release:"
     if [ "$version" = "latest" ]; then
-        printf '     %bhttps://github.com/%s/releases/latest%b\n' "$CYAN" "$GITHUB_REPO" "$NC"
+        echo "     ${CYAN}https://github.com/${GITHUB_REPO}/releases/latest${NC}"
     else
-        printf '     %bhttps://github.com/%s/releases/tag/%s%b\n' "$CYAN" "$GITHUB_REPO" "$version" "$NC"
+        echo "     ${CYAN}https://github.com/${GITHUB_REPO}/releases/tag/${version}${NC}"
     fi
     echo ""
-    printf '  2. Download: %bhelixscreen-%s.tar.gz%b\n' "$BOLD" "$platform" "$NC"
+    echo "  2. Download: ${BOLD}helixscreen-${platform}.tar.gz${NC}"
     echo ""
     echo "  3. Copy to this device (note: AD5M needs -O flag):"
     if [ "$platform" = "ad5m" ]; then
         # AD5M /tmp is a tiny tmpfs (~54MB), use /data/ instead
-        printf '     %bscp -O helixscreen-%s.tar.gz root@<this-ip>:/data/%b\n' "$CYAN" "$platform" "$NC"
+        echo "     ${CYAN}scp -O helixscreen-${platform}.tar.gz root@<this-ip>:/data/${NC}"
         echo ""
         echo "  4. Run the installer with the local file:"
-        printf '     %bsh /data/install.sh --local /data/helixscreen-%s.tar.gz%b\n' "$CYAN" "$platform" "$NC"
+        echo "     ${CYAN}sh /data/install.sh --local /data/helixscreen-${platform}.tar.gz${NC}"
     else
-        printf '     %bscp helixscreen-%s.tar.gz root@<this-ip>:/tmp/%b\n' "$CYAN" "$platform" "$NC"
+        echo "     ${CYAN}scp helixscreen-${platform}.tar.gz root@<this-ip>:/tmp/${NC}"
         echo ""
         echo "  4. Run the installer with the local file:"
-        printf '     %bsh /tmp/install.sh --local /tmp/helixscreen-%s.tar.gz%b\n' "$CYAN" "$platform" "$NC"
+        echo "     ${CYAN}sh /tmp/install.sh --local /tmp/helixscreen-${platform}.tar.gz${NC}"
     fi
     echo ""
     exit 1
@@ -1259,6 +1407,20 @@ install_service_systemd() {
 
     $SUDO cp "$service_src" "$service_dest"
 
+    # Template placeholders (match SysV pattern in install_service_sysv)
+    local helix_user="${KLIPPER_USER:-root}"
+    local helix_group="${KLIPPER_USER:-root}"
+    local install_dir="${INSTALL_DIR:-/opt/helixscreen}"
+
+    $SUDO sed -i "s|@@HELIX_USER@@|${helix_user}|g" "$service_dest" 2>/dev/null || \
+    $SUDO sed -i '' "s|@@HELIX_USER@@|${helix_user}|g" "$service_dest" 2>/dev/null || true
+
+    $SUDO sed -i "s|@@HELIX_GROUP@@|${helix_group}|g" "$service_dest" 2>/dev/null || \
+    $SUDO sed -i '' "s|@@HELIX_GROUP@@|${helix_group}|g" "$service_dest" 2>/dev/null || true
+
+    $SUDO sed -i "s|@@INSTALL_DIR@@|${install_dir}|g" "$service_dest" 2>/dev/null || \
+    $SUDO sed -i '' "s|@@INSTALL_DIR@@|${install_dir}|g" "$service_dest" 2>/dev/null || true
+
     if ! $SUDO systemctl daemon-reload; then
         log_error "Failed to reload systemd daemon."
         exit 1
@@ -1359,6 +1521,37 @@ start_service_sysv() {
     log_warn "Check: $INIT_SCRIPT_DEST status"
 }
 
+# Deploy platform-specific hook file
+# Copies the correct hook file to $INSTALL_DIR/platform/hooks.sh so the
+# init script can source it at runtime.
+deploy_platform_hooks() {
+    local install_dir="$1"
+    local platform="$2"  # "ad5m-forgex", "ad5m-kmod", "pi", "k1"
+    local hooks_src="${install_dir}/config/platform/hooks-${platform}.sh"
+
+    if [ ! -f "$hooks_src" ]; then
+        log_warn "No platform hooks for: $platform"
+        return 0
+    fi
+
+    $SUDO mkdir -p "${install_dir}/platform"
+    $SUDO cp "$hooks_src" "${install_dir}/platform/hooks.sh"
+    $SUDO chmod +x "${install_dir}/platform/hooks.sh"
+    log_info "Deployed platform hooks: $platform"
+}
+
+# Fix ownership of config directory for non-root Klipper users
+# Binaries stay root-owned for security; only config needs user write access
+fix_install_ownership() {
+    local user="${KLIPPER_USER:-}"
+    if [ -n "$user" ] && [ "$user" != "root" ] && [ -d "$INSTALL_DIR" ]; then
+        log_info "Setting ownership to ${user}..."
+        if [ -d "${INSTALL_DIR}/config" ]; then
+            $SUDO chown -R "${user}:${user}" "${INSTALL_DIR}/config"
+        fi
+    fi
+}
+
 # Stop service for update
 stop_service() {
     if [ "$INIT_SYSTEM" = "systemd" ]; then
@@ -1393,6 +1586,7 @@ stop_service() {
 # Common moonraker.conf locations
 MOONRAKER_CONF_PATHS="
 /home/pi/printer_data/config/moonraker.conf
+/home/biqu/printer_data/config/moonraker.conf
 /home/mks/printer_data/config/moonraker.conf
 /root/printer_data/config/moonraker.conf
 /opt/config/moonraker.conf
@@ -1402,6 +1596,16 @@ MOONRAKER_CONF_PATHS="
 # Find moonraker.conf
 # Returns: path to moonraker.conf or empty string
 find_moonraker_conf() {
+    # Dynamic: check detected user's home first
+    if [ -n "${KLIPPER_HOME:-}" ]; then
+        local user_conf="${KLIPPER_HOME}/printer_data/config/moonraker.conf"
+        if [ -f "$user_conf" ]; then
+            echo "$user_conf"
+            return 0
+        fi
+    fi
+
+    # Static fallback
     for conf in $MOONRAKER_CONF_PATHS; do
         if [ -f "$conf" ]; then
             echo "$conf"
@@ -1542,6 +1746,35 @@ remove_update_manager_section() {
 # ============================================
 
 #
+# Re-enable services that were disabled during installation
+# Reads the state file and reverses each recorded disable action
+reenable_disabled_services() {
+    local state_file="${INSTALL_DIR}/config/.disabled_services"
+    [ -f "$state_file" ] || return 0
+
+    log_info "Re-enabling previously disabled services..."
+    while IFS= read -r entry; do
+        # Skip empty lines and comments
+        case "$entry" in ""|\#*) continue ;; esac
+
+        local type="${entry%%:*}"
+        local target="${entry#*:}"
+
+        case "$type" in
+            systemd)
+                log_info "Re-enabling systemd service: $target"
+                $SUDO systemctl enable "$target" 2>/dev/null || true
+                ;;
+            sysv-chmod)
+                if [ -f "$target" ]; then
+                    log_info "Re-enabling init script: $target"
+                    $SUDO chmod +x "$target" 2>/dev/null || true
+                fi
+                ;;
+        esac
+    done < "$state_file"
+}
+
 # Uninstall HelixScreen
 # Args: platform (optional)
 uninstall() {
@@ -1577,6 +1810,9 @@ uninstall() {
     $SUDO rm -f /var/run/helixscreen.pid 2>/dev/null || true
     $SUDO rm -f /var/run/helix-splash.pid 2>/dev/null || true
     $SUDO rm -f /tmp/helixscreen.log 2>/dev/null || true
+
+    # Re-enable services from state file (before removing install dir)
+    reenable_disabled_services
 
     # Remove installation (check all possible locations)
     local removed_dir=""
@@ -1615,39 +1851,9 @@ uninstall() {
         restored_ui="GuppyScreen (/etc/init.d/S99guppyscreen)"
     fi
 
-    if [ -z "$restored_ui" ]; then
-        # Forge-X - restore GuppyScreen and stock UI settings
-        # Restore ForgeX display mode to GUPPY (from HEADLESS or STOCK)
-        if [ -f "/opt/config/mod_data/variables.cfg" ]; then
-            if grep -q "display[[:space:]]*=[[:space:]]*'HEADLESS'" "/opt/config/mod_data/variables.cfg"; then
-                log_info "Restoring ForgeX display mode to GUPPY..."
-                $SUDO sed -i "s/display[[:space:]]*=[[:space:]]*'HEADLESS'/display = 'GUPPY'/" "/opt/config/mod_data/variables.cfg"
-            elif grep -q "display[[:space:]]*=[[:space:]]*'STOCK'" "/opt/config/mod_data/variables.cfg"; then
-                log_info "Restoring ForgeX display mode to GUPPY..."
-                $SUDO sed -i "s/display[[:space:]]*=[[:space:]]*'STOCK'/display = 'GUPPY'/" "/opt/config/mod_data/variables.cfg"
-            fi
-        fi
-        # Restore stock FlashForge UI in auto_run.sh
-        restore_stock_firmware_ui || true
-        # Remove HelixScreen patches from screen.sh
-        unpatch_forgex_screen_sh || true
-        # Remove logged wrapper
-        uninstall_forgex_logged_wrapper || true
-        # Re-enable GuppyScreen and tslib init scripts
-        if [ -f "/opt/config/mod/.root/S80guppyscreen" ]; then
-            $SUDO chmod +x "/opt/config/mod/.root/S80guppyscreen" 2>/dev/null || true
-            restored_ui="GuppyScreen (/opt/config/mod/.root/S80guppyscreen)"
-        fi
-        if [ -f "/opt/config/mod/.root/S35tslib" ]; then
-            $SUDO chmod +x "/opt/config/mod/.root/S35tslib" 2>/dev/null || true
-        fi
-        # Clean up any leftover backup files from manual patches
-        for backup_file in /opt/config/mod/.shell/*.helix-backup /opt/config/mod/.shell/*.bak; do
-            if [ -f "$backup_file" ] 2>/dev/null; then
-                log_info "Removing leftover backup: $backup_file"
-                $SUDO rm -f "$backup_file"
-            fi
-        done
+    # ForgeX - restore GuppyScreen and stock UI settings
+    if [ -z "$restored_ui" ] && [ "$AD5M_FIRMWARE" = "forge_x" ]; then
+        uninstall_forgex
     fi
 
     # Clean up helixscreen cache directories
@@ -1792,6 +1998,44 @@ usage() {
     echo "  $0 --local /tmp/helixscreen-ad5m.tar.gz  # Install from local file"
 }
 
+# Configure platform-specific settings before stopping competing UIs
+# (ForgeX display mode, stock UI disable, screen.sh patching)
+configure_platform() {
+    case "$AD5M_FIRMWARE" in
+        forge_x)
+            configure_forgex_display || true
+            disable_stock_firmware_ui || true
+            patch_forgex_screen_sh || true
+            patch_forgex_screen_drawing || true
+            install_forgex_logged_wrapper || true
+            ;;
+        klipper_mod)
+            # Klipper Mod-specific install-time configuration (if any)
+            ;;
+    esac
+}
+
+# Deploy platform-specific hooks for the init script
+# Must be called after extract_release (hooks are in the release package)
+install_platform_hooks() {
+    local platform_hook=""
+    case "$AD5M_FIRMWARE" in
+        forge_x)     platform_hook="ad5m-forgex" ;;
+        klipper_mod) platform_hook="ad5m-kmod" ;;
+    esac
+
+    # Pi and K1 platform hooks
+    if [ "$platform" = "pi" ]; then
+        platform_hook="pi"
+    elif [ "$platform" = "k1" ]; then
+        platform_hook="k1"
+    fi
+
+    if [ -n "$platform_hook" ]; then
+        deploy_platform_hooks "$INSTALL_DIR" "$platform_hook"
+    fi
+}
+
 # Main installation flow
 main() {
     update_mode=false
@@ -1844,14 +2088,14 @@ main() {
     done
 
     echo ""
-    printf '%b========================================%b\n' "$BOLD" "$NC"
-    printf '%b       HelixScreen Installer%b\n' "$BOLD" "$NC"
-    printf '%b========================================%b\n' "$BOLD" "$NC"
+    echo "${BOLD}========================================${NC}"
+    echo "${BOLD}       HelixScreen Installer${NC}"
+    echo "${BOLD}========================================${NC}"
     echo ""
 
     # Detect platform
     platform=$(detect_platform)
-    printf '%b[INFO]%b Detected platform: %b%s%b\n' "$CYAN" "$NC" "$BOLD" "$platform" "$NC"
+    log_info "Detected platform: ${BOLD}${platform}${NC}"
 
     if [ "$platform" = "unsupported" ]; then
         log_error "Unsupported platform: $(uname -m)"
@@ -1909,14 +2153,8 @@ main() {
     fi
     log_info "Target version: ${BOLD}${version}${NC}"
 
-    # For ForgeX firmware, disable GuppyScreen in variables.cfg before stopping UIs
-    if [ "$AD5M_FIRMWARE" = "forge_x" ]; then
-        configure_forgex_display || true
-        disable_stock_firmware_ui || true
-        patch_forgex_screen_sh || true
-        patch_forgex_screen_drawing || true
-        install_forgex_logged_wrapper || true
-    fi
+    # Configure platform-specific settings before stopping UIs
+    configure_platform
 
     # Stop competing UIs
     stop_competing_uis
@@ -1941,7 +2179,9 @@ main() {
         download_release "$version" "$platform"
     fi
     extract_release "$platform"
+    fix_install_ownership
     install_service "$platform"
+    install_platform_hooks
 
     # Configure Moonraker update_manager (Pi only - enables web UI updates)
     configure_moonraker_updates "$platform"
@@ -1953,9 +2193,9 @@ main() {
     cleanup_on_success
 
     echo ""
-    printf '%b%b========================================%b\n' "$GREEN" "$BOLD" "$NC"
-    printf '%b%b    Installation Complete!%b\n' "$GREEN" "$BOLD" "$NC"
-    printf '%b%b========================================%b\n' "$GREEN" "$BOLD" "$NC"
+    echo "${GREEN}${BOLD}========================================${NC}"
+    echo "${GREEN}${BOLD}    Installation Complete!${NC}"
+    echo "${GREEN}${BOLD}========================================${NC}"
     echo ""
     echo "HelixScreen ${version} installed to ${INSTALL_DIR}"
     echo ""

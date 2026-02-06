@@ -335,6 +335,21 @@ check_desktop_tools() {
         warn "xmllint not found (needed for XML validation)"
         hint "xmllint" "libxml2" "libxml2-utils" "libxml2"
     fi
+
+    # Shell testing and linting tools (warnings only)
+    if command -v shellcheck >/dev/null 2>&1; then
+        ok "shellcheck found: $(shellcheck --version | grep '^version:' | awk '{print $2}')"
+    else
+        warn "shellcheck not found (needed for shell script linting)"
+        hint "shellcheck" "shellcheck" "shellcheck" "ShellCheck"
+    fi
+
+    if command -v bats >/dev/null 2>&1; then
+        ok "bats found: $(bats --version)"
+    else
+        warn "bats not found (needed for shell/platform hook tests)"
+        hint "bats" "bats-core" "bats" "bats"
+    fi
 }
 
 check_docker_tools() {

@@ -4,7 +4,7 @@
 # Platform detection: AD5M vs K1 vs Pi, firmware variant, installation paths
 #
 # Reads: -
-# Writes: PLATFORM, AD5M_FIRMWARE, K1_FIRMWARE, INSTALL_DIR, INIT_SCRIPT_DEST, PREVIOUS_UI_SCRIPT, TMP_DIR
+# Writes: PLATFORM, AD5M_FIRMWARE, K1_FIRMWARE, INSTALL_DIR, INIT_SCRIPT_DEST, PREVIOUS_UI_SCRIPT, TMP_DIR, KLIPPER_USER, KLIPPER_HOME
 
 # Source guard
 [ -n "${_HELIX_PLATFORM_SOURCED:-}" ] && return 0
@@ -17,6 +17,8 @@ INIT_SCRIPT_DEST=""
 PREVIOUS_UI_SCRIPT=""
 AD5M_FIRMWARE=""
 K1_FIRMWARE=""
+KLIPPER_USER=""
+KLIPPER_HOME=""
 
 # Detect platform
 # Returns: "ad5m", "k1", "pi", or "unsupported"
@@ -64,8 +66,8 @@ detect_platform() {
             echo "pi"
             return
         fi
-        # Also check for MainsailOS
-        if [ -d /home/pi ] || [ -d /home/mks ]; then
+        # Also check for MainsailOS / BTT Pi / MKS
+        if [ -d /home/pi ] || [ -d /home/mks ] || [ -d /home/biqu ]; then
             echo "pi"
             return
         fi
@@ -80,6 +82,69 @@ detect_platform() {
     fi
 
     echo "unsupported"
+}
+
+# Detect the Klipper ecosystem user (who runs klipper/moonraker services)
+# Detection cascade (most reliable first):
+#   1. systemd: systemctl show klipper.service
+#   2. Process table: ps for running klipper
+#   3. printer_data scan: /home/*/printer_data
+#   4. Well-known users: biqu, pi, mks
+#   5. Fallback: root
+# Sets: KLIPPER_USER, KLIPPER_HOME
+detect_klipper_user() {
+    # 1. systemd service owner (most reliable on Pi)
+    if command -v systemctl >/dev/null 2>&1; then
+        local svc_user
+        svc_user=$(systemctl show -p User --value klipper.service 2>/dev/null) || true
+        if [ -n "$svc_user" ] && [ "$svc_user" != "root" ] && id "$svc_user" >/dev/null 2>&1; then
+            KLIPPER_USER="$svc_user"
+            KLIPPER_HOME=$(eval echo "~$svc_user")
+            log_info "Klipper user (systemd): $KLIPPER_USER"
+            return 0
+        fi
+    fi
+
+    # 2. Process table (catches running instances)
+    local ps_user
+    ps_user=$(ps -eo user,comm 2>/dev/null | awk '/klipper$/ && !/grep/ {print $1; exit}') || true
+    if [ -n "$ps_user" ] && [ "$ps_user" != "root" ] && id "$ps_user" >/dev/null 2>&1; then
+        KLIPPER_USER="$ps_user"
+        KLIPPER_HOME=$(eval echo "~$ps_user")
+        log_info "Klipper user (process): $KLIPPER_USER"
+        return 0
+    fi
+
+    # 3. printer_data directory scan
+    local pd_dir
+    for pd_dir in /home/*/printer_data; do
+        [ -d "$pd_dir" ] || continue
+        local pd_user
+        pd_user=$(echo "$pd_dir" | sed 's|^/home/||;s|/printer_data$||')
+        if [ -n "$pd_user" ] && id "$pd_user" >/dev/null 2>&1; then
+            KLIPPER_USER="$pd_user"
+            KLIPPER_HOME="/home/$pd_user"
+            log_info "Klipper user (printer_data): $KLIPPER_USER"
+            return 0
+        fi
+    done
+
+    # 4. Well-known users (checked in priority order)
+    local known_user
+    for known_user in biqu pi mks; do
+        if id "$known_user" >/dev/null 2>&1; then
+            KLIPPER_USER="$known_user"
+            KLIPPER_HOME="/home/$known_user"
+            log_info "Klipper user (well-known): $KLIPPER_USER"
+            return 0
+        fi
+    done
+
+    # 5. Fallback: root (embedded platforms, AD5M, K1)
+    KLIPPER_USER="root"
+    KLIPPER_HOME="/root"
+    log_info "Klipper user (fallback): root"
+    return 0
 }
 
 # Detect AD5M firmware variant (Klipper Mod vs Forge-X)
@@ -170,5 +235,6 @@ set_install_paths() {
         INIT_SCRIPT_DEST="/etc/init.d/S90helixscreen"
         PREVIOUS_UI_SCRIPT=""
         TMP_DIR="/tmp/helixscreen-install"
+        detect_klipper_user
     fi
 }

@@ -511,6 +511,61 @@ if [ "$STAGED_ONLY" = true ]; then
 fi
 
 # ====================================================================
+# Shell Script Linting (shellcheck)
+# ====================================================================
+SECTION_START=$(date +%s)
+echo -n "🐚 Checking shell scripts (shellcheck)..."
+
+# Platform hook scripts and init script
+SHELL_FILES=""
+if [ "$STAGED_ONLY" = true ]; then
+  SHELL_FILES=$(git diff --cached --name-only --diff-filter=ACM | \
+    grep -E '(config/platform/.*\.sh|config/helixscreen\.init)$' || true)
+else
+  SHELL_FILES=$(find config/platform -name "*.sh" 2>/dev/null || true)
+  if [ -f "config/helixscreen.init" ]; then
+    SHELL_FILES="$SHELL_FILES config/helixscreen.init"
+  fi
+fi
+
+if [ -n "$SHELL_FILES" ]; then
+  if command -v shellcheck >/dev/null 2>&1; then
+    SHELL_ERRORS=0
+    for script in $SHELL_FILES; do
+      if [ -f "$script" ]; then
+        if ! shellcheck "$script" 2>/dev/null; then
+          SHELL_ERRORS=$((SHELL_ERRORS + 1))
+        fi
+      fi
+    done
+    section_time $SECTION_START
+    echo ""
+    if [ $SHELL_ERRORS -eq 0 ]; then
+      echo "✅ All shell scripts pass shellcheck"
+    else
+      echo "❌ shellcheck found issues in $SHELL_ERRORS file(s)"
+      echo "   Run: shellcheck config/platform/*.sh config/helixscreen.init"
+      EXIT_CODE=1
+    fi
+  else
+    section_time $SECTION_START
+    echo ""
+    echo "⚠️  shellcheck not found - skipping shell script linting"
+    echo "   Install with: brew install shellcheck (macOS) or apt install shellcheck (Linux)"
+  fi
+else
+  section_time $SECTION_START
+  echo ""
+  if [ "$STAGED_ONLY" = true ]; then
+    echo "ℹ️  No shell scripts staged for commit"
+  else
+    echo "ℹ️  No shell scripts found"
+  fi
+fi
+
+echo ""
+
+# ====================================================================
 # Final Result
 # ====================================================================
 SCRIPT_END=$(date +%s)

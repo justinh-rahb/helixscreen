@@ -164,6 +164,11 @@ package_platform() {
     cp "${PROJECT_DIR}/config/printer_database.json" "$pkg_dir/config/" 2>/dev/null || true
     cp "${PROJECT_DIR}/config/printing_tips.json" "$pkg_dir/config/" 2>/dev/null || true
 
+    # Copy platform hook files (init script sources the appropriate one at runtime)
+    if [ -d "${PROJECT_DIR}/config/platform" ]; then
+        cp -r "${PROJECT_DIR}/config/platform" "$pkg_dir/config/"
+    fi
+
     # Platform-specific default config: use preset for known platforms, template otherwise
     # Presets skip the wizard with pre-configured hardware mappings and touch calibration
     # Printer type is left empty for runtime auto-detection (AD5M vs AD5M Pro)

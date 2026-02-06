@@ -181,6 +181,20 @@ test-all: test-build
 tests: test-run
 
 # ============================================================================
+# Shell/Bats Tests
+# ============================================================================
+
+# Run shell/bats tests for platform hooks and installer scripts
+test-shell:
+	$(ECHO) "$(CYAN)$(BOLD)Running shell tests (bats)...$(RESET)"
+	@if command -v bats >/dev/null 2>&1; then \
+		bats tests/shell/; \
+	else \
+		echo "$(YELLOW)⚠ bats not found - skipping shell tests$(RESET)"; \
+		echo "  Install with: brew install bats-core (macOS) or apt install bats (Linux)"; \
+	fi
+
+# ============================================================================
 # Convenience Test Targets - Run tests by component
 # ============================================================================
 
@@ -865,7 +879,7 @@ clean-sanitizers:
 # Test Help
 # ============================================================================
 
-.PHONY: help-test test-serial test-asan test-tsan test-asan-one test-tsan-one clean-sanitizers
+.PHONY: help-test test-shell test-serial test-asan test-tsan test-asan-one test-tsan-one clean-sanitizers
 help-test:
 	@if [ -t 1 ] && [ -n "$(TERM)" ] && [ "$(TERM)" != "dumb" ]; then \
 		B='$(BOLD)'; G='$(GREEN)'; Y='$(YELLOW)'; C='$(CYAN)'; X='$(RESET)'; \

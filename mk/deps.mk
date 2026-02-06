@@ -97,6 +97,10 @@ install-deps:
 			openssl:brew) echo "openssl";; \
 			openssl:apt) echo "libssl-dev";; \
 			openssl:dnf) echo "openssl-devel";; \
+			shellcheck:brew|shellcheck:apt) echo "shellcheck";; \
+			shellcheck:dnf) echo "ShellCheck";; \
+			bats:brew) echo "bats-core";; \
+			bats:apt|bats:dnf) echo "bats";; \
 			docker-buildx:brew) echo "docker-buildx";; \
 			docker-buildx:apt) echo "";; \
 			docker-buildx:dnf) echo "";; \
@@ -125,6 +129,12 @@ install-deps:
 	fi; \
 	if ! command -v xmllint >/dev/null 2>&1; then \
 		INSTALL_NEEDED=1; TO_INSTALL="$$TO_INSTALL $$(add_pkg xmllint)"; \
+	fi; \
+	if ! command -v shellcheck >/dev/null 2>&1; then \
+		INSTALL_NEEDED=1; TO_INSTALL="$$TO_INSTALL $$(add_pkg shellcheck)"; \
+	fi; \
+	if ! command -v bats >/dev/null 2>&1; then \
+		INSTALL_NEEDED=1; TO_INSTALL="$$TO_INSTALL $$(add_pkg bats)"; \
 	fi; \
 	if ! command -v pkg-config >/dev/null 2>&1; then \
 		INSTALL_NEEDED=1; TO_INSTALL="$$TO_INSTALL $$(add_pkg pkg-config)"; \

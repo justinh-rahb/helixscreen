@@ -140,6 +140,44 @@ usage() {
     echo "  $0 --local /tmp/helixscreen-ad5m.tar.gz  # Install from local file"
 }
 
+# Configure platform-specific settings before stopping competing UIs
+# (ForgeX display mode, stock UI disable, screen.sh patching)
+configure_platform() {
+    case "$AD5M_FIRMWARE" in
+        forge_x)
+            configure_forgex_display || true
+            disable_stock_firmware_ui || true
+            patch_forgex_screen_sh || true
+            patch_forgex_screen_drawing || true
+            install_forgex_logged_wrapper || true
+            ;;
+        klipper_mod)
+            # Klipper Mod-specific install-time configuration (if any)
+            ;;
+    esac
+}
+
+# Deploy platform-specific hooks for the init script
+# Must be called after extract_release (hooks are in the release package)
+install_platform_hooks() {
+    local platform_hook=""
+    case "$AD5M_FIRMWARE" in
+        forge_x)     platform_hook="ad5m-forgex" ;;
+        klipper_mod) platform_hook="ad5m-kmod" ;;
+    esac
+
+    # Pi and K1 platform hooks
+    if [ "$platform" = "pi" ]; then
+        platform_hook="pi"
+    elif [ "$platform" = "k1" ]; then
+        platform_hook="k1"
+    fi
+
+    if [ -n "$platform_hook" ]; then
+        deploy_platform_hooks "$INSTALL_DIR" "$platform_hook"
+    fi
+}
+
 # Main installation flow
 main() {
     update_mode=false
@@ -257,12 +295,8 @@ main() {
     fi
     log_info "Target version: ${BOLD}${version}${NC}"
 
-    # For ForgeX firmware, disable GuppyScreen in variables.cfg before stopping UIs
-    if [ "$AD5M_FIRMWARE" = "forge_x" ]; then
-        configure_forgex_display || true
-        disable_stock_firmware_ui || true
-        patch_forgex_screen_sh || true
-    fi
+    # Configure platform-specific settings before stopping UIs
+    configure_platform
 
     # Stop competing UIs
     stop_competing_uis
@@ -287,7 +321,9 @@ main() {
         download_release "$version" "$platform"
     fi
     extract_release "$platform"
+    fix_install_ownership
     install_service "$platform"
+    install_platform_hooks
 
     # Configure Moonraker update_manager (Pi only - enables web UI updates)
     configure_moonraker_updates "$platform"

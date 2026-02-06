@@ -39,6 +39,20 @@ install_service_systemd() {
 
     $SUDO cp "$service_src" "$service_dest"
 
+    # Template placeholders (match SysV pattern in install_service_sysv)
+    local helix_user="${KLIPPER_USER:-root}"
+    local helix_group="${KLIPPER_USER:-root}"
+    local install_dir="${INSTALL_DIR:-/opt/helixscreen}"
+
+    $SUDO sed -i "s|@@HELIX_USER@@|${helix_user}|g" "$service_dest" 2>/dev/null || \
+    $SUDO sed -i '' "s|@@HELIX_USER@@|${helix_user}|g" "$service_dest" 2>/dev/null || true
+
+    $SUDO sed -i "s|@@HELIX_GROUP@@|${helix_group}|g" "$service_dest" 2>/dev/null || \
+    $SUDO sed -i '' "s|@@HELIX_GROUP@@|${helix_group}|g" "$service_dest" 2>/dev/null || true
+
+    $SUDO sed -i "s|@@INSTALL_DIR@@|${install_dir}|g" "$service_dest" 2>/dev/null || \
+    $SUDO sed -i '' "s|@@INSTALL_DIR@@|${install_dir}|g" "$service_dest" 2>/dev/null || true
+
     if ! $SUDO systemctl daemon-reload; then
         log_error "Failed to reload systemd daemon."
         exit 1
@@ -137,6 +151,37 @@ start_service_sysv() {
     done
     log_warn "Service may still be starting..."
     log_warn "Check: $INIT_SCRIPT_DEST status"
+}
+
+# Deploy platform-specific hook file
+# Copies the correct hook file to $INSTALL_DIR/platform/hooks.sh so the
+# init script can source it at runtime.
+deploy_platform_hooks() {
+    local install_dir="$1"
+    local platform="$2"  # "ad5m-forgex", "ad5m-kmod", "pi", "k1"
+    local hooks_src="${install_dir}/config/platform/hooks-${platform}.sh"
+
+    if [ ! -f "$hooks_src" ]; then
+        log_warn "No platform hooks for: $platform"
+        return 0
+    fi
+
+    $SUDO mkdir -p "${install_dir}/platform"
+    $SUDO cp "$hooks_src" "${install_dir}/platform/hooks.sh"
+    $SUDO chmod +x "${install_dir}/platform/hooks.sh"
+    log_info "Deployed platform hooks: $platform"
+}
+
+# Fix ownership of config directory for non-root Klipper users
+# Binaries stay root-owned for security; only config needs user write access
+fix_install_ownership() {
+    local user="${KLIPPER_USER:-}"
+    if [ -n "$user" ] && [ "$user" != "root" ] && [ -d "$INSTALL_DIR" ]; then
+        log_info "Setting ownership to ${user}..."
+        if [ -d "${INSTALL_DIR}/config" ]; then
+            $SUDO chown -R "${user}:${user}" "${INSTALL_DIR}/config"
+        fi
+    fi
 }
 
 # Stop service for update
