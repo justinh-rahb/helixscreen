@@ -181,8 +181,11 @@ void PrintStartCollector::enable_fallbacks() {
     fallbacks_enabled_.store(true);
     spdlog::debug("[PrintStartCollector] Fallback detection enabled");
 
-    // Immediately check if any fallback conditions are already met
-    check_fallback_completion();
+    // Don't immediately check fallback conditions here.
+    // set_print_start_state() defers reset_for_new_print() via async invoke,
+    // so stale subject data (layer count, progress) from the previous print
+    // hasn't been cleared yet. Let fallback checks be triggered naturally by
+    // incoming data updates (observer callbacks on layer/progress subjects).
 }
 
 void PrintStartCollector::check_fallback_completion() {

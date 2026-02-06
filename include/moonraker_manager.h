@@ -157,10 +157,15 @@ class MoonrakerManager {
             return false; // Not a transition to printing
         }
 
-        // Check if we're mid-print (progress > 0).
-        // This catches the case where app starts while a print is in progress.
-        bool is_mid_print = current_progress > 0;
-        return !is_mid_print;
+        // Mid-print detection: only relevant when prev_state is STANDBY.
+        // STANDBY is the initial state at app boot - if we transition STANDBY → PRINTING
+        // with progress > 0, the app started while a print was already running.
+        // From COMPLETE/CANCELLED/ERROR → PRINTING, progress is stale from the
+        // previous print and should be ignored - this is always a fresh print.
+        if (prev_state == PrintJobState::STANDBY && current_progress > 0) {
+            return false; // App joined mid-print, skip collector
+        }
+        return true;
     }
 
     /**

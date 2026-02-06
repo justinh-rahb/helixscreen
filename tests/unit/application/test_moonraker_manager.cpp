@@ -118,8 +118,10 @@ TEST_CASE("should_start_print_collector - fresh print start", "[application][pri
                                                            PrintJobState::PRINTING, 0));
 }
 
-TEST_CASE("should_start_print_collector - mid-print detection", "[application][print_start]") {
-    // Transition from STANDBY to PRINTING with progress > 0 = mid-print, don't start
+TEST_CASE("should_start_print_collector - mid-print detection (app boot)",
+          "[application][print_start]") {
+    // App boots, finds print already running (STANDBY → PRINTING with progress > 0)
+    // This is the ONLY case where mid-print detection should suppress the collector
     REQUIRE_FALSE(MoonrakerManager::should_start_print_collector(PrintJobState::STANDBY,
                                                                  PrintJobState::PRINTING, 1));
 
@@ -128,6 +130,40 @@ TEST_CASE("should_start_print_collector - mid-print detection", "[application][p
 
     REQUIRE_FALSE(MoonrakerManager::should_start_print_collector(PrintJobState::STANDBY,
                                                                  PrintJobState::PRINTING, 99));
+
+    REQUIRE_FALSE(MoonrakerManager::should_start_print_collector(PrintJobState::STANDBY,
+                                                                 PrintJobState::PRINTING, 100));
+}
+
+TEST_CASE("should_start_print_collector - new print after completed print",
+          "[application][print_start]") {
+    // COMPLETE → PRINTING with stale progress from previous print.
+    // Progress subject retains 100% from the finished print until Moonraker resets it.
+    // This MUST start the collector - it's a fresh print, not mid-print.
+    REQUIRE(MoonrakerManager::should_start_print_collector(PrintJobState::COMPLETE,
+                                                           PrintJobState::PRINTING, 100));
+
+    REQUIRE(MoonrakerManager::should_start_print_collector(PrintJobState::COMPLETE,
+                                                           PrintJobState::PRINTING, 50));
+
+    REQUIRE(MoonrakerManager::should_start_print_collector(PrintJobState::COMPLETE,
+                                                           PrintJobState::PRINTING, 1));
+}
+
+TEST_CASE("should_start_print_collector - new print after cancelled/error",
+          "[application][print_start]") {
+    // CANCELLED/ERROR → PRINTING with stale progress should also start collector
+    REQUIRE(MoonrakerManager::should_start_print_collector(PrintJobState::CANCELLED,
+                                                           PrintJobState::PRINTING, 75));
+
+    REQUIRE(MoonrakerManager::should_start_print_collector(PrintJobState::CANCELLED,
+                                                           PrintJobState::PRINTING, 100));
+
+    REQUIRE(MoonrakerManager::should_start_print_collector(PrintJobState::ERROR,
+                                                           PrintJobState::PRINTING, 30));
+
+    REQUIRE(MoonrakerManager::should_start_print_collector(PrintJobState::ERROR,
+                                                           PrintJobState::PRINTING, 100));
 }
 
 TEST_CASE("should_start_print_collector - already printing", "[application][print_start]") {
