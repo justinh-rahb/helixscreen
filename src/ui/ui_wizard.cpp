@@ -755,12 +755,17 @@ static void ui_wizard_load_screen(int step) {
         lv_obj_update_layout(content);
         // Schedule refresh in case sensors are discovered after screen creation
         // (handles race condition when jumping directly to step 9)
-        lv_timer_create(
-            [](lv_timer_t* timer) {
-                get_wizard_filament_sensor_select_step()->refresh();
-                lv_timer_delete(timer);
-            },
-            1500, nullptr); // Refresh after 1.5 seconds
+        {
+            auto* step = get_wizard_filament_sensor_select_step();
+            step->refresh_timer_ = lv_timer_create(
+                [](lv_timer_t* timer) {
+                    auto* s = get_wizard_filament_sensor_select_step();
+                    s->refresh_timer_ = nullptr;
+                    s->refresh();
+                    lv_timer_delete(timer);
+                },
+                1500, nullptr);
+        }
         break;
 
     case 10: // Probe Sensor Select
@@ -770,12 +775,17 @@ static void ui_wizard_load_screen(int step) {
         get_wizard_probe_sensor_select_step()->create(content);
         lv_obj_update_layout(content);
         // Schedule refresh in case sensors are discovered after screen creation
-        lv_timer_create(
-            [](lv_timer_t* timer) {
-                get_wizard_probe_sensor_select_step()->refresh();
-                lv_timer_delete(timer);
-            },
-            1500, nullptr); // Refresh after 1.5 seconds
+        {
+            auto* step = get_wizard_probe_sensor_select_step();
+            step->refresh_timer_ = lv_timer_create(
+                [](lv_timer_t* timer) {
+                    auto* s = get_wizard_probe_sensor_select_step();
+                    s->refresh_timer_ = nullptr;
+                    s->refresh();
+                    lv_timer_delete(timer);
+                },
+                1500, nullptr);
+        }
         break;
 
     case 11: // Input Shaper Calibration

@@ -56,35 +56,6 @@ WizardProbeSensorSelectStep::~WizardProbeSensorSelectStep() {
 }
 
 // ============================================================================
-// Move Semantics
-// ============================================================================
-
-WizardProbeSensorSelectStep::WizardProbeSensorSelectStep(
-    WizardProbeSensorSelectStep&& other) noexcept
-    : screen_root_(other.screen_root_), probe_sensor_selected_(other.probe_sensor_selected_),
-      sensor_items_(std::move(other.sensor_items_)),
-      available_sensors_(std::move(other.available_sensors_)),
-      subjects_initialized_(other.subjects_initialized_) {
-    other.screen_root_ = nullptr;
-    other.subjects_initialized_ = false;
-}
-
-WizardProbeSensorSelectStep&
-WizardProbeSensorSelectStep::operator=(WizardProbeSensorSelectStep&& other) noexcept {
-    if (this != &other) {
-        screen_root_ = other.screen_root_;
-        probe_sensor_selected_ = other.probe_sensor_selected_;
-        sensor_items_ = std::move(other.sensor_items_);
-        available_sensors_ = std::move(other.available_sensors_);
-        subjects_initialized_ = other.subjects_initialized_;
-
-        other.screen_root_ = nullptr;
-        other.subjects_initialized_ = false;
-    }
-    return *this;
-}
-
-// ============================================================================
 // Sensor Filtering
 // ============================================================================
 
@@ -117,9 +88,13 @@ void WizardProbeSensorSelectStep::filter_available_sensors() {
 // ============================================================================
 
 void WizardProbeSensorSelectStep::init_subjects() {
-    spdlog::debug("[{}] Initializing subjects", get_name());
+    if (subjects_initialized_) {
+        spdlog::debug("[{}] Subjects already initialized, resetting value", get_name());
+        lv_subject_set_int(&probe_sensor_selected_, 0);
+        return;
+    }
 
-    // Initialize subject with default index 0 (None)
+    spdlog::debug("[{}] Initializing subjects", get_name());
     helix::ui::wizard::init_int_subject(&probe_sensor_selected_, 0, "probe_sensor_selected");
 
     subjects_initialized_ = true;
@@ -259,15 +234,18 @@ void WizardProbeSensorSelectStep::refresh() {
     size_t old_count = available_sensors_.size();
     filter_available_sensors();
 
-    if (old_count != available_sensors_.size()) {
-        spdlog::info("[{}] Sensor count changed ({} -> {}), refreshing dropdown", get_name(),
-                     old_count, available_sensors_.size());
+    // Nothing changed — don't repopulate and disrupt user interaction
+    if (old_count == available_sensors_.size()) {
+        spdlog::debug("[{}] Refresh: sensor count unchanged ({}), skipping repopulate", get_name(),
+                      old_count);
+        return;
     }
 
-    // Re-populate dropdown
+    spdlog::info("[{}] Sensor count changed ({} -> {}), refreshing dropdown", get_name(), old_count,
+                 available_sensors_.size());
+
+    // Re-populate dropdown with new sensor list
     populate_dropdown();
-    spdlog::debug("[{}] Refreshed with {} available sensors", get_name(),
-                  available_sensors_.size());
 }
 
 // ============================================================================
@@ -304,27 +282,38 @@ bool WizardProbeSensorSelectStep::should_skip() const {
 void WizardProbeSensorSelectStep::cleanup() {
     spdlog::debug("[{}] Cleaning up resources", get_name());
 
+    // Cancel pending refresh timer to prevent stale access after navigation
+    if (refresh_timer_) {
+        lv_timer_delete(refresh_timer_);
+        refresh_timer_ = nullptr;
+    }
+
     auto& sensor_mgr = helix::FilamentSensorManager::instance();
 
-    // Clear existing Z_PROBE role assignments first
-    // NOTE: Query ALL sensors from the manager, not available_sensors_ (which only has role=NONE)
-    for (const auto& sensor : sensor_mgr.get_sensors()) {
-        if (sensor.role == helix::FilamentSensorRole::Z_PROBE) {
-            sensor_mgr.set_sensor_role(sensor.klipper_name, helix::FilamentSensorRole::NONE);
+    if (subjects_initialized_) {
+        // Clear existing Z_PROBE role assignments first
+        // NOTE: Query ALL sensors from the manager, not available_sensors_ (which only has
+        // role=NONE)
+        for (const auto& sensor : sensor_mgr.get_sensors()) {
+            if (sensor.role == helix::FilamentSensorRole::Z_PROBE) {
+                sensor_mgr.set_sensor_role(sensor.klipper_name, helix::FilamentSensorRole::NONE);
+            }
         }
+
+        // Apply new role assignment based on dropdown selection
+        std::string probe_name =
+            get_klipper_name_for_index(lv_subject_get_int(&probe_sensor_selected_));
+
+        if (!probe_name.empty()) {
+            sensor_mgr.set_sensor_role(probe_name, helix::FilamentSensorRole::Z_PROBE);
+            spdlog::info("[{}] Assigned Z_PROBE role to: {}", get_name(), probe_name);
+        }
+
+        // Persist to disk
+        sensor_mgr.save_config_to_file();
+    } else {
+        spdlog::warn("[{}] Subjects not initialized, skipping role assignment", get_name());
     }
-
-    // Apply new role assignment based on dropdown selection
-    std::string probe_name =
-        get_klipper_name_for_index(lv_subject_get_int(&probe_sensor_selected_));
-
-    if (!probe_name.empty()) {
-        sensor_mgr.set_sensor_role(probe_name, helix::FilamentSensorRole::Z_PROBE);
-        spdlog::info("[{}] Assigned Z_PROBE role to: {}", get_name(), probe_name);
-    }
-
-    // Persist to disk
-    sensor_mgr.save_config_to_file();
 
     // Reset UI references
     screen_root_ = nullptr;

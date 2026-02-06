@@ -54,35 +54,6 @@ WizardFilamentSensorSelectStep::~WizardFilamentSensorSelectStep() {
 }
 
 // ============================================================================
-// Move Semantics
-// ============================================================================
-
-WizardFilamentSensorSelectStep::WizardFilamentSensorSelectStep(
-    WizardFilamentSensorSelectStep&& other) noexcept
-    : screen_root_(other.screen_root_), runout_sensor_selected_(other.runout_sensor_selected_),
-      sensor_items_(std::move(other.sensor_items_)),
-      standalone_sensors_(std::move(other.standalone_sensors_)),
-      subjects_initialized_(other.subjects_initialized_) {
-    other.screen_root_ = nullptr;
-    other.subjects_initialized_ = false;
-}
-
-WizardFilamentSensorSelectStep&
-WizardFilamentSensorSelectStep::operator=(WizardFilamentSensorSelectStep&& other) noexcept {
-    if (this != &other) {
-        screen_root_ = other.screen_root_;
-        runout_sensor_selected_ = other.runout_sensor_selected_;
-        sensor_items_ = std::move(other.sensor_items_);
-        standalone_sensors_ = std::move(other.standalone_sensors_);
-        subjects_initialized_ = other.subjects_initialized_;
-
-        other.screen_root_ = nullptr;
-        other.subjects_initialized_ = false;
-    }
-    return *this;
-}
-
-// ============================================================================
 // AMS Sensor Detection
 // ============================================================================
 
@@ -115,9 +86,13 @@ void WizardFilamentSensorSelectStep::filter_standalone_sensors() {
 // ============================================================================
 
 void WizardFilamentSensorSelectStep::init_subjects() {
-    spdlog::debug("[{}] Initializing subjects", get_name());
+    if (subjects_initialized_) {
+        spdlog::debug("[{}] Subjects already initialized, resetting value", get_name());
+        lv_subject_set_int(&runout_sensor_selected_, 0);
+        return;
+    }
 
-    // Initialize subject with default index 0 (None)
+    spdlog::debug("[{}] Initializing subjects", get_name());
     helix::ui::wizard::init_int_subject(&runout_sensor_selected_, 0, "runout_sensor_selected");
 
     subjects_initialized_ = true;
@@ -288,11 +263,18 @@ void WizardFilamentSensorSelectStep::refresh() {
     size_t old_count = standalone_sensors_.size();
     filter_standalone_sensors();
 
+    // Nothing changed — don't repopulate and disrupt user interaction
+    if (old_count == standalone_sensors_.size()) {
+        spdlog::debug("[{}] Refresh: sensor count unchanged ({}), skipping repopulate", get_name(),
+                      old_count);
+        return;
+    }
+
+    spdlog::info("[{}] Sensor count changed ({} -> {}), refreshing dropdown", get_name(), old_count,
+                 standalone_sensors_.size());
+
     // If sensors were just discovered and none selected, run auto-selection
     if (old_count == 0 && !standalone_sensors_.empty()) {
-        spdlog::info("[{}] Sensors discovered after create(), running auto-selection", get_name());
-
-        // Check if still at "None" selection
         if (lv_subject_get_int(&runout_sensor_selected_) == 0) {
             std::vector<std::string> sensor_names;
             sensor_names.reserve(standalone_sensors_.size());
@@ -315,10 +297,8 @@ void WizardFilamentSensorSelectStep::refresh() {
         }
     }
 
-    // Re-populate dropdown
+    // Re-populate dropdown with new sensor list
     populate_dropdowns();
-    spdlog::debug("[{}] Refreshed with {} standalone sensors", get_name(),
-                  standalone_sensors_.size());
 }
 
 // ============================================================================
@@ -379,26 +359,36 @@ void WizardFilamentSensorSelectStep::auto_configure_single_sensor() {
 void WizardFilamentSensorSelectStep::cleanup() {
     spdlog::debug("[{}] Cleaning up resources", get_name());
 
+    // Cancel pending refresh timer to prevent stale access after navigation
+    if (refresh_timer_) {
+        lv_timer_delete(refresh_timer_);
+        refresh_timer_ = nullptr;
+    }
+
     auto& sensor_mgr = helix::FilamentSensorManager::instance();
 
-    // Clear existing RUNOUT role assignments first
-    for (const auto& sensor : standalone_sensors_) {
-        if (sensor.role == helix::FilamentSensorRole::RUNOUT) {
-            sensor_mgr.set_sensor_role(sensor.klipper_name, helix::FilamentSensorRole::NONE);
+    if (subjects_initialized_) {
+        // Clear existing RUNOUT role assignments first
+        for (const auto& sensor : standalone_sensors_) {
+            if (sensor.role == helix::FilamentSensorRole::RUNOUT) {
+                sensor_mgr.set_sensor_role(sensor.klipper_name, helix::FilamentSensorRole::NONE);
+            }
         }
+
+        // Apply new role assignment based on dropdown selection
+        std::string runout_name =
+            get_klipper_name_for_index(lv_subject_get_int(&runout_sensor_selected_));
+
+        if (!runout_name.empty()) {
+            sensor_mgr.set_sensor_role(runout_name, helix::FilamentSensorRole::RUNOUT);
+            spdlog::info("[{}] Assigned RUNOUT role to: {}", get_name(), runout_name);
+        }
+
+        // Persist to disk
+        sensor_mgr.save_config_to_file();
+    } else {
+        spdlog::warn("[{}] Subjects not initialized, skipping role assignment", get_name());
     }
-
-    // Apply new role assignment based on dropdown selection
-    std::string runout_name =
-        get_klipper_name_for_index(lv_subject_get_int(&runout_sensor_selected_));
-
-    if (!runout_name.empty()) {
-        sensor_mgr.set_sensor_role(runout_name, helix::FilamentSensorRole::RUNOUT);
-        spdlog::info("[{}] Assigned RUNOUT role to: {}", get_name(), runout_name);
-    }
-
-    // Persist to disk
-    sensor_mgr.save_config_to_file();
 
     // Reset UI references
     screen_root_ = nullptr;

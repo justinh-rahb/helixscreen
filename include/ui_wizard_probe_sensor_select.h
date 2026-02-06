@@ -42,13 +42,11 @@ class WizardProbeSensorSelectStep {
     WizardProbeSensorSelectStep();
     ~WizardProbeSensorSelectStep();
 
-    // Non-copyable
+    // Non-copyable, non-movable (lv_subject_t cannot be safely moved)
     WizardProbeSensorSelectStep(const WizardProbeSensorSelectStep&) = delete;
     WizardProbeSensorSelectStep& operator=(const WizardProbeSensorSelectStep&) = delete;
-
-    // Movable
-    WizardProbeSensorSelectStep(WizardProbeSensorSelectStep&& other) noexcept;
-    WizardProbeSensorSelectStep& operator=(WizardProbeSensorSelectStep&& other) noexcept;
+    WizardProbeSensorSelectStep(WizardProbeSensorSelectStep&&) = delete;
+    WizardProbeSensorSelectStep& operator=(WizardProbeSensorSelectStep&&) = delete;
 
     /**
      * @brief Initialize reactive subjects
@@ -120,6 +118,9 @@ class WizardProbeSensorSelectStep {
     std::vector<std::string>& get_sensor_items() {
         return sensor_items_;
     }
+
+    // Pending refresh timer (set by wizard orchestrator, cancelled on cleanup)
+    lv_timer_t* refresh_timer_ = nullptr;
 
   private:
     /**
