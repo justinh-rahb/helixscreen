@@ -428,7 +428,7 @@ void bed_mesh_renderer_auto_color_range(bed_mesh_renderer_t* renderer) {
 }
 
 bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer, int canvas_width,
-                              int canvas_height) {
+                              int canvas_height, int widget_x, int widget_y) {
     if (!renderer || !layer) {
         spdlog::error("[Bed Mesh Renderer] Invalid parameters for render: renderer={}, layer={}",
                       (void*)renderer, (void*)layer);
@@ -477,19 +477,19 @@ bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer, 
                   renderer->view_state.fov_scale, renderer->view_state.center_offset_x,
                   renderer->view_state.center_offset_y);
 
-    // Get layer's clip area (used for clipping output, NOT for canvas dimensions)
-    // IMPORTANT: During partial redraws, clip_area may be smaller than the widget.
-    // We must use the passed-in canvas_width/height for projection calculations,
-    // otherwise the 3D projection math will be corrupted on partial redraws.
-    const lv_area_t* clip_area = &layer->_clip_area;
-    int clip_width = lv_area_get_width(clip_area);
-    int clip_height = lv_area_get_height(clip_area);
-    int layer_offset_x = clip_area->x1; // Layer's screen X position
-    int layer_offset_y = clip_area->y1; // Layer's screen Y position
+    // Use widget's absolute position for projection offset (stable across partial redraws).
+    // IMPORTANT: Do NOT use clip_area for the offset — during partial redraws LVGL splits the
+    // widget into horizontal bands, each with a different clip_area. Using clip_area->y1 as
+    // offset would project the mesh at a different position per band, causing triple rendering.
+    int layer_offset_x = widget_x;
+    int layer_offset_y = widget_y;
 
-    spdlog::debug("[Bed Mesh Renderer] [LAYER] Widget: {}x{}, Clip area: {}x{} at offset ({},{})",
-                  canvas_width, canvas_height, clip_width, clip_height, layer_offset_x,
-                  layer_offset_y);
+    // Clip area is only used for background fill (LVGL clips draw calls automatically)
+    const lv_area_t* clip_area = &layer->_clip_area;
+
+    spdlog::debug("[Bed Mesh Renderer] [LAYER] Widget: {}x{} at ({},{}), clip: ({},{})→({},{})",
+                  canvas_width, canvas_height, widget_x, widget_y, clip_area->x1, clip_area->y1,
+                  clip_area->x2, clip_area->y2);
 
     // Draw background to fill the clip area (not the full canvas)
     // LVGL will clip this to the dirty region during partial redraws

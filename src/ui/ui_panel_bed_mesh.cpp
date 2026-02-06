@@ -1159,14 +1159,15 @@ static int get_profile_index_from_event(lv_event_t* e) {
     if (!target)
         return -1;
 
-    // Find parent row and extract index from its name
-    lv_obj_t* parent = lv_obj_get_parent(target);
-    while (parent) {
-        const char* name = lv_obj_get_name(parent);
+    // Walk from target upward looking for profile_row_N
+    // Start from target itself (handles clicking the row card directly)
+    lv_obj_t* obj = target;
+    while (obj) {
+        const char* name = lv_obj_get_name(obj);
         if (name && std::strncmp(name, "profile_row_", 12) == 0) {
             return name[12] - '0'; // Extract digit
         }
-        parent = lv_obj_get_parent(parent);
+        obj = lv_obj_get_parent(obj);
     }
     return -1;
 }

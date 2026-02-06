@@ -306,10 +306,12 @@ void bed_mesh_renderer_auto_color_range(bed_mesh_renderer_t* renderer);
  * @param layer LVGL draw layer (from DRAW_POST event callback)
  * @param canvas_width Viewport width in pixels
  * @param canvas_height Viewport height in pixels
+ * @param widget_x Widget's absolute screen X position (from lv_obj_get_coords)
+ * @param widget_y Widget's absolute screen Y position (from lv_obj_get_coords)
  * @return true on success, false on error (NULL pointers, no mesh data)
  */
 bool bed_mesh_renderer_render(bed_mesh_renderer_t* renderer, lv_layer_t* layer, int canvas_width,
-                              int canvas_height);
+                              int canvas_height, int widget_x, int widget_y);
 
 /**
  * @brief Set render mode (auto, force 3D, or force 2D)

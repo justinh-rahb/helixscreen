@@ -56,9 +56,11 @@ static void bed_mesh_draw_cb(lv_event_t* e) {
         return;
     }
 
-    // Get widget dimensions
-    int width = lv_obj_get_width(obj);
-    int height = lv_obj_get_height(obj);
+    // Get widget's absolute screen coordinates (stable across partial redraws)
+    lv_area_t widget_coords;
+    lv_obj_get_coords(obj, &widget_coords);
+    int width = lv_area_get_width(&widget_coords);
+    int height = lv_area_get_height(&widget_coords);
 
     spdlog::trace("[bed_mesh] draw_cb: rendering at {}x{}", width, height);
 
@@ -68,7 +70,8 @@ static void bed_mesh_draw_cb(lv_event_t* e) {
     }
 
     // Render mesh directly to layer (matches G-code viewer pattern)
-    if (!bed_mesh_renderer_render(data->renderer, layer, width, height)) {
+    if (!bed_mesh_renderer_render(data->renderer, layer, width, height, widget_coords.x1,
+                                  widget_coords.y1)) {
         return;
     }
 
