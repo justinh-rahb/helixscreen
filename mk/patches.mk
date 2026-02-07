@@ -157,6 +157,17 @@ $(PATCHES_STAMP): $(PATCH_FILES) $(LVGL_HEAD) $(LIBHV_HEAD)
 	else \
 		echo "$(GREEN)✓ LVGL slider scroll chain patch already applied$(RESET)"; \
 	fi
+	$(Q)if git -C $(LVGL_DIR) diff --quiet src/xml/parsers/lv_xml_label_parser.c 2>/dev/null; then \
+		echo "$(YELLOW)→ Applying LVGL bind_text empty guard patch...$(RESET)"; \
+		if git -C $(LVGL_DIR) apply --check ../../patches/lvgl_bind_text_empty_guard.patch 2>/dev/null; then \
+			git -C $(LVGL_DIR) apply ../../patches/lvgl_bind_text_empty_guard.patch && \
+			echo "$(GREEN)✓ bind_text empty guard patch applied$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠ Cannot apply patch (already applied or conflicts)$(RESET)"; \
+		fi \
+	else \
+		echo "$(GREEN)✓ LVGL bind_text empty guard patch already applied$(RESET)"; \
+	fi
 	$(ECHO) "$(CYAN)Checking libhv patches...$(RESET)"
 	$(Q)if git -C $(LIBHV_DIR) diff --quiet http/client/requests.h 2>/dev/null; then \
 		echo "$(YELLOW)→ Applying libhv streaming upload patch...$(RESET)"; \
