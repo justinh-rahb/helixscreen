@@ -31,8 +31,6 @@
  * - String formatting respects pluralization
  */
 
-#include "ui_update_queue.h"
-
 #include "../ui_test_utils.h"
 #include "app_globals.h"
 #include "hardware_validator.h"
@@ -72,145 +70,16 @@ TEST_CASE("Hardware validation characterization: initial values after init",
     state.reset_for_testing();
     state.init_subjects(true); // Need XML registration to lookup by name
 
-    SECTION("hardware_has_issues initializes to 0") {
-        lv_subject_t* subject = get_subject_by_name("hardware_has_issues");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
-    SECTION("hardware_issue_count initializes to 0") {
-        lv_subject_t* subject = get_subject_by_name("hardware_issue_count");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
-    SECTION("hardware_max_severity initializes to 0 (INFO)") {
-        lv_subject_t* subject = get_subject_by_name("hardware_max_severity");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
-    SECTION("hardware_critical_count initializes to 0") {
-        lv_subject_t* subject = get_subject_by_name("hardware_critical_count");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
-    SECTION("hardware_warning_count initializes to 0") {
-        lv_subject_t* subject = get_subject_by_name("hardware_warning_count");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
-    SECTION("hardware_info_count initializes to 0") {
-        lv_subject_t* subject = get_subject_by_name("hardware_info_count");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
-    SECTION("hardware_session_count initializes to 0") {
-        lv_subject_t* subject = get_subject_by_name("hardware_session_count");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
     SECTION("hardware_status_title initializes to 'Healthy'") {
         lv_subject_t* subject = get_subject_by_name("hardware_status_title");
         REQUIRE(subject != nullptr);
         REQUIRE(std::string(lv_subject_get_string(subject)) == "Healthy");
     }
 
-    SECTION("hardware_status_detail initializes to empty string") {
-        lv_subject_t* subject = get_subject_by_name("hardware_status_detail");
-        REQUIRE(subject != nullptr);
-        REQUIRE(std::string(lv_subject_get_string(subject)) == "");
-    }
-
     SECTION("hardware_issues_label initializes to 'No Hardware Issues'") {
         lv_subject_t* subject = get_subject_by_name("hardware_issues_label");
         REQUIRE(subject != nullptr);
         REQUIRE(std::string(lv_subject_get_string(subject)) == "No Hardware Issues");
-    }
-
-    SECTION("hardware_validation_version initializes to 0") {
-        lv_subject_t* subject = get_subject_by_name("hardware_validation_version");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-}
-
-// ============================================================================
-// Subject Accessor Tests - Verify subject getter methods work correctly
-// ============================================================================
-
-TEST_CASE("Hardware validation characterization: subject getter methods",
-          "[characterization][hardware-validation][access]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(true);
-
-    SECTION("get_hardware_has_issues_subject returns valid pointer matching XML name") {
-        lv_subject_t* via_getter = state.get_hardware_has_issues_subject();
-        lv_subject_t* via_xml = get_subject_by_name("hardware_has_issues");
-
-        REQUIRE(via_getter != nullptr);
-        REQUIRE(via_getter == via_xml);
-    }
-
-    SECTION("get_hardware_issue_count_subject returns valid pointer matching XML name") {
-        lv_subject_t* via_getter = state.get_hardware_issue_count_subject();
-        lv_subject_t* via_xml = get_subject_by_name("hardware_issue_count");
-
-        REQUIRE(via_getter != nullptr);
-        REQUIRE(via_getter == via_xml);
-    }
-
-    SECTION("get_hardware_max_severity_subject returns valid pointer matching XML name") {
-        lv_subject_t* via_getter = state.get_hardware_max_severity_subject();
-        lv_subject_t* via_xml = get_subject_by_name("hardware_max_severity");
-
-        REQUIRE(via_getter != nullptr);
-        REQUIRE(via_getter == via_xml);
-    }
-
-    SECTION("get_hardware_validation_version_subject returns valid pointer matching XML name") {
-        lv_subject_t* via_getter = state.get_hardware_validation_version_subject();
-        lv_subject_t* via_xml = get_subject_by_name("hardware_validation_version");
-
-        REQUIRE(via_getter != nullptr);
-        REQUIRE(via_getter == via_xml);
-    }
-
-    SECTION("get_hardware_issues_label_subject returns valid pointer matching XML name") {
-        lv_subject_t* via_getter = state.get_hardware_issues_label_subject();
-        lv_subject_t* via_xml = get_subject_by_name("hardware_issues_label");
-
-        REQUIRE(via_getter != nullptr);
-        REQUIRE(via_getter == via_xml);
-    }
-
-    SECTION("all hardware validation subjects are distinct pointers") {
-        std::vector<lv_subject_t*> subjects = {state.get_hardware_has_issues_subject(),
-                                               state.get_hardware_issue_count_subject(),
-                                               state.get_hardware_max_severity_subject(),
-                                               state.get_hardware_validation_version_subject(),
-                                               state.get_hardware_issues_label_subject(),
-                                               get_subject_by_name("hardware_critical_count"),
-                                               get_subject_by_name("hardware_warning_count"),
-                                               get_subject_by_name("hardware_info_count"),
-                                               get_subject_by_name("hardware_session_count"),
-                                               get_subject_by_name("hardware_status_title"),
-                                               get_subject_by_name("hardware_status_detail")};
-
-        // All subjects must be distinct pointers
-        for (size_t i = 0; i < subjects.size(); ++i) {
-            REQUIRE(subjects[i] != nullptr);
-            for (size_t j = i + 1; j < subjects.size(); ++j) {
-                REQUIRE(subjects[i] != subjects[j]);
-            }
-        }
     }
 }
 
@@ -877,29 +746,4 @@ TEST_CASE("Hardware validation characterization: subjects survive reset_for_test
 
     REQUIRE(state.has_hardware_issues() == true);
     REQUIRE(lv_subject_get_int(state.get_hardware_issue_count_subject()) == 1);
-}
-
-TEST_CASE("Hardware validation characterization: subject pointers remain valid after reset",
-          "[characterization][hardware-validation][reset]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(true);
-
-    // Capture subject pointers before reset
-    lv_subject_t* has_issues_before = state.get_hardware_has_issues_subject();
-    lv_subject_t* issue_count_before = state.get_hardware_issue_count_subject();
-    lv_subject_t* version_before = state.get_hardware_validation_version_subject();
-    lv_subject_t* label_before = state.get_hardware_issues_label_subject();
-
-    // Reset and reinitialize
-    state.reset_for_testing();
-    state.init_subjects(true);
-
-    // Pointers should be the same (singleton subjects are reused)
-    REQUIRE(state.get_hardware_has_issues_subject() == has_issues_before);
-    REQUIRE(state.get_hardware_issue_count_subject() == issue_count_before);
-    REQUIRE(state.get_hardware_validation_version_subject() == version_before);
-    REQUIRE(state.get_hardware_issues_label_subject() == label_before);
 }

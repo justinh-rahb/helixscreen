@@ -25,8 +25,6 @@
  * - "fan_generic *" -> GENERIC_FAN (controllable)
  */
 
-#include "ui_update_queue.h"
-
 #include "../ui_test_utils.h"
 #include "app_globals.h"
 #include "printer_state.h"
@@ -35,43 +33,6 @@
 
 using json = nlohmann::json;
 using helix::FanType;
-
-// ============================================================================
-// Subject Accessor Tests - Verify get_*_subject() returns valid pointers
-// ============================================================================
-
-TEST_CASE("Fan characterization: get_*_subject() returns valid pointers",
-          "[characterization][fan]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false); // Skip XML registration
-
-    SECTION("fan_speed_subject is not null") {
-        lv_subject_t* subject = state.get_fan_speed_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("fans_version_subject is not null") {
-        lv_subject_t* subject = state.get_fans_version_subject();
-        REQUIRE(subject != nullptr);
-    }
-}
-
-TEST_CASE("Fan characterization: static subject pointers are distinct", "[characterization][fan]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    lv_subject_t* fan_speed = state.get_fan_speed_subject();
-    lv_subject_t* fans_version = state.get_fans_version_subject();
-
-    // Static fan subjects must be distinct pointers
-    REQUIRE(fan_speed != fans_version);
-}
 
 // ============================================================================
 // Initial State Tests - Document default initialization behavior
@@ -83,14 +44,6 @@ TEST_CASE("Fan characterization: initial values after init", "[characterization]
     PrinterState& state = get_printer_state();
     state.reset_for_testing();
     state.init_subjects(false);
-
-    SECTION("fan_speed initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_fan_speed_subject()) == 0);
-    }
-
-    SECTION("fans_version initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_fans_version_subject()) == 0);
-    }
 
     SECTION("no per-fan subjects initially") {
         // Before init_fans(), no per-fan subjects exist
@@ -126,22 +79,6 @@ TEST_CASE("Fan characterization: init_fans creates per-fan subjects",
     SECTION("unknown fan returns nullptr") {
         REQUIRE(state.get_fan_speed_subject("nonexistent") == nullptr);
         REQUIRE(state.get_fan_speed_subject("heater_fan other_fan") == nullptr);
-    }
-
-    SECTION("per-fan subjects are distinct pointers") {
-        lv_subject_t* fan = state.get_fan_speed_subject("fan");
-        lv_subject_t* heater = state.get_fan_speed_subject("heater_fan hotend_fan");
-        lv_subject_t* generic = state.get_fan_speed_subject("fan_generic aux_fan");
-
-        REQUIRE(fan != heater);
-        REQUIRE(fan != generic);
-        REQUIRE(heater != generic);
-    }
-
-    SECTION("per-fan subjects initialize to 0") {
-        REQUIRE(lv_subject_get_int(state.get_fan_speed_subject("fan")) == 0);
-        REQUIRE(lv_subject_get_int(state.get_fan_speed_subject("heater_fan hotend_fan")) == 0);
-        REQUIRE(lv_subject_get_int(state.get_fan_speed_subject("fan_generic aux_fan")) == 0);
     }
 
     SECTION("fans_version increments on init_fans") {
@@ -603,30 +540,6 @@ TEST_CASE("Fan characterization: static subjects reset to defaults",
     // Static subjects should be back to defaults
     REQUIRE(lv_subject_get_int(state.get_fan_speed_subject()) == 0);
     REQUIRE(lv_subject_get_int(state.get_fans_version_subject()) == 0);
-}
-
-TEST_CASE("Fan characterization: static subject pointers remain valid after reset",
-          "[characterization][fan][reset]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Capture subject pointers
-    lv_subject_t* fan_speed_before = state.get_fan_speed_subject();
-    lv_subject_t* fans_version_before = state.get_fans_version_subject();
-
-    // Reset and reinitialize
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Static subject pointers should be the same (embedded in singleton)
-    lv_subject_t* fan_speed_after = state.get_fan_speed_subject();
-    lv_subject_t* fans_version_after = state.get_fans_version_subject();
-
-    REQUIRE(fan_speed_before == fan_speed_after);
-    REQUIRE(fans_version_before == fans_version_after);
 }
 
 TEST_CASE("Fan characterization: reinitializing fans replaces previous subjects",

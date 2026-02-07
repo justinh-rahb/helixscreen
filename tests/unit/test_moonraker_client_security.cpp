@@ -6,7 +6,6 @@
 
 #include <atomic>
 #include <chrono>
-#include <cstdint>
 #include <thread>
 
 #include "../catch_amalgamated.hpp"
@@ -18,12 +17,10 @@
  * in the Moonraker Security Review (docs/MOONRAKER_SECURITY_REVIEW.md).
  *
  * Test Categories:
- * 1. Issue #2: Race Condition - Callback pass-by-value (no data races)
- * 2. Issue #3: Integer Overflow - uint64_t request IDs (no wraparound)
- * 3. Issue #4: Use-After-Free - Destructor cleanup (no dangling callbacks)
- * 4. Issue #6: Deadlock Risk - Two-phase timeout pattern (callbacks outside mutex)
- * 5. Issue #7: JSON-RPC Validation - Method/params/payload validation
- * 6. Issue #9: Exception Safety - All callbacks exception-safe
+ * 1. Issue #4: Use-After-Free - Destructor cleanup (no dangling callbacks)
+ * 2. Issue #6: Deadlock Risk - Two-phase timeout pattern (callbacks outside mutex)
+ * 3. Issue #7: JSON-RPC Validation - Method/params/payload validation
+ * 4. Issue #9: Exception Safety - All callbacks exception-safe
  *
  * SECURITY CRITICAL: These tests verify memory safety, thread safety, and
  * robust error handling that prevents crashes and undefined behavior.
@@ -86,136 +83,6 @@ class MoonrakerClientSecurityFixture {
     MoonrakerError captured_error;
     json captured_response;
 };
-
-// ============================================================================
-// Issue #2: Race Condition - Callback Pass-by-Value
-// ============================================================================
-
-TEST_CASE_METHOD(MoonrakerClientSecurityFixture,
-                 "MoonrakerClient callbacks use pass-by-value (no data races)",
-                 "[connection][security][race][issue2][eventloop][slow]") {
-    SECTION("Callback receives copy of JSON, not reference") {
-        // This test verifies that callbacks receive copies of JSON data,
-        // preventing data races when callbacks run on different threads.
-
-        bool callback_invoked = false;
-        json captured_data;
-
-        // Register callback that captures JSON
-        auto callback = [&callback_invoked, &captured_data](json response) {
-            callback_invoked = true;
-            captured_data = response;
-
-            // Modify the received JSON (should not affect original)
-            response["modified"] = true;
-        };
-
-        // Send a request (will fail because no connection, but that's ok)
-        client->send_jsonrpc("printer.info", json(), callback);
-
-        // Verify callback was registered (would be invoked on response)
-        // Since we can't easily trigger a response in unit test without
-        // a real server, we verify the callback mechanism exists and
-        // the signature is pass-by-value (not pass-by-reference).
-
-        // The key verification is compilation: if signature was wrong
-        // (e.g., json& instead of json), this wouldn't compile.
-        REQUIRE(true); // Compilation = pass
-    }
-
-    SECTION("Multiple callbacks don't interfere with each other") {
-        // Verify that multiple callbacks with same JSON don't race
-
-        std::atomic<int> callbacks_completed{0};
-        json shared_data = {{"test", "data"}};
-
-        // Create multiple callbacks that would race if data was shared
-        for (int i = 0; i < 5; i++) {
-            client->send_jsonrpc(
-                "printer.info", shared_data,
-                [&callbacks_completed, i](json response) {
-                    // Each callback gets its own copy
-                    response["callback_id"] = i;
-                    callbacks_completed++;
-                },
-                [](const MoonrakerError& err) {
-                    // Error callback also pass-by-value
-                });
-        }
-
-        // Verify all callbacks were registered
-        REQUIRE(true); // Test verifies compilation and registration
-    }
-}
-
-// ============================================================================
-// Issue #3: Integer Overflow - uint64_t Request IDs
-// ============================================================================
-
-TEST_CASE_METHOD(MoonrakerClientSecurityFixture,
-                 "MoonrakerClient request IDs use uint64_t consistently",
-                 "[connection][security][overflow][issue3][eventloop][slow]") {
-    SECTION("Request ID type is uint64_t") {
-        // Verify that request IDs are 64-bit unsigned integers
-        // This is primarily a compile-time verification
-
-        // Send multiple requests and verify IDs increment
-        for (int i = 0; i < 100; i++) {
-            client->send_jsonrpc("printer.info", json(), [](json) {}, [](const MoonrakerError&) {});
-        }
-
-        // The fact that this compiles and runs without overflow
-        // warnings verifies uint64_t is used
-        REQUIRE(true);
-    }
-
-    SECTION("Request IDs near UINT64_MAX don't wraparound") {
-        // This test verifies that even with very large request IDs,
-        // there's no integer overflow (uint64_t provides sufficient range)
-
-        // We can't easily set request_id_ to UINT64_MAX - 10 without
-        // making it public, but we can verify the type supports it.
-
-        // Mathematical verification: At 1000 requests/second,
-        // uint64_t (18,446,744,073,709,551,615) provides:
-        // 18,446,744,073,709,551 seconds = 584 million years
-
-        constexpr uint64_t max_id = UINT64_MAX;
-        constexpr uint64_t near_max = max_id - 100;
-
-        // Verify these values are representable
-        REQUIRE(max_id > near_max);
-        REQUIRE(near_max > 0);
-
-        // Verify no wraparound in arithmetic
-        uint64_t test_id = near_max;
-        for (int i = 0; i < 10; i++) {
-            uint64_t old_id = test_id;
-            test_id++;
-            REQUIRE(test_id > old_id); // No wraparound
-        }
-    }
-}
-
-TEST_CASE_METHOD(MoonrakerClientSecurityFixture,
-                 "MoonrakerClient handles uint64_t request IDs correctly in map",
-                 "[connection][security][overflow][issue3][eventloop][slow]") {
-    SECTION("Pending requests map uses uint64_t keys") {
-        // Verify that pending_requests_ map uses uint64_t keys,
-        // not smaller integer types that could overflow
-
-        // Send requests with IDs that would overflow uint32_t
-        // (if mistakenly used)
-        constexpr uint64_t large_id_base = static_cast<uint64_t>(UINT32_MAX) + 1000;
-
-        // This test primarily verifies compilation and type safety
-        for (int i = 0; i < 10; i++) {
-            client->send_jsonrpc("printer.info", json(), [](json) {}, [](const MoonrakerError&) {});
-        }
-
-        REQUIRE(true); // Compilation = correct types
-    }
-}
 
 // ============================================================================
 // Issue #4: Use-After-Free - Destructor Cleanup
@@ -395,109 +262,39 @@ TEST_CASE_METHOD(MoonrakerClientSecurityFixture,
 // Issue #7: JSON-RPC Validation
 // ============================================================================
 
-TEST_CASE_METHOD(MoonrakerClientSecurityFixture, "MoonrakerClient validates method names",
+// TODO: Test actual JSON-RPC validation with MockWebSocketServer
+TEST_CASE_METHOD(MoonrakerClientSecurityFixture,
+                 "MoonrakerClient unconnected send returns error for any input",
                  "[connection][security][validation][issue7][eventloop][slow]") {
-    SECTION("Empty method name rejected") {
-        // Note: Current implementation doesn't validate method names
-        // in send_jsonrpc, but this test documents expected behavior
-        // if validation is added in the future.
+    // All send_jsonrpc calls return -1 when not connected. This verifies graceful
+    // failure (no crash, no UB) across representative input variations.
 
-        int result = client->send_jsonrpc("");
-
-        // Current behavior: returns -1 (not connected) since client isn't connected
-        // The important thing is that it doesn't crash or cause undefined behavior
-        // Future: could add client-side validation for empty method names
-        REQUIRE(result == -1); // Not connected, graceful failure
+    SECTION("Various method names") {
+        REQUIRE(client->send_jsonrpc("") == -1);
+        REQUIRE(client->send_jsonrpc(std::string(300, 'a')) == -1);
+        REQUIRE(client->send_jsonrpc("printer.info") == -1);
+        REQUIRE(client->send_jsonrpc("printer.objects.subscribe") == -1);
     }
 
-    SECTION("Method name with over 256 characters") {
-        // Very long method names should be handled gracefully
-
-        std::string long_method(300, 'a');
-        int result = client->send_jsonrpc(long_method);
-
-        // Should not crash or cause buffer overflow (test passes if no crash)
-        // Returns -1 because client isn't connected
-        REQUIRE(result == -1); // Failed gracefully, no crash or buffer overflow
+    SECTION("Various param types") {
+        REQUIRE(client->send_jsonrpc("printer.info", nullptr) == -1);
+        REQUIRE(client->send_jsonrpc("printer.info", json::object()) == -1);
+        REQUIRE(client->send_jsonrpc("printer.info", json::array({"a", "b"})) == -1);
+        REQUIRE(client->send_jsonrpc("printer.info",
+                                     json{{"objects", {{"print_stats", nullptr}}}}) == -1);
     }
 
-    SECTION("Valid method names accepted") {
-        // Verify common valid method names don't cause crashes or errors
+    SECTION("Large and special-character payloads") {
+        // ~100KB payload
+        json large_params = json::object();
+        for (int i = 0; i < 1000; i++)
+            large_params["key_" + std::to_string(i)] = std::string(100, 'x');
+        REQUIRE(client->send_jsonrpc("test.method", large_params) == -1);
 
-        std::vector<std::string> valid_methods = {"printer.info",         "server.info",
-                                                  "printer.objects.list", "printer.gcode.script",
-                                                  "printer.print.pause",  "machine.update.status"};
-
-        for (const auto& method : valid_methods) {
-            int result = client->send_jsonrpc(method);
-            // Returns -1 because client isn't connected, but shouldn't crash
-            REQUIRE(result == -1); // Not connected, graceful failure
-        }
-    }
-}
-
-TEST_CASE_METHOD(MoonrakerClientSecurityFixture, "MoonrakerClient validates params structure",
-                 "[connection][security][validation][issue7][eventloop][slow]") {
-    SECTION("Params as object accepted") {
-        json params = {{"key", "value"}};
-        int result = client->send_jsonrpc("printer.info", params);
-        // Returns -1 (not connected) but doesn't crash with object params
-        REQUIRE(result == -1);
-    }
-
-    SECTION("Params as array accepted") {
-        json params = json::array({"item1", "item2"});
-        int result = client->send_jsonrpc("printer.info", params);
-        // Returns -1 (not connected) but doesn't crash with array params
-        REQUIRE(result == -1);
-    }
-
-    SECTION("Params as null accepted") {
-        json params = nullptr;
-        int result = client->send_jsonrpc("printer.info", params);
-        // Returns -1 (not connected) but handles null params gracefully
-        REQUIRE(result == -1);
-    }
-
-    SECTION("Empty object params accepted") {
-        json params = json::object();
-        int result = client->send_jsonrpc("printer.info", params);
-        // Returns -1 (not connected) but handles empty object gracefully
-        REQUIRE(result == -1);
-    }
-
-    SECTION("Complex nested params accepted") {
-        json params = {{"objects", {{"print_stats", nullptr}, {"toolhead", nullptr}}}};
-        int result = client->send_jsonrpc("printer.objects.subscribe", params);
-        // Returns -1 (not connected) but handles complex nested params without crash
-        REQUIRE(result == -1);
-    }
-}
-
-TEST_CASE_METHOD(MoonrakerClientSecurityFixture, "MoonrakerClient handles large payloads safely",
-                 "[connection][security][validation][issue7][eventloop][slow]") {
-    SECTION("Large but reasonable payload") {
-        // Create a large params object (but under 1MB)
-        json params = json::object();
-        for (int i = 0; i < 1000; i++) {
-            params["key_" + std::to_string(i)] = std::string(100, 'x'); // 100 char string
-        }
-
-        // Should handle without crash (returns -1, not connected)
-        int result = client->send_jsonrpc("test.method", params);
-        REQUIRE(result == -1); // Not connected, but no crash with large payload
-    }
-
-    SECTION("Serialization of special characters") {
-        // Verify special characters in JSON are handled safely
-        json params = {{"string_with_quotes", "Test \"quoted\" string"},
-                       {"string_with_backslash", "Test \\ backslash"},
-                       {"string_with_newline", "Test\nNewline"},
-                       {"unicode", "Test 你好 Unicode"}};
-
-        // Should serialize without crash (returns -1, not connected)
-        int result = client->send_jsonrpc("test.method", params);
-        REQUIRE(result == -1); // Not connected, but serialization handled safely
+        // Special characters: quotes, backslash, newline, unicode
+        json special_params = {
+            {"q", "Test \"quoted\""}, {"b", "back\\slash"}, {"n", "new\nline"}, {"u", "你好"}};
+        REQUIRE(client->send_jsonrpc("test.method", special_params) == -1);
     }
 }
 
@@ -711,7 +508,6 @@ TEST_CASE("MoonrakerClient security properties work together correctly",
         }
 
         // Destroy client - tests all properties together:
-        // - uint64_t IDs (many requests)
         // - Two-phase cleanup (nested requests work)
         // - Exception safety (throwing callbacks)
         // - Callback cleanup (no UAF)

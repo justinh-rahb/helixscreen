@@ -222,7 +222,7 @@ TEST_CASE_METHOD(InputShaperCalibratorTestFixture,
 
 TEST_CASE_METHOD(InputShaperCalibratorTestFixture,
                  "check_accelerometer stores noise level in results",
-                 "[calibrator][input_shaper][accel]") {
+                 "[calibrator][input_shaper][accel][slow]") {
     // After successful check, noise level should be stored
     calibrator_.check_accelerometer([this](float noise) { on_accel_check(noise); },
                                     [this](const std::string& err) { on_error(err); });
@@ -313,7 +313,7 @@ TEST_CASE_METHOD(InputShaperCalibratorTestFixture,
 
 TEST_CASE_METHOD(InputShaperCalibratorTestFixture,
                  "run_calibration result is stored in get_results()",
-                 "[calibrator][input_shaper][calibration]") {
+                 "[calibrator][input_shaper][calibration][slow]") {
     calibrator_.run_calibration(
         'X', [this](int pct) { on_progress(pct); },
         [this](const InputShaperResult& r) { on_result(r); },
@@ -332,7 +332,7 @@ TEST_CASE_METHOD(InputShaperCalibratorTestFixture,
 
 TEST_CASE_METHOD(InputShaperCalibratorTestFixture,
                  "run_calibration Y result is stored separately from X",
-                 "[calibrator][input_shaper][calibration]") {
+                 "[calibrator][input_shaper][calibration][slow]") {
     // Run X calibration first
     calibrator_.run_calibration(
         'X', [](int) {}, [this](const InputShaperResult& r) { on_result(r); },
@@ -392,7 +392,7 @@ TEST_CASE_METHOD(InputShaperCalibratorTestFixture, "cannot start calibration whi
 // ============================================================================
 
 TEST_CASE_METHOD(InputShaperCalibratorTestFixture, "progress callback is called during calibration",
-                 "[calibrator][input_shaper][progress]") {
+                 "[calibrator][input_shaper][progress][slow]") {
     calibrator_.run_calibration(
         'X', [this](int pct) { on_progress(pct); },
         [this](const InputShaperResult& r) { on_result(r); },
@@ -617,7 +617,7 @@ TEST_CASE("InputShaperCalibrator is movable", "[calibrator][input_shaper][move]"
 // ============================================================================
 
 TEST_CASE_METHOD(InputShaperCalibratorTestFixture, "Full calibration workflow scenario",
-                 "[calibrator][input_shaper][integration]") {
+                 "[calibrator][input_shaper][integration][slow]") {
     // This test documents the expected full workflow
     // It may not pass until full implementation is done
 

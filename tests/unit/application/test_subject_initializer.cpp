@@ -20,7 +20,6 @@
 #include "runtime_config.h"
 
 #include <atomic>
-#include <cstdio>
 #include <string>
 
 #include "../../catch_amalgamated.hpp"
@@ -130,25 +129,6 @@ TEST_CASE("RuntimeConfig test file path helper", "[application][subjects][config
     REQUIRE(std::string(path).find("3DBenchy.gcode") != std::string::npos);
 }
 
-// ============================================================================
-// SubjectInitializer Design Documentation
-// ============================================================================
-// The following tests document the expected behavior of SubjectInitializer.
-// They are marked as .integration since they require the full LVGL environment.
-
-TEST_CASE("SubjectInitializer initializes subjects in dependency order",
-          "[application][subjects][.integration]") {
-    // Expected initialization order:
-    // 1. Core subjects (app_globals, navigation, status bar)
-    // 2. PrinterState subjects (panels observe these)
-    // 3. AmsState and FilamentSensorManager subjects
-    // 4. Panel subjects (home, controls, filament, settings, etc.)
-    // 5. Observers (print completion, print start navigation)
-    // 6. Utility subjects (notification system)
-    // 7. USB manager (needs notification system ready)
-    REQUIRE(true); // Documentation placeholder
-}
-
 TEST_CASE_METHOD(LVGLTestFixture, "ObserverGuard RAII removes observer on destruction",
                  "[application][subjects][observer]") {
     // Test that ObserverGuard properly removes observers when going out of scope
@@ -242,31 +222,4 @@ TEST_CASE_METHOD(LVGLTestFixture, "ObserverGuard move semantics transfer ownersh
     REQUIRE(callback_count.load() == 0); // No callback after reset
 
     lv_subject_deinit(&subject);
-}
-
-TEST_CASE("SubjectInitializer manages observer guards for cleanup",
-          "[application][subjects][.integration]") {
-    // SubjectInitializer owns ObserverGuards for:
-    // - Print completion notification observer
-    // - Print start navigation observer
-    // These are automatically cleaned up when SubjectInitializer is destroyed
-    // (See the RAII tests above for verification of the underlying mechanism)
-    REQUIRE(true); // Documentation placeholder - full test requires application context
-}
-
-TEST_CASE("SubjectInitializer supports deferred API injection",
-          "[application][subjects][.integration]") {
-    // Some panels need MoonrakerAPI which isn't available until after
-    // Moonraker connection is established. SubjectInitializer stores
-    // pointers to these panels during init_all() and injects the API
-    // when inject_api() is called later.
-    //
-    // Panels with deferred API injection:
-    // - PrintSelectPanel
-    // - PrintStatusPanel
-    // - MotionPanel
-    // - ExtrusionPanel
-    // - BedMeshPanel
-    // - TempControlPanel
-    REQUIRE(true); // Documentation placeholder
 }

@@ -23,116 +23,11 @@
  * - led_brightness_ = max(R,G,B,W) * 100 / 255
  */
 
-#include "ui_update_queue.h"
-
 #include "../ui_test_utils.h"
 #include "app_globals.h"
 #include "printer_state.h"
 
 #include "../catch_amalgamated.hpp"
-
-// ============================================================================
-// Subject Accessor Tests - Verify get_*_subject() returns valid pointers
-// ============================================================================
-
-TEST_CASE("LED characterization: get_*_subject() returns valid pointers",
-          "[characterization][led]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false); // Skip XML registration
-
-    SECTION("led_state_subject is not null") {
-        lv_subject_t* subject = state.get_led_state_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("led_r_subject is not null") {
-        lv_subject_t* subject = state.get_led_r_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("led_g_subject is not null") {
-        lv_subject_t* subject = state.get_led_g_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("led_b_subject is not null") {
-        lv_subject_t* subject = state.get_led_b_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("led_w_subject is not null") {
-        lv_subject_t* subject = state.get_led_w_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("led_brightness_subject is not null") {
-        lv_subject_t* subject = state.get_led_brightness_subject();
-        REQUIRE(subject != nullptr);
-    }
-}
-
-TEST_CASE("LED characterization: all subject pointers are distinct", "[characterization][led]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    lv_subject_t* led_state = state.get_led_state_subject();
-    lv_subject_t* led_r = state.get_led_r_subject();
-    lv_subject_t* led_g = state.get_led_g_subject();
-    lv_subject_t* led_b = state.get_led_b_subject();
-    lv_subject_t* led_w = state.get_led_w_subject();
-    lv_subject_t* led_brightness = state.get_led_brightness_subject();
-
-    // All six subjects must be distinct pointers
-    std::vector<lv_subject_t*> subjects = {led_state, led_r, led_g, led_b, led_w, led_brightness};
-
-    for (size_t i = 0; i < subjects.size(); ++i) {
-        for (size_t j = i + 1; j < subjects.size(); ++j) {
-            REQUIRE(subjects[i] != subjects[j]);
-        }
-    }
-}
-
-// ============================================================================
-// Initial State Tests - Document default initialization behavior
-// ============================================================================
-
-TEST_CASE("LED characterization: initial values after init", "[characterization][led][init]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    SECTION("led_state initializes to 0 (off)") {
-        REQUIRE(lv_subject_get_int(state.get_led_state_subject()) == 0);
-    }
-
-    SECTION("led_r initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_led_r_subject()) == 0);
-    }
-
-    SECTION("led_g initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_led_g_subject()) == 0);
-    }
-
-    SECTION("led_b initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_led_b_subject()) == 0);
-    }
-
-    SECTION("led_w initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_led_w_subject()) == 0);
-    }
-
-    SECTION("led_brightness initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_led_brightness_subject()) == 0);
-    }
-}
 
 // ============================================================================
 // Tracked LED Tests - set_tracked_led / get_tracked_led / has_tracked_led

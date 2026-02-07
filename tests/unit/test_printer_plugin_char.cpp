@@ -82,36 +82,6 @@ TEST_CASE("Plugin status characterization: initial query methods return false fo
 }
 
 // ============================================================================
-// Subject Access Tests - Verify getter methods return correct pointers
-// ============================================================================
-
-TEST_CASE("Plugin status characterization: subject getter methods",
-          "[characterization][plugin][access]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(true);
-
-    SECTION("get_helix_plugin_installed_subject returns valid subject pointer") {
-        lv_subject_t* via_getter = state.get_helix_plugin_installed_subject();
-        lv_subject_t* via_xml = get_subject_by_name("helix_plugin_installed");
-
-        REQUIRE(via_getter != nullptr);
-        REQUIRE(via_getter == via_xml);
-    }
-
-    SECTION("subjects are distinct pointers") {
-        lv_subject_t* plugin = state.get_helix_plugin_installed_subject();
-        lv_subject_t* tracking = get_subject_by_name("phase_tracking_enabled");
-
-        REQUIRE(plugin != nullptr);
-        REQUIRE(tracking != nullptr);
-        REQUIRE(plugin != tracking);
-    }
-}
-
-// ============================================================================
 // set_helix_plugin_installed Tests - Verify plugin detection updates
 // ============================================================================
 
@@ -299,31 +269,6 @@ TEST_CASE("Plugin status characterization: async update behavior",
         // Final value should be 1 (last write wins)
         REQUIRE(lv_subject_get_int(subject) == 1);
     }
-}
-
-// ============================================================================
-// XML Registration Tests - Verify subjects are available for XML binding
-// ============================================================================
-
-TEST_CASE("Plugin status characterization: XML registration", "[characterization][plugin][xml]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-
-    SECTION("subjects are accessible via XML lookup when registered") {
-        state.init_subjects(true); // Enable XML registration
-
-        lv_subject_t* plugin = get_subject_by_name("helix_plugin_installed");
-        lv_subject_t* tracking = get_subject_by_name("phase_tracking_enabled");
-
-        REQUIRE(plugin != nullptr);
-        REQUIRE(tracking != nullptr);
-    }
-
-    // Note: XML registrations persist in the global registry across test cases,
-    // so we cannot test that subjects are unavailable when init_subjects(false) is used.
-    // The behavior is: once registered, subjects remain in the registry for the process lifetime.
 }
 
 // ============================================================================

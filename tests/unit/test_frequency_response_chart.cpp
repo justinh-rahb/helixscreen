@@ -84,9 +84,7 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Create and destroy frequenc
     }
 
     SECTION("Destroy NULL chart is safe") {
-        ui_frequency_response_chart_destroy(nullptr);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_destroy(nullptr));
     }
 
     SECTION("Get obj from NULL chart returns NULL") {
@@ -98,11 +96,9 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Create and destroy frequenc
         ui_frequency_response_chart_t* chart = ui_frequency_response_chart_create(screen);
         REQUIRE(chart != nullptr);
 
-        ui_frequency_response_chart_destroy(chart);
-        // Second destroy should be safe (though pointer is now dangling - don't do this in
-        // production) This tests that the function handles already-freed state gracefully if called
-        // with garbage
-        REQUIRE(true);
+        // First destroy frees the chart; verifying it doesn't throw
+        REQUIRE_NOTHROW(ui_frequency_response_chart_destroy(chart));
+        // Second destroy with dangling pointer is undefined behavior - not testable safely
     }
 }
 
@@ -162,9 +158,11 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Remove series cleans up",
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         REQUIRE(id >= 0);
 
-        ui_frequency_response_chart_remove_series(chart, id);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_remove_series(chart, id));
+
+        // Verify removed series slot is reused: adding a new series should succeed
+        int id2 = ui_frequency_response_chart_add_series(chart, "Reused", lv_color_hex(0x00FF00));
+        REQUIRE(id2 >= 0);
     }
 
     SECTION("Remove series from middle maintains others") {
@@ -174,39 +172,36 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Remove series cleans up",
 
         ui_frequency_response_chart_remove_series(chart, id2);
 
-        // Verify we can still use remaining series
+        // Remaining series still accept data without crashing
         float freqs[] = {10.0f, 20.0f, 30.0f};
         float amps[] = {1.0f, 2.0f, 1.5f};
-        ui_frequency_response_chart_set_data(chart, id1, freqs, amps, 3);
-        ui_frequency_response_chart_set_data(chart, id3, freqs, amps, 3);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id1, freqs, amps, 3));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id3, freqs, amps, 3));
+
+        // Chart obj is still valid after partial removal
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     SECTION("Remove invalid series ID does nothing") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         REQUIRE(id >= 0);
 
-        ui_frequency_response_chart_remove_series(chart, 999);
-        // Should not crash, original series still valid
+        REQUIRE_NOTHROW(ui_frequency_response_chart_remove_series(chart, 999));
+
+        // Original series still functional after invalid remove
         float freqs[] = {10.0f};
         float amps[] = {1.0f};
-        ui_frequency_response_chart_set_data(chart, id, freqs, amps, 1);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs, amps, 1));
     }
 
     SECTION("Remove from NULL chart is safe") {
-        ui_frequency_response_chart_remove_series(nullptr, 0);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_remove_series(nullptr, 0));
     }
 
     SECTION("Remove already removed series is safe") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         ui_frequency_response_chart_remove_series(chart, id);
-        ui_frequency_response_chart_remove_series(chart, id); // Remove again
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_remove_series(chart, id));
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -221,39 +216,29 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Show/hide series toggles vi
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         REQUIRE(id >= 0);
 
-        ui_frequency_response_chart_show_series(chart, id, false);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, id, false));
     }
 
     SECTION("Show hidden series") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
-        ui_frequency_response_chart_show_series(chart, id, false);
-        ui_frequency_response_chart_show_series(chart, id, true);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, id, false));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, id, true));
     }
 
     SECTION("Toggle visibility multiple times") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
 
         for (int i = 0; i < 10; i++) {
-            ui_frequency_response_chart_show_series(chart, id, i % 2 == 0);
+            REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, id, i % 2 == 0));
         }
-        // No crash = success
-        REQUIRE(true);
     }
 
     SECTION("Show/hide invalid series ID does nothing") {
-        ui_frequency_response_chart_show_series(chart, 999, false);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, 999, false));
     }
 
     SECTION("Show/hide on NULL chart is safe") {
-        ui_frequency_response_chart_show_series(nullptr, 0, false);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(nullptr, 0, false));
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -277,9 +262,9 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Set data with various point
         float freqs[] = {10.0f, 20.0f, 30.0f, 40.0f, 50.0f};
         float amps[] = {1.0f, 2.5f, 5.0f, 2.0f, 0.5f};
 
-        ui_frequency_response_chart_set_data(chart, id, freqs, amps, 5);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs, amps, 5));
+        // Chart object still valid after data set
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     SECTION("Set data with exact max points") {
@@ -294,50 +279,41 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Set data with various point
             amps[i] = 1.0f + (float)(i % 50) * 0.1f;
         }
 
-        ui_frequency_response_chart_set_data(chart, id, freqs.data(), amps.data(), max_points);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(
+            ui_frequency_response_chart_set_data(chart, id, freqs.data(), amps.data(), max_points));
+        // max_points unchanged after setting exact-limit data
+        REQUIRE(ui_frequency_response_chart_get_max_points(chart) == max_points);
     }
 
     SECTION("Set data with NULL frequencies fails gracefully") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         float amps[] = {1.0f, 2.0f};
-        ui_frequency_response_chart_set_data(chart, id, nullptr, amps, 2);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, nullptr, amps, 2));
     }
 
     SECTION("Set data with NULL amplitudes fails gracefully") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         float freqs[] = {10.0f, 20.0f};
-        ui_frequency_response_chart_set_data(chart, id, freqs, nullptr, 2);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs, nullptr, 2));
     }
 
     SECTION("Set data with zero count fails gracefully") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         float freqs[] = {10.0f};
         float amps[] = {1.0f};
-        ui_frequency_response_chart_set_data(chart, id, freqs, amps, 0);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs, amps, 0));
     }
 
     SECTION("Set data on invalid series ID is safe") {
         float freqs[] = {10.0f};
         float amps[] = {1.0f};
-        ui_frequency_response_chart_set_data(chart, 999, freqs, amps, 1);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, 999, freqs, amps, 1));
     }
 
     SECTION("Set data on NULL chart is safe") {
         float freqs[] = {10.0f};
         float amps[] = {1.0f};
-        ui_frequency_response_chart_set_data(nullptr, 0, freqs, amps, 1);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(nullptr, 0, freqs, amps, 1));
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -388,9 +364,11 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture,
             amps[i] = 1.0f;
         }
 
-        ui_frequency_response_chart_set_data(chart, id, freqs.data(), amps.data(), input_count);
-        // No downsampling needed - 100 < 200
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs.data(), amps.data(),
+                                                             input_count));
+        // No downsampling needed - 100 < 200; max_points still reflects tier
+        REQUIRE(ui_frequency_response_chart_get_max_points(chart) ==
+                PlatformCapabilities::STANDARD_CHART_POINTS);
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -413,26 +391,22 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Clear data removes all poin
 
         ui_frequency_response_chart_clear(chart);
 
-        // Series should still exist, just data cleared
-        // Can add new data without issues
-        ui_frequency_response_chart_set_data(chart, id1, freqs, amps, 3);
-        REQUIRE(true);
+        // Series should still exist after clear: can set new data without crashing
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id1, freqs, amps, 3));
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     SECTION("Clear NULL chart is safe") {
-        ui_frequency_response_chart_clear(nullptr);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear(nullptr));
     }
 
     SECTION("Clear empty chart is safe") {
-        ui_frequency_response_chart_clear(chart);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear(chart));
     }
 
     SECTION("Clear chart with no series is safe") {
-        ui_frequency_response_chart_clear(chart);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear(chart));
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -457,55 +431,42 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Mark peak creates cursor at
         float amps[] = {1.0f, 3.0f, 10.0f, 2.0f, 0.5f};
         ui_frequency_response_chart_set_data(chart, id, freqs, amps, 5);
 
-        // Mark peak at 50 Hz with amplitude 10.0
-        ui_frequency_response_chart_mark_peak(chart, id, 50.0f, 10.0f);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id, 50.0f, 10.0f));
+        // Chart still valid after peak marking
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     SECTION("Mark peak updates existing marker") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
 
-        ui_frequency_response_chart_mark_peak(chart, id, 50.0f, 10.0f);
-        ui_frequency_response_chart_mark_peak(chart, id, 75.0f, 8.0f);
-        // Should update, not add second marker
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id, 50.0f, 10.0f));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id, 75.0f, 8.0f));
     }
 
     SECTION("Mark peak on different series is independent") {
         int id1 = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         int id2 = ui_frequency_response_chart_add_series(chart, "Y Axis", lv_color_hex(0x44FF44));
 
-        ui_frequency_response_chart_mark_peak(chart, id1, 50.0f, 10.0f);
-        ui_frequency_response_chart_mark_peak(chart, id2, 75.0f, 8.0f);
-        // Each series has its own peak marker
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id1, 50.0f, 10.0f));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id2, 75.0f, 8.0f));
     }
 
     SECTION("Mark peak on invalid series ID is safe") {
-        ui_frequency_response_chart_mark_peak(chart, 999, 50.0f, 10.0f);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, 999, 50.0f, 10.0f));
     }
 
     SECTION("Mark peak on NULL chart is safe") {
-        ui_frequency_response_chart_mark_peak(nullptr, 0, 50.0f, 10.0f);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(nullptr, 0, 50.0f, 10.0f));
     }
 
     SECTION("Mark peak with zero amplitude is valid") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
-        ui_frequency_response_chart_mark_peak(chart, id, 50.0f, 0.0f);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id, 50.0f, 0.0f));
     }
 
     SECTION("Mark peak with negative frequency is handled") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
-        // Negative frequency is invalid but should not crash
-        ui_frequency_response_chart_mark_peak(chart, id, -10.0f, 5.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id, -10.0f, 5.0f));
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -520,28 +481,20 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Clear peak removes cursor",
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
 
         ui_frequency_response_chart_mark_peak(chart, id, 50.0f, 10.0f);
-        ui_frequency_response_chart_clear_peak(chart, id);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear_peak(chart, id));
     }
 
     SECTION("Clear peak when none marked is safe") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
-        ui_frequency_response_chart_clear_peak(chart, id);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear_peak(chart, id));
     }
 
     SECTION("Clear peak on invalid series ID is safe") {
-        ui_frequency_response_chart_clear_peak(chart, 999);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear_peak(chart, 999));
     }
 
     SECTION("Clear peak on NULL chart is safe") {
-        ui_frequency_response_chart_clear_peak(nullptr, 0);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear_peak(nullptr, 0));
     }
 
     SECTION("Clear peak only affects specified series") {
@@ -551,9 +504,9 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Clear peak removes cursor",
         ui_frequency_response_chart_mark_peak(chart, id1, 50.0f, 10.0f);
         ui_frequency_response_chart_mark_peak(chart, id2, 75.0f, 8.0f);
 
-        ui_frequency_response_chart_clear_peak(chart, id1);
-        // id2's peak should still exist (can mark again without issues)
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear_peak(chart, id1));
+        // id2's peak should still exist; re-marking is safe
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id2, 80.0f, 9.0f));
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -569,42 +522,31 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Set frequency range updates
     REQUIRE(chart != nullptr);
 
     SECTION("Set valid frequency range") {
-        ui_frequency_response_chart_set_freq_range(chart, 0.0f, 200.0f);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(chart, 0.0f, 200.0f));
     }
 
     SECTION("Set custom frequency range") {
-        ui_frequency_response_chart_set_freq_range(chart, 10.0f, 150.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(chart, 10.0f, 150.0f));
     }
 
     SECTION("Set frequency range with different values") {
-        ui_frequency_response_chart_set_freq_range(chart, 5.0f, 500.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(chart, 5.0f, 500.0f));
     }
 
     SECTION("Invalid range (min >= max) is rejected or handled") {
-        // Should not crash - either rejected or handled gracefully
-        ui_frequency_response_chart_set_freq_range(chart, 100.0f, 50.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(chart, 100.0f, 50.0f));
     }
 
     SECTION("Invalid range (min == max) is rejected or handled") {
-        ui_frequency_response_chart_set_freq_range(chart, 100.0f, 100.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(chart, 100.0f, 100.0f));
     }
 
     SECTION("Set range on NULL chart is safe") {
-        ui_frequency_response_chart_set_freq_range(nullptr, 0.0f, 200.0f);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(nullptr, 0.0f, 200.0f));
     }
 
     SECTION("Negative frequency values are handled") {
-        // Frequency should typically be positive, but shouldn't crash
-        ui_frequency_response_chart_set_freq_range(chart, -10.0f, 200.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(chart, -10.0f, 200.0f));
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -616,31 +558,23 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Set amplitude range updates
     REQUIRE(chart != nullptr);
 
     SECTION("Set valid amplitude range") {
-        ui_frequency_response_chart_set_amplitude_range(chart, 0.0f, 100.0f);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_amplitude_range(chart, 0.0f, 100.0f));
     }
 
     SECTION("Set custom amplitude range") {
-        ui_frequency_response_chart_set_amplitude_range(chart, -20.0f, 40.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_amplitude_range(chart, -20.0f, 40.0f));
     }
 
     SECTION("Set amplitude range for logarithmic scale") {
-        // Common for frequency response: dB scale
-        ui_frequency_response_chart_set_amplitude_range(chart, -60.0f, 20.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_amplitude_range(chart, -60.0f, 20.0f));
     }
 
     SECTION("Invalid range (min >= max) is rejected or handled") {
-        ui_frequency_response_chart_set_amplitude_range(chart, 100.0f, 50.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_amplitude_range(chart, 100.0f, 50.0f));
     }
 
     SECTION("Set range on NULL chart is safe") {
-        ui_frequency_response_chart_set_amplitude_range(nullptr, 0.0f, 100.0f);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_amplitude_range(nullptr, 0.0f, 100.0f));
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -751,9 +685,8 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture,
 
 TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Configure on NULL chart is safe",
                  "[frequency_response_chart][platform]") {
-    ui_frequency_response_chart_configure_for_platform(nullptr, PlatformTier::STANDARD);
-    // Should not crash
-    REQUIRE(true);
+    REQUIRE_NOTHROW(
+        ui_frequency_response_chart_configure_for_platform(nullptr, PlatformTier::STANDARD));
 }
 
 // ============================================================================
@@ -833,6 +766,9 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Multiple series work indepe
         int id1 = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         int id2 = ui_frequency_response_chart_add_series(chart, "Y Axis", lv_color_hex(0x44FF44));
         int id3 = ui_frequency_response_chart_add_series(chart, "Z Axis", lv_color_hex(0x4444FF));
+        REQUIRE(id1 >= 0);
+        REQUIRE(id2 >= 0);
+        REQUIRE(id3 >= 0);
 
         // Different data for each series
         float freqs1[] = {10.0f, 20.0f, 30.0f};
@@ -844,39 +780,33 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Multiple series work indepe
         float freqs3[] = {12.0f, 22.0f};
         float amps3[] = {3.0f, 6.0f};
 
-        ui_frequency_response_chart_set_data(chart, id1, freqs1, amps1, 3);
-        ui_frequency_response_chart_set_data(chart, id2, freqs2, amps2, 4);
-        ui_frequency_response_chart_set_data(chart, id3, freqs3, amps3, 2);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id1, freqs1, amps1, 3));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id2, freqs2, amps2, 4));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id3, freqs3, amps3, 2));
 
-        // Each series maintains its own data - no crash
-        REQUIRE(true);
+        // Chart still valid with three independent series
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     SECTION("Independent visibility per series") {
         int id1 = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         int id2 = ui_frequency_response_chart_add_series(chart, "Y Axis", lv_color_hex(0x44FF44));
 
-        ui_frequency_response_chart_show_series(chart, id1, false);
-        // id2 should still be visible (default)
-
-        ui_frequency_response_chart_show_series(chart, id2, true);
-        ui_frequency_response_chart_show_series(chart, id1, true);
-
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, id1, false));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, id2, true));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, id1, true));
     }
 
     SECTION("Independent peak markers per series") {
         int id1 = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
         int id2 = ui_frequency_response_chart_add_series(chart, "Y Axis", lv_color_hex(0x44FF44));
 
-        ui_frequency_response_chart_mark_peak(chart, id1, 50.0f, 10.0f);
-        ui_frequency_response_chart_mark_peak(chart, id2, 75.0f, 15.0f);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id1, 50.0f, 10.0f));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id2, 75.0f, 15.0f));
 
-        // Clear one series peak
-        ui_frequency_response_chart_clear_peak(chart, id1);
-        // id2's peak should remain
-
-        REQUIRE(true);
+        // Clear one series peak; id2's peak should remain
+        REQUIRE_NOTHROW(ui_frequency_response_chart_clear_peak(chart, id1));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id2, 80.0f, 12.0f));
     }
 
     SECTION("Remove one series doesn't affect others") {
@@ -894,11 +824,10 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Multiple series work indepe
         // Remove middle series
         ui_frequency_response_chart_remove_series(chart, id2);
 
-        // Other series still work
-        ui_frequency_response_chart_set_data(chart, id1, freqs, amps, 3);
-        ui_frequency_response_chart_set_data(chart, id3, freqs, amps, 3);
-
-        REQUIRE(true);
+        // Other series still accept data after middle removal
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id1, freqs, amps, 3));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id3, freqs, amps, 3));
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -946,10 +875,12 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Complete calibration workfl
         ui_frequency_response_chart_set_data(chart, y_id, freqs.data(), y_amps.data(), data_points);
 
         // Mark detected peaks
-        ui_frequency_response_chart_mark_peak(chart, x_id, 45.0f, 51e8f);
-        ui_frequency_response_chart_mark_peak(chart, y_id, 52.0f, 41e8f);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, x_id, 45.0f, 51e8f));
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, y_id, 52.0f, 41e8f));
 
-        REQUIRE(true);
+        // Full workflow completed: chart still valid and in chart mode
+        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == true);
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     SECTION("Update data after initial display") {
@@ -966,9 +897,8 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Complete calibration workfl
         ui_frequency_response_chart_set_data(chart, id, freqs2, amps2, 5);
 
         // Update peak marker
-        ui_frequency_response_chart_mark_peak(chart, id, 30.0f, 5.0f);
-
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id, 30.0f, 5.0f));
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     SECTION("Clear and restart calibration") {
@@ -986,9 +916,8 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Complete calibration workfl
         // New calibration data
         float freqs2[] = {15.0f, 25.0f, 35.0f};
         float amps2[] = {2.0f, 4.0f, 2.0f};
-        ui_frequency_response_chart_set_data(chart, id, freqs2, amps2, 3);
-
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs2, amps2, 3));
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -1015,34 +944,43 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Stress tests",
                 amps[i] = 1.0f + (float)(iteration % 10);
             }
 
-            ui_frequency_response_chart_set_data(chart, id, freqs.data(), amps.data(), points);
+            REQUIRE_NOTHROW(
+                ui_frequency_response_chart_set_data(chart, id, freqs.data(), amps.data(), points));
         }
 
-        REQUIRE(true);
+        // Chart survives 100 rapid data updates
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
+        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == true);
     }
 
     SECTION("Rapid configuration changes") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
 
         for (int i = 0; i < 100; i++) {
-            ui_frequency_response_chart_set_freq_range(chart, (float)i, (float)(i + 200));
-            ui_frequency_response_chart_set_amplitude_range(chart, 0.0f, 100.0f + i);
-            ui_frequency_response_chart_mark_peak(chart, id, 50.0f + i, 10.0f);
-            ui_frequency_response_chart_show_series(chart, id, i % 2 == 0);
+            REQUIRE_NOTHROW(
+                ui_frequency_response_chart_set_freq_range(chart, (float)i, (float)(i + 200)));
+            REQUIRE_NOTHROW(
+                ui_frequency_response_chart_set_amplitude_range(chart, 0.0f, 100.0f + i));
+            REQUIRE_NOTHROW(ui_frequency_response_chart_mark_peak(chart, id, 50.0f + i, 10.0f));
+            REQUIRE_NOTHROW(ui_frequency_response_chart_show_series(chart, id, i % 2 == 0));
         }
 
-        REQUIRE(true);
+        REQUIRE(ui_frequency_response_chart_get_obj(chart) != nullptr);
     }
 
     SECTION("Rapid tier switching") {
-        // Unusual but should not crash
         for (int i = 0; i < 50; i++) {
-            ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::STANDARD);
-            ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::BASIC);
-            ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::EMBEDDED);
+            REQUIRE_NOTHROW(
+                ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::STANDARD));
+            REQUIRE_NOTHROW(
+                ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::BASIC));
+            REQUIRE_NOTHROW(
+                ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::EMBEDDED));
         }
 
-        REQUIRE(true);
+        // After 150 tier switches, final state is EMBEDDED (last configured)
+        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == false);
+        REQUIRE(ui_frequency_response_chart_get_max_points(chart) == 0);
     }
 
     ui_frequency_response_chart_destroy(chart);
@@ -1058,48 +996,42 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Edge cases",
     REQUIRE(chart != nullptr);
 
     SECTION("Very large frequency values") {
-        ui_frequency_response_chart_set_freq_range(chart, 0.0f, 1e6f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(chart, 0.0f, 1e6f));
     }
 
     SECTION("Very small frequency values") {
-        ui_frequency_response_chart_set_freq_range(chart, 0.001f, 1.0f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_freq_range(chart, 0.001f, 1.0f));
     }
 
     SECTION("Very large amplitude values") {
-        ui_frequency_response_chart_set_amplitude_range(chart, 0.0f, 1e12f);
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_amplitude_range(chart, 0.0f, 1e12f));
     }
 
     SECTION("Scientific notation data") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
+        REQUIRE(id >= 0);
 
         float freqs[] = {1e1f, 1e2f, 1e3f};
         float amps[] = {1e6f, 1e9f, 1e8f};
-        ui_frequency_response_chart_set_data(chart, id, freqs, amps, 3);
-
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs, amps, 3));
     }
 
     SECTION("Single data point") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
+        REQUIRE(id >= 0);
 
         float freqs[] = {50.0f};
         float amps[] = {100.0f};
-        ui_frequency_response_chart_set_data(chart, id, freqs, amps, 1);
-
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs, amps, 1));
     }
 
     SECTION("Two data points") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
+        REQUIRE(id >= 0);
 
         float freqs[] = {10.0f, 100.0f};
         float amps[] = {1.0f, 10.0f};
-        ui_frequency_response_chart_set_data(chart, id, freqs, amps, 2);
-
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_frequency_response_chart_set_data(chart, id, freqs, amps, 2));
     }
 
     SECTION("Very long series name") {

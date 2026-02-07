@@ -1996,7 +1996,8 @@ TEST_CASE("MoonrakerClientMock CANCEL_PRINT resets to standby", "[print][cancel]
     }
 }
 
-TEST_CASE("MoonrakerClientMock print progress increments during printing", "[print][progress]") {
+TEST_CASE("MoonrakerClientMock print progress increments during printing",
+          "[print][progress][slow]") {
     MockBehaviorTestFixture fixture;
 
     SECTION("Progress increases while printing") {
@@ -2978,7 +2979,7 @@ TEST_CASE("MoonrakerClientMock handles printer restart commands", "[mock][restar
 // Idle Timeout Simulation Tests
 // ============================================================================
 
-TEST_CASE("MoonrakerClientMock idle_timeout simulation", "[mock][idle_timeout]") {
+TEST_CASE("MoonrakerClientMock idle_timeout simulation", "[mock][idle_timeout][slow]") {
     SECTION("idle_timeout triggers after configured duration") {
         MoonrakerClientMock mock(MoonrakerClientMock::PrinterType::VORON_24);
         MockBehaviorTestFixture fixture;

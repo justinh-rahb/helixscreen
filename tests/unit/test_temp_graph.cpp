@@ -56,9 +56,7 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Create and destroy graph", "[ui][core]")
     }
 
     SECTION("Destroy NULL graph is safe") {
-        ui_temp_graph_destroy(nullptr);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_destroy(nullptr));
     }
 
     SECTION("Get chart from NULL graph returns NULL") {
@@ -181,6 +179,7 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Remove series", "[ui][series]") {
 
     SECTION("Remove invalid series ID does nothing") {
         int id = ui_temp_graph_add_series(graph, "Nozzle", lv_color_hex(0xFF5722));
+        REQUIRE(id >= 0);
         REQUIRE(graph->series_count == 1);
 
         ui_temp_graph_remove_series(graph, 999);
@@ -188,9 +187,7 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Remove series", "[ui][series]") {
     }
 
     SECTION("Remove from NULL graph is safe") {
-        ui_temp_graph_remove_series(nullptr, 0);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_remove_series(nullptr, 0));
     }
 
     SECTION("Remove already removed series is safe") {
@@ -225,15 +222,11 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Show/hide series", "[ui][series]") {
     }
 
     SECTION("Show/hide invalid series ID does nothing") {
-        ui_temp_graph_show_series(graph, 999, false);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_show_series(graph, 999, false));
     }
 
     SECTION("Show/hide on NULL graph is safe") {
-        ui_temp_graph_show_series(nullptr, 0, false);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_show_series(nullptr, 0, false));
     }
 
     ui_temp_graph_destroy(graph);
@@ -250,9 +243,8 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Update series data (push mode)", "[ui][d
     SECTION("Update single series with single value") {
         int id = ui_temp_graph_add_series(graph, "Nozzle", lv_color_hex(0xFF5722));
 
-        ui_temp_graph_update_series(graph, id, 210.5f);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_update_series(graph, id, 210.5f));
+        REQUIRE(graph->series_count == 1);
     }
 
     SECTION("Update series multiple times") {
@@ -261,31 +253,29 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Update series data (push mode)", "[ui][d
         for (int i = 0; i < 10; i++) {
             ui_temp_graph_update_series(graph, id, 200.0f + i);
         }
-        // No crash = success
-        REQUIRE(true);
+        // Series still intact after multiple updates
+        REQUIRE(graph->series_count == 1);
+        REQUIRE(graph->series_meta[0].chart_series != nullptr);
     }
 
     SECTION("Update invalid series ID is safe") {
-        ui_temp_graph_update_series(graph, 999, 100.0f);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_update_series(graph, 999, 100.0f));
+        REQUIRE(graph->series_count == 0);
     }
 
     SECTION("Update NULL graph is safe") {
-        ui_temp_graph_update_series(nullptr, 0, 100.0f);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_update_series(nullptr, 0, 100.0f));
     }
 
     SECTION("Update with boundary values") {
         int id = ui_temp_graph_add_series(graph, "Nozzle", lv_color_hex(0xFF5722));
 
-        ui_temp_graph_update_series(graph, id, 0.0f);
-        ui_temp_graph_update_series(graph, id, 300.0f);
-        ui_temp_graph_update_series(graph, id, -50.0f);
-        ui_temp_graph_update_series(graph, id, 500.0f);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_update_series(graph, id, 0.0f));
+        REQUIRE_NOTHROW(ui_temp_graph_update_series(graph, id, 300.0f));
+        REQUIRE_NOTHROW(ui_temp_graph_update_series(graph, id, -50.0f));
+        REQUIRE_NOTHROW(ui_temp_graph_update_series(graph, id, 500.0f));
+        REQUIRE(graph->series_count == 1);
+        REQUIRE(graph->series_meta[0].chart_series != nullptr);
     }
 
     ui_temp_graph_destroy(graph);
@@ -299,9 +289,9 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Set series data (array mode)", "[ui][dat
         int id = ui_temp_graph_add_series(graph, "Nozzle", lv_color_hex(0xFF5722));
 
         float temps[] = {20.0f, 50.0f, 100.0f, 150.0f, 200.0f, 210.5f};
-        ui_temp_graph_set_series_data(graph, id, temps, 6);
-        // No crash = success
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_data(graph, id, temps, 6));
+        REQUIRE(graph->series_count == 1);
+        REQUIRE(graph->series_meta[0].chart_series != nullptr);
     }
 
     SECTION("Set data with array larger than point count") {
@@ -313,40 +303,38 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Set series data (array mode)", "[ui][dat
             temps[i] = 20.0f + i * 0.5f;
         }
 
-        ui_temp_graph_set_series_data(graph, id, temps, UI_TEMP_GRAPH_DEFAULT_POINTS + 100);
-        // Should truncate to point_count
+        REQUIRE_NOTHROW(
+            ui_temp_graph_set_series_data(graph, id, temps, UI_TEMP_GRAPH_DEFAULT_POINTS + 100));
+        // Series still intact after truncation
+        REQUIRE(graph->series_count == 1);
+        REQUIRE(graph->series_meta[0].chart_series != nullptr);
         delete[] temps;
-        REQUIRE(true);
     }
 
     SECTION("Set data with NULL array fails gracefully") {
         int id = ui_temp_graph_add_series(graph, "Nozzle", lv_color_hex(0xFF5722));
-        ui_temp_graph_set_series_data(graph, id, nullptr, 10);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_data(graph, id, nullptr, 10));
+        // Series still exists despite invalid data
+        REQUIRE(graph->series_count == 1);
     }
 
     SECTION("Set data with zero count fails gracefully") {
         int id = ui_temp_graph_add_series(graph, "Nozzle", lv_color_hex(0xFF5722));
         float temps[] = {100.0f};
-        ui_temp_graph_set_series_data(graph, id, temps, 0);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_data(graph, id, temps, 0));
+        REQUIRE(graph->series_count == 1);
     }
 
     SECTION("Set data with negative count fails gracefully") {
         int id = ui_temp_graph_add_series(graph, "Nozzle", lv_color_hex(0xFF5722));
         float temps[] = {100.0f};
-        ui_temp_graph_set_series_data(graph, id, temps, -5);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_data(graph, id, temps, -5));
+        REQUIRE(graph->series_count == 1);
     }
 
     SECTION("Set data on NULL graph is safe") {
         float temps[] = {100.0f};
-        ui_temp_graph_set_series_data(nullptr, 0, temps, 1);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_data(nullptr, 0, temps, 1));
     }
 
     ui_temp_graph_destroy(graph);
@@ -371,9 +359,7 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Clear graph data", "[ui][data]") {
     }
 
     SECTION("Clear NULL graph is safe") {
-        ui_temp_graph_clear(nullptr);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_clear(nullptr));
     }
 
     SECTION("Clear empty graph is safe") {
@@ -411,15 +397,12 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Clear individual series data", "[ui][dat
     }
 
     SECTION("Clear invalid series ID is safe") {
-        ui_temp_graph_clear_series(graph, 999);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_clear_series(graph, 999));
+        REQUIRE(graph->series_count == 0);
     }
 
     SECTION("Clear on NULL graph is safe") {
-        ui_temp_graph_clear_series(nullptr, 0);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_clear_series(nullptr, 0));
     }
 
     ui_temp_graph_destroy(graph);
@@ -472,15 +455,12 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Set series target temperature", "[ui][ta
     }
 
     SECTION("Set target on invalid series ID is safe") {
-        ui_temp_graph_set_series_target(graph, 999, 210.0f, true);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_target(graph, 999, 210.0f, true));
+        REQUIRE(graph->series_count == 0);
     }
 
     SECTION("Set target on NULL graph is safe") {
-        ui_temp_graph_set_series_target(nullptr, 0, 210.0f, true);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_target(nullptr, 0, 210.0f, true));
     }
 
     ui_temp_graph_destroy(graph);
@@ -509,15 +489,12 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Show/hide target temperature", "[ui][tar
     }
 
     SECTION("Show/hide on invalid series ID is safe") {
-        ui_temp_graph_show_target(graph, 999, true);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_show_target(graph, 999, true));
+        REQUIRE(graph->series_count == 0);
     }
 
     SECTION("Show/hide on NULL graph is safe") {
-        ui_temp_graph_show_target(nullptr, 0, true);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_show_target(nullptr, 0, true));
     }
 
     ui_temp_graph_destroy(graph);
@@ -568,9 +545,7 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Set temperature range", "[ui][config]") 
     }
 
     SECTION("Set range on NULL graph is safe") {
-        ui_temp_graph_set_temp_range(nullptr, 0.0f, 250.0f);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_temp_range(nullptr, 0.0f, 250.0f));
     }
 
     ui_temp_graph_destroy(graph);
@@ -614,9 +589,7 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Set point count", "[ui][config]") {
     }
 
     SECTION("Set point count on NULL graph is safe") {
-        ui_temp_graph_set_point_count(nullptr, 600);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_point_count(nullptr, 600));
     }
 
     ui_temp_graph_destroy(graph);
@@ -654,15 +627,12 @@ TEST_CASE_METHOD(TempGraphTestFixture, "Set series gradient", "[ui][config]") {
     }
 
     SECTION("Set gradient on invalid series ID is safe") {
-        ui_temp_graph_set_series_gradient(graph, 999, LV_OPA_50, LV_OPA_10);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_gradient(graph, 999, LV_OPA_50, LV_OPA_10));
+        REQUIRE(graph->series_count == 0);
     }
 
     SECTION("Set gradient on NULL graph is safe") {
-        ui_temp_graph_set_series_gradient(nullptr, 0, LV_OPA_50, LV_OPA_10);
-        // Should not crash
-        REQUIRE(true);
+        REQUIRE_NOTHROW(ui_temp_graph_set_series_gradient(nullptr, 0, LV_OPA_50, LV_OPA_10));
     }
 
     ui_temp_graph_destroy(graph);

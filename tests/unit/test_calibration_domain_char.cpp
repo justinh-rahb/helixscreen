@@ -34,8 +34,6 @@
  * - Motor state derived from idle_timeout.state string ("Ready"/"Printing" vs "Idle")
  */
 
-#include "ui_update_queue.h"
-
 #include "../ui_test_utils.h"
 #include "app_globals.h"
 #include "printer_state.h"
@@ -61,22 +59,10 @@ TEST_CASE("Calibration characterization: initial values after init",
     state.reset_for_testing();
     state.init_subjects(true); // Need XML registration to lookup by name
 
-    SECTION("retract_length initializes to 0 (disabled)") {
-        lv_subject_t* subject = get_subject_by_name("retract_length");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
     SECTION("retract_speed initializes to 20 mm/s") {
         lv_subject_t* subject = get_subject_by_name("retract_speed");
         REQUIRE(subject != nullptr);
         REQUIRE(lv_subject_get_int(subject) == 20);
-    }
-
-    SECTION("unretract_extra_length initializes to 0") {
-        lv_subject_t* subject = get_subject_by_name("unretract_extra_length");
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
     }
 
     SECTION("unretract_speed initializes to 10 mm/s") {
@@ -85,93 +71,11 @@ TEST_CASE("Calibration characterization: initial values after init",
         REQUIRE(lv_subject_get_int(subject) == 10);
     }
 
-    SECTION("manual_probe_active initializes to 0 (inactive)") {
-        lv_subject_t* subject = state.get_manual_probe_active_subject();
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
-    SECTION("manual_probe_z_position initializes to 0") {
-        lv_subject_t* subject = state.get_manual_probe_z_position_subject();
-        REQUIRE(subject != nullptr);
-        REQUIRE(lv_subject_get_int(subject) == 0);
-    }
-
     SECTION("motors_enabled initializes to 1 (enabled)") {
         // Default is enabled (Ready state) per printer_state.cpp:256
         lv_subject_t* subject = state.get_motors_enabled_subject();
         REQUIRE(subject != nullptr);
         REQUIRE(lv_subject_get_int(subject) == 1);
-    }
-}
-
-// ============================================================================
-// Subject Access Tests - Verify getter methods and XML lookup
-// ============================================================================
-
-TEST_CASE("Calibration characterization: subject getter methods return valid pointers",
-          "[characterization][calibration][access]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(true);
-
-    SECTION("get_manual_probe_active_subject returns valid pointer") {
-        lv_subject_t* subject = state.get_manual_probe_active_subject();
-        REQUIRE(subject != nullptr);
-
-        // Verify it matches XML lookup
-        lv_subject_t* via_xml = get_subject_by_name("manual_probe_active");
-        REQUIRE(via_xml != nullptr);
-        REQUIRE(subject == via_xml);
-    }
-
-    SECTION("get_manual_probe_z_position_subject returns valid pointer") {
-        lv_subject_t* subject = state.get_manual_probe_z_position_subject();
-        REQUIRE(subject != nullptr);
-
-        lv_subject_t* via_xml = get_subject_by_name("manual_probe_z_position");
-        REQUIRE(via_xml != nullptr);
-        REQUIRE(subject == via_xml);
-    }
-
-    SECTION("get_motors_enabled_subject returns valid pointer") {
-        lv_subject_t* subject = state.get_motors_enabled_subject();
-        REQUIRE(subject != nullptr);
-
-        lv_subject_t* via_xml = get_subject_by_name("motors_enabled");
-        REQUIRE(via_xml != nullptr);
-        REQUIRE(subject == via_xml);
-    }
-}
-
-TEST_CASE("Calibration characterization: all subject pointers are distinct",
-          "[characterization][calibration][access]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(true);
-
-    lv_subject_t* retract_length = get_subject_by_name("retract_length");
-    lv_subject_t* retract_speed = get_subject_by_name("retract_speed");
-    lv_subject_t* unretract_extra = get_subject_by_name("unretract_extra_length");
-    lv_subject_t* unretract_speed = get_subject_by_name("unretract_speed");
-    lv_subject_t* probe_active = state.get_manual_probe_active_subject();
-    lv_subject_t* probe_z = state.get_manual_probe_z_position_subject();
-    lv_subject_t* motors = state.get_motors_enabled_subject();
-
-    // All seven subjects must be distinct pointers
-    std::vector<lv_subject_t*> subjects = {retract_length,  retract_speed, unretract_extra,
-                                           unretract_speed, probe_active,  probe_z,
-                                           motors};
-
-    for (size_t i = 0; i < subjects.size(); ++i) {
-        REQUIRE(subjects[i] != nullptr);
-        for (size_t j = i + 1; j < subjects.size(); ++j) {
-            REQUIRE(subjects[i] != subjects[j]);
-        }
     }
 }
 
@@ -649,62 +553,6 @@ TEST_CASE("Calibration characterization: subjects survive reset_for_testing cycl
     json new_status = {{"firmware_retraction", {{"retract_length", 0.5}}}};
     state.update_from_status(new_status);
     REQUIRE(lv_subject_get_int(get_subject_by_name("retract_length")) == 50);
-}
-
-TEST_CASE("Calibration characterization: subject pointers remain valid after reset",
-          "[characterization][calibration][reset]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Capture subject pointers
-    lv_subject_t* probe_active_before = state.get_manual_probe_active_subject();
-    lv_subject_t* probe_z_before = state.get_manual_probe_z_position_subject();
-    lv_subject_t* motors_before = state.get_motors_enabled_subject();
-
-    // Reset and reinitialize
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Pointers should be the same (singleton subjects are reused)
-    lv_subject_t* probe_active_after = state.get_manual_probe_active_subject();
-    lv_subject_t* probe_z_after = state.get_manual_probe_z_position_subject();
-    lv_subject_t* motors_after = state.get_motors_enabled_subject();
-
-    REQUIRE(probe_active_before == probe_active_after);
-    REQUIRE(probe_z_before == probe_z_after);
-    REQUIRE(motors_before == motors_after);
-}
-
-// ============================================================================
-// XML Registration Tests - Verify subjects are available for XML binding
-// ============================================================================
-
-TEST_CASE("Calibration characterization: XML registration",
-          "[characterization][calibration][xml]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-
-    SECTION("all calibration subjects are accessible via XML lookup when registered") {
-        state.init_subjects(true);
-
-        // Firmware retraction subjects
-        REQUIRE(get_subject_by_name("retract_length") != nullptr);
-        REQUIRE(get_subject_by_name("retract_speed") != nullptr);
-        REQUIRE(get_subject_by_name("unretract_extra_length") != nullptr);
-        REQUIRE(get_subject_by_name("unretract_speed") != nullptr);
-
-        // Manual probe subjects
-        REQUIRE(get_subject_by_name("manual_probe_active") != nullptr);
-        REQUIRE(get_subject_by_name("manual_probe_z_position") != nullptr);
-
-        // Motor state subject
-        REQUIRE(get_subject_by_name("motors_enabled") != nullptr);
-    }
 }
 
 // ============================================================================

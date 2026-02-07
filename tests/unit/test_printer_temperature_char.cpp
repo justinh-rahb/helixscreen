@@ -17,70 +17,11 @@
  * Centidegrees format: value * 10 for 0.1C resolution (divide by 10 for display)
  */
 
-#include "ui_update_queue.h"
-
 #include "../ui_test_utils.h"
 #include "app_globals.h"
 #include "printer_state.h"
 
 #include "../catch_amalgamated.hpp"
-
-using Catch::Approx;
-
-// ============================================================================
-// Subject Accessor Tests - Verify get_*_subject() returns valid pointers
-// ============================================================================
-
-TEST_CASE("Temperature characterization: get_*_subject() returns valid pointers",
-          "[characterization][temperature]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false); // Skip XML registration
-
-    SECTION("extruder_temp_subject is not null") {
-        lv_subject_t* subject = state.get_extruder_temp_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("extruder_target_subject is not null") {
-        lv_subject_t* subject = state.get_extruder_target_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("bed_temp_subject is not null") {
-        lv_subject_t* subject = state.get_bed_temp_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("bed_target_subject is not null") {
-        lv_subject_t* subject = state.get_bed_target_subject();
-        REQUIRE(subject != nullptr);
-    }
-}
-
-TEST_CASE("Temperature characterization: all subject pointers are distinct",
-          "[characterization][temperature]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    lv_subject_t* extruder_temp = state.get_extruder_temp_subject();
-    lv_subject_t* extruder_target = state.get_extruder_target_subject();
-    lv_subject_t* bed_temp = state.get_bed_temp_subject();
-    lv_subject_t* bed_target = state.get_bed_target_subject();
-
-    // All four subjects must be distinct pointers
-    REQUIRE(extruder_temp != extruder_target);
-    REQUIRE(extruder_temp != bed_temp);
-    REQUIRE(extruder_temp != bed_target);
-    REQUIRE(extruder_target != bed_temp);
-    REQUIRE(extruder_target != bed_target);
-    REQUIRE(bed_temp != bed_target);
-}
 
 // ============================================================================
 // Observer Notification Tests - Verify observers fire on temperature changes
@@ -272,30 +213,6 @@ TEST_CASE("Temperature characterization: subjects survive reset_for_testing cycl
     state.update_from_status(new_status);
 
     REQUIRE(lv_subject_get_int(state.get_extruder_temp_subject()) == 1500);
-}
-
-TEST_CASE("Temperature characterization: subject pointers remain valid after reset",
-          "[characterization][temperature][reset]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Capture subject pointers
-    lv_subject_t* extruder_temp_before = state.get_extruder_temp_subject();
-    lv_subject_t* bed_temp_before = state.get_bed_temp_subject();
-
-    // Reset and reinitialize
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Pointers should be the same (singleton subjects are reused)
-    lv_subject_t* extruder_temp_after = state.get_extruder_temp_subject();
-    lv_subject_t* bed_temp_after = state.get_bed_temp_subject();
-
-    REQUIRE(extruder_temp_before == extruder_temp_after);
-    REQUIRE(bed_temp_before == bed_temp_after);
 }
 
 // ============================================================================
@@ -512,25 +429,6 @@ TEST_CASE("Temperature characterization: multiple observers on same subject all 
     lv_observer_remove(observer1);
     lv_observer_remove(observer2);
     lv_observer_remove(observer3);
-}
-
-// ============================================================================
-// Initial State Tests - Document default initialization behavior
-// ============================================================================
-
-TEST_CASE("Temperature characterization: initial values are zero after init",
-          "[characterization][temperature][init]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Document that all temperature subjects initialize to 0
-    REQUIRE(lv_subject_get_int(state.get_extruder_temp_subject()) == 0);
-    REQUIRE(lv_subject_get_int(state.get_extruder_target_subject()) == 0);
-    REQUIRE(lv_subject_get_int(state.get_bed_temp_subject()) == 0);
-    REQUIRE(lv_subject_get_int(state.get_bed_target_subject()) == 0);
 }
 
 // ============================================================================

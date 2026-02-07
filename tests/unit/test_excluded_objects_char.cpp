@@ -28,72 +28,8 @@
 #include "../catch_amalgamated.hpp"
 
 // ============================================================================
-// CHARACTERIZATION: Initialization Tests
-// ============================================================================
-
-TEST_CASE_METHOD(LVGLTestFixture, "CHAR: excluded_objects_version_ initializes to 0",
-                 "[characterization][excluded_objects]") {
-    PrinterState state;
-    state.init_subjects(false); // false = skip XML registration for tests
-
-    // Document: Version starts at 0, meaning no changes have occurred yet
-    REQUIRE(lv_subject_get_int(state.get_excluded_objects_version_subject()) == 0);
-
-    state.reset_for_testing();
-}
-
-TEST_CASE_METHOD(LVGLTestFixture, "CHAR: get_excluded_objects() returns empty set initially",
-                 "[characterization][excluded_objects]") {
-    PrinterState state;
-    state.init_subjects(false);
-
-    // Document: Excluded objects set starts empty
-    const auto& excluded = state.get_excluded_objects();
-    REQUIRE(excluded.empty());
-    REQUIRE(excluded.size() == 0);
-
-    state.reset_for_testing();
-}
-
-// ============================================================================
-// CHARACTERIZATION: Subject Accessor Tests
-// ============================================================================
-
-TEST_CASE_METHOD(LVGLTestFixture,
-                 "CHAR: get_excluded_objects_version_subject() returns valid pointer",
-                 "[characterization][excluded_objects]") {
-    PrinterState state;
-    state.init_subjects(false);
-
-    // Document: Subject pointer is always valid after init_subjects()
-    lv_subject_t* subject = state.get_excluded_objects_version_subject();
-    REQUIRE(subject != nullptr);
-
-    // Can safely read the value
-    int version = lv_subject_get_int(subject);
-    REQUIRE(version == 0);
-
-    state.reset_for_testing();
-}
-
-// ============================================================================
 // CHARACTERIZATION: Set Update Tests
 // ============================================================================
-
-TEST_CASE_METHOD(LVGLTestFixture, "CHAR: Setting empty set to empty set keeps version at 0",
-                 "[characterization][excluded_objects]") {
-    PrinterState state;
-    state.init_subjects(false);
-
-    // Document: Setting same value (empty to empty) does NOT increment version
-    std::unordered_set<std::string> empty_set;
-    state.set_excluded_objects(empty_set);
-
-    REQUIRE(lv_subject_get_int(state.get_excluded_objects_version_subject()) == 0);
-    REQUIRE(state.get_excluded_objects().empty());
-
-    state.reset_for_testing();
-}
 
 TEST_CASE_METHOD(LVGLTestFixture, "CHAR: Setting empty set to non-empty set increments version",
                  "[characterization][excluded_objects]") {

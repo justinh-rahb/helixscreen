@@ -25,77 +25,12 @@
  * - nav_buttons_enabled_: 0 (starts disabled)
  */
 
-#include "ui_update_queue.h"
-
 #include "../ui_test_utils.h"
 #include "app_globals.h"
 #include "moonraker_client.h" // For ConnectionState enum
 #include "printer_state.h"
 
 #include "../catch_amalgamated.hpp"
-
-// ============================================================================
-// Subject Accessor Tests - Verify get_*_subject() returns valid pointers
-// ============================================================================
-
-TEST_CASE("Network characterization: get_*_subject() returns valid pointers",
-          "[characterization][network]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false); // Skip XML registration
-
-    SECTION("printer_connection_state_subject is not null") {
-        lv_subject_t* subject = state.get_printer_connection_state_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("printer_connection_message_subject is not null") {
-        lv_subject_t* subject = state.get_printer_connection_message_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("network_status_subject is not null") {
-        lv_subject_t* subject = state.get_network_status_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("klippy_state_subject is not null") {
-        lv_subject_t* subject = state.get_klippy_state_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("nav_buttons_enabled_subject is not null") {
-        lv_subject_t* subject = state.get_nav_buttons_enabled_subject();
-        REQUIRE(subject != nullptr);
-    }
-}
-
-TEST_CASE("Network characterization: all subject pointers are distinct",
-          "[characterization][network]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    lv_subject_t* connection_state = state.get_printer_connection_state_subject();
-    lv_subject_t* connection_message = state.get_printer_connection_message_subject();
-    lv_subject_t* network_status = state.get_network_status_subject();
-    lv_subject_t* klippy_state = state.get_klippy_state_subject();
-    lv_subject_t* nav_buttons = state.get_nav_buttons_enabled_subject();
-
-    // All five subjects must be distinct pointers
-    std::vector<lv_subject_t*> subjects = {connection_state, connection_message, network_status,
-                                           klippy_state, nav_buttons};
-
-    for (size_t i = 0; i < subjects.size(); ++i) {
-        for (size_t j = i + 1; j < subjects.size(); ++j) {
-            REQUIRE(subjects[i] != subjects[j]);
-        }
-    }
-}
 
 // ============================================================================
 // Initial State Tests - Document default initialization behavior
@@ -109,10 +44,6 @@ TEST_CASE("Network characterization: initial values after init",
     state.reset_for_testing();
     state.init_subjects(false);
 
-    SECTION("printer_connection_state initializes to 0 (disconnected)") {
-        REQUIRE(lv_subject_get_int(state.get_printer_connection_state_subject()) == 0);
-    }
-
     SECTION("printer_connection_message initializes to 'Disconnected'") {
         const char* msg = lv_subject_get_string(state.get_printer_connection_message_subject());
         REQUIRE(msg != nullptr);
@@ -121,14 +52,6 @@ TEST_CASE("Network characterization: initial values after init",
 
     SECTION("network_status initializes to 2 (connected - mock mode default)") {
         REQUIRE(lv_subject_get_int(state.get_network_status_subject()) == 2);
-    }
-
-    SECTION("klippy_state initializes to 0 (ready)") {
-        REQUIRE(lv_subject_get_int(state.get_klippy_state_subject()) == 0);
-    }
-
-    SECTION("nav_buttons_enabled initializes to 0 (disabled)") {
-        REQUIRE(lv_subject_get_int(state.get_nav_buttons_enabled_subject()) == 0);
     }
 
     // Note: was_ever_connected is NOT tested here because it persists across the

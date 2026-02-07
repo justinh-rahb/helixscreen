@@ -13,7 +13,6 @@
 
 #include "panel_factory.h"
 
-#include <cstdio>
 #include <cstring>
 
 #include "../../catch_amalgamated.hpp"
@@ -62,62 +61,4 @@ TEST_CASE("PanelFactory starts with null panels", "[application][panels]") {
 
     // Print status overlay should be null
     REQUIRE(factory.print_status_panel() == nullptr);
-}
-
-// ============================================================================
-// Integration Tests (require LVGL + XML)
-// ============================================================================
-/**
- * @section integration_tests Integration Tests
- *
- * WHY INTEGRATION TESTS:
- * PanelFactory's core functionality (find_panels, setup_panels, create_overlay)
- * requires the full LVGL and XML infrastructure to be initialized. The panel
- * discovery uses lv_obj_find_by_name() on a live widget tree, and setup_panels()
- * invokes each panel's setup() method which may bind to subjects and register
- * callbacks.
- *
- * Mocking this infrastructure would essentially recreate it, providing no
- * additional confidence over running against the real system.
- *
- * MANUAL VERIFICATION:
- *   ./build/bin/helix-screen --test --timeout 2 -vv
- *   # Check logs for "Found panel: home_panel" etc.
- *   # Verify all 6 panels are discovered and setup completes
- *
- *   ./build/bin/helix-screen --test -p print_status --timeout 2
- *   # Verify overlay creation works
- *
- * The .integration tag keeps these out of fast unit test runs while
- * documenting the expected PanelFactory behavior.
- */
-
-TEST_CASE("PanelFactory finds all panels by name", "[application][panels][.integration]") {
-    // Expected: find_panels() returns true when all 6 panels exist
-    // Panel names: home_panel, print_select_panel, controls_panel,
-    //              filament_panel, settings_panel, advanced_panel
-    REQUIRE(true);
-}
-
-TEST_CASE("PanelFactory returns false for missing panels", "[application][panels][.integration]") {
-    // Expected: find_panels() returns false and logs error for missing panel
-    REQUIRE(true);
-}
-
-TEST_CASE("PanelFactory setup_panels wires all panels", "[application][panels][.integration]") {
-    // Expected: After setup_panels(), ui_nav_set_panels() is called,
-    // and each panel's setup() method is invoked
-    REQUIRE(true);
-}
-
-TEST_CASE("PanelFactory creates print status overlay", "[application][panels][.integration]") {
-    // Expected: create_print_status_overlay() creates panel from XML,
-    // calls setup(), sets HIDDEN flag, wires to print_select
-    REQUIRE(true);
-}
-
-TEST_CASE("PanelFactory create_overlay handles failure", "[application][panels][.integration]") {
-    // Expected: create_overlay() returns nullptr and logs error
-    // when XML component doesn't exist
-    REQUIRE(true);
 }

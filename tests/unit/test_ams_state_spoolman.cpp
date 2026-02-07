@@ -49,13 +49,17 @@ TEST_CASE("AmsState - refresh_spoolman_weights updates slot weights from Spoolma
     // This requires access to backend slot configuration
 
     SECTION("updates slot weights when spoolman_id is set") {
-        // Act: Call refresh_spoolman_weights
-        ams.refresh_spoolman_weights();
+        // Verify the mock spool was configured with the test values
+        REQUIRE(mock_spools[0].id == test_spool_id);
+        REQUIRE(mock_spools[0].remaining_weight_g == 450.0);
+        REQUIRE(mock_spools[0].initial_weight_g == 1000.0);
 
-        // Assert: No crash when calling refresh_spoolman_weights with valid API
-        // (Actual weight updates are async via UI queue, so we verify the method
-        // completes without error when slots are linked to Spoolman)
-        REQUIRE(true);
+        // Act: Call refresh_spoolman_weights - should not throw
+        REQUIRE_NOTHROW(ams.refresh_spoolman_weights());
+
+        // Verify the mock spool data was not corrupted by the refresh
+        REQUIRE(api.get_mock_spools()[0].remaining_weight_g == 450.0);
+        REQUIRE(api.get_mock_spools()[0].initial_weight_g == 1000.0);
     }
 
     // Cleanup
@@ -74,15 +78,18 @@ TEST_CASE("AmsState - refresh_spoolman_weights skips slots without spoolman_id",
 
     SECTION("does not call API for slots with spoolman_id = 0") {
         // A slot with spoolman_id = 0 should not trigger get_spoolman_spool()
-        // Since we can't easily mock/count API calls, we verify no crash occurs
-        // and the method completes successfully
+        // The mock backend assigns spoolman_id = slot_index + 1 by default,
+        // so this tests the general no-crash/no-corruption path.
 
-        // Act: Call refresh with slots that have no spoolman assignment
-        ams.refresh_spoolman_weights();
+        // Record original spool weights to verify no unintended modification
+        auto original_spools = api.get_mock_spools();
+        size_t original_count = original_spools.size();
 
-        // Assert: No crash, method completes successfully
-        // (API not called for unassigned slots - verified by lack of warnings/errors)
-        REQUIRE(true);
+        // Act: Call refresh
+        REQUIRE_NOTHROW(ams.refresh_spoolman_weights());
+
+        // Assert: Mock spool inventory was not modified
+        REQUIRE(api.get_mock_spools().size() == original_count);
     }
 
     // Cleanup
@@ -101,15 +108,22 @@ TEST_CASE("AmsState - refresh_spoolman_weights handles missing spools gracefully
 
     SECTION("handles spool not found without crash") {
         // If a slot has a spoolman_id that doesn't exist in Spoolman,
-        // the error callback should be handled gracefully
+        // the callback receives std::nullopt and logs a warning.
 
-        // Act: Attempt to refresh with a non-existent spool ID
-        // (would need to configure a slot with invalid spoolman_id)
-        ams.refresh_spoolman_weights();
+        // The mock backend assigns spoolman_id = i+1, and mock API has spools 1-19.
+        // Refresh should complete without throwing even if some spools are missing.
+        REQUIRE_NOTHROW(ams.refresh_spoolman_weights());
 
-        // Assert: No crash, error is logged and handled gracefully
-        // (The error callback in refresh_spoolman_weights logs the failure and returns)
-        REQUIRE(true);
+        // Verify API is still usable after potential not-found responses
+        bool api_called = false;
+        api.get_spoolman_spool(
+            99999,
+            [&](const std::optional<SpoolInfo>& spool) {
+                api_called = true;
+                REQUIRE_FALSE(spool.has_value());
+            },
+            [](const MoonrakerError&) {});
+        REQUIRE(api_called);
     }
 
     // Cleanup
@@ -123,11 +137,20 @@ TEST_CASE("AmsState - refresh_spoolman_weights with no API set", "[ams][spoolman
     ams.set_moonraker_api(nullptr);
 
     SECTION("does nothing when API is null") {
-        // Act: Call refresh with no API configured
-        ams.refresh_spoolman_weights();
+        // Verify API is null (precondition)
+        // The get_backend() should still be accessible even without API
+        // (API and backend are independent; API is only for Spoolman)
 
-        // Assert: No crash, method returns early (checked in implementation as early guard)
-        REQUIRE(true);
+        // Act: Call refresh with no API configured - should return early without crash
+        REQUIRE_NOTHROW(ams.refresh_spoolman_weights());
+
+        // Setting API back to something valid should work (not permanently broken)
+        PrinterState state;
+        MoonrakerClientMock client;
+        MoonrakerAPIMock api(client, state);
+        ams.set_moonraker_api(&api);
+        REQUIRE_NOTHROW(ams.refresh_spoolman_weights());
+        ams.set_moonraker_api(nullptr);
     }
 }
 
@@ -139,25 +162,19 @@ TEST_CASE("AmsState - start_spoolman_polling increments refcount", "[ams][spoolm
     auto& ams = AmsState::instance();
 
     SECTION("calling start twice, stop once - still polling") {
-        // Act: Start polling twice
-        ams.start_spoolman_polling();
-        ams.start_spoolman_polling();
+        // Act: Start polling twice, stop once
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
 
-        // Stop once - refcount should be 1, still polling
-        ams.stop_spoolman_polling();
-
-        // Assert: No crash, refcount management validated through logging
-        // (Refcount behavior is internal; validated by successful execution without deadlock)
-        REQUIRE(true);
+        // Refcount should be 1 (still polling). Verify by stopping once more
+        // which should bring refcount to 0 without issue.
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
     }
 
-    SECTION("calling stop again - polling stops") {
-        // Continue from above - one more stop should bring refcount to 0
-        ams.stop_spoolman_polling();
-
-        // Assert: No crash, polling properly stopped
-        // (Refcount reaches 0 and timer is deleted in implementation)
-        REQUIRE(true);
+    SECTION("calling stop again - already at zero refcount") {
+        // Extra stop when already at refcount 0 should be safe (clamped)
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
     }
 }
 
@@ -166,23 +183,23 @@ TEST_CASE("AmsState - stop_spoolman_polling with zero refcount is safe",
     auto& ams = AmsState::instance();
 
     SECTION("calling stop without start does not crash") {
-        // Act: Stop without ever calling start
-        ams.stop_spoolman_polling();
+        // Act: Stop without ever calling start - refcount stays at 0
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
 
-        // Assert: No crash, refcount management prevents negative values
-        // (Implementation checks if refcount > 0 before decrementing)
-        REQUIRE(true);
+        // Verify system is still functional by doing a start/stop cycle
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
     }
 
     SECTION("calling stop multiple times is safe") {
-        // Act: Multiple stops without matching starts
-        ams.stop_spoolman_polling();
-        ams.stop_spoolman_polling();
-        ams.stop_spoolman_polling();
+        // Act: Multiple stops without matching starts - refcount clamped at 0
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
 
-        // Assert: No crash, system remains stable
-        // (Refcount is clamped at 0 by the if(refcount > 0) check in implementation)
-        REQUIRE(true);
+        // Verify system still works after multiple excess stops
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
     }
 }
 
@@ -197,33 +214,28 @@ TEST_CASE("AmsState - spoolman polling refcount behavior", "[ams][spoolman][poll
 
     SECTION("balanced start/stop maintains correct state") {
         // Start 3 times
-        ams.start_spoolman_polling();
-        ams.start_spoolman_polling();
-        ams.start_spoolman_polling();
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
 
-        // Stop 3 times - should be back to not polling
-        ams.stop_spoolman_polling();
-        ams.stop_spoolman_polling();
-        ams.stop_spoolman_polling();
+        // Stop 3 times - should be back to not polling (refcount 0)
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
 
-        // Assert: No crash, refcount properly balanced
-        // (Timer is deleted when refcount reaches 0 in implementation)
-        REQUIRE(true);
+        // Extra stop should be safe (refcount clamped at 0)
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
     }
 
     SECTION("start after stop restarts polling") {
-        ams.start_spoolman_polling();
-        ams.stop_spoolman_polling();
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
 
-        // Start again
-        ams.start_spoolman_polling();
+        // Start again - should create a new timer (refcount 0 -> 1)
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
 
-        // Assert: No crash, polling can be restarted
-        // (Implementation creates new timer when refcount goes 0 -> 1)
-        REQUIRE(true);
-
-        // Cleanup
-        ams.stop_spoolman_polling();
+        // Cleanup - must balance to avoid leaking timer
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
     }
 }
 
@@ -241,19 +253,19 @@ TEST_CASE("AmsState - polling triggers periodic refresh", "[ams][spoolman][polli
     ams.set_moonraker_api(&api);
 
     SECTION("polling with valid API performs refresh") {
-        // Act: Start polling
-        ams.start_spoolman_polling();
+        // Record original spool inventory to verify API state is consistent
+        const auto& spools_before = api.get_mock_spools();
+        size_t count_before = spools_before.size();
+        REQUIRE(count_before > 0);
 
-        // Note: In real implementation, this would trigger periodic refresh_spoolman_weights()
-        // every 30 seconds. Since tests run synchronously without timers,
-        // we verify that the initial refresh is called and completes.
+        // Act: Start polling - triggers an immediate refresh_spoolman_weights()
+        REQUIRE_NOTHROW(ams.start_spoolman_polling());
 
-        // Assert: No crash, polling initialized successfully
-        // (The timer is created and immediate refresh is called in implementation)
-        REQUIRE(true);
+        // Verify mock spool inventory is unchanged after refresh
+        REQUIRE(api.get_mock_spools().size() == count_before);
 
         // Cleanup
-        ams.stop_spoolman_polling();
+        REQUIRE_NOTHROW(ams.stop_spoolman_polling());
     }
 
     // Cleanup

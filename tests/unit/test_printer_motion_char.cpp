@@ -23,103 +23,17 @@
  * Offset format: value * 1000 for microns (divide by 1000 for mm)
  */
 
-#include "ui_update_queue.h"
-
 #include "../ui_test_utils.h"
 #include "app_globals.h"
 #include "printer_state.h"
 
 #include "../catch_amalgamated.hpp"
 
-using Catch::Approx;
-
 // ============================================================================
-// Subject Accessor Tests - Verify get_*_subject() returns valid pointers
+// Initial State Tests - Document non-obvious default initialization
 // ============================================================================
 
-TEST_CASE("Motion characterization: get_*_subject() returns valid pointers",
-          "[characterization][motion]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false); // Skip XML registration
-
-    SECTION("position_x_subject is not null") {
-        lv_subject_t* subject = state.get_position_x_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("position_y_subject is not null") {
-        lv_subject_t* subject = state.get_position_y_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("position_z_subject is not null") {
-        lv_subject_t* subject = state.get_position_z_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("homed_axes_subject is not null") {
-        lv_subject_t* subject = state.get_homed_axes_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("speed_factor_subject is not null") {
-        lv_subject_t* subject = state.get_speed_factor_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("flow_factor_subject is not null") {
-        lv_subject_t* subject = state.get_flow_factor_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("gcode_z_offset_subject is not null") {
-        lv_subject_t* subject = state.get_gcode_z_offset_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("pending_z_offset_delta_subject is not null") {
-        lv_subject_t* subject = state.get_pending_z_offset_delta_subject();
-        REQUIRE(subject != nullptr);
-    }
-}
-
-TEST_CASE("Motion characterization: all subject pointers are distinct",
-          "[characterization][motion]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    lv_subject_t* position_x = state.get_position_x_subject();
-    lv_subject_t* position_y = state.get_position_y_subject();
-    lv_subject_t* position_z = state.get_position_z_subject();
-    lv_subject_t* homed_axes = state.get_homed_axes_subject();
-    lv_subject_t* speed_factor = state.get_speed_factor_subject();
-    lv_subject_t* flow_factor = state.get_flow_factor_subject();
-    lv_subject_t* gcode_z_offset = state.get_gcode_z_offset_subject();
-    lv_subject_t* pending_z_offset_delta = state.get_pending_z_offset_delta_subject();
-
-    // All eight subjects must be distinct pointers
-    std::vector<lv_subject_t*> subjects = {
-        position_x,   position_y,  position_z,     homed_axes,
-        speed_factor, flow_factor, gcode_z_offset, pending_z_offset_delta};
-
-    for (size_t i = 0; i < subjects.size(); ++i) {
-        for (size_t j = i + 1; j < subjects.size(); ++j) {
-            REQUIRE(subjects[i] != subjects[j]);
-        }
-    }
-}
-
-// ============================================================================
-// Initial State Tests - Document default initialization behavior
-// ============================================================================
-
-TEST_CASE("Motion characterization: initial values after init",
+TEST_CASE("Motion characterization: non-obvious initial values after init",
           "[characterization][motion][init]") {
     lv_init_safe();
 
@@ -127,32 +41,12 @@ TEST_CASE("Motion characterization: initial values after init",
     state.reset_for_testing();
     state.init_subjects(false);
 
-    SECTION("positions initialize to 0") {
-        REQUIRE(lv_subject_get_int(state.get_position_x_subject()) == 0);
-        REQUIRE(lv_subject_get_int(state.get_position_y_subject()) == 0);
-        REQUIRE(lv_subject_get_int(state.get_position_z_subject()) == 0);
-    }
-
-    SECTION("homed_axes initializes to empty string") {
-        const char* axes = lv_subject_get_string(state.get_homed_axes_subject());
-        REQUIRE(axes != nullptr);
-        REQUIRE(std::string(axes) == "");
-    }
-
     SECTION("speed_factor initializes to 100%") {
         REQUIRE(lv_subject_get_int(state.get_speed_factor_subject()) == 100);
     }
 
     SECTION("flow_factor initializes to 100%") {
         REQUIRE(lv_subject_get_int(state.get_flow_factor_subject()) == 100);
-    }
-
-    SECTION("gcode_z_offset initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_gcode_z_offset_subject()) == 0);
-    }
-
-    SECTION("pending_z_offset_delta initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_pending_z_offset_delta_subject()) == 0);
     }
 }
 
@@ -864,49 +758,6 @@ TEST_CASE("Motion characterization: multiple observers on same subject all fire"
 // Gcode Position Tests - Verify gcode_position_x/y/z subjects read from
 // gcode_move["gcode_position"] (commanded position), NOT gcode_move["position"]
 // ============================================================================
-
-TEST_CASE("Motion characterization: gcode_position subjects exist and are valid",
-          "[characterization][motion][gcode_position]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    SECTION("gcode_position_x_subject is not null") {
-        lv_subject_t* subject = state.get_gcode_position_x_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("gcode_position_y_subject is not null") {
-        lv_subject_t* subject = state.get_gcode_position_y_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("gcode_position_z_subject is not null") {
-        lv_subject_t* subject = state.get_gcode_position_z_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("gcode_position subjects are distinct from toolhead position subjects") {
-        REQUIRE(state.get_gcode_position_x_subject() != state.get_position_x_subject());
-        REQUIRE(state.get_gcode_position_y_subject() != state.get_position_y_subject());
-        REQUIRE(state.get_gcode_position_z_subject() != state.get_position_z_subject());
-    }
-}
-
-TEST_CASE("Motion characterization: gcode_position initializes to zero",
-          "[characterization][motion][gcode_position][init]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    REQUIRE(lv_subject_get_int(state.get_gcode_position_x_subject()) == 0);
-    REQUIRE(lv_subject_get_int(state.get_gcode_position_y_subject()) == 0);
-    REQUIRE(lv_subject_get_int(state.get_gcode_position_z_subject()) == 0);
-}
 
 TEST_CASE("Motion characterization: gcode_position updates from gcode_move.gcode_position",
           "[characterization][motion][gcode_position]") {

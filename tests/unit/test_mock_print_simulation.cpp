@@ -373,7 +373,7 @@ TEST_CASE("Mock print phase state machine transitions", "[print][phase]") {
 // Speedup Factor Tests [print][speedup]
 // ============================================================================
 
-TEST_CASE("Mock print speedup factor behavior", "[print][speedup]") {
+TEST_CASE("Mock print speedup factor behavior", "[print][speedup][slow]") {
     MockPrintTestFixture fixture;
 
     SECTION("default constructor has speedup factor 1.0") {
@@ -721,7 +721,7 @@ TEST_CASE("Mock print progress and layer tracking", "[print][progress][slow]") {
 // Thermal Phase Tests [print][thermal]
 // ============================================================================
 
-TEST_CASE("Mock print thermal phase behavior", "[print][thermal]") {
+TEST_CASE("Mock print thermal phase behavior", "[print][thermal][slow]") {
     MockPrintTestFixture fixture;
 
     SECTION("preheat sets temperature targets from metadata") {

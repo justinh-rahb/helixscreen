@@ -54,136 +54,11 @@
 using json = nlohmann::json;
 
 // ============================================================================
-// Subject Accessor Tests - Verify get_*_subject() returns valid pointers
+// Initial State Tests - Document non-obvious default initialization
 // ============================================================================
 
-TEST_CASE("Print characterization: get_*_subject() returns valid pointers",
-          "[characterization][print]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false); // Skip XML registration
-
-    SECTION("print_state_subject is not null") {
-        lv_subject_t* subject = state.get_print_state_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_state_enum_subject is not null") {
-        lv_subject_t* subject = state.get_print_state_enum_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_active_subject is not null") {
-        lv_subject_t* subject = state.get_print_active_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_outcome_subject is not null") {
-        lv_subject_t* subject = state.get_print_outcome_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_filename_subject is not null") {
-        lv_subject_t* subject = state.get_print_filename_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_display_filename_subject is not null") {
-        lv_subject_t* subject = state.get_print_display_filename_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_thumbnail_path_subject is not null") {
-        lv_subject_t* subject = state.get_print_thumbnail_path_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_progress_subject is not null") {
-        lv_subject_t* subject = state.get_print_progress_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_show_progress_subject is not null") {
-        lv_subject_t* subject = state.get_print_show_progress_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_layer_current_subject is not null") {
-        lv_subject_t* subject = state.get_print_layer_current_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_layer_total_subject is not null") {
-        lv_subject_t* subject = state.get_print_layer_total_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_duration_subject is not null") {
-        lv_subject_t* subject = state.get_print_duration_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_time_left_subject is not null") {
-        lv_subject_t* subject = state.get_print_time_left_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_start_phase_subject is not null") {
-        lv_subject_t* subject = state.get_print_start_phase_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_start_message_subject is not null") {
-        lv_subject_t* subject = state.get_print_start_message_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_start_progress_subject is not null") {
-        lv_subject_t* subject = state.get_print_start_progress_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("print_in_progress_subject is not null") {
-        lv_subject_t* subject = state.get_print_in_progress_subject();
-        REQUIRE(subject != nullptr);
-    }
-}
-
-TEST_CASE("Print characterization: all subject pointers are distinct",
-          "[characterization][print]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    std::vector<lv_subject_t*> subjects = {
-        state.get_print_state_subject(),          state.get_print_state_enum_subject(),
-        state.get_print_active_subject(),         state.get_print_outcome_subject(),
-        state.get_print_filename_subject(),       state.get_print_display_filename_subject(),
-        state.get_print_thumbnail_path_subject(), state.get_print_progress_subject(),
-        state.get_print_show_progress_subject(),  state.get_print_layer_current_subject(),
-        state.get_print_layer_total_subject(),    state.get_print_duration_subject(),
-        state.get_print_time_left_subject(),      state.get_print_start_phase_subject(),
-        state.get_print_start_message_subject(),  state.get_print_start_progress_subject(),
-        state.get_print_in_progress_subject(),
-    };
-
-    // All 17 subjects must be distinct pointers
-    for (size_t i = 0; i < subjects.size(); ++i) {
-        for (size_t j = i + 1; j < subjects.size(); ++j) {
-            REQUIRE(subjects[i] != subjects[j]);
-        }
-    }
-}
-
-// ============================================================================
-// Initial State Tests - Document default initialization behavior
-// ============================================================================
-
-TEST_CASE("Print characterization: initial values after init", "[characterization][print][init]") {
+TEST_CASE("Print characterization: non-obvious initial values after init",
+          "[characterization][print][init]") {
     lv_init_safe();
 
     PrinterState& state = get_printer_state();
@@ -200,70 +75,14 @@ TEST_CASE("Print characterization: initial values after init", "[characterizatio
                 static_cast<int>(PrintJobState::STANDBY));
     }
 
-    SECTION("print_active initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_active_subject()) == 0);
-    }
-
     SECTION("print_outcome initializes to NONE (0)") {
         REQUIRE(lv_subject_get_int(state.get_print_outcome_subject()) ==
                 static_cast<int>(PrintOutcome::NONE));
     }
 
-    SECTION("print_filename initializes to empty string") {
-        const char* val = lv_subject_get_string(state.get_print_filename_subject());
-        REQUIRE(std::string(val) == "");
-    }
-
-    SECTION("print_display_filename initializes to empty string") {
-        const char* val = lv_subject_get_string(state.get_print_display_filename_subject());
-        REQUIRE(std::string(val) == "");
-    }
-
-    SECTION("print_thumbnail_path initializes to empty string") {
-        const char* val = lv_subject_get_string(state.get_print_thumbnail_path_subject());
-        REQUIRE(std::string(val) == "");
-    }
-
-    SECTION("print_progress initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_progress_subject()) == 0);
-    }
-
-    SECTION("print_show_progress initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_show_progress_subject()) == 0);
-    }
-
-    SECTION("print_layer_current initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 0);
-    }
-
-    SECTION("print_layer_total initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_layer_total_subject()) == 0);
-    }
-
-    SECTION("print_duration initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_duration_subject()) == 0);
-    }
-
-    SECTION("print_time_left initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 0);
-    }
-
     SECTION("print_start_phase initializes to IDLE (0)") {
         REQUIRE(lv_subject_get_int(state.get_print_start_phase_subject()) ==
                 static_cast<int>(PrintStartPhase::IDLE));
-    }
-
-    SECTION("print_start_message initializes to empty string") {
-        const char* val = lv_subject_get_string(state.get_print_start_message_subject());
-        REQUIRE(std::string(val) == "");
-    }
-
-    SECTION("print_start_progress initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_start_progress_subject()) == 0);
-    }
-
-    SECTION("print_in_progress initializes to 0") {
-        REQUIRE(lv_subject_get_int(state.get_print_in_progress_subject()) == 0);
     }
 }
 

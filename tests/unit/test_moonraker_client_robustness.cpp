@@ -8,7 +8,6 @@
 
 #include <atomic>
 #include <chrono>
-#include <future>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -303,113 +302,48 @@ TEST_CASE_METHOD(MoonrakerRobustnessFixture,
 // Priority 2: Message Parsing Edge Cases
 // ============================================================================
 
-TEST_CASE("MoonrakerClient handles malformed JSON gracefully",
-          "[connection][edge][parsing][priority2][eventloop][slow]") {
-    // Note: These tests document expected behavior when receiving
-    // malformed messages. Actual testing requires simulating server
-    // responses, which is done via code inspection and manual testing.
-
-    SECTION("Not JSON at all") {
-        // Input: "not json at all"
-        // Expected: Parse error logged, message ignored, no crash
-        REQUIRE(true); // Verified via code inspection (line 143-147)
+TEST_CASE("MoonrakerClient handles deeply nested JSON without stack overflow",
+          "[connection][edge][parsing][priority2]") {
+    json deep = json::object();
+    json* current = &deep;
+    for (int i = 0; i < 100; i++) {
+        (*current)["nested"] = json::object();
+        current = &(*current)["nested"];
     }
 
-    SECTION("Incomplete JSON") {
-        // Input: "{\"id\": 1"
-        // Expected: Parse error logged, message ignored, no crash
-        REQUIRE(true); // Verified via code inspection
-    }
-
-    SECTION("Wrong type for 'id' field") {
-        // Input: "{\"id\": \"string\"}"
-        // Expected: Type validation logged, message ignored, no crash
-        REQUIRE(true); // Verified via code inspection (line 153-156)
-    }
-
-    SECTION("Wrong type for 'method' field") {
-        // Input: "{\"method\": 123}"
-        // Expected: Type validation logged, message ignored, no crash
-        REQUIRE(true); // Verified via code inspection (line 201-205)
-    }
-
-    SECTION("Missing required fields") {
-        // Input: "{\"jsonrpc\": \"2.0\"}"
-        // Expected: No 'id' or 'method', message ignored gracefully
-        REQUIRE(true); // Verified via code inspection
-    }
-
-    SECTION("Deeply nested JSON") {
-        // Create deeply nested structure to verify no stack overflow
-        json deep = json::object();
-        json* current = &deep;
-        for (int i = 0; i < 100; i++) {
-            (*current)["nested"] = json::object();
-            current = &(*current)["nested"];
-        }
-
-        // Should serialize without crash
-        std::string serialized;
-        REQUIRE_NOTHROW(serialized = deep.dump());
-        REQUIRE(serialized.length() > 100);
-    }
+    std::string serialized;
+    REQUIRE_NOTHROW(serialized = deep.dump());
+    REQUIRE(serialized.length() > 100);
 }
 
-TEST_CASE("MoonrakerClient rejects oversized messages", "[connection][edge][parsing][priority2]") {
-    SECTION("Message > 1 MB triggers disconnect") {
-        // Verified via code inspection (line 130-135)
-        // onmessage handler checks msg.size() > MAX_MESSAGE_SIZE
-        // and calls disconnect() if exceeded
-        REQUIRE(true);
+TEST_CASE("MoonrakerClient large params object stays under message size limit",
+          "[connection][edge][parsing][priority2]") {
+    json large_params = json::object();
+    for (int i = 0; i < 10000; i++) {
+        large_params["key_" + std::to_string(i)] = std::string(50, 'x');
     }
 
-    SECTION("Serialization of large params objects") {
-        // Create params object approaching size limit
-        json large_params = json::object();
-        for (int i = 0; i < 10000; i++) {
-            large_params["key_" + std::to_string(i)] = std::string(50, 'x');
-        }
+    std::string serialized;
+    REQUIRE_NOTHROW(serialized = large_params.dump());
 
-        std::string serialized;
-        REQUIRE_NOTHROW(serialized = large_params.dump());
-
-        // Should be large but < 1MB
-        INFO("Serialized size: " << serialized.size() << " bytes");
-        REQUIRE(serialized.size() < 1024 * 1024);
-    }
+    INFO("Serialized size: " << serialized.size() << " bytes");
+    REQUIRE(serialized.size() < 1024 * 1024);
 }
 
 TEST_CASE("MoonrakerClient handles invalid field types robustly",
-          "[connection][edge][parsing][priority2][eventloop][slow]") {
-    SECTION("Response 'id' as string instead of integer") {
-        // Server sends: {"id": "not_an_int", "result": {}}
-        // Expected: Type check fails (line 153), warning logged, ignored
-        REQUIRE(true); // Verified via code inspection
-    }
-
-    SECTION("Notification 'method' as number instead of string") {
-        // Server sends: {"method": 123, "params": {}}
-        // Expected: Type check fails (line 202), warning logged, ignored
-        REQUIRE(true); // Verified via code inspection
-    }
-
+          "[connection][edge][parsing][priority2]") {
     SECTION("Response 'result' field missing") {
-        // Server sends: {"id": 1, "jsonrpc": "2.0"}
-        // Expected: No error, no result, callback receives full response
         json response = {{"id", 1}, {"jsonrpc", "2.0"}};
         REQUIRE(response.contains("id"));
         REQUIRE_FALSE(response.contains("result"));
     }
 
     SECTION("Response with both 'result' and 'error'") {
-        // Invalid per JSON-RPC spec, but server might send
-        // Expected: Error takes precedence (line 176-182)
         json response = {{"id", 1},
                          {"jsonrpc", "2.0"},
                          {"result", {"data", "value"}},
                          {"error", {{"code", -1}, {"message", "error"}}}};
         REQUIRE(response.contains("error"));
-        // Error callback would be invoked
     }
 }
 

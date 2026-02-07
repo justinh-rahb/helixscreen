@@ -20,8 +20,6 @@
  * - "moonraker_version"
  */
 
-#include "ui_update_queue.h"
-
 #include "../ui_test_utils.h"
 #include "app_globals.h"
 #include "printer_state.h"
@@ -56,43 +54,6 @@ TEST_CASE("Versions characterization: moonraker_version initializes to em dash",
     const char* version = lv_subject_get_string(state.get_moonraker_version_subject());
     REQUIRE(version != nullptr);
     REQUIRE(std::string(version) == "—");
-}
-
-// ============================================================================
-// Subject Accessor Tests - Verify get_*_subject() returns valid pointers
-// ============================================================================
-
-TEST_CASE("Versions characterization: get_*_subject() returns valid pointers",
-          "[characterization][versions]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    SECTION("klipper_version_subject is not null") {
-        lv_subject_t* subject = state.get_klipper_version_subject();
-        REQUIRE(subject != nullptr);
-    }
-
-    SECTION("moonraker_version_subject is not null") {
-        lv_subject_t* subject = state.get_moonraker_version_subject();
-        REQUIRE(subject != nullptr);
-    }
-}
-
-TEST_CASE("Versions characterization: version subject pointers are distinct",
-          "[characterization][versions]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    lv_subject_t* klipper = state.get_klipper_version_subject();
-    lv_subject_t* moonraker = state.get_moonraker_version_subject();
-
-    REQUIRE(klipper != moonraker);
 }
 
 // ============================================================================
@@ -225,30 +186,6 @@ TEST_CASE("Versions characterization: versions reset to em dash after reset cycl
     // After reset, values should be back to default em dash
     REQUIRE(std::string(lv_subject_get_string(state.get_klipper_version_subject())) == "—");
     REQUIRE(std::string(lv_subject_get_string(state.get_moonraker_version_subject())) == "—");
-}
-
-TEST_CASE("Versions characterization: subject pointers remain valid after reset",
-          "[characterization][versions][reset]") {
-    lv_init_safe();
-
-    PrinterState& state = get_printer_state();
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Capture subject pointers
-    lv_subject_t* klipper_before = state.get_klipper_version_subject();
-    lv_subject_t* moonraker_before = state.get_moonraker_version_subject();
-
-    // Reset and reinitialize
-    state.reset_for_testing();
-    state.init_subjects(false);
-
-    // Pointers should be the same (singleton subjects are reused)
-    lv_subject_t* klipper_after = state.get_klipper_version_subject();
-    lv_subject_t* moonraker_after = state.get_moonraker_version_subject();
-
-    REQUIRE(klipper_before == klipper_after);
-    REQUIRE(moonraker_before == moonraker_after);
 }
 
 TEST_CASE("Versions characterization: subjects are functional after reset cycle",

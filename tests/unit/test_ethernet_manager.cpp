@@ -7,32 +7,6 @@
 #include "../catch_amalgamated.hpp"
 
 // ============================================================================
-// Initialization Tests
-// ============================================================================
-
-TEST_CASE("Ethernet Manager: Initialization creates backend", "[network][init]") {
-    EthernetManager manager;
-
-    // Manager should initialize without crashing
-    // Backend creation is platform-specific, so we just verify it works
-    REQUIRE(true);
-}
-
-// ============================================================================
-// Interface Detection Tests
-// ============================================================================
-
-TEST_CASE("Ethernet Manager: has_interface returns bool", "[network][interface]") {
-    EthernetManager manager;
-
-    bool has_interface = manager.has_interface();
-
-    // Should return true or false without crashing
-    // Result depends on platform and actual hardware
-    REQUIRE((has_interface == true || has_interface == false));
-}
-
-// ============================================================================
 // Info Retrieval Tests
 // ============================================================================
 

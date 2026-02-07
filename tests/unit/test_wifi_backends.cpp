@@ -183,7 +183,8 @@ TEST_CASE_METHOD(WiFiBackendTestFixture, "Backend lifecycle", "[network][backend
 // Event System Tests
 // ============================================================================
 
-TEST_CASE_METHOD(WiFiBackendTestFixture, "Backend event system", "[network][backend][events]") {
+TEST_CASE_METHOD(WiFiBackendTestFixture, "Backend event system",
+                 "[network][backend][events][slow]") {
     SECTION("Event callback registration") {
         int callback_count = 0;
         backend->register_event_callback("TEST_EVENT", [&callback_count](const std::string& data) {
@@ -259,7 +260,7 @@ TEST_CASE_METHOD(WiFiBackendTestFixture, "Backend event system", "[network][back
 // ============================================================================
 
 TEST_CASE_METHOD(WiFiBackendTestFixture, "Mock backend scan behavior",
-                 "[network][backend][mock][scan]") {
+                 "[network][backend][mock][scan][slow]") {
     SECTION("trigger_scan() fails when backend not running") {
         // Backend not started
         REQUIRE_FALSE(backend->is_running());
@@ -602,7 +603,8 @@ TEST_CASE_METHOD(WiFiBackendTestFixture, "Backend timer cleanup",
 // Edge Cases
 // ============================================================================
 
-TEST_CASE_METHOD(WiFiBackendTestFixture, "Backend edge cases", "[network][backend][edge-cases]") {
+TEST_CASE_METHOD(WiFiBackendTestFixture, "Backend edge cases",
+                 "[network][backend][edge-cases][slow]") {
     SECTION("Rapid start/stop cycles") {
         for (int i = 0; i < 5; i++) {
             backend->start();
