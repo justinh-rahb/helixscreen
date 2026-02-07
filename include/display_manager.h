@@ -52,7 +52,7 @@ class DisplayManager {
         int width = 0;               ///< Display width in pixels (0 = auto-detect)
         int height = 0;              ///< Display height in pixels (0 = auto-detect)
         int scroll_throw = 25;       ///< Scroll momentum decay (1-99, higher = faster decay)
-        int scroll_limit = 5;        ///< Pixels before scrolling starts
+        int scroll_limit = 10;       ///< Pixels before scrolling starts
         bool require_pointer = true; ///< Fail init if no pointer device (embedded only)
     };
 

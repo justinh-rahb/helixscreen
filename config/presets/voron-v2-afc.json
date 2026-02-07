@@ -7,7 +7,7 @@
     "tube_sides": 4
   },
   "input": {
-    "scroll_limit": 5,
+    "scroll_limit": 10,
     "scroll_throw": 25
   },
   "log_level": "warn",

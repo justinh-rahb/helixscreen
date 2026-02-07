@@ -167,8 +167,8 @@ void SettingsManager::init_subjects() {
     scroll_throw = std::max(5, std::min(50, scroll_throw));
     UI_MANAGED_SUBJECT_INT(scroll_throw_subject_, scroll_throw, "settings_scroll_throw", subjects_);
 
-    // Scroll limit (default: 5, range 1-20)
-    int scroll_limit = config->get<int>("/input/scroll_limit", 5);
+    // Scroll limit (default: 10, range 1-20)
+    int scroll_limit = config->get<int>("/input/scroll_limit", 10);
     scroll_limit = std::max(1, std::min(20, scroll_limit));
     UI_MANAGED_SUBJECT_INT(scroll_limit_subject_, scroll_limit, "settings_scroll_limit", subjects_);
 

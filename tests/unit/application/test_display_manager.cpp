@@ -25,7 +25,7 @@ TEST_CASE("DisplayManager::Config has sensible defaults", "[application][display
     REQUIRE(config.width == 800);
     REQUIRE(config.height == 480);
     REQUIRE(config.scroll_throw == 25);
-    REQUIRE(config.scroll_limit == 5);
+    REQUIRE(config.scroll_limit == 10);
     REQUIRE(config.require_pointer == true);
 }
 
@@ -263,7 +263,7 @@ TEST_CASE("DisplayManager scroll configuration applies to pointer", "[applicatio
 
     // Test default scroll values
     REQUIRE(config.scroll_throw == 25);
-    REQUIRE(config.scroll_limit == 5);
+    REQUIRE(config.scroll_limit == 10);
 
     // Test custom scroll values are stored correctly
     config.scroll_throw = 50;

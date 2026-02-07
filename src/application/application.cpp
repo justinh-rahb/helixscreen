@@ -528,7 +528,7 @@ bool Application::init_display() {
 
     // Get scroll config from helixconfig.json
     config.scroll_throw = m_config->get<int>("/input/scroll_throw", 25);
-    config.scroll_limit = m_config->get<int>("/input/scroll_limit", 5);
+    config.scroll_limit = m_config->get<int>("/input/scroll_limit", 10);
 
     if (!m_display->init(config)) {
         spdlog::error("[Application] Display initialization failed");

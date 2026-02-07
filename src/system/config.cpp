@@ -205,7 +205,7 @@ json get_default_config(const std::string& moonraker_host, bool include_user_pre
                    {"gcode_viewer", {{"shading_model", "phong"}, {"tube_sides", 4}}},
                    {"input",
                     {{"scroll_throw", 25},
-                     {"scroll_limit", 5},
+                     {"scroll_limit", 10},
                      {"touch_device", ""},
                      {"calibration",
                       {{"valid", false},
@@ -387,7 +387,7 @@ void Config::init(const std::string& config_path) {
     // Ensure input section exists with defaults (scroll settings + touch calibration)
     if (!data.contains("input")) {
         data["input"] = {{"scroll_throw", 25},
-                         {"scroll_limit", 5},
+                         {"scroll_limit", 10},
                          {"touch_device", ""},
                          {"calibration",
                           {{"valid", false},
@@ -408,7 +408,7 @@ void Config::init(const std::string& config_path) {
             config_modified = true;
         }
         if (!input.contains("scroll_limit")) {
-            input["scroll_limit"] = 5;
+            input["scroll_limit"] = 10;
             config_modified = true;
         }
         if (!input.contains("touch_device")) {

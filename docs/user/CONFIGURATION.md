@@ -310,7 +310,7 @@ Located in the `input` section:
 {
   "input": {
     "scroll_throw": 25,
-    "scroll_limit": 5
+    "scroll_limit": 10
   }
 }
 ```
@@ -323,9 +323,9 @@ Located in the `input` section:
 
 ### `scroll_limit`
 **Type:** integer
-**Default:** `5`
+**Default:** `10`
 **Range:** `1` - `50`
-**Description:** Pixels of movement required before scrolling starts. Lower = more responsive. Default LVGL is 10; we use 5.
+**Description:** Pixels of movement required before scrolling starts. Lower = more responsive. Matches LVGL's default of 10.
 
 ---
 
@@ -1018,7 +1018,7 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
 
   "input": {
     "scroll_throw": 25,
-    "scroll_limit": 5
+    "scroll_limit": 10
   },
 
   "output": {
