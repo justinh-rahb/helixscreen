@@ -215,7 +215,7 @@ void HeatingIconAnimator::stop_pulse() {
 }
 
 void HeatingIconAnimator::apply_color() {
-    if (icon_ == nullptr) {
+    if (icon_ == nullptr || !lv_obj_is_valid(icon_)) {
         return;
     }
 
@@ -267,7 +267,7 @@ void HeatingIconAnimator::refresh_theme() {
 
 void HeatingIconAnimator::pulse_anim_cb(void* var, int32_t value) {
     auto* animator = static_cast<HeatingIconAnimator*>(var);
-    if (animator && animator->icon_) {
+    if (animator && animator->icon_ && lv_obj_is_valid(animator->icon_)) {
         animator->current_opacity_ = static_cast<lv_opa_t>(value);
         animator->apply_color();
     }

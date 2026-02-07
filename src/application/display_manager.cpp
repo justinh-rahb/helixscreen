@@ -151,9 +151,13 @@ bool DisplayManager::init(const Config& config) {
 
 #ifdef HELIX_DISPLAY_SDL
     // Install event filter to intercept window close before LVGL sees it.
-    // Without this, closing the window deletes the display mid-timer-handler,
-    // causing use-after-free crashes in any running timer callbacks.
-    SDL_AddEventWatch(sdl_event_filter, nullptr);
+    // CRITICAL: Must use SDL_SetEventFilter (not SDL_AddEventWatch) because only
+    // SetEventFilter can actually DROP events (return 0 = drop). AddEventWatch
+    // calls the callback but ignores the return value - events still reach the queue.
+    // Without filtering, LVGL's SDL driver sees SDL_WINDOWEVENT_CLOSE, calls
+    // lv_display_delete() mid-timer-handler, destroying all objects while animation
+    // timers still reference them → use-after-free crash.
+    SDL_SetEventFilter(sdl_event_filter, nullptr);
     spdlog::trace("[DisplayManager] Installed SDL event filter for graceful window close");
 #endif
 
@@ -288,7 +292,7 @@ void DisplayManager::shutdown() {
     // Quit SDL before LVGL deinit - must be called outside the SDL event handler.
 #ifdef HELIX_DISPLAY_SDL
     // Remove our event filter before SDL cleanup
-    SDL_DelEventWatch(sdl_event_filter, nullptr);
+    SDL_SetEventFilter(nullptr, nullptr);
     lv_sdl_quit();
 #endif
 
