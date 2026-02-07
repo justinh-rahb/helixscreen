@@ -275,6 +275,7 @@ k1:
 # Helper target to ensure Docker daemon is running
 # On macOS with Colima, automatically starts it with resources based on host hardware
 # Allocates ~50% of system RAM (min 6GB, max 16GB) and ~50% of CPUs (min 2, max 8)
+# Handles zombie Colima state (VM running but Docker socket dead) with automatic restart
 .PHONY: ensure-docker
 ensure-docker:
 	@if docker info >/dev/null 2>&1; then \
@@ -300,6 +301,20 @@ ensure-docker:
 				fi; \
 			fi; \
 			colima start --memory $$COLIMA_RAM --cpu $$COLIMA_CPUS && echo "$(GREEN)✓ Colima started$(RESET)"; \
+			if docker info >/dev/null 2>&1; then \
+				exit 0; \
+			fi; \
+			echo "$(YELLOW)Docker socket not responding after start. Restarting Colima...$(RESET)"; \
+			colima stop 2>/dev/null || true; \
+			sleep 2; \
+			colima start --memory $$COLIMA_RAM --cpu $$COLIMA_CPUS; \
+			if docker info >/dev/null 2>&1; then \
+				echo "$(GREEN)✓ Colima restarted successfully$(RESET)"; \
+				exit 0; \
+			fi; \
+			echo "$(RED)Docker still not responding after Colima restart.$(RESET)"; \
+			echo "$(YELLOW)Try manually: colima delete && colima start$(RESET)"; \
+			exit 1; \
 		elif [ -e "/Applications/Docker.app" ]; then \
 			echo "$(RED)Docker Desktop is installed but not running.$(RESET)"; \
 			echo "$(YELLOW)Please start Docker Desktop from your Applications folder.$(RESET)"; \
