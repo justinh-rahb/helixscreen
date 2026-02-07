@@ -990,3 +990,8 @@ package-ad5m: ad5m-docker gen-images-ad5m gen-splash-3d-ad5m gen-printer-images 
 package-pi: pi-docker gen-images gen-splash-3d gen-printer-images release-pi
 package-all: package-ad5m package-pi
 package-clean: release-clean
+
+# Convenience aliases (verb-target → target-verb)
+.PHONY: pi-deploy ad5m-deploy
+pi-deploy: deploy-pi
+ad5m-deploy: deploy-ad5m
