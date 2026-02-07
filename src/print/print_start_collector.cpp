@@ -3,11 +3,19 @@
 
 #include "print_start_collector.h"
 
+#include "async_helpers.h"
+#include "config.h"
+#include "format_utils.h"
+
 #include <spdlog/spdlog.h>
 
 #include <atomic>
+#include <ctime>
 
 using json = nlohmann::json;
+
+// Config path for pre-print prediction history
+static constexpr const char* PREPRINT_HISTORY_PATH = "/print_start_history/entries";
 
 // ============================================================================
 // STATIC PATTERN DEFINITIONS
@@ -40,6 +48,12 @@ PrintStartCollector::~PrintStartCollector() {
     // Just mark as inactive to prevent any pending callbacks from running.
     active_.store(false);
     registered_.store(false);
+
+    // Safe to delete timer here (doesn't use client_ or state_)
+    if (eta_timer_) {
+        lv_timer_delete(eta_timer_);
+        eta_timer_ = nullptr;
+    }
 }
 
 // ============================================================================
@@ -60,8 +74,12 @@ void PrintStartCollector::start() {
         current_phase_ = PrintStartPhase::IDLE;
         print_start_detected_ = false;
         max_sequential_progress_ = 0;
+        phase_enter_times_.clear();
     }
     fallbacks_enabled_.store(false); // Will be enabled after initial window
+
+    // Load prediction history from config
+    load_prediction_history();
 
     // Ensure we have a profile for pattern matching
     if (!profile_) {
@@ -130,6 +148,22 @@ void PrintStartCollector::start() {
     // Set initial state
     state_.set_print_start_state(PrintStartPhase::INITIALIZING, "Preparing Print...", 0);
 
+    // Create LVGL timer for periodic elapsed + ETA updates (runs on main thread)
+    {
+        eta_timer_ = lv_timer_create(
+            [](lv_timer_t* timer) {
+                auto* collector = static_cast<PrintStartCollector*>(lv_timer_get_user_data(timer));
+                if (collector) {
+                    collector->update_eta_display();
+                }
+            },
+            ETA_UPDATE_INTERVAL_MS, this);
+        spdlog::debug("[PrintStartCollector] ETA timer created ({}ms interval)",
+                      ETA_UPDATE_INTERVAL_MS);
+    }
+    // Run first update immediately
+    update_eta_display();
+
     spdlog::info("[PrintStartCollector] Started monitoring (handler: {})", handler_name_);
 }
 
@@ -152,7 +186,14 @@ void PrintStartCollector::stop() {
 
     fallbacks_enabled_.store(false);
 
+    // Delete ETA timer (must be on main thread, but stop() is always called from main thread)
+    if (eta_timer_) {
+        lv_timer_delete(eta_timer_);
+        eta_timer_ = nullptr;
+    }
+
     if (was_active) {
+        state_.clear_print_start_time_left();
         state_.reset_print_start_state();
         spdlog::info("[PrintStartCollector] Stopped monitoring");
     }
@@ -166,6 +207,7 @@ void PrintStartCollector::reset() {
         print_start_detected_ = false;
         max_sequential_progress_ = 0;
         printing_state_start_ = std::chrono::steady_clock::now();
+        phase_enter_times_.clear();
     }
     fallbacks_enabled_.store(false);
 
@@ -459,27 +501,57 @@ bool PrintStartCollector::check_helix_phase_signal(const std::string& line) {
 
 void PrintStartCollector::update_phase(PrintStartPhase phase, const char* message) {
     int progress;
+    bool should_save = false;
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
         current_phase_ = phase;
+
+        // Record phase enter timestamp (skip IDLE and INITIALIZING)
+        int phase_int = static_cast<int>(phase);
+        if (phase != PrintStartPhase::IDLE && phase != PrintStartPhase::INITIALIZING &&
+            phase != PrintStartPhase::COMPLETE) {
+            if (phase_enter_times_.find(phase_int) == phase_enter_times_.end()) {
+                phase_enter_times_[phase_int] = std::chrono::steady_clock::now();
+            }
+        }
+
+        if (phase == PrintStartPhase::COMPLETE) {
+            should_save = true;
+        }
+
         progress = calculate_progress_locked();
     }
     // Call PrinterState outside the lock to avoid potential deadlocks
     state_.set_print_start_state(phase, message, progress);
+
+    if (should_save) {
+        save_prediction_entry();
+    }
 }
 
 void PrintStartCollector::update_phase(PrintStartPhase phase, const std::string& message,
                                        int progress) {
     int effective_progress;
+    bool should_save = false;
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
         current_phase_ = phase;
         detected_phases_.insert(phase);
 
+        // Record phase enter timestamp (skip IDLE and INITIALIZING)
+        int phase_int = static_cast<int>(phase);
+        if (phase != PrintStartPhase::IDLE && phase != PrintStartPhase::INITIALIZING &&
+            phase != PrintStartPhase::COMPLETE) {
+            if (phase_enter_times_.find(phase_int) == phase_enter_times_.end()) {
+                phase_enter_times_[phase_int] = std::chrono::steady_clock::now();
+            }
+        }
+
         // Monotonic progress guard: never allow progress to decrease in sequential mode
         // (except COMPLETE which always goes to 100%)
         if (phase == PrintStartPhase::COMPLETE) {
             effective_progress = 100;
+            should_save = true;
         } else {
             effective_progress = std::max(progress, max_sequential_progress_);
             effective_progress = std::min(effective_progress, 95);
@@ -487,6 +559,10 @@ void PrintStartCollector::update_phase(PrintStartPhase phase, const std::string&
         max_sequential_progress_ = effective_progress;
     }
     state_.set_print_start_state(phase, message.c_str(), effective_progress);
+
+    if (should_save) {
+        save_prediction_entry();
+    }
 }
 
 void PrintStartCollector::set_profile(std::shared_ptr<PrintStartProfile> profile) {
@@ -527,4 +603,169 @@ bool PrintStartCollector::is_print_start_marker(const std::string& line) const {
 
 bool PrintStartCollector::is_completion_marker(const std::string& line) const {
     return std::regex_search(line, completion_pattern_);
+}
+
+// ============================================================================
+// PUBLIC ACCESSORS FOR PREDICTION
+// ============================================================================
+
+std::set<int> PrintStartCollector::get_completed_phase_ints() const {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    std::set<int> result;
+    for (const auto& phase : detected_phases_) {
+        int p = static_cast<int>(phase);
+        // Exclude current phase from "completed" set
+        if (phase != current_phase_ && phase != PrintStartPhase::IDLE &&
+            phase != PrintStartPhase::INITIALIZING) {
+            result.insert(p);
+        }
+    }
+    return result;
+}
+
+int PrintStartCollector::get_current_phase_int() const {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    return static_cast<int>(current_phase_);
+}
+
+int PrintStartCollector::get_current_phase_elapsed_seconds() const {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    int phase_int = static_cast<int>(current_phase_);
+    auto it = phase_enter_times_.find(phase_int);
+    if (it == phase_enter_times_.end()) {
+        return 0;
+    }
+    auto elapsed = std::chrono::steady_clock::now() - it->second;
+    return static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count());
+}
+
+// ============================================================================
+// ETA DISPLAY UPDATE
+// ============================================================================
+
+void PrintStartCollector::update_eta_display() {
+    if (!active_.load()) {
+        return;
+    }
+
+    // Always update elapsed time since preparation started
+    int total_elapsed;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        auto now = std::chrono::steady_clock::now();
+        total_elapsed = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::seconds>(now - printing_state_start_).count());
+    }
+    state_.set_preprint_elapsed_seconds(total_elapsed);
+
+    if (!predictor_.has_predictions()) {
+        return;
+    }
+
+    auto completed = get_completed_phase_ints();
+    int current = get_current_phase_int();
+    int elapsed = get_current_phase_elapsed_seconds();
+
+    int remaining = predictor_.remaining_seconds(completed, current, elapsed);
+
+    // Always update the int subject for print time integration
+    state_.set_preprint_remaining_seconds(remaining);
+
+    if (remaining <= 0) {
+        state_.set_print_start_time_left("Almost ready");
+        return;
+    }
+
+    // Format as "~X min left" or "~X:XX left"
+    std::string text = "~" + helix::fmt::duration_remaining(remaining);
+    state_.set_print_start_time_left(text.c_str());
+
+    spdlog::trace("[PrintStartCollector] ETA: {}s remaining (phase={}, elapsed={}s)", remaining,
+                  current, elapsed);
+}
+
+// ============================================================================
+// PREDICTION HISTORY PERSISTENCE
+// ============================================================================
+
+void PrintStartCollector::load_prediction_history() {
+    auto entries = helix::PreprintPredictor::load_entries_from_config();
+
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    predictor_.load_entries(entries);
+
+    if (!entries.empty()) {
+        spdlog::info("[PrintStartCollector] Loaded {} prediction entries (predicted total: {}s)",
+                     entries.size(), predictor_.predicted_total());
+    }
+}
+
+void PrintStartCollector::save_prediction_entry() {
+    // Compute per-phase durations from timestamps
+    std::map<int, int> phase_durations;
+    auto now = std::chrono::steady_clock::now();
+    int total_seconds = 0;
+
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+
+        // Build sorted list of phase enter times
+        std::vector<std::pair<int, std::chrono::steady_clock::time_point>> sorted_phases(
+            phase_enter_times_.begin(), phase_enter_times_.end());
+        std::sort(sorted_phases.begin(), sorted_phases.end(),
+                  [](const auto& a, const auto& b) { return a.second < b.second; });
+
+        for (size_t i = 0; i < sorted_phases.size(); ++i) {
+            auto end_time = (i + 1 < sorted_phases.size()) ? sorted_phases[i + 1].second : now;
+            int duration = static_cast<int>(
+                std::chrono::duration_cast<std::chrono::seconds>(end_time - sorted_phases[i].second)
+                    .count());
+            phase_durations[sorted_phases[i].first] = duration;
+            total_seconds += duration;
+        }
+    }
+
+    if (phase_durations.empty()) {
+        spdlog::debug("[PrintStartCollector] No phase timings to save");
+        return;
+    }
+
+    helix::PreprintEntry entry;
+    entry.total_seconds = total_seconds;
+    entry.timestamp = static_cast<int64_t>(std::time(nullptr));
+    entry.phase_durations = std::move(phase_durations);
+
+    std::vector<helix::PreprintEntry> entries;
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        predictor_.add_entry(entry);
+        entries = predictor_.get_entries();
+    }
+
+    // Persist to config (must be on main thread)
+    helix::async::invoke([entries]() {
+        auto* cfg = Config::get_instance();
+        if (!cfg) {
+            return;
+        }
+
+        json entries_json = json::array();
+        for (const auto& e : entries) {
+            json entry_json;
+            entry_json["total"] = e.total_seconds;
+            entry_json["timestamp"] = e.timestamp;
+
+            json phases_json = json::object();
+            for (const auto& [phase, duration] : e.phase_durations) {
+                phases_json[std::to_string(phase)] = duration;
+            }
+            entry_json["phases"] = phases_json;
+            entries_json.push_back(entry_json);
+        }
+
+        cfg->set<json>(PREPRINT_HISTORY_PATH, entries_json);
+        cfg->save();
+
+        spdlog::info("[PrintStartCollector] Saved prediction history ({} entries)", entries.size());
+    });
 }

@@ -4,11 +4,13 @@
 #pragma once
 
 #include "moonraker_client.h"
+#include "preprint_predictor.h"
 #include "print_start_profile.h"
 #include "printer_state.h"
 
 #include <atomic>
 #include <chrono>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <regex>
@@ -103,6 +105,34 @@ class PrintStartCollector : public std::enable_shared_from_this<PrintStartCollec
      */
     void set_profile(std::shared_ptr<PrintStartProfile> profile);
 
+    /**
+     * @brief Get the predictor for reading predictions
+     *
+     * Thread-safe: predictor is loaded on start() and entries added on COMPLETE,
+     * both under state_mutex_. Callers (LVGL timer) should use remaining_seconds()
+     * which is const and safe to call from main thread.
+     */
+    [[nodiscard]] const helix::PreprintPredictor& predictor() const {
+        return predictor_;
+    }
+
+    /**
+     * @brief Get detected phases as int set (for predictor remaining calculation)
+     *
+     * Must be called under state_mutex_ or from main thread when collector stopped.
+     */
+    [[nodiscard]] std::set<int> get_completed_phase_ints() const;
+
+    /**
+     * @brief Get current phase as int
+     */
+    [[nodiscard]] int get_current_phase_int() const;
+
+    /**
+     * @brief Get elapsed seconds in current phase
+     */
+    [[nodiscard]] int get_current_phase_elapsed_seconds() const;
+
   private:
     /**
      * @brief Handle incoming G-code response
@@ -188,4 +218,30 @@ class PrintStartCollector : public std::enable_shared_from_this<PrintStartCollec
     // Fallback detection state (for printers without G-code layer markers)
     std::atomic<bool> fallbacks_enabled_{false};
     std::atomic<SubscriptionId> macro_subscription_id_{0};
+
+    // Phase timing for duration prediction (protected by state_mutex_)
+    std::map<int, std::chrono::steady_clock::time_point> phase_enter_times_;
+    helix::PreprintPredictor predictor_;
+
+    // LVGL timer for periodic ETA updates (main thread only)
+    lv_timer_t* eta_timer_ = nullptr;
+    static constexpr uint32_t ETA_UPDATE_INTERVAL_MS = 5000;
+
+    /**
+     * @brief Update ETA display from timer callback (main thread)
+     */
+    void update_eta_display();
+
+    /**
+     * @brief Load prediction entries from Config on start()
+     */
+    void load_prediction_history();
+
+    /**
+     * @brief Save current print's phase timings to prediction history
+     *
+     * Called on COMPLETE. Computes per-phase durations from timestamps,
+     * adds entry to predictor, and persists to Config.
+     */
+    void save_prediction_entry();
 };
