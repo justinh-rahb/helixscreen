@@ -591,6 +591,24 @@ class SettingsManager {
         return &estop_require_confirmation_subject_;
     }
 
+    /** @brief Update channel subject (integer: 0=Stable, 1=Beta, 2=Dev) */
+    lv_subject_t* subject_update_channel() {
+        return &update_channel_subject_;
+    }
+
+    // =========================================================================
+    // UPDATE SETTINGS
+    // =========================================================================
+
+    /** @brief Get current update channel (0=Stable, 1=Beta, 2=Dev) */
+    int get_update_channel() const;
+
+    /** @brief Set update channel, persist, and clear update cache */
+    void set_update_channel(int channel);
+
+    /** @brief Get dropdown options string "Stable\nBeta\nDev" */
+    static const char* get_update_channel_options();
+
     // =========================================================================
     // DISPLAY DIM OPTIONS (for dropdown population)
     // =========================================================================
@@ -669,6 +687,7 @@ class SettingsManager {
     lv_subject_t estop_require_confirmation_subject_;
     lv_subject_t scroll_throw_subject_;
     lv_subject_t scroll_limit_subject_;
+    lv_subject_t update_channel_subject_;
 
     // External references
     MoonrakerClient* moonraker_client_ = nullptr;

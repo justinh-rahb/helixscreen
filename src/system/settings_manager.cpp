@@ -15,6 +15,7 @@
 #include "printer_state.h"
 #include "runtime_config.h"
 #include "spdlog/spdlog.h"
+#include "system/update_checker.h"
 #include "theme_loader.h"
 #include "theme_manager.h"
 
@@ -204,6 +205,11 @@ void SettingsManager::init_subjects() {
     int lang_index = language_code_to_index(lang_code);
     UI_MANAGED_SUBJECT_INT(language_subject_, lang_index, "settings_language", subjects_);
     spdlog::debug("[SettingsManager] Language initialized to {} (index {})", lang_code, lang_index);
+
+    // Update channel (default: 0 = Stable)
+    int update_channel = config->get<int>("/update/channel", 0);
+    update_channel = std::clamp(update_channel, 0, 2);
+    UI_MANAGED_SUBJECT_INT(update_channel_subject_, update_channel, "update_channel", subjects_);
 
     subjects_initialized_ = true;
     spdlog::debug("[SettingsManager] Subjects initialized: dark_mode={}, theme={}, "
@@ -898,4 +904,33 @@ void SettingsManager::set_estop_require_confirmation(bool require) {
 
     spdlog::debug("[SettingsManager] E-Stop confirmation {} and saved",
                   require ? "enabled" : "disabled");
+}
+
+// =============================================================================
+// UPDATE SETTINGS
+// =============================================================================
+
+int SettingsManager::get_update_channel() const {
+    return lv_subject_get_int(&const_cast<SettingsManager*>(this)->update_channel_subject_);
+}
+
+void SettingsManager::set_update_channel(int channel) {
+    int clamped = std::clamp(channel, 0, 2);
+    spdlog::info("[SettingsManager] set_update_channel({})",
+                 clamped == 0 ? "Stable" : (clamped == 1 ? "Beta" : "Dev"));
+
+    // 1. Update subject (UI reacts)
+    lv_subject_set_int(&update_channel_subject_, clamped);
+
+    // 2. Persist to config
+    Config* config = Config::get_instance();
+    config->set<int>("/update/channel", clamped);
+    config->save();
+
+    // 3. Clear update checker cache (force re-check on new channel)
+    UpdateChecker::instance().clear_cache();
+}
+
+const char* SettingsManager::get_update_channel_options() {
+    return "Stable\nBeta\nDev";
 }

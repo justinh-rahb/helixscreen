@@ -154,6 +154,22 @@
                           description="View installed plugins and status"
                           description_tag="View installed plugins and status" callback="on_plugins_clicked"/>
     </beta_feature>
+    <!-- Software Update -->
+    <setting_info_row name="row_update_version" label="Current Version" label_tag="Current Version" icon="info">
+      <text_muted name="value" bind_text="update_current_version"/>
+    </setting_info_row>
+    <setting_action_row name="row_check_updates"
+                        label="Check for Updates" label_tag="Check for Updates" icon="refresh"
+                        bind_description="update_version_text" callback="on_check_updates_clicked"/>
+    <!-- Update Channel (gated by beta_features) -->
+    <lv_obj name="container_update_channel" width="100%" style_pad_all="0">
+      <bind_flag_if_eq subject="show_beta_features" flag="hidden" ref_value="0"/>
+      <setting_dropdown_row name="row_update_channel"
+                            label="Update Channel" label_tag="Update Channel" icon="swap_vertical"
+                            options="Stable&#10;Beta&#10;Dev"
+                            bind_selected="update_channel"
+                            callback="on_update_channel_changed"/>
+    </lv_obj>
     <!-- Install Update (visible only when update available) -->
     <lv_obj name="container_install_update" width="100%" style_pad_all="0">
       <bind_flag_if_not_eq subject="update_status" flag="hidden" ref_value="2"/>

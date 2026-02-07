@@ -176,5 +176,11 @@
   "plugins": {
     "enabled": [],
     "_enabled_comment": "List of plugin IDs to load. Plugins must be explicitly enabled. Example: [\"led-effects\"]"
+  },
+  "update": {
+    "channel": 0,
+    "_channel_comment": "Update channel. 0=Stable, 1=Beta (pre-releases), 2=Dev (custom URL)",
+    "dev_url": "",
+    "_dev_url_comment": "Base URL for dev channel manifest. Set to enable Dev channel option."
   }
 }

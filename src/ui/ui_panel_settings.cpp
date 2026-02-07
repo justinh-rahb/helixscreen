@@ -152,6 +152,35 @@ static void on_language_changed(lv_event_t* e) {
     SettingsManager::instance().set_language_by_index(index);
 }
 
+// Static callback for update channel dropdown
+static void on_update_channel_changed(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_update_channel_changed");
+    lv_obj_t* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
+
+    // Dev channel (2) requires dev_url to be configured
+    bool rejected = false;
+    if (index == 2) {
+        auto* config = Config::get_instance();
+        std::string dev_url = config ? config->get<std::string>("/update/dev_url", "") : "";
+        if (dev_url.empty()) {
+            spdlog::warn("[SettingsPanel] Dev channel selected but no dev_url configured");
+            // Revert to previous value
+            int current = SettingsManager::instance().get_update_channel();
+            lv_dropdown_set_selected(dropdown, static_cast<uint32_t>(current));
+            ui_toast_show(ToastSeverity::WARNING, "Dev channel requires dev_url in config", 3000);
+            rejected = true;
+        }
+    }
+
+    if (!rejected) {
+        spdlog::info("[SettingsPanel] Update channel changed: {} ({})", index,
+                     index == 0 ? "Stable" : (index == 1 ? "Beta" : "Dev"));
+        SettingsManager::instance().set_update_channel(index);
+    }
+    LVGL_SAFE_EVENT_CB_END();
+}
+
 // Static callback for version row tap (toggle beta_features via 7-tap secret)
 // Like Android's "tap build number 7 times" to enable developer mode
 static constexpr int kSecretTapCount = 7;
@@ -355,6 +384,7 @@ void SettingsPanel::init_subjects() {
     lv_xml_register_event_cb(nullptr, "on_gcode_mode_changed", on_gcode_mode_changed);
     lv_xml_register_event_cb(nullptr, "on_time_format_changed", on_time_format_changed);
     lv_xml_register_event_cb(nullptr, "on_language_changed", on_language_changed);
+    lv_xml_register_event_cb(nullptr, "on_update_channel_changed", on_update_channel_changed);
     lv_xml_register_event_cb(nullptr, "on_version_clicked", on_version_clicked);
 
     // Register XML event callbacks for toggle switches

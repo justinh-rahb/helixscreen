@@ -214,6 +214,7 @@ static const IconMapping ICON_MAP[] = {
     {"speed_up",           "\xF3\xB0\xBE\x85"},  // F0F85 speedometer-medium
     {"spoolman",           "\xF3\xB0\x88\xAF"},  // F022F film (same as filament)
     {"stop",               "\xF3\xB0\x93\x9B"},  // F04DB stop
+    {"swap_vertical",      "\xF3\xB0\x93\xA2"},  // F04E2 swap-vertical
     {"sysinfo",            "\xF3\xB0\x8B\xBC"},  // F02FC information
     {"target",             "\xF3\xB0\x93\xBE"},  // F04FE target (touch calibration)
 

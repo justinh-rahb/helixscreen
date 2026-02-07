@@ -57,6 +57,7 @@ class UpdateChecker {
         std::string download_url;  ///< Asset download URL for binary
         std::string release_notes; ///< Body markdown
         std::string published_at;  ///< ISO 8601 timestamp
+        std::string sha256;        ///< SHA-256 hash (for dev channel verification)
     };
 
     /**
@@ -69,6 +70,11 @@ class UpdateChecker {
         UpToDate = 3,        ///< Already on latest
         Error = 4            ///< Check failed
     };
+
+    /**
+     * @brief Update channel selection
+     */
+    enum class UpdateChannel { Stable = 0, Beta = 1, Dev = 2 };
 
     /**
      * @brief Download and install status
@@ -180,6 +186,12 @@ class UpdateChecker {
     std::string get_download_path() const;
     std::string get_platform_asset_name() const;
 
+    /** @brief Get the configured update channel */
+    UpdateChannel get_channel() const;
+
+    /** @brief Get platform key for current build ("pi", "ad5m", "k1") */
+    static std::string get_platform_key();
+
   private:
     UpdateChecker() = default;
     ~UpdateChecker();
@@ -192,6 +204,11 @@ class UpdateChecker {
      * @brief Worker thread entry point
      */
     void do_check();
+
+    // Channel-specific fetch methods
+    bool fetch_stable_release(ReleaseInfo& info, std::string& error);
+    bool fetch_beta_release(ReleaseInfo& info, std::string& error);
+    bool fetch_dev_release(ReleaseInfo& info, std::string& error);
 
     /**
      * @brief Report result to callback on LVGL thread
@@ -219,6 +236,10 @@ class UpdateChecker {
     std::atomic<bool> shutting_down_{false};
     std::atomic<bool> initialized_{false};
     Callback pending_callback_;
+
+    // Channel cached on main thread before worker spawns (Config is not thread-safe)
+    UpdateChannel cached_channel_{UpdateChannel::Stable};
+    std::string cached_dev_url_;
 
     // LVGL subjects for UI binding (update check)
     lv_subject_t status_subject_{};

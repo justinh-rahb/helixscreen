@@ -132,6 +132,7 @@ MDI_ICONS+=",0xF048A"    # send (for console input)
 MDI_ICONS+=",0xF0493"    # cog (settings)
 MDI_ICONS+=",0xF04C5"    # speedometer
 MDI_ICONS+=",0xF04DB"    # stop
+MDI_ICONS+=",0xF04E2"    # swap-vertical
 MDI_ICONS+=",0xF050F"    # thermometer
 MDI_ICONS+=",0xF054C"    # undo (counter-clockwise arrow - for loosen)
 MDI_ICONS+=",0xF0E04"    # thermometer-minus

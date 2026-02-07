@@ -18,6 +18,7 @@
 #include "ui_update_queue.h"
 
 #include "app_globals.h"
+#include "config.h"
 #include "hv/requests.h"
 #include "printer_state.h"
 #include "spdlog/spdlog.h"
@@ -40,6 +41,10 @@ namespace {
 /// GitHub API URL for latest release
 constexpr const char* GITHUB_API_URL =
     "https://api.github.com/repos/prestonbrown/helixscreen/releases/latest";
+
+/// GitHub API URL for all releases (beta channel uses this)
+constexpr const char* GITHUB_RELEASES_URL =
+    "https://api.github.com/repos/prestonbrown/helixscreen/releases";
 
 /// HTTP request timeout in seconds
 constexpr int HTTP_TIMEOUT_SECONDS = 30;
@@ -74,38 +79,36 @@ std::string json_string_or_empty(const json& j, const std::string& key) {
 }
 
 /**
- * @brief Parse ReleaseInfo from GitHub API JSON response
- *
- * @param json_str JSON response body
- * @param[out] info Parsed release info
- * @param[out] error Error message if parsing fails
- * @return true if parsing succeeded
+ * @brief Parse ReleaseInfo from a GitHub release JSON object (already parsed)
  */
-bool parse_github_release(const std::string& json_str, UpdateChecker::ReleaseInfo& info,
-                          std::string& error) {
-    try {
-        auto j = json::parse(json_str);
+bool parse_github_release(const json& j, UpdateChecker::ReleaseInfo& info, std::string& error) {
+    info.tag_name = json_string_or_empty(j, "tag_name");
+    info.release_notes = json_string_or_empty(j, "body");
+    info.published_at = json_string_or_empty(j, "published_at");
+    info.version = strip_version_prefix(info.tag_name);
 
-        info.tag_name = json_string_or_empty(j, "tag_name");
-        info.release_notes = json_string_or_empty(j, "body");
-        info.published_at = json_string_or_empty(j, "published_at");
+    if (info.version.empty()) {
+        error = "Invalid release format: missing tag_name";
+        return false;
+    }
 
-        // Strip 'v' prefix for version comparison
-        info.version = strip_version_prefix(info.tag_name);
+    if (!helix::version::parse_version(info.version).has_value()) {
+        error = "Invalid version format: " + info.tag_name;
+        return false;
+    }
 
-        if (info.version.empty()) {
-            error = "Invalid release format: missing tag_name";
-            return false;
+    // Find platform-specific binary asset
+    if (j.contains("assets") && j["assets"].is_array()) {
+        std::string platform_prefix = "helixscreen-" + UpdateChecker::get_platform_key() + "-";
+        for (const auto& asset : j["assets"]) {
+            std::string name = asset.value("name", "");
+            if (name.find(platform_prefix) == 0 && name.find(".tar.gz") != std::string::npos) {
+                info.download_url = asset.value("browser_download_url", "");
+                break;
+            }
         }
-
-        // Validate version can be parsed
-        if (!helix::version::parse_version(info.version).has_value()) {
-            error = "Invalid version format: " + info.tag_name;
-            return false;
-        }
-
-        // Find binary asset URL (look for .tar.gz)
-        if (j.contains("assets") && j["assets"].is_array()) {
+        // Fallback: if no platform-specific match, try any .tar.gz (backward compat)
+        if (info.download_url.empty()) {
             for (const auto& asset : j["assets"]) {
                 std::string name = asset.value("name", "");
                 if (name.find(".tar.gz") != std::string::npos) {
@@ -114,9 +117,19 @@ bool parse_github_release(const std::string& json_str, UpdateChecker::ReleaseInf
                 }
             }
         }
+    }
 
-        return true;
+    return true;
+}
 
+/**
+ * @brief Parse ReleaseInfo from GitHub API JSON response string
+ */
+bool parse_github_release(const std::string& json_str, UpdateChecker::ReleaseInfo& info,
+                          std::string& error) {
+    try {
+        auto j = json::parse(json_str);
+        return parse_github_release(j, info, error);
     } catch (const json::exception& e) {
         error = std::string("JSON parse error: ") + e.what();
         return false;
@@ -457,13 +470,7 @@ std::string UpdateChecker::get_platform_asset_name() const {
         std::lock_guard<std::mutex> lock(mutex_);
         version = cached_info_ ? cached_info_->tag_name : "";
     }
-#ifdef HELIX_PLATFORM_AD5M
-    return "helixscreen-ad5m-" + version + ".tar.gz";
-#elif defined(HELIX_PLATFORM_K1)
-    return "helixscreen-k1-" + version + ".tar.gz";
-#else
-    return "helixscreen-pi-" + version + ".tar.gz";
-#endif
+    return "helixscreen-" + get_platform_key() + "-" + version + ".tar.gz";
 }
 
 void UpdateChecker::report_download_status(DownloadStatus status, int progress,
@@ -760,6 +767,11 @@ void UpdateChecker::check_for_updates(Callback callback) {
     status_ = Status::Checking;
     cancelled_ = false;
 
+    // Cache channel config on main thread (Config is NOT thread-safe)
+    cached_channel_ = get_channel();
+    auto* config = Config::get_instance();
+    cached_dev_url_ = config ? config->get<std::string>("/update/dev_url", "") : "";
+
     // Update subjects on LVGL thread (check_for_updates is public, could be called from any thread)
     if (subjects_initialized_) {
         ui_queue_update([this]() {
@@ -812,56 +824,43 @@ void UpdateChecker::do_check() {
         last_check_time_ = std::chrono::steady_clock::now();
     }
 
-    // Check for cancellation before network request
     if (cancelled_) {
         spdlog::debug("[UpdateChecker] Check cancelled before network request");
         return;
     }
 
-    // Make HTTP request to GitHub API
-    auto req = std::make_shared<HttpRequest>();
-    req->method = HTTP_GET;
-    req->url = GITHUB_API_URL;
-    req->timeout = HTTP_TIMEOUT_SECONDS;
-    req->headers["User-Agent"] = std::string("HelixScreen/") + HELIX_VERSION;
-    req->headers["Accept"] = "application/vnd.github.v3+json";
+    // Use channel cached on main thread (Config is NOT thread-safe)
+    auto channel = cached_channel_;
+    const char* channel_name = (channel == UpdateChannel::Beta)  ? "Beta"
+                               : (channel == UpdateChannel::Dev) ? "Dev"
+                                                                 : "Stable";
+    spdlog::info("[UpdateChecker] Checking {} channel", channel_name);
 
-    spdlog::debug("[UpdateChecker] Requesting: {}", GITHUB_API_URL);
+    ReleaseInfo info;
+    std::string error;
+    bool ok = false;
 
-    auto resp = requests::request(req);
+    switch (channel) {
+    case UpdateChannel::Beta:
+        ok = fetch_beta_release(info, error);
+        break;
+    case UpdateChannel::Dev:
+        ok = fetch_dev_release(info, error);
+        break;
+    case UpdateChannel::Stable:
+    default:
+        ok = fetch_stable_release(info, error);
+        break;
+    }
 
-    // Check for cancellation after network request
     if (cancelled_) {
         spdlog::debug("[UpdateChecker] Check cancelled after network request");
         return;
     }
 
-    // Handle network failure
-    if (!resp) {
-        spdlog::warn("[UpdateChecker] Network request failed (no response)");
-        report_result(Status::Error, std::nullopt, "Network request failed");
-        return;
-    }
-
-    // Handle HTTP errors
-    if (resp->status_code != 200) {
-        const char* status_msg = resp->status_message();
-        std::string error = "HTTP " + std::to_string(resp->status_code);
-        if (status_msg != nullptr && status_msg[0] != '\0') {
-            error += ": ";
-            error += status_msg;
-        }
+    if (!ok) {
         spdlog::warn("[UpdateChecker] {}", error);
         report_result(Status::Error, std::nullopt, error);
-        return;
-    }
-
-    // Parse JSON response
-    ReleaseInfo info;
-    std::string parse_error;
-    if (!parse_github_release(resp->body, info, parse_error)) {
-        spdlog::warn("[UpdateChecker] {}", parse_error);
-        report_result(Status::Error, std::nullopt, parse_error);
         return;
     }
 
@@ -878,6 +877,219 @@ void UpdateChecker::do_check() {
     }
 
     spdlog::debug("[UpdateChecker] Worker thread finished");
+}
+
+// ============================================================================
+// Channel-specific fetch methods
+// ============================================================================
+
+UpdateChecker::UpdateChannel UpdateChecker::get_channel() const {
+    auto* config = Config::get_instance();
+    if (!config) {
+        return UpdateChannel::Stable;
+    }
+    int channel = config->get<int>("/update/channel", 0);
+    switch (channel) {
+    case 1:
+        return UpdateChannel::Beta;
+    case 2:
+        return UpdateChannel::Dev;
+    default:
+        return UpdateChannel::Stable;
+    }
+}
+
+std::string UpdateChecker::get_platform_key() {
+#ifdef HELIX_PLATFORM_AD5M
+    return "ad5m";
+#elif defined(HELIX_PLATFORM_K1)
+    return "k1";
+#else
+    return "pi";
+#endif
+}
+
+bool UpdateChecker::fetch_stable_release(ReleaseInfo& info, std::string& error) {
+    auto req = std::make_shared<HttpRequest>();
+    req->method = HTTP_GET;
+    req->url = GITHUB_API_URL;
+    req->timeout = HTTP_TIMEOUT_SECONDS;
+    req->headers["User-Agent"] = std::string("HelixScreen/") + HELIX_VERSION;
+    req->headers["Accept"] = "application/vnd.github.v3+json";
+
+    spdlog::debug("[UpdateChecker] Requesting: {}", GITHUB_API_URL);
+    auto resp = requests::request(req);
+
+    if (cancelled_)
+        return false;
+
+    if (!resp) {
+        error = "Network request failed";
+        return false;
+    }
+
+    if (resp->status_code != 200) {
+        const char* status_msg = resp->status_message();
+        error = "HTTP " + std::to_string(resp->status_code);
+        if (status_msg && status_msg[0] != '\0') {
+            error += ": ";
+            error += status_msg;
+        }
+        return false;
+    }
+
+    return parse_github_release(resp->body, info, error);
+}
+
+bool UpdateChecker::fetch_beta_release(ReleaseInfo& info, std::string& error) {
+    auto req = std::make_shared<HttpRequest>();
+    req->method = HTTP_GET;
+    req->url = GITHUB_RELEASES_URL;
+    req->timeout = HTTP_TIMEOUT_SECONDS;
+    req->headers["User-Agent"] = std::string("HelixScreen/") + HELIX_VERSION;
+    req->headers["Accept"] = "application/vnd.github.v3+json";
+
+    spdlog::debug("[UpdateChecker] Requesting (beta): {}", GITHUB_RELEASES_URL);
+    auto resp = requests::request(req);
+
+    if (cancelled_)
+        return false;
+
+    if (!resp) {
+        error = "Network request failed";
+        return false;
+    }
+
+    if (resp->status_code != 200) {
+        const char* status_msg = resp->status_message();
+        error = "HTTP " + std::to_string(resp->status_code);
+        if (status_msg && status_msg[0] != '\0') {
+            error += ": ";
+            error += status_msg;
+        }
+        return false;
+    }
+
+    // Parse JSON array of releases
+    try {
+        auto releases = json::parse(resp->body);
+
+        if (!releases.is_array() || releases.empty()) {
+            error = "Empty or invalid releases array";
+            return false;
+        }
+
+        // First pass: find latest prerelease (GitHub returns newest-first)
+        for (const auto& rel : releases) {
+            if (rel.value("draft", false))
+                continue;
+            if (!rel.value("prerelease", false))
+                continue;
+
+            if (parse_github_release(rel, info, error)) {
+                spdlog::debug("[UpdateChecker] Beta: selected prerelease {}", info.tag_name);
+                return true;
+            }
+        }
+
+        // Fallback: no prerelease found, use latest stable
+        for (const auto& rel : releases) {
+            if (rel.value("draft", false))
+                continue;
+            if (parse_github_release(rel, info, error)) {
+                spdlog::debug("[UpdateChecker] Beta: no prerelease found, falling back to {}",
+                              info.tag_name);
+                return true;
+            }
+        }
+
+        error = "No valid releases found";
+        return false;
+
+    } catch (const json::exception& e) {
+        error = std::string("JSON parse error: ") + e.what();
+        return false;
+    }
+}
+
+bool UpdateChecker::fetch_dev_release(ReleaseInfo& info, std::string& error) {
+    // Use dev_url cached on main thread (Config is NOT thread-safe)
+    std::string dev_url = cached_dev_url_;
+    if (dev_url.empty()) {
+        error = "Dev channel not configured (set /update/dev_url)";
+        return false;
+    }
+
+    // Validate URL scheme
+    if (dev_url.find("http://") != 0 && dev_url.find("https://") != 0) {
+        error = "Dev URL must use http:// or https:// scheme";
+        return false;
+    }
+
+    // Ensure trailing slash
+    if (dev_url.back() != '/') {
+        dev_url += '/';
+    }
+    std::string manifest_url = dev_url + "manifest.json";
+
+    auto req = std::make_shared<HttpRequest>();
+    req->method = HTTP_GET;
+    req->url = manifest_url;
+    req->timeout = HTTP_TIMEOUT_SECONDS;
+    req->headers["User-Agent"] = std::string("HelixScreen/") + HELIX_VERSION;
+
+    spdlog::debug("[UpdateChecker] Requesting (dev): {}", manifest_url);
+    auto resp = requests::request(req);
+
+    if (cancelled_)
+        return false;
+
+    if (!resp) {
+        error = "Network request failed";
+        return false;
+    }
+
+    if (resp->status_code != 200) {
+        error = "HTTP " + std::to_string(resp->status_code);
+        return false;
+    }
+
+    // Parse dev manifest
+    try {
+        auto j = json::parse(resp->body);
+
+        info.version = json_string_or_empty(j, "version");
+        if (info.version.empty()) {
+            error = "Missing 'version' field in manifest";
+            return false;
+        }
+
+        info.tag_name = json_string_or_empty(j, "tag");
+        info.release_notes = json_string_or_empty(j, "notes");
+        info.published_at = json_string_or_empty(j, "published_at");
+
+        if (!j.contains("assets") || !j["assets"].is_object() || j["assets"].empty()) {
+            error = "Missing or empty 'assets' in manifest";
+            return false;
+        }
+
+        std::string platform = get_platform_key();
+        const auto& assets = j["assets"];
+        if (!assets.contains(platform)) {
+            error = "No asset for platform '" + platform + "'";
+            return false;
+        }
+
+        const auto& platform_asset = assets[platform];
+        info.download_url = json_string_or_empty(platform_asset, "url");
+        info.sha256 = json_string_or_empty(platform_asset, "sha256");
+
+        return true;
+
+    } catch (const json::exception& e) {
+        error = std::string("JSON parse error: ") + e.what();
+        return false;
+    }
 }
 
 void UpdateChecker::report_result(Status status, std::optional<ReleaseInfo> info,

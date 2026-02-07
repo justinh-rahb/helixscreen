@@ -24,6 +24,7 @@ Complete reference for HelixScreen configuration options.
 - [Safety Settings](#safety-settings)
 - [Filament Sensor Settings](#filament-sensor-settings)
 - [Plugin Settings](#plugin-settings)
+- [Update Settings](#update-settings)
 - [Safety Limits](#safety-limits)
 - [Capability Overrides](#capability-overrides)
 - [Resetting Configuration](#resetting-configuration)
@@ -84,7 +85,8 @@ The configuration file is JSON format with several top-level sections:
   "streaming": { ... },
   "safety": { ... },
   "filament_sensors": { ... },
-  "plugins": { ... }
+  "plugins": { ... },
+  "update": { ... }
 }
 ```
 
@@ -800,6 +802,38 @@ Located in the `plugins` section:
 
 ---
 
+## Update Settings
+
+Located in the `update` section:
+
+```json
+{
+  "update": {
+    "channel": 0,
+    "dev_url": ""
+  }
+}
+```
+
+### `channel`
+**Type:** integer
+**Default:** `0`
+**Values:** `0` (Stable), `1` (Beta), `2` (Dev)
+**Description:** Update channel selection:
+- `0` - **Stable**: Only official releases from GitHub (default)
+- `1` - **Beta**: Includes GitHub pre-releases (tagged as `v1.0.0-beta.1` etc.)
+- `2` - **Dev**: Fetches from a custom URL (requires `dev_url` to be set)
+
+Can also be changed from the Settings panel when `beta_features` is enabled.
+
+### `dev_url`
+**Type:** string
+**Default:** `""` (empty)
+**Example:** `"https://releases.helixscreen.org/dev"`
+**Description:** Base URL for the dev update channel. When `channel` is `2`, HelixScreen fetches `{dev_url}/manifest.json` to check for updates. Must use `http://` or `https://` scheme. Leave empty to disable the Dev channel option.
+
+---
+
 ## Safety Limits
 
 Located in `printer.safety_limits`:
@@ -1128,6 +1162,11 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
 
   "plugins": {
     "enabled": []
+  },
+
+  "update": {
+    "channel": 0,
+    "dev_url": ""
   }
 }
 ```
