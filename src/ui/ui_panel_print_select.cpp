@@ -35,6 +35,7 @@
 #include "lvgl/src/xml/lv_xml.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h" // For ConnectionState enum
+#include "preprint_predictor.h"
 #include "print_history_manager.h"
 #include "print_start_analyzer.h"
 #include "printer_state.h"
@@ -902,8 +903,14 @@ void PrintSelectPanel::process_metadata_result(size_t i, const std::string& file
     const ThumbnailInfo* best_thumb = metadata.get_best_thumbnail(target.width, target.height);
     std::string thumb_path = best_thumb ? best_thumb->relative_path : "";
 
+    // Include predicted pre-print overhead (heating, homing, bed mesh, etc.)
+    // in the total time estimate so users see realistic wall-clock time
+    int preprint_seconds = helix::PreprintPredictor::predicted_total_from_config();
+    int total_minutes =
+        print_time_minutes + (preprint_seconds + 30) / 60; // round to nearest minute
+
     // Format strings on background thread (uses standalone helper functions)
-    std::string print_time_str = format_print_time(print_time_minutes);
+    std::string print_time_str = format_print_time(total_minutes);
     std::string filament_str = format_filament_weight(filament_grams);
     std::string layer_count_str = format_layer_count(layer_count);
     std::string print_height_str = format_print_height(object_height) + " tall";

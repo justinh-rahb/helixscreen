@@ -128,6 +128,12 @@ PrintStatusPanel::PrintStatusPanel(PrinterState& printer_state, MoonrakerAPI* ap
                                            [](PrintStatusPanel* self, int progress) {
                                                self->on_print_start_progress_changed(progress);
                                            });
+    preprint_remaining_observer_ = observe_int_sync<PrintStatusPanel>(
+        printer_state_.get_preprint_remaining_subject(), this,
+        [](PrintStatusPanel* self, int seconds) { self->on_preprint_remaining_changed(seconds); });
+    preprint_elapsed_observer_ = observe_int_sync<PrintStatusPanel>(
+        printer_state_.get_preprint_elapsed_subject(), this,
+        [](PrintStatusPanel* self, int seconds) { self->on_preprint_elapsed_changed(seconds); });
 
     spdlog::debug("[{}] Subscribed to PrinterState subjects", get_name());
 
@@ -1152,6 +1158,11 @@ void PrintStatusPanel::on_print_state_changed(PrintJobState job_state) {
                 exclude_manager_->clear_excluded_objects();
                 spdlog::debug("[{}] Cleared excluded objects for new print", get_name());
             }
+
+            // Transition remaining display from preprint observer back to Moonraker's time_left.
+            // Without this, remaining stays stuck on the last preprint prediction value.
+            format_time(remaining_seconds_, remaining_buf_, sizeof(remaining_buf_));
+            lv_subject_copy_string(&remaining_subject_, remaining_buf_);
         }
 
         // Show print complete overlay when entering Complete state
@@ -1163,11 +1174,20 @@ void PrintStatusPanel::on_print_state_changed(PrintJobState job_state) {
                 lv_subject_copy_string(&progress_text_subject_, progress_text_buf_);
             }
 
+            // Freeze final elapsed time (preprint + print) and zero remaining
+            int total_elapsed = preprint_elapsed_seconds_ + elapsed_seconds_;
+            format_time(total_elapsed, elapsed_buf_, sizeof(elapsed_buf_));
+            lv_subject_copy_string(&elapsed_subject_, elapsed_buf_);
+            format_time(0, remaining_buf_, sizeof(remaining_buf_));
+            lv_subject_copy_string(&remaining_subject_, remaining_buf_);
+
             // Trigger celebratory animation on the success badge
             animate_print_complete();
 
-            spdlog::info("[{}] Print complete! Final progress: {}%, elapsed: {}s", get_name(),
-                         current_progress_, elapsed_seconds_);
+            spdlog::info(
+                "[{}] Print complete! Final progress: {}%, elapsed: {}s ({}s preprint + {}s print)",
+                get_name(), current_progress_, total_elapsed, preprint_elapsed_seconds_,
+                elapsed_seconds_);
         }
 
         // Show print cancelled overlay when entering Cancelled state
@@ -1326,9 +1346,12 @@ void PrintStatusPanel::on_print_duration_changed(int seconds) {
         return;
     }
 
-    format_time(elapsed_seconds_, elapsed_buf_, sizeof(elapsed_buf_));
+    // Include preprint time so elapsed reflects total wall-clock time
+    int total_elapsed = preprint_elapsed_seconds_ + elapsed_seconds_;
+    format_time(total_elapsed, elapsed_buf_, sizeof(elapsed_buf_));
     lv_subject_copy_string(&elapsed_subject_, elapsed_buf_);
-    spdlog::trace("[{}] Print duration updated: {}s", get_name(), seconds);
+    spdlog::trace("[{}] Print duration updated: {}s print + {}s preprint = {}s total", get_name(),
+                  seconds, preprint_elapsed_seconds_, total_elapsed);
 }
 
 void PrintStatusPanel::on_print_time_left_changed(int seconds) {
@@ -1342,6 +1365,15 @@ void PrintStatusPanel::on_print_time_left_changed(int seconds) {
 
     // Guard: subjects may not be initialized if called from constructor's observer setup
     if (!subjects_initialized_) {
+        return;
+    }
+
+    // During pre-print, the preprint observer owns the remaining display.
+    // Moonraker's time_left is just the slicer estimate (not counting down yet),
+    // so showing it would cause flickering between 0 and the slicer value.
+    if (current_state_ == PrintState::Preparing) {
+        spdlog::trace("[{}] Stored slicer time_left={}s (display deferred to preprint observer)",
+                      get_name(), seconds);
         return;
     }
 
@@ -1363,6 +1395,8 @@ void PrintStatusPanel::on_print_start_phase_changed(int phase) {
 
     if (preparing) {
         current_state_ = PrintState::Preparing;
+        preprint_elapsed_seconds_ = 0;
+        preprint_remaining_seconds_ = 0;
     }
     spdlog::debug("[{}] Print start phase changed: {} (visible={})", get_name(), phase, preparing);
 }
@@ -1396,6 +1430,49 @@ void PrintStatusPanel::on_print_start_progress_changed(int progress) {
         lv_bar_set_value(preparing_progress_bar_, progress, anim_enable);
     }
     spdlog::trace("[{}] Print start progress: {}%", get_name(), progress);
+}
+
+void PrintStatusPanel::on_preprint_remaining_changed(int seconds) {
+    // Guard: subjects may not be initialized if called from constructor's observer setup
+    if (!subjects_initialized_) {
+        return;
+    }
+
+    // Only track during Preparing. Once printing starts, this value is no longer relevant.
+    // The subject gets cleared to 0 when the collector stops - ignore that reset.
+    if (current_state_ != PrintState::Preparing) {
+        return;
+    }
+
+    preprint_remaining_seconds_ = seconds;
+
+    // This observer owns the remaining time display during pre-print.
+    // Combine preprint prediction with slicer estimate for total remaining.
+    {
+        int total_remaining = remaining_seconds_ + seconds;
+        format_time(total_remaining, remaining_buf_, sizeof(remaining_buf_));
+        lv_subject_copy_string(&remaining_subject_, remaining_buf_);
+        spdlog::trace("[{}] Preprint remaining: {}s preprint + {}s slicer = {}s", get_name(),
+                      seconds, remaining_seconds_, total_remaining);
+    }
+}
+
+void PrintStatusPanel::on_preprint_elapsed_changed(int seconds) {
+    // Guard: subjects may not be initialized if called from constructor's observer setup
+    if (!subjects_initialized_) {
+        return;
+    }
+
+    // Only track preprint elapsed during Preparing state.
+    // Once printing starts, this value is frozen so it can be added to print duration.
+    // The subject gets cleared to 0 when the collector stops - ignore that reset.
+    if (current_state_ != PrintState::Preparing) {
+        return;
+    }
+
+    preprint_elapsed_seconds_ = seconds;
+    format_time(seconds, elapsed_buf_, sizeof(elapsed_buf_));
+    lv_subject_copy_string(&elapsed_subject_, elapsed_buf_);
 }
 
 void PrintStatusPanel::update_button_states() {

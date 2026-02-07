@@ -119,6 +119,9 @@
                   style_bg_color="#screen_bg" style_radius="4"/>
           <!-- Phase message -->
           <text_small bind_text="print_start_message"/>
+          <!-- Predicted time remaining -->
+          <text_small name="print_start_eta" bind_text="print_start_time_left"
+                      style_text_color="#text_muted"/>
         </lv_obj>
         <!-- PRINTING STATE: Actual print progress (hidden when print_show_progress==0) -->
         <!-- Horizontal layout: thumbnail left, info right (mirrors idle state layout) -->

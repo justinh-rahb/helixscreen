@@ -332,6 +332,8 @@ class PrintStatusPanel : public OverlayBase {
     int total_layers_ = 0;
     int elapsed_seconds_ = 0;
     int remaining_seconds_ = 0;
+    int preprint_remaining_seconds_ = 0;
+    int preprint_elapsed_seconds_ = 0; ///< Total pre-print elapsed time (frozen on print start)
     int nozzle_current_ = 0;
     int nozzle_target_ = 0;
     int bed_current_ = 0;
@@ -461,6 +463,8 @@ class PrintStatusPanel : public OverlayBase {
     void on_print_start_phase_changed(int phase);
     void on_print_start_message_changed(const char* message);
     void on_print_start_progress_changed(int progress);
+    void on_preprint_remaining_changed(int seconds);
+    void on_preprint_elapsed_changed(int seconds);
 
     // PrinterState observers (ObserverGuard handles cleanup)
     /// @brief Temperature observer bundle (nozzle + bed temps)
@@ -478,6 +482,8 @@ class PrintStatusPanel : public OverlayBase {
     ObserverGuard print_start_phase_observer_;
     ObserverGuard print_start_message_observer_;
     ObserverGuard print_start_progress_observer_;
+    ObserverGuard preprint_remaining_observer_;
+    ObserverGuard preprint_elapsed_observer_;
 
     //
     // === Exclude Object Manager ===
