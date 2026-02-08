@@ -1007,6 +1007,7 @@ void SettingsPanel::handle_sound_theme_changed(int index) {
         spdlog::info("[{}] Sound theme changed: {} (index {})", get_name(), theme_name, index);
         SettingsManager::instance().set_sound_theme(theme_name);
         SoundManager::instance().set_theme(theme_name);
+        SoundManager::instance().play("test_beep");
     } else {
         spdlog::warn("[{}] Sound theme index {} out of range ({})", get_name(), index,
                      themes.size());

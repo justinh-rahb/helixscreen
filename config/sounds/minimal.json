@@ -40,6 +40,26 @@
         { "freq": 150, "dur": 120, "vel": 0.5 }
       ]
     },
+    "print_cancelled": {
+      "description": "Descending minor tone",
+      "steps": [
+        { "note": "E5", "dur": 120, "vel": 0.6 },
+        { "note": "C5", "dur": 200, "vel": 0.4,
+          "env": { "a": 5, "d": 50, "s": 0.3, "r": 150 } }
+      ]
+    },
+    "alarm_urgent": {
+      "description": "Continuous alarm for critical failures",
+      "steps": [
+        { "freq": 2500, "dur": 200, "wave": "saw",
+          "lfo": { "target": "freq", "rate": 4, "depth": 300 } },
+        { "pause": 100 },
+        { "freq": 1800, "dur": 200,
+          "lfo": { "target": "freq", "rate": 4, "depth": 300 } },
+        { "pause": 100 }
+      ],
+      "repeat": 5
+    },
     "test_beep": {
       "description": "Settings test sound",
       "steps": [
