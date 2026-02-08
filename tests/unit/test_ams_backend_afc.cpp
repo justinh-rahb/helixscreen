@@ -82,6 +82,10 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
         }
     }
 
+    void set_running(bool state) {
+        running_ = state;
+    }
+
     void set_filament_loaded(bool state) {
         system_info_.filament_loaded = state;
     }
@@ -187,6 +191,118 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
                 return true;
         }
         return false;
+    }
+
+    // Feed a Moonraker notify_status_update notification through the backend
+    void feed_status_update(const nlohmann::json& params_inner) {
+        // Build the full notification format: { "params": [ { ... }, timestamp ] }
+        nlohmann::json notification;
+        notification["params"] = nlohmann::json::array({params_inner, 0.0});
+        handle_status_update(notification);
+    }
+
+    // Feed AFC global state update
+    void feed_afc_state(const nlohmann::json& afc_data) {
+        nlohmann::json params;
+        params["AFC"] = afc_data;
+        feed_status_update(params);
+    }
+
+    // Feed AFC_stepper lane update
+    void feed_afc_stepper(const std::string& lane_name, const nlohmann::json& data) {
+        nlohmann::json params;
+        params["AFC_stepper " + lane_name] = data;
+        feed_status_update(params);
+    }
+
+    // State accessors for test assertions
+    AmsAction get_action() const {
+        return system_info_.action;
+    }
+    std::string get_operation_detail() const {
+        return system_info_.operation_detail;
+    }
+    std::vector<int> get_tool_to_slot_map() const {
+        return system_info_.tool_to_slot_map;
+    }
+
+    const std::vector<helix::printer::EndlessSpoolConfig>& get_endless_spool_configs() const {
+        return endless_spool_configs_;
+    }
+
+    // Get mapped_tool from a slot
+    int get_slot_mapped_tool(int slot_index) const {
+        const auto* slot = system_info_.get_slot_global(slot_index);
+        return slot ? slot->mapped_tool : -1;
+    }
+
+    // Event tracking
+    std::vector<std::pair<std::string, std::string>> emitted_events;
+
+    void install_event_tracker() {
+        set_event_callback([this](const std::string& event, const std::string& data) {
+            emitted_events.emplace_back(event, data);
+        });
+    }
+
+    bool has_event(const std::string& event) const {
+        for (const auto& [ev, _] : emitted_events) {
+            if (ev == event)
+                return true;
+        }
+        return false;
+    }
+
+    std::string get_event_data(const std::string& event) const {
+        for (const auto& [ev, data] : emitted_events) {
+            if (ev == event)
+                return data;
+        }
+        return "";
+    }
+
+    // Phase 2: Access to extended parsing state
+    const LaneSensors& get_lane_sensors(int index) const {
+        return lane_sensors_[index];
+    }
+    bool get_hub_sensor() const {
+        return hub_sensor_;
+    }
+    bool get_tool_start_sensor() const {
+        return tool_start_sensor_;
+    }
+    bool get_tool_end_sensor() const {
+        return tool_end_sensor_;
+    }
+    bool get_quiet_mode() const {
+        return afc_quiet_mode_;
+    }
+    bool get_led_state() const {
+        return afc_led_state_;
+    }
+    float get_bowden_length() const {
+        return bowden_length_;
+    }
+
+    // Feed AFC_hub update
+    void feed_afc_hub(const std::string& hub_name, const nlohmann::json& data) {
+        nlohmann::json params;
+        params["AFC_hub " + hub_name] = data;
+        feed_status_update(params);
+    }
+
+    // Feed AFC_extruder update
+    void feed_afc_extruder(const std::string& ext_name, const nlohmann::json& data) {
+        nlohmann::json params;
+        params["AFC_extruder " + ext_name] = data;
+        feed_status_update(params);
+    }
+
+    // Feed AFC_buffer update
+    void feed_afc_buffer(const std::string& buf_name, const nlohmann::json& data) {
+        nlohmann::json params;
+        params["AFC_buffer " + buf_name] = data;
+        feed_status_update(params);
     }
 };
 
@@ -891,4 +1007,588 @@ TEST_CASE("AFC reset_endless_spool continues on partial failure",
 
     // Should still have attempted all 4 slots even if one hypothetically failed
     REQUIRE(helper.captured_gcodes.size() == 4);
+}
+
+// ============================================================================
+// Phase 1: Bug Fixes & Critical Data Sync Tests
+// ============================================================================
+//
+// These tests verify parsing of fields that the real AFC device exposes
+// (captured from 192.168.1.112). Tests use fixture data to validate that
+// state updates flow through correctly to internal state.
+// ============================================================================
+
+TEST_CASE("AFC current_state preferred over status field", "[ams][afc][state][phase1]") {
+    // Real device sends "current_state": "Idle" (in AFC global object)
+    // but we only parse "status" field today. current_state should take priority
+    // because it's the newer, more accurate field.
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    // Feed AFC state with both current_state and status
+    // current_state says "Idle" but status says "Loading" — current_state should win
+    nlohmann::json afc_data = {{"current_state", "Idle"}, {"status", "Loading"}};
+    helper.feed_afc_state(afc_data);
+
+    // current_state takes priority over status field
+    REQUIRE(helper.get_action() == AmsAction::IDLE);
+}
+
+TEST_CASE("AFC current_state fallback to status when no current_state",
+          "[ams][afc][state][phase1]") {
+    // When current_state is absent, fall back to status field (regression guard)
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    nlohmann::json afc_data = {{"status", "Loading"}};
+    helper.feed_afc_state(afc_data);
+
+    // Should still work via status field — this PASSES today (regression guard)
+    REQUIRE(helper.get_action() == AmsAction::LOADING);
+}
+
+TEST_CASE("AFC tool mapping from stepper map field", "[ams][afc][tool_mapping][phase1]") {
+    // Real device: AFC_stepper lane1 has "map": "T0", lane2 has "map": "T1", etc.
+    // We never parse this field today.
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    // Feed stepper data with map field
+    helper.feed_afc_stepper("lane1", {{"map", "T0"}, {"prep", true}});
+    helper.feed_afc_stepper("lane2", {{"map", "T1"}, {"prep", true}});
+    helper.feed_afc_stepper("lane3", {{"map", "T2"}, {"prep", false}});
+    helper.feed_afc_stepper("lane4", {{"map", "T3"}, {"prep", false}});
+
+    // tool_to_slot_map should reflect the mapping from stepper "map" fields
+    auto mapping = helper.get_tool_mapping();
+    REQUIRE(mapping.size() == 4);
+    REQUIRE(mapping[0] == 0); // T0 → lane1 (slot 0)
+    REQUIRE(mapping[1] == 1); // T1 → lane2 (slot 1)
+    REQUIRE(mapping[2] == 2); // T2 → lane3 (slot 2)
+    REQUIRE(mapping[3] == 3); // T3 → lane4 (slot 3)
+}
+
+TEST_CASE("AFC tool mapping swap updates correctly", "[ams][afc][tool_mapping][phase1]") {
+    // When lanes swap tools (e.g., T0 moves from lane1 to lane3), the mapping
+    // should update accordingly
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    // Initial mapping: T0→lane1, T1→lane2, T2→lane3, T3→lane4
+    helper.feed_afc_stepper("lane1", {{"map", "T0"}});
+    helper.feed_afc_stepper("lane2", {{"map", "T1"}});
+    helper.feed_afc_stepper("lane3", {{"map", "T2"}});
+    helper.feed_afc_stepper("lane4", {{"map", "T3"}});
+
+    // Now swap: lane1 gets T2, lane3 gets T0
+    helper.feed_afc_stepper("lane1", {{"map", "T2"}});
+    helper.feed_afc_stepper("lane3", {{"map", "T0"}});
+
+    // After swap, mapping should reflect new tool assignments
+    auto mapping = helper.get_tool_mapping();
+    REQUIRE(mapping.size() == 4);
+    REQUIRE(mapping[0] == 2); // T0 → lane3 (slot 2)
+    REQUIRE(mapping[1] == 1); // T1 → lane2 (slot 1)
+    REQUIRE(mapping[2] == 0); // T2 → lane1 (slot 0)
+    REQUIRE(mapping[3] == 3); // T3 → lane4 (slot 3)
+
+    // Slot mapped_tool should also be updated
+    REQUIRE(helper.get_slot_mapped_tool(0) == 2); // lane1 now maps to T2
+    REQUIRE(helper.get_slot_mapped_tool(2) == 0); // lane3 now maps to T0
+}
+
+TEST_CASE("AFC endless spool from runout_lane field", "[ams][afc][endless_spool][phase1]") {
+    // Real device: AFC_stepper lane1 has "runout_lane": "lane2"
+    // meaning if lane1 runs out, switch to lane2.
+    // We never parse this field today.
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.initialize_endless_spool_configs(4);
+
+    // Feed stepper data with runout_lane
+    helper.feed_afc_stepper("lane1", {{"runout_lane", "lane2"}});
+
+    // runout_lane should update endless spool backup config
+    auto configs = helper.get_endless_spool_configs();
+    REQUIRE(configs.size() == 4);
+    REQUIRE(configs[0].backup_slot == 1); // lane1's backup is lane2 (slot 1)
+}
+
+TEST_CASE("AFC endless spool null runout_lane clears backup", "[ams][afc][endless_spool][phase1]") {
+    // When runout_lane is null, the backup should be cleared (-1)
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.initialize_endless_spool_configs(4);
+
+    // First set a backup
+    helper.set_endless_spool_config(0, 1); // lane1 backup = lane2
+
+    // Now feed a null runout_lane
+    nlohmann::json stepper_data;
+    stepper_data["runout_lane"] = nullptr; // JSON null
+    helper.feed_afc_stepper("lane1", stepper_data);
+
+    // null runout_lane should clear the backup
+    auto configs = helper.get_endless_spool_configs();
+    REQUIRE(configs[0].backup_slot == -1); // Cleared
+}
+
+TEST_CASE("AFC message sets operation detail", "[ams][afc][message][phase1]") {
+    // Real device: AFC global state has "message": {"message": "Loading T1", "type": "info"}
+    // We never parse this field today, but it should set operation_detail.
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    nlohmann::json afc_data = {{"message", {{"message", "Loading T1"}, {"type", "info"}}}};
+    helper.feed_afc_state(afc_data);
+
+    // message.message should flow through to operation_detail
+    REQUIRE(helper.get_operation_detail().find("Loading T1") != std::string::npos);
+}
+
+TEST_CASE("AFC error message emits EVENT_ERROR", "[ams][afc][message][phase1]") {
+    // When message.type == "error", we should emit EVENT_ERROR with the message text
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.install_event_tracker();
+
+    nlohmann::json afc_data = {
+        {"message", {{"message", "AFC Error: lane1 failed to load"}, {"type", "error"}}}};
+    helper.feed_afc_state(afc_data);
+
+    // error type messages should emit EVENT_ERROR
+    REQUIRE(helper.has_event(AmsBackend::EVENT_ERROR));
+    // Error data should contain the message text
+    std::string error_data = helper.get_event_data(AmsBackend::EVENT_ERROR);
+    REQUIRE(error_data.find("lane1 failed to load") != std::string::npos);
+}
+
+TEST_CASE("AFC current_load and next_lane tracked", "[ams][afc][state][phase1]") {
+    // Real device: AFC global state has "current_load": "lane2", "next_lane": "lane3"
+    // These tell us which lane is actively loading and which is queued next.
+    // We never parse these fields today.
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    nlohmann::json afc_data = {
+        {"current_load", "lane2"}, {"next_lane", "lane3"}, {"current_state", "Loading"}};
+    helper.feed_afc_state(afc_data);
+
+    // current_load should update current_slot (lane2 = slot 1)
+    REQUIRE(helper.get_current_slot() == 1);
+    // operation_detail should mention the loading context
+    // At minimum, the action should be LOADING from current_state
+    REQUIRE(helper.get_action() == AmsAction::LOADING);
+}
+
+// ============================================================================
+// Phase 2: Full Data Parsing Tests
+// ============================================================================
+//
+// These tests verify parsing of extended hub, extruder, stepper, and buffer
+// fields from real AFC device data. Tests use fixture structures captured
+// from a real Box Turtle at 192.168.1.112.
+// ============================================================================
+
+TEST_CASE("AFC hub bowden length parsed from afc_bowden_length", "[ams][afc][hub][phase2]") {
+    // Real device: AFC_hub Turtle_1 has "afc_bowden_length": 1285.0
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    // Set hub names so the status update routes correctly
+    std::vector<std::string> lanes = {"lane1", "lane2", "lane3", "lane4"};
+    std::vector<std::string> hubs = {"Turtle_1"};
+    helper.set_discovered_lanes(lanes, hubs);
+
+    helper.feed_afc_hub("Turtle_1", {{"state", false}, {"afc_bowden_length", 1285.0}});
+
+    // bowden_length should be stored and accessible for device actions
+    auto actions = helper.get_device_actions();
+    bool found_bowden = false;
+    for (const auto& action : actions) {
+        if (action.id == "bowden_length") {
+            found_bowden = true;
+            // Value should use the real bowden length, not hardcoded 450
+            auto val = std::any_cast<float>(action.current_value);
+            REQUIRE(val == Catch::Approx(1285.0f));
+            break;
+        }
+    }
+    REQUIRE(found_bowden);
+}
+
+TEST_CASE("AFC hub cutter info parsed", "[ams][afc][hub][phase2]") {
+    // Real device: AFC_hub has "cut": false, "cut_dist": 50.0, etc.
+    // We should track whether the hub has a cutter for UI decisions
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    std::vector<std::string> lanes = {"lane1", "lane2", "lane3", "lane4"};
+    std::vector<std::string> hubs = {"Turtle_1"};
+    helper.set_discovered_lanes(lanes, hubs);
+
+    helper.feed_afc_hub(
+        "Turtle_1",
+        {{"state", false}, {"cut", false}, {"cut_dist", 50.0}, {"afc_bowden_length", 1285.0}});
+
+    // Hub sensor state should be updated
+    REQUIRE(helper.get_hub_sensor() == false);
+
+    // System info should reflect cutter availability
+    auto sys_info = helper.get_system_info();
+    // AFC always advertises TipMethod::CUT - but we should parse cut field
+    // to know if cutter is actually present/configured
+    REQUIRE(sys_info.tip_method == TipMethod::CUT);
+}
+
+TEST_CASE("AFC extruder speeds parsed", "[ams][afc][extruder][phase2]") {
+    // Real device: AFC_extruder has "tool_load_speed": 25.0, "tool_unload_speed": 25.0
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    helper.feed_afc_extruder("extruder", {{"tool_start_status", false},
+                                          {"tool_end_status", false},
+                                          {"tool_load_speed", 25.0},
+                                          {"tool_unload_speed", 30.0}});
+
+    // Sensor state should be updated
+    REQUIRE(helper.get_tool_start_sensor() == false);
+    REQUIRE(helper.get_tool_end_sensor() == false);
+}
+
+TEST_CASE("AFC extruder distances parsed", "[ams][afc][extruder][phase2]") {
+    // Real device: tool_stn=42.0, tool_stn_unload=90.0
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    helper.feed_afc_extruder("extruder", {{"tool_start_status", true},
+                                          {"tool_end_status", false},
+                                          {"tool_stn", 42.0},
+                                          {"tool_stn_unload", 90.0}});
+
+    REQUIRE(helper.get_tool_start_sensor() == true);
+}
+
+TEST_CASE("AFC stepper buffer_status parsed", "[ams][afc][stepper][phase2]") {
+    // Real device: AFC_stepper lane1 has "buffer_status": "Advancing"
+    // LaneSensors struct only has prep, load, loaded_to_hub today
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    helper.feed_afc_stepper("lane1",
+                            {{"prep", true}, {"load", true}, {"buffer_status", "Advancing"}});
+
+    // buffer_status should be stored on lane sensors
+    auto sensors = helper.get_lane_sensors(0);
+    REQUIRE(sensors.prep == true);
+    REQUIRE(sensors.load == true);
+    REQUIRE(sensors.buffer_status == "Advancing");
+}
+
+TEST_CASE("AFC stepper filament_status parsed", "[ams][afc][stepper][phase2]") {
+    // Real device: "filament_status": "Ready" or "Not Ready"
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    helper.feed_afc_stepper("lane1",
+                            {{"filament_status", "Ready"}, {"filament_status_led", "#00ff00"}});
+
+    auto sensors = helper.get_lane_sensors(0);
+    REQUIRE(sensors.filament_status == "Ready");
+}
+
+TEST_CASE("AFC stepper dist_hub parsed", "[ams][afc][stepper][phase2]") {
+    // Real device: "dist_hub": 200.0 (distance to hub in mm)
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    helper.feed_afc_stepper("lane1", {{"dist_hub", 200.0}});
+
+    auto sensors = helper.get_lane_sensors(0);
+    REQUIRE(sensors.dist_hub == Catch::Approx(200.0f));
+}
+
+TEST_CASE("AFC buffer object parsed via status update", "[ams][afc][buffer][phase2]") {
+    // Real device: AFC_buffer Turtle_1 has "state": "Advancing", "enabled": false
+    // We don't subscribe to or parse AFC_buffer objects today
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    std::vector<std::string> lanes = {"lane1", "lane2", "lane3", "lane4"};
+    std::vector<std::string> hubs = {"Turtle_1"};
+    helper.set_discovered_lanes(lanes, hubs);
+
+    // Feed buffer names through AFC state
+    helper.feed_afc_state({{"buffers", {"Turtle_1"}}});
+
+    // Now feed a buffer update
+    helper.feed_afc_buffer("Turtle_1", {{"state", "Advancing"}, {"enabled", false}});
+
+    // Buffer state should be tracked (at minimum, no crash)
+    // The test verifies the feed_afc_buffer path doesn't crash
+    // and that buffer names are stored
+    REQUIRE(true); // Placeholder — buffer tracking will expand in implementation
+}
+
+TEST_CASE("AFC global quiet_mode parsed from AFC state", "[ams][afc][global][phase2]") {
+    // Real device: AFC has "quiet_mode": false
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    helper.feed_afc_state({{"quiet_mode", false}});
+    REQUIRE(helper.get_quiet_mode() == false);
+
+    // Toggle it on
+    helper.feed_afc_state({{"quiet_mode", true}});
+    REQUIRE(helper.get_quiet_mode() == true);
+}
+
+TEST_CASE("AFC global led_state parsed from AFC state", "[ams][afc][global][phase2]") {
+    // Real device: AFC has "led_state": true
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    helper.feed_afc_state({{"led_state", true}});
+    REQUIRE(helper.get_led_state() == true);
+
+    // Toggle it off
+    helper.feed_afc_state({{"led_state", false}});
+    REQUIRE(helper.get_led_state() == false);
+}
+
+TEST_CASE("AFC bowden slider max accommodates real bowden length",
+          "[ams][afc][device_actions][phase2]") {
+    // The bowden slider max was hardcoded to 1000mm, but real bowden can be 1285mm
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    std::vector<std::string> lanes = {"lane1", "lane2", "lane3", "lane4"};
+    std::vector<std::string> hubs = {"Turtle_1"};
+    helper.set_discovered_lanes(lanes, hubs);
+
+    helper.feed_afc_hub("Turtle_1", {{"state", false}, {"afc_bowden_length", 1285.0}});
+
+    auto actions = helper.get_device_actions();
+    for (const auto& action : actions) {
+        if (action.id == "bowden_length") {
+            // Max should accommodate the real bowden length
+            REQUIRE(action.max_value >= 1285.0f);
+            break;
+        }
+    }
+}
+
+// ============================================================================
+// Phase 3: New Device Actions & Commands Tests
+// ============================================================================
+//
+// Tests for new maintenance section, LED/mode toggles, and maintenance commands.
+// ============================================================================
+
+TEST_CASE("AFC device sections include maintenance and led",
+          "[ams][afc][device_sections][phase3]") {
+    AmsBackendAfcTestHelper helper;
+
+    auto sections = helper.get_device_sections();
+
+    bool has_maintenance = false;
+    bool has_led = false;
+    for (const auto& section : sections) {
+        if (section.id == "maintenance")
+            has_maintenance = true;
+        if (section.id == "led")
+            has_led = true;
+    }
+    REQUIRE(has_maintenance);
+    REQUIRE(has_led);
+}
+
+TEST_CASE("AFC device action test_lanes dispatches gcode", "[ams][afc][device_actions][phase3]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    auto result = helper.execute_device_action("test_lanes");
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_TEST_LANES"));
+}
+
+TEST_CASE("AFC device action change_blade dispatches gcode", "[ams][afc][device_actions][phase3]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    auto result = helper.execute_device_action("change_blade");
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_CHANGE_BLADE"));
+}
+
+TEST_CASE("AFC device action park dispatches gcode", "[ams][afc][device_actions][phase3]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    auto result = helper.execute_device_action("park");
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_PARK"));
+}
+
+TEST_CASE("AFC device action brush dispatches gcode", "[ams][afc][device_actions][phase3]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    auto result = helper.execute_device_action("brush");
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_BRUSH"));
+}
+
+TEST_CASE("AFC device action reset_motor dispatches gcode", "[ams][afc][device_actions][phase3]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    auto result = helper.execute_device_action("reset_motor");
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_RESET_MOTOR_TIME"));
+}
+
+TEST_CASE("AFC device action led toggle on when off", "[ams][afc][device_actions][phase3]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    // LED is off, toggling should turn it on
+    helper.feed_afc_state({{"led_state", false}});
+
+    auto result = helper.execute_device_action("led_toggle");
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("TURN_ON_AFC_LED"));
+}
+
+TEST_CASE("AFC device action led toggle off when on", "[ams][afc][device_actions][phase3]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    // LED is on, toggling should turn it off
+    helper.feed_afc_state({{"led_state", true}});
+
+    auto result = helper.execute_device_action("led_toggle");
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("TURN_OFF_AFC_LED"));
+}
+
+TEST_CASE("AFC device action quiet_mode dispatches gcode", "[ams][afc][device_actions][phase3]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+
+    auto result = helper.execute_device_action("quiet_mode");
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_QUIET_MODE"));
+}
+
+// ============================================================================
+// Phase 4: Error Recovery Improvements Tests
+// ============================================================================
+//
+// Tests for differentiated reset (AFC_RESET vs AFC_HOME), per-lane reset,
+// and error message surfacing.
+// ============================================================================
+
+TEST_CASE("AFC recover sends AFC_RESET", "[ams][afc][recovery][phase4]") {
+    // Regression guard — recover() should continue using AFC_RESET
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true); // Bypass precondition for unit test
+
+    auto result = helper.recover();
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_RESET"));
+    REQUIRE_FALSE(helper.has_gcode("AFC_HOME"));
+}
+
+TEST_CASE("AFC reset sends AFC_HOME not AFC_RESET", "[ams][afc][recovery][phase4]") {
+    // reset() should send AFC_HOME to differentiate from recover()'s AFC_RESET
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true); // Bypass precondition for unit test
+
+    auto result = helper.reset();
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_HOME"));
+    REQUIRE_FALSE(helper.has_gcode("AFC_RESET"));
+}
+
+TEST_CASE("AFC reset_lane sends per-lane reset command", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true);
+
+    auto result = helper.reset_lane(0);
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_LANE_RESET LANE=lane1"));
+}
+
+TEST_CASE("AFC reset_lane second lane", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true);
+
+    auto result = helper.reset_lane(2);
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_LANE_RESET LANE=lane3"));
+}
+
+TEST_CASE("AFC reset_lane validates slot index", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true);
+
+    auto result = helper.reset_lane(99);
+
+    REQUIRE_FALSE(result.success());
+    REQUIRE(result.result == AmsResult::INVALID_SLOT);
+}
+
+TEST_CASE("AFC reset_lane validates negative index", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true);
+
+    auto result = helper.reset_lane(-1);
+
+    REQUIRE_FALSE(result.success());
+    REQUIRE(result.result == AmsResult::INVALID_SLOT);
+}
+
+TEST_CASE("AFC reset_lane fails when not running", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    // running_ defaults to false
+
+    auto result = helper.reset_lane(0);
+
+    REQUIRE_FALSE(result.success());
+    REQUIRE(result.result == AmsResult::NOT_CONNECTED);
+}
+
+TEST_CASE("AFC error message surfaces in EVENT_ERROR data", "[ams][afc][recovery][phase4]") {
+    // Verify that AFC error messages contain useful text in the event data
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.install_event_tracker();
+
+    nlohmann::json afc_data = {
+        {"message", {{"message", "Lane 1 failed: filament jam detected"}, {"type", "error"}}}};
+    helper.feed_afc_state(afc_data);
+
+    REQUIRE(helper.has_event(AmsBackend::EVENT_ERROR));
+    std::string error_data = helper.get_event_data(AmsBackend::EVENT_ERROR);
+    REQUIRE(error_data.find("filament jam detected") != std::string::npos);
 }

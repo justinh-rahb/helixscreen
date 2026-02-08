@@ -94,6 +94,7 @@ class AmsBackendAfc : public AmsBackend {
     // Recovery
     AmsError recover() override;
     AmsError reset() override;
+    AmsError reset_lane(int slot_index) override;
     AmsError cancel() override;
 
     // Configuration
@@ -414,9 +415,12 @@ class AmsBackendAfc : public AmsBackend {
 
     // Per-lane sensor state (from AFC_stepper objects)
     struct LaneSensors {
-        bool prep = false;          ///< Prep sensor triggered
-        bool load = false;          ///< Load sensor triggered
-        bool loaded_to_hub = false; ///< Filament reached hub
+        bool prep = false;           ///< Prep sensor triggered
+        bool load = false;           ///< Load sensor triggered
+        bool loaded_to_hub = false;  ///< Filament reached hub
+        std::string buffer_status;   ///< Buffer state (e.g., "Advancing")
+        std::string filament_status; ///< Filament readiness (e.g., "Ready", "Not Ready")
+        float dist_hub = 0.0f;       ///< Distance to hub in mm
     };
     std::array<LaneSensors, 16> lane_sensors_{}; ///< Sensor state for each lane
 
@@ -426,10 +430,15 @@ class AmsBackendAfc : public AmsBackend {
     bool tool_end_sensor_{false};   ///< Toolhead exit/nozzle sensor
 
     // Global state
-    bool error_state_{false};            ///< AFC error state
-    bool bypass_active_{false};          ///< Bypass mode active (external spool)
-    std::string current_lane_name_;      ///< Currently active lane name
-    std::vector<std::string> hub_names_; ///< Discovered hub names
+    bool error_state_{false};               ///< AFC error state
+    bool bypass_active_{false};             ///< Bypass mode active (external spool)
+    bool afc_quiet_mode_{false};            ///< AFC quiet mode state
+    bool afc_led_state_{false};             ///< AFC LED state
+    std::string current_lane_name_;         ///< Currently active lane name
+    std::string last_error_msg_;            ///< Last emitted error message (dedup)
+    std::vector<std::string> hub_names_;    ///< Discovered hub names
+    std::vector<std::string> buffer_names_; ///< Discovered buffer names
+    float bowden_length_{450.0f};           ///< Bowden tube length from hub (default 450mm)
 
     // Path visualization state
     PathSegment error_segment_{PathSegment::NONE}; ///< Inferred error location

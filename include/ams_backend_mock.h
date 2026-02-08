@@ -209,6 +209,27 @@ class AmsBackendMock : public AmsBackend {
     [[nodiscard]] bool is_tool_changer_mode() const;
 
     /**
+     * @brief Enable AFC simulation mode
+     * @param enabled true to simulate an AFC Box Turtle, false for Happy Hare
+     *
+     * When enabled, the mock will:
+     * - Report type as AFC instead of HAPPY_HARE
+     * - Use HUB path topology (4 lanes merge through hub)
+     * - Configure 4 lanes with realistic AFC filament data
+     * - Set AFC-specific device sections and actions (calibration, maintenance, etc.)
+     * - Use CUT tip method
+     *
+     * Can also be set via HELIX_MOCK_AMS_TYPE=afc environment variable.
+     */
+    void set_afc_mode(bool enabled);
+
+    /**
+     * @brief Check if AFC mode is enabled
+     * @return true if simulating an AFC Box Turtle
+     */
+    [[nodiscard]] bool is_afc_mode() const;
+
+    /**
      * @brief Set whether endless spool is supported
      * @param supported true to enable endless spool support
      *
@@ -373,6 +394,9 @@ class AmsBackendMock : public AmsBackend {
 
     // Tool changer mode (alternative to filament system simulation)
     bool tool_changer_mode_ = false; ///< Simulate tool changer instead of filament system
+
+    // AFC mode (alternative to Happy Hare simulation)
+    bool afc_mode_ = false; ///< Simulate AFC Box Turtle instead of Happy Hare
 
     // Endless spool simulation state
     bool endless_spool_supported_ = true; ///< Whether endless spool is supported

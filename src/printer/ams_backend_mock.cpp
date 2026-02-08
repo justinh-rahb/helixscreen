@@ -1056,6 +1056,401 @@ bool AmsBackendMock::is_tool_changer_mode() const {
     return tool_changer_mode_;
 }
 
+void AmsBackendMock::set_afc_mode(bool enabled) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    afc_mode_ = enabled;
+
+    if (enabled) {
+        // Disable conflicting mode
+        tool_changer_mode_ = false;
+
+        // Configure system info for AFC Box Turtle
+        system_info_.type = AmsType::AFC;
+        system_info_.type_name = "AFC (Mock)";
+        system_info_.version = "1.0.32-mock";
+        system_info_.total_slots = 4;
+        system_info_.supports_bypass = true;
+        system_info_.supports_endless_spool = true;
+        system_info_.supports_spoolman = true;
+        system_info_.supports_tool_mapping = true;
+        system_info_.has_hardware_bypass_sensor = false;
+        system_info_.tip_method = TipMethod::CUT;
+        system_info_.supports_purge = true;
+
+        // HUB topology, single unit
+        topology_ = PathTopology::HUB;
+
+        // Build single Box Turtle unit with 4 lanes
+        system_info_.units.clear();
+        AmsUnit unit;
+        unit.unit_index = 0;
+        unit.name = "Box Turtle (Mock)";
+        unit.slot_count = 4;
+        unit.first_slot_global_index = 0;
+        unit.connected = true;
+        unit.firmware_version = "1.0.32-mock";
+        unit.has_encoder = false;
+        unit.has_toolhead_sensor = true;
+        unit.has_slot_sensors = true;
+
+        // Lane 1: ASA, loaded
+        {
+            SlotInfo slot;
+            slot.slot_index = 0;
+            slot.global_index = 0;
+            slot.material = "ASA";
+            slot.color_rgb = 0x000000;
+            slot.color_name = "Black";
+            slot.status = SlotStatus::LOADED;
+            slot.mapped_tool = 0;
+            slot.total_weight_g = 1000.0f;
+            slot.remaining_weight_g = 750.0f;
+            auto mat_info = filament::find_material("ASA");
+            if (mat_info) {
+                slot.nozzle_temp_min = mat_info->nozzle_min;
+                slot.nozzle_temp_max = mat_info->nozzle_max;
+                slot.bed_temp = mat_info->bed_temp;
+            }
+            unit.slots.push_back(slot);
+        }
+
+        // Lane 2: PLA, loaded
+        {
+            SlotInfo slot;
+            slot.slot_index = 1;
+            slot.global_index = 1;
+            slot.material = "PLA";
+            slot.color_rgb = 0xFF0000;
+            slot.color_name = "Red";
+            slot.status = SlotStatus::AVAILABLE;
+            slot.mapped_tool = 1;
+            slot.total_weight_g = 1000.0f;
+            slot.remaining_weight_g = 900.0f;
+            auto mat_info = filament::find_material("PLA");
+            if (mat_info) {
+                slot.nozzle_temp_min = mat_info->nozzle_min;
+                slot.nozzle_temp_max = mat_info->nozzle_max;
+                slot.bed_temp = mat_info->bed_temp;
+            }
+            unit.slots.push_back(slot);
+        }
+
+        // Lane 3: PETG, loaded
+        {
+            SlotInfo slot;
+            slot.slot_index = 2;
+            slot.global_index = 2;
+            slot.material = "PETG";
+            slot.color_rgb = 0x00FF00;
+            slot.color_name = "Green";
+            slot.status = SlotStatus::AVAILABLE;
+            slot.mapped_tool = 2;
+            slot.total_weight_g = 1000.0f;
+            slot.remaining_weight_g = 500.0f;
+            auto mat_info = filament::find_material("PETG");
+            if (mat_info) {
+                slot.nozzle_temp_min = mat_info->nozzle_min;
+                slot.nozzle_temp_max = mat_info->nozzle_max;
+                slot.bed_temp = mat_info->bed_temp;
+            }
+            unit.slots.push_back(slot);
+        }
+
+        // Lane 4: empty
+        {
+            SlotInfo slot;
+            slot.slot_index = 3;
+            slot.global_index = 3;
+            slot.material = "";
+            slot.color_name = "";
+            slot.status = SlotStatus::EMPTY;
+            slot.mapped_tool = 3;
+            slot.total_weight_g = 0.0f;
+            slot.remaining_weight_g = 0.0f;
+            unit.slots.push_back(slot);
+        }
+
+        system_info_.units.push_back(unit);
+
+        // Tool-to-slot mapping: T0->lane1, T1->lane2, T2->lane3, T3->lane4
+        system_info_.tool_to_slot_map = {0, 1, 2, 3};
+
+        // Start with lane 0 (ASA) loaded
+        system_info_.current_slot = 0;
+        system_info_.current_tool = 0;
+        system_info_.filament_loaded = true;
+        filament_segment_ = PathSegment::NOZZLE;
+
+        // Reinitialize endless spool configs for 4 slots
+        endless_spool_configs_.clear();
+        endless_spool_configs_.reserve(4);
+        for (int i = 0; i < 4; ++i) {
+            helix::printer::EndlessSpoolConfig config;
+            config.slot_index = i;
+            config.backup_slot = -1;
+            endless_spool_configs_.push_back(config);
+        }
+
+        // AFC-specific device sections
+        using helix::printer::ActionType;
+        mock_device_sections_ = {
+            {"calibration", "Calibration", "wrench", 0},
+            {"maintenance", "Maintenance", "tools", 1},
+            {"speed", "Speed Settings", "speedometer", 2},
+            {"led", "LEDs & Modes", "lightbulb", 3},
+        };
+
+        // AFC-specific device actions
+        mock_device_actions_ = {
+            // Calibration section
+            {"calibration_wizard",
+             "Run Calibration Wizard",
+             "play",
+             "calibration",
+             "Interactive calibration for all lanes",
+             ActionType::BUTTON,
+             {},
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+            {"bowden_length",
+             "Bowden Length",
+             "ruler",
+             "calibration",
+             "Distance from hub to toolhead",
+             ActionType::SLIDER,
+             450.0f,
+             {},
+             100.0f,
+             1000.0f,
+             "mm",
+             -1,
+             true,
+             ""},
+            {"test_lanes",
+             "Test All Lanes",
+             "refresh",
+             "calibration",
+             "Load and unload each lane to verify operation",
+             ActionType::BUTTON,
+             {},
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+            // Maintenance section
+            {"change_blade",
+             "Change Blade",
+             "scissors",
+             "maintenance",
+             "Prepare cutter for blade replacement",
+             ActionType::BUTTON,
+             {},
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+            {"park",
+             "Park Filament",
+             "download",
+             "maintenance",
+             "Retract filament to parking position",
+             ActionType::BUTTON,
+             {},
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+            {"brush",
+             "Clean Brush",
+             "paint-roller",
+             "maintenance",
+             "Run nozzle cleaning brush cycle",
+             ActionType::BUTTON,
+             {},
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+            {"reset_motor",
+             "Reset Motor",
+             "rotate-ccw",
+             "maintenance",
+             "Reset stepper motor to default state",
+             ActionType::BUTTON,
+             {},
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+            // Speed section
+            {"speed_fwd",
+             "Forward Multiplier",
+             "fast-forward",
+             "speed",
+             "Speed multiplier for forward moves",
+             ActionType::SLIDER,
+             1.0f,
+             {},
+             0.5f,
+             2.0f,
+             "x",
+             -1,
+             true,
+             ""},
+            {"speed_rev",
+             "Reverse Multiplier",
+             "rewind",
+             "speed",
+             "Speed multiplier for reverse moves",
+             ActionType::SLIDER,
+             1.0f,
+             {},
+             0.5f,
+             2.0f,
+             "x",
+             -1,
+             true,
+             ""},
+            // LED section
+            {"led_toggle",
+             "Status LEDs",
+             "lightbulb",
+             "led",
+             "Toggle lane status indicator LEDs",
+             ActionType::TOGGLE,
+             true,
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+            {"quiet_mode",
+             "Quiet Mode",
+             "volume-x",
+             "led",
+             "Reduce motor noise at the cost of speed",
+             ActionType::TOGGLE,
+             false,
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+        };
+
+        spdlog::info("[AmsBackendMock] AFC mode enabled (4-lane Box Turtle)");
+    } else {
+        // Revert to Happy Hare defaults
+        afc_mode_ = false;
+        system_info_.type = AmsType::HAPPY_HARE;
+        system_info_.type_name = "Happy Hare (Mock)";
+        system_info_.version = "2.7.0-mock";
+        system_info_.supports_bypass = true;
+        topology_ = PathTopology::HUB;
+
+        if (!system_info_.units.empty()) {
+            system_info_.units[0].name = "Mock MMU";
+        }
+
+        // Restore default device sections and actions (from constructor pattern)
+        mock_device_sections_ = {
+            {"calibration", "Calibration", "wrench", 0},
+            {"speed", "Speed Settings", "speedometer", 1},
+        };
+
+        using helix::printer::ActionType;
+        mock_device_actions_ = {
+            {"calibration_wizard",
+             "Run Calibration Wizard",
+             "play",
+             "calibration",
+             "Interactive calibration for all lanes",
+             ActionType::BUTTON,
+             {},
+             {},
+             0,
+             100,
+             "",
+             -1,
+             true,
+             ""},
+            {"bowden_length",
+             "Bowden Length",
+             "ruler",
+             "calibration",
+             "Distance from hub to toolhead",
+             ActionType::SLIDER,
+             450.0f,
+             {},
+             100.0f,
+             1000.0f,
+             "mm",
+             -1,
+             true,
+             ""},
+            {"speed_fwd",
+             "Forward Multiplier",
+             "fast-forward",
+             "speed",
+             "Speed multiplier for forward moves",
+             ActionType::SLIDER,
+             1.0f,
+             {},
+             0.5f,
+             2.0f,
+             "x",
+             -1,
+             true,
+             ""},
+            {"speed_rev",
+             "Reverse Multiplier",
+             "rewind",
+             "speed",
+             "Speed multiplier for reverse moves",
+             ActionType::SLIDER,
+             1.0f,
+             {},
+             0.5f,
+             2.0f,
+             "x",
+             -1,
+             true,
+             ""},
+        };
+
+        spdlog::info("[AmsBackendMock] AFC mode disabled, reverting to Happy Hare");
+    }
+}
+
+bool AmsBackendMock::is_afc_mode() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return afc_mode_;
+}
+
 int AmsBackendMock::get_effective_delay_ms(int base_ms, float variance) const {
     double speedup = get_runtime_config()->sim_speedup;
     if (speedup <= 0)
