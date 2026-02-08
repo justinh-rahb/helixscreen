@@ -88,39 +88,8 @@ bool has_touch_capabilities(int event_num) {
     }
 }
 
-/**
- * @brief Check if device name matches known touchscreen patterns
- * @param name Device name to check
- * @return true if name matches a known touchscreen pattern
- */
-bool is_known_touchscreen_name(const std::string& name) {
-    // Known touchscreen name patterns (case-insensitive substrings)
-    // Note: Avoid overly broad patterns like "ts" which match "events", "buttons", etc.
-    static const char* patterns[] = {"rtp",    // Resistive touch panel (sun4i_ts on AD5M)
-                                     "touch",  // Generic touchscreen
-                                     "sun4i",  // Allwinner touch controller
-                                     "ft5x",   // FocalTech touch controllers
-                                     "goodix", // Goodix touch controllers
-                                     "gt9",    // Goodix GT9xx series
-                                     "ili2",   // ILI touch controllers
-                                     "atmel",  // Atmel touch controllers
-                                     "edt-ft", // EDT FocalTech displays
-                                     "tsc",    // Touch screen controller
-                                     nullptr};
-
-    // Convert name to lowercase for case-insensitive matching
-    std::string lower_name = name;
-    for (auto& c : lower_name) {
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    }
-
-    for (int i = 0; patterns[i] != nullptr; ++i) {
-        if (lower_name.find(patterns[i]) != std::string::npos) {
-            return true;
-        }
-    }
-    return false;
-}
+// is_known_touchscreen_name() is now in touch_calibration.h (helix::is_known_touchscreen_name)
+using helix::is_known_touchscreen_name;
 
 /**
  * @brief Check if an input device is connected via USB
@@ -405,7 +374,7 @@ std::string DisplayBackendFbdev::auto_detect_touch_device() const {
     DIR* dir = opendir(input_dir);
     if (dir == nullptr) {
         spdlog::debug("[Fbdev Backend] Cannot open {}", input_dir);
-        return "/dev/input/event0";
+        return "";
     }
 
     std::string best_device;
@@ -457,8 +426,8 @@ std::string DisplayBackendFbdev::auto_detect_touch_device() const {
     closedir(dir);
 
     if (best_device.empty()) {
-        spdlog::debug("[Fbdev Backend] No touch-capable device found, using default");
-        return "/dev/input/event0";
+        spdlog::debug("[Fbdev Backend] No touch-capable device found");
+        return "";
     }
 
     spdlog::info("[Fbdev Backend] Found touchscreen: {} ({})", best_device, best_name);

@@ -385,3 +385,79 @@ TEST_CASE("TouchCalibration: USB input phys detection", "[touch-calibration][usb
         REQUIRE(is_usb_input_phys("usb-xhci-hcd.0-1/input1") == true);
     }
 }
+
+// ============================================================================
+// Known Touchscreen Name Detection Tests
+// ============================================================================
+
+TEST_CASE("TouchCalibration: known touchscreen name detection",
+          "[touch-calibration][touchscreen-detect]") {
+    // --- Real touchscreen controllers should match ---
+
+    SECTION("AD5M sun4i resistive touchscreen") {
+        REQUIRE(is_known_touchscreen_name("sun4i-ts") == true);
+    }
+
+    SECTION("Goodix capacitive touchscreen") {
+        REQUIRE(is_known_touchscreen_name("Goodix Capacitive TouchScreen") == true);
+    }
+
+    SECTION("FocalTech FT5x touchscreen") {
+        REQUIRE(is_known_touchscreen_name("ft5x06_ts") == true);
+    }
+
+    SECTION("Goodix GT911 touchscreen") {
+        REQUIRE(is_known_touchscreen_name("gt911") == true);
+    }
+
+    SECTION("ILI2130 touchscreen") {
+        REQUIRE(is_known_touchscreen_name("ili2130_ts") == true);
+    }
+
+    SECTION("generic touch device") {
+        REQUIRE(is_known_touchscreen_name("Generic Touchscreen") == true);
+    }
+
+    SECTION("EDT FocalTech display") {
+        REQUIRE(is_known_touchscreen_name("edt-ft5x06") == true);
+    }
+
+    SECTION("case insensitive matching") {
+        REQUIRE(is_known_touchscreen_name("GOODIX Touch") == true);
+        REQUIRE(is_known_touchscreen_name("SUN4I-TS") == true);
+    }
+
+    // --- Non-touch devices must NOT match ---
+
+    SECTION("HDMI CEC remote control") {
+        REQUIRE(is_known_touchscreen_name("vc4-hdmi") == false);
+    }
+
+    SECTION("HDMI CEC variant") {
+        REQUIRE(is_known_touchscreen_name("vc4-hdmi HDMI Jack") == false);
+    }
+
+    SECTION("generic keyboard") {
+        REQUIRE(is_known_touchscreen_name("AT Translated Set 2 keyboard") == false);
+    }
+
+    SECTION("USB mouse") {
+        REQUIRE(is_known_touchscreen_name("Logitech USB Mouse") == false);
+    }
+
+    SECTION("power button") {
+        REQUIRE(is_known_touchscreen_name("Power Button") == false);
+    }
+
+    SECTION("GPIO keys") {
+        REQUIRE(is_known_touchscreen_name("gpio-keys") == false);
+    }
+
+    SECTION("empty name") {
+        REQUIRE(is_known_touchscreen_name("") == false);
+    }
+
+    SECTION("IR remote") {
+        REQUIRE(is_known_touchscreen_name("rc-cec") == false);
+    }
+}

@@ -72,4 +72,43 @@ inline bool is_usb_input_phys(const std::string& phys) {
     return phys.find("usb") != std::string::npos;
 }
 
+/**
+ * @brief Check if a device name matches known touchscreen patterns
+ *
+ * Used during touch device auto-detection to prefer known touchscreen
+ * controllers. Performs case-insensitive substring matching against a list
+ * of known touchscreen name patterns.
+ *
+ * Non-touch devices like HDMI CEC ("vc4-hdmi"), keyboard, or mouse
+ * devices will not match and should return false.
+ *
+ * @param name The device name from /sys/class/input/eventN/device/name
+ * @return true if the name matches a known touchscreen pattern
+ */
+inline bool is_known_touchscreen_name(const std::string& name) {
+    static const char* patterns[] = {"rtp",    // Resistive touch panel (sun4i_ts on AD5M)
+                                     "touch",  // Generic touchscreen
+                                     "sun4i",  // Allwinner touch controller
+                                     "ft5x",   // FocalTech touch controllers
+                                     "goodix", // Goodix touch controllers
+                                     "gt9",    // Goodix GT9xx series
+                                     "ili2",   // ILI touch controllers
+                                     "atmel",  // Atmel touch controllers
+                                     "edt-ft", // EDT FocalTech displays
+                                     "tsc",    // Touch screen controller
+                                     nullptr};
+
+    std::string lower_name = name;
+    for (auto& c : lower_name) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+
+    for (int i = 0; patterns[i] != nullptr; ++i) {
+        if (lower_name.find(patterns[i]) != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace helix
