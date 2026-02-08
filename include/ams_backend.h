@@ -298,6 +298,20 @@ class AmsBackend {
     virtual AmsError reset() = 0;
 
     /**
+     * @brief Reset a specific lane/slot
+     *
+     * Resets an individual lane to a known good state without affecting others.
+     * Default implementation returns NOT_SUPPORTED.
+     *
+     * @param slot_index Lane to reset (0-based)
+     * @return AmsError indicating if operation was started
+     */
+    virtual AmsError reset_lane(int slot_index) {
+        (void)slot_index;
+        return AmsErrorHelper::not_supported("Per-lane reset not supported");
+    }
+
+    /**
      * @brief Cancel current operation
      *
      * Attempts to safely abort the current operation.

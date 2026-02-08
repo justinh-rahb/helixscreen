@@ -94,6 +94,7 @@ class AmsBackendAfc : public AmsBackend {
     // Recovery
     AmsError recover() override;
     AmsError reset() override;
+    AmsError reset_lane(int slot_index) override;
     AmsError cancel() override;
 
     // Configuration

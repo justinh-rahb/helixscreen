@@ -82,6 +82,10 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
         }
     }
 
+    void set_running(bool state) {
+        running_ = state;
+    }
+
     void set_filament_loaded(bool state) {
         system_info_.filament_loaded = state;
     }
@@ -1483,4 +1487,108 @@ TEST_CASE("AFC device action quiet_mode dispatches gcode", "[ams][afc][device_ac
 
     REQUIRE(result.success());
     REQUIRE(helper.has_gcode("AFC_QUIET_MODE"));
+}
+
+// ============================================================================
+// Phase 4: Error Recovery Improvements Tests
+// ============================================================================
+//
+// Tests for differentiated reset (AFC_RESET vs AFC_HOME), per-lane reset,
+// and error message surfacing.
+// ============================================================================
+
+TEST_CASE("AFC recover sends AFC_RESET", "[ams][afc][recovery][phase4]") {
+    // Regression guard — recover() should continue using AFC_RESET
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true); // Bypass precondition for unit test
+
+    auto result = helper.recover();
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_RESET"));
+    REQUIRE_FALSE(helper.has_gcode("AFC_HOME"));
+}
+
+TEST_CASE("AFC reset sends AFC_HOME not AFC_RESET", "[ams][afc][recovery][phase4]") {
+    // reset() should send AFC_HOME to differentiate from recover()'s AFC_RESET
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true); // Bypass precondition for unit test
+
+    auto result = helper.reset();
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_HOME"));
+    REQUIRE_FALSE(helper.has_gcode("AFC_RESET"));
+}
+
+TEST_CASE("AFC reset_lane sends per-lane reset command", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true);
+
+    auto result = helper.reset_lane(0);
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_LANE_RESET LANE=lane1"));
+}
+
+TEST_CASE("AFC reset_lane second lane", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true);
+
+    auto result = helper.reset_lane(2);
+
+    REQUIRE(result.success());
+    REQUIRE(helper.has_gcode("AFC_LANE_RESET LANE=lane3"));
+}
+
+TEST_CASE("AFC reset_lane validates slot index", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true);
+
+    auto result = helper.reset_lane(99);
+
+    REQUIRE_FALSE(result.success());
+    REQUIRE(result.result == AmsResult::INVALID_SLOT);
+}
+
+TEST_CASE("AFC reset_lane validates negative index", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.set_running(true);
+
+    auto result = helper.reset_lane(-1);
+
+    REQUIRE_FALSE(result.success());
+    REQUIRE(result.result == AmsResult::INVALID_SLOT);
+}
+
+TEST_CASE("AFC reset_lane fails when not running", "[ams][afc][recovery][phase4]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    // running_ defaults to false
+
+    auto result = helper.reset_lane(0);
+
+    REQUIRE_FALSE(result.success());
+    REQUIRE(result.result == AmsResult::NOT_CONNECTED);
+}
+
+TEST_CASE("AFC error message surfaces in EVENT_ERROR data", "[ams][afc][recovery][phase4]") {
+    // Verify that AFC error messages contain useful text in the event data
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_with_slots(4);
+    helper.install_event_tracker();
+
+    nlohmann::json afc_data = {
+        {"message", {{"message", "Lane 1 failed: filament jam detected"}, {"type", "error"}}}};
+    helper.feed_afc_state(afc_data);
+
+    REQUIRE(helper.has_event(AmsBackend::EVENT_ERROR));
+    std::string error_data = helper.get_event_data(AmsBackend::EVENT_ERROR);
+    REQUIRE(error_data.find("filament jam detected") != std::string::npos);
 }

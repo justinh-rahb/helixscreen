@@ -1253,12 +1253,13 @@ AmsError AmsBackendAfc::recover() {
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
 
+        // Only check running_, NOT is_busy() — recovery must work even when
+        // the system is stuck in a busy/error state
         if (!running_) {
             return AmsErrorHelper::not_connected("AFC backend not started");
         }
     }
 
-    // AFC may use AFC_RESET or AFC_RECOVER for error recovery
     spdlog::info("[AMS AFC] Initiating recovery");
     return execute_gcode("AFC_RESET");
 }
@@ -1273,8 +1274,29 @@ AmsError AmsBackendAfc::reset() {
         }
     }
 
-    spdlog::info("[AMS AFC] Resetting AFC system");
-    return execute_gcode("AFC_RESET");
+    spdlog::info("[AMS AFC] Homing AFC system");
+    return execute_gcode("AFC_HOME");
+}
+
+AmsError AmsBackendAfc::reset_lane(int slot_index) {
+    std::string lane_name;
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
+
+        AmsError precondition = check_preconditions();
+        if (!precondition) {
+            return precondition;
+        }
+
+        if (slot_index < 0 || slot_index >= static_cast<int>(lane_names_.size())) {
+            return AmsErrorHelper::invalid_slot(
+                slot_index, lane_names_.empty() ? 0 : static_cast<int>(lane_names_.size()) - 1);
+        }
+        lane_name = lane_names_[slot_index];
+    }
+
+    spdlog::info("[AMS AFC] Resetting lane {}", lane_name);
+    return execute_gcode("AFC_LANE_RESET LANE=" + lane_name);
 }
 
 AmsError AmsBackendAfc::cancel() {
