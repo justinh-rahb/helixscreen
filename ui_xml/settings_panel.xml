@@ -59,13 +59,12 @@
                           description_tag="Weight sync settings" callback="on_spoolman_settings_clicked"/>
     </lv_obj>
     <!-- LED Light Settings (hidden if no LED capability) -->
-    <lv_obj name="container_led_light" width="100%" style_pad_all="0" style_layout="flex" style_flex_flow="column" scrollable="false">
+    <lv_obj name="container_led_light"
+            width="100%" style_pad_all="0" style_layout="flex" style_flex_flow="column" scrollable="false">
       <bind_flag_if_eq subject="printer_has_led" flag="hidden" ref_value="0"/>
       <setting_dropdown_row name="row_led_select"
-                            label="Main LED" label_tag="Main LED" icon="light"
-                            description="Select which LED to control"
-                            description_tag="Select which LED to control"
-                            callback="on_led_select_changed"/>
+                            label="Main LED" label_tag="Main LED" icon="light" description="Select which LED to control"
+                            description_tag="Select which LED to control" callback="on_led_select_changed"/>
       <setting_toggle_row name="row_led_light"
                           label="LED on at Start" label_tag="LED on at Start" icon="light"
                           description="Turn on LED when printer starts"
@@ -95,7 +94,8 @@
     <!-- ================================================================== -->
     <setting_section_header title="NOTIFICATIONS" title_tag="NOTIFICATIONS" icon="notifications"/>
     <!-- Sounds Toggle (hidden if no speaker capability) -->
-    <lv_obj name="container_sounds" width="100%" style_pad_all="0" style_layout="flex" style_flex_flow="column" scrollable="false">
+    <lv_obj name="container_sounds"
+            width="100%" style_pad_all="0" style_layout="flex" style_flex_flow="column" scrollable="false">
       <bind_flag_if_eq subject="printer_has_speaker" flag="hidden" ref_value="0"/>
       <setting_toggle_row name="row_sounds"
                           label="Sounds" label_tag="Sounds" icon="notifications" description="Enable audio feedback"
@@ -106,26 +106,22 @@
         <setting_toggle_row name="row_ui_sounds"
                             label="UI Sounds" label_tag="UI Sounds" icon="notifications"
                             description="Button taps and navigation sounds"
-                            description_tag="Button taps and navigation sounds"
-                            subject="settings_ui_sounds_enabled" callback="on_ui_sounds_changed"/>
+                            description_tag="Button taps and navigation sounds" subject="settings_ui_sounds_enabled"
+                            callback="on_ui_sounds_changed"/>
       </lv_obj>
       <!-- Sound Theme Dropdown (hidden when master sounds off) -->
       <lv_obj name="container_sound_theme" width="100%" style_pad_all="0" scrollable="false">
         <bind_flag_if_eq subject="settings_sounds_enabled" flag="hidden" ref_value="0"/>
         <setting_dropdown_row name="row_sound_theme"
-                              label="Sound Theme" label_tag="Sound Theme" icon="tune"
-                              description="Choose sound style"
-                              description_tag="Choose sound style"
-                              callback="on_sound_theme_changed"/>
+                              label="Sound Theme" label_tag="Sound Theme" icon="tune" description="Choose sound style"
+                              description_tag="Choose sound style" callback="on_sound_theme_changed"/>
       </lv_obj>
       <!-- Test Beep Button (hidden when master sounds off) -->
       <lv_obj name="container_test_beep" width="100%" style_pad_all="0" scrollable="false">
         <bind_flag_if_eq subject="settings_sounds_enabled" flag="hidden" ref_value="0"/>
         <setting_action_row name="row_test_beep"
-                            label="Test Sound" label_tag="Test Sound" icon="play"
-                            description="Play a test beep"
-                            description_tag="Play a test beep"
-                            callback="on_test_beep"/>
+                            label="Test Sound" label_tag="Test Sound" icon="play" description="Play a test beep"
+                            description_tag="Play a test beep" callback="on_test_beep"/>
       </lv_obj>
     </lv_obj>
     <!-- Completion Alert Dropdown (Off/Notification/Alert) -->
@@ -172,8 +168,8 @@
     <!-- Restart HelixScreen -->
     <setting_action_row name="row_restart_helix"
                         label="Restart HelixScreen" label_tag="Restart HelixScreen" icon="restart"
-                        description="Restart the display application"
-                        description_tag="Restart the display application" callback="on_restart_helix_settings_clicked"/>
+                        description="Restart the display application" description_tag="Restart the display application"
+                        callback="on_restart_helix_settings_clicked"/>
     <!-- Factory Reset -->
     <setting_action_row name="row_factory_reset"
                         label="Factory Reset" label_tag="Factory Reset" icon="refresh"
@@ -191,8 +187,7 @@
       <bind_flag_if_eq subject="show_beta_features" flag="hidden" ref_value="0"/>
       <setting_dropdown_row name="row_update_channel"
                             label="Update Channel" label_tag="Update Channel" icon="swap_vertical"
-                            options="Stable&#10;Beta&#10;Dev"
-                            bind_selected="update_channel"
+                            options="Stable&#10;Beta&#10;Dev" bind_selected="update_channel"
                             callback="on_update_channel_changed"/>
     </lv_obj>
     <!-- Install Update (visible only when update available) -->
@@ -215,8 +210,8 @@
               event_bubble="true">
         <icon name="row_icon" src="info" size="sm" variant="secondary" clickable="false" event_bubble="true"/>
         <text_body name="label"
-                   text="Current Version" translation_tag="Current Version" style_text_color="#text" flex_grow="1" clickable="false"
-                   event_bubble="true"/>
+                   text="Current Version" translation_tag="Current Version" style_text_color="#text" flex_grow="1"
+                   clickable="false" event_bubble="true"/>
         <text_muted name="value" bind_text="version_value" clickable="false" event_bubble="true"/>
       </lv_obj>
       <event_cb trigger="clicked" callback="on_version_clicked"/>
@@ -230,8 +225,8 @@
       <text_muted name="value" bind_text="printer_value"/>
     </setting_info_row>
     <!-- Printer Host (clickable - opens change host modal) -->
-    <setting_action_row name="row_printer_host" label="Host" label_tag="Host"
-                        icon="lan" callback="on_change_host_clicked"/>
+    <setting_action_row name="row_printer_host"
+                        label="Host" label_tag="Host" icon="lan" callback="on_change_host_clicked"/>
     <!-- Klipper Version -->
     <setting_info_row name="row_klipper" label="Klipper" label_tag="Klipper" icon="toy_brick_outline">
       <text_muted name="value" text="—"/>
