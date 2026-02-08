@@ -1540,19 +1540,16 @@ void PrintStatusPanel::on_preprint_remaining_changed(int seconds) {
 
     preprint_remaining_seconds_ = seconds;
 
-    // This observer owns the remaining time display during pre-print.
-    // Combine preprint prediction with slicer estimate for total remaining.
-    // Use slicer estimate directly as fallback if remaining_seconds_ hasn't been seeded yet
-    // (covers race where metadata fetch hasn't completed by the time preprint observer fires).
-    {
-        int slicer_time =
-            remaining_seconds_ > 0 ? remaining_seconds_ : printer_state_.get_estimated_print_time();
-        int total_remaining = slicer_time + seconds;
-        format_time(total_remaining, remaining_buf_, sizeof(remaining_buf_));
-        lv_subject_copy_string(&remaining_subject_, remaining_buf_);
-        spdlog::trace("[{}] Preprint remaining: {}s preprint + {}s slicer = {}s", get_name(),
-                      seconds, slicer_time, total_remaining);
-    }
+    // Combine preprint prediction with slicer estimate for total remaining time.
+    // Fall back to get_estimated_print_time() if remaining_seconds_ hasn't been seeded yet
+    // (covers race where metadata fetch hasn't completed by the time this observer fires).
+    int slicer_time =
+        remaining_seconds_ > 0 ? remaining_seconds_ : printer_state_.get_estimated_print_time();
+    int total_remaining = slicer_time + seconds;
+    format_time(total_remaining, remaining_buf_, sizeof(remaining_buf_));
+    lv_subject_copy_string(&remaining_subject_, remaining_buf_);
+    spdlog::trace("[{}] Preprint remaining: {}s preprint + {}s slicer = {}s", get_name(), seconds,
+                  slicer_time, total_remaining);
 }
 
 void PrintStatusPanel::on_preprint_elapsed_changed(int seconds) {

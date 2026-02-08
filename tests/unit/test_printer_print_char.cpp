@@ -581,16 +581,17 @@ TEST_CASE("Print characterization: time tracking from JSON", "[characterization]
         REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 0);
     }
 
-    SECTION("time_left not updated when progress is below 5%") {
-        // Low progress values give noisy estimates, so we require >= 5%
+    SECTION("time_left estimated at low progress with extrapolation") {
+        // At 3% progress with no slicer estimate, pure extrapolation is used
+        // (blend only engages when estimated_print_time_ > 0)
         json status1 = {{"virtual_sdcard", {{"progress", 0.03}}}};
         state.update_from_status(status1);
 
         json status2 = {{"print_stats", {{"print_duration", 360.0}, {"total_duration", 400.0}}}};
         state.update_from_status(status2);
 
-        // time_left stays at 0 (progress too low for reliable estimate)
-        REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 0);
+        // 360 * (100-3) / 3 = 11640
+        REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 11640);
     }
 
     SECTION("time_left not updated when progress is 0") {
@@ -1300,15 +1301,49 @@ TEST_CASE("Print characterization: slicer estimated_print_time used as fallback"
         REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 0);
     }
 
-    SECTION("slicer fallback not used when progress is 0") {
+    SECTION("slicer estimate seeds time_left at progress 0") {
         state.set_estimated_print_time(83);
+        helix::ui::UpdateQueue::instance().drain_queue_for_testing();
 
-        // Progress at 0%, print_duration at 0
+        // Seeding sets time_left to slicer estimate
+        REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 83);
+
+        // Progress at 0%, print_duration at 0 - no condition fires, seeded value persists
         json status = {{"print_stats", {{"print_duration", 0.0}, {"total_duration", 5.0}}}};
         state.update_from_status(status);
 
-        // No fallback when progress is 0 (avoid 100% remaining)
-        REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 0);
+        REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 83);
+    }
+
+    SECTION("low progress blends slicer and progress-based estimates") {
+        // At 3% progress with slicer estimate, blend weights: 40% slicer, 60% progress
+        state.set_estimated_print_time(2700); // 45 min
+
+        json progress_status = {{"virtual_sdcard", {{"progress", 0.03}}}};
+        state.update_from_status(progress_status);
+
+        json status = {{"print_stats", {{"print_duration", 90.0}, {"total_duration", 100.0}}}};
+        state.update_from_status(status);
+
+        // Progress-based: 90 * 97 / 3 = 2910
+        // Slicer-based: 2700 * 97 / 100 = 2619
+        // Blend weight at 3%: (5-3)/5 = 0.4 slicer, 0.6 progress
+        // Blended: 0.4 * 2619 + 0.6 * 2910 = 1047.6 + 1746.0 = 2793
+        int time_left = lv_subject_get_int(state.get_print_time_left_subject());
+        REQUIRE(time_left == 2793);
+    }
+
+    SECTION("blend disengages at 5% progress") {
+        state.set_estimated_print_time(2700);
+
+        json progress_status = {{"virtual_sdcard", {{"progress", 0.05}}}};
+        state.update_from_status(progress_status);
+
+        json status = {{"print_stats", {{"print_duration", 150.0}, {"total_duration", 160.0}}}};
+        state.update_from_status(status);
+
+        // At 5%, no blend - pure progress-based: 150 * 95 / 5 = 2850
+        REQUIRE(lv_subject_get_int(state.get_print_time_left_subject()) == 2850);
     }
 
     SECTION("negative estimated_print_time is clamped to 0") {

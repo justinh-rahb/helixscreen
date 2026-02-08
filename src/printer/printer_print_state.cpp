@@ -256,7 +256,7 @@ void PrinterPrintState::update_from_status(const nlohmann::json& status) {
                 }
 
                 lv_subject_set_int(&print_time_left_, remaining);
-            } else if (progress > 0 && progress < 100 && print_time == 0 &&
+            } else if (progress >= 1 && progress < 100 && print_time == 0 &&
                        estimated_print_time_ > 0) {
                 // Fallback: use slicer estimate when print_duration hasn't started yet
                 int remaining = estimated_print_time_ * (100 - progress) / 100;
@@ -410,13 +410,17 @@ void PrinterPrintState::set_estimated_print_time(int seconds) {
     estimated_print_time_ = std::max(0, seconds);
     spdlog::debug("[PrinterPrintState] Slicer estimated print time: {}s", estimated_print_time_);
 
-    // Seed time_left with slicer estimate so pre-print display includes print time.
-    // Progress-based calculation takes over once progress >= 5%.
-    if (estimated_print_time_ > 0 && lv_subject_get_int(&print_time_left_) == 0) {
-        lv_subject_set_int(&print_time_left_, estimated_print_time_);
-        spdlog::debug("[PrinterPrintState] Seeded time_left with slicer estimate: {}s",
-                      estimated_print_time_);
-    }
+    // Defer subject update to main thread: called from metadata callback (background thread).
+    // lv_subject_set_int triggers observer chain which touches LVGL objects.
+    int est = estimated_print_time_;
+    helix::async::invoke([this, est]() {
+        // Seed time_left with slicer estimate so pre-print display includes print time.
+        // Progress-based calculation blends in starting at 1% and fully takes over at 5%.
+        if (est > 0 && lv_subject_get_int(&print_time_left_) == 0) {
+            lv_subject_set_int(&print_time_left_, est);
+            spdlog::debug("[PrinterPrintState] Seeded time_left with slicer estimate: {}s", est);
+        }
+    });
 }
 
 int PrinterPrintState::get_estimated_print_time() const {
