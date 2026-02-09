@@ -218,11 +218,11 @@
     <px name="metadata_overlay_height_large" value="109"/>
     <!-- detail_metadata_clip_height: Clip container for print file detail overlay -->
     <px name="detail_metadata_clip_height_small" value="92"/>
-    <px name="detail_metadata_clip_height_medium" value="102"/>
+    <px name="detail_metadata_clip_height_medium" value="112"/>
     <px name="detail_metadata_clip_height_large" value="112"/>
     <!-- detail_metadata_overlay_height: Inner overlay for print file detail -->
     <px name="detail_metadata_overlay_height_small" value="100"/>
-    <px name="detail_metadata_overlay_height_medium" value="110"/>
+    <px name="detail_metadata_overlay_height_medium" value="120"/>
     <px name="detail_metadata_overlay_height_large" value="120"/>
     <!-- history_clip_height: Clip container for history detail overlay -->
     <px name="history_clip_height_small" value="44"/>
