@@ -141,3 +141,7 @@
 - **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-07 | **Last**: 2026-02-07 | **Category**: build
 > AD5M cross-compilation uses 'make ad5m-docker' (Docker-based ARM cross-compile), NOT 'make pi-test' (which targets Raspberry Pi). Deploy with 'AD5M_HOST=192.168.1.67 make ad5m-deploy'. The pi-test target is for a different device entirely.
 
+### [L063] [-----|-----] Check staging area before commit
+- **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-08 | **Last**: 2026-02-08 | **Category**: git
+> Run 'git status' before committing to verify no unexpected files are already staged from prior work. 'git add file1 file2' ADDS to the index but doesn't REPLACE it - pre-staged files from previous sessions will silently be included in the commit.
+
