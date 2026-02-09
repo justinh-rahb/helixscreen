@@ -14,7 +14,7 @@
  *
  * Handles printer identification during first-run wizard:
  * - User-entered printer name
- * - Printer type selection from roller
+ * - Printer type selection from list
  * - Auto-detection via hardware fingerprinting
  * - Configuration persistence
  *
@@ -28,7 +28,7 @@
  * ## Subject Bindings (3 total):
  *
  * - printer_name (string) - User-entered printer name
- * - printer_type_selected (int) - Selected index in roller
+ * - printer_type_selected (int) - Selected index in list
  * - printer_detection_status (string) - Auto-detection status message
  *
  * ## External Subject:
@@ -119,8 +119,8 @@ class WizardPrinterIdentifyStep {
     /**
      * @brief Find printer type index by name
      *
-     * @param printer_name Name to search for in PrinterDetector roller
-     * @return Index in the roller, or get_unknown_index() if not found
+     * @param printer_name Name to search for in PrinterDetector list
+     * @return Index in the list, or get_unknown_list_index() if not found
      */
     static int find_printer_type_index(const std::string& printer_name);
 
@@ -148,6 +148,7 @@ class WizardPrinterIdentifyStep {
     bool subjects_initialized_ = false;
     bool updating_from_subject_ = false; // Re-entry guard for observer loop prevention
     std::string last_detected_url_;      // Track URL to detect printer changes
+    std::string detected_kinematics_;    // Detected kinematics for list filtering
 
     // Event handler implementations
     void handle_printer_name_changed(lv_event_t* e);
@@ -171,7 +172,7 @@ class WizardPrinterIdentifyStep {
  * @brief Printer auto-detection hint (confidence + reasoning)
  */
 struct PrinterDetectionHint {
-    int type_index;        // Index into PrinterDetector roller
+    int type_index;        // Index into PrinterDetector list
     int confidence;        // 0-100 (>=70 = auto-select, <70 = suggest)
     std::string type_name; // Detected printer type name
 };

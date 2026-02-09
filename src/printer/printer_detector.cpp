@@ -184,7 +184,7 @@ struct PrinterDatabase {
                 if (it != bundled_index.end()) {
                     // Override bundled printer
                     if (!enabled) {
-                        // Mark as disabled (will be filtered out in roller)
+                        // Mark as disabled (will be filtered out in list)
                         data["printers"][it->second]["enabled"] = false;
                         spdlog::debug("[PrinterDetector] Disabled bundled printer '{}'", id);
                     } else {
@@ -576,6 +576,15 @@ PrinterDetectionResult PrinterDetector::detect(const PrinterHardwareData& hardwa
                              result.best_single_confidence, result.reason);
             }
 
+            // Non-printer addons (show_in_list: false) can't win detection
+            // They're scored and logged for diagnostics, but excluded from the winner
+            if (!printer.value("show_in_list", true)) {
+                if (result.confidence > 0) {
+                    spdlog::info("[PrinterDetector]   [excluded from winner - not a real printer]");
+                }
+                continue;
+            }
+
             // Tiebreakers: best_single_confidence first (more specific match wins),
             // then match_count (more supporting evidence)
             if (result.confidence > best_match.confidence ||
@@ -681,12 +690,30 @@ std::string PrinterDetector::get_image_for_printer_id(const std::string& printer
 }
 
 // ============================================================================
-// Dynamic Roller Builder
+// Dynamic List Builder
 // ============================================================================
 
 namespace {
-// Cached roller data - built once and reused
-struct RollerCache {
+
+// Extract kinematics type from a printer's heuristics array
+// Returns the pattern value from the first kinematics_match heuristic, or ""
+std::string extract_kinematics(const json& printer) {
+    if (!printer.contains("heuristics") || !printer["heuristics"].is_array()) {
+        return "";
+    }
+    for (const auto& h : printer["heuristics"]) {
+        if (h.value("type", "") == "kinematics_match") {
+            std::string pattern = h.value("pattern", "");
+            std::transform(pattern.begin(), pattern.end(), pattern.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+            return pattern;
+        }
+    }
+    return "";
+}
+
+// Cached list data - built once and reused
+struct ListCache {
     std::string options;            // Newline-separated string for lv_roller_set_options()
     std::vector<std::string> names; // Vector of names for index lookups
     bool built = false;
@@ -703,7 +730,7 @@ struct RollerCache {
 
         // Load database if not already loaded
         if (!g_database.load()) {
-            spdlog::warn("[PrinterDetector] Cannot build roller without database");
+            spdlog::warn("[PrinterDetector] Cannot build list without database");
             // Fallback to just Custom/Other and Unknown
             names = {"Custom/Other", "Unknown"};
             options = "Custom/Other\nUnknown";
@@ -718,7 +745,7 @@ struct RollerCache {
             return;
         }
 
-        // Collect all printer names that should appear in roller
+        // Collect all printer names that should appear in list
         for (const auto& printer : g_database.data["printers"]) {
             // Check enabled flag (defaults to true if missing) - allows user to hide bundled
             bool enabled = printer.value("enabled", true);
@@ -726,8 +753,8 @@ struct RollerCache {
                 continue;
             }
 
-            // Check show_in_roller flag (defaults to true if missing)
-            bool show = printer.value("show_in_roller", true);
+            // Check show_in_list flag (defaults to true if missing)
+            bool show = printer.value("show_in_list", true);
             if (!show) {
                 continue;
             }
@@ -745,7 +772,7 @@ struct RollerCache {
         names.push_back("Custom/Other");
         names.push_back("Unknown");
 
-        // Build newline-separated string for LVGL roller
+        // Build newline-separated string for list display
         for (size_t i = 0; i < names.size(); ++i) {
             options += names[i];
             if (i < names.size() - 1) {
@@ -753,34 +780,100 @@ struct RollerCache {
             }
         }
 
-        spdlog::info("[PrinterDetector] Built roller with {} printer types", names.size());
+        spdlog::info("[PrinterDetector] Built list with {} printer types", names.size());
         built = true;
     }
 };
 
-RollerCache g_roller_cache;
+ListCache g_list_cache;
+
+ListCache g_filtered_list_cache;
+std::string g_filtered_kinematics; // The kinematics filter currently applied
+
+void build_filtered_list(const std::string& kinematics_filter) {
+    if (g_filtered_list_cache.built && g_filtered_kinematics == kinematics_filter) {
+        return; // Already built with same filter
+    }
+
+    g_filtered_list_cache.reset();
+    g_filtered_kinematics = kinematics_filter;
+
+    if (!g_database.load()) {
+        g_filtered_list_cache.names = {"Custom/Other", "Unknown"};
+        g_filtered_list_cache.options = "Custom/Other\nUnknown";
+        g_filtered_list_cache.built = true;
+        return;
+    }
+
+    if (!g_database.data.contains("printers") || !g_database.data["printers"].is_array()) {
+        g_filtered_list_cache.names = {"Custom/Other", "Unknown"};
+        g_filtered_list_cache.options = "Custom/Other\nUnknown";
+        g_filtered_list_cache.built = true;
+        return;
+    }
+
+    std::string filter_lower = kinematics_filter;
+    std::transform(filter_lower.begin(), filter_lower.end(), filter_lower.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+
+    for (const auto& printer : g_database.data["printers"]) {
+        if (!printer.value("enabled", true))
+            continue;
+        if (!printer.value("show_in_list", true))
+            continue;
+
+        std::string name = printer.value("name", "");
+        if (name.empty())
+            continue;
+
+        // Apply kinematics filter
+        std::string printer_kin = extract_kinematics(printer);
+        if (!filter_lower.empty() && !printer_kin.empty() && printer_kin != filter_lower) {
+            continue; // Kinematics doesn't match filter, skip
+        }
+        // Printers with no kinematics heuristic are always included
+
+        g_filtered_list_cache.names.push_back(name);
+    }
+
+    std::sort(g_filtered_list_cache.names.begin(), g_filtered_list_cache.names.end());
+    g_filtered_list_cache.names.push_back("Custom/Other");
+    g_filtered_list_cache.names.push_back("Unknown");
+
+    for (size_t i = 0; i < g_filtered_list_cache.names.size(); ++i) {
+        g_filtered_list_cache.options += g_filtered_list_cache.names[i];
+        if (i < g_filtered_list_cache.names.size() - 1) {
+            g_filtered_list_cache.options += "\n";
+        }
+    }
+
+    spdlog::info("[PrinterDetector] Built filtered list ({}) with {} printer types",
+                 kinematics_filter, g_filtered_list_cache.names.size());
+    g_filtered_list_cache.built = true;
+}
+
 } // namespace
 
-const std::string& PrinterDetector::get_roller_options() {
-    g_roller_cache.build();
-    return g_roller_cache.options;
+const std::string& PrinterDetector::get_list_options() {
+    g_list_cache.build();
+    return g_list_cache.options;
 }
 
-const std::vector<std::string>& PrinterDetector::get_roller_names() {
-    g_roller_cache.build();
-    return g_roller_cache.names;
+const std::vector<std::string>& PrinterDetector::get_list_names() {
+    g_list_cache.build();
+    return g_list_cache.names;
 }
 
-int PrinterDetector::find_roller_index(const std::string& printer_name) {
-    g_roller_cache.build();
+int PrinterDetector::find_list_index(const std::string& printer_name) {
+    g_list_cache.build();
 
     // Case-insensitive search
     std::string name_lower = printer_name;
     std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(),
                    [](unsigned char c) { return std::tolower(c); });
 
-    for (size_t i = 0; i < g_roller_cache.names.size(); ++i) {
-        std::string cached_lower = g_roller_cache.names[i];
+    for (size_t i = 0; i < g_list_cache.names.size(); ++i) {
+        std::string cached_lower = g_list_cache.names[i];
         std::transform(cached_lower.begin(), cached_lower.end(), cached_lower.begin(),
                        [](unsigned char c) { return std::tolower(c); });
 
@@ -790,27 +883,89 @@ int PrinterDetector::find_roller_index(const std::string& printer_name) {
     }
 
     // Return Unknown index if not found
-    return get_unknown_index();
+    return get_unknown_list_index();
 }
 
-std::string PrinterDetector::get_roller_name_at(int index) {
-    g_roller_cache.build();
+std::string PrinterDetector::get_list_name_at(int index) {
+    g_list_cache.build();
 
-    if (index < 0 || static_cast<size_t>(index) >= g_roller_cache.names.size()) {
+    if (index < 0 || static_cast<size_t>(index) >= g_list_cache.names.size()) {
         return "Unknown";
     }
 
-    return g_roller_cache.names[static_cast<size_t>(index)];
+    return g_list_cache.names[static_cast<size_t>(index)];
 }
 
-int PrinterDetector::get_unknown_index() {
-    g_roller_cache.build();
+int PrinterDetector::get_unknown_list_index() {
+    g_list_cache.build();
 
     // Unknown is always the last entry
-    if (g_roller_cache.names.empty()) {
+    if (g_list_cache.names.empty()) {
         return 0;
     }
-    return static_cast<int>(g_roller_cache.names.size() - 1);
+    return static_cast<int>(g_list_cache.names.size() - 1);
+}
+
+// ============================================================================
+// Kinematics-Filtered List API
+// ============================================================================
+
+const std::string& PrinterDetector::get_list_options(const std::string& kinematics) {
+    if (kinematics.empty())
+        return get_list_options();
+    build_filtered_list(kinematics);
+    return g_filtered_list_cache.options;
+}
+
+const std::vector<std::string>& PrinterDetector::get_list_names(const std::string& kinematics) {
+    if (kinematics.empty())
+        return get_list_names();
+    build_filtered_list(kinematics);
+    return g_filtered_list_cache.names;
+}
+
+int PrinterDetector::find_list_index(const std::string& printer_name,
+                                     const std::string& kinematics) {
+    if (kinematics.empty())
+        return find_list_index(printer_name);
+    build_filtered_list(kinematics);
+
+    std::string name_lower = printer_name;
+    std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+
+    for (size_t i = 0; i < g_filtered_list_cache.names.size(); ++i) {
+        std::string cached_lower = g_filtered_list_cache.names[i];
+        std::transform(cached_lower.begin(), cached_lower.end(), cached_lower.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (cached_lower == name_lower) {
+            return static_cast<int>(i);
+        }
+    }
+
+    // Return Unknown index in filtered list
+    return get_unknown_list_index(kinematics);
+}
+
+std::string PrinterDetector::get_list_name_at(int index, const std::string& kinematics) {
+    if (kinematics.empty())
+        return get_list_name_at(index);
+    build_filtered_list(kinematics);
+
+    if (index < 0 || static_cast<size_t>(index) >= g_filtered_list_cache.names.size()) {
+        return "Unknown";
+    }
+    return g_filtered_list_cache.names[static_cast<size_t>(index)];
+}
+
+int PrinterDetector::get_unknown_list_index(const std::string& kinematics) {
+    if (kinematics.empty())
+        return get_unknown_list_index();
+    build_filtered_list(kinematics);
+
+    if (g_filtered_list_cache.names.empty())
+        return 0;
+    return static_cast<int>(g_filtered_list_cache.names.size() - 1);
 }
 
 // ============================================================================
@@ -967,7 +1122,9 @@ std::string PrinterDetector::get_print_start_profile(const std::string& printer_
 
 void PrinterDetector::reload() {
     spdlog::info("[PrinterDetector] Reloading printer database and extensions");
-    g_roller_cache.reset();
+    g_list_cache.reset();
+    g_filtered_list_cache.reset();
+    g_filtered_kinematics.clear();
     g_database.reload();
 }
 

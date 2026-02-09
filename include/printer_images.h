@@ -40,13 +40,13 @@ inline constexpr int PRERENDERED_SIZE = 300;
 /**
  * @brief Get printer name from type index
  *
- * Uses the dynamic roller built from the printer database.
+ * Uses the dynamic list built from the printer database.
  *
- * @param printer_type_index Index from printer type roller
+ * @param printer_type_index Index from printer type list
  * @return Printer name string (e.g., "Voron 2.4")
  */
 inline std::string get_printer_name(int printer_type_index) {
-    return PrinterDetector::get_roller_name_at(printer_type_index);
+    return PrinterDetector::get_list_name_at(printer_type_index);
 }
 
 /**
@@ -137,7 +137,7 @@ inline std::string get_image_path_for_name(const std::string& printer_name) {
  * Converts index to printer name, then looks up image in database.
  * Falls back to DEFAULT_IMAGE if not found or file doesn't exist.
  *
- * @param printer_type_index Index from printer type roller
+ * @param printer_type_index Index from printer type list
  * @return Full LVGL path to printer image
  */
 inline std::string get_image_path(int printer_type_index) {
@@ -151,7 +151,7 @@ inline std::string get_image_path(int printer_type_index) {
  * This is the primary function to use for displaying printer images.
  * It handles all lookup and validation logic internally.
  *
- * @param printer_type_index Index from printer type roller
+ * @param printer_type_index Index from printer type list
  * @return Full LVGL path to printer image (guaranteed to exist or be default)
  *
  * @note Returns a std::string that manages its own memory. The caller

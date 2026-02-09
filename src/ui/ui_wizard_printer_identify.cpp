@@ -122,37 +122,41 @@ WizardPrinterIdentifyStep::operator=(WizardPrinterIdentifyStep&& other) noexcept
 // ============================================================================
 
 int WizardPrinterIdentifyStep::find_printer_type_index(const std::string& printer_name) {
-    // Use dynamic roller from PrinterDetector (data-driven from database)
-    return PrinterDetector::find_roller_index(printer_name);
+    // Use dynamic list from PrinterDetector (data-driven from database)
+    // NOTE: This static method uses the unfiltered list. For kinematics-filtered
+    // lookups, call PrinterDetector::find_list_index(name, kinematics) directly.
+    return PrinterDetector::find_list_index(printer_name);
 }
 
 /**
  * @brief Detect printer type from hardware discovery data
  *
- * Uses PrinterDetector::auto_detect() and maps result to roller index.
+ * Uses PrinterDetector::auto_detect() and maps result to list index.
+ * Uses kinematics-filtered list when kinematics is provided.
  */
-static PrinterDetectionHint detect_printer_type() {
+static PrinterDetectionHint detect_printer_type(const std::string& kinematics) {
     MoonrakerAPI* api = get_moonraker_api();
     if (!api) {
         spdlog::debug("[Wizard Printer] No MoonrakerAPI available for auto-detection");
-        return {PrinterDetector::get_unknown_index(), 0, "No printer connection available"};
+        return {PrinterDetector::get_unknown_list_index(kinematics), 0,
+                "No printer connection available"};
     }
 
     // Use shared auto_detect() which handles building PrinterHardwareData
     PrinterDetectionResult result = PrinterDetector::auto_detect(api->hardware());
 
     if (result.confidence == 0) {
-        return {PrinterDetector::get_unknown_index(), 0, result.type_name};
+        return {PrinterDetector::get_unknown_list_index(kinematics), 0, result.type_name};
     }
 
-    // Map detected type_name to roller index
-    int type_index = WizardPrinterIdentifyStep::find_printer_type_index(result.type_name);
+    // Map detected type_name to list index (filtered by kinematics)
+    int type_index = PrinterDetector::find_list_index(result.type_name, kinematics);
 
-    if (type_index == PrinterDetector::get_unknown_index() && result.confidence > 0) {
-        spdlog::warn(
-            "[Wizard Printer] Detected '{}' ({}% confident) but not found in printer database",
-            result.type_name, result.confidence);
-        return {PrinterDetector::get_unknown_index(), result.confidence,
+    if (type_index == PrinterDetector::get_unknown_list_index(kinematics) &&
+        result.confidence > 0) {
+        spdlog::warn("[Wizard Printer] Detected '{}' ({}% confident) but not found in printer list",
+                     result.type_name, result.confidence);
+        return {PrinterDetector::get_unknown_list_index(kinematics), result.confidence,
                 result.type_name + " (not in dropdown list)"};
     }
 
@@ -198,19 +202,31 @@ void WizardPrinterIdentifyStep::init_subjects() {
 
     spdlog::debug("[{}] Initializing subjects", get_name());
 
+    // Detect kinematics FIRST — all list index lookups below use filtered APIs
+    {
+        MoonrakerAPI* api = get_moonraker_api();
+        if (api) {
+            detected_kinematics_ = api->hardware().kinematics();
+            spdlog::info("[{}] Detected kinematics: '{}' (will filter printer list)", get_name(),
+                         detected_kinematics_);
+        } else {
+            spdlog::debug("[{}] No MoonrakerAPI — printer list will be unfiltered", get_name());
+        }
+    }
+
     // Load existing values from config if available
     Config* config = Config::get_instance();
     std::string default_name = "";
     std::string saved_type = "";
-    int default_type = PrinterDetector::get_unknown_index();
+    int default_type = PrinterDetector::get_unknown_list_index(detected_kinematics_);
 
     try {
         default_name = config->get<std::string>(helix::wizard::PRINTER_NAME, "");
         saved_type = config->get<std::string>(helix::wizard::PRINTER_TYPE, "");
 
-        // Dynamic lookup: find index by type name
+        // Dynamic lookup: find index by type name (using filtered list)
         if (!saved_type.empty()) {
-            default_type = find_printer_type_index(saved_type);
+            default_type = PrinterDetector::find_list_index(saved_type, detected_kinematics_);
             spdlog::debug("[{}] Loaded from config: name='{}', type='{}', resolved index={}",
                           get_name(), default_name, saved_type, default_type);
         } else {
@@ -247,10 +263,10 @@ void WizardPrinterIdentifyStep::init_subjects() {
     UI_SUBJECT_INIT_AND_REGISTER_STRING(printer_name_, printer_name_buffer_, printer_name_buffer_,
                                         "printer_name");
 
-    // Run auto-detection if no saved type
-    PrinterDetectionHint hint{PrinterDetector::get_unknown_index(), 0, ""};
+    // Run auto-detection if no saved type (uses filtered list for index)
+    PrinterDetectionHint hint{PrinterDetector::get_unknown_list_index(detected_kinematics_), 0, ""};
     if (saved_type.empty()) {
-        hint = detect_printer_type();
+        hint = detect_printer_type(detected_kinematics_);
         if (hint.confidence >= 70) {
             default_type = hint.type_index;
             spdlog::debug("[{}] Auto-detection: {} (confidence: {}%)", get_name(), hint.type_name,
@@ -377,9 +393,10 @@ void WizardPrinterIdentifyStep::handle_printer_type_changed(lv_event_t* event) {
     // Update subject
     lv_subject_set_int(&printer_type_selected_, selected);
 
-    // Update printer preview image (with fallback to generic CoreXY if missing)
+    // Update printer preview image (resolve name from filtered list)
     if (printer_preview_image_) {
-        std::string image_path = PrinterImages::get_validated_image_path(selected);
+        std::string name = PrinterDetector::get_list_name_at(selected, detected_kinematics_);
+        std::string image_path = PrinterImages::get_image_path_for_name(name);
         lv_image_set_src(printer_preview_image_, image_path.c_str());
         spdlog::debug("[{}] Preview image updated: {}", get_name(), image_path);
     }
@@ -426,7 +443,7 @@ lv_obj_t* WizardPrinterIdentifyStep::create(lv_obj_t* parent) {
     if (printer_type_list_) {
         populate_printer_type_list();
         spdlog::debug("[{}] Printer type list populated with {} items", get_name(),
-                      PrinterDetector::get_roller_names().size());
+                      PrinterDetector::get_list_names(detected_kinematics_).size());
     } else {
         spdlog::warn("[{}] Printer type list not found in XML", get_name());
     }
@@ -445,7 +462,9 @@ lv_obj_t* WizardPrinterIdentifyStep::create(lv_obj_t* parent) {
     printer_preview_image_ = lv_obj_find_by_name(screen_root_, "printer_preview_image");
     if (printer_preview_image_) {
         int selected = lv_subject_get_int(&printer_type_selected_);
-        std::string image_path = PrinterImages::get_validated_image_path(selected);
+        // Resolve name from filtered list, then look up image by name
+        std::string name = PrinterDetector::get_list_name_at(selected, detected_kinematics_);
+        std::string image_path = PrinterImages::get_image_path_for_name(name);
         lv_image_set_src(printer_preview_image_, image_path.c_str());
         spdlog::debug("[{}] Preview image configured: {}", get_name(), image_path);
     } else {
@@ -493,7 +512,7 @@ void WizardPrinterIdentifyStep::cleanup() {
 
         // Get current type index and convert to type name (via dynamic database lookup)
         int type_index = lv_subject_get_int(&printer_type_selected_);
-        std::string type_name = PrinterDetector::get_roller_name_at(type_index);
+        std::string type_name = PrinterDetector::get_list_name_at(type_index, detected_kinematics_);
 
         // Save printer type name
         config->set<std::string>(helix::wizard::PRINTER_TYPE, type_name);
@@ -543,8 +562,8 @@ void WizardPrinterIdentifyStep::populate_printer_type_list() {
     // Clear any existing children
     lv_obj_clean(printer_type_list_);
 
-    // Get printer names from database
-    const auto& names = PrinterDetector::get_roller_names();
+    // Get printer names from database (filtered by detected kinematics)
+    const auto& names = PrinterDetector::get_list_names(detected_kinematics_);
     int selected = lv_subject_get_int(&printer_type_selected_);
 
     for (size_t i = 0; i < names.size(); ++i) {
@@ -634,7 +653,7 @@ void WizardPrinterIdentifyStep::on_printer_type_item_clicked(lv_event_t* e) {
     lv_obj_t* btn = static_cast<lv_obj_t*>(lv_event_get_target(e));
     int index = static_cast<int>(reinterpret_cast<uintptr_t>(lv_obj_get_user_data(btn)));
 
-    const auto& names = PrinterDetector::get_roller_names();
+    const auto& names = PrinterDetector::get_list_names(self->detected_kinematics_);
     if (index >= 0 && index < static_cast<int>(names.size())) {
         spdlog::debug("[{}] Type selected: index {} ({})", self->get_name(), index, names[index]);
 
@@ -644,9 +663,9 @@ void WizardPrinterIdentifyStep::on_printer_type_item_clicked(lv_event_t* e) {
         // Update visual selection
         self->update_list_selection(index);
 
-        // Update printer preview image
+        // Update printer preview image (resolve name from filtered list)
         if (self->printer_preview_image_) {
-            std::string image_path = PrinterImages::get_validated_image_path(index);
+            std::string image_path = PrinterImages::get_image_path_for_name(names[index]);
             lv_image_set_src(self->printer_preview_image_, image_path.c_str());
             spdlog::debug("[{}] Preview image updated: {}", self->get_name(), image_path);
         }

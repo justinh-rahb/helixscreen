@@ -114,7 +114,7 @@ struct PrinterHardwareData {
  * new printer types to be added without recompilation.
  *
  * **Contract**: Returned type_name strings are loaded from printer_database.json.
- * The detector dynamically builds roller options from the database, making it
+ * The detector dynamically builds list options from the database, making it
  * fully data-driven with no hardcoded printer lists.
  */
 class PrinterDetector {
@@ -160,51 +160,97 @@ class PrinterDetector {
     static std::string get_image_for_printer_id(const std::string& printer_id);
 
     /**
-     * @brief Build roller options string from database
+     * @brief Build list options string from database
      *
      * Dynamically builds a newline-separated string of printer names suitable
-     * for LVGL roller widget. Only includes entries with `show_in_roller: true`
+     * for LVGL list widget. Only includes entries with `show_in_list: true`
      * (defaults to true if field is missing). Always appends "Custom/Other"
      * and "Unknown" at the end.
      *
      * The string is cached after first build for performance.
      *
-     * @return Newline-separated printer names for lv_roller_set_options()
+     * @return Newline-separated printer names for lv_list_set_options()
      */
-    static const std::string& get_roller_options();
+    static const std::string& get_list_options();
 
     /**
      * @brief Get list of printer names from database
      *
-     * Returns a vector of all printer names that should appear in the roller.
+     * Returns a vector of all printer names that should appear in the list.
      * Useful for index lookups and iteration.
      *
      * @return Vector of printer names (includes Custom/Other and Unknown)
      */
-    static const std::vector<std::string>& get_roller_names();
+    static const std::vector<std::string>& get_list_names();
 
     /**
-     * @brief Find index of a printer name in the roller
+     * @brief Find index of a printer name in the list
      *
      * @param printer_name Name to search for
      * @return Index if found, or index of "Unknown" if not found
      */
-    static int find_roller_index(const std::string& printer_name);
+    static int find_list_index(const std::string& printer_name);
 
     /**
-     * @brief Get printer name at roller index
+     * @brief Get printer name at list index
      *
      * @param index Roller index (0-based)
      * @return Printer name, or "Unknown" if index out of bounds
      */
-    static std::string get_roller_name_at(int index);
+    static std::string get_list_name_at(int index);
 
     /**
-     * @brief Get the index of "Unknown" in the roller
+     * @brief Get the index of "Unknown" in the list
      *
      * @return Index of the Unknown entry (last entry)
      */
-    static int get_unknown_index();
+    static int get_unknown_list_index();
+
+    // =========================================================================
+    // Kinematics-Filtered List API
+    // =========================================================================
+
+    /**
+     * @brief Get list options filtered by kinematics type
+     *
+     * @param kinematics Kinematics filter (e.g., "delta", "corexy"). Empty = unfiltered.
+     * @return Newline-separated printer names matching the kinematics
+     */
+    static const std::string& get_list_options(const std::string& kinematics);
+
+    /**
+     * @brief Get list names filtered by kinematics type
+     *
+     * @param kinematics Kinematics filter. Empty = unfiltered.
+     * @return Vector of printer names matching the kinematics
+     */
+    static const std::vector<std::string>& get_list_names(const std::string& kinematics);
+
+    /**
+     * @brief Find index of a printer name in the filtered list
+     *
+     * @param printer_name Name to search for
+     * @param kinematics Kinematics filter. Empty = unfiltered.
+     * @return Index if found, or index of "Unknown" if not found
+     */
+    static int find_list_index(const std::string& printer_name, const std::string& kinematics);
+
+    /**
+     * @brief Get printer name at index in the filtered list
+     *
+     * @param index List index (0-based)
+     * @param kinematics Kinematics filter. Empty = unfiltered.
+     * @return Printer name, or "Unknown" if index out of bounds
+     */
+    static std::string get_list_name_at(int index, const std::string& kinematics);
+
+    /**
+     * @brief Get the index of "Unknown" in the filtered list
+     *
+     * @param kinematics Kinematics filter. Empty = unfiltered.
+     * @return Index of the Unknown entry (last entry)
+     */
+    static int get_unknown_list_index(const std::string& kinematics);
 
     /**
      * @brief Get PRINT_START capabilities for a printer

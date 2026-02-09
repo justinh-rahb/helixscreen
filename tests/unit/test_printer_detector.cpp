@@ -875,9 +875,12 @@ TEST_CASE_METHOD(PrinterDetectorFixture, "PrinterDetector: macro_match heuristic
 
     auto result = PrinterDetector::detect(hardware);
 
-    REQUIRE(result.detected());
-    REQUIRE(result.type_name == "KAMP (Adaptive Meshing)");
-    REQUIRE(result.confidence >= 80);
+    // Non-printer addons (show_in_list: false) should never win detection
+    REQUIRE_FALSE(result.type_name == "KAMP (Adaptive Meshing)");
+    // If detected, it should be a real printer (corexy kinematics matches real printers)
+    if (result.detected()) {
+        REQUIRE(result.confidence >= 30);
+    }
 }
 
 TEST_CASE_METHOD(PrinterDetectorFixture,
@@ -897,9 +900,10 @@ TEST_CASE_METHOD(PrinterDetectorFixture,
 
     auto result = PrinterDetector::detect(hardware);
 
-    REQUIRE(result.detected());
-    REQUIRE(result.type_name == "Klippain Shake&Tune");
-    REQUIRE(result.confidence >= 85);
+    REQUIRE_FALSE(result.type_name == "Klippain Shake&Tune");
+    if (result.detected()) {
+        REQUIRE(result.confidence >= 30);
+    }
 }
 
 TEST_CASE_METHOD(PrinterDetectorFixture, "PrinterDetector: macro_match heuristic - Klicky Probe",
@@ -918,9 +922,10 @@ TEST_CASE_METHOD(PrinterDetectorFixture, "PrinterDetector: macro_match heuristic
 
     auto result = PrinterDetector::detect(hardware);
 
-    REQUIRE(result.detected());
-    REQUIRE(result.type_name == "Klicky Probe User");
-    REQUIRE(result.confidence >= 80);
+    REQUIRE_FALSE(result.type_name == "Klicky Probe User");
+    if (result.detected()) {
+        REQUIRE(result.confidence >= 30);
+    }
 }
 
 TEST_CASE_METHOD(PrinterDetectorFixture, "PrinterDetector: macro_match heuristic - Happy Hare MMU",
@@ -938,9 +943,10 @@ TEST_CASE_METHOD(PrinterDetectorFixture, "PrinterDetector: macro_match heuristic
 
     auto result = PrinterDetector::detect(hardware);
 
-    REQUIRE(result.detected());
-    REQUIRE(result.type_name == "ERCF/Happy Hare MMU");
-    REQUIRE(result.confidence >= 85);
+    REQUIRE_FALSE(result.type_name == "ERCF/Happy Hare MMU");
+    if (result.detected()) {
+        REQUIRE(result.confidence >= 30);
+    }
 }
 
 TEST_CASE_METHOD(PrinterDetectorFixture,
@@ -961,8 +967,56 @@ TEST_CASE_METHOD(PrinterDetectorFixture,
 
     auto result = PrinterDetector::detect(hardware);
 
+    REQUIRE_FALSE(result.type_name == "KAMP (Adaptive Meshing)");
+}
+
+TEST_CASE_METHOD(PrinterDetectorFixture, "PrinterDetector: Doron Velta wins over Klippain addon",
+                 "[printer][macros][non_printer]") {
+    // Doron Velta hardware with Klippain Shake&Tune macros installed
+    PrinterHardwareData hardware{.heaters = {"extruder", "heater_bed"},
+                                 .sensors = {},
+                                 .fans = {},
+                                 .leds = {},
+                                 .hostname = "doron-velta",
+                                 .printer_objects = {"delta_calibrate",
+                                                     "gcode_macro AXES_SHAPER_CALIBRATION",
+                                                     "gcode_macro BELTS_SHAPER_CALIBRATION"},
+                                 .steppers = {"stepper_a", "stepper_b", "stepper_c"},
+                                 .kinematics = "delta"};
+
+    auto result = PrinterDetector::detect(hardware);
+
     REQUIRE(result.detected());
-    REQUIRE(result.type_name == "KAMP (Adaptive Meshing)");
+    // Real printer should always beat non-printer addon
+    REQUIRE(result.type_name == "Doron Velta");
+    REQUIRE(result.confidence >= 90);
+}
+
+TEST_CASE_METHOD(PrinterDetectorFixture,
+                 "PrinterDetector: Only addon macros yields no detection or real printer",
+                 "[printer][macros][non_printer]") {
+    // Only non-printer addon macros, no distinctive real printer hardware
+    PrinterHardwareData hardware{
+        .heaters = {"extruder"},
+        .sensors = {},
+        .fans = {},
+        .leds = {},
+        .hostname = "test-printer",
+        .printer_objects = {"gcode_macro ADAPTIVE_BED_MESH", "gcode_macro LINE_PURGE",
+                            "gcode_macro AXES_SHAPER_CALIBRATION", "gcode_macro ATTACH_PROBE",
+                            "gcode_macro DOCK_PROBE"},
+        .steppers = {},
+        .kinematics = ""};
+
+    auto result = PrinterDetector::detect(hardware);
+
+    // Non-printer addons should never be the winning detection
+    if (result.detected()) {
+        // If something was detected, it must be a real printer, not an addon
+        REQUIRE_FALSE(result.type_name == "KAMP (Adaptive Meshing)");
+        REQUIRE_FALSE(result.type_name == "Klippain Shake&Tune");
+        REQUIRE_FALSE(result.type_name == "Klicky Probe User");
+    }
 }
 
 // ============================================================================
@@ -2201,10 +2255,10 @@ TEST_CASE("PrinterDetector: reload clears and reloads data", "[printer][extensio
     REQUIRE(status1.total_printers == status2.total_printers);
 }
 
-TEST_CASE("PrinterDetector: roller includes Custom/Other and Unknown", "[printer][extensions]") {
+TEST_CASE("PrinterDetector: list includes Custom/Other and Unknown", "[printer][extensions]") {
     PrinterDetector::reload();
 
-    const auto& names = PrinterDetector::get_roller_names();
+    const auto& names = PrinterDetector::get_list_names();
 
     REQUIRE_FALSE(names.empty());
 
@@ -2215,37 +2269,37 @@ TEST_CASE("PrinterDetector: roller includes Custom/Other and Unknown", "[printer
     REQUIRE(names.back() == "Unknown");
 }
 
-TEST_CASE("PrinterDetector: get_unknown_index returns last index", "[printer][extensions]") {
+TEST_CASE("PrinterDetector: get_unknown_list_index returns last index", "[printer][extensions]") {
     PrinterDetector::reload();
 
-    int unknown_idx = PrinterDetector::get_unknown_index();
-    const auto& names = PrinterDetector::get_roller_names();
+    int unknown_idx = PrinterDetector::get_unknown_list_index();
+    const auto& names = PrinterDetector::get_list_names();
 
     REQUIRE(unknown_idx == static_cast<int>(names.size() - 1));
     REQUIRE(names[static_cast<size_t>(unknown_idx)] == "Unknown");
 }
 
-TEST_CASE("PrinterDetector: find_roller_index is case insensitive", "[printer][extensions]") {
+TEST_CASE("PrinterDetector: find_list_index is case insensitive", "[printer][extensions]") {
     PrinterDetector::reload();
 
     // Find a known printer with different cases
-    int idx1 = PrinterDetector::find_roller_index("Voron 2.4");
-    int idx2 = PrinterDetector::find_roller_index("voron 2.4");
-    int idx3 = PrinterDetector::find_roller_index("VORON 2.4");
+    int idx1 = PrinterDetector::find_list_index("Voron 2.4");
+    int idx2 = PrinterDetector::find_list_index("voron 2.4");
+    int idx3 = PrinterDetector::find_list_index("VORON 2.4");
 
     // All should find the same index (not Unknown)
     REQUIRE(idx1 == idx2);
     REQUIRE(idx2 == idx3);
-    REQUIRE(idx1 != PrinterDetector::get_unknown_index());
+    REQUIRE(idx1 != PrinterDetector::get_unknown_list_index());
 }
 
-TEST_CASE("PrinterDetector: find_roller_index returns Unknown for missing printer",
+TEST_CASE("PrinterDetector: find_list_index returns Unknown for missing printer",
           "[printer][extensions]") {
     PrinterDetector::reload();
 
-    int idx = PrinterDetector::find_roller_index("Nonexistent Printer XYZ123");
+    int idx = PrinterDetector::find_list_index("Nonexistent Printer XYZ123");
 
-    REQUIRE(idx == PrinterDetector::get_unknown_index());
+    REQUIRE(idx == PrinterDetector::get_unknown_list_index());
 }
 
 // ============================================================================
@@ -2359,4 +2413,103 @@ TEST_CASE("PrinterDetector: match_count in result reflects actual matches",
     REQUIRE(result.match_count >= 3);
     // Reason should indicate additional matches
     REQUIRE(result.reason.find("+") != std::string::npos);
+}
+
+// ============================================================================
+// Kinematics Filtering Tests
+// ============================================================================
+
+TEST_CASE("PrinterDetector: Delta filter shows only delta printers",
+          "[printer][kinematics_filter]") {
+    PrinterDetector::reload();
+
+    const auto& names = PrinterDetector::get_list_names("delta");
+
+    // Should have delta printers + Custom/Other + Unknown
+    // Delta printers in database: FLSUN V400, FLSUN Super Racer, FLSUN QQ-S Pro, Doron Velta
+    // Plus printers with NO kinematics heuristic (always included)
+    REQUIRE(names.size() >= 4); // At minimum: some delta printers + Custom/Other + Unknown
+
+    // Custom/Other and Unknown always present
+    REQUIRE(names[names.size() - 2] == "Custom/Other");
+    REQUIRE(names.back() == "Unknown");
+
+    // Should NOT contain corexy printers
+    bool has_voron = false;
+    for (const auto& name : names) {
+        if (name == "Voron 2.4")
+            has_voron = true;
+    }
+    REQUIRE_FALSE(has_voron);
+
+    // Should contain delta printers
+    bool has_flsun = false;
+    bool has_doron = false;
+    for (const auto& name : names) {
+        if (name == "FLSUN V400")
+            has_flsun = true;
+        if (name == "Doron Velta")
+            has_doron = true;
+    }
+    REQUIRE(has_flsun);
+    REQUIRE(has_doron);
+}
+
+TEST_CASE("PrinterDetector: Corexy filter includes Voron, excludes FLSUN",
+          "[printer][kinematics_filter]") {
+    PrinterDetector::reload();
+
+    const auto& names = PrinterDetector::get_list_names("corexy");
+
+    // Should contain corexy printers
+    bool has_voron24 = false;
+    for (const auto& name : names) {
+        if (name == "Voron 2.4")
+            has_voron24 = true;
+    }
+    REQUIRE(has_voron24);
+
+    // Should NOT contain delta printers
+    bool has_flsun_v400 = false;
+    for (const auto& name : names) {
+        if (name == "FLSUN V400")
+            has_flsun_v400 = true;
+    }
+    REQUIRE_FALSE(has_flsun_v400);
+}
+
+TEST_CASE("PrinterDetector: Empty filter returns same as unfiltered",
+          "[printer][kinematics_filter]") {
+    PrinterDetector::reload();
+
+    const auto& unfiltered = PrinterDetector::get_list_names();
+    const auto& empty_filter = PrinterDetector::get_list_names("");
+
+    REQUIRE(unfiltered.size() == empty_filter.size());
+}
+
+TEST_CASE("PrinterDetector: find_list_index with kinematics filter",
+          "[printer][kinematics_filter]") {
+    PrinterDetector::reload();
+
+    // Doron Velta should be findable in delta-filtered list
+    int doron_idx = PrinterDetector::find_list_index("Doron Velta", "delta");
+    REQUIRE(doron_idx != PrinterDetector::get_unknown_list_index("delta"));
+
+    // Voron 2.4 should NOT be findable in delta-filtered list (it's corexy)
+    int voron_idx = PrinterDetector::find_list_index("Voron 2.4", "delta");
+    REQUIRE(voron_idx == PrinterDetector::get_unknown_list_index("delta"));
+}
+
+TEST_CASE("PrinterDetector: Filtered list is smaller than unfiltered",
+          "[printer][kinematics_filter]") {
+    PrinterDetector::reload();
+
+    const auto& all = PrinterDetector::get_list_names();
+    const auto& delta = PrinterDetector::get_list_names("delta");
+    const auto& corexy = PrinterDetector::get_list_names("corexy");
+
+    // Filtered lists should be smaller than unfiltered
+    REQUIRE(delta.size() < all.size());
+    REQUIRE(corexy.size() < all.size());
 }
