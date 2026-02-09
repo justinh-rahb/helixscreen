@@ -389,6 +389,10 @@ class BacklightBackendAllwinner : public BacklightBackend {
         return "Allwinner";
     }
 
+    bool supports_hardware_blank() const override {
+        return available_;
+    }
+
   private:
     void probe_device() {
         // Check if /dev/disp exists

@@ -227,6 +227,19 @@ class DisplayManager {
      */
     bool has_backlight_control() const;
 
+    /**
+     * @brief Check if hardware blanking is used for display sleep
+     *
+     * When true, sleep uses FBIOBLANK + backlight off (AD5M/Allwinner).
+     * When false, sleep uses a software black overlay (safe for all displays).
+     * Determined by backlight backend capability or config override.
+     *
+     * @return true if using hardware blank, false if using software overlay
+     */
+    bool uses_hardware_blank() const {
+        return m_use_hardware_blank;
+    }
+
     // ========================================================================
     // Touch Calibration
     // ========================================================================
@@ -335,6 +348,10 @@ class DisplayManager {
     int m_dim_timeout_sec = 300;
     int m_dim_brightness_percent = 30;
 
+    // Hardware vs software blank strategy
+    bool m_use_hardware_blank = false;
+    lv_obj_t* m_sleep_overlay = nullptr;
+
     // Original pointer read callback (before sleep-aware wrapper)
     lv_indev_read_cb_t m_original_pointer_read_cb = nullptr;
 
@@ -345,6 +362,22 @@ class DisplayManager {
 
     static void resize_event_cb(lv_event_t* e);
     static void resize_timer_cb(lv_timer_t* timer);
+
+    /**
+     * @brief Transition display to sleep state (hardware blank or software overlay)
+     * @param timeout_sec Sleep timeout for logging
+     */
+    void enter_sleep(int timeout_sec);
+
+    /**
+     * @brief Create fullscreen black overlay on lv_layer_top() for software sleep
+     */
+    void create_sleep_overlay();
+
+    /**
+     * @brief Destroy the software sleep overlay
+     */
+    void destroy_sleep_overlay();
 
     /**
      * @brief Configure scroll behavior on pointer device

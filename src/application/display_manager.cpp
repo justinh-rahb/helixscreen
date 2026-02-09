@@ -216,6 +216,21 @@ bool DisplayManager::init(const Config& config) {
     spdlog::info("[DisplayManager] Backlight: {} (available: {})", m_backlight->name(),
                  m_backlight->is_available());
 
+    // Resolve hardware vs software blank strategy.
+    // Config override: /display/hardware_blank (0 or 1). Missing (-1) = auto-detect.
+    {
+        int hw_blank_override = ::Config::get_instance()->get<int>("/display/hardware_blank", -1);
+        if (hw_blank_override >= 0) {
+            m_use_hardware_blank = (hw_blank_override != 0);
+            spdlog::info("[DisplayManager] Hardware blank: {} (config override)",
+                         m_use_hardware_blank);
+        } else {
+            m_use_hardware_blank = m_backlight && m_backlight->supports_hardware_blank();
+            spdlog::info("[DisplayManager] Hardware blank: {} (auto-detected from {})",
+                         m_use_hardware_blank, m_backlight ? m_backlight->name() : "none");
+        }
+    }
+
     // Force backlight ON at startup - ensures display is visible even if
     // previous instance left it off or in an unknown state
     if (m_backlight && m_backlight->is_available()) {
@@ -283,6 +298,12 @@ void DisplayManager::shutdown() {
     // lv_deinit() iterates all displays and deletes them.
     // Manually deleting first causes double-free crash.
     m_display = nullptr;
+
+    // Sleep overlay is an LVGL object freed by lv_deinit() — just clear the pointer.
+    // Don't call destroy_sleep_overlay() here because lv_obj_delete() ordering
+    // relative to other LVGL teardown is fragile.
+    m_sleep_overlay = nullptr;
+    m_use_hardware_blank = false;
 
     // Release backends
     m_backlight.reset();
@@ -354,6 +375,56 @@ void DisplayManager::delay(uint32_t ms) {
 }
 
 // ============================================================================
+// Sleep Entry
+// ============================================================================
+
+void DisplayManager::enter_sleep(int timeout_sec) {
+    m_display_sleeping = true;
+    if (m_use_hardware_blank) {
+        if (m_backend) {
+            m_backend->blank_display();
+        }
+        if (m_backlight) {
+            m_backlight->set_brightness(0);
+        }
+        spdlog::info("[DisplayManager] Display sleeping (hardware blank) after {}s", timeout_sec);
+    } else {
+        create_sleep_overlay();
+        if (m_backlight && m_backlight->is_available()) {
+            m_backlight->set_brightness(0);
+        }
+        spdlog::info("[DisplayManager] Display sleeping (software overlay) after {}s", timeout_sec);
+    }
+}
+
+// ============================================================================
+// Software Sleep Overlay
+// ============================================================================
+
+void DisplayManager::create_sleep_overlay() {
+    if (m_sleep_overlay) {
+        return;
+    }
+    m_sleep_overlay = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(m_sleep_overlay, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(m_sleep_overlay, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(m_sleep_overlay, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(m_sleep_overlay, 0, 0);
+    lv_obj_set_style_pad_all(m_sleep_overlay, 0, 0);
+    lv_obj_remove_flag(m_sleep_overlay, LV_OBJ_FLAG_CLICKABLE);
+    spdlog::debug("[DisplayManager] Software sleep overlay created");
+}
+
+void DisplayManager::destroy_sleep_overlay() {
+    if (!m_sleep_overlay) {
+        return;
+    }
+    lv_obj_delete(m_sleep_overlay);
+    m_sleep_overlay = nullptr;
+    spdlog::debug("[DisplayManager] Software sleep overlay destroyed");
+}
+
+// ============================================================================
 // Display Sleep Management
 // ============================================================================
 
@@ -406,29 +477,13 @@ void DisplayManager::check_display_sleep() {
             wake_display();
         } else if (sleep_timeout_sec > 0 && inactive_ms >= sleep_timeout_ms) {
             // Transition from dimmed to sleeping
-            m_display_sleeping = true;
-            if (m_backend) {
-                m_backend->blank_display();
-            }
-            if (m_backlight) {
-                m_backlight->set_brightness(0);
-            }
-            spdlog::info("[DisplayManager] Display sleeping (blanked + backlight off) after {}s",
-                         sleep_timeout_sec);
+            enter_sleep(sleep_timeout_sec);
         }
     } else {
         // Currently awake - check if we should dim or sleep
         if (sleep_timeout_sec > 0 && inactive_ms >= sleep_timeout_ms) {
             // Skip dim, go straight to sleep (sleep timeout <= dim timeout)
-            m_display_sleeping = true;
-            if (m_backend) {
-                m_backend->blank_display();
-            }
-            if (m_backlight) {
-                m_backlight->set_brightness(0);
-            }
-            spdlog::info("[DisplayManager] Display sleeping (blanked + backlight off) after {}s",
-                         sleep_timeout_sec);
+            enter_sleep(sleep_timeout_sec);
         } else if (m_dim_timeout_sec > 0 && inactive_ms >= dim_timeout_ms) {
             // Dim the display
             m_display_dimmed = true;
@@ -455,16 +510,20 @@ void DisplayManager::wake_display() {
     if (was_sleeping) {
         disable_input_briefly();
 
-        // Unblank framebuffer when waking from full sleep (not just dim).
-        // On AD5M, the FBIOBLANK ioctl is needed to actually turn on the display.
-        if (m_backend) {
-            m_backend->unblank_display();
+        if (m_use_hardware_blank) {
+            // Unblank framebuffer when waking from full sleep (not just dim).
+            // On AD5M, the FBIOBLANK ioctl is needed to actually turn on the display.
+            if (m_backend) {
+                m_backend->unblank_display();
+            }
+        } else {
+            // Remove software sleep overlay
+            destroy_sleep_overlay();
         }
 
-        // Force full screen repaint after unblank. Some HDMI hardware clears
-        // framebuffer memory during FBIOBLANK, and LVGL's dirty region tracking
-        // doesn't know the buffer was wiped — without this, only dynamic regions
-        // get redrawn, leaving static UI elements corrupted. (#19)
+        // Force full screen repaint after wake. Hardware path: some HDMI hardware
+        // clears framebuffer memory during FBIOBLANK (#19). Software path: ensures
+        // UI is fully rendered after overlay removal.
         lv_obj_invalidate(lv_screen_active());
 
         // Reset LVGL's inactivity timer so we don't immediately go back to sleep.
@@ -506,6 +565,9 @@ void DisplayManager::set_dim_timeout(int seconds) {
 }
 
 void DisplayManager::restore_display_on_shutdown() {
+    // Clean up software sleep overlay if active
+    destroy_sleep_overlay();
+
     // Ensure display is awake before exiting so next app doesn't start with black screen
     int brightness = SettingsManager::instance().get_brightness();
     brightness = std::clamp(brightness, 10, 100);

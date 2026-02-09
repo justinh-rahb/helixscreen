@@ -288,3 +288,38 @@ TEST_CASE("DisplayManager scroll configuration applies to pointer", "[applicatio
     // - lv_indev_set_scroll_throw(m_pointer, scroll_throw)
     // - lv_indev_set_scroll_limit(m_pointer, scroll_limit)
 }
+
+// ============================================================================
+// Hardware Blank / Software Sleep Overlay Tests
+// ============================================================================
+
+TEST_CASE("DisplayManager defaults to software blank", "[application][display][sleep]") {
+    // Uninitialized DisplayManager should default to software blank (false)
+    DisplayManager mgr;
+    REQUIRE_FALSE(mgr.uses_hardware_blank());
+}
+
+TEST_CASE("DisplayManager sleep state defaults to awake", "[application][display][sleep]") {
+    DisplayManager mgr;
+    REQUIRE_FALSE(mgr.is_display_sleeping());
+    REQUIRE_FALSE(mgr.is_display_dimmed());
+}
+
+TEST_CASE("DisplayManager wake is safe when already awake", "[application][display][sleep]") {
+    DisplayManager mgr;
+
+    // wake_display() on non-sleeping manager should be safe (no-op)
+    mgr.wake_display();
+
+    REQUIRE_FALSE(mgr.is_display_sleeping());
+    REQUIRE_FALSE(mgr.is_display_dimmed());
+}
+
+TEST_CASE("DisplayManager restore_display_on_shutdown is safe when not sleeping",
+          "[application][display][sleep]") {
+    // Should not crash even on uninitialized manager
+    DisplayManager mgr;
+    mgr.restore_display_on_shutdown();
+
+    REQUIRE_FALSE(mgr.is_display_sleeping());
+}

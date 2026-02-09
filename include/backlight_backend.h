@@ -77,6 +77,19 @@ class BacklightBackend {
     virtual const char* name() const = 0;
 
     /**
+     * @brief Check if this backend supports reliable hardware display blanking
+     *
+     * Only returns true for backends with known-good FBIOBLANK / backlight
+     * hardware (e.g. Allwinner on AD5M). All other backends default to false,
+     * causing DisplayManager to use a software black overlay for sleep instead.
+     *
+     * @return true if hardware blank/unblank is reliable on this platform
+     */
+    virtual bool supports_hardware_blank() const {
+        return false;
+    }
+
+    /**
      * @brief Factory: create best available backend with auto-detection
      *
      * Detection order:
