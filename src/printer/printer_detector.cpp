@@ -1184,49 +1184,6 @@ std::string PrinterDetector::get_print_start_profile(const std::string& printer_
 }
 
 // ============================================================================
-// Z-Offset Calibration Strategy Lookup
-// ============================================================================
-
-std::string PrinterDetector::get_z_offset_calibration_strategy(const std::string& printer_name) {
-    // Load database if not already loaded
-    if (!g_database.load()) {
-        spdlog::warn(
-            "[PrinterDetector] Cannot lookup z_offset_calibration_strategy without database");
-        return "";
-    }
-
-    if (!g_database.data.contains("printers") || !g_database.data["printers"].is_array()) {
-        return "";
-    }
-
-    // Case-insensitive search by printer name
-    std::string name_lower = printer_name;
-    std::transform(name_lower.begin(), name_lower.end(), name_lower.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-
-    for (const auto& printer : g_database.data["printers"]) {
-        std::string db_name = printer.value("name", "");
-        std::string db_name_lower = db_name;
-        std::transform(db_name_lower.begin(), db_name_lower.end(), db_name_lower.begin(),
-                       [](unsigned char c) { return std::tolower(c); });
-
-        if (db_name_lower == name_lower) {
-            std::string strategy = printer.value("z_offset_calibration_strategy", "");
-            if (!strategy.empty()) {
-                spdlog::debug(
-                    "[PrinterDetector] Found z_offset_calibration_strategy '{}' for printer '{}'",
-                    strategy, printer_name);
-            }
-            return strategy;
-        }
-    }
-
-    spdlog::debug("[PrinterDetector] No z_offset_calibration_strategy found for printer '{}'",
-                  printer_name);
-    return "";
-}
-
-// ============================================================================
 // Reload and Status Functions
 // ============================================================================
 
