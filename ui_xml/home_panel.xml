@@ -126,19 +126,30 @@
         <!-- PRINTING STATE: Actual print progress (hidden when print_show_progress==0) -->
         <!-- Horizontal layout: thumbnail left, info right (mirrors idle state layout) -->
         <lv_obj name="print_card_printing"
-                width="100%" height="100%" style_pad_all="0" flex_flow="row" style_flex_main_place="center"
+                width="100%" height="100%" style_pad_all="#space_sm" flex_flow="row"
                 style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false" hidden="true"
                 clickable="false">
           <!-- Single binding: show only when print_active==1 AND print_start_phase==IDLE -->
           <bind_flag_if_eq subject="print_show_progress" flag="hidden" ref_value="0"/>
-          <!-- Thumbnail (set programmatically via lv_image_set_src when print starts) -->
-          <lv_image name="print_card_active_thumb"
-                    width="50%" height="100%" src="A:assets/images/benchy_thumbnail_white.png" inner_align="contain"/>
-          <!-- Info column: filename, progress bar, percentage -->
-          <lv_obj width="50%"
+          <!-- Thumbnail wrapper: constrains size so lv_image_set_src can't blow out layout -->
+          <lv_obj width="40%" height="100%" style_pad_all="0" style_bg_opa="0%" scrollable="false">
+            <lv_image name="print_card_active_thumb"
+                      width="100%" height="100%" src="A:assets/images/benchy_thumbnail_white.png"
+                      inner_align="contain"/>
+          </lv_obj>
+          <!-- Info column: e-stop, filename, progress bar, percentage -->
+          <lv_obj flex_grow="1"
                   height="100%" style_pad_all="0" flex_flow="column" style_flex_main_place="center"
                   style_flex_cross_place="center" style_pad_gap="#space_xs" scrollable="false"
                   clickable="false">
+            <!-- E-stop button (only visible when printing) -->
+            <ui_button name="estop_button_print"
+                       width="#button_height_sm" height="#button_height_sm" variant="danger" style_radius="24"
+                       focusable="false" hidden="true">
+              <bind_flag_if_eq subject="estop_visible" flag="hidden" ref_value="0"/>
+              <icon src="alert_octagon" size="sm" variant="text" align="center"/>
+              <event_cb trigger="clicked" callback="emergency_stop_clicked"/>
+            </ui_button>
             <!-- Filename (constrained width with wrapping for long names) -->
             <text_body width="100%"
                        bind_text="print_display_filename" style_text_color="#text" long_mode="wrap"
@@ -246,25 +257,6 @@
                 <event_cb trigger="clicked" callback="status_notification_history_clicked"/>
               </notification_badge>
             </lv_obj>
-          </lv_obj>
-
-          <!-- E-stop divider (ONLY visible when printing) -->
-          <divider_vertical name="estop_divider" height="80%" hidden="true">
-            <bind_flag_if_eq subject="estop_visible" flag="hidden" ref_value="0"/>
-          </divider_vertical>
-
-          <!-- E-stop button container (ONLY visible when printing) -->
-          <lv_obj height="100%"
-                  flex_grow="1" style_pad_all="0" flex_flow="column" style_flex_main_place="center"
-                  style_flex_track_place="center" hidden="true">
-            <bind_flag_if_eq subject="estop_visible" flag="hidden" ref_value="0"/>
-            <!-- Circular button: radius=24 is half of button_height_small (48px) -->
-            <ui_button name="estop_button_home"
-                       width="#button_height_sm" height="#button_height_sm" variant="danger" style_radius="24"
-                       align="center" focusable="false">
-              <icon src="alert_octagon" size="sm" variant="text" align="center"/>
-              <event_cb trigger="clicked" callback="emergency_stop_clicked"/>
-            </ui_button>
           </lv_obj>
 
           <!-- Firmware restart divider (ONLY visible when klippy SHUTDOWN) -->
