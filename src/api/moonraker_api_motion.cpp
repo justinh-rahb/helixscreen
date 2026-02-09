@@ -4,9 +4,11 @@
 #include "ui_error_reporting.h"
 #include "ui_notification.h"
 
+#include "app_globals.h"
 #include "hv/requests.h"
 #include "moonraker_api.h"
 #include "moonraker_api_internal.h"
+#include "printer_state.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -644,6 +646,17 @@ void MoonrakerAPI::update_safety_limits_from_printer(SuccessCallback on_success,
                                   "X[{:.0f},{:.0f}] Y[{:.0f},{:.0f}] Z[0,{:.0f}]",
                                   build_vol.x_min, build_vol.x_max, build_vol.y_min,
                                   build_vol.y_max, build_vol.z_max);
+                }
+
+                // Extract stepper_z position_endstop for non-probe Z-offset reference
+                if (settings.contains("stepper_z") &&
+                    settings["stepper_z"].contains("position_endstop")) {
+                    double endstop = settings["stepper_z"]["position_endstop"].get<double>();
+                    int microns = static_cast<int>(endstop * 1000.0);
+                    get_printer_state().set_stepper_z_endstop_microns(microns);
+                    spdlog::debug(
+                        "[Moonraker API] stepper_z position_endstop: {:.3f}mm ({} microns)",
+                        endstop, microns);
                 }
 
                 // Extract temperature limits from heater configurations

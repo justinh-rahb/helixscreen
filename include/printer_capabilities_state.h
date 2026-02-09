@@ -87,6 +87,28 @@ class PrinterCapabilitiesState {
      */
     void set_bed_moves(bool bed_moves);
 
+    /**
+     * @brief Set stepper_z position_endstop value (for non-probe printers)
+     *
+     * Stores the configured position_endstop from stepper_z in Klipper's
+     * configfile.settings. Used as the "saved z-offset" reference for
+     * endstop-based printers during Z-offset calibration.
+     *
+     * @param microns position_endstop in microns (e.g., 235000 for 235.0mm)
+     */
+    void set_stepper_z_endstop_microns(int microns) {
+        stepper_z_endstop_microns_ = microns;
+    }
+
+    /**
+     * @brief Get stepper_z position_endstop value in microns
+     *
+     * @return position_endstop in microns, or 0 if not set
+     */
+    int get_stepper_z_endstop_microns() const {
+        return stepper_z_endstop_microns_;
+    }
+
     // ========================================================================
     // Subject accessors (15 subjects)
     // ========================================================================
@@ -187,6 +209,9 @@ class PrinterCapabilitiesState {
   private:
     SubjectManager subjects_;
     bool subjects_initialized_ = false;
+
+    /// stepper_z position_endstop from configfile.settings (microns)
+    int stepper_z_endstop_microns_ = 0;
 
     // Printer capability subjects (all integer: 0=no, 1=yes)
     lv_subject_t printer_has_qgl_{};                 // quad_gantry_level

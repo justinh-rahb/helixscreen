@@ -1266,6 +1266,28 @@ class PrinterState {
         return capabilities_state_.has_probe();
     }
 
+    /**
+     * @brief Get the configured (saved) z-offset in microns
+     *
+     * Returns the printer's saved z-offset value before calibration started.
+     * For probe printers: reads probe z_offset from ProbeSensorManager.
+     * For endstop printers: reads stepper_z position_endstop from config.
+     *
+     * @return Z-offset in microns (e.g., -1500 for -1.500mm)
+     */
+    int get_configured_z_offset_microns();
+
+    /**
+     * @brief Set stepper_z position_endstop (for non-probe printers)
+     *
+     * Forwarded to PrinterCapabilitiesState.
+     *
+     * @param microns position_endstop in microns
+     */
+    void set_stepper_z_endstop_microns(int microns) {
+        capabilities_state_.set_stepper_z_endstop_microns(microns);
+    }
+
     // ========================================================================
     // HARDWARE VALIDATION API
     // ========================================================================

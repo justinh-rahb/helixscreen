@@ -588,6 +588,16 @@ bool PrinterState::can_start_new_print() const {
     return print_domain_.can_start_new_print();
 }
 
+int PrinterState::get_configured_z_offset_microns() {
+    if (has_probe()) {
+        // Probe printers: z_offset stored in ProbeSensorManager (already in microns)
+        return lv_subject_get_int(
+            helix::sensors::ProbeSensorManager::instance().get_probe_z_offset_subject());
+    }
+    // Endstop printers: position_endstop from configfile.settings
+    return capabilities_state_.get_stepper_z_endstop_microns();
+}
+
 void PrinterState::set_kinematics(const std::string& kinematics) {
     if (kinematics == last_kinematics_) {
         return;
