@@ -384,7 +384,7 @@ bool ensure_themes_directory(const std::string& themes_dir) {
     // First ensure parent config directory exists
     std::string config_dir = "config";
     if (stat(config_dir.c_str(), &st) != 0) {
-        if (mkdir(config_dir.c_str(), 0755) != 0) {
+        if (mkdir(config_dir.c_str(), 0750) != 0) {
             spdlog::error("[ThemeLoader] Failed to create config directory {}: {}", config_dir,
                           strerror(errno));
             return false;
@@ -394,7 +394,7 @@ bool ensure_themes_directory(const std::string& themes_dir) {
 
     // Then create themes directory if it doesn't exist
     if (stat(themes_dir.c_str(), &st) != 0) {
-        if (mkdir(themes_dir.c_str(), 0755) != 0) {
+        if (mkdir(themes_dir.c_str(), 0750) != 0) {
             spdlog::error("[ThemeLoader] Failed to create themes directory {}: {}", themes_dir,
                           strerror(errno));
             return false;

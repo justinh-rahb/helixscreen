@@ -1148,7 +1148,7 @@ std::string get_cached_thumbnail(const std::string& gcode_path, const std::strin
     // Ensure cache directory exists (create on-the-fly)
     struct stat dir_stat;
     if (stat(cache_dir.c_str(), &dir_stat) != 0) {
-        if (mkdir(cache_dir.c_str(), 0755) != 0) {
+        if (mkdir(cache_dir.c_str(), 0750) != 0) {
             if (!cache_dir_error_shown) {
                 spdlog::error(
                     "Cannot create thumbnail cache directory: {} (further errors suppressed)",

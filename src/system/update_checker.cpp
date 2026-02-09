@@ -775,7 +775,7 @@ bool UpdateChecker::validate_elf_architecture(const std::string& tarball_path) {
 
     // Extract binary to temp location for inspection
     std::string temp_dir = tarball_path + ".validate";
-    mkdir(temp_dir.c_str(), 0755);
+    mkdir(temp_dir.c_str(), 0750);
 
     // Extract binary from tarball for inspection (safe_exec avoids shell injection)
     auto ret =

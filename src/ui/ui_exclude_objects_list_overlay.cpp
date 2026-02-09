@@ -394,7 +394,7 @@ lv_obj_t* ExcludeObjectsListOverlay::create_object_row(lv_obj_t* parent, const s
         // Allocate name string for callback
         char* name_copy = static_cast<char*>(lv_malloc(name.size() + 1));
         if (name_copy) {
-            strcpy(name_copy, name.c_str());
+            memcpy(name_copy, name.c_str(), name.size() + 1);
             lv_obj_set_user_data(row, name_copy);
 
             // Click handler - uses singleton accessor to avoid capturing 'this'
