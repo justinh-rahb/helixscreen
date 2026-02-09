@@ -265,10 +265,13 @@ class PrinterDetector {
     static PrintStartCapabilities get_print_start_capabilities(const std::string& printer_name);
 
     /**
-     * @brief Get Z-offset calibration strategy string for a printer
+     * @brief Get Z-offset calibration strategy for a printer
      *
-     * Looks up the z_offset_calibration_strategy field from the printer database.
-     * Returns "probe_calibrate", "gcode_offset", "endstop", or "" if not specified.
+     * Looks up the z_offset_calibration_strategy field from the printer database JSON.
+     * Returns empty string if not specified (caller should auto-detect).
+     *
+     * @param printer_name Printer name (e.g., "FlashForge Adventurer 5M Pro")
+     * @return Strategy string ("probe_calibrate", "gcode_offset", "endstop"), or empty string
      */
     static std::string get_z_offset_calibration_strategy(const std::string& printer_name);
 
@@ -283,17 +286,6 @@ class PrinterDetector {
      * @return Profile name (e.g., "forge_x"), or empty string if not specified
      */
     static std::string get_print_start_profile(const std::string& printer_name);
-
-    /**
-     * @brief Get Z-offset calibration strategy for a printer
-     *
-     * Looks up the z_offset_calibration_strategy field from the printer database JSON.
-     * Returns empty string if not specified (caller should auto-detect).
-     *
-     * @param printer_name Printer name (e.g., "FlashForge Adventurer 5M Pro")
-     * @return Strategy string ("probe_calibrate", "gcode_offset", "endstop"), or empty string
-     */
-    static std::string get_z_offset_calibration_strategy(const std::string& printer_name);
 
     // =========================================================================
     // User Extensions API
