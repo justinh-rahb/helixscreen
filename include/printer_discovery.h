@@ -170,6 +170,9 @@ class PrinterDiscovery {
             } else if (name == "screws_tilt_adjust") {
                 has_screws_tilt_ = true;
             }
+            // NOTE: screws_tilt_adjust may not appear in objects/list (no get_status()).
+            // Also detected in parse_config_keys() as fallback.
+            //
             // NOTE: Accelerometer detection removed from parse_objects().
             // Klipper's objects/list only returns objects with get_status() methods.
             // Accelerometers (adxl345, lis2dw, mpu9250, resonance_tester) intentionally
@@ -326,6 +329,13 @@ class PrinterDiscovery {
                 key == "resonance_tester") {
                 has_accelerometer_ = true;
                 spdlog::debug("[PrinterDiscovery] Accelerometer detected from config: {}", key);
+            }
+
+            // screws_tilt_adjust doesn't implement get_status() in Klipper,
+            // so it may not appear in objects/list. Detect from configfile as fallback.
+            if (key == "screws_tilt_adjust") {
+                has_screws_tilt_ = true;
+                spdlog::debug("[PrinterDiscovery] screws_tilt_adjust detected from config");
             }
         }
     }

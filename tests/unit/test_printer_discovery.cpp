@@ -805,3 +805,53 @@ TEST_CASE("PrinterDiscovery handles full Voron 2.4 config", "[printer_discovery]
     REQUIRE(hw.macros().size() == 2);
     REQUIRE(hw.nozzle_clean_macro() == "CLEAN_NOZZLE");
 }
+
+// ============================================================================
+// screws_tilt_adjust Detection Tests
+// ============================================================================
+// NOTE: screws_tilt_adjust doesn't implement get_status() in Klipper,
+// so it typically won't appear in objects/list. Must detect from configfile.
+
+TEST_CASE("PrinterDiscovery detects screws_tilt_adjust from objects list", "[printer_discovery]") {
+    // Belt-and-suspenders: if a future Klipper version adds get_status(), this still works
+    PrinterDiscovery hw;
+
+    json objects = {"extruder", "heater_bed", "screws_tilt_adjust"};
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_screws_tilt());
+}
+
+TEST_CASE("PrinterDiscovery detects screws_tilt_adjust from config keys", "[printer_discovery]") {
+    PrinterDiscovery hw;
+
+    SECTION("screws_tilt_adjust present in config") {
+        json config = {{"screws_tilt_adjust", json::object()}};
+        hw.parse_config_keys(config);
+        REQUIRE(hw.has_screws_tilt());
+    }
+
+    SECTION("unrelated config keys do not trigger screws_tilt") {
+        json config = {{"extruder", json::object()}, {"heater_bed", json::object()}};
+        hw.parse_config_keys(config);
+        REQUIRE_FALSE(hw.has_screws_tilt());
+    }
+}
+
+TEST_CASE("PrinterDiscovery detects screws_tilt_adjust from config when missing from objects",
+          "[printer_discovery]") {
+    // Real-world scenario: screws_tilt_adjust in configfile but NOT in objects/list
+    PrinterDiscovery hw;
+
+    // Objects list without screws_tilt_adjust (as happens on real printers)
+    json objects = {"extruder", "heater_bed", "bed_mesh", "probe"};
+    hw.parse_objects(objects);
+    REQUIRE_FALSE(hw.has_screws_tilt());
+
+    // Config keys include screws_tilt_adjust (the fallback path)
+    json config = {{"screws_tilt_adjust", {{"screw1", "50, 50"}}},
+                   {"extruder", json::object()},
+                   {"printer", {{"kinematics", "corexy"}}}};
+    hw.parse_config_keys(config);
+    REQUIRE(hw.has_screws_tilt());
+}
