@@ -16,7 +16,7 @@
 
 Stock touchscreen UIs barely scratch the surface of what Klipper can do—and the good stuff (bed mesh visualization, input shaper graphs, multi-material control) lives in your browser. HelixScreen brings it all to your fingertips.
 
-Built on LVGL 9's modern declarative XML system, HelixScreen delivers a fast, polished experience across the entire Klipper ecosystem—from resource-constrained machines like the Creality K1 and FlashForge AD5M to custom Vorons, RatRigs, and high-end builds.
+Built on LVGL 9's modern declarative XML system, HelixScreen delivers a fast, polished experience across the entire Klipper ecosystem—from resource-constrained machines like the Creality K1, K2 series, and FlashForge AD5M to custom Vorons, RatRigs, and high-end builds.
 
 ---
 
@@ -29,6 +29,8 @@ Built on LVGL 9's modern declarative XML system, HelixScreen delivers a fast, po
 > **Raspberry Pi:** Both 64-bit and 32-bit Raspberry Pi OS are supported.
 >
 > **Creality K1:** Binaries are included in the release but have **not been tested on hardware**. If you have a K1, we'd love your help verifying it works!
+>
+> **Creality K2:** Build target exists (ARM, static musl) but is **completely untested**. Stock Moonraker on port 4408 makes this a promising target. If you have a K2/K2 Plus with SSH access, we'd love your help!
 >
 > **Ready to help?** See [Installation](#installation). Found a bug? [Open an issue](https://github.com/prestonbrown/helixscreen/issues). Have an idea? [Request a feature](https://github.com/prestonbrown/helixscreen/issues/new?labels=enhancement).
 
@@ -43,7 +45,7 @@ Built on LVGL 9's modern declarative XML system, HelixScreen delivers a fast, po
 - **Declarative XML UI** — Change layouts without recompiling
 - **Reactive Data Binding** — Subject-Observer pattern for automatic UI updates
 - **Resource Efficient** — ~10MB RAM, runs on constrained hardware
-- **Scales Anywhere** — From a Creality K1 to a tricked-out Voron
+- **Scales Anywhere** — From a Creality K1 or K2 to a tricked-out Voron
 - **Modern C++17** — Type-safe architecture with RAII memory management
 
 | Feature | HelixScreen | GuppyScreen | KlipperScreen |
@@ -87,7 +89,7 @@ See [docs/GALLERY.md](docs/GALLERY.md) for all screenshots.
 
 > **⚠️ Run these commands on your printer's host computer, not your local machine.**
 >
-> SSH into your Raspberry Pi, BTT CB1/Manta, or similar host as root. For all-in-one printers (Creality K1, Adventurer 5M/Pro), SSH directly into the printer itself.
+> SSH into your Raspberry Pi, BTT CB1/Manta, or similar host as root. For all-in-one printers (Creality K1, K2 series, Adventurer 5M/Pro), SSH directly into the printer itself.
 
 **Raspberry Pi / Creality K1:**
 ```bash
@@ -127,7 +129,7 @@ Beta status. Core features are stable and improving with each release. Suitable 
 HelixScreen uses LVGL 9's declarative XML—change layouts without recompiling. ~10MB RAM vs ~50MB for KlipperScreen. See the [comparison table](#why-helixscreen).
 
 **Which printers are supported?**
-Any Klipper + Moonraker printer. Tested on Voron 2.4, Voron 0.2, Doron Velta, and FlashForge Adventurer 5M Pro. Both 64-bit and 32-bit Raspberry Pi OS are supported. Creality K1 binaries are available but untested. The wizard auto-discovers your printer's capabilities.
+Any Klipper + Moonraker printer. Tested on Voron 2.4, Voron 0.2, Doron Velta, and FlashForge Adventurer 5M Pro. Both 64-bit and 32-bit Raspberry Pi OS are supported. Creality K1 and K2 series binaries are available but untested. The wizard auto-discovers your printer's capabilities.
 
 **What screen sizes are supported?**
 800×480 and up (including 1024×600) work well. Smaller displays like 480×320 are a work-in-progress — they'll run but may have some layout overlap issues.
@@ -153,7 +155,7 @@ See [docs/user/TROUBLESHOOTING.md](docs/user/TROUBLESHOOTING.md) for more soluti
 ### User Guides
 | Guide | Description |
 |-------|-------------|
-| [Installation](docs/user/INSTALL.md) | Setup for Pi, K1, AD5M |
+| [Installation](docs/user/INSTALL.md) | Setup for Pi, K1, K2, AD5M |
 | [User Guide](docs/user/USER_GUIDE.md) | Using HelixScreen |
 | [FAQ](docs/user/FAQ.md) | Common questions |
 | [Troubleshooting](docs/user/TROUBLESHOOTING.md) | Problem solutions |

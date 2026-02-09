@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change Host modal for switching Moonraker connection in settings
 - Z movement style override setting and E-Stop relocated to Motion section
 - K1 dynamic linking toolchain and build target
+- Creality K2 series cross-compilation target (ARM, static musl — untested, needs hardware validation)
 - CDN-first installer downloads with GitHub fallback
 - Multi-channel R2 update distribution with GitHub API fallback
 

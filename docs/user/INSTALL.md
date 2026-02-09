@@ -13,6 +13,7 @@ This guide walks you through installing HelixScreen on your 3D printer's touchsc
 - [MainsailOS Installation](#mainsailos-installation)
 - [Adventurer 5M Installation](#adventurer-5m-installation)
 - [Creality K1 Installation](#creality-k1-series-simple-af)
+- [Creality K2 Series (Untested)](#creality-k2-series-untested)
 - [First Boot & Setup Wizard](#first-boot--setup-wizard)
 - [Display Configuration](#display-configuration)
 - [Starting on Boot](#starting-on-boot)
@@ -26,7 +27,7 @@ This guide walks you through installing HelixScreen on your 3D printer's touchsc
 
 > **⚠️ Run these commands on your printer's host, not your local computer.**
 >
-> SSH into your Raspberry Pi, BTT CB1/Manta, or similar host. For all-in-one printers (Creality K1, Adventurer 5M/Pro), SSH directly into the printer itself as root.
+> SSH into your Raspberry Pi, BTT CB1/Manta, or similar host. For all-in-one printers (Creality K1, K2 series, Adventurer 5M/Pro), SSH directly into the printer itself as root.
 
 **Raspberry Pi (MainsailOS) or Creality K1:**
 ```bash
@@ -138,6 +139,34 @@ The HelixScreen installer will:
 - Configure Moonraker update_manager for one-click updates from Fluidd/Mainsail
 
 On uninstall, GuppyScreen is restored.
+
+### Creality K2 Series (Untested)
+
+> **⚠️ This platform has not been tested on real hardware.** The build target exists and produces a binary, but no one has run it on an actual K2 yet. If you have a K2 with SSH access, we'd love your help validating it!
+
+- **Hardware:**
+  - Creality K2, K2 Pro, K2 Plus, or K2 SE
+  - Stock 4.3" touchscreen display (480x800)
+  - Network connection
+
+- **Software:**
+  - Stock firmware with root access enabled (Settings → "Root account information")
+  - SSH access (`root@<printer-ip>`, password: `creality_2024`)
+  - Moonraker is included in stock firmware on port 4408
+
+**What's different from K1:**
+- ARM processor (Allwinner, not MIPS) — standard cross-compilation
+- Stock Moonraker — no community firmware (Simple AF, etc.) required
+- OpenWrt-based init system (procd, not SysV)
+- Display may be portrait orientation (480x800) — rotation support may be needed
+
+**Current status:**
+- Build target: `make k2-docker` produces a static ARM binary
+- Deploy targets exist: `make deploy-k2 K2_HOST=<ip>`
+- No installer script support yet — manual deployment only
+- See `docs/printer-research/CREALITY_K2_PLUS_RESEARCH.md` for full research and open questions
+
+**If you want to help test**, run the diagnostic commands in the research doc (Section 13) and report back via [GitHub Issues](https://github.com/prestonbrown/helixscreen/issues).
 
 ---
 
@@ -556,6 +585,7 @@ Or via SSH, check the help output:
 # Path varies by platform:
 #   Pi: ~/helixscreen/bin/helix-screen (or /opt/helixscreen if no Klipper ecosystem)
 #   K1: /usr/data/helixscreen/bin/helix-screen
+#   K2: /opt/helixscreen/bin/helix-screen (assumed, untested)
 #   AD5M Klipper Mod: /root/printer_software/helixscreen/bin/helix-screen
 ~/helixscreen/bin/helix-screen --help | head -1
 ```

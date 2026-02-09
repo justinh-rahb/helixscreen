@@ -26,10 +26,14 @@ HelixScreen is a touchscreen interface for Klipper 3D printers. It connects to y
 - Voron 2.4
 - FlashForge Adventurer 5M / 5M Pro (with [Forge-X](https://github.com/DrA1ex/ff5m)) — most thoroughly tested on ForgeX 1.4.0 with FlashForge firmware 3.1.5; other versions may work fine
 
+**Binaries available but untested:**
+- Creality K1 series (K1, K1C, K1 Max) — requires [Simple AF](https://github.com/pellcorp/creality) community firmware
+- Creality K2 series (K2, K2 Pro, K2 Plus) — stock firmware has Moonraker on port 4408, no community firmware needed
+
 **Should work but not yet tested:**
 - Other Voron models
 - Prusa (with Klipper mod)
-- Creality (K1, Ender with Klipper)
+- Creality Ender (with Klipper)
 - Bambu (with Klipper mod)
 - Ratrig
 - Any custom Klipper build
@@ -45,6 +49,7 @@ If you test on a printer not listed above, please let us know your results!
 
 **Should work but not yet tested:**
 - Official Raspberry Pi 7" DSI touchscreen
+- Creality K2 built-in 4.3" display (480x800, portrait — may need rotation)
 - Other HDMI displays
 - SPI displays (with proper configuration)
 
