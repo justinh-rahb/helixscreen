@@ -1422,6 +1422,28 @@ void Application::setup_discovery_callbacks() {
 
             // Start automatic update checks (15s initial delay, then every 24h)
             UpdateChecker::instance().start_auto_check();
+
+            // Auto-navigate to Z-Offset Calibration if manual probe is already active
+            // (e.g., PROBE_CALIBRATE started from Mainsail or console before HelixScreen launched)
+            // Deferred one tick: status updates from the subscription response are queued
+            // via helix::async::invoke and may not have landed yet at this point.
+            MoonrakerClient* client_ptr = c->client;
+            lv_obj_t* screen = c->app->m_screen;
+            helix::async::invoke([client_ptr, screen]() {
+                auto& ps = get_printer_state();
+                int probe_active = lv_subject_get_int(ps.get_manual_probe_active_subject());
+                spdlog::info("[Application] Checking manual_probe at startup: is_active={}",
+                             probe_active);
+                if (probe_active == 1) {
+                    spdlog::info("[Application] Manual probe active at startup, auto-opening "
+                                 "Z-Offset Calibration");
+                    auto& overlay = get_global_zoffset_cal_panel();
+                    overlay.set_client(client_ptr);
+                    if (overlay.create(screen)) {
+                        overlay.show();
+                    }
+                }
+            });
         });
     });
 }
