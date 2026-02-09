@@ -18,6 +18,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 
@@ -82,35 +83,20 @@ static void on_tune_reset_clicked_cb(lv_event_t* /*e*/) {
     get_print_tune_overlay().handle_reset();
 }
 
-// Z-offset step button callbacks - each calls handle_z_offset_changed with fixed delta
-static void on_tune_z_n05_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_offset_changed(-0.05);
-}
-static void on_tune_z_n025_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_offset_changed(-0.025);
-}
-static void on_tune_z_n01_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_offset_changed(-0.01);
-}
-static void on_tune_z_n005_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_offset_changed(-0.005);
-}
-static void on_tune_z_p005_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_offset_changed(0.005);
-}
-static void on_tune_z_p01_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_offset_changed(0.01);
-}
-static void on_tune_z_p025_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_offset_changed(0.025);
-}
-static void on_tune_z_p05_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_offset_changed(0.05);
+// Z-offset step amount selector (user_data = index "0"-"3")
+static void on_tune_z_step_cb(lv_event_t* e) {
+    const char* idx_str = static_cast<const char*>(lv_event_get_user_data(e));
+    if (!idx_str)
+        return;
+    get_print_tune_overlay().handle_z_step_select(atoi(idx_str));
 }
 
-// Z-offset reset button callback
-static void on_tune_z_reset_cb(lv_event_t*) {
-    get_print_tune_overlay().handle_z_reset();
+// Z-offset direction adjust (user_data = "-1" closer or "1" farther)
+static void on_tune_z_adjust_cb(lv_event_t* e) {
+    const char* dir_str = static_cast<const char*>(lv_event_get_user_data(e));
+    if (!dir_str)
+        return;
+    get_print_tune_overlay().handle_z_adjust(atoi(dir_str));
 }
 
 static void on_tune_save_z_offset_cb(lv_event_t* /*e*/) {
@@ -205,25 +191,27 @@ void PrintTuneOverlay::init_subjects_internal() {
     UI_MANAGED_SUBJECT_STRING(tune_z_offset_subject_, tune_z_offset_buf_, "0.000mm",
                               "tune_z_offset_display", subjects_);
 
+    // Z-offset direction button icons (kinematic-aware, like motion panel)
+    UI_MANAGED_SUBJECT_STRING(z_closer_icon_subject_, z_closer_icon_buf_, "arrow_down",
+                              "tune_z_closer_icon", subjects_);
+    UI_MANAGED_SUBJECT_STRING(z_farther_icon_subject_, z_farther_icon_buf_, "arrow_up",
+                              "tune_z_farther_icon", subjects_);
+
+    // Z-offset step amount boolean subjects (L040: one per button for bind_style radio pattern)
+    UI_MANAGED_SUBJECT_INT(z_step_active_subjects_[0], 0, "z_step_0_active", subjects_);
+    UI_MANAGED_SUBJECT_INT(z_step_active_subjects_[1], 0, "z_step_1_active", subjects_);
+    UI_MANAGED_SUBJECT_INT(z_step_active_subjects_[2], 1, "z_step_2_active", subjects_); // default
+    UI_MANAGED_SUBJECT_INT(z_step_active_subjects_[3], 0, "z_step_3_active", subjects_);
+
     // Register XML event callbacks
-    // Speed/flow sliders: separate display (while dragging) and send (on release) callbacks
     lv_xml_register_event_cb(nullptr, "on_tune_speed_display", on_tune_speed_display_cb);
     lv_xml_register_event_cb(nullptr, "on_tune_speed_send", on_tune_speed_send_cb);
     lv_xml_register_event_cb(nullptr, "on_tune_flow_display", on_tune_flow_display_cb);
     lv_xml_register_event_cb(nullptr, "on_tune_flow_send", on_tune_flow_send_cb);
     lv_xml_register_event_cb(nullptr, "on_tune_reset_clicked", on_tune_reset_clicked_cb);
     lv_xml_register_event_cb(nullptr, "on_tune_save_z_offset", on_tune_save_z_offset_cb);
-
-    // Z-offset step button callbacks
-    lv_xml_register_event_cb(nullptr, "on_tune_z_n05", on_tune_z_n05_cb);
-    lv_xml_register_event_cb(nullptr, "on_tune_z_n025", on_tune_z_n025_cb);
-    lv_xml_register_event_cb(nullptr, "on_tune_z_n01", on_tune_z_n01_cb);
-    lv_xml_register_event_cb(nullptr, "on_tune_z_n005", on_tune_z_n005_cb);
-    lv_xml_register_event_cb(nullptr, "on_tune_z_p005", on_tune_z_p005_cb);
-    lv_xml_register_event_cb(nullptr, "on_tune_z_p01", on_tune_z_p01_cb);
-    lv_xml_register_event_cb(nullptr, "on_tune_z_p025", on_tune_z_p025_cb);
-    lv_xml_register_event_cb(nullptr, "on_tune_z_p05", on_tune_z_p05_cb);
-    lv_xml_register_event_cb(nullptr, "on_tune_z_reset", on_tune_z_reset_cb);
+    lv_xml_register_event_cb(nullptr, "on_tune_z_step", on_tune_z_step_cb);
+    lv_xml_register_event_cb(nullptr, "on_tune_z_adjust", on_tune_z_adjust_cb);
 
     subjects_initialized_ = true;
     spdlog::debug("[PrintTuneOverlay] Subjects initialized");
@@ -317,10 +305,17 @@ void PrintTuneOverlay::update_z_offset_icons(lv_obj_t* /*panel*/) {
     int kin = lv_subject_get_int(printer_state_->get_printer_bed_moves_subject());
     bool bed_moves_z = (kin == 1);
 
-    // Icons are now handled via XML bind_flag_if_eq on printer_bed_moves subject
-    // This function just logs the kinematics for debugging
-    spdlog::debug("[PrintTuneOverlay] Z-offset icons set for {} kinematics (via XML binding)",
-                  bed_moves_z ? "bed-moves-Z" : "head-moves-Z");
+    // Set icon names via string subjects (bind_icon in XML)
+    const char* closer_icon = bed_moves_z ? "arrow_expand_down" : "arrow_down";
+    const char* farther_icon = bed_moves_z ? "arrow_expand_up" : "arrow_up";
+
+    std::strncpy(z_closer_icon_buf_, closer_icon, sizeof(z_closer_icon_buf_) - 1);
+    lv_subject_copy_string(&z_closer_icon_subject_, z_closer_icon_buf_);
+    std::strncpy(z_farther_icon_buf_, farther_icon, sizeof(z_farther_icon_buf_) - 1);
+    lv_subject_copy_string(&z_farther_icon_subject_, z_farther_icon_buf_);
+
+    spdlog::debug("[PrintTuneOverlay] Z-offset icons: closer={}, farther={}", closer_icon,
+                  farther_icon);
 }
 
 // ============================================================================
@@ -487,32 +482,24 @@ void PrintTuneOverlay::handle_z_offset_changed(double delta) {
     }
 }
 
-void PrintTuneOverlay::handle_z_reset() {
-    spdlog::debug("[PrintTuneOverlay] Z-offset reset requested");
+void PrintTuneOverlay::handle_z_step_select(int idx) {
+    if (idx < 0 || idx >= static_cast<int>(std::size(Z_STEP_AMOUNTS))) {
+        spdlog::warn("[PrintTuneOverlay] Invalid step index: {}", idx);
+        return;
+    }
+    selected_z_step_idx_ = idx;
 
-    // Reset local state
-    current_z_offset_ = 0.0;
-    helix::fmt::format_distance_mm(0.0, 3, tune_z_offset_buf_, sizeof(tune_z_offset_buf_));
-    lv_subject_copy_string(&tune_z_offset_subject_, tune_z_offset_buf_);
-
-    // Update indicator
-    if (tune_panel_) {
-        lv_obj_t* indicator = lv_obj_find_by_name(tune_panel_, "z_offset_indicator");
-        if (indicator) {
-            ui_z_offset_indicator_set_value(indicator, 0);
-        }
+    // Update boolean subjects (only one active at a time, like filament panel)
+    for (int i = 0; i < static_cast<int>(std::size(Z_STEP_AMOUNTS)); i++) {
+        lv_subject_set_int(&z_step_active_subjects_[i], i == idx ? 1 : 0);
     }
 
-    // Send G-code to reset z-offset
-    if (api_) {
-        api_->execute_gcode(
-            "SET_GCODE_OFFSET Z=0 MOVE=1",
-            []() { spdlog::debug("[PrintTuneOverlay] Z-offset reset to 0"); },
-            [](const MoonrakerError& err) {
-                spdlog::error("[PrintTuneOverlay] Z-offset reset failed: {}", err.message);
-                NOTIFY_ERROR("Z-offset reset failed: {}", err.user_message());
-            });
-    }
+    spdlog::debug("[PrintTuneOverlay] Z-offset step selected: {}mm", Z_STEP_AMOUNTS[idx]);
+}
+
+void PrintTuneOverlay::handle_z_adjust(int direction) {
+    double amount = Z_STEP_AMOUNTS[selected_z_step_idx_];
+    handle_z_offset_changed(direction * amount);
 }
 
 void PrintTuneOverlay::handle_save_z_offset() {

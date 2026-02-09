@@ -2,6 +2,11 @@
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <component>
+  <!-- Styles for Z-offset step amount radio buttons (L040: TWO bind_styles per button) -->
+  <styles>
+    <style name="z_step_selected" bg_color="#primary" bg_opa="255"/>
+    <style name="z_step_unselected" bg_color="#primary" bg_opa="40"/>
+  </styles>
   <!-- Print Tuning Panel: Speed and Flow adjustment during active print -->
   <view name="print_tune_panel" extends="overlay_panel" title="Print Tuning" title_tag="Print Tuning">
     <!-- Content Area -->
@@ -45,12 +50,10 @@
       <ui_button name="btn_reset" width="100%" icon="refresh" text="Reset Speed &amp; Flow to 100%" translation_tag="Reset Speed &amp; Flow to 100%">
         <event_cb trigger="clicked" callback="on_tune_reset_clicked"/>
       </ui_button>
-      <!-- Spacer to push Z-offset to bottom -->
-      <lv_obj flex_grow="1" scrollable="false"/>
-      <!-- Z-Offset Baby Stepping Section -->
+      <!-- Z-Offset Baby Stepping Section (flex_grow claims remaining space, content aligned to bottom) -->
       <lv_obj name="z_offset_section"
-              width="100%" height="content" style_pad_all="0" flex_flow="column" style_pad_gap="#space_xs"
-              scrollable="false">
+              width="100%" flex_grow="1" style_pad_all="0" flex_flow="column" style_pad_gap="#space_xs"
+              style_flex_main_place="end" scrollable="false">
         <!-- Header Row -->
         <lv_obj width="100%"
                 height="content" style_pad_all="0" scrollable="false" flex_flow="row"
@@ -59,53 +62,61 @@
           <text_heading name="z_offset_display" bind_text="tune_z_offset_display"/>
         </lv_obj>
 
-        <!-- Nozzle-over-bed visual indicator -->
-        <z_offset_indicator name="z_offset_indicator" width="100%" flex_grow="1"/>
-
-        <!-- Step buttons Row 1: larger steps -->
+        <!-- Indicator (left) + Controls (right) side-by-side -->
         <lv_obj width="100%"
-                height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="center"
-                style_pad_gap="#space_xxs" scrollable="false">
-          <ui_button name="btn_z_n05" flex_grow="1" text="-0.05">
-            <event_cb trigger="clicked" callback="on_tune_z_n05"/>
-          </ui_button>
-          <ui_button name="btn_z_n025" flex_grow="1" text="-0.025">
-            <event_cb trigger="clicked" callback="on_tune_z_n025"/>
-          </ui_button>
-          <!-- Reset button in center -->
-          <ui_button name="btn_z_reset" flex_grow="1" icon="refresh" text="">
-            <event_cb trigger="clicked" callback="on_tune_z_reset"/>
-          </ui_button>
-          <ui_button name="btn_z_p025" flex_grow="1" text="+0.025">
-            <event_cb trigger="clicked" callback="on_tune_z_p025"/>
-          </ui_button>
-          <ui_button name="btn_z_p05" flex_grow="1" text="+0.05">
-            <event_cb trigger="clicked" callback="on_tune_z_p05"/>
-          </ui_button>
+                height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_sm"
+                style_flex_cross_place="stretch" scrollable="false">
+          <!-- Nozzle-over-bed visual indicator -->
+          <z_offset_indicator name="z_offset_indicator" width="170"/>
+          <!-- Controls column: amount buttons row with direction buttons stacked on the right -->
+          <lv_obj flex_grow="1"
+                  height="content" style_pad_all="0" flex_flow="column" style_pad_gap="#space_xxs"
+                  scrollable="false">
+            <!-- Amount selectors (left) + direction buttons (right) -->
+            <lv_obj width="100%"
+                    height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_sm"
+                    style_flex_cross_place="center" scrollable="false">
+              <!-- Amount selector buttons (radio-style: one active at a time) -->
+              <lv_obj flex_grow="1"
+                      height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_xxs"
+                      scrollable="false">
+                <ui_button flex_grow="1" text="0.05" height="#button_height_sm">
+                  <bind_style name="z_step_selected" subject="z_step_0_active" ref_value="1"/>
+                  <bind_style name="z_step_unselected" subject="z_step_0_active" ref_value="0"/>
+                  <event_cb trigger="clicked" callback="on_tune_z_step" user_data="0"/>
+                </ui_button>
+                <ui_button flex_grow="1" text="0.025" height="#button_height_sm">
+                  <bind_style name="z_step_selected" subject="z_step_1_active" ref_value="1"/>
+                  <bind_style name="z_step_unselected" subject="z_step_1_active" ref_value="0"/>
+                  <event_cb trigger="clicked" callback="on_tune_z_step" user_data="1"/>
+                </ui_button>
+                <ui_button flex_grow="1" text="0.01" height="#button_height_sm">
+                  <bind_style name="z_step_selected" subject="z_step_2_active" ref_value="1"/>
+                  <bind_style name="z_step_unselected" subject="z_step_2_active" ref_value="0"/>
+                  <event_cb trigger="clicked" callback="on_tune_z_step" user_data="2"/>
+                </ui_button>
+                <ui_button flex_grow="1" text="0.005" height="#button_height_sm">
+                  <bind_style name="z_step_selected" subject="z_step_3_active" ref_value="1"/>
+                  <bind_style name="z_step_unselected" subject="z_step_3_active" ref_value="0"/>
+                  <event_cb trigger="clicked" callback="on_tune_z_step" user_data="3"/>
+                </ui_button>
+              </lv_obj>
+              <!-- Direction buttons stacked vertically -->
+              <lv_obj width="90"
+                      height="content" style_pad_all="0" flex_flow="column" style_pad_gap="#space_xxs"
+                      scrollable="false">
+                <ui_button width="100%" icon="arrow_down" bind_icon="tune_z_closer_icon">
+                  <event_cb trigger="clicked" callback="on_tune_z_adjust" user_data="-1"/>
+                </ui_button>
+                <ui_button width="100%" icon="arrow_up" bind_icon="tune_z_farther_icon">
+                  <event_cb trigger="clicked" callback="on_tune_z_adjust" user_data="1"/>
+                </ui_button>
+              </lv_obj>
+            </lv_obj>
+            <!-- Help text -->
+            <text_small text="Closer = more squish | Farther = less squish" translation_tag="Closer = more squish | Farther = less squish"/>
+          </lv_obj>
         </lv_obj>
-
-        <!-- Step buttons Row 2: finer steps -->
-        <lv_obj width="100%"
-                height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="center"
-                style_pad_gap="#space_xxs" scrollable="false">
-          <ui_button name="btn_z_n01" flex_grow="1" text="-0.01">
-            <event_cb trigger="clicked" callback="on_tune_z_n01"/>
-          </ui_button>
-          <ui_button name="btn_z_n005" flex_grow="1" text="-0.005">
-            <event_cb trigger="clicked" callback="on_tune_z_n005"/>
-          </ui_button>
-          <!-- Spacer in center to match reset button above -->
-          <lv_obj flex_grow="1" style_pad_all="0" scrollable="false"/>
-          <ui_button name="btn_z_p005" flex_grow="1" text="+0.005">
-            <event_cb trigger="clicked" callback="on_tune_z_p005"/>
-          </ui_button>
-          <ui_button name="btn_z_p01" flex_grow="1" text="+0.01">
-            <event_cb trigger="clicked" callback="on_tune_z_p01"/>
-          </ui_button>
-        </lv_obj>
-
-        <!-- Help text -->
-        <text_small text="Closer ← → Farther" translation_tag="Closer ← → Farther" style_text_align="center" width="100%"/>
         <text_small name="z_offset_help_text" text="Temporary adjustment for this print, unless saved on Controls panel" translation_tag="Temporary adjustment for this print, unless saved on Controls panel"/>
       </lv_obj>
     </lv_obj>

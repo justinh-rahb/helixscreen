@@ -89,9 +89,16 @@ class PrintTuneOverlay : public OverlayBase {
     void handle_z_offset_changed(double delta);
 
     /**
-     * @brief Handle Z-offset reset button - resets z-offset to 0
+     * @brief Handle step amount selection (radio-style buttons)
+     * @param idx Step index (0=0.05, 1=0.025, 2=0.01, 3=0.005)
      */
-    void handle_z_reset();
+    void handle_z_step_select(int idx);
+
+    /**
+     * @brief Handle Z-offset adjust in direction by selected step amount
+     * @param direction -1 for closer (more squish), +1 for farther (less squish)
+     */
+    void handle_z_adjust(int direction);
 
     /**
      * @brief Handle save Z-offset button click
@@ -203,17 +210,26 @@ class PrintTuneOverlay : public OverlayBase {
     lv_subject_t tune_speed_subject_;
     lv_subject_t tune_flow_subject_;
     lv_subject_t tune_z_offset_subject_;
+    lv_subject_t z_step_active_subjects_[4]; ///< Boolean subjects for step button radio styling
+    lv_subject_t z_closer_icon_subject_;     ///< Icon name for closer button (kinematic-aware)
+    lv_subject_t z_farther_icon_subject_;    ///< Icon name for farther button (kinematic-aware)
 
     // Subject storage buffers
     char tune_speed_buf_[16] = "100%";
     char tune_flow_buf_[16] = "100%";
     char tune_z_offset_buf_[16] = "0.000mm";
+    char z_closer_icon_buf_[24] = "arrow_down";
+    char z_farther_icon_buf_[24] = "arrow_up";
 
     //
     // === State ===
     //
 
+    static constexpr double Z_STEP_AMOUNTS[] = {0.05, 0.025, 0.01, 0.005};
+    static constexpr int Z_STEP_DEFAULT = 2; ///< Default step: 0.01mm
+
     double current_z_offset_ = 0.0;
+    int selected_z_step_idx_ = Z_STEP_DEFAULT;
     int speed_percent_ = 100;
     int flow_percent_ = 100;
 
