@@ -2120,25 +2120,44 @@ void PrintStatusPanel::set_progress(int percent) {
         current_progress_ = 0;
     if (current_progress_ > 100)
         current_progress_ = 100;
-    update_all_displays();
+    if (!subjects_initialized_)
+        return;
+    helix::fmt::format_percent(current_progress_, progress_text_buf_, sizeof(progress_text_buf_));
+    lv_subject_copy_string(&progress_text_subject_, progress_text_buf_);
 }
 
 void PrintStatusPanel::set_layer(int current, int total) {
     current_layer_ = current;
     total_layers_ = total;
-    update_all_displays();
+    if (!subjects_initialized_)
+        return;
+    std::snprintf(layer_text_buf_, sizeof(layer_text_buf_), "Layer %d / %d", current_layer_,
+                  total_layers_);
+    lv_subject_copy_string(&layer_text_subject_, layer_text_buf_);
 }
 
 void PrintStatusPanel::set_times(int elapsed_secs, int remaining_secs) {
     elapsed_seconds_ = elapsed_secs;
     remaining_seconds_ = remaining_secs;
-    update_all_displays();
+    if (!subjects_initialized_)
+        return;
+    if (current_state_ != PrintState::Preparing && current_state_ != PrintState::Complete) {
+        format_time(elapsed_seconds_, elapsed_buf_, sizeof(elapsed_buf_));
+        lv_subject_copy_string(&elapsed_subject_, elapsed_buf_);
+        format_time(remaining_seconds_, remaining_buf_, sizeof(remaining_buf_));
+        lv_subject_copy_string(&remaining_subject_, remaining_buf_);
+    }
 }
 
 void PrintStatusPanel::set_speeds(int speed_pct, int flow_pct) {
     speed_percent_ = speed_pct;
     flow_percent_ = flow_pct;
-    update_all_displays();
+    if (!subjects_initialized_)
+        return;
+    helix::fmt::format_percent(speed_percent_, speed_buf_, sizeof(speed_buf_));
+    lv_subject_copy_string(&speed_subject_, speed_buf_);
+    helix::fmt::format_percent(flow_percent_, flow_buf_, sizeof(flow_buf_));
+    lv_subject_copy_string(&flow_subject_, flow_buf_);
 }
 
 void PrintStatusPanel::set_state(PrintState state) {
