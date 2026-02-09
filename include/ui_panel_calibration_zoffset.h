@@ -6,6 +6,7 @@
 #include "ui_observer_guard.h"
 
 #include "lvgl/lvgl.h"
+#include "operation_timeout_guard.h"
 #include "overlay_base.h"
 #include "subject_managed_panel.h"
 
@@ -201,6 +202,11 @@ class ZOffsetCalibrationPanel : public OverlayBase {
     // Observer guards for manual_probe state changes (RAII cleanup)
     ObserverGuard manual_probe_active_observer_;
     ObserverGuard manual_probe_z_observer_;
+
+    // Operation timeout guard (PROBING: 180s, SAVING: 30s)
+    OperationTimeoutGuard operation_guard_;
+    static constexpr uint32_t PROBING_TIMEOUT_MS = 180000;
+    static constexpr uint32_t SAVING_TIMEOUT_MS = 30000;
 };
 
 // Global instance accessor

@@ -8,6 +8,7 @@
 #include "ui_print_tune_overlay.h"
 
 #include "config.h"
+#include "operation_timeout_guard.h"
 #include "standard_macros.h"
 #include "subject_managed_panel.h"
 #include "ui/position_observer_bundle.h"
@@ -207,6 +208,7 @@ class ControlsPanel : public PanelBase {
 
     helix::ui::ModalGuard motors_confirmation_dialog_;
     helix::ui::ModalGuard save_z_offset_confirmation_dialog_;
+    OperationTimeoutGuard operation_guard_;
     bool save_z_offset_in_progress_ = false; ///< Guard against double-click race condition
 
     //

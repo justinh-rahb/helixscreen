@@ -7,6 +7,7 @@
 #include "ui_subscription_guard.h"
 
 #include "moonraker_domain_service.h" // For BedMeshProfile
+#include "operation_timeout_guard.h"
 #include "overlay_base.h"
 #include "subject_managed_panel.h"
 
@@ -163,6 +164,10 @@ class BedMeshPanel : public OverlayBase {
     std::string pending_rename_new_;
     enum class PendingOperation { None, Delete, Rename, Calibrate };
     PendingOperation pending_operation_ = PendingOperation::None;
+
+    // Operation timeout guard (no subject needed — modals prevent interaction)
+    OperationTimeoutGuard operation_guard_;
+    static constexpr uint32_t OPERATION_TIMEOUT_MS = 15000;
 
     // Destruction flag for async callback safety [L012]
     // Shared with WebSocket callbacks to detect when panel is destroyed

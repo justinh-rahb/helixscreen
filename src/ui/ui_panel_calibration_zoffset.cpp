@@ -3,6 +3,7 @@
 
 #include "ui_panel_calibration_zoffset.h"
 
+#include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
@@ -287,6 +288,9 @@ void ZOffsetCalibrationPanel::on_deactivate() {
 void ZOffsetCalibrationPanel::cleanup() {
     spdlog::debug("[ZOffsetCal] Cleaning up");
 
+    // Cancel any pending operation timeout
+    operation_guard_.end();
+
     // Reset ObserverGuards to remove observers before cleanup (applying [L020])
     manual_probe_active_observer_.reset();
     manual_probe_z_observer_.reset();
@@ -315,6 +319,28 @@ void ZOffsetCalibrationPanel::set_state(State new_state) {
     spdlog::debug("[ZOffsetCal] State change: {} -> {}", static_cast<int>(state_),
                   static_cast<int>(new_state));
     state_ = new_state;
+
+    // Manage operation timeout guard based on state transitions
+    switch (new_state) {
+    case State::PROBING:
+        operation_guard_.begin(PROBING_TIMEOUT_MS, [this] {
+            set_state(State::ERROR);
+            NOTIFY_WARNING("Z-offset calibration timed out");
+        });
+        break;
+    case State::SAVING:
+        operation_guard_.begin(SAVING_TIMEOUT_MS, [this] {
+            set_state(State::ERROR);
+            NOTIFY_WARNING("Z-offset calibration timed out");
+        });
+        break;
+    case State::ADJUSTING:
+    case State::COMPLETE:
+    case State::ERROR:
+    case State::IDLE:
+        operation_guard_.end();
+        break;
+    }
 
     // Update subject - XML bindings handle visibility automatically
     lv_subject_set_int(&s_zoffset_cal_state, static_cast<int>(new_state));

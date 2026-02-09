@@ -757,16 +757,30 @@ void BedMeshPanel::load_profile(int index) {
         return;
     if (profile_names_[static_cast<size_t>(index)].empty())
         return;
+    if (operation_guard_.is_active()) {
+        NOTIFY_WARNING("Operation already in progress");
+        return;
+    }
 
     const std::string& name = profile_names_[static_cast<size_t>(index)];
     spdlog::info("[{}] Loading profile: {}", get_name(), name);
 
     MoonrakerAPI* api = get_moonraker_api();
     if (api) {
+        operation_guard_.begin(OPERATION_TIMEOUT_MS, [this] {
+            hide_all_modals();
+            pending_operation_ = PendingOperation::None;
+            NOTIFY_WARNING("Bed mesh operation timed out");
+        });
         std::string cmd = "BED_MESH_PROFILE LOAD=" + name;
         api->execute_gcode(
-            cmd, [this, name]() { spdlog::debug("[{}] Profile loaded: {}", get_name(), name); },
+            cmd,
+            [this, name]() {
+                operation_guard_.end();
+                spdlog::debug("[{}] Profile loaded: {}", get_name(), name);
+            },
             [this](const MoonrakerError& err) {
+                operation_guard_.end();
                 spdlog::error("[{}] Failed to load profile: {}", get_name(), err.message);
                 NOTIFY_ERROR("Failed to load profile");
             });
@@ -899,6 +913,9 @@ void BedMeshPanel::show_save_config_modal() {
 }
 
 void BedMeshPanel::hide_all_modals() {
+    // Cancel any pending operation timeout
+    operation_guard_.end();
+
     // Reset calibration state machine
     lv_subject_set_int(&bed_mesh_calibrating_, 0);
     lv_subject_set_int(&bed_mesh_calibrate_state_, static_cast<int>(BedMeshCalibrationState::IDLE));
@@ -961,16 +978,24 @@ void BedMeshPanel::execute_delete_profile(const std::string& name) {
 
     spdlog::info("[{}] Deleting profile: {}", get_name(), name);
 
+    operation_guard_.begin(OPERATION_TIMEOUT_MS, [this] {
+        hide_all_modals();
+        pending_operation_ = PendingOperation::None;
+        NOTIFY_WARNING("Bed mesh operation timed out");
+    });
+
     std::string cmd = "BED_MESH_PROFILE REMOVE=" + name;
     api->execute_gcode(
         cmd,
         [this, name]() {
+            operation_guard_.end();
             spdlog::info("[{}] Profile deleted: {}", get_name(), name);
             NOTIFY_SUCCESS("Profile deleted");
             pending_operation_ = PendingOperation::Delete;
             show_save_config_modal();
         },
         [this](const MoonrakerError& err) {
+            operation_guard_.end();
             spdlog::error("[{}] Failed to delete profile: {}", get_name(), err.message);
             NOTIFY_ERROR("Failed to delete profile");
         });
@@ -984,6 +1009,12 @@ void BedMeshPanel::execute_rename_profile(const std::string& old_name,
 
     spdlog::info("[{}] Renaming profile: {} -> {}", get_name(), old_name, new_name);
 
+    operation_guard_.begin(OPERATION_TIMEOUT_MS, [this] {
+        hide_all_modals();
+        pending_operation_ = PendingOperation::None;
+        NOTIFY_WARNING("Bed mesh operation timed out");
+    });
+
     // Step 1: Load the profile
     std::string load_cmd = "BED_MESH_PROFILE LOAD=" + old_name;
     api->execute_gcode(
@@ -991,20 +1022,25 @@ void BedMeshPanel::execute_rename_profile(const std::string& old_name,
         [this, old_name, new_name]() {
             // Step 2: Save with new name
             MoonrakerAPI* api2 = get_moonraker_api();
-            if (!api2)
+            if (!api2) {
+                operation_guard_.end();
                 return;
+            }
             std::string save_cmd = "BED_MESH_PROFILE SAVE=" + new_name;
             api2->execute_gcode(
                 save_cmd,
                 [this, old_name, new_name]() {
                     // Step 3: Remove old name
                     MoonrakerAPI* api3 = get_moonraker_api();
-                    if (!api3)
+                    if (!api3) {
+                        operation_guard_.end();
                         return;
+                    }
                     std::string remove_cmd = "BED_MESH_PROFILE REMOVE=" + old_name;
                     api3->execute_gcode(
                         remove_cmd,
                         [this, old_name, new_name]() {
+                            operation_guard_.end();
                             spdlog::info("[{}] Profile renamed: {} -> {}", get_name(), old_name,
                                          new_name);
                             NOTIFY_SUCCESS("Profile renamed");
@@ -1012,17 +1048,20 @@ void BedMeshPanel::execute_rename_profile(const std::string& old_name,
                             show_save_config_modal();
                         },
                         [this](const MoonrakerError& err) {
+                            operation_guard_.end();
                             spdlog::error("[{}] Failed to remove old profile: {}", get_name(),
                                           err.message);
                             NOTIFY_ERROR("Rename failed at remove step");
                         });
                 },
                 [this](const MoonrakerError& err) {
+                    operation_guard_.end();
                     spdlog::error("[{}] Failed to save new profile: {}", get_name(), err.message);
                     NOTIFY_ERROR("Rename failed at save step");
                 });
         },
         [this](const MoonrakerError& err) {
+            operation_guard_.end();
             spdlog::error("[{}] Failed to load profile for rename: {}", get_name(), err.message);
             NOTIFY_ERROR("Rename failed at load step");
         });
@@ -1058,13 +1097,21 @@ void BedMeshPanel::execute_save_config() {
 
     spdlog::info("[{}] Saving config (will restart Klipper)", get_name());
 
+    operation_guard_.begin(OPERATION_TIMEOUT_MS, [this] {
+        hide_all_modals();
+        pending_operation_ = PendingOperation::None;
+        NOTIFY_WARNING("Bed mesh operation timed out");
+    });
+
     api->execute_gcode(
         "SAVE_CONFIG",
         [this]() {
+            operation_guard_.end();
             spdlog::info("[{}] SAVE_CONFIG sent - Klipper will restart", get_name());
             NOTIFY_INFO("Configuration saved - restarting");
         },
         [this](const MoonrakerError& err) {
+            operation_guard_.end();
             spdlog::error("[{}] Failed to save config: {}", get_name(), err.message);
             NOTIFY_ERROR("Failed to save configuration");
         });

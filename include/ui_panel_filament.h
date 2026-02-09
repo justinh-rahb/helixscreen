@@ -7,6 +7,7 @@
 #include "ui_panel_base.h"
 
 #include "config.h"
+#include "operation_timeout_guard.h"
 #include "subject_managed_panel.h"
 #include "ui/temperature_observer_bundle.h"
 
@@ -187,8 +188,7 @@ class FilamentPanel : public PanelBase {
     lv_subject_t bed_target_subject_;
 
     // Operation state
-    lv_subject_t operation_in_progress_subject_;
-    bool operation_in_progress_ = false;
+    OperationTimeoutGuard operation_guard_;
 
     // Cooldown button visibility (1 when nozzle target > 0, 0 otherwise)
     lv_subject_t nozzle_heating_subject_;
@@ -285,7 +285,7 @@ class FilamentPanel : public PanelBase {
     void update_material_temp_display();
     void update_left_card_temps();
     void update_status_icon_for_state();
-    void set_operation_in_progress(bool in_progress);
+    static constexpr uint32_t OPERATION_TIMEOUT_MS = 30000;
 
     // Filament sensor warning helpers
     void show_load_warning();

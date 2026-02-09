@@ -21,12 +21,14 @@
 #include "ui_settings_sensors.h"
 #include "ui_subject_registry.h"
 #include "ui_toast.h"
+#include "ui_update_queue.h"
 
 #include "app_globals.h"
 #include "format_utils.h"
 #include "lvgl/src/others/translation/lv_translation.h"
 #include "moonraker_api.h"
 #include "observer_factory.h"
+#include "operation_timeout_guard.h"
 #include "printer_state.h"
 #include "standard_macros.h"
 #include "static_panel_registry.h"
@@ -166,6 +168,9 @@ void ControlsPanel::init_subjects() {
     UI_MANAGED_SUBJECT_INT(macro_4_visible_, 0, "macro_4_visible", subjects_);
     UI_MANAGED_SUBJECT_STRING(macro_3_name_, macro_3_name_buf_, "", "macro_3_name", subjects_);
     UI_MANAGED_SUBJECT_STRING(macro_4_name_, macro_4_name_buf_, "", "macro_4_name", subjects_);
+
+    // Operation timeout guard (disables buttons while homing/QGL/Z-tilt in progress)
+    operation_guard_.init_subject("controls_operation_in_progress", subjects_);
 
     // Z-offset display subject for live tuning
     std::strcpy(controls_z_offset_buf_, "+0.000mm");
@@ -1001,51 +1006,126 @@ void ControlsPanel::handle_secondary_fans_clicked() {
 
 void ControlsPanel::handle_home_all() {
     spdlog::debug("[{}] Home All clicked", get_name());
+    if (operation_guard_.is_active()) {
+        NOTIFY_WARNING("Operation already in progress");
+        return;
+    }
     if (api_) {
+        operation_guard_.begin(30000, [] { NOTIFY_WARNING("Homing timed out"); });
         NOTIFY_INFO("Homing all axes...");
-        api_->home_axes("XYZ", nullptr, [](const MoonrakerError& err) {
-            NOTIFY_ERROR("Homing failed: {}", err.user_message());
-        });
+        api_->home_axes(
+            "XYZ",
+            [this]() {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+            },
+            [this](const MoonrakerError& err) {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+                NOTIFY_ERROR("Homing failed: {}", err.user_message());
+            });
     }
 }
 
 void ControlsPanel::handle_home_xy() {
     spdlog::debug("[{}] Home XY clicked", get_name());
+    if (operation_guard_.is_active()) {
+        NOTIFY_WARNING("Operation already in progress");
+        return;
+    }
     if (api_) {
+        operation_guard_.begin(30000, [] { NOTIFY_WARNING("Homing timed out"); });
         NOTIFY_INFO("Homing XY...");
-        api_->home_axes("XY", nullptr, [](const MoonrakerError& err) {
-            NOTIFY_ERROR("Homing failed: {}", err.user_message());
-        });
+        api_->home_axes(
+            "XY",
+            [this]() {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+            },
+            [this](const MoonrakerError& err) {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+                NOTIFY_ERROR("Homing failed: {}", err.user_message());
+            });
     }
 }
 
 void ControlsPanel::handle_home_z() {
     spdlog::debug("[{}] Home Z clicked", get_name());
+    if (operation_guard_.is_active()) {
+        NOTIFY_WARNING("Operation already in progress");
+        return;
+    }
     if (api_) {
+        operation_guard_.begin(30000, [] { NOTIFY_WARNING("Homing timed out"); });
         NOTIFY_INFO("Homing Z...");
-        api_->home_axes("Z", nullptr, [](const MoonrakerError& err) {
-            NOTIFY_ERROR("Homing failed: {}", err.user_message());
-        });
+        api_->home_axes(
+            "Z",
+            [this]() {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+            },
+            [this](const MoonrakerError& err) {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+                NOTIFY_ERROR("Homing failed: {}", err.user_message());
+            });
     }
 }
 
 void ControlsPanel::handle_qgl() {
     spdlog::debug("[{}] QGL clicked", get_name());
+    if (operation_guard_.is_active()) {
+        NOTIFY_WARNING("Operation already in progress");
+        return;
+    }
     if (api_) {
+        operation_guard_.begin(180000, [] { NOTIFY_WARNING("QGL timed out"); });
         NOTIFY_INFO("Quad Gantry Level started...");
         api_->execute_gcode(
-            "QUAD_GANTRY_LEVEL", []() { NOTIFY_SUCCESS("Quad Gantry Level complete"); },
-            [](const MoonrakerError& err) { NOTIFY_ERROR("QGL failed: {}", err.user_message()); });
+            "QUAD_GANTRY_LEVEL",
+            [this]() {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+                NOTIFY_SUCCESS("Quad Gantry Level complete");
+            },
+            [this](const MoonrakerError& err) {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+                NOTIFY_ERROR("QGL failed: {}", err.user_message());
+            });
     }
 }
 
 void ControlsPanel::handle_z_tilt() {
     spdlog::debug("[{}] Z-Tilt clicked", get_name());
+    if (operation_guard_.is_active()) {
+        NOTIFY_WARNING("Operation already in progress");
+        return;
+    }
     if (api_) {
+        operation_guard_.begin(180000, [] { NOTIFY_WARNING("Z-Tilt timed out"); });
         NOTIFY_INFO("Z-Tilt Adjust started...");
         api_->execute_gcode(
-            "Z_TILT_ADJUST", []() { NOTIFY_SUCCESS("Z-Tilt Adjust complete"); },
-            [](const MoonrakerError& err) {
+            "Z_TILT_ADJUST",
+            [this]() {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+                NOTIFY_SUCCESS("Z-Tilt Adjust complete");
+            },
+            [this](const MoonrakerError& err) {
+                ui_async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
                 NOTIFY_ERROR("Z-Tilt failed: {}", err.user_message());
             });
     }
