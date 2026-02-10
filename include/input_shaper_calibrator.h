@@ -213,6 +213,17 @@ class InputShaperCalibrator {
     void save_to_config(SuccessCallback on_success, ErrorCallback on_error);
 
   private:
+    /**
+     * @brief Ensure printer is homed before proceeding
+     *
+     * Checks homed_axes subject. If not fully homed, sends G28 first.
+     * Calls continuation on success, on_error on failure.
+     *
+     * @param then Callback to invoke once homing is confirmed
+     * @param on_error Called with error message if homing fails
+     */
+    void ensure_homed_then(std::function<void()> then, ErrorCallback on_error);
+
     MoonrakerAPI* api_ = nullptr; ///< Non-owning pointer to API
     State state_ = State::IDLE;
     CalibrationResults results_;

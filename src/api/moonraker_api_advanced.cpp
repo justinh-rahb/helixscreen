@@ -1531,14 +1531,9 @@ void MoonrakerAPI::set_machine_limits(const MachineLimits& limits, SuccessCallba
     execute_gcode(cmd.str(), on_success, on_error);
 }
 
-void MoonrakerAPI::save_config(SuccessCallback /*on_success*/, ErrorCallback on_error) {
-    spdlog::warn("[Moonraker API] save_config() not yet implemented");
-    if (on_error) {
-        MoonrakerError err;
-        err.type = MoonrakerErrorType::UNKNOWN;
-        err.message = "Save config not yet implemented";
-        on_error(err);
-    }
+void MoonrakerAPI::save_config(SuccessCallback on_success, ErrorCallback on_error) {
+    spdlog::info("[Moonraker API] Sending SAVE_CONFIG");
+    execute_gcode("SAVE_CONFIG", on_success, on_error);
 }
 
 void MoonrakerAPI::execute_macro(const std::string& name,

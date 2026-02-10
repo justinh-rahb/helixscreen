@@ -10,7 +10,9 @@
 
 #include "input_shaper_calibrator.h"
 
+#include "app_globals.h"
 #include "moonraker_api.h"
+#include "printer_state.h"
 #include "spdlog/spdlog.h"
 
 #include <cctype>
@@ -28,6 +30,39 @@ InputShaperCalibrator::InputShaperCalibrator() : api_(nullptr) {
 
 InputShaperCalibrator::InputShaperCalibrator(MoonrakerAPI* api) : api_(api) {
     spdlog::debug("[InputShaperCalibrator] Created with API");
+}
+
+// ============================================================================
+// ensure_homed_then()
+// ============================================================================
+
+void InputShaperCalibrator::ensure_homed_then(std::function<void()> then, ErrorCallback on_error) {
+    // Check current homing state from PrinterState
+    const char* homed = lv_subject_get_string(get_printer_state().get_homed_axes_subject());
+    bool all_homed = homed && std::string(homed).find("xyz") != std::string::npos;
+
+    if (all_homed) {
+        spdlog::debug("[InputShaperCalibrator] Already homed, proceeding");
+        then();
+        return;
+    }
+
+    spdlog::info("[InputShaperCalibrator] Not fully homed (axes={}), sending G28",
+                 homed ? homed : "none");
+
+    api_->execute_gcode(
+        "G28",
+        [then = std::move(then)]() {
+            spdlog::info("[InputShaperCalibrator] G28 complete, proceeding");
+            then();
+        },
+        [this, on_error](const MoonrakerError& err) {
+            state_ = State::IDLE;
+            spdlog::error("[InputShaperCalibrator] Homing failed: {}", err.message);
+            if (on_error) {
+                on_error("Homing failed: " + err.message);
+            }
+        });
 }
 
 // ============================================================================
@@ -49,34 +84,34 @@ void InputShaperCalibrator::check_accelerometer(AccelCheckCallback on_complete,
     state_ = State::CHECKING_ADXL;
     spdlog::info("[InputShaperCalibrator] Starting accelerometer check");
 
-    // Call API to measure noise level
-    api_->measure_axes_noise(
-        [this, on_complete](float noise_level) {
-            // Store noise level in results
-            results_.noise_level = noise_level;
+    // Ensure homed before measuring (toolhead needs to be positioned)
+    ensure_homed_then(
+        [this, on_complete, on_error]() {
+            api_->measure_axes_noise(
+                [this, on_complete](float noise_level) {
+                    results_.noise_level = noise_level;
+                    state_ = State::IDLE;
 
-            // Transition back to IDLE
-            state_ = State::IDLE;
+                    spdlog::info(
+                        "[InputShaperCalibrator] Accelerometer check complete, noise={:.4f}",
+                        noise_level);
 
-            spdlog::info("[InputShaperCalibrator] Accelerometer check complete, noise={:.4f}",
-                         noise_level);
+                    if (on_complete) {
+                        on_complete(noise_level);
+                    }
+                },
+                [this, on_error](const MoonrakerError& err) {
+                    state_ = State::IDLE;
 
-            // Call user callback if provided
-            if (on_complete) {
-                on_complete(noise_level);
-            }
+                    spdlog::error("[InputShaperCalibrator] Accelerometer check failed: {}",
+                                  err.message);
+
+                    if (on_error) {
+                        on_error(err.message);
+                    }
+                });
         },
-        [this, on_error](const MoonrakerError& err) {
-            // Transition back to IDLE on error
-            state_ = State::IDLE;
-
-            spdlog::error("[InputShaperCalibrator] Accelerometer check failed: {}", err.message);
-
-            // Call user callback if provided
-            if (on_error) {
-                on_error(err.message);
-            }
-        });
+        on_error);
 }
 
 // ============================================================================
@@ -121,50 +156,47 @@ void InputShaperCalibrator::run_calibration(char axis, ProgressCallback on_progr
     state_ = (normalized_axis == 'X') ? State::TESTING_X : State::TESTING_Y;
     spdlog::info("[InputShaperCalibrator] Starting calibration for axis {}", normalized_axis);
 
-    // Adapt progress callback from int percentage to API's format
-    auto api_progress = [on_progress](int percent) {
-        if (on_progress) {
-            on_progress(percent);
-        }
-    };
+    // Ensure homed before running resonance test (needs absolute coordinates)
+    ensure_homed_then(
+        [this, normalized_axis, on_progress, on_complete, on_error]() {
+            auto api_progress = [on_progress](int percent) {
+                if (on_progress) {
+                    on_progress(percent);
+                }
+            };
 
-    // Call API to run resonance test
-    api_->start_resonance_test(
-        normalized_axis, api_progress,
-        [this, normalized_axis, on_complete](const InputShaperResult& result) {
-            // Store result in appropriate slot
-            if (normalized_axis == 'X') {
-                results_.x_result = result;
-            } else {
-                results_.y_result = result;
-            }
+            api_->start_resonance_test(
+                normalized_axis, api_progress,
+                [this, normalized_axis, on_complete](const InputShaperResult& result) {
+                    if (normalized_axis == 'X') {
+                        results_.x_result = result;
+                    } else {
+                        results_.y_result = result;
+                    }
 
-            // Determine next state
-            if (results_.is_complete()) {
-                state_ = State::READY;
-                spdlog::info("[InputShaperCalibrator] Both axes calibrated, state=READY");
-            } else {
-                state_ = State::IDLE;
-                spdlog::info("[InputShaperCalibrator] Axis {} complete, awaiting other axis",
-                             normalized_axis);
-            }
+                    if (results_.is_complete()) {
+                        state_ = State::READY;
+                        spdlog::info("[InputShaperCalibrator] Both axes calibrated, state=READY");
+                    } else {
+                        state_ = State::IDLE;
+                        spdlog::info(
+                            "[InputShaperCalibrator] Axis {} complete, awaiting other axis",
+                            normalized_axis);
+                    }
 
-            // Call user callback if provided
-            if (on_complete) {
-                on_complete(result);
-            }
+                    if (on_complete) {
+                        on_complete(result);
+                    }
+                },
+                [this, on_error](const MoonrakerError& err) {
+                    state_ = State::IDLE;
+                    spdlog::error("[InputShaperCalibrator] Calibration failed: {}", err.message);
+                    if (on_error) {
+                        on_error(err.message);
+                    }
+                });
         },
-        [this, on_error](const MoonrakerError& err) {
-            // Transition back to IDLE on error
-            state_ = State::IDLE;
-
-            spdlog::error("[InputShaperCalibrator] Calibration failed: {}", err.message);
-
-            // Call user callback if provided
-            if (on_error) {
-                on_error(err.message);
-            }
-        });
+        on_error);
 }
 
 // ============================================================================
