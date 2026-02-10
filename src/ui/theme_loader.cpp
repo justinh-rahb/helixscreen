@@ -158,6 +158,8 @@ ThemeData get_default_nord_theme() {
     theme.properties.border_width = 1;
     theme.properties.border_opacity = 40;
     theme.properties.shadow_intensity = 0;
+    theme.properties.shadow_opa = 0;
+    theme.properties.shadow_offset_y = 2;
 
     return theme;
 }
@@ -218,6 +220,8 @@ ThemeData parse_theme_json(const std::string& json_str, const std::string& filen
         theme.properties.border_width = json.value("border_width", 1);
         theme.properties.border_opacity = json.value("border_opacity", 40);
         theme.properties.shadow_intensity = json.value("shadow_intensity", 0);
+        theme.properties.shadow_opa = json.value("shadow_opa", 0);
+        theme.properties.shadow_offset_y = json.value("shadow_offset_y", 2);
 
     } catch (const nlohmann::json::exception& e) {
         spdlog::error("[ThemeLoader] Failed to parse {}: {}", filename, e.what());
@@ -312,6 +316,8 @@ bool save_theme_to_file(const ThemeData& theme, const std::string& filepath) {
     json["border_width"] = theme.properties.border_width;
     json["border_opacity"] = theme.properties.border_opacity;
     json["shadow_intensity"] = theme.properties.shadow_intensity;
+    json["shadow_opa"] = theme.properties.shadow_opa;
+    json["shadow_offset_y"] = theme.properties.shadow_offset_y;
 
     // Write with pretty formatting
     std::ofstream file(filepath);

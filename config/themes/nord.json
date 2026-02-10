@@ -39,5 +39,7 @@
     "warning": "#b08900"
   },
   "name": "Nord",
-  "shadow_intensity": 0
+  "shadow_intensity": 0,
+  "shadow_offset_y": 2,
+  "shadow_opa": 0
 }

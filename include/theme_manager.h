@@ -91,6 +91,9 @@ struct ThemePalette {
     int border_radius = 8;
     int border_width = 1;
     int border_opacity = 40;
+    int shadow_width = 0;
+    int shadow_opa = 0;
+    int shadow_offset_y = 2;
 };
 
 /// Style configure function type - applies palette colors to a style.

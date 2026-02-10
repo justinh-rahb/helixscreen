@@ -333,9 +333,15 @@ static void init_extra_styles(const theme_palette_t* palette, int border_radius)
     lv_style_set_bg_opa(&slider_knob_style, LV_OPA_COVER);
     lv_style_set_border_color(&slider_knob_style, palette->border);
     lv_style_set_border_width(&slider_knob_style, 1);
-    lv_style_set_shadow_width(&slider_knob_style, 4);
+    // Slider knob shadow is functional (depth cue), not decorative.
+    // Use theme shadow_intensity if set, otherwise keep sensible defaults.
+    int knob_shadow_w =
+        active_theme.properties.shadow_intensity > 0 ? active_theme.properties.shadow_intensity : 4;
+    int knob_shadow_opa =
+        active_theme.properties.shadow_opa > 0 ? active_theme.properties.shadow_opa : LV_OPA_30;
+    lv_style_set_shadow_width(&slider_knob_style, knob_shadow_w);
     lv_style_set_shadow_color(&slider_knob_style, lv_color_black());
-    lv_style_set_shadow_opa(&slider_knob_style, LV_OPA_30);
+    lv_style_set_shadow_opa(&slider_knob_style, static_cast<lv_opa_t>(knob_shadow_opa));
 
     lv_style_init(&slider_disabled_style);
     lv_style_set_opa(&slider_disabled_style, LV_OPA_50);
@@ -457,8 +463,8 @@ static void helix_theme_apply(lv_theme_t* theme, lv_obj_t* obj) {
 /**
  * @brief Convert theme_palette_t to ThemePalette for ThemeManager
  */
-static ThemePalette convert_to_theme_palette(const theme_palette_t* p, int border_radius,
-                                             int border_width, int border_opacity) {
+static ThemePalette convert_to_theme_palette(const theme_palette_t* p,
+                                             const helix::ThemeProperties& props) {
     ThemePalette palette;
     palette.screen_bg = p->screen_bg;
     palette.overlay_bg = p->overlay_bg;
@@ -476,9 +482,12 @@ static ThemePalette convert_to_theme_palette(const theme_palette_t* p, int borde
     palette.warning = p->warning;
     palette.danger = p->danger;
     palette.focus = p->focus;
-    palette.border_radius = border_radius;
-    palette.border_width = border_width;
-    palette.border_opacity = border_opacity;
+    palette.border_radius = props.border_radius;
+    palette.border_width = props.border_width;
+    palette.border_opacity = props.border_opacity;
+    palette.shadow_width = props.shadow_intensity;
+    palette.shadow_opa = props.shadow_opa;
+    palette.shadow_offset_y = props.shadow_offset_y;
     return palette;
 }
 
@@ -489,17 +498,15 @@ static ThemePalette convert_to_theme_palette(const theme_palette_t* p, int borde
  * the helix_theme with LVGL.
  */
 static lv_theme_t* theme_init_lvgl(lv_display_t* display, const theme_palette_t* palette,
-                                   bool is_dark, const lv_font_t* base_font, int32_t border_radius,
-                                   int32_t border_width, int32_t border_opacity) {
+                                   bool is_dark, const lv_font_t* base_font) {
     // Build BOTH dark and light palettes from active_theme for contrast calculations
     // The contrast system needs both palettes to pick appropriate text colors
     theme_palette_t dark_theme_pal = build_palette_from_mode(active_theme.dark);
     theme_palette_t light_theme_pal = build_palette_from_mode(active_theme.light);
 
-    ThemePalette dark_pal =
-        convert_to_theme_palette(&dark_theme_pal, border_radius, border_width, border_opacity);
-    ThemePalette light_pal =
-        convert_to_theme_palette(&light_theme_pal, border_radius, border_width, border_opacity);
+    const auto& props = active_theme.properties;
+    ThemePalette dark_pal = convert_to_theme_palette(&dark_theme_pal, props);
+    ThemePalette light_pal = convert_to_theme_palette(&light_theme_pal, props);
 
     auto& tm = ThemeManager::instance();
     tm.set_palettes(light_pal, dark_pal);
@@ -507,7 +514,7 @@ static lv_theme_t* theme_init_lvgl(lv_display_t* display, const theme_palette_t*
     tm.set_dark_mode(is_dark);
 
     // Initialize widget-specific styles not in StyleRole enum
-    init_extra_styles(palette, border_radius);
+    init_extra_styles(palette, props.border_radius);
 
     // Create LVGL default theme as base (we'll layer on top)
     default_theme_backup =
@@ -528,9 +535,8 @@ static lv_theme_t* theme_init_lvgl(lv_display_t* display, const theme_palette_t*
 /**
  * @brief Update theme colors without full re-initialization
  */
-static void theme_update_colors(bool is_dark, int32_t border_opacity) {
+static void theme_update_colors(bool is_dark) {
     auto& tm = ThemeManager::instance();
-    const auto& current = tm.current_palette();
 
     // Build BOTH palettes from active_theme so each side keeps its own colors.
     // The contrast system needs both palettes to detect text colors from either
@@ -539,10 +545,9 @@ static void theme_update_colors(bool is_dark, int32_t border_opacity) {
     theme_palette_t dark_theme_pal = build_palette_from_mode(active_theme.dark);
     theme_palette_t light_theme_pal = build_palette_from_mode(active_theme.light);
 
-    ThemePalette dark_pal = convert_to_theme_palette(&dark_theme_pal, current.border_radius,
-                                                     current.border_width, border_opacity);
-    ThemePalette light_pal = convert_to_theme_palette(&light_theme_pal, current.border_radius,
-                                                      current.border_width, border_opacity);
+    const auto& props = active_theme.properties;
+    ThemePalette dark_pal = convert_to_theme_palette(&dark_theme_pal, props);
+    ThemePalette light_pal = convert_to_theme_palette(&light_theme_pal, props);
 
     tm.set_palettes(light_pal, dark_pal);
 
@@ -934,14 +939,21 @@ static void theme_manager_register_theme_properties(lv_xml_component_scope_t* sc
     snprintf(buf, sizeof(buf), "%d", theme.properties.border_opacity);
     lv_xml_register_const(scope, "border_opacity", buf);
 
-    // Register shadow_intensity
+    // Register shadow properties
     snprintf(buf, sizeof(buf), "%d", theme.properties.shadow_intensity);
     lv_xml_register_const(scope, "shadow_intensity", buf);
 
+    snprintf(buf, sizeof(buf), "%d", theme.properties.shadow_opa);
+    lv_xml_register_const(scope, "shadow_opa", buf);
+
+    snprintf(buf, sizeof(buf), "%d", theme.properties.shadow_offset_y);
+    lv_xml_register_const(scope, "shadow_offset_y", buf);
+
     spdlog::debug("[Theme] Registered properties: border_radius={}, border_width={}, "
-                  "border_opacity={}, shadow_intensity={}",
+                  "border_opacity={}, shadow=({},{},{})",
                   theme.properties.border_radius, theme.properties.border_width,
-                  theme.properties.border_opacity, theme.properties.shadow_intensity);
+                  theme.properties.border_opacity, theme.properties.shadow_intensity,
+                  theme.properties.shadow_opa, theme.properties.shadow_offset_y);
 }
 
 /**
@@ -1058,14 +1070,8 @@ void theme_manager_init(lv_display_t* display, bool use_dark_mode_param) {
     const helix::ModePalette& mode_palette = get_current_mode_palette();
     theme_palette_t palette = build_palette_from_mode(mode_palette);
 
-    // Get theme properties
-    int32_t border_radius = active_theme.properties.border_radius;
-    int32_t border_width = active_theme.properties.border_width;
-    int32_t border_opacity = active_theme.properties.border_opacity;
-
     // Initialize custom HelixScreen theme (wraps LVGL default theme)
-    current_theme = theme_init_lvgl(display, &palette, use_dark_mode, base_font, border_radius,
-                                    border_width, border_opacity);
+    current_theme = theme_init_lvgl(display, &palette, use_dark_mode, base_font);
 
     if (current_theme) {
         lv_display_set_theme(display, current_theme);
@@ -1224,7 +1230,7 @@ void theme_manager_apply_theme(const helix::ThemeData& theme, bool dark_mode) {
     }
 
     // Update ThemeManager stored palettes and apply current mode
-    theme_update_colors(effective_dark, active_theme.properties.border_opacity);
+    theme_update_colors(effective_dark);
 
     // Re-register XML constants: semantic colors, theme properties, and color pairs
     theme_manager_register_semantic_colors(nullptr, active_theme, effective_dark);

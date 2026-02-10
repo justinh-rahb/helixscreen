@@ -71,7 +71,9 @@ struct ThemeProperties {
     int border_radius = 12;   // Corner roundness (0 = sharp, 12 = soft)
     int border_width = 1;     // Default border width
     int border_opacity = 40;  // Border opacity (0-255)
-    int shadow_intensity = 0; // Shadow strength (0 = disabled)
+    int shadow_intensity = 0; // Shadow blur radius in px (0 = disabled)
+    int shadow_opa = 0;       // Shadow opacity (0-255, default 0 = no shadow)
+    int shadow_offset_y = 2;  // Shadow vertical offset in px
 };
 
 /**

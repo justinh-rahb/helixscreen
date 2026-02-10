@@ -5,21 +5,39 @@
 
 namespace style_configs {
 
+/// Apply shadow properties from palette when shadow_width > 0
+static void apply_shadow(lv_style_t* s, const ThemePalette& p) {
+    if (p.shadow_width > 0) {
+        lv_style_set_shadow_width(s, p.shadow_width);
+        lv_style_set_shadow_opa(s, static_cast<lv_opa_t>(p.shadow_opa));
+        lv_style_set_shadow_offset_y(s, p.shadow_offset_y);
+        lv_style_set_shadow_color(s, p.border); // Derived from border — muted in both modes
+    }
+}
+
+/// Apply border properties from palette (border_color, border_width, border_opa)
+static void apply_border(lv_style_t* s, const ThemePalette& p) {
+    lv_style_set_border_color(s, p.border);
+    lv_style_set_border_width(s, p.border_width);
+    lv_style_set_border_opa(s, static_cast<lv_opa_t>(p.border_opacity * 255 / 100));
+}
+
 // Base styles
 void configure_card(lv_style_t* s, const ThemePalette& p) {
     lv_style_set_bg_color(s, p.card_bg);
     lv_style_set_bg_opa(s, LV_OPA_COVER);
-    lv_style_set_border_color(s, p.border);
-    lv_style_set_border_width(s, p.border_width);
-    lv_style_set_border_opa(s, static_cast<lv_opa_t>(p.border_opacity * 255 / 100));
+    apply_border(s, p);
     lv_style_set_radius(s, p.border_radius);
+    apply_shadow(s, p);
 }
 
 void configure_dialog(lv_style_t* s, const ThemePalette& p) {
     // Use elevated_bg so inputs (overlay_bg) have contrast
     lv_style_set_bg_color(s, p.elevated_bg);
     lv_style_set_bg_opa(s, LV_OPA_COVER);
+    apply_border(s, p);
     lv_style_set_radius(s, p.border_radius);
+    apply_shadow(s, p);
 }
 
 void configure_obj_base(lv_style_t* s, const ThemePalette& p) {
@@ -34,6 +52,7 @@ void configure_obj_base(lv_style_t* s, const ThemePalette& p) {
 void configure_input_bg(lv_style_t* s, const ThemePalette& p) {
     lv_style_set_bg_color(s, p.elevated_bg);
     lv_style_set_bg_opa(s, LV_OPA_COVER);
+    apply_border(s, p);
     lv_style_set_radius(s, p.border_radius);
     lv_style_set_text_color(s, p.text);
 }
@@ -109,7 +128,9 @@ void configure_icon_danger(lv_style_t* s, const ThemePalette& p) {
 void configure_button(lv_style_t* s, const ThemePalette& p) {
     lv_style_set_bg_color(s, p.elevated_bg);
     lv_style_set_bg_opa(s, LV_OPA_COVER);
+    apply_border(s, p);
     lv_style_set_radius(s, p.border_radius);
+    apply_shadow(s, p);
 }
 
 void configure_button_primary(lv_style_t* s, const ThemePalette& p) {
@@ -193,10 +214,10 @@ void configure_severity_danger(lv_style_t* s, const ThemePalette& p) {
 void configure_dropdown(lv_style_t* s, const ThemePalette& p) {
     lv_style_set_bg_color(s, p.elevated_bg);
     lv_style_set_bg_opa(s, LV_OPA_COVER);
-    lv_style_set_border_color(s, p.border);
-    lv_style_set_border_width(s, p.border_width);
+    apply_border(s, p);
     lv_style_set_radius(s, p.border_radius);
     lv_style_set_text_color(s, p.text);
+    apply_shadow(s, p);
 }
 
 void configure_checkbox(lv_style_t* s, const ThemePalette& p) {
