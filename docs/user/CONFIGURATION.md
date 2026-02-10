@@ -134,7 +134,7 @@ The configuration file is JSON format with several top-level sections:
 ### `beta_features`
 **Type:** boolean
 **Default:** `false`
-**Description:** Enable beta features that are still under testing. Gates several Advanced panel features (Input Shaping, Z-Offset Calibration, PID Tuning, HelixPrint plugin management, PRINT_START configuration, Timelapse), the Plugins section in Settings, and the Update Channel selector. Always enabled automatically when running in `--test` mode. Can also be toggled by tapping the version button 7 times in Settings > About. See the [Beta Features](USER_GUIDE.md#beta-features) section in the User Guide for the full list.
+**Description:** Enable beta features that are still under testing. Gates several Advanced panel features (Macro Browser, Input Shaping, Z-Offset Calibration, PID Tuning, HelixPrint plugin management, PRINT_START configuration, Timelapse), the Plugins section in Settings, and the Update Channel selector. Always enabled automatically when running in `--test` mode. Can also be toggled by tapping the version button 7 times in Settings > About. See the [Beta Features](USER_GUIDE.md#beta-features) section in the User Guide for the full list.
 
 ---
 

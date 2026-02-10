@@ -91,10 +91,12 @@
     <!-- AUTOMATION SECTION -->
     <!-- ================================================================== -->
     <setting_section_header title="AUTOMATION" title_tag="AUTOMATION" icon="code_tags"/>
-    <!-- Macro Browser -->
-    <setting_action_row name="row_macros" label="Macro Browser" label_tag="Macro Browser" icon="console" description="Execute printer macros" description_tag="Execute printer macros">
-      <event_cb trigger="clicked" callback="on_advanced_macros"/>
-    </setting_action_row>
+    <!-- Macro Browser (gated by beta_features) -->
+    <beta_feature name="container_macro_browser">
+      <setting_action_row name="row_macros" label="Macro Browser" label_tag="Macro Browser" icon="console" description="Execute printer macros" description_tag="Execute printer macros">
+        <event_cb trigger="clicked" callback="on_advanced_macros"/>
+      </setting_action_row>
+    </beta_feature>
     <!-- HelixPrint Plugin (NOT installed - show Install row) -->
     <!-- Shows ONLY when value == 0 (not installed), hidden otherwise (-1 or 1) -->
     <beta_feature name="container_helix_plugin_install">

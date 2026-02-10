@@ -928,6 +928,7 @@ When beta features are enabled, the following appear in the UI with an orange "B
 | **Timelapse Setup** | Advanced panel | Install the timelapse plugin (shown when not installed but webcam detected) | Functional |
 | **Plugins** | Settings panel | View installed plugins and their status | Functional; plugin system is early-stage |
 | **Update Channel** | Settings panel | Switch between Stable, Beta, and Dev update channels | Functional; Beta/Dev channels may have less-tested releases |
+| **Macro Browser** | Advanced panel | Browse and execute custom Klipper macros | Functional; hides system macros, confirms dangerous ones |
 | **Z Calibration** | Controls panel | Quick-access Z calibration button | Functional; requires probe hardware |
 
 ### Update Channel Selection
