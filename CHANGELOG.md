@@ -5,6 +5,25 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.10] - 2026-02-10
+
+Hotfix release — gradient and flag images were broken for all users due to a missing decoder setting, and WiFi initialization caused a 5-second startup delay on NetworkManager-based systems.
+
+### Added
+- Optional bed warming step before Z-offset calibration
+- Reusable multi-select checkbox widget
+- Symbol maps for crash backtrace resolution
+- KIAUH extension discovery tests
+
+### Fixed
+- Gradient and flag images failing to load (LV_BIN_DECODER_RAM_LOAD not enabled)
+- WiFi backend now tries NetworkManager first, avoiding 5-second wpa_supplicant timeout on most systems
+- Observer crash on shutdown from subject lifetime mismatch
+- Connection wizard mDNS section hidden, subtitle improved
+
+### Changed
+- Project permission settings organized into .claude/settings.json
+
 ## [0.9.9] - 2026-02-09
 
 Telemetry, security hardening, and a bundled uninstaller — plus deploy packages are now ~60% smaller.
@@ -291,6 +310,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.9.10]: https://github.com/prestonbrown/helixscreen/compare/v0.9.9...v0.9.10
 [0.9.9]: https://github.com/prestonbrown/helixscreen/compare/v0.9.8...v0.9.9
 [0.9.8]: https://github.com/prestonbrown/helixscreen/compare/v0.9.7...v0.9.8
 [0.9.7]: https://github.com/prestonbrown/helixscreen/compare/v0.9.6...v0.9.7
