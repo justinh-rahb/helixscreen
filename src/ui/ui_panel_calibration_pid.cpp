@@ -4,7 +4,6 @@
 #include "ui_panel_calibration_pid.h"
 
 #include "ui_event_safety.h"
-#include "ui_fan_dial.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
 #include "ui_update_queue.h"
@@ -13,7 +12,6 @@
 #include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "static_panel_registry.h"
-#include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -56,8 +54,6 @@ PIDCalibrationPanel::~PIDCalibrationPanel() {
     // Clear widget pointers (owned by LVGL)
     overlay_root_ = nullptr;
     parent_screen_ = nullptr;
-    btn_heater_extruder_ = nullptr;
-    btn_heater_bed_ = nullptr;
 
     // Guard against static destruction order fiasco (spdlog may be gone)
     if (!StaticPanelRegistry::is_destroyed()) {
@@ -105,6 +101,9 @@ void PIDCalibrationPanel::init_subjects() {
 
     // Int subject: 1 when extruder selected, 0 when bed selected (controls fan/preset visibility)
     UI_MANAGED_SUBJECT_INT(subj_heater_is_extruder_, 1, "pid_heater_is_extruder", subjects_);
+
+    // Int subject: 1 when not idle (disables Start button in header)
+    UI_MANAGED_SUBJECT_INT(subj_cal_not_idle_, 0, "pid_cal_not_idle", subjects_);
 
     subjects_initialized_ = true;
 
@@ -182,18 +181,11 @@ void PIDCalibrationPanel::setup_widgets() {
         return;
     }
 
-    // Find widgets in idle state (for heater selection styling)
-    btn_heater_extruder_ = lv_obj_find_by_name(overlay_root_, "btn_heater_extruder");
-    btn_heater_bed_ = lv_obj_find_by_name(overlay_root_, "btn_heater_bed");
-
-    // Fan dial (created programmatically in the XML container)
-    fan_dial_container_ = lv_obj_find_by_name(overlay_root_, "fan_dial_container");
-    if (fan_dial_container_) {
-        fan_dial_ = std::make_unique<FanDial>(fan_dial_container_, "Part Fan", "fan", 0);
-        fan_dial_->set_on_speed_changed([this](const std::string&, int speed) {
-            fan_speed_ = speed;
-            spdlog::debug("[PIDCal] Fan speed set to {}%", speed);
-        });
+    // Fan speed slider
+    fan_slider_ = lv_obj_find_by_name(overlay_root_, "fan_speed_slider");
+    fan_speed_label_ = lv_obj_find_by_name(overlay_root_, "fan_speed_label");
+    if (fan_slider_) {
+        lv_obj_add_event_cb(fan_slider_, on_fan_slider_changed, LV_EVENT_VALUE_CHANGED, this);
     }
 
     // Event callbacks are registered via XML <event_cb> elements
@@ -201,7 +193,6 @@ void PIDCalibrationPanel::setup_widgets() {
 
     // Set initial state
     set_state(State::IDLE);
-    update_heater_selection();
     update_temp_display();
     update_temp_hint();
 
@@ -245,11 +236,9 @@ void PIDCalibrationPanel::on_activate() {
     target_temp_ = EXTRUDER_DEFAULT_TEMP;
     fan_speed_ = 0;
     selected_material_.clear();
-    if (fan_dial_)
-        fan_dial_->set_speed(0);
+    update_fan_slider(0);
     lv_subject_set_int(&subj_heater_is_extruder_, 1);
 
-    update_heater_selection();
     update_temp_display();
     update_temp_hint();
 }
@@ -280,17 +269,15 @@ void PIDCalibrationPanel::cleanup() {
         NavigationManager::instance().unregister_overlay_instance(overlay_root_);
     }
 
-    // Destroy fan dial before LVGL cleanup
-    fan_dial_.reset();
-    fan_dial_container_ = nullptr;
+    // Clear slider references
+    fan_slider_ = nullptr;
+    fan_speed_label_ = nullptr;
 
     // Call base class to set cleanup_called_ flag
     OverlayBase::cleanup();
 
     // Clear references
     parent_screen_ = nullptr;
-    btn_heater_extruder_ = nullptr;
-    btn_heater_bed_ = nullptr;
 }
 
 // ============================================================================
@@ -313,29 +300,24 @@ void PIDCalibrationPanel::set_state(State new_state) {
                   static_cast<int>(new_state));
     state_ = new_state;
 
-    // Update subject - XML bindings handle visibility automatically
+    // Update subjects - XML bindings handle visibility automatically
     // State mapping: 0=IDLE, 1=CALIBRATING, 2=SAVING, 3=COMPLETE, 4=ERROR
     lv_subject_set_int(&s_pid_cal_state, static_cast<int>(new_state));
+    // Disable Start button in header when not idle
+    lv_subject_set_int(&subj_cal_not_idle_, new_state != State::IDLE ? 1 : 0);
 }
 
 // ============================================================================
 // UI UPDATES
 // ============================================================================
 
-void PIDCalibrationPanel::update_heater_selection() {
-    if (!btn_heater_extruder_ || !btn_heater_bed_)
-        return;
-
-    // Use background color to indicate selection
-    lv_color_t selected_color = theme_manager_get_color("primary");
-    lv_color_t neutral_color = theme_manager_get_color("elevated_bg");
-
-    if (selected_heater_ == Heater::EXTRUDER) {
-        lv_obj_set_style_bg_color(btn_heater_extruder_, selected_color, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(btn_heater_bed_, neutral_color, LV_PART_MAIN);
-    } else {
-        lv_obj_set_style_bg_color(btn_heater_extruder_, neutral_color, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(btn_heater_bed_, selected_color, LV_PART_MAIN);
+void PIDCalibrationPanel::update_fan_slider(int speed) {
+    if (fan_slider_)
+        lv_slider_set_value(fan_slider_, speed, LV_ANIM_OFF);
+    if (fan_speed_label_) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%d%%", speed);
+        lv_label_set_text(fan_speed_label_, buf);
     }
 }
 
@@ -467,7 +449,6 @@ void PIDCalibrationPanel::handle_heater_extruder_clicked() {
     target_temp_ = EXTRUDER_DEFAULT_TEMP;
     selected_material_.clear();
     lv_subject_set_int(&subj_heater_is_extruder_, 1);
-    update_heater_selection();
     update_temp_display();
     update_temp_hint();
 }
@@ -481,10 +462,8 @@ void PIDCalibrationPanel::handle_heater_bed_clicked() {
     target_temp_ = BED_DEFAULT_TEMP;
     selected_material_.clear();
     fan_speed_ = 0;
-    if (fan_dial_)
-        fan_dial_->set_speed(0);
+    update_fan_slider(0);
     lv_subject_set_int(&subj_heater_is_extruder_, 0);
-    update_heater_selection();
     update_temp_display();
     update_temp_hint();
 }
@@ -647,61 +626,83 @@ void PIDCalibrationPanel::on_retry_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-// Material preset trampolines (extruder)
+void PIDCalibrationPanel::on_fan_slider_changed(lv_event_t* e) {
+    auto* panel = static_cast<PIDCalibrationPanel*>(lv_event_get_user_data(e));
+    if (!panel)
+        return;
+    auto* slider = lv_event_get_target_obj(e);
+    int speed = lv_slider_get_value(slider);
+    panel->fan_speed_ = speed;
+    panel->update_fan_slider(speed);
+    spdlog::debug("[PIDCal] Fan speed set to {}%", speed);
+}
+
+// Helper: look up recommended temp from filament database
+static int get_material_nozzle_temp(const char* name) {
+    auto mat = filament::find_material(name);
+    return mat ? mat->nozzle_recommended() : 200;
+}
+
+static int get_material_bed_temp(const char* name) {
+    auto mat = filament::find_material(name);
+    return mat ? mat->bed_temp : 60;
+}
+
+// Material preset trampolines (extruder) — temps from filament database
 void PIDCalibrationPanel::on_pid_preset_pla(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_pla");
     (void)e;
-    get_global_pid_cal_panel().handle_preset_clicked(205, "PLA");
+    get_global_pid_cal_panel().handle_preset_clicked(get_material_nozzle_temp("PLA"), "PLA");
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PIDCalibrationPanel::on_pid_preset_petg(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_petg");
     (void)e;
-    get_global_pid_cal_panel().handle_preset_clicked(245, "PETG");
+    get_global_pid_cal_panel().handle_preset_clicked(get_material_nozzle_temp("PETG"), "PETG");
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PIDCalibrationPanel::on_pid_preset_abs(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_abs");
     (void)e;
-    get_global_pid_cal_panel().handle_preset_clicked(255, "ABS");
+    get_global_pid_cal_panel().handle_preset_clicked(get_material_nozzle_temp("ABS"), "ABS");
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PIDCalibrationPanel::on_pid_preset_pa(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_pa");
     (void)e;
-    get_global_pid_cal_panel().handle_preset_clicked(265, "PA");
+    get_global_pid_cal_panel().handle_preset_clicked(get_material_nozzle_temp("PA"), "PA");
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PIDCalibrationPanel::on_pid_preset_tpu(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_tpu");
     (void)e;
-    get_global_pid_cal_panel().handle_preset_clicked(225, "TPU");
+    get_global_pid_cal_panel().handle_preset_clicked(get_material_nozzle_temp("TPU"), "TPU");
     LVGL_SAFE_EVENT_CB_END();
 }
 
-// Material preset trampolines (bed)
+// Material preset trampolines (bed) — temps from filament database
 void PIDCalibrationPanel::on_pid_preset_bed_pla(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_bed_pla");
     (void)e;
-    get_global_pid_cal_panel().handle_preset_clicked(60, "PLA");
+    get_global_pid_cal_panel().handle_preset_clicked(get_material_bed_temp("PLA"), "PLA");
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PIDCalibrationPanel::on_pid_preset_bed_petg(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_bed_petg");
     (void)e;
-    get_global_pid_cal_panel().handle_preset_clicked(80, "PETG");
+    get_global_pid_cal_panel().handle_preset_clicked(get_material_bed_temp("PETG"), "PETG");
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PIDCalibrationPanel::on_pid_preset_bed_abs(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_bed_abs");
     (void)e;
-    get_global_pid_cal_panel().handle_preset_clicked(100, "ABS");
+    get_global_pid_cal_panel().handle_preset_clicked(get_material_bed_temp("ABS"), "ABS");
     LVGL_SAFE_EVENT_CB_END();
 }
 

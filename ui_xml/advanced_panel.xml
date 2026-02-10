@@ -66,7 +66,7 @@
     </beta_feature>
     <!-- PID Tuning (beta) -->
     <beta_feature name="container_pid_tuning">
-      <setting_action_row name="row_pid_tuning" label="PID Tuning" label_tag="PID Tuning" icon="heater" description="Tune heater PID parameters" description_tag="Tune heater PID parameters">
+      <setting_action_row name="row_pid_tuning" label="Automatic PID Calibration" label_tag="Automatic PID Calibration" icon="heater" description="Tune heater PID parameters" description_tag="Tune heater PID parameters">
         <event_cb trigger="clicked" callback="on_pid_tuning_clicked"/>
       </setting_action_row>
     </beta_feature>

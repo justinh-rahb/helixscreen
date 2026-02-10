@@ -3,13 +3,10 @@
 
 #pragma once
 
-#include "ui_fan_dial.h"
-
 #include "overlay_base.h"
 #include "subject_managed_panel.h"
 
 #include <lvgl.h>
-#include <memory>
 #include <string>
 
 class MoonrakerAPI;
@@ -229,11 +226,12 @@ class PIDCalibrationPanel : public OverlayBase {
     // Int subject for showing/hiding extruder-only sections
     lv_subject_t subj_heater_is_extruder_;
 
-    // Widget references (only for imperative updates like styling)
-    lv_obj_t* btn_heater_extruder_ = nullptr;
-    lv_obj_t* btn_heater_bed_ = nullptr;
-    lv_obj_t* fan_dial_container_ = nullptr;
-    std::unique_ptr<FanDial> fan_dial_;
+    // Int subject: 1 when not idle (disables Start button in header)
+    lv_subject_t subj_cal_not_idle_;
+
+    // Widget references
+    lv_obj_t* fan_slider_ = nullptr;
+    lv_obj_t* fan_speed_label_ = nullptr;
 
     // State management
     void set_state(State new_state);
@@ -245,7 +243,7 @@ class PIDCalibrationPanel : public OverlayBase {
     void setup_widgets();
 
     // UI updates
-    void update_heater_selection();
+    void update_fan_slider(int speed);
     void update_temp_display();
     void update_temp_hint();
 
@@ -273,6 +271,7 @@ class PIDCalibrationPanel : public OverlayBase {
     static void on_abort_clicked(lv_event_t* e);
     static void on_done_clicked(lv_event_t* e);
     static void on_retry_clicked(lv_event_t* e);
+    static void on_fan_slider_changed(lv_event_t* e);
     // Material preset trampolines (extruder)
     static void on_pid_preset_pla(lv_event_t* e);
     static void on_pid_preset_petg(lv_event_t* e);
