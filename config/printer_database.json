@@ -1505,6 +1505,7 @@
       "name": "Qidi X-Max 3",
       "manufacturer": "Qidi",
       "image": "qidi-x-max-3.png",
+      "print_start_profile": "qidi",
       "heuristics": [
         {
           "type": "kinematics_match",
@@ -1557,6 +1558,34 @@
           "pattern": "xmax",
           "confidence": 90,
           "reason": "Hostname contains 'xmax'"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M141",
+          "confidence": 75,
+          "reason": "M141 chamber heater macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M191",
+          "confidence": 80,
+          "reason": "M191 chamber temp wait macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "CLEAR_NOZZLE",
+          "confidence": 60,
+          "reason": "CLEAR_NOZZLE macro (common on QIDI printers)"
+        },
+        {
+          "type": "mcu_match",
+          "field": "mcu",
+          "pattern": "rp2040",
+          "confidence": 45,
+          "reason": "RP2040 toolhead MCU (QIDI dual-MCU design)"
         }
       ]
     },
@@ -1565,6 +1594,7 @@
       "name": "Qidi Plus 4",
       "manufacturer": "Qidi",
       "image": "qidi-plus-4.png",
+      "print_start_profile": "qidi",
       "heuristics": [
         {
           "type": "kinematics_match",
@@ -1614,6 +1644,41 @@
           "pattern": "STM32F402",
           "confidence": 35,
           "reason": "STM32F402 MCU (Qidi Plus 4 mainboard)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M141",
+          "confidence": 75,
+          "reason": "M141 chamber heater macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M191",
+          "confidence": 80,
+          "reason": "M191 chamber temp wait macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "CLEAR_NOZZLE",
+          "confidence": 60,
+          "reason": "CLEAR_NOZZLE macro (common on QIDI printers)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M4029",
+          "confidence": 70,
+          "reason": "M4029 calibration macro (QIDI Plus 4 specific)"
+        },
+        {
+          "type": "mcu_match",
+          "field": "mcu",
+          "pattern": "rp2040",
+          "confidence": 45,
+          "reason": "RP2040 toolhead MCU (QIDI dual-MCU design)"
         }
       ]
     },
@@ -1622,6 +1687,7 @@
       "name": "Qidi X-Plus 3",
       "manufacturer": "Qidi",
       "image": "qidi-x-plus-3.png",
+      "print_start_profile": "qidi",
       "heuristics": [
         {
           "type": "kinematics_match",
@@ -1674,6 +1740,34 @@
           "pattern": "xplus",
           "confidence": 90,
           "reason": "Hostname contains 'xplus'"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M141",
+          "confidence": 75,
+          "reason": "M141 chamber heater macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M191",
+          "confidence": 80,
+          "reason": "M191 chamber temp wait macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "CLEAR_NOZZLE",
+          "confidence": 60,
+          "reason": "CLEAR_NOZZLE macro (common on QIDI printers)"
+        },
+        {
+          "type": "mcu_match",
+          "field": "mcu",
+          "pattern": "rp2040",
+          "confidence": 45,
+          "reason": "RP2040 toolhead MCU (QIDI dual-MCU design)"
         }
       ]
     },
@@ -1682,6 +1776,7 @@
       "name": "Qidi Q1 Pro",
       "manufacturer": "Qidi",
       "image": "qidi-q1-pro.png",
+      "print_start_profile": "qidi",
       "heuristics": [
         {
           "type": "kinematics_match",
@@ -1717,6 +1812,34 @@
           "pattern": "q1",
           "confidence": 85,
           "reason": "Hostname contains 'q1'"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M141",
+          "confidence": 75,
+          "reason": "M141 chamber heater macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M191",
+          "confidence": 80,
+          "reason": "M191 chamber temp wait macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "CLEAR_NOZZLE",
+          "confidence": 60,
+          "reason": "CLEAR_NOZZLE macro (common on QIDI printers)"
+        },
+        {
+          "type": "mcu_match",
+          "field": "mcu",
+          "pattern": "rp2040",
+          "confidence": 45,
+          "reason": "RP2040 toolhead MCU (QIDI dual-MCU design)"
         }
       ]
     },
@@ -1725,6 +1848,7 @@
       "name": "Qidi Q2",
       "manufacturer": "Qidi",
       "image": "qidi-q2.png",
+      "print_start_profile": "qidi",
       "heuristics": [
         {
           "type": "kinematics_match",
@@ -1770,6 +1894,34 @@
           "pattern": "q2",
           "confidence": 90,
           "reason": "Hostname contains 'q2'"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M141",
+          "confidence": 75,
+          "reason": "M141 chamber heater macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M191",
+          "confidence": 80,
+          "reason": "M191 chamber temp wait macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "CLEAR_NOZZLE",
+          "confidence": 60,
+          "reason": "CLEAR_NOZZLE macro (common on QIDI printers)"
+        },
+        {
+          "type": "mcu_match",
+          "field": "mcu",
+          "pattern": "rp2040",
+          "confidence": 45,
+          "reason": "RP2040 toolhead MCU (QIDI dual-MCU design)"
         }
       ]
     },
@@ -1778,6 +1930,7 @@
       "name": "Qidi Q2 Pro",
       "manufacturer": "Qidi",
       "image": "qidi-q2-pro.png",
+      "print_start_profile": "qidi",
       "heuristics": [
         {
           "type": "kinematics_match",
@@ -1830,6 +1983,34 @@
           "pattern": "q2-pro",
           "confidence": 95,
           "reason": "Hostname contains 'q2-pro'"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M141",
+          "confidence": 75,
+          "reason": "M141 chamber heater macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "M191",
+          "confidence": 80,
+          "reason": "M191 chamber temp wait macro (QIDI signature)"
+        },
+        {
+          "type": "macro_match",
+          "field": "macros",
+          "pattern": "CLEAR_NOZZLE",
+          "confidence": 60,
+          "reason": "CLEAR_NOZZLE macro (common on QIDI printers)"
+        },
+        {
+          "type": "mcu_match",
+          "field": "mcu",
+          "pattern": "rp2040",
+          "confidence": 45,
+          "reason": "RP2040 toolhead MCU (QIDI dual-MCU design)"
         }
       ]
     },
