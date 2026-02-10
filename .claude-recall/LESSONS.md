@@ -145,3 +145,7 @@
 - **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-08 | **Last**: 2026-02-08 | **Category**: git
 > Run 'git status' before committing to verify no unexpected files are already staged from prior work. 'git add file1 file2' ADDS to the index but doesn't REPLACE it - pre-staged files from previous sessions will silently be included in the commit.
 
+### [L064] [-----|-----] Commit generated translation artifacts
+- **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-10 | **Last**: 2026-02-10 | **Category**: i18n
+> After syncing translation YAML files, must also regenerate and commit the compiled artifacts: src/generated/lv_i18n_translations.c, src/generated/lv_i18n_translations.h, and ui_xml/translations/translations.xml. These are tracked in git (not gitignored) for cross-compilation support. The build regenerates them automatically, but they won't be staged unless you explicitly add them.
+
