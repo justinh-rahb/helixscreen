@@ -285,3 +285,59 @@ EOF
     # The conditional must check if already set
     grep -q 'if \[ -z "\${HELIX_DISPLAY_BACKEND:-}"' "$LAUNCHER"
 }
+
+# =============================================================================
+# Splash PID routing (must go to watchdog args, not passthrough/child args)
+# =============================================================================
+
+@test "HELIX_SPLASH_PID routes to SPLASH_ARGS not PASSTHROUGH_ARGS" {
+    # The launcher should put --splash-pid into SPLASH_ARGS (before --)
+    # not into PASSTHROUGH_ARGS (after --)
+    grep -q 'SPLASH_ARGS="--splash-pid=\${HELIX_SPLASH_PID}"' "$LAUNCHER"
+}
+
+@test "HELIX_SPLASH_PID does not go to PASSTHROUGH_ARGS" {
+    # Ensure the old pattern (putting splash-pid in PASSTHROUGH_ARGS) is gone
+    ! grep -q 'PASSTHROUGH_ARGS.*--splash-pid' "$LAUNCHER"
+}
+
+@test "launcher passes SPLASH_ARGS before -- separator to watchdog" {
+    # SPLASH_ARGS should appear before the -- separator in the watchdog invocation
+    grep -q '"${WATCHDOG_BIN}" ${SPLASH_ARGS} --' "$LAUNCHER"
+}
+
+@test "splash PID routing end-to-end with mock watchdog" {
+    # Create a mock watchdog that captures its arguments
+    cat > "$MOCK_INSTALL/bin/helix-watchdog" << 'WDEOF'
+#!/bin/sh
+# Write all args to a file for inspection
+for arg in "$@"; do
+    echo "$arg"
+done > "$MOCK_INSTALL/watchdog_args.txt"
+exit 0
+WDEOF
+    chmod +x "$MOCK_INSTALL/bin/helix-watchdog"
+
+    # Run the launcher with HELIX_SPLASH_PID set
+    export HELIX_SPLASH_PID=1476
+    export HELIX_NO_SPLASH=0
+
+    # Run launcher (it will use the mock watchdog)
+    cd "$MOCK_INSTALL/bin"
+    HELIX_SPLASH_PID=1476 sh "$LAUNCHER" 2>/dev/null || true
+
+    # Check that --splash-pid appears BEFORE -- in the watchdog args
+    if [ -f "$MOCK_INSTALL/watchdog_args.txt" ]; then
+        # --splash-pid should be one of the args before --
+        seen_separator=false
+        splash_before_sep=false
+        while IFS= read -r line; do
+            if [ "$line" = "--" ]; then
+                seen_separator=true
+            elif [ "$seen_separator" = "false" ] && echo "$line" | grep -q '^--splash-pid='; then
+                splash_before_sep=true
+            fi
+        done < "$MOCK_INSTALL/watchdog_args.txt"
+        [ "$splash_before_sep" = "true" ]
+    fi
+}

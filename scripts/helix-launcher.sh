@@ -179,8 +179,9 @@ SPLASH_ARGS=""
 if [ "${HELIX_NO_SPLASH:-0}" = "1" ]; then
     log "Splash disabled (HELIX_NO_SPLASH=1)"
 elif [ -n "${HELIX_SPLASH_PID}" ]; then
-    # Splash was pre-started by init script, pass PID to helix-screen for cleanup
-    PASSTHROUGH_ARGS="${PASSTHROUGH_ARGS} --splash-pid=${HELIX_SPLASH_PID}"
+    # Splash was pre-started by init script, pass PID to watchdog (before --)
+    # so watchdog can forward it to helix-screen on first launch
+    SPLASH_ARGS="--splash-pid=${HELIX_SPLASH_PID}"
     log "Using pre-started splash (PID ${HELIX_SPLASH_PID})"
 elif [ -x "${SPLASH_BIN}" ]; then
     # No pre-started splash, let watchdog manage it

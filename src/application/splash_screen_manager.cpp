@@ -124,7 +124,16 @@ void SplashScreenManager::signal_and_wait() {
 #endif
 
     if (wait_attempts <= 0) {
-        spdlog::warn("[SplashManager] Splash process did not exit in time");
+        // Escalate: SIGTERM then SIGKILL as defense-in-depth
+        spdlog::warn("[SplashManager] Splash did not exit after SIGUSR1, sending SIGTERM");
+        kill(m_splash_pid, SIGTERM);
+        usleep(200000); // 200ms
+
+        if (kill(m_splash_pid, 0) == 0) {
+            spdlog::warn("[SplashManager] Splash still alive, sending SIGKILL");
+            kill(m_splash_pid, SIGKILL);
+            usleep(50000); // 50ms
+        }
     } else {
         spdlog::info("[SplashManager] Splash process exited");
     }

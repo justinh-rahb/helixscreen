@@ -179,19 +179,22 @@ struct WatchdogArgs {
     int height = 0;
     int rotation = 0;          // Display rotation in degrees (0, 90, 180, 270)
     std::string splash_binary; // Optional: --splash-bin=<path>
+    pid_t splash_pid = 0;      // Optional: --splash-pid=N (externally started splash)
     std::string child_binary;
     std::vector<std::string> child_args;
 };
 
 static void print_usage(const char* program) {
     fprintf(stderr,
-            "Usage: %s [-w width] [-h height] [--splash-bin=<path>] -- <helix-screen> [args...]\n",
+            "Usage: %s [-w width] [-h height] [--splash-bin=<path>] [--splash-pid=N] -- "
+            "<helix-screen> [args...]\n",
             program);
     fprintf(stderr, "  -w <width>          Screen width (default: %d)\n", DEFAULT_WIDTH);
     fprintf(stderr, "  -h <height>         Screen height (default: %d)\n", DEFAULT_HEIGHT);
     fprintf(stderr,
             "  -r <degrees>        Display rotation: 0, 90, 180, 270 (default: from config)\n");
     fprintf(stderr, "  --splash-bin=<path> Path to splash screen binary (optional)\n");
+    fprintf(stderr, "  --splash-pid=<pid>  PID of externally started splash process (optional)\n");
     fprintf(stderr, "  --                  Separator before child binary and args\n");
 }
 
@@ -215,6 +218,8 @@ static bool parse_args(int argc, char** argv, WatchdogArgs& args) {
             args.rotation = atoi(argv[++i]);
         } else if (strncmp(argv[i], "--splash-bin=", 13) == 0) {
             args.splash_binary = argv[i] + 13;
+        } else if (strncmp(argv[i], "--splash-pid=", 13) == 0) {
+            args.splash_pid = static_cast<pid_t>(atoi(argv[i] + 13));
         } else if (strcmp(argv[i], "--help") == 0) {
             print_usage(argv[0]);
             exit(0);
@@ -704,15 +709,24 @@ static int run_watchdog(const WatchdogArgs& args) {
     if (!args.splash_binary.empty()) {
         spdlog::info("[Watchdog] Splash binary: {}", args.splash_binary);
     }
+    if (args.splash_pid > 0) {
+        spdlog::info("[Watchdog] External splash PID: {}", args.splash_pid);
+    }
 
     bool first_launch = true;
 
     while (!g_quit) {
-        // Start splash screen before launching helix-screen
-        // Only show splash on first launch or after normal restart, not after crash
-        // (crash dialog is shown instead)
+        // Start or adopt splash screen before launching helix-screen.
+        // On first launch, prefer an externally-started splash (args.splash_pid)
+        // over starting a new one. On restarts, always start fresh (the original
+        // PID is stale).
         pid_t splash_pid = 0;
-        if (first_launch || (!args.splash_binary.empty())) {
+        if (first_launch && args.splash_pid > 0) {
+            // Adopt externally-started splash (e.g. from init script)
+            splash_pid = args.splash_pid;
+            g_splash_pid = splash_pid;
+            spdlog::info("[Watchdog] Adopting external splash (PID {})", splash_pid);
+        } else if (first_launch || !args.splash_binary.empty()) {
             splash_pid = start_splash_process(args);
         }
         first_launch = false;
