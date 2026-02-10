@@ -9,6 +9,7 @@
 #include "ui_utils.h"
 
 #include "settings_manager.h"
+#include "static_subject_registry.h"
 
 #include <spdlog/spdlog.h>
 
@@ -210,8 +211,32 @@ void ToastManager::init() {
     // Register callback for XML event_cb to work
     lv_xml_register_event_cb(nullptr, "toast_close_btn_clicked", close_btn_clicked);
 
+    // Register subject cleanup for proper shutdown ordering
+    StaticSubjectRegistry::instance().register_deinit(
+        "ToastManager", []() { ToastManager::instance().deinit_subjects(); });
+
     initialized_ = true;
     spdlog::debug("[ToastManager] Toast notification system initialized");
+}
+
+void ToastManager::deinit_subjects() {
+    if (!initialized_) {
+        return;
+    }
+
+    if (!lv_is_initialized()) {
+        initialized_ = false;
+        return;
+    }
+
+    // Deinit subjects - removes all observers AND their event callbacks from LVGL objects.
+    // Must happen before lv_deinit() so widget deletion doesn't hit dangling observer pointers.
+    lv_subject_deinit(&severity_subject_);
+    lv_subject_deinit(&action_text_subject_);
+    lv_subject_deinit(&action_visible_subject_);
+
+    initialized_ = false;
+    spdlog::debug("[ToastManager] Subjects deinitialized");
 }
 
 void ToastManager::show(ToastSeverity severity, const char* message, uint32_t duration_ms) {

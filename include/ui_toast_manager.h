@@ -99,6 +99,14 @@ class ToastManager {
     void hide();
 
     /**
+     * @brief Deinitialize LVGL subjects (removes all observers from widgets)
+     *
+     * Must be called before lv_deinit() to prevent dangling observer pointers.
+     * Registered with StaticSubjectRegistry for automatic cleanup.
+     */
+    void deinit_subjects();
+
+    /**
      * @brief Check if a toast is currently visible
      * @return true if a toast is visible, false otherwise
      */

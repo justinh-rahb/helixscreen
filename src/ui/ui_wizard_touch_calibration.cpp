@@ -132,6 +132,12 @@ WizardTouchCalibrationStep::WizardTouchCalibrationStep() {
 }
 
 WizardTouchCalibrationStep::~WizardTouchCalibrationStep() {
+    // Deinit subjects before memory is freed — removes observers from LVGL widgets
+    if (subjects_initialized_ && lv_is_initialized()) {
+        lv_subject_deinit(&calibration_valid_);
+        lv_subject_deinit(&current_step_);
+        subjects_initialized_ = false;
+    }
     screen_root_ = nullptr;
 }
 
