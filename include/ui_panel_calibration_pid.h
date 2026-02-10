@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "ui_fan_dial.h"
+
 #include "overlay_base.h"
 #include "subject_managed_panel.h"
 
@@ -10,6 +12,7 @@
 #include <memory>
 #include <string>
 
+class MoonrakerAPI;
 class MoonrakerClient;
 
 /**
@@ -131,6 +134,15 @@ class PIDCalibrationPanel : public OverlayBase {
     }
 
     /**
+     * @brief Set the Moonraker API for high-level operations
+     *
+     * @param api MoonrakerAPI for PID calibrate and save_config
+     */
+    void set_api(MoonrakerAPI* api) {
+        api_ = api;
+    }
+
+    /**
      * @brief Get current state
      */
     State get_state() const {
@@ -160,19 +172,18 @@ class PIDCalibrationPanel : public OverlayBase {
                                const std::string& error_message = "");
 
   private:
-    // Client reference
+    // Client/API references
     // Note: overlay_root_ inherited from OverlayBase
     lv_obj_t* parent_screen_ = nullptr;
     MoonrakerClient* client_ = nullptr;
-
-    // Timer management (CRITICAL: must be cancelled on deactivate to prevent use-after-free)
-    lv_timer_t* calibrate_timer_ = nullptr;
-    lv_timer_t* save_timer_ = nullptr;
+    MoonrakerAPI* api_ = nullptr;
 
     // State
     State state_ = State::IDLE;
     Heater selected_heater_ = Heater::EXTRUDER;
-    int target_temp_ = 200; // Default for extruder
+    int target_temp_ = 200;         // Default for extruder
+    int fan_speed_ = 0;             // Part cooling fan speed for extruder PID
+    std::string selected_material_; // Active material preset name
 
     // Temperature limits
     static constexpr int EXTRUDER_MIN_TEMP = 150;
@@ -215,15 +226,20 @@ class PIDCalibrationPanel : public OverlayBase {
     lv_subject_t subj_error_message_;
     char buf_error_message_[256];
 
+    // Int subject for showing/hiding extruder-only sections
+    lv_subject_t subj_heater_is_extruder_;
+
     // Widget references (only for imperative updates like styling)
     lv_obj_t* btn_heater_extruder_ = nullptr;
     lv_obj_t* btn_heater_bed_ = nullptr;
+    lv_obj_t* fan_dial_container_ = nullptr;
+    std::unique_ptr<FanDial> fan_dial_;
 
     // State management
     void set_state(State new_state);
 
-    // Timer management
-    void cancel_pending_timers();
+    // Fan control
+    void turn_off_fan();
 
     // UI setup (called by create())
     void setup_widgets();
@@ -246,6 +262,7 @@ class PIDCalibrationPanel : public OverlayBase {
     void handle_abort_clicked();
     void handle_done_clicked();
     void handle_retry_clicked();
+    void handle_preset_clicked(int temp, const char* material_name);
 
     // Static trampolines
     static void on_heater_extruder_clicked(lv_event_t* e);
@@ -256,6 +273,16 @@ class PIDCalibrationPanel : public OverlayBase {
     static void on_abort_clicked(lv_event_t* e);
     static void on_done_clicked(lv_event_t* e);
     static void on_retry_clicked(lv_event_t* e);
+    // Material preset trampolines (extruder)
+    static void on_pid_preset_pla(lv_event_t* e);
+    static void on_pid_preset_petg(lv_event_t* e);
+    static void on_pid_preset_abs(lv_event_t* e);
+    static void on_pid_preset_pa(lv_event_t* e);
+    static void on_pid_preset_tpu(lv_event_t* e);
+    // Material preset trampolines (bed)
+    static void on_pid_preset_bed_pla(lv_event_t* e);
+    static void on_pid_preset_bed_petg(lv_event_t* e);
+    static void on_pid_preset_bed_abs(lv_event_t* e);
 };
 
 // Global instance accessor

@@ -1349,6 +1349,85 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
         spdlog::debug("[MoonrakerClientMock] Note: Extrusion (E parameter) ignored in G0/G1");
     }
 
+    // PID Calibration simulation
+    if (gcode.find("PID_CALIBRATE") != std::string::npos) {
+        // Parse HEATER= parameter
+        std::string heater = "extruder";
+        auto heater_pos = gcode.find("HEATER=");
+        if (heater_pos != std::string::npos) {
+            size_t start = heater_pos + 7;
+            size_t end = gcode.find(' ', start);
+            heater =
+                gcode.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        }
+
+        // Parse TARGET= parameter
+        int target = 200;
+        auto target_pos = gcode.find("TARGET=");
+        if (target_pos != std::string::npos) {
+            target = std::stoi(gcode.substr(target_pos + 7));
+        }
+
+        spdlog::info("[MoonrakerClientMock] PID_CALIBRATE: heater={} target={}°C", heater, target);
+
+        // Simulate PID calibration with a background timer
+        struct PIDSimState {
+            MoonrakerClientMock* mock;
+            std::string heater;
+            int target;
+            int cycle;
+        };
+
+        auto* sim = new PIDSimState{this, heater, target, 0};
+
+        lv_timer_t* timer = lv_timer_create(
+            [](lv_timer_t* t) {
+                auto* s = static_cast<PIDSimState*>(lv_timer_get_user_data(t));
+                s->cycle++;
+
+                if (s->cycle <= 5) {
+                    // Simulate temperature cycling progress
+                    char buf[128];
+                    float temp = static_cast<float>(s->target) + (s->cycle % 2 == 0 ? 2.5f : -2.5f);
+                    snprintf(buf, sizeof(buf), "// Heating cycle %d of 5, temp: %.1f", s->cycle,
+                             temp);
+                    s->mock->dispatch_gcode_response(buf);
+                } else {
+                    // Emit final PID result matching real Klipper format
+                    float kp, ki, kd;
+                    if (s->heater == "heater_bed") {
+                        kp = 73.517f;
+                        ki = 1.132f;
+                        kd = 1194.093f;
+                    } else {
+                        kp = 22.865f;
+                        ki = 1.292f;
+                        kd = 101.178f;
+                    }
+
+                    char buf[128];
+                    snprintf(buf, sizeof(buf),
+                             "PID parameters: pid_Kp=%.3f pid_Ki=%.3f pid_Kd=%.3f", kp, ki, kd);
+                    s->mock->dispatch_gcode_response(buf);
+
+                    delete s;
+                    lv_timer_delete(t);
+                    return;
+                }
+            },
+            500, sim);                       // 500ms between cycles for quick mock
+        lv_timer_set_repeat_count(timer, 6); // 5 progress + 1 result
+
+        return 0; // Success - results come asynchronously via gcode_response
+    }
+
+    // SAVE_CONFIG simulation
+    if (gcode.find("SAVE_CONFIG") != std::string::npos) {
+        spdlog::info("[MoonrakerClientMock] SAVE_CONFIG - simulating config save + restart");
+        dispatch_gcode_response("ok");
+        return 1;
+    }
+
     // Bed mesh commands
     if (gcode.find("BED_MESH_CALIBRATE") != std::string::npos) {
         // Parse optional PROFILE= parameter

@@ -277,6 +277,123 @@ void MoonrakerAPI::get_available_objects(
 // NOTE: start_bed_mesh_calibrate is implemented after BedMeshProgressCollector class below.
 
 /**
+ * @brief Collector for PID_CALIBRATE gcode responses
+ *
+ * Klipper sends PID calibration results as console output via notify_gcode_response.
+ * This class monitors for the result line containing pid_Kp, pid_Ki, pid_Kd values.
+ *
+ * Expected output format:
+ *   PID parameters: pid_Kp=22.865 pid_Ki=1.292 pid_Kd=101.178
+ *
+ * Error handling:
+ *   - "Unknown command" with "PID_CALIBRATE" - command not recognized
+ *   - "Error"/"error"/"!! " - Klipper error messages
+ *
+ * Note: No timeout is implemented. Caller should implement UI-level timeout if needed.
+ */
+class PIDCalibrateCollector : public std::enable_shared_from_this<PIDCalibrateCollector> {
+  public:
+    using PIDCallback = std::function<void(float kp, float ki, float kd)>;
+
+    PIDCalibrateCollector(MoonrakerClient& client, PIDCallback on_success,
+                          MoonrakerAPI::ErrorCallback on_error)
+        : client_(client), on_success_(std::move(on_success)), on_error_(std::move(on_error)) {}
+
+    ~PIDCalibrateCollector() {
+        unregister();
+    }
+
+    void start() {
+        static std::atomic<uint64_t> s_collector_id{0};
+        handler_name_ = "pid_calibrate_collector_" + std::to_string(++s_collector_id);
+        auto self = shared_from_this();
+        client_.register_method_callback("notify_gcode_response", handler_name_,
+                                         [self](const json& msg) { self->on_gcode_response(msg); });
+        registered_.store(true);
+        spdlog::debug("[PIDCalibrateCollector] Started (handler: {})", handler_name_);
+    }
+
+    void unregister() {
+        bool was = registered_.exchange(false);
+        if (was) {
+            client_.unregister_method_callback("notify_gcode_response", handler_name_);
+            spdlog::debug("[PIDCalibrateCollector] Unregistered");
+        }
+    }
+
+    void mark_completed() {
+        completed_.store(true);
+    }
+
+    void on_gcode_response(const json& msg) {
+        if (completed_.load())
+            return;
+        if (!msg.contains("params") || !msg["params"].is_array() || msg["params"].empty())
+            return;
+
+        const std::string& line = msg["params"][0].get_ref<const std::string&>();
+        spdlog::trace("[PIDCalibrateCollector] Received: {}", line);
+
+        // Check for PID result: "PID parameters: pid_Kp=22.865 pid_Ki=1.292 pid_Kd=101.178"
+        static const std::regex pid_regex(R"(pid_Kp=([\d.]+)\s+pid_Ki=([\d.]+)\s+pid_Kd=([\d.]+))");
+        std::smatch match;
+        if (std::regex_search(line, match, pid_regex) && match.size() == 4) {
+            float kp = std::stof(match[1].str());
+            float ki = std::stof(match[2].str());
+            float kd = std::stof(match[3].str());
+            complete_success(kp, ki, kd);
+            return;
+        }
+
+        // Check for unknown command error
+        if (line.find("Unknown command") != std::string::npos &&
+            line.find("PID_CALIBRATE") != std::string::npos) {
+            complete_error("PID_CALIBRATE command not recognized. Check Klipper configuration.");
+            return;
+        }
+
+        // Broader error detection
+        if (line.find("Error") != std::string::npos || line.find("error") != std::string::npos ||
+            line.rfind("!! ", 0) == 0) {
+            complete_error(line);
+            return;
+        }
+    }
+
+  private:
+    void complete_success(float kp, float ki, float kd) {
+        if (completed_.exchange(true))
+            return;
+        spdlog::info("[PIDCalibrateCollector] PID result: Kp={:.3f} Ki={:.3f} Kd={:.3f}", kp, ki,
+                     kd);
+        unregister();
+        if (on_success_)
+            on_success_(kp, ki, kd);
+    }
+
+    void complete_error(const std::string& message) {
+        if (completed_.exchange(true))
+            return;
+        spdlog::error("[PIDCalibrateCollector] Error: {}", message);
+        unregister();
+        if (on_error_) {
+            MoonrakerError err;
+            err.type = MoonrakerErrorType::JSON_RPC_ERROR;
+            err.message = message;
+            err.method = "PID_CALIBRATE";
+            on_error_(err);
+        }
+    }
+
+    MoonrakerClient& client_;
+    PIDCallback on_success_;
+    MoonrakerAPI::ErrorCallback on_error_;
+    std::string handler_name_;
+    std::atomic<bool> registered_{false};
+    std::atomic<bool> completed_{false};
+};
+
+/**
  * @brief State machine for collecting SCREWS_TILT_CALCULATE responses
  *
  * Klipper sends screw tilt results as console output lines via notify_gcode_response.
@@ -1531,14 +1648,9 @@ void MoonrakerAPI::set_machine_limits(const MachineLimits& limits, SuccessCallba
     execute_gcode(cmd.str(), on_success, on_error);
 }
 
-void MoonrakerAPI::save_config(SuccessCallback /*on_success*/, ErrorCallback on_error) {
-    spdlog::warn("[Moonraker API] save_config() not yet implemented");
-    if (on_error) {
-        MoonrakerError err;
-        err.type = MoonrakerErrorType::UNKNOWN;
-        err.message = "Save config not yet implemented";
-        on_error(err);
-    }
+void MoonrakerAPI::save_config(SuccessCallback on_success, ErrorCallback on_error) {
+    spdlog::info("[MoonrakerAPI] Sending SAVE_CONFIG");
+    execute_gcode("SAVE_CONFIG", std::move(on_success), std::move(on_error));
 }
 
 void MoonrakerAPI::execute_macro(const std::string& name,
@@ -1622,6 +1734,31 @@ void MoonrakerAPI::execute_macro(const std::string& name,
 std::vector<MacroInfo> MoonrakerAPI::get_user_macros(bool /*include_system*/) const {
     spdlog::warn("[Moonraker API] get_user_macros() not yet implemented");
     return {};
+}
+
+// ============================================================================
+// Advanced Panel Operations - PID Calibration
+// ============================================================================
+
+void MoonrakerAPI::start_pid_calibrate(const std::string& heater, int target_temp,
+                                       MoonrakerAPI::PIDCalibrateCallback on_complete,
+                                       ErrorCallback on_error) {
+    spdlog::info("[MoonrakerAPI] Starting PID calibration for {} at {}°C", heater, target_temp);
+
+    auto collector =
+        std::make_shared<PIDCalibrateCollector>(client_, std::move(on_complete), on_error);
+    collector->start();
+
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "PID_CALIBRATE HEATER=%s TARGET=%d", heater.c_str(), target_temp);
+
+    execute_gcode(cmd, nullptr, [collector, on_error](const MoonrakerError& err) {
+        spdlog::error("[MoonrakerAPI] Failed to send PID_CALIBRATE: {}", err.message);
+        collector->mark_completed();
+        collector->unregister();
+        if (on_error)
+            on_error(err);
+    });
 }
 
 // ============================================================================

@@ -1267,6 +1267,27 @@ class MoonrakerAPI {
     virtual void save_config(SuccessCallback on_success, ErrorCallback on_error);
 
     // ========================================================================
+    // Advanced Panel Operations - PID Calibration
+    // ========================================================================
+
+    /// Callback for PID calibration result
+    using PIDCalibrateCallback = std::function<void(float kp, float ki, float kd)>;
+
+    /**
+     * @brief Start PID calibration for a heater
+     *
+     * Executes PID_CALIBRATE HEATER={heater} TARGET={target_temp} command
+     * and collects results via gcode_response parsing.
+     *
+     * @param heater Heater name ("extruder" or "heater_bed")
+     * @param target_temp Target temperature for calibration
+     * @param on_complete Called with PID values on success
+     * @param on_error Called on failure
+     */
+    virtual void start_pid_calibrate(const std::string& heater, int target_temp,
+                                     PIDCalibrateCallback on_complete, ErrorCallback on_error);
+
+    // ========================================================================
     // Advanced Panel Operations - Macros
     // ========================================================================
 

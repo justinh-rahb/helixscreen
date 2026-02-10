@@ -4,9 +4,13 @@
 #include "ui_panel_calibration_pid.h"
 
 #include "ui_event_safety.h"
+#include "ui_fan_dial.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
+#include "ui_update_queue.h"
 
+#include "filament_database.h"
+#include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "static_panel_registry.h"
 #include "theme_manager.h"
@@ -48,9 +52,6 @@ PIDCalibrationPanel::~PIDCalibrationPanel() {
     // Applying [L011]: No mutex in destructors
     // Applying [L041]: deinit_subjects() as first line in destructor
     deinit_subjects();
-
-    // Cancel any pending timers before destruction
-    cancel_pending_timers();
 
     // Clear widget pointers (owned by LVGL)
     overlay_root_ = nullptr;
@@ -102,6 +103,9 @@ void PIDCalibrationPanel::init_subjects() {
                               "An error occurred during calibration.", "pid_error_message",
                               subjects_);
 
+    // Int subject: 1 when extruder selected, 0 when bed selected (controls fan/preset visibility)
+    UI_MANAGED_SUBJECT_INT(subj_heater_is_extruder_, 1, "pid_heater_is_extruder", subjects_);
+
     subjects_initialized_ = true;
 
     // Register XML event callbacks (once globally)
@@ -114,6 +118,15 @@ void PIDCalibrationPanel::init_subjects() {
         lv_xml_register_event_cb(nullptr, "on_pid_abort", on_abort_clicked);
         lv_xml_register_event_cb(nullptr, "on_pid_done", on_done_clicked);
         lv_xml_register_event_cb(nullptr, "on_pid_retry", on_retry_clicked);
+        // Material preset callbacks
+        lv_xml_register_event_cb(nullptr, "on_pid_preset_pla", on_pid_preset_pla);
+        lv_xml_register_event_cb(nullptr, "on_pid_preset_petg", on_pid_preset_petg);
+        lv_xml_register_event_cb(nullptr, "on_pid_preset_abs", on_pid_preset_abs);
+        lv_xml_register_event_cb(nullptr, "on_pid_preset_pa", on_pid_preset_pa);
+        lv_xml_register_event_cb(nullptr, "on_pid_preset_tpu", on_pid_preset_tpu);
+        lv_xml_register_event_cb(nullptr, "on_pid_preset_bed_pla", on_pid_preset_bed_pla);
+        lv_xml_register_event_cb(nullptr, "on_pid_preset_bed_petg", on_pid_preset_bed_petg);
+        lv_xml_register_event_cb(nullptr, "on_pid_preset_bed_abs", on_pid_preset_bed_abs);
         s_callbacks_registered = true;
     }
 
@@ -173,6 +186,16 @@ void PIDCalibrationPanel::setup_widgets() {
     btn_heater_extruder_ = lv_obj_find_by_name(overlay_root_, "btn_heater_extruder");
     btn_heater_bed_ = lv_obj_find_by_name(overlay_root_, "btn_heater_bed");
 
+    // Fan dial (created programmatically in the XML container)
+    fan_dial_container_ = lv_obj_find_by_name(overlay_root_, "fan_dial_container");
+    if (fan_dial_container_) {
+        fan_dial_ = std::make_unique<FanDial>(fan_dial_container_, "Part Fan", "fan", 0);
+        fan_dial_->set_on_speed_changed([this](const std::string&, int speed) {
+            fan_speed_ = speed;
+            spdlog::debug("[PIDCal] Fan speed set to {}%", speed);
+        });
+    }
+
     // Event callbacks are registered via XML <event_cb> elements
     // State visibility is controlled via subject binding in XML
 
@@ -220,6 +243,11 @@ void PIDCalibrationPanel::on_activate() {
     set_state(State::IDLE);
     selected_heater_ = Heater::EXTRUDER;
     target_temp_ = EXTRUDER_DEFAULT_TEMP;
+    fan_speed_ = 0;
+    selected_material_.clear();
+    if (fan_dial_)
+        fan_dial_->set_speed(0);
+    lv_subject_set_int(&subj_heater_is_extruder_, 1);
 
     update_heater_selection();
     update_temp_display();
@@ -229,8 +257,8 @@ void PIDCalibrationPanel::on_activate() {
 void PIDCalibrationPanel::on_deactivate() {
     spdlog::debug("[PIDCal] on_deactivate()");
 
-    // Cancel pending timers to prevent use-after-free
-    cancel_pending_timers();
+    // Turn off fan if it was running
+    turn_off_fan();
 
     // If calibration is in progress, abort it
     if (state_ == State::CALIBRATING) {
@@ -252,8 +280,9 @@ void PIDCalibrationPanel::cleanup() {
         NavigationManager::instance().unregister_overlay_instance(overlay_root_);
     }
 
-    // Cancel any pending timers
-    cancel_pending_timers();
+    // Destroy fan dial before LVGL cleanup
+    fan_dial_.reset();
+    fan_dial_container_ = nullptr;
 
     // Call base class to set cleanup_called_ flag
     OverlayBase::cleanup();
@@ -265,20 +294,13 @@ void PIDCalibrationPanel::cleanup() {
 }
 
 // ============================================================================
-// TIMER MANAGEMENT
+// FAN CONTROL
 // ============================================================================
 
-void PIDCalibrationPanel::cancel_pending_timers() {
-    // Guard against LVGL shutdown - timers may already be destroyed
-    if (calibrate_timer_ && lv_is_initialized()) {
-        lv_timer_delete(calibrate_timer_);
-        calibrate_timer_ = nullptr;
-        spdlog::debug("[PIDCal] Cancelled calibrate timer");
-    }
-    if (save_timer_ && lv_is_initialized()) {
-        lv_timer_delete(save_timer_);
-        save_timer_ = nullptr;
-        spdlog::debug("[PIDCal] Cancelled save timer");
+void PIDCalibrationPanel::turn_off_fan() {
+    if (fan_speed_ > 0 && client_) {
+        client_->gcode_script("M107");
+        spdlog::debug("[PIDCal] Fan turned off after calibration");
     }
 }
 
@@ -324,8 +346,26 @@ void PIDCalibrationPanel::update_temp_display() {
 }
 
 void PIDCalibrationPanel::update_temp_hint() {
-    const char* hint = (selected_heater_ == Heater::EXTRUDER) ? "Recommended: 200°C for extruder"
-                                                              : "Recommended: 60°C for heated bed";
+    if (!selected_material_.empty()) {
+        auto mat = filament::find_material(selected_material_);
+        if (mat) {
+            char hint[64];
+            if (selected_heater_ == Heater::EXTRUDER) {
+                snprintf(hint, sizeof(hint),
+                         "%s: %d-%d\xC2\xB0"
+                         "C range",
+                         selected_material_.c_str(), mat->nozzle_min, mat->nozzle_max);
+            } else {
+                snprintf(hint, sizeof(hint),
+                         "%s: bed temp %d\xC2\xB0"
+                         "C",
+                         selected_material_.c_str(), mat->bed_temp);
+            }
+            lv_subject_copy_string(&subj_temp_hint_, hint);
+            return;
+        }
+    }
+    const char* hint = "Select a material or adjust temperature";
     lv_subject_copy_string(&subj_temp_hint_, hint);
 }
 
@@ -340,22 +380,20 @@ void PIDCalibrationPanel::update_temperature(float current, float target) {
 // ============================================================================
 
 void PIDCalibrationPanel::send_pid_calibrate() {
-    if (!client_) {
-        spdlog::error("[PIDCal] No Moonraker client");
+    if (!api_) {
+        spdlog::error("[PIDCal] No MoonrakerAPI");
         on_calibration_result(false, 0, 0, 0, "No printer connection");
         return;
     }
 
     const char* heater_name = (selected_heater_ == Heater::EXTRUDER) ? "extruder" : "heater_bed";
 
-    char cmd[64];
-    snprintf(cmd, sizeof(cmd), "PID_CALIBRATE HEATER=%s TARGET=%d", heater_name, target_temp_);
-
-    spdlog::info("[PIDCal] Sending: {}", cmd);
-    int result = client_->gcode_script(cmd);
-    if (result <= 0) {
-        spdlog::error("[PIDCal] Failed to send PID_CALIBRATE");
-        on_calibration_result(false, 0, 0, 0, "Failed to start calibration");
+    // Set fan speed before calibration (extruder only)
+    if (selected_heater_ == Heater::EXTRUDER && fan_speed_ > 0 && client_) {
+        char fan_cmd[32];
+        snprintf(fan_cmd, sizeof(fan_cmd), "M106 S%d", fan_speed_ * 255 / 100);
+        spdlog::info("[PIDCal] Setting fan: {}", fan_cmd);
+        client_->gcode_script(fan_cmd);
     }
 
     // Update calibrating state label
@@ -363,60 +401,57 @@ void PIDCalibrationPanel::send_pid_calibrate() {
         (selected_heater_ == Heater::EXTRUDER) ? "Extruder PID Tuning" : "Heated Bed PID Tuning";
     lv_subject_copy_string(&subj_calibrating_heater_, label);
 
-    // For demo purposes, simulate completion after a delay
-    // In real implementation, this would be triggered by Moonraker events
-    // Applying [L012]: Guard async callbacks
-    calibrate_timer_ = lv_timer_create(
-        [](lv_timer_t* t) {
-            auto* self = static_cast<PIDCalibrationPanel*>(lv_timer_get_user_data(t));
-            if (!self || self->cleanup_called()) {
-                // Panel was destroyed or cleaning up, just delete timer
-                lv_timer_delete(t);
-                return;
-            }
-            // Clear our timer pointer before deleting
-            self->calibrate_timer_ = nullptr;
-            if (self->get_state() == State::CALIBRATING) {
-                // Simulate successful calibration with typical values
-                self->on_calibration_result(true, 22.865f, 1.292f, 101.178f);
-            }
-            lv_timer_delete(t);
+    spdlog::info("[PIDCal] Starting PID calibration: {} at {}°C", heater_name, target_temp_);
+
+    api_->start_pid_calibrate(
+        heater_name, target_temp_,
+        [this](float kp, float ki, float kd) {
+            // Callback from background thread - marshal to UI thread
+            ui_queue_update([this, kp, ki, kd]() {
+                if (cleanup_called())
+                    return;
+                turn_off_fan();
+                on_calibration_result(true, kp, ki, kd);
+            });
         },
-        5000, this); // 5 second delay to simulate calibration
-    lv_timer_set_repeat_count(calibrate_timer_, 1);
+        [this](const MoonrakerError& err) {
+            std::string msg = err.message;
+            ui_queue_update([this, msg]() {
+                if (cleanup_called())
+                    return;
+                turn_off_fan();
+                on_calibration_result(false, 0, 0, 0, msg);
+            });
+        });
 }
 
 void PIDCalibrationPanel::send_save_config() {
-    if (!client_)
+    if (!api_)
         return;
 
     spdlog::info("[PIDCal] Sending SAVE_CONFIG");
-    int result = client_->gcode_script("SAVE_CONFIG");
-    if (result <= 0) {
-        spdlog::error("[PIDCal] Failed to send SAVE_CONFIG");
-        on_calibration_result(false, 0, 0, 0, "Failed to save configuration");
-        return;
-    }
-
-    // Simulate save completing
-    // Applying [L012]: Guard async callbacks
-    save_timer_ = lv_timer_create(
-        [](lv_timer_t* t) {
-            auto* self = static_cast<PIDCalibrationPanel*>(lv_timer_get_user_data(t));
-            if (!self || self->cleanup_called()) {
-                // Panel was destroyed or cleaning up, just delete timer
-                lv_timer_delete(t);
-                return;
-            }
-            // Clear our timer pointer before deleting
-            self->save_timer_ = nullptr;
-            if (self->get_state() == State::SAVING) {
-                self->set_state(State::COMPLETE);
-            }
-            lv_timer_delete(t);
+    api_->save_config(
+        [this]() {
+            ui_queue_update([this]() {
+                if (cleanup_called())
+                    return;
+                if (state_ == State::SAVING) {
+                    set_state(State::COMPLETE);
+                }
+            });
         },
-        2000, this);
-    lv_timer_set_repeat_count(save_timer_, 1);
+        [this](const MoonrakerError& err) {
+            std::string msg = err.message;
+            ui_queue_update([this, msg]() {
+                if (cleanup_called())
+                    return;
+                // Still show results even if save fails
+                spdlog::warn("[PIDCal] Save config failed: {}", msg);
+                if (state_ == State::SAVING) {
+                    set_state(State::COMPLETE);
+                }
+            });
+        });
 }
 
 // ============================================================================
@@ -430,6 +465,8 @@ void PIDCalibrationPanel::handle_heater_extruder_clicked() {
     spdlog::debug("[PIDCal] Extruder selected");
     selected_heater_ = Heater::EXTRUDER;
     target_temp_ = EXTRUDER_DEFAULT_TEMP;
+    selected_material_.clear();
+    lv_subject_set_int(&subj_heater_is_extruder_, 1);
     update_heater_selection();
     update_temp_display();
     update_temp_hint();
@@ -442,6 +479,11 @@ void PIDCalibrationPanel::handle_heater_bed_clicked() {
     spdlog::debug("[PIDCal] Heated bed selected");
     selected_heater_ = Heater::BED;
     target_temp_ = BED_DEFAULT_TEMP;
+    selected_material_.clear();
+    fan_speed_ = 0;
+    if (fan_dial_)
+        fan_dial_->set_speed(0);
+    lv_subject_set_int(&subj_heater_is_extruder_, 0);
     update_heater_selection();
     update_temp_display();
     update_temp_hint();
@@ -455,7 +497,9 @@ void PIDCalibrationPanel::handle_temp_up() {
 
     if (target_temp_ < max_temp) {
         target_temp_ += 5;
+        selected_material_.clear();
         update_temp_display();
+        update_temp_hint();
     }
 }
 
@@ -467,7 +511,9 @@ void PIDCalibrationPanel::handle_temp_down() {
 
     if (target_temp_ > min_temp) {
         target_temp_ -= 5;
+        selected_material_.clear();
         update_temp_display();
+        update_temp_hint();
     }
 }
 
@@ -479,11 +525,23 @@ void PIDCalibrationPanel::handle_start_clicked() {
 
 void PIDCalibrationPanel::handle_abort_clicked() {
     spdlog::debug("[PIDCal] Abort clicked");
+    turn_off_fan();
     // Send TURN_OFF_HEATERS to abort
     if (client_) {
         client_->gcode_script("TURN_OFF_HEATERS");
     }
     set_state(State::IDLE);
+}
+
+void PIDCalibrationPanel::handle_preset_clicked(int temp, const char* material_name) {
+    if (state_ != State::IDLE)
+        return;
+
+    spdlog::debug("[PIDCal] Preset: {} at {}°C", material_name, temp);
+    target_temp_ = temp;
+    selected_material_ = material_name;
+    update_temp_display();
+    update_temp_hint();
 }
 
 void PIDCalibrationPanel::handle_done_clicked() {
@@ -586,6 +644,64 @@ void PIDCalibrationPanel::on_retry_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_retry_clicked");
     (void)e;
     get_global_pid_cal_panel().handle_retry_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+// Material preset trampolines (extruder)
+void PIDCalibrationPanel::on_pid_preset_pla(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_pla");
+    (void)e;
+    get_global_pid_cal_panel().handle_preset_clicked(205, "PLA");
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_pid_preset_petg(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_petg");
+    (void)e;
+    get_global_pid_cal_panel().handle_preset_clicked(245, "PETG");
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_pid_preset_abs(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_abs");
+    (void)e;
+    get_global_pid_cal_panel().handle_preset_clicked(255, "ABS");
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_pid_preset_pa(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_pa");
+    (void)e;
+    get_global_pid_cal_panel().handle_preset_clicked(265, "PA");
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_pid_preset_tpu(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_tpu");
+    (void)e;
+    get_global_pid_cal_panel().handle_preset_clicked(225, "TPU");
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+// Material preset trampolines (bed)
+void PIDCalibrationPanel::on_pid_preset_bed_pla(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_bed_pla");
+    (void)e;
+    get_global_pid_cal_panel().handle_preset_clicked(60, "PLA");
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_pid_preset_bed_petg(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_bed_petg");
+    (void)e;
+    get_global_pid_cal_panel().handle_preset_clicked(80, "PETG");
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_pid_preset_bed_abs(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_bed_abs");
+    (void)e;
+    get_global_pid_cal_panel().handle_preset_clicked(100, "ABS");
     LVGL_SAFE_EVENT_CB_END();
 }
 

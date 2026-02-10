@@ -624,6 +624,20 @@ class MoonrakerClientMock : public MoonrakerClient {
         return !active_bed_mesh_.probed_matrix.empty();
     }
 
+    // ========================================================================
+    // Test Helpers - Public dispatch for test injection
+    // ========================================================================
+
+    /**
+     * @brief Dispatch a gcode response line to all registered callbacks
+     *
+     * Public for test code to inject arbitrary gcode response lines,
+     * simulating Klipper output for collector-based APIs.
+     *
+     * @param line G-code response line to dispatch
+     */
+    void dispatch_gcode_response(const std::string& line);
+
   private:
     /**
      * @brief Populate hardware lists based on configured printer type
@@ -787,17 +801,6 @@ class MoonrakerClientMock : public MoonrakerClient {
      * @brief Dispatch manual_probe status update (for Z-offset calibration)
      */
     void dispatch_manual_probe_update();
-
-    /**
-     * @brief Dispatch a G-code response notification
-     *
-     * Simulates `notify_gcode_response` WebSocket notification by invoking
-     * all registered method callbacks for that method. Used to simulate
-     * PRINT_START macro output during preheat phase.
-     *
-     * @param line G-code response line to dispatch
-     */
-    void dispatch_gcode_response(const std::string& line);
 
     /**
      * @brief Dispatch SHAPER_CALIBRATE response sequence
