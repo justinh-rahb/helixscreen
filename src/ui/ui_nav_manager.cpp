@@ -15,6 +15,7 @@
 #include "overlay_base.h"
 #include "printer_state.h" // For KlippyState enum
 #include "settings_manager.h"
+#include "sound_manager.h"
 #include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
@@ -516,6 +517,7 @@ void NavigationManager::switch_to_panel_impl(int panel_id) {
 
     spdlog::trace("[NavigationManager] Switched to panel {}", panel_id);
     set_active((ui_panel_id_t)panel_id);
+    SoundManager::instance().play("nav_forward");
 }
 
 // ============================================================================
@@ -861,6 +863,7 @@ void NavigationManager::push_overlay(lv_obj_t* overlay_panel, bool hide_previous
             it->second->on_activate();
         }
 
+        SoundManager::instance().play("nav_forward");
         spdlog::trace("[NavigationManager] Pushed overlay {} (stack: {})", (void*)overlay_panel,
                       mgr.panel_stack_.size());
     });
@@ -925,6 +928,7 @@ bool NavigationManager::go_back() {
         // Animate slide-out if overlay
         if (is_overlay && current_top) {
             mgr.overlay_animate_slide_out(current_top);
+            SoundManager::instance().play("nav_back");
         }
 
         // Determine the previous panel (what will be visible after pop)

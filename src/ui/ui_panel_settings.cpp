@@ -393,6 +393,9 @@ void SettingsPanel::init_subjects() {
     lv_xml_register_event_cb(nullptr, "on_led_light_changed", on_led_light_changed);
     // Note: on_retraction_row_clicked is registered by RetractionSettingsOverlay
     lv_xml_register_event_cb(nullptr, "on_sounds_changed", on_sounds_changed);
+    lv_xml_register_event_cb(nullptr, "on_ui_sounds_changed", on_ui_sounds_changed);
+    lv_xml_register_event_cb(nullptr, "on_sound_theme_changed", on_sound_theme_changed);
+    lv_xml_register_event_cb(nullptr, "on_test_beep", on_test_beep);
     lv_xml_register_event_cb(nullptr, "on_estop_confirm_changed", on_estop_confirm_changed);
     lv_xml_register_event_cb(nullptr, "on_telemetry_changed", SettingsPanel::on_telemetry_changed);
     lv_xml_register_event_cb(nullptr, "on_telemetry_view_data",
@@ -580,6 +583,47 @@ void SettingsPanel::setup_toggle_handlers() {
                 lv_obj_add_state(sounds_switch_, LV_STATE_CHECKED);
             }
             spdlog::trace("[{}]   ✓ Sounds toggle", get_name());
+        }
+    }
+
+    // === UI Sounds Toggle ===
+    // Bound to settings_ui_sounds_enabled subject in XML, no manual state sync needed
+    lv_obj_t* ui_sounds_row = lv_obj_find_by_name(panel_, "row_ui_sounds");
+    if (ui_sounds_row) {
+        ui_sounds_switch_ = lv_obj_find_by_name(ui_sounds_row, "toggle");
+        if (ui_sounds_switch_) {
+            spdlog::trace("[{}]   ✓ UI Sounds toggle (subject-bound)", get_name());
+        }
+    }
+
+    // === Sound Theme Dropdown ===
+    // Populated with available themes from SoundManager
+    lv_obj_t* sound_theme_row = lv_obj_find_by_name(panel_, "row_sound_theme");
+    if (sound_theme_row) {
+        sound_theme_dropdown_ = lv_obj_find_by_name(sound_theme_row, "dropdown");
+        if (sound_theme_dropdown_) {
+            auto themes = SoundManager::instance().get_available_themes();
+            std::string current_theme = settings.get_sound_theme();
+
+            // Build newline-separated options string
+            std::string options;
+            int selected_index = 0;
+            for (int i = 0; i < static_cast<int>(themes.size()); i++) {
+                if (i > 0)
+                    options += "\n";
+                options += themes[i];
+                if (themes[i] == current_theme) {
+                    selected_index = i;
+                }
+            }
+
+            if (!options.empty()) {
+                lv_dropdown_set_options(sound_theme_dropdown_, options.c_str());
+                lv_dropdown_set_selected(sound_theme_dropdown_,
+                                         static_cast<uint32_t>(selected_index));
+            }
+            spdlog::trace("[{}]   ✓ Sound theme dropdown ({} themes, current={})", get_name(),
+                          themes.size(), current_theme);
         }
     }
 
@@ -852,6 +896,30 @@ void SettingsPanel::handle_sounds_changed(bool enabled) {
     if (enabled) {
         SoundManager::instance().play_test_beep();
     }
+}
+
+void SettingsPanel::handle_ui_sounds_changed(bool enabled) {
+    spdlog::info("[{}] UI Sounds toggled: {}", get_name(), enabled ? "ON" : "OFF");
+    SettingsManager::instance().set_ui_sounds_enabled(enabled);
+}
+
+void SettingsPanel::handle_sound_theme_changed(int index) {
+    auto themes = SoundManager::instance().get_available_themes();
+    if (index >= 0 && index < static_cast<int>(themes.size())) {
+        const auto& theme_name = themes[index];
+        spdlog::info("[{}] Sound theme changed: {} (index {})", get_name(), theme_name, index);
+        SettingsManager::instance().set_sound_theme(theme_name);
+        SoundManager::instance().set_theme(theme_name);
+        SoundManager::instance().play("test_beep");
+    } else {
+        spdlog::warn("[{}] Sound theme index {} out of range ({})", get_name(), index,
+                     themes.size());
+    }
+}
+
+void SettingsPanel::handle_test_beep() {
+    spdlog::info("[{}] Test beep requested", get_name());
+    SoundManager::instance().play_test_beep();
 }
 
 void SettingsPanel::handle_estop_confirm_changed(bool enabled) {
@@ -1243,6 +1311,28 @@ void SettingsPanel::on_sounds_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void SettingsPanel::on_ui_sounds_changed(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_ui_sounds_changed");
+    auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    bool enabled = lv_obj_has_state(toggle, LV_STATE_CHECKED);
+    get_global_settings_panel().handle_ui_sounds_changed(enabled);
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void SettingsPanel::on_sound_theme_changed(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_sound_theme_changed");
+    auto* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
+    get_global_settings_panel().handle_sound_theme_changed(index);
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void SettingsPanel::on_test_beep(lv_event_t* /*e*/) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_test_beep");
+    get_global_settings_panel().handle_test_beep();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
 void SettingsPanel::on_estop_confirm_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_estop_confirm_changed");
     auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
@@ -1408,6 +1498,10 @@ void register_settings_panel_callbacks() {
                              SettingsPanel::on_led_select_changed);
     lv_xml_register_event_cb(nullptr, "on_led_light_changed", SettingsPanel::on_led_light_changed);
     lv_xml_register_event_cb(nullptr, "on_sounds_changed", SettingsPanel::on_sounds_changed);
+    lv_xml_register_event_cb(nullptr, "on_ui_sounds_changed", SettingsPanel::on_ui_sounds_changed);
+    lv_xml_register_event_cb(nullptr, "on_sound_theme_changed",
+                             SettingsPanel::on_sound_theme_changed);
+    lv_xml_register_event_cb(nullptr, "on_test_beep", SettingsPanel::on_test_beep);
     lv_xml_register_event_cb(nullptr, "on_estop_confirm_changed",
                              SettingsPanel::on_estop_confirm_changed);
     lv_xml_register_event_cb(nullptr, "on_telemetry_changed", SettingsPanel::on_telemetry_changed);

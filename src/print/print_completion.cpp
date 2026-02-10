@@ -17,6 +17,7 @@
 #include "moonraker_manager.h"
 #include "printer_state.h"
 #include "settings_manager.h"
+#include "sound_manager.h"
 #include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
@@ -204,6 +205,22 @@ static void on_print_state_changed_for_notification(lv_observer_t* observer,
         // Do this before anything else so it happens regardless of notification settings
         if (raw_filename && raw_filename[0]) {
             cleanup_helix_temp_file(raw_filename);
+        }
+
+        // Play sound for terminal state (independent of CompletionAlertMode —
+        // sound respects its own sounds_enabled toggle via SoundManager::play())
+        switch (current) {
+        case PrintJobState::COMPLETE:
+            SoundManager::instance().play("print_complete", SoundPriority::EVENT);
+            break;
+        case PrintJobState::ERROR:
+            SoundManager::instance().play("error_alert", SoundPriority::EVENT);
+            break;
+        case PrintJobState::CANCELLED:
+            SoundManager::instance().play("print_cancelled", SoundPriority::EVENT);
+            break;
+        default:
+            break;
         }
 
         // Check if user is on print status panel

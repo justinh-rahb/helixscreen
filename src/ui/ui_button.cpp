@@ -12,6 +12,7 @@
 #include "lvgl/src/xml/lv_xml_utils.h"
 #include "lvgl/src/xml/lv_xml_widget.h"
 #include "lvgl/src/xml/parsers/lv_xml_obj_parser.h"
+#include "sound_manager.h"
 #include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
@@ -143,6 +144,19 @@ void update_button_text_contrast(lv_obj_t* btn) {
 void button_style_changed_cb(lv_event_t* e) {
     lv_obj_t* btn = lv_event_get_target_obj(e);
     update_button_text_contrast(btn);
+}
+
+/**
+ * @brief Event callback for LV_EVENT_CLICKED — plays button tap sound
+ *
+ * Hooked at the component level so ALL <ui_button> instances get audio
+ * feedback automatically. SoundManager::play() handles the sounds_enabled
+ * and ui_sounds_enabled checks internally, so no gating needed here.
+ *
+ * @param e Event object (unused)
+ */
+void button_clicked_sound_cb(lv_event_t* /*e*/) {
+    SoundManager::instance().play("button_tap");
 }
 
 /**
@@ -412,6 +426,7 @@ void* ui_button_create(lv_xml_parser_state_t* state, const char** attrs) {
     // Register event handlers
     lv_obj_add_event_cb(btn, button_style_changed_cb, LV_EVENT_STYLE_CHANGED, nullptr);
     lv_obj_add_event_cb(btn, button_style_changed_cb, LV_EVENT_STATE_CHANGED, nullptr);
+    lv_obj_add_event_cb(btn, button_clicked_sound_cb, LV_EVENT_CLICKED, nullptr);
     lv_obj_add_event_cb(btn, button_delete_cb, LV_EVENT_DELETE, nullptr);
 
     // Apply initial text contrast for buttons with text=/icon= attrs

@@ -89,11 +89,35 @@
     <!-- ================================================================== -->
     <setting_section_header title="NOTIFICATIONS" title_tag="NOTIFICATIONS" icon="notifications"/>
     <!-- Sounds Toggle (hidden if no speaker capability) -->
-    <lv_obj name="container_sounds" width="100%" style_pad_all="0" scrollable="false">
+    <lv_obj name="container_sounds"
+            width="100%" style_pad_all="0" style_layout="flex" style_flex_flow="column" scrollable="false">
       <bind_flag_if_eq subject="printer_has_speaker" flag="hidden" ref_value="0"/>
       <setting_toggle_row name="row_sounds"
                           label="Sounds" label_tag="Sounds" icon="notifications" description="Enable audio feedback"
                           description_tag="Enable audio feedback" callback="on_sounds_changed"/>
+      <!-- UI Sounds Toggle (hidden when master sounds off) -->
+      <lv_obj name="container_ui_sounds" width="100%" style_pad_all="0" scrollable="false">
+        <bind_flag_if_eq subject="settings_sounds_enabled" flag="hidden" ref_value="0"/>
+        <setting_toggle_row name="row_ui_sounds"
+                            label="UI Sounds" label_tag="UI Sounds" icon="notifications"
+                            description="Button taps and navigation sounds"
+                            description_tag="Button taps and navigation sounds" subject="settings_ui_sounds_enabled"
+                            callback="on_ui_sounds_changed"/>
+      </lv_obj>
+      <!-- Sound Theme Dropdown (hidden when master sounds off) -->
+      <lv_obj name="container_sound_theme" width="100%" style_pad_all="0" scrollable="false">
+        <bind_flag_if_eq subject="settings_sounds_enabled" flag="hidden" ref_value="0"/>
+        <setting_dropdown_row name="row_sound_theme"
+                              label="Sound Theme" label_tag="Sound Theme" icon="tune" description="Choose sound style"
+                              description_tag="Choose sound style" callback="on_sound_theme_changed"/>
+      </lv_obj>
+      <!-- Test Beep Button (hidden when master sounds off) -->
+      <lv_obj name="container_test_beep" width="100%" style_pad_all="0" scrollable="false">
+        <bind_flag_if_eq subject="settings_sounds_enabled" flag="hidden" ref_value="0"/>
+        <setting_action_row name="row_test_beep"
+                            label="Test Sound" label_tag="Test Sound" icon="play" description="Play a test beep"
+                            description_tag="Play a test beep" callback="on_test_beep"/>
+      </lv_obj>
     </lv_obj>
     <!-- Completion Alert Dropdown (Off/Notification/Alert) -->
     <setting_dropdown_row name="row_completion_alert"
@@ -184,11 +208,67 @@
                         callback="on_telemetry_view_data">
       <bind_flag_if_eq subject="settings_telemetry_enabled" flag="hidden" ref_value="0"/>
     </setting_action_row>
-    <!-- About HelixScreen (opens overlay with version info, updates, component versions) -->
-    <!-- Description bound to about_version_description subject in C++ setup() -->
-    <setting_action_row name="row_about"
-                        label="About HelixScreen" label_tag="About HelixScreen" icon="info" description=""
-                        callback="on_about_clicked"/>
+    <!-- Update Channel (gated by beta_features) -->
+    <lv_obj name="container_update_channel" width="100%" style_pad_all="0">
+      <bind_flag_if_eq subject="show_beta_features" flag="hidden" ref_value="0"/>
+      <setting_dropdown_row name="row_update_channel"
+                            label="Update Channel" label_tag="Update Channel" icon="swap_vertical"
+                            options="Stable&#10;Beta&#10;Dev" bind_selected="update_channel"
+                            callback="on_update_channel_changed"/>
+    </lv_obj>
+    <!-- Install Update (visible only when update available) -->
+    <lv_obj name="container_install_update" width="100%" style_pad_all="0">
+      <bind_flag_if_not_eq subject="update_status" flag="hidden" ref_value="2"/>
+      <setting_action_row name="row_install_update"
+                          label="Install Update" label_tag="Install Update" icon="download" description=""
+                          description_tag="" callback="on_install_update_clicked"/>
+    </lv_obj>
+    <!-- ================================================================== -->
+    <!-- ABOUT SECTION -->
+    <!-- ================================================================== -->
+    <setting_section_header title="ABOUT" title_tag="ABOUT" icon="info"/>
+    <!-- Current Version - ui_button for native press feedback (7-tap secret to toggle beta features) -->
+    <ui_button name="row_version" width="100%" height="content" variant="ghost" style_radius="0" style_pad_all="0">
+      <lv_obj width="100%"
+              height="content" flex_flow="row" style_flex_main_place="start" style_flex_cross_place="center"
+              style_pad_left="#space_lg" style_pad_right="#space_lg" style_pad_top="#space_md"
+              style_pad_bottom="#space_md" style_pad_gap="#space_sm" scrollable="false" clickable="false"
+              event_bubble="true">
+        <icon name="row_icon" src="info" size="sm" variant="secondary" clickable="false" event_bubble="true"/>
+        <text_body name="label"
+                   text="Current Version" translation_tag="Current Version" style_text_color="#text" flex_grow="1"
+                   clickable="false" event_bubble="true"/>
+        <text_muted name="value" bind_text="version_value" clickable="false" event_bubble="true"/>
+      </lv_obj>
+      <event_cb trigger="clicked" callback="on_version_clicked"/>
+    </ui_button>
+    <!-- Check for Updates (reactive description shows available version) -->
+    <setting_action_row name="row_check_updates"
+                        label="Check for Updates" label_tag="Check for Updates" icon="refresh"
+                        bind_description="update_version_text" callback="on_check_updates_clicked"/>
+    <!-- Printer Name -->
+    <setting_info_row name="row_printer" label="Printer" label_tag="Printer" icon="printer_3d">
+      <text_muted name="value" bind_text="printer_value"/>
+    </setting_info_row>
+    <!-- Printer Host (clickable - opens change host modal) -->
+    <setting_action_row name="row_printer_host"
+                        label="Host" label_tag="Host" icon="lan" callback="on_change_host_clicked"/>
+    <!-- Klipper Version -->
+    <setting_info_row name="row_klipper" label="Klipper" label_tag="Klipper" icon="toy_brick_outline">
+      <text_muted name="value" text="—"/>
+    </setting_info_row>
+    <!-- Moonraker Version -->
+    <setting_info_row name="row_moonraker" label="Moonraker" label_tag="Moonraker" icon="toy_brick_outline">
+      <text_muted name="value" text="—"/>
+    </setting_info_row>
+    <!-- OS Version -->
+    <setting_info_row name="row_os" label="OS" label_tag="OS" icon="console">
+      <text_muted name="value" text="—"/>
+    </setting_info_row>
+    <!-- Total Print Hours -->
+    <setting_info_row name="row_print_hours" label="Print Hours" label_tag="Print Hours" icon="clock">
+      <text_body name="value" bind_text="print_hours_value" style_text_color="#text_muted"/>
+    </setting_info_row>
     <!-- Bottom padding for scroll -->
     <lv_obj width="100%" height="#space_lg" scrollable="false"/>
   </view>

@@ -502,23 +502,55 @@ class SettingsManager {
     void set_estop_require_confirmation(bool require);
 
     // =========================================================================
-    // NOTIFICATION SETTINGS (placeholders for future hardware)
+    // NOTIFICATION SETTINGS
     // =========================================================================
 
     /**
-     * @brief Get sound enabled state
+     * @brief Get sound enabled state (master switch)
      * @return true if sounds enabled
      */
     bool get_sounds_enabled() const;
 
     /**
-     * @brief Set sound enabled state
+     * @brief Set sound enabled state (master switch)
      *
-     * Placeholder - hardware support TBD. Updates subject and persists.
+     * Controls all sound playback. Updates subject and persists.
      *
      * @param enabled true to enable sounds
      */
     void set_sounds_enabled(bool enabled);
+
+    /**
+     * @brief Get UI sounds enabled state
+     * @return true if UI interaction sounds (taps, nav) enabled
+     */
+    bool get_ui_sounds_enabled() const;
+
+    /**
+     * @brief Set UI sounds enabled state
+     *
+     * Controls UI interaction sounds separately from event sounds.
+     * Only affects button taps, navigation, toggles, dropdowns.
+     * Print complete/error/alarm sounds are unaffected.
+     *
+     * @param enabled true to enable UI sounds
+     */
+    void set_ui_sounds_enabled(bool enabled);
+
+    /**
+     * @brief Get current sound theme name
+     * @return Theme name (e.g., "default", "minimal")
+     */
+    std::string get_sound_theme() const;
+
+    /**
+     * @brief Set sound theme name
+     *
+     * Persists to config. SoundManager reloads the theme.
+     *
+     * @param name Theme name (corresponds to config/sounds/<name>.json)
+     */
+    void set_sound_theme(const std::string& name);
 
     /** @brief Get completion alert mode (Off/Notification/Alert) */
     CompletionAlertMode get_completion_alert_mode() const;
@@ -612,6 +644,11 @@ class SettingsManager {
     /** @brief Sounds enabled subject (integer: 0=off, 1=on) */
     lv_subject_t* subject_sounds_enabled() {
         return &sounds_enabled_subject_;
+    }
+
+    /** @brief UI sounds enabled subject (integer: 0=off, 1=on) */
+    lv_subject_t* subject_ui_sounds_enabled() {
+        return &ui_sounds_enabled_subject_;
     }
 
     /** @brief Completion alert subject (integer: 0=off, 1=on) */
@@ -742,6 +779,7 @@ class SettingsManager {
     lv_subject_t language_subject_;
     lv_subject_t led_enabled_subject_;
     lv_subject_t sounds_enabled_subject_;
+    lv_subject_t ui_sounds_enabled_subject_;
     lv_subject_t completion_alert_subject_;
     lv_subject_t estop_require_confirmation_subject_;
     lv_subject_t scroll_throw_subject_;

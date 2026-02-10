@@ -9,6 +9,7 @@
 #include "lvgl/src/xml/lv_xml_style.h"
 #include "lvgl/src/xml/lv_xml_widget.h"
 #include "lvgl/src/xml/parsers/lv_xml_obj_parser.h"
+#include "sound_manager.h"
 #include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
@@ -116,6 +117,18 @@ static void apply_size_preset(lv_obj_t* obj, const SwitchSizePreset& preset) {
 }
 
 /**
+ * @brief Event callback for LV_EVENT_VALUE_CHANGED — plays toggle on/off sound
+ *
+ * Hooked at the component level so ALL <ui_switch> instances get audio
+ * feedback. Checks LV_STATE_CHECKED to determine on vs off.
+ */
+static void switch_value_changed_sound_cb(lv_event_t* e) {
+    auto* sw = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    bool checked = lv_obj_has_state(sw, LV_STATE_CHECKED);
+    SoundManager::instance().play(checked ? "toggle_on" : "toggle_off");
+}
+
+/**
  * XML create handler for ui_switch
  * Creates an lv_switch widget when <ui_switch> is encountered in XML
  */
@@ -129,6 +142,8 @@ static void* ui_switch_xml_create(lv_xml_parser_state_t* state, const char** att
         spdlog::error("[Switch] Failed to create lv_switch");
         return nullptr;
     }
+
+    lv_obj_add_event_cb(obj, switch_value_changed_sound_cb, LV_EVENT_VALUE_CHANGED, nullptr);
 
     return (void*)obj;
 }

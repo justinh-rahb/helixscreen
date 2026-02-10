@@ -3,93 +3,96 @@
 
 #pragma once
 
+#include "sound_sequencer.h"
+#include "sound_theme.h"
+
+#include <memory>
+#include <string>
+#include <vector>
+
 class MoonrakerClient;
 
 /**
- * @brief Audio feedback manager for printer sounds
+ * @brief Audio feedback manager using the synth engine
  *
- * Handles M300 G-code playback for UI feedback sounds.
- * Respects SettingsManager::get_sounds_enabled() setting.
+ * Plays named sounds from JSON themes through a backend-agnostic sequencer.
+ * Detects the best available backend (M300/Moonraker for now, SDL/PWM later).
  *
- * ## Supported Sounds:
- * - Test beep: Short confirmation tone when enabling sounds
- * - Print complete: Multi-tone melody (future)
- * - Error alert: Attention-grabbing tone (future)
+ * Respects SettingsManager toggles:
+ * - sounds_enabled: master switch for all sounds
+ * - ui_sounds_enabled: separate toggle for UI interaction sounds (button taps, nav)
  *
  * ## Usage:
  * @code
  * auto& sound = SoundManager::instance();
  * sound.set_moonraker_client(client);
+ * sound.initialize();
  *
- * if (sound.is_available()) {
- *     sound.play_test_beep();
- * }
+ * sound.play("button_tap");
+ * sound.play("print_complete", SoundPriority::EVENT);
  * @endcode
  */
 class SoundManager {
   public:
-    /**
-     * @brief Get singleton instance
-     * @return Reference to the global SoundManager instance
-     */
     static SoundManager& instance();
 
     // Prevent copying
     SoundManager(const SoundManager&) = delete;
     SoundManager& operator=(const SoundManager&) = delete;
 
-    /**
-     * @brief Set Moonraker client for G-code execution
-     * @param client Pointer to MoonrakerClient (can be nullptr)
-     */
+    /// Set Moonraker client for M300 backend
     void set_moonraker_client(MoonrakerClient* client);
 
-    /**
-     * @brief Check if sound playback is available
-     *
-     * Returns true if:
-     * - MoonrakerClient is connected
-     * - Sound is enabled in SettingsManager
-     * - (In test mode, always returns true for UI testing)
-     *
-     * @return true if sounds can be played
-     */
-    [[nodiscard]] bool is_available() const;
+    /// Auto-detect backend, load theme, start sequencer
+    void initialize();
 
-    /**
-     * @brief Play a short test beep
-     *
-     * Used when enabling sounds in settings to confirm hardware works.
-     * Plays a 1000Hz tone for 100ms.
-     */
+    /// Stop sequencer, cleanup
+    void shutdown();
+
+    /// Play a named sound from the current theme (UI priority)
+    void play(const std::string& sound_name);
+
+    /// Play a named sound with explicit priority
+    void play(const std::string& sound_name, SoundPriority priority);
+
+    /// Backward compatibility: calls play("test_beep")
     void play_test_beep();
 
-    /**
-     * @brief Play print complete melody
-     *
-     * Plays a short celebratory tune when a print finishes.
-     * Only plays if sounds are enabled and printer has speaker.
-     */
+    /// Backward compatibility: calls play("print_complete", EVENT)
     void play_print_complete();
 
-    /**
-     * @brief Play error alert tone
-     *
-     * Plays attention-grabbing beeps for errors.
-     */
+    /// Backward compatibility: calls play("error_alert", EVENT)
     void play_error_alert();
+
+    /// Set active theme by name (loads from config/sounds/<name>.json)
+    void set_theme(const std::string& theme_name);
+
+    /// Get current theme name
+    std::string get_current_theme() const;
+
+    /// Scan config/sounds/ for available .json theme files
+    std::vector<std::string> get_available_themes() const;
+
+    /// Check if sound playback is available (backend exists + sounds enabled)
+    [[nodiscard]] bool is_available() const;
 
   private:
     SoundManager() = default;
     ~SoundManager() = default;
 
-    /**
-     * @brief Send M300 G-code command
-     * @param frequency Frequency in Hz (100-10000 typical)
-     * @param duration Duration in milliseconds
-     * @return true if command was sent
-     */
-    bool send_m300(int frequency, int duration);
+    /// Detect best available backend
+    std::shared_ptr<SoundBackend> create_backend();
+
+    /// Load theme JSON from config/sounds/
+    void load_theme(const std::string& theme_name);
+
+    /// Check if a sound name is a UI sound (affected by ui_sounds_enabled)
+    static bool is_ui_sound(const std::string& name);
 
     MoonrakerClient* client_ = nullptr;
+    std::unique_ptr<SoundSequencer> sequencer_;
+    std::shared_ptr<SoundBackend> backend_;
+    SoundTheme current_theme_;
+    std::string theme_name_ = "default";
+    bool initialized_ = false;
 };

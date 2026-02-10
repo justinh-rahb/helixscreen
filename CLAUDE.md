@@ -33,6 +33,8 @@ scripts/setup-worktree.sh feature/my-branch  # Symlinks deps, builds fast
 | `docs/MOONRAKER_SECURITY_REVIEW.md` | Moonraker/security |
 | `docs/LOGGING.md` | Adding spdlog calls, choosing info vs debug vs trace |
 | `docs/PRINT_START_PROFILES.md` | Print start profiles: adding new printers, JSON schema, all phases |
+| `docs/SOUND_SYSTEM.md` | Sound system dev guide: architecture, JSON schema, adding themes/backends |
+| `docs/SOUND_SETTINGS.md` | Sound system user guide: settings, themes, troubleshooting |
 
 ---
 

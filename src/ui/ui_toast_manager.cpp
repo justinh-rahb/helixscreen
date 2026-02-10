@@ -9,6 +9,7 @@
 #include "ui_utils.h"
 
 #include "settings_manager.h"
+#include "sound_manager.h"
 #include "static_subject_registry.h"
 
 #include <spdlog/spdlog.h>
@@ -362,6 +363,12 @@ void ToastManager::create_toast_internal(ToastSeverity severity, const char* mes
 
     // Update status bar notification icon
     ui_status_bar_update_notification(severity_to_notification_status(severity));
+
+    // Play error sound for error toasts (uses EVENT priority so it's not affected by
+    // ui_sounds_enabled)
+    if (severity == ToastSeverity::ERROR) {
+        SoundManager::instance().play("error_tone", SoundPriority::EVENT);
+    }
 
     spdlog::debug("[ToastManager] Toast shown: [{}] {} ({}ms, action={})",
                   severity_to_string(severity), message, duration_ms, with_action);

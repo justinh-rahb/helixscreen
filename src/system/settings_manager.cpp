@@ -156,6 +156,11 @@ void SettingsManager::init_subjects() {
     UI_MANAGED_SUBJECT_INT(sounds_enabled_subject_, sounds ? 1 : 0, "settings_sounds_enabled",
                            subjects_);
 
+    // UI sounds (default: true) — separate toggle for button taps, nav sounds
+    bool ui_sounds = config->get<bool>("/ui_sounds_enabled", true);
+    UI_MANAGED_SUBJECT_INT(ui_sounds_enabled_subject_, ui_sounds ? 1 : 0,
+                           "settings_ui_sounds_enabled", subjects_);
+
     // Completion alert mode (default: NOTIFICATION=1, handles old bool migration)
     int completion_mode = config->get<int>("/completion_alert", 1);
     completion_mode = std::max(0, std::min(2, completion_mode));
@@ -240,10 +245,10 @@ void SettingsManager::init_subjects() {
 
     subjects_initialized_ = true;
     spdlog::debug("[SettingsManager] Subjects initialized: dark_mode={}, theme={}, "
-                  "dim={}s, sleep={}s, sounds={}, "
+                  "dim={}s, sleep={}s, sounds={}, ui_sounds={}, "
                   "completion_alert_mode={}, scroll_throw={}, scroll_limit={}, animations={}",
-                  dark_mode, get_theme_name(), dim_sec, sleep_sec, sounds, completion_mode,
-                  scroll_throw, scroll_limit, animations);
+                  dark_mode, get_theme_name(), dim_sec, sleep_sec, sounds, ui_sounds,
+                  completion_mode, scroll_throw, scroll_limit, animations);
 }
 
 void SettingsManager::deinit_subjects() {
@@ -806,8 +811,33 @@ void SettingsManager::set_sounds_enabled(bool enabled) {
     Config* config = Config::get_instance();
     config->set<bool>("/sounds_enabled", enabled);
     config->save();
+}
 
-    // Note: Actual sound playback is a placeholder - hardware TBD
+bool SettingsManager::get_ui_sounds_enabled() const {
+    return lv_subject_get_int(const_cast<lv_subject_t*>(&ui_sounds_enabled_subject_)) != 0;
+}
+
+void SettingsManager::set_ui_sounds_enabled(bool enabled) {
+    spdlog::info("[SettingsManager] set_ui_sounds_enabled({})", enabled);
+
+    lv_subject_set_int(&ui_sounds_enabled_subject_, enabled ? 1 : 0);
+
+    Config* config = Config::get_instance();
+    config->set<bool>("/ui_sounds_enabled", enabled);
+    config->save();
+}
+
+std::string SettingsManager::get_sound_theme() const {
+    Config* config = Config::get_instance();
+    return config->get<std::string>("/sound_theme", "default");
+}
+
+void SettingsManager::set_sound_theme(const std::string& name) {
+    spdlog::info("[SettingsManager] set_sound_theme('{}')", name);
+
+    Config* config = Config::get_instance();
+    config->set<std::string>("/sound_theme", name);
+    config->save();
 }
 
 CompletionAlertMode SettingsManager::get_completion_alert_mode() const {

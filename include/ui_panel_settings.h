@@ -95,6 +95,7 @@ class SettingsPanel : public PanelBase {
     lv_obj_t* gcode_3d_switch_ = nullptr;
     lv_obj_t* led_light_switch_ = nullptr;
     lv_obj_t* sounds_switch_ = nullptr;
+    lv_obj_t* ui_sounds_switch_ = nullptr;
     lv_obj_t* estop_confirm_switch_ = nullptr;
     lv_obj_t* telemetry_switch_ = nullptr;
 
@@ -103,6 +104,7 @@ class SettingsPanel : public PanelBase {
     lv_obj_t* display_sleep_dropdown_ = nullptr;
     lv_obj_t* language_dropdown_ = nullptr;
     lv_obj_t* led_select_dropdown_ = nullptr;
+    lv_obj_t* sound_theme_dropdown_ = nullptr;
 
     // LED selection state (populated by wizard_populate_hardware_dropdown)
     std::vector<std::string> led_items_;
@@ -217,6 +219,9 @@ class SettingsPanel : public PanelBase {
     void handle_display_sleep_changed(int index);
     void handle_led_light_changed(bool enabled);
     void handle_sounds_changed(bool enabled);
+    void handle_ui_sounds_changed(bool enabled);
+    void handle_sound_theme_changed(int index);
+    void handle_test_beep();
     void handle_estop_confirm_changed(bool enabled);
     void handle_telemetry_changed(bool enabled);
     void handle_telemetry_view_data_clicked();
@@ -268,6 +273,9 @@ class SettingsPanel : public PanelBase {
     static void on_led_select_changed(lv_event_t* e);
     static void on_led_light_changed(lv_event_t* e);
     static void on_sounds_changed(lv_event_t* e);
+    static void on_ui_sounds_changed(lv_event_t* e);
+    static void on_sound_theme_changed(lv_event_t* e);
+    static void on_test_beep(lv_event_t* e);
     static void on_estop_confirm_changed(lv_event_t* e);
     static void on_about_clicked(lv_event_t* e);
     static void on_telemetry_changed(lv_event_t* e);
