@@ -264,10 +264,11 @@ endif
 	$(call emit-compile-command,$(CXX),$(CXXFLAGS) $(PCH_FLAGS) $(INCLUDES) $(LV_CONF),$<,$@)
 
 # Compile LVGL sources (use SUBMODULE_CFLAGS to suppress third-party warnings)
-# NOTE: No DEPFLAGS - LVGL is a submodule with 600+ files whose deps bloat make startup.
-# If lv_conf.h changes, do 'make clean && make' rather than tracking each header.
+# NOTE: No DEPFLAGS for internal LVGL headers - 600+ files whose deps bloat make startup.
+# However, lv_conf.h IS tracked as an explicit prerequisite since it controls feature flags
+# (e.g. LV_BIN_DECODER_RAM_LOAD) and missing rebuilds cause subtle runtime failures.
 # Emits .ccj fragment for incremental compile_commands.json generation
-$(OBJ_DIR)/lvgl/%.o: $(LVGL_DIR)/%.c
+$(OBJ_DIR)/lvgl/%.o: $(LVGL_DIR)/%.c lv_conf.h
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(CYAN)[CC]$(RESET) $<"
 ifeq ($(V),1)
@@ -290,9 +291,10 @@ $(OBJ_DIR)/lv_markdown/%.o: $(LV_MARKDOWN_DIR)/%.c
 	$(call emit-compile-command,$(CC),$(SUBMODULE_CFLAGS) $(INCLUDES) $(LV_CONF),$<,$@)
 
 # Compile LVGL C++ sources (ThorVG) - use SUBMODULE_CXXFLAGS and PCH
-# NOTE: No DEPFLAGS - see C rule above for rationale
+# NOTE: No DEPFLAGS for internal headers - see C rule above for rationale.
+# lv_conf.h tracked explicitly as it controls LVGL feature flags.
 # Emits .ccj fragment for incremental compile_commands.json generation
-$(OBJ_DIR)/lvgl/%.o: $(LVGL_DIR)/%.cpp $(PCH)
+$(OBJ_DIR)/lvgl/%.o: $(LVGL_DIR)/%.cpp $(PCH) lv_conf.h
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(CYAN)[CXX]$(RESET) $<"
 ifeq ($(V),1)
