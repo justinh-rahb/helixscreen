@@ -114,8 +114,8 @@ def run_sync(
         result.keys_added = merge_result.keys_added
         result.files_modified = merge_result.files_modified
 
-    # Check for obsolete keys
-    obsolete = find_obsolete_keys(xml_dir, yaml_dir, base_locale)
+    # Check for obsolete keys (include C++ sources for accurate count)
+    obsolete = find_obsolete_keys(xml_dir, yaml_dir, base_locale, cpp_dir=cpp_dir)
     result.obsolete_keys_found = len(obsolete)
 
     return result

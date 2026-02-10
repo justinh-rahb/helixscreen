@@ -39,6 +39,9 @@ XML_ATTR_VALUE_PATTERN = re.compile(r'(?:value|height)\s*=')  # Test/debug attri
 SIGNED_NUMERIC_PATTERN = re.compile(r'^[+-]\.?\d*\.?\d*$')  # +.005, -1, +0, -.1
 PAREN_TECH_PATTERN = re.compile(r'^\(.{0,8}\)$')  # Short parenthesized tech values
 CARET_DIRECTION_PATTERN = re.compile(r'^\^')  # Direction labels like ^ FRONT
+SNAKE_CASE_PATTERN = re.compile(r'^[a-z][a-z0-9]*(_[a-z0-9]+)+$')  # snake_case identifiers
+URL_PATTERN = re.compile(r'https?://')  # URLs
+MATERIAL_TEMP_PATTERN = re.compile(r'^[A-Z]+ \d+$')  # Material presets like "PLA 205", "ABS 100"
 
 # Short tokens and non-translatable exact strings
 NON_TRANSLATABLE = {"true", "false", "xl", "lg", "md", "sm", "xs", "#RRGGBB"}
@@ -137,6 +140,22 @@ def should_skip_text(text: str) -> bool:
 
     # Skip strings containing literal \n (multi-line dropdown option labels)
     if r"\n" in text:
+        return True
+
+    # Skip strings containing actual newlines (multi-line code blocks from &#10;)
+    if "\n" in text:
+        return True
+
+    # Skip snake_case identifiers (subject names like update_version_text)
+    if SNAKE_CASE_PATTERN.match(stripped):
+        return True
+
+    # Skip strings containing URLs (shell commands, links)
+    if URL_PATTERN.search(text):
+        return True
+
+    # Skip material+temperature presets like "PLA 205", "ABS 100"
+    if MATERIAL_TEMP_PATTERN.match(stripped):
         return True
 
     return False
@@ -272,10 +291,16 @@ def extract_strings_from_xml(xml_path: Path) -> Set[str]:
     # This is a simplification - we extract text from the whole file and skip bind_text elements
 
     for attr in TEXT_ATTRIBUTES:
-        # Match attr="value" patterns, but skip if bind_text is on same element
-        # Simple approach: find all attr="value", exclude if line also has bind_text
+        # Match attr="value" including compound forms like primary_text="value"
+        # but NOT bind_attr="value" (bind_text, bind_description, etc.)
         pattern = rf'{attr}="([^"]*)"'
         for match in re.finditer(pattern, content):
+            # Check if this is a bind_ variant (not translatable)
+            prefix_start = max(0, match.start() - 5)
+            prefix = content[prefix_start:match.start()]
+            if prefix.endswith("bind_"):
+                continue
+
             text = match.group(1)
 
             # Get the line containing this match to check for bind_text
@@ -285,7 +310,7 @@ def extract_strings_from_xml(xml_path: Path) -> Set[str]:
                 line_end = len(content)
             line = content[line_start:line_end]
 
-            # Skip if this element has bind_text
+            # Skip if this element has bind_text (overrides static text)
             if "bind_text=" in line:
                 continue
 
@@ -328,9 +353,15 @@ def extract_strings_with_locations(xml_path: Path) -> Dict[str, List[Tuple[str, 
     # Parse with line tracking
     # Simple regex-based extraction for line numbers
     for attr in TEXT_ATTRIBUTES:
-        # Match attr="value" patterns
+        # Match attr="value" including compound forms, but skip bind_ variants
         pattern = rf'{attr}="([^"]*)"'
         for match in re.finditer(pattern, content):
+            # Check if this is a bind_ variant (not translatable)
+            prefix_start = max(0, match.start() - 5)
+            prefix = content[prefix_start:match.start()]
+            if prefix.endswith("bind_"):
+                continue
+
             text = match.group(1)
 
             # Decode XML entities

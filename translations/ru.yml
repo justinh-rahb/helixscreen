@@ -1,807 +1,883 @@
 locale: ru
 translations:
-  ' / ': ' / '
   ' 0 / 0': ' 0 / 0'
   ' elapsed · ': ' elapsed · '
   ' left': ' left'
-  (0): (0)
-  (2.4GHz): (2.4GHz)
-  +: '+'
-  '+.005': '+.005'
-  '+.01': '+.01'
-  '+.05': '+.05'
-  '+.1': '+.1'
-  '+0': '+0'
-  '+1': '+1'
-  '-': '-'
-  "- Check [resonance_tester] in printer.cfg": "- Проверьте [resonance_tester] в printer.cfg"
-  "- Ensure ADXL345 is connected": "- Убедитесь, что ADXL345 подключен"
-  "- Try Measure Noise first": "- Сначала попробуйте измерить шум"
-  --: '--'
-  '---': '---'
-  '-.005': '-.005'
-  '-.01': '-.01'
-  '-.05': '-.05'
-  '-.1': '-.1'
-  '-1': '-1'
-  /: '/'
-  "0.4-2mm direct drive, 4-6mm bowden": "0.4-2мм прямой привод, 4-6мм боуден"
-  "1. Printer homes and probes the bed": "1. Принтер паркуется и зондирует стол"
-  "1. Printer will home and probe each screw": "1. Принтер запаркуется и проверит каждый винт"
+  '- Check [resonance_tester] in printer.cfg': '- Проверьте [resonance_tester] в printer.cfg'
+  '- Ensure ADXL345 is connected': '- Убедитесь, что ADXL345 подключен'
+  '- Try Measure Noise first': '- Сначала попробуйте измерить шум'
+  0.4-2mm direct drive, 4-6mm bowden: 0.4-2мм прямой привод, 4-6мм боуден
+  1. Printer homes and probes the bed: 1. Принтер паркуется и зондирует стол
+  1. Printer will home and probe each screw: 1. Принтер запаркуется и проверит каждый
+    винт
   10mm: 10мм
   1mm: 1мм
-  "2. Place paper between nozzle and bed": "2. Положите бумагу между соплом и столом"
-  "2. Results show how much to turn each screw": "2. Результаты покажут, насколько повернуть каждый винт"
+  2. Place paper between nozzle and bed: 2. Положите бумагу между соплом и столом
+  2. Results show how much to turn each screw: 2. Результаты покажут, насколько повернуть
+    каждый винт
   200-230°C: 200-230°C
   210°C / 60°C: 210°C / 60°C
   230°C / 50°C: 230°C / 50°C
   240°C / 80°C: 240°C / 80°C
   250°C / 100°C: 250°C / 100°C
   25mm: 25мм
-  "3. Adjust screws, then re-probe to verify": "3. Отрегулируйте винты, затем перепроверьте"
-  "3. Lower nozzle until paper drags slightly": "3. Опустите сопло, пока бумага не начнёт слегка цепляться"
-  "3D Preview": "3D-просмотр"
-  "4. Paper should move but with resistance": "4. Бумага должна двигаться, но с сопротивлением"
-  "4. Repeat until bed is level": "4. Повторяйте, пока стол не выровняется"
+  3. Adjust screws, then re-probe to verify: 3. Отрегулируйте винты, затем перепроверьте
+  3. Lower nozzle until paper drags slightly: 3. Опустите сопло, пока бумага не начнёт
+    слегка цепляться
+  3D Preview: 3D-просмотр
+  4. Paper should move but with resistance: 4. Бумага должна двигаться, но с сопротивлением
+  4. Repeat until bed is level: 4. Повторяйте, пока стол не выровняется
   5mm: 5мм
   60°C: 60°C
   6mm: 6мм
   850g: 850г
-  "= Loosen": "= Ослабить"
-  "= Tighten": "= Затянуть"
-  '?': '?'
-  "ABS": "ABS"
-  "AMS Settings": "Настройки AMS"
-  "APPEARANCE": "ВНЕШНИЙ ВИД"
-  "AUTOMATION": "АВТОМАТИЗАЦИЯ"
-  "Abort": "Прервать"
-  About HelixScreen: 'О HelixScreen'
-  "Accel to Decel": "Ускорение к торможению"
-  "Acceleration to deceleration limit (mm/s²)": "Предел ускорения к торможению (мм/с²)"
-  "Accelerometers": "Акселерометры"
-  "Accept": "Принять"
+  = Loosen: = Ослабить
+  = Tighten: = Затянуть
+  ABOUT: ''
+  ABS: ABS
+  AMS Settings: Настройки AMS
+  APPEARANCE: ВНЕШНИЙ ВИД
+  AUTOMATION: АВТОМАТИЗАЦИЯ
+  Abort: Прервать
+  About HelixScreen: О HelixScreen
+  Accel to Decel: Ускорение к торможению
+  Acceleration to deceleration limit (mm/s²): Предел ускорения к торможению (мм/с²)
+  Accelerometers: Акселерометры
+  Accept: Принять
   'Accepted Z Position: 0.000': 'Принятая позиция Z: 0.000'
-  "Action Required": "Требуется действие"
-  "Actions": "Действия"
-  "Active": "Активно"
-  "Add Hidden Network": "Добавить скрытую сеть"
-  "Adjust screen brightness level": "Настроить уровень яркости экрана"
-  "Adjust screws, then re-probe.": "Отрегулируйте винты, затем перепроверьте."
-  "Adjustments stay active until restart. Save after print completes.": "Настройки активны до перезагрузки. Сохраните после завершения печати."
-  "Advanced Setting": "Расширенные настройки"
-  "All": "Все"
-  "All screws are within tolerance.": "Все винты в пределах допуска."
-  Allow display to sleep during active prints: 'Разрешить спящий режим дисплея во время печати'
+  Action Required: Требуется действие
+  Actions: Действия
+  Active: Активно
+  Add Hidden Network: Добавить скрытую сеть
+  Adjust screen brightness level: Настроить уровень яркости экрана
+  Adjust screws, then re-probe.: Отрегулируйте винты, затем перепроверьте.
+  Adjustments stay active until restart. Save after print completes.: Настройки активны
+    до перезагрузки. Сохраните после завершения печати.
+  Advanced Setting: Расширенные настройки
+  After running the commands, tap Check Again below.: ''
+  All: Все
+  All screws are within tolerance.: Все винты в пределах допуска.
+  Allow display to sleep during active prints: Разрешить спящий режим дисплея во время
+    печати
   Allwinner: Allwinner
-  "An accelerometer was detected on your printer.": "На вашем принтере обнаружен акселерометр."
-  "An error occurred during calibration.": "Во время калибровки произошла ошибка."
-  "An error occurred during probing.": "Во время зондирования произошла ошибка."
-  "An error occurred while loading filament.": "Во время загрузки филамента произошла ошибка."
-  "Animations": "Анимации"
-  "App Background": "Фон приложения"
-  "Apply": "Применить"
-  "Apply Changes": "Применить изменения"
-  "Apply saves for this session only": "Применить только для этой сессии"
-  "Applying...": "Применение..."
-  "Are you sure you want to cancel this print? All progress will be lost.": "Вы уверены, что хотите отменить печать? Весь прогресс будет потерян."
-  "Assign Spool": "Назначить катушку"
-  "Assign a role to enable sensor monitoring": "Назначьте роль для мониторинга датчика"
-  "Assigning to Slot 1": "Назначение в слот 1"
-  "Auto": "Авто"
-  "Auto Bed Mesh": "Авто сетка стола"
-  "Auto-Heat on Load": "Автонагрев при загрузке"
-  "Auto-probe or manually check screw heights": "Автозондирование или ручная проверка высоты винтов"
-  "Auto-render video": "Автоматический рендер видео"
-  "Automatic PID Calibration": "Автоматическая PID-калибровка"
-  "Automatically poll Spoolman for weight updates": "Автоматически опрашивать Spoolman для обновления веса"
-  "Available Networks": "Доступные сети"
-  "Available networks": "Доступные сети"
-  BETA: 'BETA'
-  "Back": "Назад"
-  "Backup": "Резервная копия"
-  "Bed": "Стол"
-  "Bed Heater": "Нагреватель стола"
-  "Bed Level": "Уровень стола"
-  "Bed Leveling": "Выравнивание стола"
-  "Bed Mesh": "Сетка стола"
-  "Bed Mesh Render": "Рендер сетки стола"
-  "Bed Screw Adjustment": "Регулировка винтов стола"
-  "Bed Screws": "Винты стола"
-  "Bed is Level!": "Стол выровнен!"
-  "Bed °C": "Стол °C"
-  "Bed:": "Стол:"
-  Beta features are enabled: 'Beta-функции включены'
+  An accelerometer was detected on your printer.: На вашем принтере обнаружен акселерометр.
+  An error occurred during calibration.: Во время калибровки произошла ошибка.
+  An error occurred during probing.: Во время зондирования произошла ошибка.
+  An error occurred while loading filament.: Во время загрузки филамента произошла
+    ошибка.
+  Animations: Анимации
+  Anonymous data to help improve HelixScreen: ''
+  Anonymous stats — no personal data, ever.: ''
+  App Background: Фон приложения
+  Apply: Применить
+  Apply Changes: Применить изменения
+  Apply saves for this session only: Применить только для этой сессии
+  Applying...: Применение...
+  Are you sure you want to cancel this print? All progress will be lost.: Вы уверены,
+    что хотите отменить печать? Весь прогресс будет потерян.
+  Assign Spool: Назначить катушку
+  Assign a role to enable sensor monitoring: Назначьте роль для мониторинга датчика
+  Assigning to Slot 1: Назначение в слот 1
+  Auto: Авто
+  Auto Bed Mesh: Авто сетка стола
+  Auto-Heat on Load: Автонагрев при загрузке
+  Auto-probe or manually check screw heights: Автозондирование или ручная проверка
+    высоты винтов
+  Auto-render video: Автоматический рендер видео
+  Automatic PID Calibration: Автоматическая PID-калибровка
+  Automatically poll Spoolman for weight updates: Автоматически опрашивать Spoolman
+    для обновления веса
+  Available Networks: Доступные сети
+  Available networks: Доступные сети
+  BETA: BETA
+  Back: Назад
+  Backup: Резервная копия
+  Bed: Стол
+  Bed Heater: Нагреватель стола
+  Bed Level: Уровень стола
+  Bed Leveling: Выравнивание стола
+  Bed Mesh: Сетка стола
+  Bed Mesh Render: Рендер сетки стола
+  Bed Screw Adjustment: Регулировка винтов стола
+  Bed Screws: Винты стола
+  Bed is Level!: Стол выровнен!
+  Bed °C: Стол °C
+  'Bed:': 'Стол:'
+  Beta features are enabled: Beta-функции включены
   Black: Чёрный
-  "Bluetooth": "Bluetooth"
-  "Body text supports longer guidance while staying readable.": "Основной текст поддерживает развёрнутые инструкции, оставаясь читаемым."
-  "Border Opacity": "Прозрачность границы"
-  "Border Radius": "Радиус скругления"
-  "Border Width": "Толщина границы"
-  "Border transparency (0 = invisible, 255 = solid)": "Прозрачность границы (0 = невидимая, 255 = сплошная)"
-  "Brightness": "Яркость"
-  "Browse": "Обзор"
-  "Bypass": "Обход"
-  "Bypass Mode": "Режим обхода"
-  "CALIBRATION": "КАЛИБРОВКА"
-  "CHANGED FROM LAST SESSION": "ИЗМЕНЕНО С ПРОШЛОЙ СЕССИИ"
-  "COLORS REQUIRED": "ТРЕБУЕМЫЕ ЦВЕТА"
-  "CRITICAL": "КРИТИЧНО"
-  "Calibrate X": "Калибровать X"
-  "Calibrate Y": "Калибровать Y"
-  "Calibrate resonance compensation": "Калибровка компенсации резонанса"
-  "Calibrating...": "Калибровка..."
-  "Calibration": "Калибровка"
-  Calibration & Tools: 'Калибровка и инструменты'
-  "Calibration Complete!": "Калибровка завершена!"
-  "Calibration Failed": "Ошибка калибровки"
-  "Cancel": "Отмена"
-  "Cancel Print": "Отменить печать"
+  Bluetooth: Bluetooth
+  Body text supports longer guidance while staying readable.: Основной текст поддерживает
+    развёрнутые инструкции, оставаясь читаемым.
+  Border Opacity: Прозрачность границы
+  Border Radius: Радиус скругления
+  Border Width: Толщина границы
+  Border transparency (0 = invisible, 255 = solid): Прозрачность границы (0 = невидимая,
+    255 = сплошная)
+  Brightness: Яркость
+  Browse: Обзор
+  Button taps and navigation sounds: ''
+  Bypass: Обход
+  Bypass Mode: Режим обхода
+  CALIBRATION: КАЛИБРОВКА
+  CHANGED FROM LAST SESSION: ИЗМЕНЕНО С ПРОШЛОЙ СЕССИИ
+  COLORS REQUIRED: ТРЕБУЕМЫЕ ЦВЕТА
+  CRITICAL: КРИТИЧНО
+  Calibrate X: Калибровать X
+  Calibrate Y: Калибровать Y
+  Calibrate resonance compensation: Калибровка компенсации резонанса
+  Calibrating...: Калибровка...
+  Calibration: Калибровка
+  Calibration & Tools: Калибровка и инструменты
+  Calibration Complete!: Калибровка завершена!
+  Calibration Failed: Ошибка калибровки
+  Cancel: Отмена
+  Cancel Print: Отменить печать
   Cancelled: Отменено
-  "Chamber Fan": "Вентилятор камеры"
-  "Chamber and dryer humidity monitoring": "Мониторинг влажности камеры и сушилки"
-  "Chamber:": "Камера:"
-  Change Printer Host: 'Изменить хост принтера'
-  "Changes apply immediately. Adjust during print for tuning.": "Изменения применяются немедленно. Корректируйте во время печати."
-  "Changes are temporary and reset on printer reboot": "Изменения временные и сбрасываются при перезагрузке принтера"
-  Check for Updates: 'Проверить обновления'
-  "Check the filament path and try again.": "Проверьте путь филамента и попробуйте снова."
+  Chamber Fan: Вентилятор камеры
+  Chamber and dryer humidity monitoring: Мониторинг влажности камеры и сушилки
+  'Chamber:': 'Камера:'
+  Change Printer Host: Изменить хост принтера
+  Changes apply immediately. Adjust during print for tuning.: Изменения применяются
+    немедленно. Корректируйте во время печати.
+  Changes are temporary and reset on printer reboot: Изменения временные и сбрасываются
+    при перезагрузке принтера
+  Check Again: ''
+  Check for Updates: Проверить обновления
+  Check the filament path and try again.: Проверьте путь филамента и попробуйте снова.
   Checking slots...: Проверка слотов...
-  "Choose 12-hour or 24-hour time display": "Выберите 12-часовой или 24-часовой формат времени"
-  "Choose display language": "Выберите язык интерфейса"
-  "Choose how frames are captured during printing": "Выберите способ захвата кадров во время печати"
-  "Choose rendering mode for G-code visualization": "Выберите режим рендеринга для визуализации G-code"
-  "Choose rendering mode for bed mesh visualization": "Выберите режим рендеринга для визуализации сетки стола"
-  "Clean Nozzle": "Очистить сопло"
-  "Clear": "Очистить"
-  "Clear All": "Очистить всё"
-  "Clear Assignment": "Очистить назначение"
+  Choose 12-hour or 24-hour time display: Выберите 12-часовой или 24-часовой формат
+    времени
+  Choose display language: Выберите язык интерфейса
+  Choose how frames are captured during printing: Выберите способ захвата кадров во
+    время печати
+  Choose rendering mode for G-code visualization: Выберите режим рендеринга для визуализации
+    G-code
+  Choose rendering mode for bed mesh visualization: Выберите режим рендеринга для
+    визуализации сетки стола
+  Choose sound style: ''
+  Clean Nozzle: Очистить сопло
+  Clear: Очистить
+  Clear All: Очистить всё
+  Clear All Events: ''
+  Clear Assignment: Очистить назначение
   Clipboard unavailable - use SSH: Буфер обмена недоступен - используйте SSH
-  "Close": "Закрыть"
-  Closer: 'Ближе'
-  "Closer = more squish | Farther = less squish": "Ближе = больше сжатие | Дальше = меньше сжатие"
-  "Color Sensors": "Датчики цвета"
-  "Complete": "Завершено"
+  Close: Закрыть
+  Closer: Ближе
+  Closer = more squish | Farther = less squish: Ближе = больше сжатие | Дальше = меньше
+    сжатие
+  Color Sensors: Датчики цвета
+  Complete: Завершено
   Completed: Завершено
-  Completed in 3 probes: 'Завершено за 3 замера'
-  "Config-defined (read-only)": "Определено в конфигурации (только чтение)"
-  "Configure G10/G11 firmware retraction": "Настроить аппаратный ретракт G10/G11"
-  "Configure PRINT_START": "Настроить PRINT_START"
-  "Configure Spoolman integration and weight sync settings.": "Настройте интеграцию со Spoolman и синхронизацию веса."
-  "Configure devices in Moonraker": "Настроить устройства в Moonraker"
-  "Configure filament detection sensors": "Настроить датчики обнаружения филамента"
-  "Configure quick buttons and standard macros": "Настроить быстрые кнопки и стандартные макросы"
-  "Configure timelapse recording": "Настроить запись таймлапса"
-  "Connect": "Подключить"
-  "Connected": "Подключен"
-  "Connecting to network...": "Подключение к сети..."
-  "Connecting...": "Подключение..."
-  "Connection": "Соединение"
+  Completed in 3 probes: Завершено за 3 замера
+  Config-defined (read-only): Определено в конфигурации (только чтение)
+  Configure G10/G11 firmware retraction: Настроить аппаратный ретракт G10/G11
+  Configure PRINT_START: Настроить PRINT_START
+  Configure Spoolman integration and weight sync settings.: Настройте интеграцию со
+    Spoolman и синхронизацию веса.
+  Configure devices in Moonraker: Настроить устройства в Moonraker
+  Configure filament detection sensors: Настроить датчики обнаружения филамента
+  Configure quick buttons and standard macros: Настроить быстрые кнопки и стандартные
+    макросы
+  Configure timelapse recording: Настроить запись таймлапса
+  Connect: Подключить
+  'Connect to your printer via SSH and run:': ''
+  Connected: Подключен
+  Connecting to network...: Подключение к сети...
+  Connecting...: Подключение...
+  Connection: Соединение
   Connection failed. Check password.: Ошибка подключения. Проверьте пароль.
-  "Console": "Консоль"
-  "Control optional print start features": "Управление дополнительными функциями начала печати"
-  "Cool Down": "Охладить"
-  "Cooling": "Охлаждение"
-  "Copy Command": "Копировать команду"
-  "Corner roundness (0 = sharp, 40 = very round)": "Скругление углов (0 = острые, 40 = очень круглые)"
-  "Create video when print completes": "Создать видео после завершения печати"
+  Console: Консоль
+  Control optional print start features: Управление дополнительными функциями начала
+    печати
+  Cool Down: Охладить
+  Cooling: Охлаждение
+  Copy Command: Копировать команду
+  Corner roundness (0 = sharp, 40 = very round): Скругление углов (0 = острые, 40
+    = очень круглые)
+  Create video when print completes: Создать видео после завершения печати
   Current / Target: Текущая / Цель
-  "Current Mesh": "Текущая сетка"
-  "Current Temperature": "Текущая температура"
-  Current Version: 'Текущая версия'
-  "Current Z Position": "Текущая позиция Z"
-  "Current name:": "Текущее имя:"
-  "Currently Loaded": "Сейчас загружен"
+  Current Mesh: Текущая сетка
+  Current Temperature: Текущая температура
+  Current Version: Текущая версия
+  Current Z Position: Текущая позиция Z
+  'Current name:': 'Текущее имя:'
+  Currently Loaded: Сейчас загружен
   Currently printing: Сейчас печатается
-  "Custom...": "Настроить..."
+  Custom...: Настроить...
   Cutting filament...: Обрезка филамента...
-  "DIAGNOSTICS": "ДИАГНОСТИКА"
-  "DISABLED": "ОТКЛЮЧЕНО"
-  "Danger": "Опасность"
-  "Dark Mode": "Тёмный режим"
-  "Day": "День"
-  Default (value=50): 'Default (value=50)'
-  "Default border thickness": "Толщина границы по умолчанию"
-  "Define macros in your printer.cfg": "Определите макросы в вашем printer.cfg"
-  "Delete": "Удалить"
-  "Delta:": "Дельта:"
-  Deutsch: 'Deutsch'
-  "Device Operations": "Операции с устройством"
-  "Disable": "Отключить"
-  "Discovered Printers": "Обнаруженные принтеры"
-  "Dismiss": "Отклонить"
-  "Display Settings": "Настройки дисплея"
-  "Display Sleep": "Спящий режим экрана"
-  Do not power off your printer.: 'Не выключайте принтер.'
-  "Don't Save": "Не сохранять"
-  "Don't ask again": "Больше не спрашивать"
-  "Done": "Готово"
-  Downloading...: 'Загрузка...'
-  "Drop shadow strength (0 = disabled)": "Интенсивность тени (0 = отключено)"
-  "Dryer": "Сушилка"
-  "Dryer Control": "Управление сушилкой"
-  "Duration": "Длительность"
-  "E-Stop Confirmation": "Подтверждение аварийной остановки"
-  "EMERGENCY CONTROLS": "АВАРИЙНОЕ УПРАВЛЕНИЕ"
-  "EMERGENCY STOP": "АВАРИЙНАЯ ОСТАНОВКА"
-  Each fan can only be selected once: Каждый вентилятор можно выбрать только один раз
-  "Edit": "Редактировать"
-  "Edit Preset": "Редактировать пресет"
-  "Edit Slot 1": "Редактировать слот 1"
-  "Edit Theme Colors": "Редактировать цвета темы"
+  DIAGNOSTICS: ДИАГНОСТИКА
+  DISABLED: ОТКЛЮЧЕНО
+  Danger: Опасность
+  Dark Mode: Тёмный режим
+  Day: День
+  Default border thickness: Толщина границы по умолчанию
+  Define macros in your printer.cfg: Определите макросы в вашем printer.cfg
+  Delete: Удалить
+  'Delta:': 'Дельта:'
+  Device Operations: Операции с устройством
+  Disable: Отключить
+  Discovered Printers: Обнаруженные принтеры
+  Dismiss: Отклонить
+  Display Settings: Настройки дисплея
+  Display Sleep: Спящий режим экрана
+  Do not power off your printer.: Не выключайте принтер.
+  Don't Save: Не сохранять
+  Don't ask again: Больше не спрашивать
+  Done: Готово
+  Downloading...: Загрузка...
+  Drop shadow strength (0 = disabled): Интенсивность тени (0 = отключено)
+  Dryer: Сушилка
+  Dryer Control: Управление сушилкой
+  Duration: Длительность
+  E-Stop Confirmation: Подтверждение аварийной остановки
+  EMERGENCY CONTROLS: АВАРИЙНОЕ УПРАВЛЕНИЕ
+  EMERGENCY STOP: АВАРИЙНАЯ ОСТАНОВКА
+  Each fan can only be selected once: Каждый вентилятор можно выбрать только один
+    раз
+  Edit: Редактировать
+  Edit Preset: Редактировать пресет
+  Edit Slot 1: Редактировать слот 1
+  Edit Theme Colors: Редактировать цвета темы
   Edit Theme Colors (Modified): Редактировать цвета темы (изменено)
-  "Emergency Stop": "Аварийная остановка"
-  "Emergency Stop (M112)": "Аварийная остановка (M112)"
-  "Emergency Stop?": "Аварийная остановка?"
-  "Empty": "Пусто"
-  "Empty slots disable the associated functionality": "Пустые слоты отключают связанный функционал"
-  "Enable": "Включить"
-  "Enable Monitoring": "Включить мониторинг"
-  "Enable Retraction": "Включить ретракт"
-  "Enable Timelapse": "Включить таймлапс"
-  "Enable UI motion effects": "Включить эффекты движения интерфейса"
-  "Enable WiFi to scan": "Включите WiFi для сканирования"
-  "Enable WiFi to scan for networks": "Включите WiFi для поиска сетей"
-  "Enable audio feedback": "Включить звуковую обратную связь"
-  "Enable detailed print preparation tracking (Recommended)": "Включить детальное отслеживание подготовки к печати (рекомендуется)"
-  "Enabled": "Включено"
-  "Ended": "Завершено"
-  English: 'English'
-  "Enhancement Complete!": "Улучшение завершено!"
-  "Enhancement Failed": "Ошибка улучшения"
-  "Enter WiFi Password": "Введите пароль WiFi"
-  "Enter a name for your custom theme:": "Введите название для вашей темы:"
-  "Enter a name to save this profile": "Введите имя для сохранения профиля"
-  "Enter password": "Введите пароль"
-  "Error": "Ошибка"
+  Emergency Stop: Аварийная остановка
+  Emergency Stop (M112): Аварийная остановка (M112)
+  Emergency Stop?: Аварийная остановка?
+  Empty: Пусто
+  Empty slots disable the associated functionality: Пустые слоты отключают связанный
+    функционал
+  Enable: Включить
+  Enable Monitoring: Включить мониторинг
+  Enable Retraction: Включить ретракт
+  Enable Timelapse: Включить таймлапс
+  Enable UI motion effects: Включить эффекты движения интерфейса
+  Enable WiFi to scan: Включите WiFi для сканирования
+  Enable WiFi to scan for networks: Включите WiFi для поиска сетей
+  Enable audio feedback: Включить звуковую обратную связь
+  Enable detailed print preparation tracking (Recommended): Включить детальное отслеживание
+    подготовки к печати (рекомендуется)
+  Enabled: Включено
+  Ended: Завершено
+  Enhancement Complete!: Улучшение завершено!
+  Enhancement Failed: Ошибка улучшения
+  Enter WiFi Password: Введите пароль WiFi
+  'Enter a name for your custom theme:': 'Введите название для вашей темы:'
+  Enter a name to save this profile: Введите имя для сохранения профиля
+  Enter password: Введите пароль
+  Error: Ошибка
   Error state: Состояние ошибки
-  Español: 'Español'
-  "Ethernet": "Ethernet"
-  "Exclude": "Исключить"
-  Excluded: 'Исключён'
-  "Execute printer macros": "Выполнить макросы принтера"
-  "Exhaust Fan": "Вытяжной вентилятор"
-  "Explore how the selected palette shapes text, controls, and status colors.": "Изучите, как выбранная палитра влияет на текст, элементы управления и цвета статуса."
-  "Explore palette and preview": "Изучить палитру и предпросмотр"
-  "Extra prime to compensate ooze": "Дополнительная подача для компенсации вытекания"
+  Ethernet: Ethernet
+  Events appear here after sessions and prints: ''
+  Exclude: Исключить
+  Excluded: Исключён
+  Execute printer macros: Выполнить макросы принтера
+  Exhaust Fan: Вытяжной вентилятор
+  Explore how the selected palette shapes text, controls, and status colors.: Изучите,
+    как выбранная палитра влияет на текст, элементы управления и цвета статуса.
+  Explore palette and preview: Изучить палитру и предпросмотр
+  Extra prime to compensate ooze: Дополнительная подача для компенсации вытекания
   Extruder: Экструдер
-  "Extruder heats automatically based on material": "Экструдер нагревается автоматически в зависимости от материала"
-  "Extrusion rate": "Скорость экструзии"
-  "FAILED": "ОШИБКА"
-  "FILAMENT": "ФИЛАМЕНТ"
-  "Factory Reset": "Сброс к заводским настройкам"
+  Extruder heats automatically based on material: Экструдер нагревается автоматически
+    в зависимости от материала
+  Extrusion rate: Скорость экструзии
+  FAILED: ОШИБКА
+  FILAMENT: ФИЛАМЕНТ
+  Factory Reset: Сброс к заводским настройкам
   Failed: Ошибка
   Failed to save theme file: Не удалось сохранить файл темы
-  Farther: 'Дальше'
-  "Feed filament directly to extruder": "Подать филамент напрямую в экструдер"
-  "Filament": "Филамент"
-  "Filament Sensor": "Датчик филамента"
-  "Filament Sensors": "Датчики филамента"
-  "Filament Used": "Использовано филамента"
-  "Filament by Type": "Филамент по типу"
-  "Filament diameter sensors for flow compensation": "Датчики диаметра филамента для компенсации потока"
-  "Filament runout and motion detection sensors": "Датчики окончания и движения филамента"
-  "Filament tracking and inventory": "Отслеживание и учёт филамента"
-  "File": "Файл"
-  "File Info": "Информация о файле"
-  "Filename": "Имя файла"
-  "Fill: 100% / 75% / 40% / 10%": "Заполнение: 100% / 75% / 40% / 10%"
-  "Finish": "Завершить"
-  "Firmware Restart": "Перезапуск прошивки"
-  "Flat Concentric Rings (existing ams_slot)": "Плоские концентрические кольца (существующий ams_slot)"
-  "Flow Rate": "Скорость потока"
+  Farther: Дальше
+  Feed filament directly to extruder: Подать филамент напрямую в экструдер
+  Filament: Филамент
+  Filament Sensor: Датчик филамента
+  Filament Sensors: Датчики филамента
+  Filament Used: Использовано филамента
+  Filament by Type: Филамент по типу
+  Filament diameter sensors for flow compensation: Датчики диаметра филамента для
+    компенсации потока
+  Filament runout and motion detection sensors: Датчики окончания и движения филамента
+  Filament tracking and inventory: Отслеживание и учёт филамента
+  File: Файл
+  File Info: Информация о файле
+  Filename: Имя файла
+  'Fill: 100% / 75% / 40% / 10%': 'Заполнение: 100% / 75% / 40% / 10%'
+  Finish: Завершить
+  Firmware Restart: Перезапуск прошивки
+  Flat Concentric Rings (existing ams_slot): Плоские концентрические кольца (существующий
+    ams_slot)
+  Flow Rate: Скорость потока
   Forming tip...: Формирование кончика...
-  "Framerate": "Частота кадров"
-  Français: 'Français'
-  "Freq": "Частота"
-  "Front": "Спереди"
-  "G-code Console": "Консоль G-code"
-  "G-code Preview": "Просмотр G-code"
-  "G-code commands will appear here": "Здесь будут отображаться G-code команды"
+  Framerate: Частота кадров
+  Freq: Частота
+  Front: Спереди
+  G-code Console: Консоль G-code
+  G-code Preview: Просмотр G-code
+  G-code commands will appear here: Здесь будут отображаться G-code команды
   'Ghost:': 'Тень:'
-  "Gray": "Серый"
+  Got it: ''
+  Gray: Серый
   Happy Hare MMU: Happy Hare MMU
-  "Hardware": "Оборудование"
-  "Hardware Health": "Состояние оборудования"
-  "Hardware Issues": "Проблемы оборудования"
-  "Hardware Name": "Название оборудования"
-  "Hardware is validated on startup and reconnection": "Оборудование проверяется при запуске и переподключении"
-  "Have a piece of paper ready before starting.": "Подготовьте лист бумаги перед началом."
-  ? "Have your bed adjustment tool (screwdriver, hex-key, etc.) ready if your bed isn't adjusted with                              thumb wheels or some other built-in mechanism."
-  : "Подготовьте инструмент для регулировки стола (отвёртку, шестигранник и т.д.), если стол не регулируется                              барашками или другим встроенным механизмом."
-  "Heading": "Заголовок"
-  "Heat Soak": "Прогрев"
-  "Heatbed Temperature": "Температура стола"
-  "Heated Bed": "Подогреваемый стол"
+  Hardware: Оборудование
+  Hardware Health: Состояние оборудования
+  Hardware Issues: Проблемы оборудования
+  Hardware Name: Название оборудования
+  Hardware is validated on startup and reconnection: Оборудование проверяется при
+    запуске и переподключении
+  Have a piece of paper ready.: ''
+  ? Have your bed adjustment tool (screwdriver, hex-key, etc.) ready if your bed isn't
+    adjusted with                              thumb wheels or some other built-in
+    mechanism.
+  : Подготовьте инструмент для регулировки стола (отвёртку, шестигранник и т.д.),
+    если стол не регулируется                              барашками или другим встроенным
+    механизмом.
+  Heading: Заголовок
+  Heat Soak: Прогрев
+  Heat bed before calibrating for accurate offset with thermal expansion.: ''
+  Heatbed Temperature: Температура стола
+  Heated Bed: Подогреваемый стол
   Heating...: Нагрев...
   HelixScreen Crashed: HelixScreen аварийно завершился
-  "HelixScreen will integrate with your filament changer for multi-spool/color print operations.": "HelixScreen интегрируется с вашим сменщиком филамента для многокатушечной/многоцветной печати."
-  "Higher = faster": "Выше = быстрее"
-  "Home": "Главная"
-  "Horizontal Progress (Leveling Wizard)": "Горизонтальный прогресс (мастер выравнивания)"
-  "Host": "Хост"
-  "Hotend": "Хотенд"
-  "Hotend Fan": "Вентилятор хотенда"
-  "Hotend Heater": "Нагреватель хотенда"
-  How Z-axis movement is displayed: 'Как отображается движение по оси Z'
-  "How often to check Spoolman for weight updates": "Как часто проверять Spoolman на обновления веса"
-  "Humidity": "Влажность"
-  "Humidity Sensors": "Датчики влажности"
+  HelixScreen will integrate with your filament changer for multi-spool/color print operations.: HelixScreen
+    интегрируется с вашим сменщиком филамента для многокатушечной/многоцветной печати.
+  Help improve HelixScreen?: ''
+  Higher = faster: Выше = быстрее
+  Home: Главная
+  Horizontal Progress (Leveling Wizard): Горизонтальный прогресс (мастер выравнивания)
+  Host: Хост
+  Hotend: Хотенд
+  Hotend Fan: Вентилятор хотенда
+  Hotend Heater: Нагреватель хотенда
+  How Z-axis movement is displayed: Как отображается движение по оси Z
+  How often to check Spoolman for weight updates: Как часто проверять Spoolman на
+    обновления веса
+  Humidity: Влажность
+  Humidity Sensors: Датчики влажности
   'IP:': 'IP:'
   Idle: Ожидание
-  "If Moonraker is local or your screen is attached to the printer directly, we'll connect automatically": "Если Moonraker локальный или экран подключён напрямую к принтеру, подключение произойдёт автоматически"
-  "Ignore": "Игнорировать"
+  Ignore: Игнорировать
   In Progress: В процессе
   Indexing G-code...: Индексация G-code...
-  "Input": "Ввод"
-  "Input Shaper": "Компенсатор вибраций"
-  "Input Shaping": "Компенсация вибраций"
-  "Input shaper calibration sensors": "Датчики калибровки компенсатора вибраций"
-  "Input shaping reduces vibration artifacts (ringing) in your prints.": "Компенсация вибраций уменьшает артефакты вибрации (звон) в ваших отпечатках."
-  Install: 'Установить'
-  "Install HelixPrint Plugin": "Установить плагин HelixPrint"
-  "Install Plugin": "Установить плагин"
-  Install Update: 'Установить обновление'
-  "Install the HelixPrint plugin to enable fast G-code modifications. Run this command via SSH on your printer:": "Установите плагин HelixPrint для быстрой модификации G-code. Выполните эту команду через SSH на вашем принтере:"
+  Initializing...: ''
+  Input: Ввод
+  Input Shaper: Компенсатор вибраций
+  Input Shaping: Компенсация вибраций
+  Input shaper calibration sensors: Датчики калибровки компенсатора вибраций
+  Input shaping reduces vibration artifacts (ringing) in your prints.: Компенсация
+    вибраций уменьшает артефакты вибрации (звон) в ваших отпечатках.
+  Install: Установить
+  Install HelixPrint Plugin: Установить плагин HelixPrint
+  Install Plugin: Установить плагин
+  Install Update: Установить обновление
+  'Install the HelixPrint plugin to enable fast G-code modifications. Run this command via SSH on your printer:': 'Установите
+    плагин HelixPrint для быстрой модификации G-code. Выполните эту команду через
+    SSH на вашем принтере:'
+  Install timelapse plugin: ''
   Installation Failed: Ошибка установки
-  "Installation takes about 30 seconds.": "Установка занимает около 30 секунд."
-  "Installing...": "Установка..."
-  "Intensity": "Интенсивность"
-  "Interactive 3D G-code during prints": "Интерактивный 3D G-code во время печати"
-  "Interactive probe calibration": "Интерактивная калибровка зонда"
-  "Issue description": "Описание проблемы"
-  Italiano: 'Italiano'
+  Installation takes about 30 seconds.: Установка занимает около 30 секунд.
+  Installing...: Установка...
+  Intensity: Интенсивность
+  Interactive 3D G-code during prints: Интерактивный 3D G-code во время печати
+  Interactive probe calibration: Интерактивная калибровка зонда
+  Issue description: Описание проблемы
   Just now: Только что
-  "Kd:": "Kd:"
-  "Keep Printing": "Продолжить печать"
-  "Keep Required": "Оставить обязательным"
-  "Keyboard Test (Gboard-style)": "Тест клавиатуры (стиль Gboard)"
-  "Ki:": "Ki:"
-  "Klipper": "Klipper"
-  "Klipper has entered shutdown state. This may be due to an emergency stop, thermal runaway, or configuration error.": "Klipper перешёл в состояние остановки. Это может быть вызвано аварийной остановкой, тепловым разгоном или ошибкой конфигурации."
-  "Klipper will restart to apply changes": "Klipper перезапустится для применения изменений"
-  "Klipper will restart to apply changes.": "Klipper перезапустится для применения изменений."
-  "Klipper will restart to apply new PID values.": "Klipper перезапустится для применения новых значений PID."
-  "Kp:": "Kp:"
-  "LED Strip": "LED-лента"
-  "LED on at Start": "Включать LED при старте"
-  "LOADED": "ЗАГРУЖЕН"
-  "Language": "Язык"
+  'Kd:': 'Kd:'
+  Keep Printing: Продолжить печать
+  Keep Required: Оставить обязательным
+  Keyboard Test (Gboard-style): Тест клавиатуры (стиль Gboard)
+  'Ki:': 'Ki:'
+  Klipper: Klipper
+  Klipper has entered shutdown state. This may be due to an emergency stop, thermal runaway, or configuration error.: Klipper
+    перешёл в состояние остановки. Это может быть вызвано аварийной остановкой, тепловым
+    разгоном или ошибкой конфигурации.
+  Klipper will restart to apply changes: Klipper перезапустится для применения изменений
+  Klipper will restart to apply changes.: Klipper перезапустится для применения изменений.
+  Klipper will restart to apply new PID values.: Klipper перезапустится для применения
+    новых значений PID.
+  'Kp:': 'Kp:'
+  LED Strip: LED-лента
+  LED on at Start: Включать LED при старте
+  LOADED: ЗАГРУЖЕН
+  Language: Язык
   Last print cancelled: Последняя печать отменена
   Last print failed: Последняя печать не удалась
-  "Later": "Позже"
-  "Layer Height": "Высота слоя"
-  "Layer mode captures one frame per layer change. Best for most prints.": "Послойный режим захватывает один кадр на каждую смену слоя. Лучший выбор для большинства печатей."
-  "Layer:": "Слой:"
-  "Layers": "Слои"
-  "Length:": "Длина:"
-  "Light": "Светлый"
-  "Load": "Загрузить"
-  "Load Filament": "Загрузить филамент"
-  "Loaded": "Загружен"
-  "Loading Error": "Ошибка загрузки"
+  Later: Позже
+  Layer Height: Высота слоя
+  Layer mode captures one frame per layer change. Best for most prints.: Послойный
+    режим захватывает один кадр на каждую смену слоя. Лучший выбор для большинства
+    печатей.
+  'Layer:': 'Слой:'
+  Layers: Слои
+  Learn More: ''
+  'Length:': 'Длина:'
+  Light: Светлый
+  Load: Загрузить
+  Load Filament: Загрузить филамент
+  Loaded: Загружен
+  Loading Error: Ошибка загрузки
   Loading G-code...: Загрузка G-code...
   Loading filament...: Загрузка филамента...
-  "Loading history...": "Загрузка истории..."
-  "Loading spools...": "Загрузка катушек..."
-  "Loading...": "Загрузка..."
+  Loading history...: Загрузка истории...
+  Loading spools...: Загрузка катушек...
+  Loading...: Загрузка...
   Locked during print: Заблокировано во время печати
-  "M to toggle": "M для переключения"
+  M to toggle: M для переключения
   'MAC:': 'MAC:'
-  MCU, host, and auxiliary temperature monitoring: 'Мониторинг температуры MCU, хоста и вспомогательных датчиков'
-  "MDI Icons": "Иконки MDI"
-  "MISSING CONFIGURED": "ОТСУТСТВУЕТ НАСТРОЕННОЕ"
-  "MOTION": "ДВИЖЕНИЕ"
-  "Machine Limits": "Ограничения принтера"
-  "Macro Browser": "Обзор макросов"
-  "Macro Buttons": "Кнопки макросов"
-  "Macro for bed mesh calibration": "Макрос для калибровки сетки стола"
-  "Macro for chamber/bed heat soak": "Макрос для прогрева камеры/стола"
-  "Macro for physical bed leveling (QGL/Z-Tilt)": "Макрос для механического выравнивания стола (QGL/Z-Tilt)"
-  "Macro to cancel an active print": "Макрос для отмены активной печати"
-  "Macro to clean/wipe the nozzle": "Макрос для очистки/протирки сопла"
-  "Macro to load filament into extruder": "Макрос для загрузки филамента в экструдер"
-  "Macro to pause an active print": "Макрос для паузы активной печати"
-  "Macro to purge/prime the nozzle": "Макрос для продувки/подготовки сопла"
-  "Macro to resume a paused print": "Макрос для возобновления приостановленной печати"
-  "Macro to unload filament from extruder": "Макрос для выгрузки филамента из экструдера"
-  "Macros": "Макросы"
-  Main LED: 'Основной LED'
-  "Main LED Strip": "Основная LED-лента"
-  "Make Optional": "Сделать опциональным"
-  "Make bed mesh and QGL skippable": "Сделать сетку стола и QGL пропускаемыми"
-  "Manage": "Управление"
-  "Manual Bed Leveling": "Ручное выравнивание стола"
-  "Material": "Материал"
-  "Material Design Spinner": "Индикатор загрузки Material Design"
-  "Max Acceleration": "Макс. ускорение"
-  "Max Velocity": "Макс. скорость"
-  "Max Z Accel": "Макс. ускорение Z"
-  "Max Z Velocity": "Макс. скорость Z"
-  "Max speed through corners (mm/s)": "Макс. скорость на поворотах (мм/с)"
-  "Maximum acceleration (mm/s²)": "Максимальное ускорение (мм/с²)"
-  "Maximum toolhead speed (mm/s)": "Максимальная скорость печатающей головки (мм/с)"
-  "Measure Noise": "Измерить шум"
-  "Memory (MB)": "Память (МБ)"
-  "Mesh Complete": "Сетка завершена"
-  "Mode": "Режим"
-  "Modified": "Изменён"
-  "Month": "Месяц"
-  "Moonraker": "Moonraker"
-  "Motion": "Движение"
-  "Motion: XYZ": "Движение: XYZ"
-  "Motors Off": "Отключить моторы"
-  "Move paper back and forth while adjusting. Stop when paper catches slightly but still slides.": "Двигайте бумагу вперёд-назад во время регулировки. Остановитесь, когда бумага слегка цепляется, но ещё скользит."
-  "Movement speed": "Скорость движения"
-  "Multi-Filament": "Мульти-филамент"
-  "Multi-Material": "Мульти-материал"
-  "My Custom Theme": "Моя тема"
-  "My Panel": "Моя панель"
-  "NEWLY DISCOVERED": "НЕДАВНО ОБНАРУЖЕНО"
-  "NOTIFICATIONS": "УВЕДОМЛЕНИЯ"
-  "Name": "Название"
-  "Network Address": "Сетевой адрес"
-  "Network Name": "Название сети"
-  "Network Name (SSID)": "Название сети (SSID)"
-  "Network Settings": "Сетевые настройки"
-  "Network Test": "Тест сети"
-  "New PID Values": "Новые значения PID"
-  New Version Available: 'Доступна новая версия'
-  "New profile name": "Новое имя профиля"
-  "Next": "Далее"
-  "No AMS system connected.": "AMS-система не подключена."
-  "No History": "Нет истории"
-  "No Macros Found": "Макросы не найдены"
-  "No Power Devices": "Нет устройств питания"
-  "No Spools": "Нет катушек"
+  MCU, host, and auxiliary temperature monitoring: Мониторинг температуры MCU, хоста
+    и вспомогательных датчиков
+  MDI Icons: Иконки MDI
+  MISSING CONFIGURED: ОТСУТСТВУЕТ НАСТРОЕННОЕ
+  MOTION: ДВИЖЕНИЕ
+  Machine Limits: Ограничения принтера
+  Macro Browser: Обзор макросов
+  Macro Buttons: Кнопки макросов
+  Macro for bed mesh calibration: Макрос для калибровки сетки стола
+  Macro for chamber/bed heat soak: Макрос для прогрева камеры/стола
+  Macro for physical bed leveling (QGL/Z-Tilt): Макрос для механического выравнивания
+    стола (QGL/Z-Tilt)
+  Macro to cancel an active print: Макрос для отмены активной печати
+  Macro to clean/wipe the nozzle: Макрос для очистки/протирки сопла
+  Macro to load filament into extruder: Макрос для загрузки филамента в экструдер
+  Macro to pause an active print: Макрос для паузы активной печати
+  Macro to purge/prime the nozzle: Макрос для продувки/подготовки сопла
+  Macro to resume a paused print: Макрос для возобновления приостановленной печати
+  Macro to unload filament from extruder: Макрос для выгрузки филамента из экструдера
+  Macros: Макросы
+  Main LED: Основной LED
+  Main LED Strip: Основная LED-лента
+  Make Optional: Сделать опциональным
+  Make bed mesh and QGL skippable: Сделать сетку стола и QGL пропускаемыми
+  Manage: Управление
+  Manual Bed Leveling: Ручное выравнивание стола
+  Match your typical print fan speed for best results: ''
+  Material: Материал
+  Material Design Spinner: Индикатор загрузки Material Design
+  Max Acceleration: Макс. ускорение
+  Max Velocity: Макс. скорость
+  Max Z Accel: Макс. ускорение Z
+  Max Z Velocity: Макс. скорость Z
+  Max speed through corners (mm/s): Макс. скорость на поворотах (мм/с)
+  Maximum acceleration (mm/s²): Максимальное ускорение (мм/с²)
+  Maximum toolhead speed (mm/s): Максимальная скорость печатающей головки (мм/с)
+  Measure Noise: Измерить шум
+  Memory (MB): Память (МБ)
+  Mesh Complete: Сетка завершена
+  Mode: Режим
+  Modified: Изменён
+  Month: Месяц
+  Moonraker: Moonraker
+  Motion: Движение
+  'Motion: XYZ': 'Движение: XYZ'
+  Motors Off: Отключить моторы
+  Move paper back and forth while adjusting. Stop when paper catches slightly but still slides.: Двигайте
+    бумагу вперёд-назад во время регулировки. Остановитесь, когда бумага слегка цепляется,
+    но ещё скользит.
+  Movement speed: Скорость движения
+  Multi-Filament: Мульти-филамент
+  Multi-Material: Мульти-материал
+  My Custom Theme: Моя тема
+  My Panel: Моя панель
+  NEWLY DISCOVERED: НЕДАВНО ОБНАРУЖЕНО
+  NOTIFICATIONS: УВЕДОМЛЕНИЯ
+  Name: Название
+  Network Address: Сетевой адрес
+  Network Name: Название сети
+  Network Name (SSID): Название сети (SSID)
+  Network Settings: Сетевые настройки
+  Network Test: Тест сети
+  New PID Values: Новые значения PID
+  New Version Available: Доступна новая версия
+  New profile name: Новое имя профиля
+  Next: Далее
+  No AMS system connected.: AMS-система не подключена.
+  No History: Нет истории
+  No Macros Found: Макросы не найдены
+  No Power Devices: Нет устройств питания
+  No Spools: Нет катушек
+  No events queued: ''
   No file loaded: Файл не загружен
-  "No files available for printing": "Нет файлов для печати"
-  "No mesh loaded": "Сетка не загружена"
-  "No networks found": "Сети не найдены"
-  "No notifications": "Нет уведомлений"
-  "No plugins found": "Плагины не найдены"
-  "No preview": "Нет предпросмотра"
-  "No print history yet": "Истории печати пока нет"
+  No files available for printing: Нет файлов для печати
+  No mesh loaded: Сетка не загружена
+  No networks found: Сети не найдены
+  No notifications: Нет уведомлений
+  No plugins found: Плагины не найдены
+  No preview: Нет предпросмотра
+  No print history yet: Истории печати пока нет
   No print start macro found: Макрос старта печати не найден
-  "No profiles available": "Профили недоступны"
-  "No sensors detected": "Датчики не обнаружены"
-  "No spools available": "Катушки недоступны"
-  "Not Now": "Не сейчас"
-  "Not connected": "Не подключен"
-  "Notifications": "Уведомления"
-  "Notify when print finishes": "Уведомить о завершении печати"
-  "Nozzle": "Сопло"
-  "Nozzle Priming": "Подготовка сопла"
-  "Nozzle Temperature": "Температура сопла"
-  "Nozzle °C": "Сопло °C"
-  "Nozzle:": "Сопло:"
-  "OK": "OK"
-  OS: 'OS'
-  "Off": "Выкл"
-  "On": "Вкл"
-  "Open": "Открыть"
-  "Operations": "Операции"
-  "Optimize Your Printing": "Оптимизируйте вашу печать"
-  "Or Enter Manually": "Или введите вручную"
-  "PETG": "PETG"
-  "PID Tuning": "PID-настройка"
-  "PID tuning optimizes temperature control for stable heating.": "PID-настройка оптимизирует контроль температуры для стабильного нагрева."
-  "PLA": "PLA"
-  "PLA - Black": "PLA - Чёрный"
-  "PRE-PRINT STEPS": "ЭТАПЫ ПОДГОТОВКИ"
-  "PRINTER": "ПРИНТЕР"
-  "Paper Test Calibration": "Калибровка бумажным тестом"
-  "Part Cooling Fan": "Вентилятор охлаждения детали"
-  "Part Fan": "Вент. детали"
-  "Password": "Пароль"
+  No profiles available: Профили недоступны
+  No sensors detected: Датчики не обнаружены
+  No spools available: Катушки недоступны
+  Not Now: Не сейчас
+  Not connected: Не подключен
+  Notifications: Уведомления
+  Notify when print finishes: Уведомить о завершении печати
+  Nozzle: Сопло
+  Nozzle Priming: Подготовка сопла
+  Nozzle Temperature: Температура сопла
+  Nozzle °C: Сопло °C
+  'Nozzle:': 'Сопло:'
+  OK: OK
+  OS: OS
+  'Off': Выкл
+  'On': Вкл
+  Open: Открыть
+  Operations: Операции
+  Optimize Your Printing: Оптимизируйте вашу печать
+  Or Enter Manually: Или введите вручную
+  PETG: PETG
+  PID Tuning: PID-настройка
+  PID tuning optimizes temperature control for stable heating.: PID-настройка оптимизирует
+    контроль температуры для стабильного нагрева.
+  PLA: PLA
+  PLA - Black: PLA - Чёрный
+  PRE-PRINT STEPS: ЭТАПЫ ПОДГОТОВКИ
+  PRINTER: ПРИНТЕР
+  Paper Test Calibration: Калибровка бумажным тестом
+  Part Cooling Fan: Вентилятор охлаждения детали
+  Part Fan: Вент. детали
+  Password: Пароль
   Password cannot be empty: Пароль не может быть пустым
-  "Pause": "Пауза"
+  Pause: Пауза
   Paused: Приостановлено
   Paused (attention needed): Приостановлено (требуется внимание)
   'Peak:': 'Пик:'
-  "Phase Tracking": "Отслеживание фазы"
-  "Pick Color": "Выбрать цвет"
-  "Place plugins in the plugins directory to extend HelixScreen": "Поместите плагины в директорию plugins для расширения HelixScreen"
+  Phase Tracking: Отслеживание фазы
+  Pick Color: Выбрать цвет
+  Place plugins in the plugins directory to extend HelixScreen: Поместите плагины
+    в директорию plugins для расширения HelixScreen
+  Play a test beep: ''
   Please enter a theme name: Введите название темы
-  "Please wait while the printer homes and probes.": "Пожалуйста, подождите, пока принтер паркуется и зондирует."
-  "Please wait while the printer probes each screw position.": "Пожалуйста, подождите, пока принтер проверяет позицию каждого винта."
-  "Plugin installed successfully.": "Плагин успешно установлен."
-  "Plugins": "Плагины"
-  "Plugins are discovered on application startup": "Плагины обнаруживаются при запуске приложения"
-  "Polymaker": "Polymaker"
-  "Port": "Порт"
-  Português: 'Português'
-  "Position": "Позиция"
-  "Power": "Питание"
-  "Power Control": "Управление питанием"
-  "Preparing Print": "Подготовка печати"
-  "Presets": "Пресеты"
-  "Previous": "Назад"
-  "Primary": "Основной"
-  "Print": "Печать"
-  "Print Cancelled": "Печать отменена"
-  "Print Complete": "Печать завершена"
-  "Print Complete!": "Печать завершена!"
-  "Print Completion Alert": "Уведомление о завершении печати"
-  "Print Details": "Детали печати"
-  Print Failed: 'Печать не удалась'
-  "Print File": "Файл печати"
-  "Print Files": "Файлы печати"
-  "Print History": "История печати"
-  "Print Hours": "Часы печати"
-  Print Objects: 'Объекты печати'
-  "Print Speed": "Скорость печати"
-  "Print Status": "Статус печати"
-  "Print Time": "Время печати"
-  "Print Tuning": "Настройка печати"
-  "Printer": "Принтер"
-  "Printer Name": "Название принтера"
-  "Printer Shutdown": "Остановка принтера"
-  "Printer Type": "Тип принтера"
-  "Printing": "Печать"
-  "Prints Trend": "Тренд печатей"
-  "Private:": "Закрытая:"
+  Please wait while the printer homes and probes.: Пожалуйста, подождите, пока принтер
+    паркуется и зондирует.
+  Please wait while the printer probes each screw position.: Пожалуйста, подождите,
+    пока принтер проверяет позицию каждого винта.
+  Plugin installed successfully.: Плагин успешно установлен.
+  Plugins: Плагины
+  Plugins are discovered on application startup: Плагины обнаруживаются при запуске
+    приложения
+  Polymaker: Polymaker
+  Port: Порт
+  Position: Позиция
+  Power: Питание
+  Power Control: Управление питанием
+  Preparing Print: Подготовка печати
+  Presets: Пресеты
+  Previous: Назад
+  Primary: Основной
+  Print: Печать
+  Print Cancelled: Печать отменена
+  Print Complete: Печать завершена
+  Print Complete!: Печать завершена!
+  Print Completion Alert: Уведомление о завершении печати
+  Print Details: Детали печати
+  Print Failed: Печать не удалась
+  Print File: Файл печати
+  Print Files: Файлы печати
+  Print History: История печати
+  Print Hours: Часы печати
+  Print Objects: Объекты печати
+  Print Speed: Скорость печати
+  Print Status: Статус печати
+  Print Time: Время печати
+  Print Tuning: Настройка печати
+  Printer: Принтер
+  Printer Name: Название принтера
+  Printer Shutdown: Остановка принтера
+  Printer Type: Тип принтера
+  Printing: Печать
+  Prints Trend: Тренд печатей
+  'Private:': 'Закрытая:'
   Probe: Зонд
-  "Probe Sensor": "Датчик зонда"
-  "Probe Sensors": "Датчики зонда"
-  "Probing Bed Mesh": "Зондирование сетки стола"
-  "Probing Bed Screws...": "Проверка винтов стола..."
-  "Probing Bed...": "Зондирование стола..."
-  "Probing Failed": "Ошибка зондирования"
-  "Profile name (e.g., default)": "Имя профиля (например, default)"
-  "Profiles": "Профили"
-  "Progress Bar Tests": "Тесты прогресс-бара"
-  "Purge": "Продуть"
-  "QUICK BUTTONS": "БЫСТРЫЕ КНОПКИ"
-  "Quad Gantry Level": "Выравнивание портала"
-  "Quick Actions": "Быстрые действия"
-  "Quick Button 1": "Быстрая кнопка 1"
-  "Quick Button 2": "Быстрая кнопка 2"
-  "Quick actions, calibration, speed": "Быстрые действия, калибровка, скорость"
+  Probe Sensor: Датчик зонда
+  Probe Sensors: Датчики зонда
+  Probing Bed Mesh: Зондирование сетки стола
+  Probing Bed Screws...: Проверка винтов стола...
+  Probing Bed...: Зондирование стола...
+  Probing Failed: Ошибка зондирования
+  Profile name (e.g., default): Имя профиля (например, default)
+  Profiles: Профили
+  Progress Bar Tests: Тесты прогресс-бара
+  Purge: Продуть
+  QUEUED EVENTS: ''
+  QUICK BUTTONS: БЫСТРЫЕ КНОПКИ
+  Quad Gantry Level: Выравнивание портала
+  Quick Actions: Быстрые действия
+  Quick Button 1: Быстрая кнопка 1
+  Quick Button 2: Быстрая кнопка 2
+  Quick actions, calibration, speed: Быстрые действия, калибровка, скорость
   'RSS:': 'RSS:'
-  "Re-probe": "Перепроверить"
-  "Ready": "Готов"
-  "Recommended": "Рекомендуется"
-  "Recommended: 200°C for extruder": "Рекомендуется: 200°C для экструдера"
-  "Record Timelapse": "Записать таймлапс"
-  "Record timelapses of your prints": "Записывайте таймлапсы ваших печатей"
-  "Recording Mode": "Режим записи"
-  "Recover": "Восстановить"
-  "Reduce Ringing": "Уменьшить звон"
-  "Refresh Interval": "Интервал обновления"
-  "Remaining": "Осталось"
-  "Remove plugin from printer": "Удалить плагин с принтера"
-  "Rename": "Переименовать"
-  "Rename Mesh Profile": "Переименовать профиль сетки"
-  "Reprint": "Повторить печать"
-  "Require confirmation before emergency stop": "Требовать подтверждение перед аварийной остановкой"
-  "Requires Moonraker-Timelapse plugin": "Требуется плагин Moonraker-Timelapse"
-  "Reset": "Сброс"
+  Re-probe: Перепроверить
+  Ready: Готов
+  Recommended: Рекомендуется
+  Record Timelapse: Записать таймлапс
+  Record timelapses of your prints: Записывайте таймлапсы ваших печатей
+  Recording Mode: Режим записи
+  Recover: Восстановить
+  Reduce Ringing: Уменьшить звон
+  Refresh Interval: Интервал обновления
+  Remaining: Осталось
+  Remove plugin from printer: Удалить плагин с принтера
+  Rename: Переименовать
+  Rename Mesh Profile: Переименовать профиль сетки
+  Reprint: Повторить печать
+  Require confirmation before emergency stop: Требовать подтверждение перед аварийной
+    остановкой
+  Requires Moonraker-Timelapse plugin: Требуется плагин Moonraker-Timelapse
+  Reset: Сброс
   Reset Speed & Flow to 100%: Сбросить скорость и поток на 100%
-  "Reset all settings and restart wizard": "Сбросить все настройки и перезапустить мастер"
+  Reset all settings and restart wizard: Сбросить все настройки и перезапустить мастер
   Resetting...: Сброс...
-  "Resonance compensation tuning": "Настройка компенсации резонанса"
-  "Restart HelixScreen": "Перезапустить HelixScreen"
-  "Restart Klipper": "Перезапустить Klipper"
-  "Restart Now": "Перезапустить сейчас"
-  "Restart Required": "Требуется перезапуск"
-  "Restart the display application": "Перезапустить приложение дисплея"
-  "Resume": "Продолжить"
-  "Resume Print": "Продолжить печать"
-  "Retract Length": "Длина ретракта"
-  "Retract Speed": "Скорость ретракта"
-  "Retraction Settings": "Настройки ретракта"
-  "Retry": "Повторить"
-  "Review detected hardware validation issues": "Просмотр обнаруженных проблем валидации оборудования"
-  "Review your changes": "Просмотр ваших изменений"
-  "Role:": "Роль:"
-  "Runout Sensor": "Датчик окончания"
-  "STANDARD MACROS": "СТАНДАРТНЫЕ МАКРОСЫ"
-  "STOP": "СТОП"
-  "STYLE PROPERTIES": "СВОЙСТВА СТИЛЯ"
-  "SYSTEM": "СИСТЕМА"
-  "Save": "Сохранить"
+  Resonance compensation tuning: Настройка компенсации резонанса
+  Restart HelixScreen: Перезапустить HelixScreen
+  Restart Klipper: Перезапустить Klipper
+  Restart Now: Перезапустить сейчас
+  Restart Required: Требуется перезапуск
+  Restart the display application: Перезапустить приложение дисплея
+  Resume: Продолжить
+  Resume Print: Продолжить печать
+  Retract Length: Длина ретракта
+  Retract Speed: Скорость ретракта
+  Retraction Settings: Настройки ретракта
+  Retry: Повторить
+  Review detected hardware validation issues: Просмотр обнаруженных проблем валидации
+    оборудования
+  Review your changes: Просмотр ваших изменений
+  'Role:': 'Роль:'
+  Runout Sensor: Датчик окончания
+  STANDARD MACROS: СТАНДАРТНЫЕ МАКРОСЫ
+  STOP: СТОП
+  STYLE PROPERTIES: СВОЙСТВА СТИЛЯ
+  SYSTEM: СИСТЕМА
+  Save: Сохранить
   Save & Restart: Сохранить и перезапустить
-  "Save As New": "Сохранить как новый"
-  "Save Config": "Сохранить конфигурацию"
-  "Save Printer Configuration": "Сохранить конфигурацию принтера"
-  "Save Theme As": "Сохранить тему как"
-  "Save Z-Offset": "Сохранить Z-смещение"
-  "Save Z-Offset?": "Сохранить Z-смещение?"
-  "Save changes to persist them across restarts?": "Сохранить изменения, чтобы они сохранились после перезапуска?"
-  Saved Z-Offset: 'Сохранённый Z-Offset'
-  "Saving Configuration...": "Сохранение конфигурации..."
-  "Saving will restart Klipper and CANCEL any active print!": "Сохранение перезапустит Klipper и ОТМЕНИТ любую активную печать!"
-  "Scanning for networks...": "Поиск сетей..."
-  "Screen Dim": "Затемнение экрана"
-  "Screen dims to lower brightness after period of inactivity": "Экран затемняется после периода неактивности"
-  "Screen will dim after the selected period of inactivity": "Экран затемнится после выбранного периода неактивности"
-  "Scroll Speed": "Скорость прокрутки"
-  "Search filename...": "Поиск файла..."
-  "Secondary": "Вторичный"
-  "Security": "Безопасность"
-  "Select": "Выбрать"
-  "Select 'None' if you don't have a filament sensor, or if you don't want to pause on runout.": "Выберите 'Нет', если у вас нет датчика филамента или вы не хотите паузу при окончании."
-  "Select 'None' if you have a dedicated probe, or don't use bed mesh leveling.": "Выберите 'Нет', если у вас отдельный зонд или вы не используете сетку стола."
-  "Select Filament": "Выбрать филамент"
+  Save As New: Сохранить как новый
+  Save Config: Сохранить конфигурацию
+  Save Printer Configuration: Сохранить конфигурацию принтера
+  Save Theme As: Сохранить тему как
+  Save Z-Offset: Сохранить Z-смещение
+  Save Z-Offset?: Сохранить Z-смещение?
+  Save changes to persist them across restarts?: Сохранить изменения, чтобы они сохранились
+    после перезапуска?
+  Saved Z-Offset: Сохранённый Z-Offset
+  Saving Configuration...: Сохранение конфигурации...
+  Saving will restart Klipper and CANCEL any active print!: Сохранение перезапустит
+    Klipper и ОТМЕНИТ любую активную печать!
+  Scanning for networks...: Поиск сетей...
+  Screen Dim: Затемнение экрана
+  Screen dims to lower brightness after period of inactivity: Экран затемняется после
+    периода неактивности
+  Screen will dim after the selected period of inactivity: Экран затемнится после
+    выбранного периода неактивности
+  Scroll Speed: Скорость прокрутки
+  Search filename...: Поиск файла...
+  Secondary: Вторичный
+  Security: Безопасность
+  See exactly what data will be sent: ''
+  Select: Выбрать
+  Select 'None' if you don't have a filament sensor, or if you don't want to pause on runout.: Выберите
+    'Нет', если у вас нет датчика филамента или вы не хотите паузу при окончании.
+  Select 'None' if you have a dedicated probe, or don't use bed mesh leveling.: Выберите
+    'Нет', если у вас отдельный зонд или вы не используете сетку стола.
+  Select Filament: Выбрать филамент
   Select G-Code File: Выбрать файл G-Code
-  "Select Heater": "Выбрать нагреватель"
-  "Select macro for first button": "Выберите макрос для первой кнопки"
-  "Select macro for second button": "Выберите макрос для второй кнопки"
-  Select which LED to control: 'Выберите LED для управления'
+  Select Heater: Выбрать нагреватель
+  Select a material or adjust temperature: ''
+  Select macro for first button: Выберите макрос для первой кнопки
+  Select macro for second button: Выберите макрос для второй кнопки
+  Select which LED to control: Выберите LED для управления
   Selecting slot...: Выбор слота...
-  "Semantic Size Parameter Tests": "Тесты семантических параметров размера"
-  "Send commands directly to printer": "Отправлять команды напрямую принтеру"
-  "Sensors": "Датчики"
-  "Set ": "Установить "
-  "Settings": "Настройки"
-  "Shadow Intensity": "Интенсивность тени"
-  "Shaper": "Шейпер"
+  Semantic Size Parameter Tests: Тесты семантических параметров размера
+  Send commands directly to printer: Отправлять команды напрямую принтеру
+  Sensors: Датчики
+  'Set ': 'Установить '
+  Settings: Настройки
+  Setup Timelapse: ''
+  Shadow Intensity: Интенсивность тени
+  Shaper: Шейпер
+  Share Usage Data: ''
   'Shininess:': 'Блеск:'
-  "Show detailed print preparation status": "Показывать детальный статус подготовки к печати"
-  "Side": "Сбоку"
-  "Size": "Размер"
-  "Skip": "Пропустить"
-  Sleep While Printing: 'Спящий режим при печати'
-  "Slot 1": "Слот 1"
-  "Small labels help keep controls calm and focused.": "Мелкие надписи помогают сохранять элементы управления аккуратными."
-  "Some settings will take effect after restart.": "Некоторые настройки вступят в силу после перезапуска."
-  "Sounds": "Звуки"
+  Show detailed print preparation status: Показывать детальный статус подготовки к
+    печати
+  Side: Сбоку
+  Size: Размер
+  Skip: Пропустить
+  Sleep While Printing: Спящий режим при печати
+  Slot 1: Слот 1
+  Small labels help keep controls calm and focused.: Мелкие надписи помогают сохранять
+    элементы управления аккуратными.
+  Some settings will take effect after restart.: Некоторые настройки вступят в силу
+    после перезапуска.
+  Sound Theme: ''
+  Sounds: Звуки
   'Specular:': 'Отражение:'
-  "Speed Settings": "Настройки скорости"
-  "Speed of prime movement": "Скорость движения подачи"
-  "Speed of retraction movement": "Скорость движения ретракта"
-  "Spool Visualization (Pseudo-3D Canvas)": "Визуализация катушки (псевдо-3D)"
-  "Spoolman": "Spoolman"
-  "Spoolman has no spools configured": "В Spoolman нет настроенных катушек"
-  "Square Corner Velocity": "Скорость прямых углов"
-  Stable\nBeta\nDev: 'Stable\nBeta\nDev'
+  Speed Settings: Настройки скорости
+  Speed of prime movement: Скорость движения подачи
+  Speed of retraction movement: Скорость движения ретракта
+  Spool Visualization (Pseudo-3D Canvas): Визуализация катушки (псевдо-3D)
+  Spoolman: Spoolman
+  Spoolman has no spools configured: В Spoolman нет настроенных катушек
+  Square Corner Velocity: Скорость прямых углов
   Standby: Режим ожидания
-  "Start Calibration": "Начать калибровку"
-  "Start Probing": "Начать зондирование"
-  "Started": "Начато"
-  "Status": "Статус"
-  "Status icons": "Иконки статуса"
-  "Step": "Шаг"
-  "Step Progress Widget Test": "Тест виджета пошагового прогресса"
-  "Stop": "Стоп"
-  "Stop Drying": "Остановить сушку"
-  "Stop Print?": "Остановить печать?"
-  "Stops all motion. Requires firmware restart.": "Останавливает всё движение. Требуется перезапуск прошивки."
-  Styled (value=75): 'Styled (value=75)'
-  "Success Rate": "Процент успеха"
-  "Success!": "Успешно!"
-  "Surfaces inherit app background tokens for light and dark modes.": "Поверхности наследуют токены фона приложения для светлого и тёмного режимов."
-  "Switch Sensors": "Переключить датчики"
-  "Switch between light and dark themes": "Переключение между светлой и тёмной темами"
-  "Sync to Spoolman": "Синхронизировать со Spoolman"
-  "Sync with Spoolman": "Синхронизация со Spoolman"
+  Start Calibration: Начать калибровку
+  Start Probing: Начать зондирование
+  Started: Начато
+  Status: Статус
+  Status icons: Иконки статуса
+  Step: Шаг
+  Step Progress Widget Test: Тест виджета пошагового прогресса
+  Stop: Стоп
+  Stop Drying: Остановить сушку
+  Stop Print?: Остановить печать?
+  Stops all motion. Requires firmware restart.: Останавливает всё движение. Требуется
+    перезапуск прошивки.
+  Success Rate: Процент успеха
+  Success!: Успешно!
+  Surfaces inherit app background tokens for light and dark modes.: Поверхности наследуют
+    токены фона приложения для светлого и тёмного режимов.
+  Switch Sensors: Переключить датчики
+  Switch between light and dark themes: Переключение между светлой и тёмной темами
+  Sync to Spoolman: Синхронизировать со Spoolman
+  Sync with Spoolman: Синхронизация со Spoolman
   Sysfs: Sysfs
   System detected: Обнаружена система
-  "TD-1 filament color detection": "Определение цвета филамента TD-1"
-  "THEME COLORS": "ЦВЕТА ТЕМЫ"
-  "TPU": "TPU"
-  "Tap to show keyboard...": "Нажмите для показа клавиатуры..."
-  "Target Temperature": "Целевая температура"
-  "Temperature": "Температура"
-  Temperature Sensors: 'Датчики температуры'
-  "Temperatures": "Температуры"
-  "Temporary adjustment for this print, unless saved on Controls panel": "Временная настройка для этой печати, если не сохранена в панели управления"
-  "Tertiary": "Третичный"
-  "Test Connection": "Тест соединения"
-  "Test Network": "Тест сети"
-  "Test Print": "Тестовая печать"
-  ? "The HelixPrint plugin enables fast G-code modifications directly on your printer—like skipping bed mesh for quick reprints."
-  : "Плагин HelixPrint позволяет быстро модифицировать G-code прямо на принтере — например, пропускать сетку стола для быстрых перепечаток."
-  "The heater will cycle on and off several times.": "Нагреватель будет несколько раз включаться и выключаться."
-  "Theme": "Тема"
-  "Theme Colors": "Цвета темы"
-  "Theme Preset": "Пресет темы"
-  "Theme changes apply after restart.": "Изменения темы применяются после перезапуска."
-  "Theme, brightness, and sleep settings": "Тема, яркость и настройки сна"
-  Thin bar (height=8): 'Thin bar (height=8)'
-  "This calibration uses the paper friction method to set your Z-offset.": "Эта калибровка использует метод трения бумаги для установки Z-смещения."
-  "This may take 1-2 minutes": "Это может занять 1-2 минуты"
-  "This may take up to 30 seconds": "Это может занять до 30 секунд"
-  ? "This plugin lets HelixScreen control print start options like bed mesh and QGL. Once installed, use Configure PRINT_START below to enable optional steps."
-  : "Этот плагин позволяет HelixScreen управлять опциями старта печати, такими как сетка стола и QGL. После установки используйте «Настроить PRINT_START» ниже для включения опциональных шагов."
-  "This process takes 3-5 minutes. Do not interrupt.": "Этот процесс занимает 3-5 минут. Не прерывайте."
-  "This tool probes each bed screw and tells you how much to adjust.": "Этот инструмент проверяет каждый винт стола и показывает, насколько его нужно отрегулировать."
-  "This will immediately halt all printer operations. The printer will require a restart to resume.": "Это немедленно остановит все операции принтера. Для продолжения потребуется перезапуск."
-  "This will reset all settings to defaults. This action cannot be undone.": "Это сбросит все настройки к значениям по умолчанию. Это действие нельзя отменить."
-  "This will restart Klipper.": "Это перезапустит Klipper."
-  "Time": "Время"
-  "Time Format": "Формат времени"
-  "Timelapse": "Таймлапс"
-  "Timelapse Available": "Таймлапс доступен"
-  "Timelapse Settings": "Настройки таймлапса"
-  "Tip:": "Совет:"
-  "Toggle Feature": "Переключить функцию"
-  "Tool": "Инструмент"
+  TD-1 filament color detection: Определение цвета филамента TD-1
+  THEME COLORS: ЦВЕТА ТЕМЫ
+  TPU: TPU
+  Tap to show keyboard...: Нажмите для показа клавиатуры...
+  Target Temperature: Целевая температура
+  Telemetry Data: ''
+  Temperature: Температура
+  Temperature Sensors: Датчики температуры
+  Temperatures: Температуры
+  Temporary adjustment for this print, unless saved on Controls panel: Временная настройка
+    для этой печати, если не сохранена в панели управления
+  Tertiary: Третичный
+  Test Connection: Тест соединения
+  Test Network: Тест сети
+  Test Print: Тестовая печать
+  Test Sound: ''
+  ? The HelixPrint plugin enables fast G-code modifications directly on your printer—like
+    skipping bed mesh for quick reprints.
+  : Плагин HelixPrint позволяет быстро модифицировать G-code прямо на принтере — например,
+    пропускать сетку стола для быстрых перепечаток.
+  The heater will cycle on and off several times.: Нагреватель будет несколько раз
+    включаться и выключаться.
+  Theme: Тема
+  Theme Colors: Цвета темы
+  Theme Preset: Пресет темы
+  Theme changes apply after restart.: Изменения темы применяются после перезапуска.
+  Theme, brightness, and sleep settings: Тема, яркость и настройки сна
+  This calibration uses the paper friction method to set your Z-offset.: Эта калибровка
+    использует метод трения бумаги для установки Z-смещения.
+  This is exactly the data that will be sent: ''
+  This is what data would be sent if enabled: ''
+  This may take 1-2 minutes: Это может занять 1-2 минуты
+  This may take up to 30 seconds: Это может занять до 30 секунд
+  ? This plugin lets HelixScreen control print start options like bed mesh and QGL.
+    Once installed, use Configure PRINT_START below to enable optional steps.
+  : Этот плагин позволяет HelixScreen управлять опциями старта печати, такими как
+    сетка стола и QGL. После установки используйте «Настроить PRINT_START» ниже для
+    включения опциональных шагов.
+  This process takes 3-5 minutes. Do not interrupt.: Этот процесс занимает 3-5 минут.
+    Не прерывайте.
+  This tool probes each bed screw and tells you how much to adjust.: Этот инструмент
+    проверяет каждый винт стола и показывает, насколько его нужно отрегулировать.
+  This will immediately halt all printer operations. The printer will require a restart to resume.: Это
+    немедленно остановит все операции принтера. Для продолжения потребуется перезапуск.
+  This will reset all settings to defaults. This action cannot be undone.: Это сбросит
+    все настройки к значениям по умолчанию. Это действие нельзя отменить.
+  This will restart Klipper.: Это перезапустит Klipper.
+  Time: Время
+  Time Format: Формат времени
+  Timelapse: Таймлапс
+  Timelapse Available: Таймлапс доступен
+  Timelapse Settings: Настройки таймлапса
+  'Tip:': 'Совет:'
+  Toggle Feature: Переключить функцию
+  Tool: Инструмент
   Tool Changer: Сменщик инструментов
-  "Top": "Сверху"
-  "Total Prints": "Всего печатей"
-  "Touch Calibration": "Калибровка касания"
-  "Touch anywhere to test calibration": "Коснитесь экрана для проверки калибровки"
-  "Touch screen to wake from sleep": "Коснитесь экрана для выхода из сна"
-  "Travels": "Перемещения"
-  "Troubleshooting:": "Устранение неполадок:"
-  "Tune": "Настройка"
-  "Tune heater PID parameters": "Настроить PID-параметры нагревателя"
-  "Turn on LED when printer starts": "Включать LED при запуске принтера"
-  "Type": "Тип"
-  "Type to preview input field...": "Введите для предпросмотра поля ввода..."
-  "USB": "USB"
-  "Uninstall HelixPrint Plugin": "Удалить плагин HelixPrint"
+  Top: Сверху
+  Total Prints: Всего печатей
+  Touch Calibration: Калибровка касания
+  Touch anywhere to test calibration: Коснитесь экрана для проверки калибровки
+  Touch screen to wake from sleep: Коснитесь экрана для выхода из сна
+  Travels: Перемещения
+  'Troubleshooting:': 'Устранение неполадок:'
+  Tune: Настройка
+  Tune heater PID parameters: Настроить PID-параметры нагревателя
+  Turn on LED when printer starts: Включать LED при запуске принтера
+  Type: Тип
+  Type to preview input field...: Введите для предпросмотра поля ввода...
+  UI Sounds: ''
+  USB: USB
+  Uninstall HelixPrint Plugin: Удалить плагин HelixPrint
   Unknown: Неизвестно
-  "Unknown Spool": "Неизвестная катушка"
+  Unknown Spool: Неизвестная катушка
   Unknown Step: Неизвестный шаг
-  "Unload": "Выгрузить"
-  "Unload Filament": "Выгрузить филамент"
+  Unload: Выгрузить
+  Unload Filament: Выгрузить филамент
   Unloading filament...: Выгрузка филамента...
-  "Unretract Extra": "Дополнительный возврат"
-  "Unretract Speed": "Скорость возврата"
-  Update Available: 'Доступно обновление'
-  Update Channel: 'Канал обновлений'
-  Update Failed: 'Ошибка обновления'
-  Update Installed: 'Обновление установлено'
-  "Upload gcode files to get started": "Загрузите gcode-файлы для начала"
-  "Use G10/G11 firmware retraction": "Использовать аппаратный ретракт G10/G11"
+  Unretract Extra: Дополнительный возврат
+  Unretract Speed: Скорость возврата
+  Update Available: Доступно обновление
+  Update Channel: Канал обновлений
+  Update Failed: Ошибка обновления
+  Update Installed: Обновление установлено
+  Upload gcode files to get started: Загрузите gcode-файлы для начала
+  Use G10/G11 firmware retraction: Использовать аппаратный ретракт G10/G11
   ValgACE (ACE Pro): ValgACE (ACE Pro)
-  "Values have been saved to printer configuration.": "Значения сохранены в конфигурацию принтера."
-  "Velocity and acceleration limits": "Ограничения скорости и ускорения"
-  "Vendor": "Производитель"
-  Verifying...: 'Проверка...'
-  "Version": "Версия"
-  "Vertical Progress (Retract Wizard)": "Вертикальный прогресс (мастер ретракта)"
-  "Vibration": "Вибрация"
-  "Video playback speed": "Скорость воспроизведения видео"
-  View Changelog: 'Просмотр изменений'
-  "View Full History": "Просмотреть полную историю"
-  "View Presets": "Просмотр пресетов"
-  "View Timelapse": "Просмотр таймлапса"
-  "View installed plugins and status": "Просмотр установленных плагинов и статуса"
-  "View print statistics and job history": "Просмотр статистики печати и истории заданий"
-  "Warning": "Предупреждение"
-  "Week": "Неделя"
-  ? "Weight data is synced from Spoolman to display remaining filament. Changes are also synced when prints start, pause, or complete."
-  : "Данные о весе синхронизируются из Spoolman для отображения оставшегося филамента. Изменения также синхронизируются при начале, паузе или завершении печати."
-  "Weight sync settings": "Настройки синхронизации веса"
+  Values have been saved to printer configuration.: Значения сохранены в конфигурацию
+    принтера.
+  Velocity and acceleration limits: Ограничения скорости и ускорения
+  Vendor: Производитель
+  Verifying...: Проверка...
+  Version: Версия
+  Vertical Progress (Retract Wizard): Вертикальный прогресс (мастер ретракта)
+  Vibration: Вибрация
+  Video playback speed: Скорость воспроизведения видео
+  View Changelog: Просмотр изменений
+  View Full History: Просмотреть полную историю
+  View Presets: Просмотр пресетов
+  View Telemetry Data: ''
+  View Timelapse: Просмотр таймлапса
+  View installed plugins and status: Просмотр установленных плагинов и статуса
+  View print statistics and job history: Просмотр статистики печати и истории заданий
+  Waiting for bed to reach temperature for accurate calibration.: ''
+  Warm Bed: ''
+  Warming Bed...: ''
+  Warning: Предупреждение
+  Week: Неделя
+  ? Weight data is synced from Spoolman to display remaining filament. Changes are
+    also synced when prints start, pause, or complete.
+  : Данные о весе синхронизируются из Spoolman для отображения оставшегося филамента.
+    Изменения также синхронизируются при начале, паузе или завершении печати.
+  Weight sync settings: Настройки синхронизации веса
+  What We Collect: ''
   White: Белый
-  "WiFi": "WiFi"
-  "WiFi Network": "Сеть WiFi"
-  "WiFi and Ethernet": "WiFi и Ethernet"
-  "WiFi and Ethernet configuration": "Настройка WiFi и Ethernet"
-  "WiFi control unavailable": "Управление WiFi недоступно"
-  "WiFi hardware unavailable": "Оборудование WiFi недоступно"
-  "Width": "Ширина"
-  "Width Sensors": "Датчики ширины"
+  WiFi: WiFi
+  WiFi Network: Сеть WiFi
+  WiFi and Ethernet: WiFi и Ethernet
+  WiFi and Ethernet configuration: Настройка WiFi и Ethernet
+  WiFi control unavailable: Управление WiFi недоступно
+  WiFi hardware unavailable: Оборудование WiFi недоступно
+  Width: Ширина
+  Width Sensors: Датчики ширины
   'X:': 'X:'
-  XY: 'XY'
+  XY: XY
   'Y:': 'Y:'
-  "Year": "Год"
-  You can skip this and calibrate later in Settings.: 'Вы можете пропустить это и откалибровать позже в настройках.'
-  "Your completed prints will appear here": "Ваши завершённые печати появятся здесь"
-  Z: 'Z'
-  "Z Calibration": "Калибровка Z"
-  Z Movement: 'Движение Z'
-  "Z Range": "Диапазон Z"
-  "Z probes for bed leveling and mesh generation": "Z-зонды для выравнивания стола и создания сетки"
-  "Z-Offset": "Z-смещение"
-  "Z-Offset Calibration": "Калибровка Z-смещения"
-  "Z-Offset:": "Z-смещение:"
-  "Z-Tilt Adjust": "Регулировка Z-наклона"
+  Year: Год
+  You can skip this and calibrate later in Settings.: Вы можете пропустить это и откалибровать
+    позже в настройках.
+  Your completed prints will appear here: Ваши завершённые печати появятся здесь
+  Z: Z
+  Z Calibration: Калибровка Z
+  Z Movement: Движение Z
+  Z Range: Диапазон Z
+  Z probes for bed leveling and mesh generation: Z-зонды для выравнивания стола и
+    создания сетки
+  Z-Offset: Z-смещение
+  Z-Offset Calibration: Калибровка Z-смещения
+  'Z-Offset:': 'Z-смещение:'
+  Z-Tilt Adjust: Регулировка Z-наклона
   'Z:': 'Z:'
   'Z: 0.000': 'Z: 0.000'
-  "Zoom": "Масштаб"
-  ^ FRONT: '^ FRONT'
-  min_value=0, max_value=100, value=25: 'min_value=0, max_value=100, value=25'
-  mzv @ 36.7 Hz: 'mzv @ 36.7 Hz'
-  "of": "из"
-  value=0 (shows FULL - BUG!): 'value=0 (shows FULL - BUG!)'
-  value=1 (tiny sliver?): 'value=1 (tiny sliver?)'
-  value=100 (should be full): 'value=100 (should be full)'
-  Русский: 'Русский'
-  —: '—'
-  •: '•'
-  中文: '中文'
-  日本語: '日本語'
+  Zoom: Масштаб
+  mzv @ 36.7 Hz: mzv @ 36.7 Hz
+  of: из

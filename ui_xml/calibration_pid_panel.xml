@@ -65,19 +65,19 @@
           <lv_obj name="extruder_presets" width="100%" height="content" style_pad_all="0"
                   flex_flow="row" style_pad_gap="#space_xs" style_flex_main_place="center" scrollable="false">
             <bind_flag_if_eq subject="pid_heater_is_extruder" flag="hidden" ref_value="0"/>
-            <ui_button name="btn_preset_pla" height="36" text="PLA 205" translation_tag="PLA 205" style_text_font="#font_small">
+            <ui_button name="btn_preset_pla" height="36" text="PLA 205" style_text_font="#font_small">
               <event_cb trigger="clicked" callback="on_pid_preset_pla"/>
             </ui_button>
-            <ui_button name="btn_preset_petg" height="36" text="PETG 245" translation_tag="PETG 245" style_text_font="#font_small">
+            <ui_button name="btn_preset_petg" height="36" text="PETG 245" style_text_font="#font_small">
               <event_cb trigger="clicked" callback="on_pid_preset_petg"/>
             </ui_button>
-            <ui_button name="btn_preset_abs" height="36" text="ABS 255" translation_tag="ABS 255" style_text_font="#font_small">
+            <ui_button name="btn_preset_abs" height="36" text="ABS 255" style_text_font="#font_small">
               <event_cb trigger="clicked" callback="on_pid_preset_abs"/>
             </ui_button>
-            <ui_button name="btn_preset_pa" height="36" text="PA 265" translation_tag="PA 265" style_text_font="#font_small">
+            <ui_button name="btn_preset_pa" height="36" text="PA 265" style_text_font="#font_small">
               <event_cb trigger="clicked" callback="on_pid_preset_pa"/>
             </ui_button>
-            <ui_button name="btn_preset_tpu" height="36" text="TPU 225" translation_tag="TPU 225" style_text_font="#font_small">
+            <ui_button name="btn_preset_tpu" height="36" text="TPU 225" style_text_font="#font_small">
               <event_cb trigger="clicked" callback="on_pid_preset_tpu"/>
             </ui_button>
           </lv_obj>
@@ -85,13 +85,13 @@
           <lv_obj name="bed_presets" width="100%" height="content" style_pad_all="0"
                   flex_flow="row" style_pad_gap="#space_xs" style_flex_main_place="center" scrollable="false">
             <bind_flag_if_not_eq subject="pid_heater_is_extruder" flag="hidden" ref_value="0"/>
-            <ui_button name="btn_preset_bed_pla" height="36" text="PLA 60" translation_tag="PLA 60" style_text_font="#font_small">
+            <ui_button name="btn_preset_bed_pla" height="36" text="PLA 60" style_text_font="#font_small">
               <event_cb trigger="clicked" callback="on_pid_preset_bed_pla"/>
             </ui_button>
-            <ui_button name="btn_preset_bed_petg" height="36" text="PETG 80" translation_tag="PETG 80" style_text_font="#font_small">
+            <ui_button name="btn_preset_bed_petg" height="36" text="PETG 80" style_text_font="#font_small">
               <event_cb trigger="clicked" callback="on_pid_preset_bed_petg"/>
             </ui_button>
-            <ui_button name="btn_preset_bed_abs" height="36" text="ABS 100" translation_tag="ABS 100" style_text_font="#font_small">
+            <ui_button name="btn_preset_bed_abs" height="36" text="ABS 100" style_text_font="#font_small">
               <event_cb trigger="clicked" callback="on_pid_preset_bed_abs"/>
             </ui_button>
           </lv_obj>
