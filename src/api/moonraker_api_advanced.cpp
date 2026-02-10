@@ -1752,13 +1752,19 @@ void MoonrakerAPI::start_pid_calibrate(const std::string& heater, int target_tem
     char cmd[64];
     snprintf(cmd, sizeof(cmd), "PID_CALIBRATE HEATER=%s TARGET=%d", heater.c_str(), target_temp);
 
-    execute_gcode(cmd, nullptr, [collector, on_error](const MoonrakerError& err) {
-        spdlog::error("[MoonrakerAPI] Failed to send PID_CALIBRATE: {}", err.message);
-        collector->mark_completed();
-        collector->unregister();
-        if (on_error)
-            on_error(err);
-    });
+    // PID calibration takes 3-10 minutes — use 15 min timeout
+    static constexpr uint32_t PID_TIMEOUT_MS = 15 * 60 * 1000;
+
+    execute_gcode(
+        cmd, nullptr,
+        [collector, on_error](const MoonrakerError& err) {
+            spdlog::error("[MoonrakerAPI] Failed to send PID_CALIBRATE: {}", err.message);
+            collector->mark_completed();
+            collector->unregister();
+            if (on_error)
+                on_error(err);
+        },
+        PID_TIMEOUT_MS);
 }
 
 // ============================================================================

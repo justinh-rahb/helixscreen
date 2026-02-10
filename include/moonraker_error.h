@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "format_utils.h"
+
 #include <string>
 
 #include "hv/json.hpp"
@@ -141,7 +143,7 @@ struct MoonrakerError {
         MoonrakerError err;
         err.type = MoonrakerErrorType::TIMEOUT;
         err.method = method_name;
-        err.message = "Request timeout after " + std::to_string(timeout_ms) + "ms";
+        err.message = "Request timed out after " + helix::fmt::duration(timeout_ms / 1000);
         return err;
     }
 

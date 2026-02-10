@@ -157,18 +157,35 @@
               width="100%" flex_grow="1" style_pad_all="0" flex_flow="column" style_flex_main_place="center"
               style_flex_cross_place="center" style_pad_gap="#space_lg" scrollable="false">
         <bind_flag_if_not_eq subject="pid_cal_state" flag="hidden" ref_value="1"/>
-        <spinner size="lg"/>
-        <text_heading text="Calibrating..." translation_tag="Calibrating..." style_text_align="center"/>
-        <text_muted name="calibrating_heater" text="Extruder PID Tuning" translation_tag="Extruder PID Tuning" bind_text="pid_calibrating_heater"/>
-        <!-- Temperature Display -->
-        <lv_obj width="80%"
-                height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
-                style_pad_all="#space_lg" flex_flow="column" style_flex_cross_place="center" style_pad_gap="#space_xs">
-          <text_small text="Current Temperature" translation_tag="Current Temperature"/>
-          <lv_label name="current_temp_display"
-                    text="25°C / 200°C" translation_tag="25°C / 200°C" style_text_font="#font_heading" bind_text="pid_current_temp"/>
+        <!-- Top row: spinner+status (left) | temp display (right) -->
+        <lv_obj width="90%" height="content" style_pad_all="0" flex_flow="row"
+                style_flex_main_place="center" style_pad_gap="#space_lg" scrollable="false">
+          <!-- Left: spinner + labels -->
+          <lv_obj height="content" style_pad_all="0" flex_flow="column"
+                  style_flex_cross_place="center" style_pad_gap="#space_sm" flex_grow="1">
+            <spinner size="lg"/>
+            <text_heading text="Calibrating..." translation_tag="Calibrating..." style_text_align="center"/>
+            <text_muted name="calibrating_heater" text="Extruder PID Tuning" translation_tag="Extruder PID Tuning" bind_text="pid_calibrating_heater"/>
+          </lv_obj>
+          <!-- Right: live temperature display -->
+          <lv_obj height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
+                  style_pad_all="#space_lg" flex_flow="column"
+                  style_flex_cross_place="center" style_pad_gap="#space_sm" flex_grow="1">
+            <!-- Extruder temp (shown when extruder selected) -->
+            <lv_obj width="content" height="content" style_pad_all="0" scrollable="false">
+              <bind_flag_if_eq subject="pid_heater_is_extruder" flag="hidden" ref_value="0"/>
+              <temp_display size="lg" show_target="true" bind_current="extruder_temp" bind_target="extruder_target"/>
+            </lv_obj>
+            <!-- Bed temp (shown when bed selected) -->
+            <lv_obj width="content" height="content" style_pad_all="0" scrollable="false">
+              <bind_flag_if_not_eq subject="pid_heater_is_extruder" flag="hidden" ref_value="0"/>
+              <temp_display size="lg" show_target="true" bind_current="bed_temp" bind_target="bed_target"/>
+            </lv_obj>
+            <text_small text="Current Temperature" translation_tag="Current Temperature" style_text_color="#text_muted"/>
+          </lv_obj>
         </lv_obj>
-        <text_small width="80%" text="The heater will cycle on and off several times." translation_tag="The heater will cycle on and off several times." style_text_align="center"/>
+        <text_small width="80%" text="The heater will cycle on and off several times." translation_tag="The heater will cycle on and off several times."
+                    style_text_align="center" style_text_color="#text_muted"/>
         <!-- Abort Button -->
         <ui_button name="btn_abort" width="120" text="Abort" translation_tag="Abort" variant="danger">
           <event_cb trigger="clicked" callback="on_pid_abort"/>

@@ -461,8 +461,8 @@ class MoonrakerAPI {
      * @param on_success Success callback
      * @param on_error Error callback
      */
-    void execute_gcode(const std::string& gcode, SuccessCallback on_success,
-                       ErrorCallback on_error);
+    void execute_gcode(const std::string& gcode, SuccessCallback on_success, ErrorCallback on_error,
+                       uint32_t timeout_ms = 0);
 
     /**
      * @brief Check if a string is safe to use as a G-code parameter
