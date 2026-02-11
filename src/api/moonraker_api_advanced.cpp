@@ -6,6 +6,7 @@
 
 #include "moonraker_api.h"
 #include "moonraker_api_internal.h"
+#include "shaper_csv_parser.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -941,6 +942,23 @@ class InputShaperCollector : public std::enable_shared_from_this<InputShaperColl
                 option.smoothing = fit.smoothing;
                 option.max_accel = fit.max_accel;
                 result.all_shapers.push_back(option);
+            }
+
+            // Parse frequency response data from calibration CSV
+            if (!result.csv_path.empty()) {
+                auto csv_data = helix::calibration::parse_shaper_csv(result.csv_path, axis_);
+                if (!csv_data.frequencies.empty()) {
+                    result.freq_response.reserve(csv_data.frequencies.size());
+                    for (size_t i = 0; i < csv_data.frequencies.size(); ++i) {
+                        result.freq_response.emplace_back(
+                            csv_data.frequencies[i],
+                            i < csv_data.raw_psd.size() ? csv_data.raw_psd[i] : 0.0f);
+                    }
+                    result.shaper_curves = std::move(csv_data.shaper_curves);
+                    spdlog::debug(
+                        "[InputShaperCollector] parsed {} freq bins, {} shaper curves from CSV",
+                        result.freq_response.size(), result.shaper_curves.size());
+                }
             }
 
             on_success_(result);
