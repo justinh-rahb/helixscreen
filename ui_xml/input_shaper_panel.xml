@@ -170,6 +170,75 @@
             <text_body text="X Axis" translation_tag="X Axis"/>
             <text_small bind_text="is_result_x_shaper" style_text_color="#text_muted"/>
           </lv_obj>
+          <!-- Frequency response chart container (hidden when no freq data) -->
+          <lv_obj name="chart_container_x"
+                  width="100%" height="180" style_pad_all="0" style_radius="#border_radius"
+                  style_bg_color="#screen_bg" style_bg_opa="255"
+                  scrollable="false">
+            <bind_flag_if_eq subject="is_x_has_freq_data" flag="hidden" ref_value="0"/>
+          </lv_obj>
+          <!-- Shaper overlay chip toggles -->
+          <lv_obj name="chip_row_x"
+                  width="100%" height="content" style_pad_all="0" flex_flow="row"
+                  style_pad_gap="#space_xs" style_flex_main_place="start"
+                  scrollable="false">
+            <bind_flag_if_eq subject="is_x_has_freq_data" flag="hidden" ref_value="0"/>
+            <!-- Chip 0 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_chip_0_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_x_0_cb"/>
+              <text_small bind_text="is_x_chip_0_label"/>
+            </lv_obj>
+            <!-- Chip 1 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_chip_1_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_x_1_cb"/>
+              <text_small bind_text="is_x_chip_1_label"/>
+            </lv_obj>
+            <!-- Chip 2 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_chip_2_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_x_2_cb"/>
+              <text_small bind_text="is_x_chip_2_label"/>
+            </lv_obj>
+            <!-- Chip 3 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_chip_3_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_x_3_cb"/>
+              <text_small bind_text="is_x_chip_3_label"/>
+            </lv_obj>
+            <!-- Chip 4 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_chip_4_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_x_4_cb"/>
+              <text_small bind_text="is_x_chip_4_label"/>
+            </lv_obj>
+          </lv_obj>
           <!-- Comparison table for X axis -->
           <lv_obj name="shaper_table_x"
                   width="100%" height="content" style_pad_all="0" flex_flow="column"
@@ -267,6 +336,75 @@
                   style_flex_cross_place="center" scrollable="false">
             <text_body text="Y Axis" translation_tag="Y Axis"/>
             <text_small bind_text="is_result_y_shaper" style_text_color="#text_muted"/>
+          </lv_obj>
+          <!-- Frequency response chart container (hidden when no freq data) -->
+          <lv_obj name="chart_container_y"
+                  width="100%" height="180" style_pad_all="0" style_radius="#border_radius"
+                  style_bg_color="#screen_bg" style_bg_opa="255"
+                  scrollable="false">
+            <bind_flag_if_eq subject="is_y_has_freq_data" flag="hidden" ref_value="0"/>
+          </lv_obj>
+          <!-- Shaper overlay chip toggles -->
+          <lv_obj name="chip_row_y"
+                  width="100%" height="content" style_pad_all="0" flex_flow="row"
+                  style_pad_gap="#space_xs" style_flex_main_place="start"
+                  scrollable="false">
+            <bind_flag_if_eq subject="is_y_has_freq_data" flag="hidden" ref_value="0"/>
+            <!-- Chip 0 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_chip_0_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_y_0_cb"/>
+              <text_small bind_text="is_y_chip_0_label"/>
+            </lv_obj>
+            <!-- Chip 1 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_chip_1_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_y_1_cb"/>
+              <text_small bind_text="is_y_chip_1_label"/>
+            </lv_obj>
+            <!-- Chip 2 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_chip_2_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_y_2_cb"/>
+              <text_small bind_text="is_y_chip_2_label"/>
+            </lv_obj>
+            <!-- Chip 3 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_chip_3_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_y_3_cb"/>
+              <text_small bind_text="is_y_chip_3_label"/>
+            </lv_obj>
+            <!-- Chip 4 -->
+            <lv_obj width="content" height="content" style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    style_radius="12" style_border_width="1" style_border_color="#border"
+                    style_bg_opa="0" style_bg_opa:checked="200" style_bg_color:checked="#primary"
+                    style_border_color:checked="#primary"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_chip_4_active" state="checked" ref_value="1"/>
+              <event_cb trigger="clicked" callback="input_shaper_chip_y_4_cb"/>
+              <text_small bind_text="is_y_chip_4_label"/>
+            </lv_obj>
           </lv_obj>
           <!-- Comparison table for Y axis -->
           <lv_obj name="shaper_table_y"

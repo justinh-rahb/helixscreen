@@ -3,9 +3,12 @@
 
 #pragma once
 
+#include "ui_frequency_response_chart.h"
+
 #include "calibration_types.h" // For InputShaperResult
 #include "input_shaper_calibrator.h"
 #include "overlay_base.h"
+#include "platform_capabilities.h"
 #include "subject_managed_panel.h"
 
 #include <array>
@@ -13,6 +16,7 @@
 #include <lvgl.h>
 #include <memory>
 #include <string>
+#include <vector>
 
 class MoonrakerClient;
 class MoonrakerAPI;
@@ -153,6 +157,8 @@ class InputShaperPanel : public OverlayBase {
     void handle_save_clicked();
     void handle_print_test_pattern_clicked();
     void handle_help_clicked();
+    void handle_chip_x_clicked(int index);
+    void handle_chip_y_clicked(int index);
 
   private:
     // Subject manager for RAII cleanup
@@ -284,6 +290,39 @@ class InputShaperPanel : public OverlayBase {
     char last_calibrated_axis_ = 'X'; ///< Axis most recently calibrated (for apply)
     std::string recommended_type_;
     float recommended_freq_ = 0.0f;
+
+    // Frequency response chart data per axis
+    struct AxisChartData {
+        std::vector<std::pair<float, float>> freq_response; // (freq, psd)
+        std::vector<ShaperResponseCurve> shaper_curves;
+        ui_frequency_response_chart_t* chart = nullptr;
+        int raw_series_id = -1;
+        int shaper_series_ids[MAX_SHAPERS] = {-1, -1, -1, -1, -1};
+        bool shaper_visible[MAX_SHAPERS] = {false, false, false, false, false};
+    };
+
+    AxisChartData x_chart_;
+    AxisChartData y_chart_;
+
+    // Freq data availability subjects (gating chart visibility in XML)
+    lv_subject_t is_x_has_freq_data_{};
+    lv_subject_t is_y_has_freq_data_{};
+
+    // Chip label subjects (dynamically set from shaper names)
+    static constexpr size_t CHIP_LABEL_BUF = 16;
+    struct ChipRow {
+        char label_buf[CHIP_LABEL_BUF] = {};
+        lv_subject_t label{};
+        lv_subject_t active{}; // 0=off, 1=on
+    };
+    std::array<ChipRow, MAX_SHAPERS> x_chips_;
+    std::array<ChipRow, MAX_SHAPERS> y_chips_;
+
+    // Chart management helpers
+    void populate_chart(char axis, const InputShaperResult& result);
+    void clear_chart(char axis);
+    void toggle_shaper_overlay(char axis, int index);
+    void create_chart_widgets();
 
     // Calibrator for delegating operations
     std::unique_ptr<helix::calibration::InputShaperCalibrator> calibrator_;
