@@ -108,7 +108,7 @@ void PrintLightTimelapseControls::handle_light_button() {
     spdlog::info("[PrintLightTimelapseControls] Light button clicked (current state: {})",
                  led_on_ ? "ON" : "OFF");
 
-    if (configured_led_.empty()) {
+    if (configured_leds_.empty()) {
         spdlog::warn("[PrintLightTimelapseControls] No LED configured - ignoring button click");
         NOTIFY_WARNING("No light configured. Set up in Settings > Device Setup.");
         return;
@@ -117,32 +117,34 @@ void PrintLightTimelapseControls::handle_light_button() {
     // Toggle to opposite of current state
     bool new_state = !led_on_;
 
-    // Send command to Moonraker
+    // Send command to Moonraker for all configured LEDs
     if (api_) {
-        if (new_state) {
-            api_->set_led_on(
-                configured_led_,
-                []() {
-                    spdlog::info("[PrintLightTimelapseControls] LED turned ON - waiting for state "
-                                 "update");
-                },
-                [](const MoonrakerError& err) {
-                    spdlog::error("[PrintLightTimelapseControls] Failed to turn LED on: {}",
-                                  err.message);
-                    NOTIFY_ERROR("Failed to turn light on: {}", err.user_message());
-                });
-        } else {
-            api_->set_led_off(
-                configured_led_,
-                []() {
-                    spdlog::info("[PrintLightTimelapseControls] LED turned OFF - waiting for state "
-                                 "update");
-                },
-                [](const MoonrakerError& err) {
-                    spdlog::error("[PrintLightTimelapseControls] Failed to turn LED off: {}",
-                                  err.message);
-                    NOTIFY_ERROR("Failed to turn light off: {}", err.user_message());
-                });
+        for (const auto& led : configured_leds_) {
+            if (new_state) {
+                api_->set_led_on(
+                    led,
+                    []() {
+                        spdlog::info("[PrintLightTimelapseControls] LED turned ON - waiting for "
+                                     "state update");
+                    },
+                    [](const MoonrakerError& err) {
+                        spdlog::error("[PrintLightTimelapseControls] Failed to turn LED on: {}",
+                                      err.message);
+                        NOTIFY_ERROR("Failed to turn light on: {}", err.user_message());
+                    });
+            } else {
+                api_->set_led_off(
+                    led,
+                    []() {
+                        spdlog::info("[PrintLightTimelapseControls] LED turned OFF - waiting for "
+                                     "state update");
+                    },
+                    [](const MoonrakerError& err) {
+                        spdlog::error("[PrintLightTimelapseControls] Failed to turn LED off: {}",
+                                      err.message);
+                        NOTIFY_ERROR("Failed to turn light off: {}", err.user_message());
+                    });
+            }
         }
     } else {
         spdlog::warn("[PrintLightTimelapseControls] API not available - cannot control LED");

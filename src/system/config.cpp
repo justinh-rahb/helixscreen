@@ -44,7 +44,8 @@ json get_default_printer_config(const std::string& moonraker_host) {
         {"temp_sensors", {{"bed", "heater_bed"}, {"hotend", "extruder"}}},
         {"fans",
          {{"part", "fan"}, {"hotend", "heater_fan hotend_fan"}, {"chamber", ""}, {"exhaust", ""}}},
-        {"leds", {{"strip", ""}}}, // Empty default - wizard will auto-detect
+        {"leds",
+         {{"strip", ""}, {"selected", json::array()}}}, // Empty default - wizard will auto-detect
         {"extra_sensors", json::object()},
         {"hardware",
          {{"optional", json::array()},
@@ -207,6 +208,40 @@ static void migrate_v0_to_v1(json& config) {
     }
 }
 
+/// Migration v1→v2: Multi-LED support — convert single LED string to array
+static void migrate_v1_to_v2(json& config) {
+    json::json_pointer strip_ptr("/printer/leds/strip");
+    json::json_pointer selected_ptr("/printer/leds/selected");
+
+    // If new array path already exists, nothing to do
+    if (config.contains(selected_ptr)) {
+        return;
+    }
+
+    // Convert old single string to array
+    if (config.contains(strip_ptr)) {
+        auto& strip_val = config[strip_ptr];
+        if (strip_val.is_string()) {
+            std::string led = strip_val.get<std::string>();
+            if (!led.empty()) {
+                config[selected_ptr] = json::array({led});
+                spdlog::info("[Config] Migration v2: converted LED '{}' from /printer/leds/strip "
+                             "to /printer/leds/selected array",
+                             led);
+            } else {
+                config[selected_ptr] = json::array();
+                spdlog::info(
+                    "[Config] Migration v2: empty LED strip, created empty selected array");
+            }
+        }
+        // Don't remove /printer/leds/strip - keep for wizard backward compat
+    } else {
+        // No LED configured at all - create empty array
+        config[selected_ptr] = json::array();
+        spdlog::info("[Config] Migration v2: no LED configured, created empty selected array");
+    }
+}
+
 /// Run all versioned migrations in sequence from current version to CURRENT_CONFIG_VERSION
 static void run_versioned_migrations(json& config) {
     int version = 0;
@@ -216,7 +251,8 @@ static void run_versioned_migrations(json& config) {
 
     if (version < 1)
         migrate_v0_to_v1(config);
-    // Future: if (version < 2) migrate_v1_to_v2(config);
+    if (version < 2)
+        migrate_v1_to_v2(config);
 
     config["config_version"] = CURRENT_CONFIG_VERSION;
 }
@@ -374,6 +410,24 @@ void Config::init(const std::string& config_path) {
         auto& leds = data[json::json_pointer(df() + "leds")];
         if (leds.is_null()) {
             data[json::json_pointer(df() + "leds")] = {{"strip", "neopixel chamber_light"}};
+            config_modified = true;
+        }
+
+        // Ensure leds/selected array exists (for multi-LED support)
+        auto& leds_selected = data[json::json_pointer(df() + "leds/selected")];
+        if (leds_selected.is_null()) {
+            // Check if there's a legacy strip value to migrate
+            auto& strip = data[json::json_pointer(df() + "leds/strip")];
+            if (!strip.is_null() && strip.is_string()) {
+                std::string led = strip.get<std::string>();
+                if (!led.empty()) {
+                    data[json::json_pointer(df() + "leds/selected")] = json::array({led});
+                } else {
+                    data[json::json_pointer(df() + "leds/selected")] = json::array();
+                }
+            } else {
+                data[json::json_pointer(df() + "leds/selected")] = json::array();
+            }
             config_modified = true;
         }
 

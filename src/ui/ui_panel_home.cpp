@@ -100,13 +100,28 @@ HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
         });
     spdlog::debug("[{}] Subscribed to filament_any_runout subject", get_name());
 
-    // Load configured LED from wizard settings and tell PrinterState to track it
+    // Load configured LEDs from wizard settings and tell PrinterState to track them
     Config* config = Config::get_instance();
     if (config) {
-        configured_led_ = config->get<std::string>(helix::wizard::LED_STRIP, "");
-        if (!configured_led_.empty()) {
-            // Tell PrinterState to track this LED for state updates
-            printer_state_.set_tracked_led(configured_led_);
+        // Load configured LEDs (multi-LED support)
+        auto& leds_json = config->get_json(helix::wizard::LED_SELECTED);
+        if (leds_json.is_array()) {
+            for (const auto& led : leds_json) {
+                if (led.is_string() && !led.get<std::string>().empty()) {
+                    configured_leds_.push_back(led.get<std::string>());
+                }
+            }
+        }
+        // Fallback: check legacy single LED path
+        if (configured_leds_.empty()) {
+            std::string single_led = config->get<std::string>(helix::wizard::LED_STRIP, "");
+            if (!single_led.empty()) {
+                configured_leds_.push_back(single_led);
+            }
+        }
+        if (!configured_leds_.empty()) {
+            // Tell PrinterState to track the first LED for state updates
+            printer_state_.set_tracked_led(configured_leds_.front());
 
             // Subscribe to LED state changes from PrinterState
             led_state_observer_ = observe_int_sync<HomePanel>(
@@ -118,7 +133,8 @@ HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
                 printer_state_.get_led_brightness_subject(), this,
                 [](HomePanel* self, int /*brightness*/) { self->update_light_icon(); });
 
-            spdlog::debug("[{}] Configured LED: {} (observing state)", get_name(), configured_led_);
+            spdlog::debug("[{}] Configured {} LED(s) (observing state)", get_name(),
+                          configured_leds_.size());
         } else {
             spdlog::debug("[{}] No LED configured - light control will be hidden", get_name());
         }
@@ -521,7 +537,7 @@ void HomePanel::handle_light_toggle() {
     spdlog::info("[{}] Light button clicked", get_name());
 
     // Check if LED is configured
-    if (configured_led_.empty()) {
+    if (configured_leds_.empty()) {
         spdlog::warn("[{}] Light toggle called but no LED configured", get_name());
         return;
     }
@@ -530,28 +546,30 @@ void HomePanel::handle_light_toggle() {
     // Note: UI will update when Moonraker notification arrives (via PrinterState observer)
     bool new_state = !light_on_;
 
-    // Send command to Moonraker
+    // Send command to Moonraker for all configured LEDs
     if (api_) {
-        if (new_state) {
-            api_->set_led_on(
-                configured_led_,
-                [this]() {
-                    spdlog::info("[{}] LED turned ON - waiting for state update", get_name());
-                },
-                [](const MoonrakerError& err) {
-                    spdlog::error("[Home Panel] Failed to turn LED on: {}", err.message);
-                    NOTIFY_ERROR("Failed to turn light on: {}", err.user_message());
-                });
-        } else {
-            api_->set_led_off(
-                configured_led_,
-                [this]() {
-                    spdlog::info("[{}] LED turned OFF - waiting for state update", get_name());
-                },
-                [](const MoonrakerError& err) {
-                    spdlog::error("[Home Panel] Failed to turn LED off: {}", err.message);
-                    NOTIFY_ERROR("Failed to turn light off: {}", err.user_message());
-                });
+        for (const auto& led : configured_leds_) {
+            if (new_state) {
+                api_->set_led_on(
+                    led,
+                    [this]() {
+                        spdlog::info("[{}] LED turned ON - waiting for state update", get_name());
+                    },
+                    [](const MoonrakerError& err) {
+                        spdlog::error("[Home Panel] Failed to turn LED on: {}", err.message);
+                        NOTIFY_ERROR("Failed to turn light on: {}", err.user_message());
+                    });
+            } else {
+                api_->set_led_off(
+                    led,
+                    [this]() {
+                        spdlog::info("[{}] LED turned OFF - waiting for state update", get_name());
+                    },
+                    [](const MoonrakerError& err) {
+                        spdlog::error("[Home Panel] Failed to turn LED off: {}", err.message);
+                        NOTIFY_ERROR("Failed to turn light off: {}", err.user_message());
+                    });
+            }
         }
     } else {
         spdlog::warn("[{}] API not available - cannot control LED", get_name());
@@ -777,12 +795,27 @@ void HomePanel::reload_from_config() {
     // Reload LED configuration from wizard settings
     // LED visibility is controlled by printer_has_led subject set via set_printer_capabilities()
     // which is called by the on_discovery_complete_ callback after hardware discovery
-    std::string new_led = config->get<std::string>(helix::wizard::LED_STRIP, "");
-    if (new_led != configured_led_) {
-        configured_led_ = new_led;
-        if (!configured_led_.empty() && configured_led_ != "None") {
-            // Tell PrinterState to track this LED for state updates
-            printer_state_.set_tracked_led(configured_led_);
+    std::vector<std::string> new_leds;
+    auto& leds_json = config->get_json(helix::wizard::LED_SELECTED);
+    if (leds_json.is_array()) {
+        for (const auto& led : leds_json) {
+            if (led.is_string() && !led.get<std::string>().empty()) {
+                new_leds.push_back(led.get<std::string>());
+            }
+        }
+    }
+    // Fallback: check legacy single LED path
+    if (new_leds.empty()) {
+        std::string single_led = config->get<std::string>(helix::wizard::LED_STRIP, "");
+        if (!single_led.empty()) {
+            new_leds.push_back(single_led);
+        }
+    }
+    if (new_leds != configured_leds_) {
+        configured_leds_ = new_leds;
+        if (!configured_leds_.empty() && configured_leds_.front() != "None") {
+            // Tell PrinterState to track the first LED for state updates
+            printer_state_.set_tracked_led(configured_leds_.front());
 
             // Subscribe to LED state changes if not already subscribed
             if (!led_state_observer_) {
@@ -798,7 +831,8 @@ void HomePanel::reload_from_config() {
                     [](HomePanel* self, int /*brightness*/) { self->update_light_icon(); });
             }
 
-            spdlog::info("[{}] Reloaded LED config: {}", get_name(), configured_led_);
+            spdlog::info("[{}] Reloaded LED config: {} LED(s)", get_name(),
+                         configured_leds_.size());
         } else {
             // No LED configured - clear tracking
             printer_state_.set_tracked_led("");

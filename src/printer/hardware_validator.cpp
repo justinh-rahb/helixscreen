@@ -11,6 +11,7 @@
 #include "printer_discovery.h"
 #include "printer_hardware.h"
 #include "spdlog/spdlog.h"
+#include "wizard_config_paths.h"
 
 #include <algorithm>
 #include <chrono>
@@ -447,13 +448,37 @@ void HardwareValidator::validate_configured_hardware(Config* config,
     } catch (...) {
     }
 
-    // Check configured LED strip
+    // Check configured LEDs (array format: LED_SELECTED, legacy single: LED_STRIP)
     try {
-        std::string led_strip = config->get<std::string>(config->df() + "leds/strip", "");
-        if (!led_strip.empty() && !contains_name(leds, led_strip)) {
-            bool is_optional = is_hardware_optional(config, led_strip);
-            result.expected_missing.push_back(HardwareIssue::warning(
-                led_strip, HardwareType::LED, "Configured LED strip not found", is_optional));
+        std::vector<std::string> configured_leds;
+
+        // Try new array format first
+        json& led_selected = config->get_json(helix::wizard::LED_SELECTED);
+        if (!led_selected.is_null() && led_selected.is_array()) {
+            for (const auto& item : led_selected) {
+                if (item.is_string()) {
+                    std::string name = item.get<std::string>();
+                    if (!name.empty()) {
+                        configured_leds.push_back(name);
+                    }
+                }
+            }
+        }
+
+        // Fall back to legacy single string
+        if (configured_leds.empty()) {
+            std::string led_strip = config->get<std::string>(helix::wizard::LED_STRIP, "");
+            if (!led_strip.empty()) {
+                configured_leds.push_back(led_strip);
+            }
+        }
+
+        for (const auto& led_name : configured_leds) {
+            if (!contains_name(leds, led_name)) {
+                bool is_optional = is_hardware_optional(config, led_name);
+                result.expected_missing.push_back(HardwareIssue::warning(
+                    led_name, HardwareType::LED, "Configured LED strip not found", is_optional));
+            }
         }
     } catch (...) {
     }
@@ -538,15 +563,26 @@ void HardwareValidator::validate_new_hardware(Config* config,
 
     // Check for LEDs not in config
     // Only suggest if user hasn't configured any LED yet
-    std::string configured_led;
+    bool has_configured_led = false;
     if (config) {
         try {
-            configured_led = config->get<std::string>(config->df() + "leds/strip", "");
+            // Try new array format first
+            json& led_selected = config->get_json(helix::wizard::LED_SELECTED);
+            if (!led_selected.is_null() && led_selected.is_array() && !led_selected.empty()) {
+                has_configured_led = true;
+            }
+            // Fall back to legacy single string
+            if (!has_configured_led) {
+                std::string led_strip = config->get<std::string>(helix::wizard::LED_STRIP, "");
+                if (!led_strip.empty()) {
+                    has_configured_led = true;
+                }
+            }
         } catch (...) {
         }
     }
 
-    if (configured_led.empty() && !leds.empty()) {
+    if (!has_configured_led && !leds.empty()) {
         // User has no LED configured but printer has some
         // Suggest the first "main" LED (prefer ones with "chamber", "case", "light" in name)
         std::string suggested;

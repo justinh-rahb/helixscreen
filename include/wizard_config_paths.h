@@ -35,6 +35,7 @@ constexpr const char* EXHAUST_FAN = "/printer/fans/exhaust";
 
 // LED hardware
 constexpr const char* LED_STRIP = "/printer/leds/strip";
+constexpr const char* LED_SELECTED = "/printer/leds/selected";
 
 // Network configuration
 constexpr const char* MOONRAKER_HOST = "/printer/moonraker_host";

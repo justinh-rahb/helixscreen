@@ -39,6 +39,7 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
+#include <vector>
 
 MoonrakerManager::MoonrakerManager() : m_startup_time(std::chrono::steady_clock::now()) {}
 
@@ -381,13 +382,29 @@ void MoonrakerManager::create_api(const RuntimeConfig& runtime_config) {
     // Set API for SettingsManager LED control (DRY with Home/PrintStatus panels)
     SettingsManager::instance().set_moonraker_api(m_api.get());
 
-    // Load configured LED for SettingsManager (centralized initialization)
+    // Load configured LEDs for SettingsManager (multi-LED support)
     Config* config = Config::get_instance();
     if (config) {
-        std::string led = config->get<std::string>(helix::wizard::LED_STRIP, "");
-        if (!led.empty()) {
-            SettingsManager::instance().set_configured_led(led);
-            spdlog::debug("[MoonrakerManager] Configured LED for SettingsManager: {}", led);
+        std::vector<std::string> leds;
+        auto& leds_json = config->get_json(helix::wizard::LED_SELECTED);
+        if (leds_json.is_array()) {
+            for (const auto& led : leds_json) {
+                if (led.is_string() && !led.get<std::string>().empty()) {
+                    leds.push_back(led.get<std::string>());
+                }
+            }
+        }
+        // Fallback: legacy single LED
+        if (leds.empty()) {
+            std::string led = config->get<std::string>(helix::wizard::LED_STRIP, "");
+            if (!led.empty()) {
+                leds.push_back(led);
+            }
+        }
+        if (!leds.empty()) {
+            SettingsManager::instance().set_configured_leds(leds);
+            spdlog::debug("[MoonrakerManager] Configured {} LED(s) for SettingsManager",
+                          leds.size());
         }
     }
 

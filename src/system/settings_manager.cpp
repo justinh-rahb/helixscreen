@@ -280,8 +280,20 @@ void SettingsManager::set_moonraker_api(MoonrakerAPI* api) {
 }
 
 void SettingsManager::set_configured_led(const std::string& led) {
-    configured_led_ = led;
-    spdlog::debug("[SettingsManager] Configured LED set: {}", led.empty() ? "(none)" : led);
+    configured_leds_.clear();
+    if (!led.empty()) {
+        configured_leds_.push_back(led);
+    }
+    spdlog::debug("[SettingsManager] Configured LED set (single): {}",
+                  led.empty() ? "(none)" : led);
+}
+
+void SettingsManager::set_configured_leds(const std::vector<std::string>& leds) {
+    configured_leds_ = leds;
+    spdlog::debug("[SettingsManager] Configured LEDs set: {} LED(s)", leds.size());
+    for (const auto& led : leds) {
+        spdlog::debug("[SettingsManager]   - {}", led);
+    }
 }
 
 // =============================================================================
@@ -707,9 +719,9 @@ void SettingsManager::set_led_enabled(bool enabled) {
 
     // Guard: Don't update local subject if command can't be sent
     // This prevents UI/printer state divergence
-    if (!moonraker_api_ || configured_led_.empty()) {
+    if (!moonraker_api_ || configured_leds_.empty()) {
         spdlog::warn("[SettingsManager] LED toggle ignored - {}",
-                     !moonraker_api_ ? "no API" : "no LED configured");
+                     !moonraker_api_ ? "no API" : "no LEDs configured");
         return;
     }
 
@@ -781,8 +793,8 @@ void SettingsManager::send_led_command(bool enabled) {
         return;
     }
 
-    if (configured_led_.empty()) {
-        spdlog::warn("[SettingsManager] Cannot send LED command - no LED configured");
+    if (configured_leds_.empty()) {
+        spdlog::warn("[SettingsManager] Cannot send LED command - no LEDs configured");
         return;
     }
 
@@ -792,10 +804,12 @@ void SettingsManager::send_led_command(bool enabled) {
         spdlog::error("[SettingsManager] LED command failed: {}", err.message);
     };
 
-    if (enabled) {
-        moonraker_api_->set_led_on(configured_led_, on_success, on_error);
-    } else {
-        moonraker_api_->set_led_off(configured_led_, on_success, on_error);
+    for (const auto& led : configured_leds_) {
+        if (enabled) {
+            moonraker_api_->set_led_on(led, on_success, on_error);
+        } else {
+            moonraker_api_->set_led_off(led, on_success, on_error);
+        }
     }
 }
 

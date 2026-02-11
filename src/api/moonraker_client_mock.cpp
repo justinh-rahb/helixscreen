@@ -571,7 +571,7 @@ void MoonrakerClientMock::populate_hardware() {
         fans_ = {"heater_fan hotend_fan",
                  "fan", // Part cooling fan
                  "fan_generic nevermore", "controller_fan controller_fan"};
-        leds_ = {"neopixel chamber_light", "neopixel status_led"};
+        leds_ = {"neopixel chamber_light", "neopixel status_led", "led caselight"};
         break;
 
     case PrinterType::VORON_TRIDENT:

@@ -49,6 +49,7 @@
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <vector>
 
 // Global instance for legacy API and resize callback
 static std::unique_ptr<PrintStatusPanel> g_print_status_panel;
@@ -166,16 +167,33 @@ PrintStatusPanel::PrintStatusPanel(PrinterState& printer_state, MoonrakerAPI* ap
 
     spdlog::debug("[{}] Subscribed to PrinterState subjects", get_name());
 
-    // Load configured LED from wizard settings and pass to light controls
+    // Load configured LEDs from wizard settings and pass to light controls
     Config* config = Config::get_instance();
     if (config) {
-        std::string configured_led = config->get<std::string>(helix::wizard::LED_STRIP, "");
-        if (!configured_led.empty()) {
-            light_timelapse_controls_.set_configured_led(configured_led);
+        // Load configured LEDs (multi-LED support)
+        std::vector<std::string> configured_leds;
+        auto& leds_json = config->get_json(helix::wizard::LED_SELECTED);
+        if (leds_json.is_array()) {
+            for (const auto& led : leds_json) {
+                if (led.is_string() && !led.get<std::string>().empty()) {
+                    configured_leds.push_back(led.get<std::string>());
+                }
+            }
+        }
+        // Fallback: legacy single LED path
+        if (configured_leds.empty()) {
+            std::string single_led = config->get<std::string>(helix::wizard::LED_STRIP, "");
+            if (!single_led.empty()) {
+                configured_leds.push_back(single_led);
+            }
+        }
+        if (!configured_leds.empty()) {
+            light_timelapse_controls_.set_configured_leds(configured_leds);
             led_state_observer_ = observe_int_sync<PrintStatusPanel>(
                 printer_state_.get_led_state_subject(), this,
                 [](PrintStatusPanel* self, int state) { self->on_led_state_changed(state); });
-            spdlog::debug("[{}] Configured LED: {} (observing state)", get_name(), configured_led);
+            spdlog::debug("[{}] Configured {} LED(s) (observing state)", get_name(),
+                          configured_leds.size());
         }
     }
 

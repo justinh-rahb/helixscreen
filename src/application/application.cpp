@@ -1421,8 +1421,8 @@ void Application::setup_discovery_callbacks() {
                 get_printer_state().set_os_version(c->hardware.os_version());
             }
 
-            // Populate LED dropdown now that hardware is discovered
-            get_global_settings_panel().populate_led_dropdown();
+            // Populate LED chips now that hardware is discovered
+            get_global_settings_panel().populate_led_chips();
 
             // Fetch print hours now that connection is live, and refresh on job changes
             get_global_settings_panel().fetch_print_hours();

@@ -8,6 +8,7 @@
 #include "ui_change_host_modal.h"
 #include "ui_emergency_stop.h"
 #include "ui_event_safety.h"
+#include "ui_led_chip_factory.h"
 #include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
@@ -31,6 +32,7 @@
 
 #include "app_globals.h"
 #include "config.h"
+#include "device_display_name.h"
 #include "filament_sensor_manager.h"
 #include "format_utils.h"
 #include "hardware_validator.h"
@@ -350,8 +352,7 @@ void SettingsPanel::init_subjects() {
     UI_MANAGED_SUBJECT_STRING(update_current_version_subject_, update_current_version_buf_,
                               helix_version(), "update_current_version", subjects_);
 
-    // LED selection dropdown subject (index-based, populated in setup)
-    UI_MANAGED_SUBJECT_INT(led_select_subject_, 0, "led_select", subjects_);
+    // LED chip selection (no subject needed - chips handle their own state)
 
     // Initialize visibility subjects (controls which settings are shown)
     // Touch calibration: show on touch displays (non-SDL) OR in test mode (for testing on desktop)
@@ -527,9 +528,7 @@ void SettingsPanel::setup_toggle_handlers() {
         }
     }
 
-    // === LED Selection Dropdown ===
-    // Populated later via populate_led_dropdown() after hardware discovery completes
-    // (same timing pattern as fetch_print_hours)
+    // LED chips are populated later via populate_led_chips() after hardware discovery
 
     // === LED Light Toggle ===
     // Event handler wired via XML <event_cb>, sync toggle with actual printer LED state
@@ -759,24 +758,67 @@ void SettingsPanel::fetch_print_hours() {
         });
 }
 
-void SettingsPanel::populate_led_dropdown() {
+void SettingsPanel::populate_led_chips() {
     if (!panel_ || !subjects_initialized_) {
         return;
     }
 
-    lv_obj_t* led_select_row = lv_obj_find_by_name(panel_, "row_led_select");
-    if (!led_select_row) {
+    lv_obj_t* led_chip_row = lv_obj_find_by_name(panel_, "row_led_select");
+    if (!led_chip_row) {
         return;
     }
 
-    wizard_populate_hardware_dropdown(
-        led_select_row, "dropdown", &led_select_subject_, led_items_,
-        [](MoonrakerAPI* a) -> const auto& { return a->hardware().leds(); }, nullptr, true,
-        helix::wizard::LED_STRIP,
-        [](const PrinterHardware& hw) { return hw.guess_main_led_strip(); }, "[Settings LED]",
-        helix::DeviceType::LED);
-    led_select_dropdown_ = lv_obj_find_by_name(led_select_row, "dropdown");
-    spdlog::debug("[{}] LED dropdown populated ({} items)", get_name(), led_items_.size());
+    lv_obj_t* chip_container = lv_obj_find_by_name(led_chip_row, "chip_container");
+    if (!chip_container) {
+        spdlog::warn("[{}] LED chip row found but no chip_container", get_name());
+        return;
+    }
+
+    // Clear existing chips
+    lv_obj_clean(chip_container);
+
+    // Get discovered LEDs from Moonraker
+    MoonrakerAPI* api = get_moonraker_api();
+    if (!api) {
+        spdlog::debug("[{}] No API for LED chip population", get_name());
+        return;
+    }
+
+    discovered_leds_ = api->hardware().leds();
+
+    // Load selected LEDs from config
+    selected_leds_.clear();
+    Config* config = Config::get_instance();
+    if (config) {
+        auto& leds_json = config->get_json(helix::wizard::LED_SELECTED);
+        if (leds_json.is_array()) {
+            for (const auto& led : leds_json) {
+                if (led.is_string() && !led.get<std::string>().empty()) {
+                    selected_leds_.insert(led.get<std::string>());
+                }
+            }
+        }
+        // Fallback: legacy single LED
+        if (selected_leds_.empty()) {
+            std::string legacy = config->get<std::string>(helix::wizard::LED_STRIP, "");
+            if (!legacy.empty()) {
+                selected_leds_.insert(legacy);
+            }
+        }
+    }
+
+    // Create chips for each discovered LED
+    for (const auto& led : discovered_leds_) {
+        bool selected = selected_leds_.count(led) > 0;
+        std::string display_name = helix::get_display_name(led, helix::DeviceType::LED);
+
+        helix::ui::create_led_chip(
+            chip_container, led, display_name, selected,
+            [this](const std::string& led_name) { handle_led_chip_clicked(led_name); });
+    }
+
+    spdlog::debug("[{}] LED chips populated ({} LEDs, {} selected)", get_name(),
+                  discovered_leds_.size(), selected_leds_.size());
 }
 
 // ============================================================================
@@ -812,24 +854,40 @@ void SettingsPanel::handle_led_light_changed(bool enabled) {
     SettingsManager::instance().set_led_enabled(enabled);
 }
 
-void SettingsPanel::handle_led_select_changed(int index) {
-    // led_items_ includes "None" at index 0 (inserted by wizard_populate_hardware_dropdown)
-    std::string led_name;
-    if (index > 0 && index < static_cast<int>(led_items_.size())) {
-        led_name = led_items_[index];
+void SettingsPanel::handle_led_chip_clicked(const std::string& led_name) {
+    // Toggle selection
+    if (selected_leds_.count(led_name) > 0) {
+        selected_leds_.erase(led_name);
+        spdlog::info("[{}] LED deselected: {}", get_name(), led_name);
+    } else {
+        selected_leds_.insert(led_name);
+        spdlog::info("[{}] LED selected: {}", get_name(), led_name);
     }
-    spdlog::info("[{}] LED selection changed: {} (index {})", get_name(),
-                 led_name.empty() ? "(none)" : led_name, index);
 
-    // Persist to config
+    // Save to config as array
     Config* config = Config::get_instance();
     if (config) {
-        config->set<std::string>(helix::wizard::LED_STRIP, led_name);
+        json selected_array = json::array();
+        for (const auto& led : selected_leds_) {
+            selected_array.push_back(led);
+        }
+        config->set<json>(helix::wizard::LED_SELECTED, selected_array);
+
+        // Also update legacy single LED path for backward compat
+        if (!selected_leds_.empty()) {
+            config->set<std::string>(helix::wizard::LED_STRIP, *selected_leds_.begin());
+        } else {
+            config->set<std::string>(helix::wizard::LED_STRIP, std::string(""));
+        }
         config->save();
     }
 
-    // Update SettingsManager so toggle and other consumers use the new LED
-    SettingsManager::instance().set_configured_led(led_name);
+    // Update SettingsManager with the new selection
+    std::vector<std::string> leds_vec(selected_leds_.begin(), selected_leds_.end());
+    SettingsManager::instance().set_configured_leds(leds_vec);
+
+    // Rebuild chips to update visual state
+    populate_led_chips();
 }
 
 void SettingsPanel::handle_estop_confirm_changed(bool enabled) {
@@ -1204,14 +1262,6 @@ void SettingsPanel::on_display_sleep_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void SettingsPanel::on_led_select_changed(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_led_select_changed");
-    auto* dropdown = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    int index = static_cast<int>(lv_dropdown_get_selected(dropdown));
-    get_global_settings_panel().handle_led_select_changed(index);
-    LVGL_SAFE_EVENT_CB_END();
-}
-
 void SettingsPanel::on_led_light_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_led_light_changed");
     auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
@@ -1387,8 +1437,6 @@ void register_settings_panel_callbacks() {
     lv_xml_register_event_cb(nullptr, "on_animations_changed",
                              SettingsPanel::on_animations_changed);
     lv_xml_register_event_cb(nullptr, "on_gcode_3d_changed", SettingsPanel::on_gcode_3d_changed);
-    lv_xml_register_event_cb(nullptr, "on_led_select_changed",
-                             SettingsPanel::on_led_select_changed);
     lv_xml_register_event_cb(nullptr, "on_led_light_changed", SettingsPanel::on_led_light_changed);
     lv_xml_register_event_cb(nullptr, "on_sound_settings_clicked",
                              SettingsPanel::on_sound_settings_clicked);

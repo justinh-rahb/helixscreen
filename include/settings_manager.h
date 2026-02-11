@@ -9,6 +9,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 class MoonrakerClient;
 class MoonrakerAPI;
@@ -104,18 +105,31 @@ class SettingsManager {
     void set_moonraker_api(MoonrakerAPI* api);
 
     /**
-     * @brief Set the configured LED name from wizard config
-     *
-     * @param led LED name from config (e.g., "caselight", "chamber_light")
+     * @brief Set multiple configured LEDs
+     * @param leds Vector of LED names from config
+     */
+    void set_configured_leds(const std::vector<std::string>& leds);
+
+    /**
+     * @brief Get configured LEDs
+     * @return Vector of configured LED names (empty if none)
+     */
+    const std::vector<std::string>& get_configured_leds() const {
+        return configured_leds_;
+    }
+
+    /**
+     * @brief Set a single configured LED (compatibility shim)
+     * @param led LED name, wraps into single-element vector
      */
     void set_configured_led(const std::string& led);
 
     /**
-     * @brief Get the configured LED name
-     * @return Configured LED name (empty if not configured)
+     * @brief Get the first configured LED name (compatibility)
+     * @return First configured LED name (empty if none)
      */
-    const std::string& get_configured_led() const {
-        return configured_led_;
+    std::string get_configured_led() const {
+        return configured_leds_.empty() ? std::string() : configured_leds_.front();
     }
 
     // =========================================================================
@@ -813,8 +827,8 @@ class SettingsManager {
     MoonrakerClient* moonraker_client_ = nullptr;
     MoonrakerAPI* moonraker_api_ = nullptr;
 
-    // Configured LED name from wizard (e.g., "caselight", "chamber_light")
-    std::string configured_led_;
+    // Configured LED names from wizard (e.g., "caselight", "chamber_light")
+    std::vector<std::string> configured_leds_;
 
     // State
     bool subjects_initialized_ = false;

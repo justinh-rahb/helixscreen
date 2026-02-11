@@ -12,6 +12,7 @@
 #include "tips_manager.h"
 
 #include <memory>
+#include <vector>
 
 // Forward declarations
 class WiFiManager;
@@ -115,7 +116,7 @@ class HomePanel : public PanelBase {
     network_type_t current_network_ = NETWORK_WIFI;
     PrintingTip current_tip_;
     PrintingTip pending_tip_; // Tip waiting to be displayed after fade-out
-    std::string configured_led_;
+    std::vector<std::string> configured_leds_;
     lv_timer_t* tip_rotation_timer_ = nullptr;
     lv_obj_t* tip_label_ = nullptr;                     // Cached for fade animation
     bool tip_animating_ = false;                        // Prevents overlapping animations

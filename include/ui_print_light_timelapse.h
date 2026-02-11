@@ -8,6 +8,7 @@
 #include <lvgl/lvgl.h>
 
 #include <string>
+#include <vector>
 
 // Forward declarations
 class MoonrakerAPI;
@@ -60,19 +61,30 @@ class PrintLightTimelapseControls {
     }
 
     /**
-     * @brief Set the configured LED name
-     * @param led LED name from wizard config (e.g., "chamber_light")
+     * @brief Set configured LEDs (multi-LED support)
+     * @param leds Vector of LED names to control
      */
-    void set_configured_led(const std::string& led) {
-        configured_led_ = led;
+    void set_configured_leds(const std::vector<std::string>& leds) {
+        configured_leds_ = leds;
     }
 
     /**
-     * @brief Get the configured LED name
-     * @return LED name, or empty string if not configured
+     * @brief Set single configured LED (compatibility shim)
+     * @param led LED name
      */
-    const std::string& get_configured_led() const {
-        return configured_led_;
+    void set_configured_led(const std::string& led) {
+        configured_leds_.clear();
+        if (!led.empty()) {
+            configured_leds_.push_back(led);
+        }
+    }
+
+    /**
+     * @brief Get configured LEDs
+     * @return Vector of configured LED names (empty if none)
+     */
+    const std::vector<std::string>& get_configured_leds() const {
+        return configured_leds_;
     }
 
     /**
@@ -126,7 +138,7 @@ class PrintLightTimelapseControls {
     // === Light State ===
     //
 
-    std::string configured_led_;
+    std::vector<std::string> configured_leds_;
     bool led_on_ = false;
     lv_subject_t light_button_subject_;
     char light_button_buf_[8] = "\xF3\xB0\x8C\xB6"; // MDI lightbulb_outline (off state)

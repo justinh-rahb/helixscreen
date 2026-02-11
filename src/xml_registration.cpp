@@ -262,6 +262,7 @@ void register_xml_components() {
     lv_xml_register_component_from_file("A:ui_xml/setting_action_row.xml");
     lv_xml_register_component_from_file("A:ui_xml/setting_info_row.xml");
     lv_xml_register_component_from_file("A:ui_xml/setting_slider_row.xml");
+    lv_xml_register_component_from_file("A:ui_xml/setting_led_chip_row.xml");
     register_settings_panel_callbacks(); // Register callbacks before XML parse [L013]
     lv_xml_register_component_from_file("A:ui_xml/settings_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/restart_prompt_dialog.xml");
