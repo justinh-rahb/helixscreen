@@ -3,6 +3,7 @@
 
 #include "ui_panel_input_shaper.h"
 
+#include "ui_emergency_stop.h"
 #include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
@@ -56,9 +57,6 @@ InputShaperPanel::~InputShaperPanel() {
     // Clear widget pointers (owned by LVGL)
     overlay_root_ = nullptr;
     parent_screen_ = nullptr;
-    status_label_ = nullptr;
-    error_message_ = nullptr;
-    recommendation_label_ = nullptr;
 
     // Guard against static destruction order fiasco (spdlog may be gone)
     if (!StaticPanelRegistry::is_destroyed()) {
@@ -174,32 +172,28 @@ void InputShaperPanel::init_subjects() {
     // Initialize state subject for state machine visibility
     UI_MANAGED_SUBJECT_INT(s_input_shaper_state, 0, "input_shaper_state", subjects_);
 
-    // Initialize subjects for reactive results rows (5 shaper types max)
+    // Per-axis comparison table subjects
+    auto init_cmp_row = [this](ComparisonRow& row, const char* prefix, size_t idx) {
+        char name[48];
+        snprintf(name, sizeof(name), "is_%s_cmp_%zu_type", prefix, idx);
+        UI_MANAGED_SUBJECT_STRING_N(row.type, row.type_buf, CMP_TYPE_BUF, "", name, subjects_);
+        snprintf(name, sizeof(name), "is_%s_cmp_%zu_freq", prefix, idx);
+        UI_MANAGED_SUBJECT_STRING_N(row.freq, row.freq_buf, CMP_VALUE_BUF, "", name, subjects_);
+        snprintf(name, sizeof(name), "is_%s_cmp_%zu_vib", prefix, idx);
+        UI_MANAGED_SUBJECT_STRING_N(row.vib, row.vib_buf, CMP_VALUE_BUF, "", name, subjects_);
+        snprintf(name, sizeof(name), "is_%s_cmp_%zu_accel", prefix, idx);
+        UI_MANAGED_SUBJECT_STRING_N(row.accel, row.accel_buf, CMP_VALUE_BUF, "", name, subjects_);
+    };
+
     for (size_t i = 0; i < MAX_SHAPERS; i++) {
-        // Initialize char buffers to empty
-        shaper_type_bufs_[i][0] = '\0';
-        shaper_freq_bufs_[i][0] = '\0';
-        shaper_vib_bufs_[i][0] = '\0';
-
-        // Register names for XML bindings
-        char visible_name[48];
-        char type_name[48];
-        char freq_name[48];
-        char vib_name[48];
-        snprintf(visible_name, sizeof(visible_name), "shaper_%zu_visible", i);
-        snprintf(type_name, sizeof(type_name), "shaper_%zu_type", i);
-        snprintf(freq_name, sizeof(freq_name), "shaper_%zu_freq", i);
-        snprintf(vib_name, sizeof(vib_name), "shaper_%zu_vib", i);
-
-        // Init and register subjects with manager - visible defaults to 0 (hidden)
-        UI_MANAGED_SUBJECT_INT(shaper_visible_subjects_[i], 0, visible_name, subjects_);
-        UI_MANAGED_SUBJECT_STRING_N(shaper_type_subjects_[i], shaper_type_bufs_[i],
-                                    SHAPER_TYPE_BUF_SIZE, "", type_name, subjects_);
-        UI_MANAGED_SUBJECT_STRING_N(shaper_freq_subjects_[i], shaper_freq_bufs_[i],
-                                    SHAPER_VALUE_BUF_SIZE, "", freq_name, subjects_);
-        UI_MANAGED_SUBJECT_STRING_N(shaper_vib_subjects_[i], shaper_vib_bufs_[i],
-                                    SHAPER_VALUE_BUF_SIZE, "", vib_name, subjects_);
+        init_cmp_row(x_cmp_[i], "x", i);
+        init_cmp_row(y_cmp_[i], "y", i);
     }
+
+    // Error message subject
+    UI_MANAGED_SUBJECT_STRING(is_error_message_, is_error_message_buf_,
+                              "An error occurred during calibration.", "is_error_message",
+                              subjects_);
 
     // Current config display subjects
     UI_MANAGED_SUBJECT_INT(is_shaper_configured_, 0, "is_shaper_configured", subjects_);
@@ -224,6 +218,13 @@ void InputShaperPanel::init_subjects() {
     // Per-axis result display subjects
     UI_MANAGED_SUBJECT_INT(is_results_has_x_, 0, "is_results_has_x", subjects_);
     UI_MANAGED_SUBJECT_INT(is_results_has_y_, 0, "is_results_has_y", subjects_);
+
+    // Header button disabled state
+    UI_MANAGED_SUBJECT_INT(is_calibrate_all_disabled_, 0, "is_calibrate_all_disabled", subjects_);
+
+    // Recommended row index per axis (-1 = none highlighted)
+    UI_MANAGED_SUBJECT_INT(is_x_recommended_row_, -1, "is_x_recommended_row", subjects_);
+    UI_MANAGED_SUBJECT_INT(is_y_recommended_row_, -1, "is_y_recommended_row", subjects_);
 
     UI_MANAGED_SUBJECT_STRING(is_result_x_shaper_, is_result_x_shaper_buf_, "",
                               "is_result_x_shaper", subjects_);
@@ -289,11 +290,7 @@ void InputShaperPanel::setup_widgets() {
     }
 
     // State visibility is handled via XML subject bindings
-
-    // Find display elements
-    status_label_ = lv_obj_find_by_name(overlay_root_, "status_label");
-    error_message_ = lv_obj_find_by_name(overlay_root_, "error_message");
-    recommendation_label_ = lv_obj_find_by_name(overlay_root_, "recommendation_label");
+    // All display elements are now subject-bound in XML
 
     // Set initial state
     set_state(State::IDLE);
@@ -402,9 +399,6 @@ void InputShaperPanel::cleanup() {
 
     // Clear references
     parent_screen_ = nullptr;
-    status_label_ = nullptr;
-    error_message_ = nullptr;
-    recommendation_label_ = nullptr;
 }
 
 // ============================================================================
@@ -419,6 +413,9 @@ void InputShaperPanel::set_state(State new_state) {
     // Update subject - XML bindings handle visibility automatically
     // State mapping: 0=IDLE, 1=MEASURING, 2=RESULTS, 3=ERROR
     lv_subject_set_int(&s_input_shaper_state, static_cast<int>(new_state));
+
+    // Disable Calibrate All button when not idle
+    lv_subject_set_int(&is_calibrate_all_disabled_, new_state != State::IDLE ? 1 : 0);
 }
 
 // ============================================================================
@@ -433,7 +430,6 @@ void InputShaperPanel::start_with_preflight(char axis) {
 
     current_axis_ = axis;
     last_calibrated_axis_ = axis;
-    shaper_results_.clear();
     recommended_type_.clear();
     recommended_freq_ = 0.0f;
 
@@ -504,7 +500,6 @@ void InputShaperPanel::start_calibration(char axis) {
 
     // Only clear results for first axis in Calibrate All, or for single-axis
     if (!calibrate_all_mode_ || axis == 'X') {
-        shaper_results_.clear();
         recommended_type_.clear();
         recommended_freq_ = 0.0f;
     }
@@ -520,9 +515,6 @@ void InputShaperPanel::start_calibration(char axis) {
     } else {
         lv_subject_copy_string(&is_measuring_step_label_, "");
     }
-
-    // Update status label (legacy widget path)
-    update_status_label(is_measuring_axis_label_buf_);
 
     lv_subject_set_int(&is_measuring_progress_, 0);
     set_state(State::MEASURING);
@@ -570,7 +562,9 @@ void InputShaperPanel::measure_noise() {
         return;
     }
 
-    update_status_label("Measuring accelerometer noise...");
+    snprintf(is_measuring_axis_label_buf_, sizeof(is_measuring_axis_label_buf_),
+             "Measuring accelerometer noise...");
+    lv_subject_copy_string(&is_measuring_axis_label_, is_measuring_axis_label_buf_);
     set_state(State::MEASURING);
     spdlog::info("[InputShaper] Starting accelerometer check via calibrator");
 
@@ -596,12 +590,37 @@ void InputShaperPanel::measure_noise() {
 }
 
 void InputShaperPanel::cancel_calibration() {
-    spdlog::info("[InputShaper] Calibration cancelled by user");
+    spdlog::info("[InputShaper] Abort clicked, sending emergency stop + firmware restart");
     calibrate_all_mode_ = false;
 
-    // Cancel calibrator operations
+    // Cancel calibrator state so we ignore any late results
     if (calibrator_) {
         calibrator_->cancel();
+    }
+
+    // Suppress shutdown/disconnect modals — E-stop + restart triggers expected reconnect
+    EmergencyStopOverlay::instance().suppress_recovery_dialog(15000);
+    if (api_) {
+        api_->suppress_disconnect_modal(15000);
+    }
+
+    // M112 emergency stop halts immediately at MCU level (bypasses blocked gcode queue),
+    // then firmware restart brings Klipper back online
+    if (api_) {
+        api_->emergency_stop(
+            [this]() {
+                spdlog::debug("[InputShaper] Emergency stop sent, sending firmware restart");
+                if (api_) {
+                    api_->restart_firmware(
+                        []() { spdlog::debug("[InputShaper] Firmware restart initiated"); },
+                        [](const MoonrakerError& err) {
+                            spdlog::error("[InputShaper] Firmware restart failed: {}", err.message);
+                        });
+                }
+            },
+            [](const MoonrakerError& err) {
+                spdlog::error("[InputShaper] Emergency stop failed: {}", err.message);
+            });
     }
 
     set_state(State::IDLE);
@@ -761,26 +780,6 @@ void InputShaperPanel::on_calibration_result(const InputShaperResult& result) {
     recommended_type_ = result.shaper_type;
     recommended_freq_ = result.shaper_freq;
 
-    // Build results list
-    // If Calibrate All, include both X and Y results
-    if (calibrate_all_mode_ && x_result_.is_valid()) {
-        ShaperFit x_fit;
-        x_fit.type = x_result_.shaper_type;
-        x_fit.frequency = x_result_.shaper_freq;
-        x_fit.vibrations = x_result_.vibrations;
-        x_fit.smoothing = x_result_.smoothing;
-        x_fit.is_recommended = true;
-        shaper_results_.push_back(x_fit);
-    }
-
-    ShaperFit fit;
-    fit.type = result.shaper_type;
-    fit.frequency = result.shaper_freq;
-    fit.vibrations = result.vibrations;
-    fit.smoothing = result.smoothing;
-    fit.is_recommended = true;
-    shaper_results_.push_back(fit);
-
     // Reset calibrate_all_mode (save before clearing for populate_axis_result)
     bool was_calibrate_all = calibrate_all_mode_;
     calibrate_all_mode_ = false;
@@ -795,7 +794,6 @@ void InputShaperPanel::on_calibration_result(const InputShaperResult& result) {
     }
     populate_axis_result(result.axis, result);
 
-    populate_results();
     set_state(State::RESULTS);
 }
 
@@ -811,50 +809,14 @@ void InputShaperPanel::on_calibration_error(const std::string& message) {
     // Reset Calibrate All mode on error to prevent stale state on retry
     calibrate_all_mode_ = false;
 
-    if (error_message_) {
-        lv_label_set_text(error_message_, message.c_str());
-    }
+    snprintf(is_error_message_buf_, sizeof(is_error_message_buf_), "%s", message.c_str());
+    lv_subject_copy_string(&is_error_message_, is_error_message_buf_);
     set_state(State::ERROR);
 }
 
 // ============================================================================
 // UI UPDATE HELPERS
 // ============================================================================
-
-void InputShaperPanel::populate_results() {
-    clear_results();
-
-    // Update recommendation label
-    if (recommendation_label_ && !recommended_type_.empty()) {
-        char freq_buf[16];
-        helix::fmt::format_frequency_hz(recommended_freq_, freq_buf, sizeof(freq_buf));
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Recommended: %s @ %s", recommended_type_.c_str(), freq_buf);
-        lv_label_set_text(recommendation_label_, buf);
-    }
-
-    // Update subjects for reactive rows
-    for (size_t i = 0; i < MAX_SHAPERS; i++) {
-        if (i < shaper_results_.size()) {
-            const auto& fit = shaper_results_[i];
-
-            // Copy to fixed buffers
-            snprintf(shaper_type_bufs_[i], SHAPER_TYPE_BUF_SIZE, "%s%s", fit.type.c_str(),
-                     fit.is_recommended ? " ★" : "");
-            helix::fmt::format_frequency_hz(fit.frequency, shaper_freq_bufs_[i],
-                                            SHAPER_VALUE_BUF_SIZE);
-            snprintf(shaper_vib_bufs_[i], SHAPER_VALUE_BUF_SIZE, "%.1f%%", fit.vibrations);
-
-            // Update subjects
-            lv_subject_set_int(&shaper_visible_subjects_[i], 1);
-            lv_subject_copy_string(&shaper_type_subjects_[i], shaper_type_bufs_[i]);
-            lv_subject_copy_string(&shaper_freq_subjects_[i], shaper_freq_bufs_[i]);
-            lv_subject_copy_string(&shaper_vib_subjects_[i], shaper_vib_bufs_[i]);
-        } else {
-            lv_subject_set_int(&shaper_visible_subjects_[i], 0);
-        }
-    }
-}
 
 void InputShaperPanel::populate_current_config(const InputShaperConfig& config) {
     lv_subject_set_int(&is_shaper_configured_, config.is_configured ? 1 : 0);
@@ -900,17 +862,22 @@ void InputShaperPanel::populate_current_config(const InputShaperConfig& config) 
 }
 
 void InputShaperPanel::clear_results() {
-    for (size_t i = 0; i < MAX_SHAPERS; i++) {
-        lv_subject_set_int(&shaper_visible_subjects_[i], 0);
-    }
     // Clear per-axis result cards
     lv_subject_set_int(&is_results_has_x_, 0);
     lv_subject_set_int(&is_results_has_y_, 0);
-}
+    lv_subject_set_int(&is_x_recommended_row_, -1);
+    lv_subject_set_int(&is_y_recommended_row_, -1);
 
-void InputShaperPanel::update_status_label(const std::string& text) {
-    if (status_label_) {
-        lv_label_set_text(status_label_, text.c_str());
+    // Clear comparison table subjects
+    for (size_t i = 0; i < MAX_SHAPERS; i++) {
+        lv_subject_copy_string(&x_cmp_[i].type, "");
+        lv_subject_copy_string(&x_cmp_[i].freq, "");
+        lv_subject_copy_string(&x_cmp_[i].vib, "");
+        lv_subject_copy_string(&x_cmp_[i].accel, "");
+        lv_subject_copy_string(&y_cmp_[i].type, "");
+        lv_subject_copy_string(&y_cmp_[i].freq, "");
+        lv_subject_copy_string(&y_cmp_[i].vib, "");
+        lv_subject_copy_string(&y_cmp_[i].accel, "");
     }
 }
 
@@ -969,7 +936,7 @@ void InputShaperPanel::populate_axis_result(char axis, const InputShaperResult& 
                  type_upper.c_str(), freq_buf);
         lv_subject_copy_string(&is_result_x_shaper_, is_result_x_shaper_buf_);
 
-        snprintf(is_result_x_explanation_buf_, sizeof(is_result_x_explanation_buf_), "%s",
+        snprintf(is_result_x_explanation_buf_, sizeof(is_result_x_explanation_buf_), "* %s",
                  get_shaper_explanation(result.shaper_type));
         lv_subject_copy_string(&is_result_x_explanation_, is_result_x_explanation_buf_);
 
@@ -989,7 +956,7 @@ void InputShaperPanel::populate_axis_result(char axis, const InputShaperResult& 
                  type_upper.c_str(), freq_buf);
         lv_subject_copy_string(&is_result_y_shaper_, is_result_y_shaper_buf_);
 
-        snprintf(is_result_y_explanation_buf_, sizeof(is_result_y_explanation_buf_), "%s",
+        snprintf(is_result_y_explanation_buf_, sizeof(is_result_y_explanation_buf_), "* %s",
                  get_shaper_explanation(result.shaper_type));
         lv_subject_copy_string(&is_result_y_explanation_, is_result_y_explanation_buf_);
 
@@ -1003,6 +970,61 @@ void InputShaperPanel::populate_axis_result(char axis, const InputShaperResult& 
 
         lv_subject_set_int(&is_result_y_quality_, get_vibration_quality(result.vibrations));
     }
+
+    // Populate comparison table subjects
+    auto& cmp = (axis == 'X') ? x_cmp_ : y_cmp_;
+    auto& recommended_row = (axis == 'X') ? is_x_recommended_row_ : is_y_recommended_row_;
+    lv_subject_set_int(&recommended_row, -1); // Reset
+
+    for (size_t i = 0; i < MAX_SHAPERS; i++) {
+        if (i < result.all_shapers.size()) {
+            const auto& opt = result.all_shapers[i];
+
+            // Type with * marker for recommended
+            std::string type_upper = opt.type;
+            for (auto& c : type_upper)
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            if (opt.type == result.shaper_type) {
+                type_upper += " *";
+                lv_subject_set_int(&recommended_row, static_cast<int>(i));
+            }
+            snprintf(cmp[i].type_buf, CMP_TYPE_BUF, "%s", type_upper.c_str());
+            lv_subject_copy_string(&cmp[i].type, cmp[i].type_buf);
+
+            // Frequency
+            helix::fmt::format_frequency_hz(opt.frequency, cmp[i].freq_buf, CMP_VALUE_BUF);
+            lv_subject_copy_string(&cmp[i].freq, cmp[i].freq_buf);
+
+            // Vibration with quality description
+            const char* quality = get_quality_description(opt.vibrations);
+            // Truncate quality to first word only for compact display
+            std::string quality_word;
+            if (quality) {
+                const char* dash = strstr(quality, " \xe2\x80\x94");
+                if (dash) {
+                    quality_word = std::string(quality, static_cast<size_t>(dash - quality));
+                } else {
+                    quality_word = quality;
+                }
+            }
+            snprintf(cmp[i].vib_buf, CMP_VALUE_BUF, "%.1f%% %s", opt.vibrations,
+                     quality_word.c_str());
+            lv_subject_copy_string(&cmp[i].vib, cmp[i].vib_buf);
+
+            // Max accel
+            snprintf(cmp[i].accel_buf, CMP_VALUE_BUF, "%.0f", opt.max_accel);
+            lv_subject_copy_string(&cmp[i].accel, cmp[i].accel_buf);
+        } else {
+            // Clear unused rows
+            lv_subject_copy_string(&cmp[i].type, "");
+            lv_subject_copy_string(&cmp[i].freq, "");
+            lv_subject_copy_string(&cmp[i].vib, "");
+            lv_subject_copy_string(&cmp[i].accel, "");
+        }
+    }
+
+    spdlog::debug("[InputShaper] Populated {} axis comparison table with {} shapers", axis,
+                  result.all_shapers.size());
 }
 
 // ============================================================================

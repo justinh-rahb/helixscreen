@@ -13,7 +13,6 @@
 #include <lvgl.h>
 #include <memory>
 #include <string>
-#include <vector>
 
 class MoonrakerClient;
 class MoonrakerAPI;
@@ -56,17 +55,6 @@ class InputShaperPanel : public OverlayBase {
         MEASURING, ///< SHAPER_CALIBRATE or MEASURE_AXES_NOISE running
         RESULTS,   ///< Showing calibration recommendations
         ERROR      ///< Error occurred
-    };
-
-    /**
-     * @brief Parsed shaper result for display
-     */
-    struct ShaperFit {
-        std::string type;            ///< Shaper type (zv, mzv, ei, 2hump_ei, 3hump_ei)
-        float frequency = 0.0f;      ///< Recommended frequency in Hz
-        float vibrations = 0.0f;     ///< Remaining vibrations percentage
-        float smoothing = 0.0f;      ///< Smoothing value (lower is better)
-        bool is_recommended = false; ///< True if this is the recommended shaper
     };
 
     InputShaperPanel() = default;
@@ -194,10 +182,8 @@ class InputShaperPanel : public OverlayBase {
     void on_calibration_error(const std::string& message);
 
     // UI update helpers
-    void populate_results();
     void populate_current_config(const InputShaperConfig& config);
     void clear_results();
-    void update_status_label(const std::string& text);
 
     // Per-axis result helpers
     static const char* get_shaper_explanation(const std::string& type);
@@ -213,25 +199,28 @@ class InputShaperPanel : public OverlayBase {
     // Private setup helper (called by create())
     void setup_widgets();
 
-    // Display elements
-    lv_obj_t* status_label_ = nullptr;
-    lv_obj_t* error_message_ = nullptr;
-    lv_obj_t* recommendation_label_ = nullptr;
-
-    // Subjects for reactive bindings
+    // Per-axis comparison table subjects (5 rows per axis, bound in XML)
     static constexpr size_t MAX_SHAPERS = 5;
-    static constexpr size_t SHAPER_TYPE_BUF_SIZE = 16;
-    static constexpr size_t SHAPER_VALUE_BUF_SIZE = 16;
+    static constexpr size_t CMP_TYPE_BUF = 24;
+    static constexpr size_t CMP_VALUE_BUF = 24;
 
-    std::array<lv_subject_t, MAX_SHAPERS> shaper_visible_subjects_;
-    std::array<lv_subject_t, MAX_SHAPERS> shaper_type_subjects_;
-    std::array<lv_subject_t, MAX_SHAPERS> shaper_freq_subjects_;
-    std::array<lv_subject_t, MAX_SHAPERS> shaper_vib_subjects_;
+    struct ComparisonRow {
+        char type_buf[CMP_TYPE_BUF] = {};
+        lv_subject_t type{};
+        char freq_buf[CMP_VALUE_BUF] = {};
+        lv_subject_t freq{};
+        char vib_buf[CMP_VALUE_BUF] = {};
+        lv_subject_t vib{};
+        char accel_buf[CMP_VALUE_BUF] = {};
+        lv_subject_t accel{};
+    };
 
-    // Fixed char arrays for string subjects
-    char shaper_type_bufs_[MAX_SHAPERS][SHAPER_TYPE_BUF_SIZE] = {};
-    char shaper_freq_bufs_[MAX_SHAPERS][SHAPER_VALUE_BUF_SIZE] = {};
-    char shaper_vib_bufs_[MAX_SHAPERS][SHAPER_VALUE_BUF_SIZE] = {};
+    std::array<ComparisonRow, MAX_SHAPERS> x_cmp_;
+    std::array<ComparisonRow, MAX_SHAPERS> y_cmp_;
+
+    // Error message subject (replaces imperative lv_label_set_text)
+    char is_error_message_buf_[128] = {};
+    lv_subject_t is_error_message_{};
 
     // Current config display subjects
     lv_subject_t is_shaper_configured_{};
@@ -256,6 +245,13 @@ class InputShaperPanel : public OverlayBase {
     // Per-axis result subjects
     lv_subject_t is_results_has_x_{};
     lv_subject_t is_results_has_y_{};
+
+    // Header button disabled state (1 = disabled, 0 = enabled)
+    lv_subject_t is_calibrate_all_disabled_{};
+
+    // Recommended row index per axis (for table highlight)
+    lv_subject_t is_x_recommended_row_{};
+    lv_subject_t is_y_recommended_row_{};
 
     // X axis result display
     char is_result_x_shaper_buf_[48] = {};
@@ -286,7 +282,6 @@ class InputShaperPanel : public OverlayBase {
     // Results data
     char current_axis_ = 'X';
     char last_calibrated_axis_ = 'X'; ///< Axis most recently calibrated (for apply)
-    std::vector<ShaperFit> shaper_results_;
     std::string recommended_type_;
     float recommended_freq_ = 0.0f;
 

@@ -5,7 +5,10 @@
         extends="lv_obj" width="#overlay_panel_width" height="100%" align="right_mid" style_border_width="0"
         style_pad_all="0" style_bg_opa="255" style_bg_color="#card_bg" scrollable="false" flex_flow="column">
     <!-- Header Bar -->
-    <header_bar name="overlay_header" title="Input Shaper" title_tag="Input Shaper"/>
+    <header_bar name="overlay_header" title="Input Shaper" title_tag="Input Shaper"
+                hide_action_button="false" action_button_text="Calibrate All"
+                action_button_callback="input_shaper_calibrate_all_cb"
+                action_button_disabled_subject="is_calibrate_all_disabled"/>
     <!-- Content Area -->
     <lv_obj name="panel_content"
             width="100%" flex_grow="1" style_pad_all="#space_lg" style_pad_gap="#space_md" scrollable="true"
@@ -73,18 +76,6 @@
           <icon src="alert" size="sm" variant="warning"/>
           <text_small text="Connect an ADXL345 accelerometer to calibrate" translation_tag="Connect an ADXL345 accelerometer to calibrate" style_text_color="#warning" flex_grow="1"/>
         </lv_obj>
-        <!-- Calibrate All Button (primary, prominent) -->
-        <ui_button name="btn_calibrate_all" width="100%" height="72" icon="play" text="Calibrate All" translation_tag="Calibrate All">
-          <bind_state_if_eq subject="printer_has_accelerometer" state="disabled" ref_value="0"/>
-          <event_cb trigger="clicked" callback="input_shaper_calibrate_all_cb"/>
-        </ui_button>
-        <!-- Explanatory text -->
-        <lv_obj width="100%"
-                height="content" style_pad_all="0" flex_flow="row" style_flex_cross_place="start"
-                style_pad_gap="#space_sm" scrollable="false">
-          <icon src="alert" size="sm" variant="warning"/>
-          <text_small text="Moves the print head to measure vibration frequencies on each axis. Takes 2-3 minutes. The printer will make noise — this is normal." translation_tag="Moves the print head to measure vibration frequencies on each axis. Takes 2-3 minutes. The printer will make noise — this is normal." flex_grow="1" style_text_color="#text_muted"/>
-        </lv_obj>
         <!-- Individual axis buttons (secondary, side by side) -->
         <lv_obj width="100%"
                 height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_md"
@@ -97,6 +88,15 @@
             <bind_state_if_eq subject="printer_has_accelerometer" state="disabled" ref_value="0"/>
             <event_cb trigger="clicked" callback="input_shaper_calibrate_y_cb"/>
           </ui_button>
+        </lv_obj>
+        <!-- Spacer to push warning to bottom -->
+        <lv_obj width="1" flex_grow="1" style_pad_all="0" scrollable="false"/>
+        <!-- Explanatory text (bottom) -->
+        <lv_obj width="100%"
+                height="content" style_pad_all="0" flex_flow="row" style_flex_cross_place="start"
+                style_pad_gap="#space_sm" scrollable="false">
+          <icon src="alert" size="sm" variant="warning"/>
+          <text_small text="Moves the print head to measure vibration frequencies on each axis. Takes 2-3 minutes. The printer will make noise — this is normal." translation_tag="Moves the print head to measure vibration frequencies on each axis. Takes 2-3 minutes. The printer will make noise — this is normal." flex_grow="1" style_text_color="#text_muted"/>
         </lv_obj>
       </lv_obj> <!-- idle state -->
 
@@ -120,23 +120,24 @@
           <text_small bind_text="is_measuring_step_label" text="" style_text_align="center"/>
           <text_small text="Do not touch the printer during calibration" translation_tag="Do not touch the printer during calibration" style_text_align="center" style_text_color="#text_muted"/>
 
-          <!-- Animated spinner (shown before sweep starts) -->
-          <spinner size="lg">
-            <bind_flag_if_not_eq subject="is_measuring_progress" flag="hidden" ref_value="0"/>
+          <!-- Animated spinner (visible before sweep starts, invisible after — preserves layout) -->
+          <spinner size="lg" style_opa="255" style_opa:checked="0">
+            <bind_state_if_not_eq subject="is_measuring_progress" state="checked" ref_value="0"/>
           </spinner>
 
-          <!-- Progress bar (shown once sweep starts) -->
+          <!-- Progress bar (invisible until sweep starts, preserves layout) -->
           <lv_bar name="calibration_progress_bar"
                   width="80%" height="16"
                   bind_value="is_measuring_progress"
                   min_value="0" max_value="100"
                   style_bg_color="#card_bg"
-                  style_radius="#border_radius">
-            <bind_flag_if_eq subject="is_measuring_progress" flag="hidden" ref_value="0"/>
+                  style_radius="#border_radius"
+                  style_opa="0" style_opa:checked="255">
+            <bind_state_if_not_eq subject="is_measuring_progress" state="checked" ref_value="0"/>
           </lv_bar>
         </lv_obj>
-        <!-- Cancel button -->
-        <ui_button name="btn_cancel" width="100%" variant="secondary" icon="close" text="Cancel" translation_tag="Cancel">
+        <!-- Abort button (bottom, like PID panel) -->
+        <ui_button name="btn_abort" width="25%" text="Abort" translation_tag="Abort" variant="danger">
           <event_cb trigger="clicked" callback="input_shaper_cancel_cb"/>
         </ui_button>
       </lv_obj>
@@ -144,70 +145,221 @@
       <!-- STATE: RESULTS - Per-axis result cards -->
       <!-- ============================================================ -->
       <lv_obj name="state_results"
-              width="100%" flex_grow="1" style_pad_all="0" flex_flow="column" style_flex_main_place="center"
-              style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_lg"
+              width="100%" flex_grow="1" style_pad_all="0" flex_flow="column"
+              style_pad_gap="#space_md"
               scrollable="false">
         <bind_flag_if_not_eq subject="input_shaper_state" flag="hidden" ref_value="2"/>
-        <icon src="check_circle" size="lg" variant="success"/>
-        <text_heading text="Calibration Complete!" translation_tag="Calibration Complete!" style_text_align="center"/>
+        <!-- Scrollable results area -->
+        <lv_obj width="100%" flex_grow="1" style_pad_all="0" flex_flow="column"
+                style_pad_gap="#space_md" scrollable="true">
+          <!-- Success header -->
+          <lv_obj width="100%" height="content" style_pad_all="0" flex_flow="column"
+                  style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_sm" scrollable="false">
+            <icon src="check_circle" size="lg" variant="success"/>
+            <text_heading text="Calibration Complete!" translation_tag="Calibration Complete!" style_text_align="center"/>
+          </lv_obj>
         <!-- X Axis Result Card -->
         <lv_obj name="result_card_x"
-                width="70%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
-                style_pad_all="#space_md" flex_flow="column" style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_xs" scrollable="false">
+                width="100%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
+                style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_sm" scrollable="false">
           <bind_flag_if_eq subject="is_results_has_x" flag="hidden" ref_value="0"/>
+          <!-- Card header: axis label + recommended shaper -->
           <lv_obj width="100%"
                   height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
-                  scrollable="false">
-            <text_small text="X Axis" translation_tag="X Axis" style_text_color="#text_muted"/>
-            <text_small bind_text="is_result_x_shaper"/>
+                  style_flex_cross_place="center" scrollable="false">
+            <text_body text="X Axis" translation_tag="X Axis"/>
+            <text_small bind_text="is_result_x_shaper" style_text_color="#text_muted"/>
           </lv_obj>
-          <lv_obj width="100%"
-                  height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
-                  scrollable="false">
-            <text_small text="Vibration" translation_tag="Vibration" style_text_color="#text_muted"/>
-            <text_small bind_text="is_result_x_vibration"/>
-          </lv_obj>
-          <lv_obj width="100%"
-                  height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
-                  scrollable="false">
-            <text_small text="Max Accel" translation_tag="Max Accel" style_text_color="#text_muted"/>
-            <text_small bind_text="is_result_x_max_accel"/>
+          <!-- Comparison table for X axis -->
+          <lv_obj name="shaper_table_x"
+                  width="100%" height="content" style_pad_all="0" flex_flow="column"
+                  style_pad_gap="0" scrollable="false">
+            <!-- Header row -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_border_width="1" style_border_color="#border" style_border_side="bottom"
+                    scrollable="false">
+              <text_small width="28%" text="Type" style_text_color="#text_muted"/>
+              <text_small width="22%" text="Freq" style_text_color="#text_muted"/>
+              <text_small width="25%" text="Vibration" style_text_color="#text_muted"/>
+              <text_small width="25%" text="Max Accel" style_text_color="#text_muted"/>
+            </lv_obj>
+            <!-- Row 0 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_recommended_row" state="checked" ref_value="0"/>
+              <text_small width="28%" bind_text="is_x_cmp_0_type"/>
+              <text_small width="22%" bind_text="is_x_cmp_0_freq"/>
+              <text_small width="25%" bind_text="is_x_cmp_0_vib"/>
+              <text_small width="25%" bind_text="is_x_cmp_0_accel"/>
+            </lv_obj>
+            <!-- Row 1 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_recommended_row" state="checked" ref_value="1"/>
+              <text_small width="28%" bind_text="is_x_cmp_1_type"/>
+              <text_small width="22%" bind_text="is_x_cmp_1_freq"/>
+              <text_small width="25%" bind_text="is_x_cmp_1_vib"/>
+              <text_small width="25%" bind_text="is_x_cmp_1_accel"/>
+            </lv_obj>
+            <!-- Row 2 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_recommended_row" state="checked" ref_value="2"/>
+              <text_small width="28%" bind_text="is_x_cmp_2_type"/>
+              <text_small width="22%" bind_text="is_x_cmp_2_freq"/>
+              <text_small width="25%" bind_text="is_x_cmp_2_vib"/>
+              <text_small width="25%" bind_text="is_x_cmp_2_accel"/>
+            </lv_obj>
+            <!-- Row 3 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_recommended_row" state="checked" ref_value="3"/>
+              <text_small width="28%" bind_text="is_x_cmp_3_type"/>
+              <text_small width="22%" bind_text="is_x_cmp_3_freq"/>
+              <text_small width="25%" bind_text="is_x_cmp_3_vib"/>
+              <text_small width="25%" bind_text="is_x_cmp_3_accel"/>
+            </lv_obj>
+            <!-- Row 4 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_x_recommended_row" state="checked" ref_value="4"/>
+              <text_small width="28%" bind_text="is_x_cmp_4_type"/>
+              <text_small width="22%" bind_text="is_x_cmp_4_freq"/>
+              <text_small width="25%" bind_text="is_x_cmp_4_vib"/>
+              <text_small width="25%" bind_text="is_x_cmp_4_accel"/>
+            </lv_obj>
+            <!-- Explanation -->
+            <text_small width="100%" bind_text="is_result_x_explanation" style_text_color="#text_muted"
+                        style_pad_top="#space_sm"/>
           </lv_obj>
         </lv_obj>
         <!-- Y Axis Result Card -->
         <lv_obj name="result_card_y"
-                width="70%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
-                style_pad_all="#space_md" flex_flow="column" style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_xs" scrollable="false">
+                width="100%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
+                style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_sm" scrollable="false">
           <bind_flag_if_eq subject="is_results_has_y" flag="hidden" ref_value="0"/>
+          <!-- Card header: axis label + recommended shaper -->
           <lv_obj width="100%"
                   height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
-                  scrollable="false">
-            <text_small text="Y Axis" translation_tag="Y Axis" style_text_color="#text_muted"/>
-            <text_small bind_text="is_result_y_shaper"/>
+                  style_flex_cross_place="center" scrollable="false">
+            <text_body text="Y Axis" translation_tag="Y Axis"/>
+            <text_small bind_text="is_result_y_shaper" style_text_color="#text_muted"/>
           </lv_obj>
-          <lv_obj width="100%"
-                  height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
-                  scrollable="false">
-            <text_small text="Vibration" translation_tag="Vibration" style_text_color="#text_muted"/>
-            <text_small bind_text="is_result_y_vibration"/>
-          </lv_obj>
-          <lv_obj width="100%"
-                  height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
-                  scrollable="false">
-            <text_small text="Max Accel" translation_tag="Max Accel" style_text_color="#text_muted"/>
-            <text_small bind_text="is_result_y_max_accel"/>
+          <!-- Comparison table for Y axis -->
+          <lv_obj name="shaper_table_y"
+                  width="100%" height="content" style_pad_all="0" flex_flow="column"
+                  style_pad_gap="0" scrollable="false">
+            <!-- Header row -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_border_width="1" style_border_color="#border" style_border_side="bottom"
+                    scrollable="false">
+              <text_small width="28%" text="Type" style_text_color="#text_muted"/>
+              <text_small width="22%" text="Freq" style_text_color="#text_muted"/>
+              <text_small width="25%" text="Vibration" style_text_color="#text_muted"/>
+              <text_small width="25%" text="Max Accel" style_text_color="#text_muted"/>
+            </lv_obj>
+            <!-- Row 0 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_recommended_row" state="checked" ref_value="0"/>
+              <text_small width="28%" bind_text="is_y_cmp_0_type"/>
+              <text_small width="22%" bind_text="is_y_cmp_0_freq"/>
+              <text_small width="25%" bind_text="is_y_cmp_0_vib"/>
+              <text_small width="25%" bind_text="is_y_cmp_0_accel"/>
+            </lv_obj>
+            <!-- Row 1 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_recommended_row" state="checked" ref_value="1"/>
+              <text_small width="28%" bind_text="is_y_cmp_1_type"/>
+              <text_small width="22%" bind_text="is_y_cmp_1_freq"/>
+              <text_small width="25%" bind_text="is_y_cmp_1_vib"/>
+              <text_small width="25%" bind_text="is_y_cmp_1_accel"/>
+            </lv_obj>
+            <!-- Row 2 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_recommended_row" state="checked" ref_value="2"/>
+              <text_small width="28%" bind_text="is_y_cmp_2_type"/>
+              <text_small width="22%" bind_text="is_y_cmp_2_freq"/>
+              <text_small width="25%" bind_text="is_y_cmp_2_vib"/>
+              <text_small width="25%" bind_text="is_y_cmp_2_accel"/>
+            </lv_obj>
+            <!-- Row 3 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_recommended_row" state="checked" ref_value="3"/>
+              <text_small width="28%" bind_text="is_y_cmp_3_type"/>
+              <text_small width="22%" bind_text="is_y_cmp_3_freq"/>
+              <text_small width="25%" bind_text="is_y_cmp_3_vib"/>
+              <text_small width="25%" bind_text="is_y_cmp_3_accel"/>
+            </lv_obj>
+            <!-- Row 4 -->
+            <lv_obj width="100%" height="content" style_pad_all="0"
+                    style_pad_left="#space_sm" style_pad_right="#space_sm"
+                    style_pad_top="#space_xs" style_pad_bottom="#space_xs"
+                    flex_flow="row" style_flex_cross_place="center"
+                    style_bg_opa="0" style_bg_opa:checked="40" style_bg_color:checked="#primary" style_radius:checked="4"
+                    scrollable="false">
+              <bind_state_if_eq subject="is_y_recommended_row" state="checked" ref_value="4"/>
+              <text_small width="28%" bind_text="is_y_cmp_4_type"/>
+              <text_small width="22%" bind_text="is_y_cmp_4_freq"/>
+              <text_small width="25%" bind_text="is_y_cmp_4_vib"/>
+              <text_small width="25%" bind_text="is_y_cmp_4_accel"/>
+            </lv_obj>
+            <!-- Explanation -->
+            <text_small width="100%" bind_text="is_result_y_explanation" style_text_color="#text_muted"
+                        style_pad_top="#space_sm"/>
           </lv_obj>
         </lv_obj>
-        <!-- Action buttons: Close (discard) and Save (SAVE_CONFIG) -->
-        <lv_obj width="70%"
-                height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_md" scrollable="false">
-          <ui_button name="btn_close" flex_grow="1" height="56" variant="secondary" text="Close" translation_tag="Close">
-            <event_cb trigger="clicked" callback="input_shaper_close_cb"/>
-          </ui_button>
-          <ui_button name="btn_save" flex_grow="1" height="56" variant="primary" icon="check" text="Save" translation_tag="Save">
-            <event_cb trigger="clicked" callback="input_shaper_save_cb"/>
-          </ui_button>
-        </lv_obj>
+        </lv_obj> <!-- end scrollable results area -->
+        <!-- Save button — pinned to bottom -->
+        <ui_button name="btn_save" width="100%" height="56" variant="primary" icon="check" text="Save" translation_tag="Save"
+                   style_margin_top="#space_md">
+          <event_cb trigger="clicked" callback="input_shaper_save_cb"/>
+        </ui_button>
       </lv_obj>
       <!-- ============================================================ -->
       <!-- STATE: ERROR - Error message and retry -->
@@ -224,7 +376,7 @@
                 scrollable="false">
           <icon src="alert" size="lg" variant="danger"/>
           <text_heading text="Calibration Failed" translation_tag="Calibration Failed" style_text_align="center" style_text_color="#danger"/>
-          <text_muted name="error_message" text="An error occurred during calibration." translation_tag="An error occurred during calibration." style_text_align="center"/>
+          <text_muted bind_text="is_error_message" style_text_align="center"/>
         </lv_obj>
         <!-- Troubleshooting tips -->
         <lv_obj width="100%"
