@@ -108,11 +108,4 @@ LayoutType LayoutManager::name_to_type(const std::string& name) {
     return LayoutType::STANDARD;
 }
 
-void LayoutManager::reset_for_testing() {
-    type_ = LayoutType::STANDARD;
-    name_ = "standard";
-    override_name_.clear();
-    initialized_ = false;
-}
-
 } // namespace helix

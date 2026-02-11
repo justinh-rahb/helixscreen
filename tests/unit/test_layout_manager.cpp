@@ -7,13 +7,23 @@
 using helix::LayoutManager;
 using helix::LayoutType;
 
+class LayoutManagerTestAccess {
+  public:
+    static void reset(LayoutManager& lm) {
+        lm.type_ = LayoutType::STANDARD;
+        lm.name_ = "standard";
+        lm.override_name_.clear();
+        lm.initialized_ = false;
+    }
+};
+
 // Reset singleton state between tests
 struct LayoutFixture {
     LayoutFixture() {
-        LayoutManager::instance().reset_for_testing();
+        LayoutManagerTestAccess::reset(LayoutManager::instance());
     }
     ~LayoutFixture() {
-        LayoutManager::instance().reset_for_testing();
+        LayoutManagerTestAccess::reset(LayoutManager::instance());
     }
 };
 
