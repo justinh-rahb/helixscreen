@@ -148,6 +148,7 @@ class AmsBackendHappyHare : public AmsBackend {
     // Allow test helper access to private members
     friend class AmsBackendHappyHareTestHelper;
     friend class AmsBackendHappyHareEndlessSpoolHelper;
+    friend class AmsBackendHHMultiUnitHelper;
 
   private:
     /**
@@ -228,6 +229,7 @@ class AmsBackendHappyHare : public AmsBackend {
     // Cached MMU state
     AmsSystemInfo system_info_;     ///< Current system state
     bool gates_initialized_{false}; ///< Have we seen gate_status yet?
+    int num_units_{1};              ///< Number of physical units (default 1)
 
     // Path visualization state
     int filament_pos_{0};                          ///< Happy Hare filament_pos value

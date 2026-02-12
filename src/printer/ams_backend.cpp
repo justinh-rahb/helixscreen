@@ -37,6 +37,13 @@ static std::unique_ptr<AmsBackendMock> create_mock_with_features(int gate_count)
         }
     }
 
+    // Check for multi-unit mode (overrides AFC mode if both set)
+    const char* multi_unit_env = std::getenv("HELIX_MOCK_MULTI_UNIT");
+    if (multi_unit_env && std::string(multi_unit_env) == "1") {
+        mock->set_multi_unit_mode(true);
+        spdlog::info("[AMS Backend] Mock multi-unit mode enabled via HELIX_MOCK_MULTI_UNIT");
+    }
+
     // Enable mock dryer if requested via environment variable
     // Note: Dryer is typically not applicable for tool changers, but allow override
     const char* dryer_env = std::getenv("HELIX_MOCK_DRYER");

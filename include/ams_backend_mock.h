@@ -230,6 +230,21 @@ class AmsBackendMock : public AmsBackend {
     [[nodiscard]] bool is_afc_mode() const;
 
     /**
+     * @brief Enable multi-unit mode for testing overview panel
+     *
+     * Creates 2 Box Turtle units with 4 slots each (8 total).
+     * Simulates a realistic multi-unit AFC setup.
+     *
+     * @param enabled true to enable multi-unit, false to revert to single unit
+     */
+    void set_multi_unit_mode(bool enabled);
+
+    /**
+     * @brief Check if multi-unit mode is active
+     */
+    [[nodiscard]] bool is_multi_unit_mode() const;
+
+    /**
      * @brief Set whether endless spool is supported
      * @param supported true to enable endless spool support
      *
@@ -396,7 +411,8 @@ class AmsBackendMock : public AmsBackend {
     bool tool_changer_mode_ = false; ///< Simulate tool changer instead of filament system
 
     // AFC mode (alternative to Happy Hare simulation)
-    bool afc_mode_ = false; ///< Simulate AFC Box Turtle instead of Happy Hare
+    bool afc_mode_ = false;        ///< Simulate AFC Box Turtle instead of Happy Hare
+    bool multi_unit_mode_ = false; ///< Simulate multi-unit AFC (2x Box Turtle)
 
     // Endless spool simulation state
     bool endless_spool_supported_ = true; ///< Whether endless spool is supported

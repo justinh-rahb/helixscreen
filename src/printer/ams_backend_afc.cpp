@@ -505,17 +505,56 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
 
     // Parse unit information if available
     if (afc_data.contains("units") && afc_data["units"].is_array()) {
-        // AFC may report multiple units (Box Turtles)
-        // Update unit names and connection status
-        const auto& units = afc_data["units"];
-        for (size_t i = 0; i < units.size() && i < system_info_.units.size(); ++i) {
-            if (units[i].is_object()) {
-                if (units[i].contains("name") && units[i]["name"].is_string()) {
-                    system_info_.units[i].name = units[i]["name"].get<std::string>();
+        const auto& units_json = afc_data["units"];
+
+        // Capture unit-to-lane mapping for multi-unit reorganization
+        unit_lane_map_.clear();
+        for (const auto& unit_json : units_json) {
+            if (!unit_json.is_object()) {
+                continue;
+            }
+
+            std::string unit_name;
+            if (unit_json.contains("name") && unit_json["name"].is_string()) {
+                unit_name = unit_json["name"].get<std::string>();
+            }
+
+            // Capture per-unit lane list
+            if (unit_json.contains("lanes") && unit_json["lanes"].is_array()) {
+                std::vector<std::string> lanes;
+                for (const auto& lane : unit_json["lanes"]) {
+                    if (lane.is_string()) {
+                        lanes.push_back(lane.get<std::string>());
+                    }
                 }
-                if (units[i].contains("connected") && units[i]["connected"].is_boolean()) {
-                    system_info_.units[i].connected = units[i]["connected"].get<bool>();
+                if (!unit_name.empty() && !lanes.empty()) {
+                    unit_lane_map_[unit_name] = lanes;
                 }
+            }
+        }
+
+        // Update existing unit names and connection status (backward compat)
+        for (size_t i = 0; i < units_json.size() && i < system_info_.units.size(); ++i) {
+            if (units_json[i].is_object()) {
+                if (units_json[i].contains("name") && units_json[i]["name"].is_string()) {
+                    system_info_.units[i].name = units_json[i]["name"].get<std::string>();
+                }
+                if (units_json[i].contains("connected") &&
+                    units_json[i]["connected"].is_boolean()) {
+                    system_info_.units[i].connected = units_json[i]["connected"].get<bool>();
+                }
+            }
+        }
+
+        // If we got unit-lane data, re-organize into multi-unit layout.
+        // NOTE: This runs under mutex_ lock (held by handle_status_update caller),
+        // so system_info_ modifications are safe from concurrent get_system_info() reads.
+        if (!unit_lane_map_.empty()) {
+            if (!lanes_initialized_ && !lane_names_.empty()) {
+                initialize_lanes(lane_names_);
+            }
+            if (lanes_initialized_) {
+                reorganize_units_from_map();
             }
         }
     }
@@ -975,7 +1014,11 @@ void AmsBackendAfc::parse_lane_data(const nlohmann::json& lane_data) {
         }
 
         const auto& lane = lane_data[lane_name];
-        auto& slot = system_info_.units[0].slots[i];
+        auto* slot_ptr = system_info_.get_slot_global(static_cast<int>(i));
+        if (!slot_ptr) {
+            continue;
+        }
+        auto& slot = *slot_ptr;
 
         // Parse color (AFC uses hex string without 0x prefix)
         if (lane.contains("color") && lane["color"].is_string()) {
@@ -1087,6 +1130,94 @@ void AmsBackendAfc::initialize_lanes(const std::vector<std::string>& lane_names)
     }
 
     lanes_initialized_ = true;
+}
+
+/**
+ * @brief Reorganize flat slot list into multi-unit structure using unit_lane_map_.
+ *
+ * Called from parse_afc_state() after the "units" JSON array has been parsed.
+ * Rebuilds system_info_.units from unit_lane_map_ (unit_name → [lane_names]),
+ * preserving existing slot data (colors, materials, status) by matching lane names.
+ *
+ * @pre mutex_ must be held by caller (via handle_status_update → parse_afc_state)
+ * @pre lanes_initialized_ must be true (slots exist in system_info_.units[0])
+ */
+void AmsBackendAfc::reorganize_units_from_map() {
+    if (unit_lane_map_.size() <= 1) {
+        // Single unit - just update the name if available
+        if (!unit_lane_map_.empty() && !system_info_.units.empty()) {
+            system_info_.units[0].name = unit_lane_map_.begin()->first;
+        }
+        return;
+    }
+
+    // Multi-unit: rebuild units vector with proper lane grouping
+    // Preserve existing slot data (colors, materials, etc.)
+
+    // Collect all current slot data by lane name for preservation
+    std::unordered_map<std::string, SlotInfo> slot_data_by_lane;
+    for (size_t i = 0; i < lane_names_.size(); ++i) {
+        const SlotInfo* slot = system_info_.get_slot_global(static_cast<int>(i));
+        if (slot) {
+            slot_data_by_lane[lane_names_[i]] = *slot;
+        }
+    }
+
+    // Rebuild units - sort unit names for deterministic ordering
+    std::vector<std::string> sorted_unit_names;
+    sorted_unit_names.reserve(unit_lane_map_.size());
+    for (const auto& [name, lanes] : unit_lane_map_) {
+        sorted_unit_names.push_back(name);
+    }
+    std::sort(sorted_unit_names.begin(), sorted_unit_names.end());
+
+    system_info_.units.clear();
+    int global_slot_offset = 0;
+    int unit_idx = 0;
+
+    for (const auto& unit_name : sorted_unit_names) {
+        const auto& lanes = unit_lane_map_.at(unit_name);
+
+        AmsUnit unit;
+        unit.unit_index = unit_idx;
+        unit.name = unit_name;
+        unit.slot_count = static_cast<int>(lanes.size());
+        unit.first_slot_global_index = global_slot_offset;
+        unit.connected = true;
+        unit.has_toolhead_sensor = true;
+        unit.has_slot_sensors = true;
+
+        for (int i = 0; i < unit.slot_count; ++i) {
+            SlotInfo slot;
+            slot.slot_index = i;
+            slot.global_index = global_slot_offset + i;
+
+            // Restore preserved slot data if available
+            const std::string& lane_name = lanes[i];
+            auto it = slot_data_by_lane.find(lane_name);
+            if (it != slot_data_by_lane.end()) {
+                slot = it->second;
+                // Fix up indices for new unit layout
+                slot.slot_index = i;
+                slot.global_index = global_slot_offset + i;
+            } else {
+                slot.status = SlotStatus::UNKNOWN;
+                slot.mapped_tool = global_slot_offset + i;
+                slot.color_rgb = AMS_DEFAULT_SLOT_COLOR;
+            }
+
+            unit.slots.push_back(slot);
+        }
+
+        system_info_.units.push_back(unit);
+        global_slot_offset += unit.slot_count;
+        ++unit_idx;
+    }
+
+    system_info_.total_slots = global_slot_offset;
+
+    spdlog::info("[AMS AFC] Reorganized into {} units, {} total slots", system_info_.units.size(),
+                 system_info_.total_slots);
 }
 
 std::string AmsBackendAfc::get_lane_name(int slot_index) const {

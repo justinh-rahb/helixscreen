@@ -9,6 +9,7 @@
 #include "ui_icon.h"
 #include "ui_nav.h"
 #include "ui_panel_ams.h"
+#include "ui_panel_ams_overview.h"
 #include "ui_panel_temp_control.h"
 #include "ui_subject_registry.h"
 #include "ui_temperature_utils.h"
@@ -718,15 +719,7 @@ void FilamentPanel::on_manage_slots_clicked(lv_event_t* e) {
     LV_UNUSED(e);
 
     spdlog::info("[FilamentPanel] Opening AMS panel overlay");
-
-    auto& ams_panel = get_global_ams_panel();
-    if (!ams_panel.are_subjects_initialized()) {
-        ams_panel.init_subjects();
-    }
-    lv_obj_t* panel_obj = ams_panel.get_panel();
-    if (panel_obj) {
-        ui_nav_push_overlay(panel_obj);
-    }
+    navigate_to_ams_panel();
 
     LVGL_SAFE_EVENT_CB_END();
 }

@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2025-2026 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<component>
+  <!-- Overlay panel - right-aligned, uses standard large width -->
+  <view name="ams_overview_panel"
+        extends="lv_obj" width="#overlay_panel_width" height="100%" align="right_mid" style_pad_all="0"
+        style_border_width="0" style_bg_opa="255" style_bg_color="#card_bg" scrollable="false" flex_flow="column">
+    <!-- Header Bar -->
+    <header_bar name="overlay_header" title="System Overview" title_tag="System Overview"/>
+    <!-- Content Area -->
+    <lv_obj name="overview_content"
+            width="100%" flex_grow="1" style_pad_all="#space_lg" style_pad_gap="#space_md" scrollable="false"
+            flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
+      <!-- Unit Cards Row - horizontal layout for unit summary cards -->
+      <lv_obj name="unit_cards_row"
+              width="100%" height="content" style_pad_all="0" style_pad_gap="#space_md"
+              flex_flow="row" style_flex_main_place="center" style_flex_cross_place="start"
+              scrollable="false">
+        <!-- Unit cards created dynamically by AmsOverviewPanel::create_unit_cards() -->
+      </lv_obj>
+      <!-- System Path Area - shows unit outputs → combiner → toolhead -->
+      <lv_obj name="system_path_area"
+              width="100%" flex_grow="1" style_pad_all="0" scrollable="false">
+        <!-- Path canvas will be created programmatically in Milestone 3 -->
+      </lv_obj>
+      <!-- Status Section -->
+      <lv_obj name="status_section"
+              width="100%" height="content" style_pad_all="#space_sm" flex_flow="row" style_flex_main_place="center"
+              style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
+        <!-- Status label - bound to ams_action_detail subject -->
+        <text_body name="overview_status_label" bind_text="ams_action_detail" style_text_align="center" flex_grow="1"/>
+      </lv_obj>
+      <!-- Flex spacer - pushes settings button to bottom -->
+      <lv_obj width="1" style_pad_all="0" scrollable="false" flex_grow="1"/>
+      <!-- Settings Button (full width, primary variant by default) -->
+      <ui_button name="btn_settings" width="100%" icon="settings" text="Settings" translation_tag="Settings">
+        <event_cb trigger="clicked" callback="on_ams_overview_settings_clicked"/>
+      </ui_button>
+    </lv_obj>
+  </view>
+</component>

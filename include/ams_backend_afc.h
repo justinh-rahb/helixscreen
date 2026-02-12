@@ -239,6 +239,7 @@ class AmsBackendAfc : public AmsBackend {
     // Allow test helper access to private members
     friend class AmsBackendAfcTestHelper;
     friend class AmsBackendAfcEndlessSpoolHelper;
+    friend class AmsBackendAfcMultiUnitHelper;
 
   private:
     /**
@@ -338,6 +339,19 @@ class AmsBackendAfc : public AmsBackend {
     void initialize_lanes(const std::vector<std::string>& lane_names);
 
     /**
+     * @brief Reorganize units based on unit-lane mapping from AFC
+     *
+     * When AFC reports multiple units with per-unit lane assignments,
+     * this method rebuilds system_info_.units to reflect the actual
+     * multi-unit hardware topology. Preserves existing slot data
+     * (colors, materials, etc.) during reorganization.
+     *
+     * Called from parse_afc_state() when unit_lane_map_ is populated
+     * and lanes are already initialized.
+     */
+    void reorganize_units_from_map();
+
+    /**
      * @brief Get lane name for a slot index
      *
      * AFC uses lane names (e.g., "lane1", "lane2") instead of numeric indices.
@@ -408,6 +422,10 @@ class AmsBackendAfc : public AmsBackend {
 
     // Lane name to slot index mapping
     std::unordered_map<std::string, int> lane_name_to_index_;
+
+    // Unit-to-lane mapping (populated from AFC unit data)
+    // Key: unit name, Value: lane names belonging to that unit
+    std::unordered_map<std::string, std::vector<std::string>> unit_lane_map_;
 
     // Version detection
     std::string afc_version_{"unknown"}; ///< Detected AFC version (e.g., "1.0.0")

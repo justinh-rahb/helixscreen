@@ -304,6 +304,14 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
                       path_segment_to_string(path_segment_from_happy_hare_pos(filament_pos_)));
     }
 
+    // Parse num_units if available (multi-unit Happy Hare setups)
+    if (mmu_data.contains("num_units") && mmu_data["num_units"].is_number_integer()) {
+        num_units_ = mmu_data["num_units"].get<int>();
+        if (num_units_ < 1)
+            num_units_ = 1;
+        spdlog::trace("[AMS HappyHare] Number of units: {}", num_units_);
+    }
+
     // Parse gate_status array: printer.mmu.gate_status
     // Values: -1 = unknown, 0 = empty, 1 = available, 2 = from_buffer
     if (mmu_data.contains("gate_status") && mmu_data["gate_status"].is_array()) {
@@ -315,8 +323,8 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
             initialize_gates(gate_count);
         }
 
-        // Update gate status values
-        for (size_t i = 0; i < gate_status.size() && i < system_info_.units[0].slots.size(); ++i) {
+        // Update gate status values using global indices (multi-unit safe)
+        for (size_t i = 0; i < gate_status.size(); ++i) {
             if (gate_status[i].is_number_integer()) {
                 int hh_status = gate_status[i].get<int>();
                 SlotStatus status = slot_status_from_happy_hare(hh_status);
@@ -328,7 +336,10 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
                     status = SlotStatus::LOADED;
                 }
 
-                system_info_.units[0].slots[i].status = status;
+                auto* slot = system_info_.get_slot_global(static_cast<int>(i));
+                if (slot) {
+                    slot->status = status;
+                }
             }
         }
     }
@@ -337,12 +348,12 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
     // Values are RGB integers like 0xFF0000 for red
     if (mmu_data.contains("gate_color_rgb") && mmu_data["gate_color_rgb"].is_array()) {
         const auto& colors = mmu_data["gate_color_rgb"];
-        for (size_t i = 0; i < colors.size() && !system_info_.units.empty() &&
-                           i < system_info_.units[0].slots.size();
-             ++i) {
+        for (size_t i = 0; i < colors.size(); ++i) {
             if (colors[i].is_number_integer()) {
-                system_info_.units[0].slots[i].color_rgb =
-                    static_cast<uint32_t>(colors[i].get<int>());
+                auto* slot = system_info_.get_slot_global(static_cast<int>(i));
+                if (slot) {
+                    slot->color_rgb = static_cast<uint32_t>(colors[i].get<int>());
+                }
             }
         }
     }
@@ -351,11 +362,12 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
     // Values are strings like "PLA", "PETG", "ABS"
     if (mmu_data.contains("gate_material") && mmu_data["gate_material"].is_array()) {
         const auto& materials = mmu_data["gate_material"];
-        for (size_t i = 0; i < materials.size() && !system_info_.units.empty() &&
-                           i < system_info_.units[0].slots.size();
-             ++i) {
+        for (size_t i = 0; i < materials.size(); ++i) {
             if (materials[i].is_string()) {
-                system_info_.units[0].slots[i].material = materials[i].get<std::string>();
+                auto* slot = system_info_.get_slot_global(static_cast<int>(i));
+                if (slot) {
+                    slot->material = materials[i].get<std::string>();
+                }
             }
         }
     }
@@ -372,61 +384,77 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
             }
         }
 
-        // Update gate mapped_tool references
-        if (!system_info_.units.empty()) {
-            for (auto& slot : system_info_.units[0].slots) {
+        // Update gate mapped_tool references (multi-unit safe)
+        for (auto& unit : system_info_.units) {
+            for (auto& slot : unit.slots) {
                 slot.mapped_tool = -1; // Reset
             }
-            for (size_t tool = 0; tool < system_info_.tool_to_slot_map.size(); ++tool) {
-                int slot_idx = system_info_.tool_to_slot_map[tool];
-                if (slot_idx >= 0 &&
-                    slot_idx < static_cast<int>(system_info_.units[0].slots.size())) {
-                    system_info_.units[0].slots[slot_idx].mapped_tool = static_cast<int>(tool);
-                }
+        }
+        for (size_t tool = 0; tool < system_info_.tool_to_slot_map.size(); ++tool) {
+            int slot_idx = system_info_.tool_to_slot_map[tool];
+            auto* slot = system_info_.get_slot_global(slot_idx);
+            if (slot) {
+                slot->mapped_tool = static_cast<int>(tool);
             }
         }
     }
 
-    // Parse endless_spool_groups if available
+    // Parse endless_spool_groups if available (multi-unit safe)
     if (mmu_data.contains("endless_spool_groups") && mmu_data["endless_spool_groups"].is_array()) {
         const auto& es_groups = mmu_data["endless_spool_groups"];
-        for (size_t i = 0; i < es_groups.size() && !system_info_.units.empty() &&
-                           i < system_info_.units[0].slots.size();
-             ++i) {
+        for (size_t i = 0; i < es_groups.size(); ++i) {
             if (es_groups[i].is_number_integer()) {
-                system_info_.units[0].slots[i].endless_spool_group = es_groups[i].get<int>();
+                auto* slot = system_info_.get_slot_global(static_cast<int>(i));
+                if (slot) {
+                    slot->endless_spool_group = es_groups[i].get<int>();
+                }
             }
         }
     }
 }
 
 void AmsBackendHappyHare::initialize_gates(int gate_count) {
-    spdlog::info("[AMS HappyHare] Initializing {} gates", gate_count);
-
-    // Create a single unit with all gates
-    AmsUnit unit;
-    unit.unit_index = 0;
-    unit.name = "Happy Hare MMU";
-    unit.slot_count = gate_count;
-    unit.first_slot_global_index = 0;
-    unit.connected = true;
-    unit.has_encoder = true; // Happy Hare typically has encoder
-    unit.has_toolhead_sensor = true;
-    unit.has_slot_sensors = true;
-
-    // Initialize slots with defaults
-    for (int i = 0; i < gate_count; ++i) {
-        SlotInfo slot;
-        slot.slot_index = i;
-        slot.global_index = i;
-        slot.status = SlotStatus::UNKNOWN;
-        slot.mapped_tool = i; // Default 1:1 mapping
-        slot.color_rgb = AMS_DEFAULT_SLOT_COLOR;
-        unit.slots.push_back(slot);
-    }
+    spdlog::info("[AMS HappyHare] Initializing {} gates across {} units", gate_count, num_units_);
 
     system_info_.units.clear();
-    system_info_.units.push_back(unit);
+
+    int gates_per_unit = (num_units_ > 1) ? (gate_count / num_units_) : gate_count;
+    int remaining_gates = gate_count;
+    int global_offset = 0;
+
+    for (int u = 0; u < num_units_; ++u) {
+        // Last unit gets any remainder gates
+        int unit_gates = (u == num_units_ - 1) ? remaining_gates : gates_per_unit;
+
+        AmsUnit unit;
+        unit.unit_index = u;
+        if (num_units_ > 1) {
+            unit.name = fmt::format("MMU Unit {}", u + 1);
+        } else {
+            unit.name = "Happy Hare MMU";
+        }
+        unit.slot_count = unit_gates;
+        unit.first_slot_global_index = global_offset;
+        unit.connected = true;
+        unit.has_encoder = true;
+        unit.has_toolhead_sensor = true;
+        unit.has_slot_sensors = true;
+
+        for (int i = 0; i < unit_gates; ++i) {
+            SlotInfo slot;
+            slot.slot_index = i;
+            slot.global_index = global_offset + i;
+            slot.status = SlotStatus::UNKNOWN;
+            slot.mapped_tool = global_offset + i;
+            slot.color_rgb = AMS_DEFAULT_SLOT_COLOR;
+            unit.slots.push_back(slot);
+        }
+
+        system_info_.units.push_back(unit);
+        global_offset += unit_gates;
+        remaining_gates -= unit_gates;
+    }
+
     system_info_.total_slots = gate_count;
 
     // Initialize tool-to-gate mapping (1:1 default)
@@ -809,23 +837,31 @@ AmsBackendHappyHare::get_endless_spool_config() const {
         return configs;
     }
 
-    // Iterate through slots and find backup slots based on endless_spool_group
-    for (const auto& slot : system_info_.units[0].slots) {
-        helix::printer::EndlessSpoolConfig config;
-        config.slot_index = slot.slot_index;
-        config.backup_slot = -1; // Default: no backup
+    // Iterate through all units/slots and find backup slots based on endless_spool_group
+    for (const auto& unit : system_info_.units) {
+        for (const auto& slot : unit.slots) {
+            helix::printer::EndlessSpoolConfig config;
+            config.slot_index = slot.global_index;
+            config.backup_slot = -1; // Default: no backup
 
-        if (slot.endless_spool_group >= 0) {
-            // Find another slot in the same group
-            for (const auto& other : system_info_.units[0].slots) {
-                if (other.slot_index != slot.slot_index &&
-                    other.endless_spool_group == slot.endless_spool_group) {
-                    config.backup_slot = other.slot_index;
-                    break; // Use first match
+            if (slot.endless_spool_group >= 0) {
+                // Find another slot in the same group (across all units)
+                for (const auto& other_unit : system_info_.units) {
+                    bool found = false;
+                    for (const auto& other : other_unit.slots) {
+                        if (other.global_index != slot.global_index &&
+                            other.endless_spool_group == slot.endless_spool_group) {
+                            config.backup_slot = other.global_index;
+                            found = true;
+                            break; // Use first match
+                        }
+                    }
+                    if (found)
+                        break;
                 }
             }
+            configs.push_back(config);
         }
-        configs.push_back(config);
     }
 
     return configs;

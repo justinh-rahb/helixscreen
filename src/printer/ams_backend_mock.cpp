@@ -1451,6 +1451,166 @@ bool AmsBackendMock::is_afc_mode() const {
     return afc_mode_;
 }
 
+void AmsBackendMock::set_multi_unit_mode(bool enabled) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    multi_unit_mode_ = enabled;
+
+    if (enabled) {
+        // Disable conflicting modes
+        tool_changer_mode_ = false;
+
+        // Configure as AFC with 2 Box Turtle units
+        system_info_.type = AmsType::AFC;
+        system_info_.type_name = "AFC (Mock Multi-Unit)";
+        system_info_.version = "1.0.32-mock";
+        system_info_.supports_bypass = true;
+        system_info_.supports_endless_spool = true;
+        system_info_.supports_spoolman = true;
+        system_info_.supports_tool_mapping = true;
+        system_info_.has_hardware_bypass_sensor = false;
+        system_info_.tip_method = TipMethod::CUT;
+        system_info_.supports_purge = true;
+        topology_ = PathTopology::HUB;
+
+        system_info_.units.clear();
+        system_info_.total_slots = 8;
+
+        // Unit 0: "Box Turtle 1" - 4 slots
+        {
+            AmsUnit unit;
+            unit.unit_index = 0;
+            unit.name = "Box Turtle 1";
+            unit.slot_count = 4;
+            unit.first_slot_global_index = 0;
+            unit.connected = true;
+            unit.firmware_version = "1.0.32-mock";
+            unit.has_encoder = false;
+            unit.has_toolhead_sensor = true;
+            unit.has_slot_sensors = true;
+
+            const struct {
+                uint32_t color;
+                const char* name;
+                const char* material;
+                SlotStatus status;
+            } slots[] = {
+                {0x000000, "Black", "ASA", SlotStatus::LOADED},
+                {0xFF0000, "Red", "PLA", SlotStatus::AVAILABLE},
+                {0x00FF00, "Green", "PETG", SlotStatus::AVAILABLE},
+                {0xFFFFFF, "White", "PLA", SlotStatus::EMPTY},
+            };
+
+            for (int i = 0; i < 4; i++) {
+                SlotInfo slot;
+                slot.slot_index = i;
+                slot.global_index = i;
+                slot.material = slots[i].material;
+                slot.color_rgb = slots[i].color;
+                slot.color_name = slots[i].name;
+                slot.status = slots[i].status;
+                slot.mapped_tool = i;
+                slot.total_weight_g = 1000.0f;
+                slot.remaining_weight_g = (i == 3) ? 0.0f : (1000.0f - i * 250.0f);
+                auto mat_info = filament::find_material(slots[i].material);
+                if (mat_info) {
+                    slot.nozzle_temp_min = mat_info->nozzle_min;
+                    slot.nozzle_temp_max = mat_info->nozzle_max;
+                    slot.bed_temp = mat_info->bed_temp;
+                }
+                unit.slots.push_back(slot);
+            }
+            system_info_.units.push_back(unit);
+        }
+
+        // Unit 1: "Box Turtle 2" - 4 slots
+        {
+            AmsUnit unit;
+            unit.unit_index = 1;
+            unit.name = "Box Turtle 2";
+            unit.slot_count = 4;
+            unit.first_slot_global_index = 4;
+            unit.connected = true;
+            unit.firmware_version = "1.0.32-mock";
+            unit.has_encoder = false;
+            unit.has_toolhead_sensor = true;
+            unit.has_slot_sensors = true;
+
+            const struct {
+                uint32_t color;
+                const char* name;
+                const char* material;
+                SlotStatus status;
+            } slots[] = {
+                {0x1E88E5, "Blue", "PETG", SlotStatus::AVAILABLE},
+                {0xFDD835, "Yellow", "ABS", SlotStatus::AVAILABLE},
+                {0x8E24AA, "Purple", "PA-CF", SlotStatus::AVAILABLE},
+                {0xFF6F00, "Orange", "TPU", SlotStatus::AVAILABLE},
+            };
+
+            for (int i = 0; i < 4; i++) {
+                SlotInfo slot;
+                slot.slot_index = i;
+                slot.global_index = 4 + i;
+                slot.material = slots[i].material;
+                slot.color_rgb = slots[i].color;
+                slot.color_name = slots[i].name;
+                slot.status = slots[i].status;
+                slot.mapped_tool = 4 + i;
+                slot.total_weight_g = 1000.0f;
+                slot.remaining_weight_g = 1000.0f - i * 200.0f;
+                auto mat_info = filament::find_material(slots[i].material);
+                if (mat_info) {
+                    slot.nozzle_temp_min = mat_info->nozzle_min;
+                    slot.nozzle_temp_max = mat_info->nozzle_max;
+                    slot.bed_temp = mat_info->bed_temp;
+                }
+                unit.slots.push_back(slot);
+            }
+            system_info_.units.push_back(unit);
+        }
+
+        // Tool-to-slot mapping: T0-T7
+        system_info_.tool_to_slot_map = {0, 1, 2, 3, 4, 5, 6, 7};
+
+        // Start with slot 0 loaded
+        system_info_.current_slot = 0;
+        system_info_.current_tool = 0;
+        system_info_.filament_loaded = true;
+        filament_segment_ = PathSegment::NOZZLE;
+
+        // Reinitialize endless spool configs for 8 slots
+        endless_spool_configs_.clear();
+        endless_spool_configs_.reserve(8);
+        for (int i = 0; i < 8; ++i) {
+            helix::printer::EndlessSpoolConfig config;
+            config.slot_index = i;
+            config.backup_slot = -1;
+            endless_spool_configs_.push_back(config);
+        }
+
+        spdlog::info("[AmsBackendMock] Multi-unit mode enabled (2x Box Turtle, 8 slots total)");
+    } else {
+        multi_unit_mode_ = false;
+        // Revert to Happy Hare defaults
+        system_info_.type = AmsType::HAPPY_HARE;
+        system_info_.type_name = "Happy Hare (Mock)";
+        system_info_.version = "2.7.0-mock";
+        system_info_.supports_bypass = true;
+        topology_ = PathTopology::HUB;
+
+        if (!system_info_.units.empty()) {
+            system_info_.units[0].name = "Mock MMU";
+        }
+
+        spdlog::info("[AmsBackendMock] Multi-unit mode disabled");
+    }
+}
+
+bool AmsBackendMock::is_multi_unit_mode() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return multi_unit_mode_;
+}
+
 int AmsBackendMock::get_effective_delay_ms(int base_ms, float variance) const {
     double speedup = get_runtime_config()->sim_speedup;
     if (speedup <= 0)

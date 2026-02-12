@@ -703,6 +703,79 @@ struct AmsSystemInfo {
     [[nodiscard]] bool is_busy() const {
         return action != AmsAction::IDLE && action != AmsAction::ERROR;
     }
+
+    // === Multi-unit helpers ===
+
+    /**
+     * @brief Check if this is a multi-unit setup (2+ physical units)
+     * @return true if more than one AmsUnit exists
+     */
+    [[nodiscard]] bool is_multi_unit() const {
+        return units.size() > 1;
+    }
+
+    /**
+     * @brief Get number of physical units
+     * @return Number of AmsUnit entries
+     */
+    [[nodiscard]] int unit_count() const {
+        return static_cast<int>(units.size());
+    }
+
+    /**
+     * @brief Get the unit that contains a given global slot index
+     * @param global_index Global slot index (0 to total_slots-1)
+     * @return Pointer to containing AmsUnit or nullptr if out of range
+     */
+    [[nodiscard]] const AmsUnit* get_unit_for_slot(int global_index) const {
+        for (const auto& unit : units) {
+            if (global_index >= unit.first_slot_global_index &&
+                global_index < unit.first_slot_global_index + unit.slot_count) {
+                return &unit;
+            }
+        }
+        return nullptr;
+    }
+
+    /**
+     * @brief Get mutable unit that contains a given global slot index
+     * @param global_index Global slot index (0 to total_slots-1)
+     * @return Pointer to containing AmsUnit or nullptr if out of range
+     */
+    [[nodiscard]] AmsUnit* get_unit_for_slot(int global_index) {
+        for (auto& unit : units) {
+            if (global_index >= unit.first_slot_global_index &&
+                global_index < unit.first_slot_global_index + unit.slot_count) {
+                return &unit;
+            }
+        }
+        return nullptr;
+    }
+
+    /**
+     * @brief Get unit by index
+     * @param unit_index Unit index (0 to unit_count()-1)
+     * @return Pointer to AmsUnit or nullptr if out of range
+     */
+    [[nodiscard]] const AmsUnit* get_unit(int unit_index) const {
+        if (unit_index < 0 || unit_index >= static_cast<int>(units.size())) {
+            return nullptr;
+        }
+        return &units[unit_index];
+    }
+
+    /**
+     * @brief Get the unit index that contains the currently active slot
+     * @return Unit index (0-based) or -1 if no active slot
+     */
+    [[nodiscard]] int get_active_unit_index() const {
+        if (current_slot < 0)
+            return -1;
+        const auto* unit = get_unit_for_slot(current_slot);
+        if (!unit)
+            return -1;
+        return unit->unit_index;
+    }
 };
 
 /**

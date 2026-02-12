@@ -7,6 +7,7 @@
 #include "ui_nav_manager.h"
 #include "ui_observer_guard.h"
 #include "ui_panel_ams.h"
+#include "ui_panel_ams_overview.h"
 
 #include "ams_backend.h"
 #include "ams_state.h"
@@ -300,20 +301,11 @@ static void on_delete(lv_event_t* e) {
     }
 }
 
-/** Click callback to open AMS panel */
+/** Click callback to open AMS panel (routes to overview for multi-unit) */
 static void on_click(lv_event_t* e) {
     (void)e;
-    spdlog::debug("[AmsMiniStatus] Clicked - opening AMS panel");
-
-    // Get or create the AMS panel and push it as an overlay
-    auto& ams_panel = get_global_ams_panel();
-    if (!ams_panel.are_subjects_initialized()) {
-        ams_panel.init_subjects();
-    }
-    lv_obj_t* panel_obj = ams_panel.get_panel();
-    if (panel_obj) {
-        ui_nav_push_overlay(panel_obj);
-    }
+    spdlog::debug("[AmsMiniStatus] Clicked - navigating to AMS panel");
+    navigate_to_ams_panel();
 }
 
 // ============================================================================
