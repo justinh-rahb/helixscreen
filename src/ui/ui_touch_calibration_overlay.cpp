@@ -483,6 +483,16 @@ void TouchCalibrationOverlay::handle_retry_clicked() {
         return;
     }
 
+    // Restore previous calibration before retrying
+    if (has_backup_) {
+        DisplayManager* dm = DisplayManager::instance();
+        if (dm) {
+            dm->apply_touch_calibration(backup_calibration_);
+            spdlog::info("[{}] Restored previous calibration for retry", get_name());
+        }
+        has_backup_ = false;
+    }
+
     panel_->retry();
     lv_subject_set_int(&state_subject_, STATE_POINT_1);
     update_instruction_text();
@@ -541,6 +551,20 @@ void TouchCalibrationOverlay::handle_screen_touched(lv_event_t* e) {
 
     // Capture the raw touch point
     panel_->capture_point({point.x, point.y});
+
+    // If we just entered VERIFY, temporarily apply new calibration so accept/retry buttons
+    // are tappable even if the previous calibration was bad
+    if (panel_->get_state() == helix::TouchCalibrationPanel::State::VERIFY) {
+        const TouchCalibration* cal = panel_->get_calibration();
+        DisplayManager* dm = DisplayManager::instance();
+        if (cal && cal->valid && dm) {
+            backup_calibration_ = dm->get_current_calibration();
+            has_backup_ = true;
+            if (dm->apply_touch_calibration(*cal)) {
+                spdlog::info("[{}] New calibration applied for verification", get_name());
+            }
+        }
+    }
 
     // Map panel state to subject state
     update_state_subject();
@@ -724,21 +748,7 @@ void TouchCalibrationOverlay::on_calibration_complete(const TouchCalibration* ca
     }
 
     if (cal && cal->valid) {
-        spdlog::info("[{}] Calibration complete callback received (valid)", get_name());
-
-        // Backup current calibration before applying new one for verification
-        DisplayManager* dm = DisplayManager::instance();
-        if (dm) {
-            backup_calibration_ = dm->get_current_calibration();
-            has_backup_ = true;
-
-            // Apply new calibration immediately so user can verify it feels right
-            if (dm->apply_touch_calibration(*cal)) {
-                spdlog::info("[{}] Calibration applied for verification", get_name());
-            } else {
-                spdlog::debug("[{}] Could not apply calibration for verification", get_name());
-            }
-        }
+        spdlog::info("[{}] Calibration accepted", get_name());
     } else {
         spdlog::debug("[{}] Calibration cancelled or invalid", get_name());
     }
