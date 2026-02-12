@@ -2763,6 +2763,7 @@ main() {
     install_runtime_deps "$platform"
     check_disk_space "$platform"
     detect_init_system
+    check_klipper_ecosystem "$platform"
 
     # Get version (skip if using local tarball)
     if [ -n "$local_tarball" ]; then
