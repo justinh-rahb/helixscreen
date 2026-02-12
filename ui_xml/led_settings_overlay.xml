@@ -9,7 +9,9 @@
         extends="overlay_panel" width="#overlay_panel_width_full" title="LED Settings" title_tag="LED Settings"
         bg_color="#screen_bg">
     <!-- Content Area -->
-    <lv_obj name="overlay_content" width="100%" flex_grow="1" style_pad_top="0" style_pad_left="#space_lg" style_pad_right="#space_lg" style_pad_bottom="#space_lg" scrollable="true" flex_flow="column">
+    <lv_obj name="overlay_content"
+            width="100%" flex_grow="1" style_pad_top="0" style_pad_left="#space_lg" style_pad_right="#space_lg"
+            style_pad_bottom="#space_lg" scrollable="true" flex_flow="column">
       <!-- ================================================================== -->
       <!-- STARTUP SECTION -->
       <!-- ================================================================== -->
@@ -17,8 +19,7 @@
       <setting_toggle_row name="row_led_on_at_start"
                           label="LED on at Start" label_tag="LED on at Start" icon="light"
                           description="Turn on LEDs when printer starts"
-                          description_tag="Turn on LEDs when printer starts"
-                          callback="on_led_on_at_start_changed"/>
+                          description_tag="Turn on LEDs when printer starts" callback="on_led_on_at_start_changed"/>
       <!-- ================================================================== -->
       <!-- AUTO STATE SECTION -->
       <!-- ================================================================== -->
@@ -26,24 +27,23 @@
       <setting_toggle_row name="row_auto_state_enabled"
                           label="Automatic LED Control" label_tag="Automatic LED Control" icon="tune_variant"
                           description="Change LED color based on printer state"
-                          description_tag="Change LED color based on printer state"
-                          callback="on_auto_state_changed"/>
+                          description_tag="Change LED color based on printer state" callback="on_auto_state_changed"/>
       <!-- ================================================================== -->
       <!-- MACRO DEVICES SECTION -->
       <!-- ================================================================== -->
       <setting_section_header title="MACRO DEVICES" title_tag="MACRO DEVICES" icon="code_braces"/>
       <!-- Macro device cards are populated dynamically in C++ -->
-      <lv_obj name="macro_devices_container" width="100%" height="content"
-              flex_flow="column" style_pad_gap="#space_sm"
-              style_bg_opa="0" style_border_width="0" style_pad_all="0"
-              scrollable="false"/>
+      <lv_obj name="macro_devices_container"
+              width="100%" height="content" flex_flow="column" style_pad_gap="#space_sm" style_bg_opa="0"
+              style_border_width="0" style_pad_all="0" scrollable="false"/>
       <!-- Info note about auto-detection -->
       <lv_obj width="100%"
               height="content" scrollable="false" style_pad_left="#space_lg" style_pad_right="#space_lg"
               style_pad_top="#space_md" style_pad_bottom="#space_lg" flex_flow="row" style_flex_cross_place="center"
               style_pad_gap="#space_sm" style_bg_opa="0" style_border_width="0">
         <icon src="info" size="xs" variant="secondary"/>
-        <text_small text="Macro devices are auto-detected from your printer macros" translation_tag="Macro devices are auto-detected from your printer macros"/>
+        <text_small text="Macro devices are auto-detected from your printer macros"
+                    translation_tag="Macro devices are auto-detected from your printer macros"/>
       </lv_obj>
     </lv_obj>
   </view>

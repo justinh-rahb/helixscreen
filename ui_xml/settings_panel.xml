@@ -68,8 +68,7 @@
       <setting_action_row name="row_led_settings"
                           label="LED Settings" label_tag="LED Settings" icon="tune"
                           description="Startup, auto-control, and macro devices"
-                          description_tag="Startup, auto-control, and macro devices"
-                          callback="on_led_settings_clicked"/>
+                          description_tag="Startup, auto-control, and macro devices" callback="on_led_settings_clicked"/>
     </lv_obj>
     <!-- Firmware Retraction Settings (hidden if no firmware_retraction capability) -->
     <lv_obj name="container_firmware_retraction" width="100%" style_pad_all="0" scrollable="false">
