@@ -314,7 +314,7 @@ void register_xml_components() {
     register_xml("telemetry_data_overlay.xml");
 
     // Printer manager overlay (launched from home screen printer image)
-    lv_xml_register_component_from_file("A:ui_xml/printer_manager_overlay.xml");
+    register_xml("printer_manager_overlay.xml");
 
     // Development tools
     register_xml("memory_stats_overlay.xml");

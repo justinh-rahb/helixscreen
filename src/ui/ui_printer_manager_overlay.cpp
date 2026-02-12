@@ -2,14 +2,26 @@
 
 #include "ui_printer_manager_overlay.h"
 
+#include "ui_fan_control_overlay.h"
 #include "ui_nav_manager.h"
+#include "ui_overlay_retraction_settings.h"
+#include "ui_overlay_timelapse_settings.h"
+#include "ui_panel_ams.h"
+#include "ui_panel_bed_mesh.h"
+#include "ui_panel_input_shaper.h"
+#include "ui_panel_screws_tilt.h"
+#include "ui_panel_spoolman.h"
+#include "ui_settings_sound.h"
+#include "ui_toast.h"
 
+#include "app_globals.h"
 #include "config.h"
 #include "helix_version.h"
 #include "printer_detector.h"
 #include "printer_images.h"
 #include "static_panel_registry.h"
 #include "subject_debug_registry.h"
+#include "ui/ui_lazy_panel_helper.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -86,19 +98,131 @@ lv_obj_t* PrinterManagerOverlay::create(lv_obj_t* parent) {
 // =============================================================================
 
 void PrinterManagerOverlay::register_callbacks() {
-    // Phase 1: No additional callbacks needed
-    // Back button is handled by the overlay_panel component
+    // Chip navigation callbacks
+    lv_xml_register_event_cb(nullptr, "pm_chip_bed_mesh_clicked", on_chip_bed_mesh_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_leds_clicked", on_chip_leds_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_adxl_clicked", on_chip_adxl_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_retraction_clicked", on_chip_retraction_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_spoolman_clicked", on_chip_spoolman_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_timelapse_clicked", on_chip_timelapse_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_screws_tilt_clicked", on_chip_screws_tilt_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_ams_clicked", on_chip_ams_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_fans_clicked", on_chip_fans_clicked);
+    lv_xml_register_event_cb(nullptr, "pm_chip_speaker_clicked", on_chip_speaker_clicked);
 }
 
-void PrinterManagerOverlay::on_printer_manager_back_clicked(lv_event_t* e) {
+// =============================================================================
+// Chip Navigation Callbacks
+// =============================================================================
+
+void PrinterManagerOverlay::on_chip_bed_mesh_clicked(lv_event_t* e) {
     (void)e;
-    if (g_printer_manager_overlay) {
-        g_printer_manager_overlay->handle_back_clicked();
+    spdlog::debug("[Printer Manager] Bed Mesh chip clicked");
+    auto& pm = get_printer_manager_overlay();
+    helix::ui::lazy_create_and_push_overlay<BedMeshPanel>(
+        get_global_bed_mesh_panel, pm.bed_mesh_panel_, lv_display_get_screen_active(nullptr),
+        "Bed Mesh", "Printer Manager");
+}
+
+void PrinterManagerOverlay::on_chip_leds_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] LEDs chip clicked");
+    // TODO: Navigate to LED settings when available
+    ui_toast_show(ToastSeverity::INFO, "LED settings coming soon", 2000);
+}
+
+void PrinterManagerOverlay::on_chip_adxl_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] ADXL chip clicked");
+    auto& pm = get_printer_manager_overlay();
+    helix::ui::lazy_create_and_push_overlay<InputShaperPanel>(
+        get_global_input_shaper_panel, pm.input_shaper_panel_,
+        lv_display_get_screen_active(nullptr), "Input Shaper", "Printer Manager");
+}
+
+void PrinterManagerOverlay::on_chip_retraction_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] Retraction chip clicked");
+    auto& pm = get_printer_manager_overlay();
+    helix::ui::lazy_create_and_push_overlay<RetractionSettingsOverlay>(
+        get_global_retraction_settings, pm.retraction_panel_, lv_display_get_screen_active(nullptr),
+        "Retraction Settings", "Printer Manager");
+}
+
+void PrinterManagerOverlay::on_chip_spoolman_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] Spoolman chip clicked");
+    auto& pm = get_printer_manager_overlay();
+    helix::ui::lazy_create_and_push_overlay<SpoolmanPanel>(
+        get_global_spoolman_panel, pm.spoolman_panel_, lv_display_get_screen_active(nullptr),
+        "Spoolman", "Printer Manager");
+}
+
+void PrinterManagerOverlay::on_chip_timelapse_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] Timelapse chip clicked");
+    auto& pm = get_printer_manager_overlay();
+    helix::ui::lazy_create_and_push_overlay<TimelapseSettingsOverlay>(
+        get_global_timelapse_settings, pm.timelapse_panel_, lv_display_get_screen_active(nullptr),
+        "Timelapse Settings", "Printer Manager");
+}
+
+void PrinterManagerOverlay::on_chip_screws_tilt_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] Screws Tilt chip clicked");
+    auto& pm = get_printer_manager_overlay();
+    helix::ui::lazy_create_and_push_overlay<ScrewsTiltPanel>(
+        get_global_screws_tilt_panel, pm.screws_tilt_panel_, lv_display_get_screen_active(nullptr),
+        "Bed Screws", "Printer Manager");
+}
+
+void PrinterManagerOverlay::on_chip_ams_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] AMS chip clicked");
+
+    auto& ams_panel = get_global_ams_panel();
+    if (!ams_panel.are_subjects_initialized()) {
+        ams_panel.init_subjects();
+    }
+    lv_obj_t* panel_obj = ams_panel.get_panel();
+    if (panel_obj) {
+        ui_nav_push_overlay(panel_obj);
     }
 }
 
-void PrinterManagerOverlay::handle_back_clicked() {
-    ui_nav_go_back();
+void PrinterManagerOverlay::on_chip_fans_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] Fans chip clicked");
+
+    auto& pm = get_printer_manager_overlay();
+    if (!pm.fan_control_panel_) {
+        auto& overlay = get_fan_control_overlay();
+        if (!overlay.are_subjects_initialized()) {
+            overlay.init_subjects();
+        }
+        overlay.register_callbacks();
+        overlay.set_api(get_moonraker_api());
+
+        lv_obj_t* screen = lv_display_get_screen_active(nullptr);
+        pm.fan_control_panel_ = overlay.create(screen);
+        if (!pm.fan_control_panel_) {
+            spdlog::warn("[Printer Manager] Failed to create fan control overlay");
+            return;
+        }
+        NavigationManager::instance().register_overlay_instance(pm.fan_control_panel_, &overlay);
+    }
+
+    if (pm.fan_control_panel_) {
+        get_fan_control_overlay().set_api(get_moonraker_api());
+        ui_nav_push_overlay(pm.fan_control_panel_);
+    }
+}
+
+void PrinterManagerOverlay::on_chip_speaker_clicked(lv_event_t* e) {
+    (void)e;
+    spdlog::debug("[Printer Manager] Speaker chip clicked");
+    auto& overlay = helix::settings::get_sound_settings_overlay();
+    overlay.show(lv_display_get_screen_active(nullptr));
 }
 
 // =============================================================================
@@ -108,14 +232,6 @@ void PrinterManagerOverlay::handle_back_clicked() {
 void PrinterManagerOverlay::on_activate() {
     OverlayBase::on_activate();
     refresh_printer_info();
-}
-
-void PrinterManagerOverlay::on_deactivate() {
-    OverlayBase::on_deactivate();
-}
-
-void PrinterManagerOverlay::cleanup() {
-    OverlayBase::cleanup();
 }
 
 // =============================================================================
@@ -154,9 +270,10 @@ void PrinterManagerOverlay::refresh_printer_info() {
                   model_buf_, version_buf_);
 
     // Update printer image programmatically (exception to declarative rule)
+    // Store path in member to ensure string lifetime outlives lv_image_set_src
     if (printer_image_obj_ && !model.empty()) {
-        std::string image_path = PrinterImages::get_image_path_for_name(model);
-        lv_image_set_src(printer_image_obj_, image_path.c_str());
-        spdlog::debug("[{}] Printer image: '{}' for '{}'", get_name(), image_path, model);
+        current_image_path_ = PrinterImages::get_best_printer_image(model);
+        lv_image_set_src(printer_image_obj_, current_image_path_.c_str());
+        spdlog::debug("[{}] Printer image: '{}' for '{}'", get_name(), current_image_path_, model);
     }
 }

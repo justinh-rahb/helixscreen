@@ -20,7 +20,7 @@
 #include "overlay_base.h"
 #include "subject_managed_panel.h"
 
-#include <memory>
+#include <string>
 
 /**
  * @class PrinterManagerOverlay
@@ -77,7 +77,8 @@ class PrinterManagerOverlay : public OverlayBase {
     /**
      * @brief Register event callbacks with lv_xml system
      *
-     * Phase 1: No callbacks needed (back button handled by overlay_panel component).
+     * Registers chip click callbacks for navigable capability chips.
+     * Back button is handled by the overlay_panel component.
      */
     void register_callbacks() override;
 
@@ -95,16 +96,6 @@ class PrinterManagerOverlay : public OverlayBase {
      * Refreshes printer info from config on each activation.
      */
     void on_activate() override;
-
-    /**
-     * @brief Called when overlay is being hidden
-     */
-    void on_deactivate() override;
-
-    /**
-     * @brief Clean up resources for async-safe destruction
-     */
-    void cleanup() override;
 
   private:
     //
@@ -139,17 +130,33 @@ class PrinterManagerOverlay : public OverlayBase {
     /// Printer image widget (set programmatically - exception to declarative rule)
     lv_obj_t* printer_image_obj_ = nullptr;
 
+    /// Stored image path (must outlive lv_image_set_src for path stability)
+    std::string current_image_path_;
+
+    // Cached panel pointers for lazy creation
+    lv_obj_t* bed_mesh_panel_ = nullptr;
+    lv_obj_t* spoolman_panel_ = nullptr;
+    lv_obj_t* screws_tilt_panel_ = nullptr;
+    lv_obj_t* input_shaper_panel_ = nullptr;
+    lv_obj_t* retraction_panel_ = nullptr;
+    lv_obj_t* timelapse_panel_ = nullptr;
+    lv_obj_t* fan_control_panel_ = nullptr;
+
     //
     // === Static Callbacks ===
     //
 
-    static void on_printer_manager_back_clicked(lv_event_t* e);
-
-    //
-    // === Private Handlers ===
-    //
-
-    void handle_back_clicked();
+    // Chip navigation callbacks
+    static void on_chip_bed_mesh_clicked(lv_event_t* e);
+    static void on_chip_leds_clicked(lv_event_t* e);
+    static void on_chip_adxl_clicked(lv_event_t* e);
+    static void on_chip_retraction_clicked(lv_event_t* e);
+    static void on_chip_spoolman_clicked(lv_event_t* e);
+    static void on_chip_timelapse_clicked(lv_event_t* e);
+    static void on_chip_screws_tilt_clicked(lv_event_t* e);
+    static void on_chip_ams_clicked(lv_event_t* e);
+    static void on_chip_fans_clicked(lv_event_t* e);
+    static void on_chip_speaker_clicked(lv_event_t* e);
 };
 
 /**
