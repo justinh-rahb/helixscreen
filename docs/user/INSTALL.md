@@ -40,7 +40,9 @@ The installer automatically detects your platform and downloads the correct rele
 
 > **Note:** Both `bash` and `sh` work. The installer is POSIX-compatible for BusyBox environments.
 
-**KIAUH users:** The one-liner works on KIAUH installations too! Alternatively, see [scripts/kiauh/](https://github.com/prestonbrown/helixscreen/tree/main/scripts/kiauh) to add HelixScreen to your KIAUH menu.
+**KIAUH users:** HelixScreen is available as a KIAUH extension! Run `kiauh` and find HelixScreen in the extensions menu, or use the one-liner above. See [scripts/kiauh/](https://github.com/prestonbrown/helixscreen/tree/main/scripts/kiauh) for details.
+
+> **Pre-flight checks:** On AD5M and K1, the installer validates that Klipper and Moonraker are running before proceeding. If either is missing, you'll get a clear error message explaining what's needed.
 
 After installation, the setup wizard will guide you through initial configuration.
 

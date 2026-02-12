@@ -11,10 +11,12 @@ Quick answers to common questions about HelixScreen.
 HelixScreen is a touchscreen interface for Klipper 3D printers. It connects to your Moonraker instance and provides a modern, touch-friendly UI for controlling your printer.
 
 **Key features:**
-- 25+ panels covering all printer operations
-- 3D G-code preview and bed mesh visualization
-- First-run wizard for easy setup
-- Theme editor with multiple presets (dark and light)
+- 30 panels and 48 overlays covering all printer operations
+- 3D G-code preview, bed mesh visualization, frequency response charts
+- First-run wizard with telemetry opt-in
+- Theme editor with 14 presets (dark and light)
+- Sound system, timelapse integration, filament tracking
+- Auto-detecting layout system for multiple display sizes
 - Designed for embedded displays (low memory, no desktop required)
 
 ### Which printers are supported?
@@ -22,9 +24,14 @@ HelixScreen is a touchscreen interface for Klipper 3D printers. It connects to y
 **Any printer running Klipper + Moonraker** should work. HelixScreen connects to Moonraker's API, not directly to Klipper.
 
 **Tested and confirmed working:**
-- Voron 0.1
-- Voron 2.4
+- Voron 0.1, Voron 2.4
+- Doron Velta
+- RatRig V-Core
 - FlashForge Adventurer 5M / 5M Pro (with [Forge-X](https://github.com/DrA1ex/ff5m)) — most thoroughly tested on ForgeX 1.4.0 with FlashForge firmware 3.1.5; other versions may work fine
+
+**Supported with auto-detection:**
+- QIDI printers — detection heuristics and print start profile included
+- Snapmaker U1 — cross-compile target with 480x320 display support
 
 **Binaries available but untested:**
 - Creality K1 series (K1, K1C, K1 Max) — requires [Simple AF](https://github.com/pellcorp/creality) community firmware
@@ -35,7 +42,6 @@ HelixScreen is a touchscreen interface for Klipper 3D printers. It connects to y
 - Prusa (with Klipper mod)
 - Creality Ender (with Klipper)
 - Bambu (with Klipper mod)
-- Ratrig
 - Any custom Klipper build
 
 If you test on a printer not listed above, please let us know your results!
@@ -53,7 +59,9 @@ If you test on a printer not listed above, please let us know your results!
 - Other HDMI displays
 - SPI displays (with proper configuration)
 
-Recommended: 800x480 or higher. Smaller displays (480x320) will run but may have layout overlap issues — improved small-screen support is planned.
+**Display sizes:** HelixScreen auto-detects the best layout for your display. 800x480, 1024x600, and 1920x480 (ultrawide) are fully supported. 480x320 (Snapmaker U1) will run but may have layout overlap issues — improved small-screen support is ongoing.
+
+**Display rotation:** All three binaries (main, splash, watchdog) support 0°, 90°, 180°, and 270° rotation via config or command line.
 
 If you test on hardware not listed above, please let us know your results!
 
@@ -192,11 +200,13 @@ The web frontend you use (Mainsail, Fluidd, etc.) doesn't matter - HelixScreen t
 
 ### Does it support Happy Hare or AFC-Klipper?
 
-**In progress.** AMS/multi-material support is being developed for:
-- **Happy Hare** - MMU2, ERCF, and other Happy Hare systems
-- **AFC-Klipper** - Armored Filament Changer
+**Yes.** Full multi-material support is available for:
+- **Happy Hare** — MMU2, ERCF, 3MS, Tradrack
+- **AFC-Klipper** — Box Turtle with full data parsing, 11 device actions, per-lane reset, and mock mode
+- **ValgACE** — supported
+- **Tool changers** — supported
 
-⚠️ **Note:** This support is mostly untested and still in development. Basic features like slot status display and load/unload controls exist, but expect bugs. If you have one of these systems and want to help test, please reach out on GitHub!
+Features include visual slot configuration with tool badges, endless spool arrows, tap-to-edit popup, Spoolman integration, and material compatibility validation.
 
 ### Can I customize the colors or layout?
 
@@ -232,7 +242,7 @@ For layout customization, you can edit XML files in `ui_xml/` (no recompilation 
 
 ### Does it support input shaper?
 
-**Yes.** The Input Shaper panel shows resonance data and lets you run calibration. Access via **Advanced** → **Input Shaper**.
+**Yes.** The Input Shaper panel provides a full calibration workflow with frequency response charts, per-axis results, shaper comparison tables, and Save Config. Access via **Advanced** → **Input Shaper**. Requires an accelerometer configured in Klipper.
 
 ### Does it support exclude objects?
 

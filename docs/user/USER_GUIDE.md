@@ -309,6 +309,7 @@ The Print Status panel shows:
 - **Circular progress indicator** with percentage
 - **Time elapsed** and **time remaining**
 - **Current layer** / total layers
+- **Filament used** — live consumption updated during printing
 - **Filename** and thumbnail
 
 **Print controls:**
@@ -401,10 +402,12 @@ This lets you salvage a print when one object fails without canceling the entire
 
 ### After a Print
 
-When a print completes:
+When a print completes, a **completion modal** appears showing:
 
-- Status shows **Complete** with total time
-- Notification sound plays (if enabled)
+- **Total print time** and slicer estimate comparison
+- **Layers printed** (current / total)
+- **Filament consumed** (formatted as mm, meters, or km)
+- Notification sound plays (if enabled in Sound Settings)
 - Print is logged to history
 
 ---
@@ -606,14 +609,20 @@ Assisted manual bed leveling:
 Tune vibration compensation for smoother, faster prints:
 
 1. Navigate to **Advanced > Input Shaper**
-2. Select axis to test (X or Y)
-3. Tap **Measure** to run resonance test
-4. Review recommended shaper type and frequency
-5. Tap **Apply** to save to configuration
+2. Review your current shaper configuration displayed at the top
+3. Pre-flight check verifies accelerometer is connected
+4. Select axis to test (X or Y)
+5. Tap **Calibrate** to run the resonance test (5-minute timeout applies)
+6. View **frequency response chart** with interactive shaper overlay toggles
+7. Review the **comparison table** showing recommended shaper and alternatives (frequency, vibration reduction, smoothing)
+8. Tap **Apply** to use for this session or **Save Config** to persist
 
-The panel shows frequency graphs from the resonance test and current shaper settings.
+**Chart features:**
+- Toggle different shaper types on/off to compare their frequency response curves
+- Platform-adaptive: full interactive charts on desktop, simplified on embedded hardware
+- Per-axis results shown independently
 
-> **Requirement:** Accelerometer must be configured in Klipper for measurements.
+> **Requirement:** Accelerometer must be configured in Klipper for measurements. If no accelerometer is detected, the pre-flight check will show a warning.
 
 ### Z-Offset Calibration
 
@@ -631,15 +640,25 @@ Dedicated panel for dialing in your Z-offset when not printing:
 
 ![PID Tuning Panel](../images/user/controls-pid.png)
 
-Calibrate temperature controllers:
+Calibrate temperature controllers for stable heating:
 
-1. Navigate to **Controls > PID**
+1. Navigate to **Advanced > PID**
 2. Select **Nozzle** or **Bed**
-3. Enter target temperature
-4. Tap **Start** to run automatic tuning
-5. Review results and tap **Save** to write to config
+3. Choose a **material preset** (PLA, PETG, ABS, etc.) or enter a custom target temperature
+4. Optionally set **fan speed** — calibrating with the fan on gives more accurate results for printing conditions
+5. Tap **Start** to begin automatic tuning
 
-PID tuning takes several minutes as the heater cycles through temperature swings.
+**During calibration:**
+- **Live temperature graph** shows the heater cycling in real-time
+- **Progress percentage** updates as calibration proceeds
+- **Abort button** available if you need to stop early
+- A **15-minute timeout** acts as a safety net for stuck calibrations
+
+**When complete:**
+- View new PID values with **old→new deltas** so you can see what changed
+- Tap **Save Config** to persist the new values to your Klipper configuration
+
+> **Tip:** Run PID tuning after any hardware change (new heater, thermistor, or hotend) and with the fan speed you typically use while printing.
 
 ---
 
@@ -660,6 +679,9 @@ Access via the **Gear icon** in the navigation bar.
 | **Sleep timeout** | When screen turns off (1m, 2m, 5m, 10m, Never) |
 | **Time format** | 12-hour or 24-hour clock |
 | **Bed mesh render** | Auto, 3D, or 2D visualization |
+| **Display rotation** | 0°, 90°, 180°, 270° — rotates all three binaries (main, splash, watchdog) |
+
+**Layout auto-detection:** HelixScreen automatically selects the best layout for your display size. Standard (800×480), ultrawide (1920×480), and compact (480×320) layouts are supported. You can override with the `--layout` command-line flag.
 
 ### Theme Settings
 
@@ -673,11 +695,16 @@ Access via the **Gear icon** in the navigation bar.
 
 ### Sound Settings
 
+Tap **Sound** in Settings to open the dedicated sound overlay:
+
 | Setting | Options |
 |---------|---------|
 | **Enable sounds** | Toggle all sound effects on/off |
-| **Test beep** | Play a test tone (M300 command) |
+| **Volume slider** | Adjust volume level (plays a test beep when you release the slider) |
+| **Sound theme** | Choose a theme: Minimal (subtle) or Retro Chiptune (8-bit) |
 | **Completion alert** | How to notify when prints finish (Off, Notification, Alert) |
+
+> **Note:** Sound uses the best available backend for your hardware: SDL audio on Pi/desktop, PWM on embedded boards, or M300 G-code commands as fallback. Sound is currently a beta feature.
 
 ### Network Settings
 
@@ -847,15 +874,15 @@ Review past system notifications:
 
 ### Timelapse Settings
 
-Configure Moonraker-Timelapse:
+Configure Moonraker-Timelapse (beta feature):
 
 1. Navigate to **Advanced > Timelapse**
-2. Enable/disable timelapse recording
-3. Select mode:
-   - **Layer Macro**: Snapshot at each layer
-   - **Hyperlapse**: Time-based snapshots
-4. Set framerate (15/24/30/60 fps)
-5. Enable auto-render for automatic video creation
+2. If the timelapse plugin is not installed, HelixScreen detects this and offers an **Install Wizard** to set it up
+3. Once installed, configure settings:
+   - Enable/disable timelapse recording
+   - Select mode: **Layer Macro** (snapshot at each layer) or **Hyperlapse** (time-based)
+   - Set framerate (15/24/30/60 fps)
+   - Enable auto-render for automatic video creation
 
 ---
 
@@ -919,16 +946,18 @@ When beta features are enabled, the following appear in the UI with an orange "B
 
 | Feature | Location | Description | Status |
 |---------|----------|-------------|--------|
-| **Input Shaping** | Advanced panel | Resonance compensation tuning via accelerometer | Functional; requires accelerometer hardware |
 | **Z-Offset Calibration** | Advanced panel | Interactive probe-based Z calibration | Functional; requires probe (BLTouch, etc.) |
 | **HelixPrint Plugin** | Advanced panel | Install/uninstall the HelixPrint Klipper plugin for advanced print start control | Functional; plugin manages bed mesh, QGL, z-tilt skipping |
 | **Configure PRINT_START** | Advanced panel | Make bed mesh and QGL skippable in your print start macro | Functional; requires HelixPrint plugin installed |
 | **Timelapse** | Advanced panel | Configure Moonraker-Timelapse recording settings | Functional; requires timelapse plugin or webcam |
 | **Timelapse Setup** | Advanced panel | Install the timelapse plugin (shown when not installed but webcam detected) | Functional |
+| **Sound System** | Settings panel | Sound effects with volume control and theme selection | Functional; multi-backend (SDL/PWM/M300) |
 | **Plugins** | Settings panel | View installed plugins and their status | Functional; plugin system is early-stage |
 | **Update Channel** | Settings panel | Switch between Stable, Beta, and Dev update channels | Functional; Beta/Dev channels may have less-tested releases |
 | **Macro Browser** | Advanced panel | Browse and execute custom Klipper macros | Functional; hides system macros, confirms dangerous ones |
 | **Z Calibration** | Controls panel | Quick-access Z calibration button | Functional; requires probe hardware |
+
+> **Graduated from beta:** PID Calibration and Input Shaper are now available to all users without enabling beta features.
 
 ### Update Channel Selection
 
