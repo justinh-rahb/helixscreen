@@ -643,23 +643,25 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
+        RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        R2_BUCKET: ${{ vars.R2_BUCKET_NAME || 'helixscreen-releases' }}
+        R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+        UPLOAD_CHANNELS: ${{ steps.channels.outputs.channels }}
       run: |
         chmod +x scripts/generate-manifest.sh
-        BUCKET="${{ vars.R2_BUCKET_NAME || 'helixscreen-releases' }}"
-        VERSION="${{ steps.version.outputs.version }}"
-        TAG="${{ steps.version.outputs.tag }}"
-        NOTES="${{ steps.notes.outputs.notes }}"
 
-        for CHANNEL in ${{ steps.channels.outputs.channels }}; do
+        for CHANNEL in $UPLOAD_CHANNELS; do
           echo "=== Uploading to ${CHANNEL} channel ==="
 
           # Generate channel-specific manifest
           scripts/generate-manifest.sh \
-            --version "$VERSION" \
-            --tag "$TAG" \
-            --notes "$NOTES" \
+            --version "$RELEASE_VERSION" \
+            --tag "$RELEASE_TAG" \
+            --notes "$RELEASE_NOTES" \
             --dir release-files \
-            --base-url "${{ vars.R2_PUBLIC_URL }}/${CHANNEL}" \
+            --base-url "${R2_PUBLIC_URL}/${CHANNEL}" \
             --output "release-files/manifest-${CHANNEL}.json"
 
           echo "Generated manifest for ${CHANNEL}:"
@@ -669,14 +671,14 @@ jobs:
           for tarball in release-files/*.tar.gz release-files/*.zip; do
             filename=$(basename "$tarball")
             echo "Uploading ${CHANNEL}/${filename}..."
-            aws s3 cp "$tarball" "s3://${BUCKET}/${CHANNEL}/${filename}" \
+            aws s3 cp "$tarball" "s3://${R2_BUCKET}/${CHANNEL}/${filename}" \
               --endpoint-url "$R2_ENDPOINT"
           done
 
           # Upload manifest
           echo "Uploading ${CHANNEL}/manifest.json..."
           aws s3 cp "release-files/manifest-${CHANNEL}.json" \
-            "s3://${BUCKET}/${CHANNEL}/manifest.json" \
+            "s3://${R2_BUCKET}/${CHANNEL}/manifest.json" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type "application/json"
 
@@ -689,15 +691,15 @@ jobs:
           [ -f "$symfile" ] || continue
           filename=$(basename "$symfile")
           platform="${filename%.sym}"
-          echo "Uploading symbols/v${VERSION}/${platform}.sym..."
+          echo "Uploading symbols/v${RELEASE_VERSION}/${platform}.sym..."
           aws s3 cp "$symfile" \
-            "s3://${BUCKET}/symbols/v${VERSION}/${platform}.sym" \
+            "s3://${R2_BUCKET}/symbols/v${RELEASE_VERSION}/${platform}.sym" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type "text/plain"
         done
         echo "=== Symbol map upload complete ==="
 
         echo "All uploads complete!"
-        for CHANNEL in ${{ steps.channels.outputs.channels }}; do
-          echo "  ${CHANNEL}: ${{ vars.R2_PUBLIC_URL }}/${CHANNEL}/manifest.json"
+        for CHANNEL in $UPLOAD_CHANNELS; do
+          echo "  ${CHANNEL}: ${R2_PUBLIC_URL}/${CHANNEL}/manifest.json"
         done
