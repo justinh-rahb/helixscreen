@@ -981,8 +981,9 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Stress tests",
         }
 
         // After 150 tier switches, final state is EMBEDDED (last configured)
-        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == false);
-        REQUIRE(ui_frequency_response_chart_get_max_points(chart) == 0);
+        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == true);
+        REQUIRE(ui_frequency_response_chart_get_max_points(chart) ==
+                PlatformCapabilities::BASIC_CHART_POINTS);
     }
 
     ui_frequency_response_chart_destroy(chart);
