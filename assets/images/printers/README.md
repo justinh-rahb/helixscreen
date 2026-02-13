@@ -1,6 +1,6 @@
 # Printer Images
 
-This directory contains printer images used in the first-run configuration wizard to help users identify their printer type.
+This directory contains shipped printer images used in the first-run configuration wizard and the Printer Image picker overlay. Users can also add their own custom images (see [Custom Images](#custom-images) below).
 
 ## Available Images (12 printers)
 
@@ -55,16 +55,28 @@ The following printers will use the generic Voron V2 image (`voron-24r2-pro-5-75
 - **Background:** White or transparent preferred
 - **Content:** Full printer view, centered and cropped
 
-## Adding New Images
+## Custom Images
+
+Users can add their own printer images without modifying this directory:
+
+1. Place a PNG or JPEG file into `config/custom_images/` in the HelixScreen installation directory
+2. Open the Printer Image picker (Home Panel → tap printer image → Printer Manager → tap image again)
+3. Custom images appear automatically in the picker under the "Custom" section
+
+**Requirements:** PNG or JPEG, maximum 5MB file size, maximum 2048x2048 pixels. HelixScreen auto-converts custom images to optimized LVGL binary format (300px and 150px variants) the first time the Printer Image picker overlay is opened.
+
+Custom image selection is stored in the config as `"display.printer_image": "custom:filename"` (without extension).
+
+## Adding New Shipped Images
 
 1. Source high-quality printer image (product photos work best)
-2. Resize to 750×930px with aspect ratio preservation:
+2. Resize to 750x930px with aspect ratio preservation:
    ```bash
    magick input.jpg -resize 750x930 -gravity center -extent 750x930 -background white output.png
    ```
 3. Save to this directory with descriptive filename
 4. Update this README
-5. Update wizard integration in `src/ui_wizard.cpp`
+5. Update the Printer Image picker integration
 
 ## Future Work
 
@@ -72,3 +84,4 @@ The following printers will use the generic Voron V2 image (`voron-24r2-pro-5-75
 - Add Creality Ender/CR series images
 - Add Prusa family images
 - Consider adding manufacturer logos for unidentified printers
+- Add more community-contributed shipped images

@@ -64,6 +64,11 @@ if [ -n "$_helix_env_file" ]; then
 fi
 unset _helix_env_file
 
+# Resolve debug/logging settings: CLI flags > env vars (incl. env file) > defaults
+DEBUG_MODE="${CLI_DEBUG:-${HELIX_DEBUG:-0}}"
+LOG_DEST="${CLI_LOG_DEST:-${HELIX_LOG_DEST:-auto}}"
+LOG_FILE="${CLI_LOG_FILE:-${HELIX_LOG_FILE:-}}"
+
 # Default display backend to fbdev on embedded Linux targets.
 if [ -z "${HELIX_DISPLAY_BACKEND:-}" ]; then
     case "$(uname -s)" in
@@ -76,6 +81,17 @@ fi
 # --- End: extracted from helix-launcher.sh ---
 ENVEOF
     chmod +x "$BATS_TEST_TMPDIR/env_setup.sh"
+
+    # Create a mock helix-screen that writes its args to a file for inspection
+    cat > "$MOCK_INSTALL/bin/helix-screen" << 'MOCKEOF'
+#!/bin/sh
+# Write all args to a file for test inspection
+for arg in "$@"; do
+    echo "$arg"
+done > "$MOCK_INSTALL/helix_screen_args.txt"
+exit 0
+MOCKEOF
+    chmod +x "$MOCK_INSTALL/bin/helix-screen"
 }
 
 # Helper: run the env setup snippet and print a variable's value
@@ -305,6 +321,116 @@ EOF
     # SPLASH_ARGS should appear before the -- separator in the watchdog invocation
     grep -q '"${WATCHDOG_BIN}" ${SPLASH_ARGS} --' "$LAUNCHER"
 }
+
+# =============================================================================
+# Debug mode: HELIX_DEBUG env var and --debug flag
+# =============================================================================
+
+@test "HELIX_DEBUG=1 in environment enables debug mode (simulates systemd Environment=)" {
+    # This is the case that works TODAY: systemd sets HELIX_DEBUG=1 before launcher runs
+    unset CLI_DEBUG
+    export HELIX_DEBUG=1
+    result=$(MOCK_INSTALL="$MOCK_INSTALL" sh -c ". \"$BATS_TEST_TMPDIR/env_setup.sh\" && echo \"\$DEBUG_MODE\"")
+    [ "$result" = "1" ]
+}
+
+@test "HELIX_DEBUG=1 in env file enables debug mode" {
+    # This is the fix: env file sets HELIX_DEBUG, which is read AFTER env file sourcing
+    cat > "$MOCK_INSTALL/config/helixscreen.env" << 'EOF'
+HELIX_DEBUG=1
+EOF
+    unset HELIX_DEBUG CLI_DEBUG
+    result=$(MOCK_INSTALL="$MOCK_INSTALL" sh -c ". \"$BATS_TEST_TMPDIR/env_setup.sh\" && echo \"\$DEBUG_MODE\"")
+    [ "$result" = "1" ]
+}
+
+@test "CLI --debug flag takes priority over env file HELIX_DEBUG=0" {
+    cat > "$MOCK_INSTALL/config/helixscreen.env" << 'EOF'
+HELIX_DEBUG=0
+EOF
+    unset HELIX_DEBUG
+    export CLI_DEBUG=1
+    result=$(MOCK_INSTALL="$MOCK_INSTALL" sh -c ". \"$BATS_TEST_TMPDIR/env_setup.sh\" && echo \"\$DEBUG_MODE\"")
+    [ "$result" = "1" ]
+}
+
+@test "debug mode defaults to off when nothing is set" {
+    unset HELIX_DEBUG CLI_DEBUG
+    rm -f "$MOCK_INSTALL/config/helixscreen.env"
+    result=$(MOCK_INSTALL="$MOCK_INSTALL" sh -c ". \"$BATS_TEST_TMPDIR/env_setup.sh\" && echo \"\$DEBUG_MODE\"")
+    [ "$result" = "0" ]
+}
+
+@test "HELIX_DEBUG from environment overrides env file value" {
+    # Env file says 0, but environment says 1 — environment wins
+    cat > "$MOCK_INSTALL/config/helixscreen.env" << 'EOF'
+HELIX_DEBUG=0
+EOF
+    export HELIX_DEBUG=1
+    unset CLI_DEBUG
+    result=$(MOCK_INSTALL="$MOCK_INSTALL" sh -c ". \"$BATS_TEST_TMPDIR/env_setup.sh\" && echo \"\$DEBUG_MODE\"")
+    [ "$result" = "1" ]
+}
+
+# =============================================================================
+# End-to-end: launcher passes -vv to helix-screen when debug enabled
+# =============================================================================
+
+@test "e2e: HELIX_DEBUG=1 in environment causes launcher to pass -vv" {
+    cp "$LAUNCHER" "$MOCK_INSTALL/bin/helix-launcher.sh"
+    rm -f "$MOCK_INSTALL/helix_screen_args.txt"
+
+    HELIX_DEBUG=1 MOCK_INSTALL="$MOCK_INSTALL" \
+        sh "$MOCK_INSTALL/bin/helix-launcher.sh" 2>/dev/null || true
+
+    [ -f "$MOCK_INSTALL/helix_screen_args.txt" ]
+    grep -q '^-vv$' "$MOCK_INSTALL/helix_screen_args.txt"
+}
+
+@test "e2e: HELIX_DEBUG=1 in env file causes launcher to pass -vv" {
+    cp "$LAUNCHER" "$MOCK_INSTALL/bin/helix-launcher.sh"
+    rm -f "$MOCK_INSTALL/helix_screen_args.txt"
+    cat > "$MOCK_INSTALL/config/helixscreen.env" << 'EOF'
+HELIX_DEBUG=1
+EOF
+    unset HELIX_DEBUG
+
+    MOCK_INSTALL="$MOCK_INSTALL" \
+        sh "$MOCK_INSTALL/bin/helix-launcher.sh" 2>/dev/null || true
+
+    [ -f "$MOCK_INSTALL/helix_screen_args.txt" ]
+    grep -q '^-vv$' "$MOCK_INSTALL/helix_screen_args.txt"
+}
+
+@test "e2e: launcher does NOT pass -vv when debug is off" {
+    cp "$LAUNCHER" "$MOCK_INSTALL/bin/helix-launcher.sh"
+    rm -f "$MOCK_INSTALL/helix_screen_args.txt"
+    rm -f "$MOCK_INSTALL/config/helixscreen.env"
+    unset HELIX_DEBUG
+
+    MOCK_INSTALL="$MOCK_INSTALL" \
+        sh "$MOCK_INSTALL/bin/helix-launcher.sh" 2>/dev/null || true
+
+    if [ -f "$MOCK_INSTALL/helix_screen_args.txt" ]; then
+        ! grep -q '^-vv$' "$MOCK_INSTALL/helix_screen_args.txt"
+    fi
+}
+
+@test "e2e: --debug CLI flag causes launcher to pass -vv" {
+    cp "$LAUNCHER" "$MOCK_INSTALL/bin/helix-launcher.sh"
+    rm -f "$MOCK_INSTALL/helix_screen_args.txt"
+    unset HELIX_DEBUG
+
+    MOCK_INSTALL="$MOCK_INSTALL" \
+        sh "$MOCK_INSTALL/bin/helix-launcher.sh" --debug 2>/dev/null || true
+
+    [ -f "$MOCK_INSTALL/helix_screen_args.txt" ]
+    grep -q '^-vv$' "$MOCK_INSTALL/helix_screen_args.txt"
+}
+
+# =============================================================================
+# Splash PID routing
+# =============================================================================
 
 @test "splash PID routing end-to-end with mock watchdog" {
     # Create a mock watchdog that captures its arguments

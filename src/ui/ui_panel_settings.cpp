@@ -404,6 +404,7 @@ void SettingsPanel::init_subjects() {
 
     // Register XML event callbacks for action rows
     lv_xml_register_event_cb(nullptr, "on_display_settings_clicked", on_display_settings_clicked);
+    // Note: on_printer_image_clicked moved to PrinterManagerOverlay
     lv_xml_register_event_cb(nullptr, "on_filament_sensors_clicked", on_filament_sensors_clicked);
 
     // Note: Sensors overlay callbacks are now handled by SensorSettingsOverlay
@@ -827,28 +828,14 @@ void SettingsPanel::handle_telemetry_view_data_clicked() {
 }
 
 void SettingsPanel::show_restart_prompt() {
-    // Only show once per session - check if dialog already exists and is visible
-    if (restart_prompt_dialog_ && !lv_obj_has_flag(restart_prompt_dialog_, LV_OBJ_FLAG_HIDDEN)) {
-        return; // Already showing
-    }
-
-    // Create restart prompt dialog on first access
-    if (!restart_prompt_dialog_ && parent_screen_) {
-        restart_prompt_dialog_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "restart_prompt_dialog", nullptr));
-        if (restart_prompt_dialog_) {
-            // Event handlers are already wired via XML event_cb elements
-            // No need to wire up buttons here - callbacks registered in init_subjects()
-
-            // Initially hidden
-            lv_obj_add_flag(restart_prompt_dialog_, LV_OBJ_FLAG_HIDDEN);
-            spdlog::debug("[{}] Restart prompt dialog created", get_name());
-        }
-    }
-
-    // Show the dialog
+    // Already showing
     if (restart_prompt_dialog_) {
-        lv_obj_remove_flag(restart_prompt_dialog_, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    restart_prompt_dialog_ = ui_modal_show("restart_prompt_dialog");
+    if (restart_prompt_dialog_) {
+        spdlog::debug("[{}] Restart prompt dialog shown via Modal system", get_name());
         // Clear pending flag so we don't show again until next change
         SettingsManager::instance().clear_restart_pending();
     }
@@ -1085,8 +1072,7 @@ void SettingsPanel::handle_plugins_clicked() {
 
 void SettingsPanel::show_update_download_modal() {
     if (!update_download_modal_) {
-        update_download_modal_ = static_cast<lv_obj_t*>(
-            lv_xml_create(lv_screen_active(), "update_download_modal", nullptr));
+        update_download_modal_ = ui_modal_show("update_download_modal");
     }
 
     // Set to Confirming state with version info
@@ -1094,13 +1080,12 @@ void SettingsPanel::show_update_download_modal() {
     std::string text = info ? ("Download v" + info->version + "?") : "Download update?";
     UpdateChecker::instance().report_download_status(UpdateChecker::DownloadStatus::Confirming, 0,
                                                      text);
-
-    lv_obj_remove_flag(update_download_modal_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void SettingsPanel::hide_update_download_modal() {
     if (update_download_modal_) {
-        lv_obj_add_flag(update_download_modal_, LV_OBJ_FLAG_HIDDEN);
+        ui_modal_hide(update_download_modal_);
+        update_download_modal_ = nullptr;
     }
     // Reset download state
     UpdateChecker::instance().report_download_status(UpdateChecker::DownloadStatus::Idle, 0, "");
@@ -1317,7 +1302,8 @@ void SettingsPanel::on_restart_later_clicked(lv_event_t* /* e */) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_restart_later_clicked");
     auto& panel = get_global_settings_panel();
     if (panel.restart_prompt_dialog_) {
-        lv_obj_add_flag(panel.restart_prompt_dialog_, LV_OBJ_FLAG_HIDDEN);
+        ui_modal_hide(panel.restart_prompt_dialog_);
+        panel.restart_prompt_dialog_ = nullptr;
     }
     LVGL_SAFE_EVENT_CB_END();
 }

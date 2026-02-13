@@ -16,7 +16,7 @@
  * Syncs excluded objects from Klipper (via PrinterState observer) to handle
  * exclusions made by other clients or the web interface.
  *
- * @see docs/EXCLUDE_OBJECT.md for feature design
+ * @see docs/devel/EXCLUDE_OBJECTS.md for feature design
  */
 
 #include "ui_exclude_object_modal.h"

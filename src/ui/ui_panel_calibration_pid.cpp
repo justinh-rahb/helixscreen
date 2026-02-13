@@ -252,6 +252,12 @@ void PIDCalibrationPanel::on_activate() {
 
     // Fetch current PID values now (while no gcode traffic) for delta display later
     fetch_old_pid_values();
+
+    // Demo mode: inject results after on_activate() finishes its reset
+    if (demo_inject_pending_) {
+        demo_inject_pending_ = false;
+        inject_demo_results();
+    }
 }
 
 void PIDCalibrationPanel::on_deactivate() {
@@ -767,6 +773,63 @@ void PIDCalibrationPanel::on_calibration_result(bool success, float kp, float ki
         lv_subject_copy_string(&subj_error_message_, error_message.c_str());
         set_state(State::ERROR);
     }
+}
+
+// ============================================================================
+// DEMO INJECTION
+// ============================================================================
+
+void PIDCalibrationPanel::inject_demo_results() {
+    spdlog::info("[PIDCal] Injecting demo results for screenshot mode");
+
+    // Configure heater selection and target
+    selected_heater_ = Heater::EXTRUDER;
+    target_temp_ = 200;
+    lv_subject_set_int(&subj_heater_is_extruder_, 1);
+
+    // Simulate having old PID values (90% of new) for delta display
+    has_old_values_ = true;
+    old_kp_ = 20.579f; // ~90% of 22.865
+    old_ki_ = 1.163f;  // ~90% of 1.292
+    old_kd_ = 91.060f; // ~90% of 101.178
+
+    // Mock extruder PID values (from moonraker_client_mock.cpp:1421-1423)
+    float kp = 22.865f;
+    float ki = 1.292f;
+    float kd = 101.178f;
+
+    result_kp_ = kp;
+    result_ki_ = ki;
+    result_kd_ = kd;
+
+    // Format values with delta percentages (same pattern as on_calibration_result)
+    auto format_pid_value = [this](char* buf, size_t buf_size, float new_val, float old_val) {
+        if (has_old_values_ && old_val > 0.001f) {
+            float pct = ((new_val - old_val) / old_val) * 100.0f;
+            snprintf(buf, buf_size, "%.3f (%+.0f%%)", new_val, pct);
+        } else {
+            snprintf(buf, buf_size, "%.3f", new_val);
+        }
+    };
+
+    char val_buf[32];
+    format_pid_value(val_buf, sizeof(val_buf), kp, old_kp_);
+    lv_subject_copy_string(&subj_pid_kp_, val_buf);
+
+    format_pid_value(val_buf, sizeof(val_buf), ki, old_ki_);
+    lv_subject_copy_string(&subj_pid_ki_, val_buf);
+
+    format_pid_value(val_buf, sizeof(val_buf), kd, old_kd_);
+    lv_subject_copy_string(&subj_pid_kd_, val_buf);
+
+    // Set descriptive labels
+    lv_subject_copy_string(&subj_calibrating_heater_, "Extruder PID Tuning");
+    lv_subject_copy_string(&subj_result_summary_,
+                           "Temperature control optimized for extruder at 200\xC2\xB0"
+                           "C.");
+
+    // Go directly to COMPLETE (skip SAVING)
+    set_state(State::COMPLETE);
 }
 
 // ============================================================================

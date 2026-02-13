@@ -39,24 +39,23 @@ set -e
 # Hide the Linux console text cursor (visible as a blinking block on fbdev)
 setterm --cursor off 2>/dev/null || printf '\033[?25l' > /dev/tty1 2>/dev/null || true
 
-# Debug/verbose mode - pass -vv to helix-screen for debug-level logging
-DEBUG_MODE="${HELIX_DEBUG:-0}"
-LOG_DEST="${HELIX_LOG_DEST:-auto}"
-LOG_FILE="${HELIX_LOG_FILE:-}"
-
 # Parse launcher-specific arguments (POSIX-compatible, no arrays)
 # Passthrough args stored as space-separated string
+# CLI flags take priority over env vars; env vars are applied after env file sourcing below
 PASSTHROUGH_ARGS=""
+CLI_DEBUG=""
+CLI_LOG_DEST=""
+CLI_LOG_FILE=""
 for arg in "$@"; do
     case "$arg" in
         --debug)
-            DEBUG_MODE=1
+            CLI_DEBUG=1
             ;;
         --log-dest=*)
-            LOG_DEST="${arg#--log-dest=}"
+            CLI_LOG_DEST="${arg#--log-dest=}"
             ;;
         --log-file=*)
-            LOG_FILE="${arg#--log-file=}"
+            CLI_LOG_FILE="${arg#--log-file=}"
             ;;
         *)
             PASSTHROUGH_ARGS="${PASSTHROUGH_ARGS} ${arg}"
@@ -139,6 +138,11 @@ if [ -n "$_helix_env_file" ]; then
     unset _line _var _existing
 fi
 unset _helix_env_file
+
+# Resolve debug/logging settings: CLI flags > env vars (incl. env file) > defaults
+DEBUG_MODE="${CLI_DEBUG:-${HELIX_DEBUG:-0}}"
+LOG_DEST="${CLI_LOG_DEST:-${HELIX_LOG_DEST:-auto}}"
+LOG_FILE="${CLI_LOG_FILE:-${HELIX_LOG_FILE:-}}"
 
 # Default display backend to fbdev on embedded Linux targets.
 # DRM atomic modesetting has compatibility issues with some SoCs and breaks

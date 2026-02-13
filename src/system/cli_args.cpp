@@ -146,6 +146,7 @@ static void print_help(const char* program_name) {
     printf("    --no-ams           Don't create mock AMS (enables runout modal testing)\n");
     printf("    --test-history     Enable test history API data\n");
     printf("    --sim-speed <n>    Simulation speedup factor (1.0-1000.0, e.g., 100 for 100x)\n");
+    printf("    --mock-crash       Write synthetic crash.txt to test crash reporter UI\n");
     printf("    --select-file <name>  Auto-select file in print-select panel\n");
     printf("\nG-code Viewer Options (require --test):\n");
     printf("  --gcode-file <path>  Load specific G-code file in gcode-test panel\n");
@@ -648,6 +649,8 @@ bool parse_cli_args(int argc, char** argv, CliArgs& args, int& screen_width, int
             args.memory_report = true;
         } else if (strcmp(argv[i], "--show-memory") == 0) {
             args.show_memory = true;
+        } else if (strcmp(argv[i], "--mock-crash") == 0) {
+            config.mock_crash = true;
         } else if (strcmp(argv[i], "--release-notes") == 0) {
             args.overlays.release_notes = true;
         } else if (strcmp(argv[i], "--debug-subjects") == 0) {
@@ -758,6 +761,11 @@ bool parse_cli_args(int argc, char** argv, CliArgs& args, int& screen_width, int
 
     if (config.simulate_disconnect && !config.test_mode) {
         printf("Error: --disconnected requires --test mode\n");
+        return false;
+    }
+
+    if (config.mock_crash && !config.test_mode) {
+        printf("Error: --mock-crash requires --test mode\n");
         return false;
     }
 

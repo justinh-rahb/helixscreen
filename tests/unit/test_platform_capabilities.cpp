@@ -247,16 +247,16 @@ TEST_CASE("Tier classification: EMBEDDED for very low RAM", "[platform][tier]") 
     // Less than 512MB RAM = EMBEDDED, regardless of cores
     auto caps = PlatformCapabilities::from_metrics(256, 4, 1000.0f);
     REQUIRE(caps.tier == PlatformTier::EMBEDDED);
-    REQUIRE_FALSE(caps.supports_charts);
+    REQUIRE(caps.supports_charts);
     REQUIRE_FALSE(caps.supports_animations);
-    REQUIRE(caps.max_chart_points == 0);
+    REQUIRE(caps.max_chart_points == 50);
 }
 
 TEST_CASE("Tier classification: EMBEDDED for single core", "[platform][tier]") {
     // Single core = EMBEDDED, even with lots of RAM
     auto caps = PlatformCapabilities::from_metrics(4096, 1, 1000.0f);
     REQUIRE(caps.tier == PlatformTier::EMBEDDED);
-    REQUIRE_FALSE(caps.supports_charts);
+    REQUIRE(caps.supports_charts);
 }
 
 TEST_CASE("Tier classification: EMBEDDED for zero cores (parse failure)",
@@ -264,7 +264,7 @@ TEST_CASE("Tier classification: EMBEDDED for zero cores (parse failure)",
     // Zero cores indicates cpuinfo parse failure - should default to EMBEDDED
     auto caps = PlatformCapabilities::from_metrics(4096, 0, 0.0f);
     REQUIRE(caps.tier == PlatformTier::EMBEDDED);
-    REQUIRE_FALSE(caps.supports_charts);
+    REQUIRE(caps.supports_charts);
 }
 
 TEST_CASE("Tier classification: BASIC for mid-range hardware", "[platform][tier]") {
@@ -332,7 +332,7 @@ TEST_CASE("Tier classification: tiers have different capabilities", "[platform][
     auto standard = PlatformCapabilities::from_metrics(4096, 4, 1000.0f);
 
     REQUIRE(embedded.tier != standard.tier);
-    REQUIRE(embedded.supports_charts != standard.supports_charts);
+    REQUIRE(embedded.supports_animations != standard.supports_animations);
     REQUIRE(embedded.max_chart_points != standard.max_chart_points);
 }
 
@@ -344,9 +344,9 @@ TEST_CASE("Derived capabilities: EMBEDDED tier settings", "[platform][capabiliti
     auto caps = PlatformCapabilities::from_metrics(256, 1, 200.0f);
 
     REQUIRE(caps.tier == PlatformTier::EMBEDDED);
-    REQUIRE_FALSE(caps.supports_charts);
+    REQUIRE(caps.supports_charts);
     REQUIRE_FALSE(caps.supports_animations);
-    REQUIRE(caps.max_chart_points == 0);
+    REQUIRE(caps.max_chart_points == 50);
 }
 
 TEST_CASE("Derived capabilities: BASIC tier settings", "[platform][capabilities]") {
@@ -415,7 +415,7 @@ TEST_CASE("detect(): returns valid capabilities on supported platforms",
 
     // max_chart_points should match tier
     if (caps.tier == PlatformTier::EMBEDDED) {
-        REQUIRE(caps.max_chart_points == 0);
+        REQUIRE(caps.max_chart_points == 50);
     } else if (caps.tier == PlatformTier::BASIC) {
         REQUIRE(caps.max_chart_points == 50);
     } else {

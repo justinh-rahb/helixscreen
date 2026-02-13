@@ -72,9 +72,11 @@ PlatformTier classify_tier(size_t ram_mb, int cores) {
 void set_derived_capabilities(PlatformCapabilities& caps) {
     switch (caps.tier) {
     case PlatformTier::EMBEDDED:
-        caps.supports_charts = false;
+        // Temp graphs already run 1200 live points on AD5M (EMBEDDED),
+        // so a static 132-point frequency response chart is lighter
+        caps.supports_charts = true;
         caps.supports_animations = false;
-        caps.max_chart_points = 0;
+        caps.max_chart_points = 50;
         break;
 
     case PlatformTier::BASIC:

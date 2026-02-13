@@ -6,6 +6,7 @@
 
 #include "moonraker_api.h"
 #include "moonraker_api_internal.h"
+#include "shaper_csv_parser.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -943,6 +944,23 @@ class InputShaperCollector : public std::enable_shared_from_this<InputShaperColl
                 result.all_shapers.push_back(option);
             }
 
+            // Parse frequency response data from calibration CSV
+            if (!result.csv_path.empty()) {
+                auto csv_data = helix::calibration::parse_shaper_csv(result.csv_path, axis_);
+                if (!csv_data.frequencies.empty()) {
+                    result.freq_response.reserve(csv_data.frequencies.size());
+                    for (size_t i = 0; i < csv_data.frequencies.size(); ++i) {
+                        result.freq_response.emplace_back(
+                            csv_data.frequencies[i],
+                            i < csv_data.raw_psd.size() ? csv_data.raw_psd[i] : 0.0f);
+                    }
+                    result.shaper_curves = std::move(csv_data.shaper_curves);
+                    spdlog::debug(
+                        "[InputShaperCollector] parsed {} freq bins, {} shaper curves from CSV",
+                        result.freq_response.size(), result.shaper_curves.size());
+                }
+            }
+
             on_success_(result);
         }
     }
@@ -1409,6 +1427,8 @@ void MoonrakerAPI::start_resonance_test(char axis, AdvancedProgressCallback on_p
     collector->start();
 
     // Send the G-code command
+    // SHAPER_CALIBRATE sweeps 5-100 Hz (~95s) then calculates best shapers (~30-60s)
+    static constexpr uint32_t SHAPER_CALIBRATE_TIMEOUT_MS = 5 * 60 * 1000;
     std::string cmd = "SHAPER_CALIBRATE AXIS=";
     cmd += axis;
 
@@ -1421,7 +1441,8 @@ void MoonrakerAPI::start_resonance_test(char axis, AdvancedProgressCallback on_p
             if (on_error) {
                 on_error(err);
             }
-        });
+        },
+        SHAPER_CALIBRATE_TIMEOUT_MS);
 }
 
 void MoonrakerAPI::start_klippain_shaper_calibration(const std::string& /*axis*/,

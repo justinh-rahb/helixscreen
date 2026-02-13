@@ -11,9 +11,12 @@
 
 #include "ui_frequency_response_chart.h"
 
+#include "theme_manager.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <vector>
@@ -161,11 +164,15 @@ static void update_chart_series(ui_frequency_response_chart_t* chart, FrequencyS
         return;
     }
 
+    // Match chart point count to actual data size so SHIFT mode fills all slots
+    size_t count = series->frequencies.size();
+    uint32_t current_points = lv_chart_get_point_count(chart->chart);
+    if (count > 0 && static_cast<uint32_t>(count) != current_points) {
+        lv_chart_set_point_count(chart->chart, static_cast<uint32_t>(count));
+    }
+
     // Clear existing data
     lv_chart_set_all_values(chart->chart, series->lv_series, LV_CHART_POINT_NONE);
-
-    // Add new points
-    size_t count = series->frequencies.size();
     for (size_t i = 0; i < count; i++) {
         // Scale amplitude to chart range (LVGL chart uses int32_t)
         float amp = series->amplitudes[i];
@@ -512,6 +519,365 @@ lv_obj_t* ui_frequency_response_chart_get_obj(ui_frequency_response_chart_t* cha
 }
 
 // ============================================================================
+// Draw Callbacks
+// ============================================================================
+
+/**
+ * @brief Draw subtle grid lines behind chart data
+ *
+ * Renders horizontal amplitude divisions and vertical frequency markers
+ * at round Hz values (25, 50, 75, 100 Hz) within the chart content area.
+ */
+static void draw_freq_grid_lines_cb(lv_event_t* e) {
+    lv_obj_t* chart_obj = lv_event_get_target_obj(e);
+    lv_layer_t* layer = lv_event_get_layer(e);
+    auto* chart = static_cast<ui_frequency_response_chart_t*>(lv_event_get_user_data(e));
+
+    if (!layer || !chart) {
+        return;
+    }
+
+    // Get chart bounds and calculate content area (inside padding)
+    lv_area_t coords;
+    lv_obj_get_coords(chart_obj, &coords);
+
+    int32_t pad_top = lv_obj_get_style_pad_top(chart_obj, LV_PART_MAIN);
+    int32_t pad_left = lv_obj_get_style_pad_left(chart_obj, LV_PART_MAIN);
+    int32_t pad_right = lv_obj_get_style_pad_right(chart_obj, LV_PART_MAIN);
+    int32_t pad_bottom = lv_obj_get_style_pad_bottom(chart_obj, LV_PART_MAIN);
+
+    int32_t content_x1 = coords.x1 + pad_left;
+    int32_t content_x2 = coords.x2 - pad_right;
+    int32_t content_y1 = coords.y1 + pad_top;
+    int32_t content_y2 = coords.y2 - pad_bottom;
+    int32_t content_width = content_x2 - content_x1;
+    int32_t content_height = content_y2 - content_y1;
+
+    if (content_width <= 0 || content_height <= 0) {
+        return;
+    }
+
+    // Subtle grid line style
+    lv_draw_line_dsc_t line_dsc;
+    lv_draw_line_dsc_init(&line_dsc);
+    line_dsc.color = theme_manager_get_color("elevated_bg");
+    line_dsc.width = 1;
+    line_dsc.opa = static_cast<lv_opa_t>(38); // ~15% opacity
+
+    // Horizontal grid lines: 4 divisions (amplitude)
+    constexpr int H_DIVISIONS = 4;
+    for (int i = 1; i < H_DIVISIONS; i++) {
+        int32_t y = content_y1 + (content_height * i) / H_DIVISIONS;
+        line_dsc.p1.x = content_x1;
+        line_dsc.p1.y = y;
+        line_dsc.p2.x = content_x2;
+        line_dsc.p2.y = y;
+        lv_draw_line(layer, &line_dsc);
+    }
+
+    // Vertical grid lines at round frequency values: 25, 50, 75, 100 Hz
+    float freq_range = chart->freq_max - chart->freq_min;
+    if (freq_range <= 0.0f) {
+        return;
+    }
+
+    static constexpr float GRID_FREQS[] = {25.0f, 50.0f, 75.0f, 100.0f};
+    for (float freq : GRID_FREQS) {
+        if (freq <= chart->freq_min || freq >= chart->freq_max) {
+            continue;
+        }
+        float frac = (freq - chart->freq_min) / freq_range;
+        int32_t x = content_x1 + static_cast<int32_t>(frac * content_width);
+        line_dsc.p1.x = x;
+        line_dsc.p1.y = content_y1;
+        line_dsc.p2.x = x;
+        line_dsc.p2.y = content_y2;
+        lv_draw_line(layer, &line_dsc);
+    }
+}
+
+/**
+ * @brief Draw peak frequency dots with glow effect on top of chart data
+ *
+ * For each series with a marked peak, draws a semi-transparent glow circle
+ * behind a solid filled dot at the peak frequency position.
+ */
+static void draw_peak_dots_cb(lv_event_t* e) {
+    lv_layer_t* layer = lv_event_get_layer(e);
+    auto* chart = static_cast<ui_frequency_response_chart_t*>(lv_event_get_user_data(e));
+
+    if (!layer || !chart || !chart->chart) {
+        return;
+    }
+
+    // Get chart content area (inside padding) for manual position calculation
+    lv_area_t chart_coords;
+    lv_obj_get_coords(chart->chart, &chart_coords);
+
+    int32_t pad_top = lv_obj_get_style_pad_top(chart->chart, LV_PART_MAIN);
+    int32_t pad_left = lv_obj_get_style_pad_left(chart->chart, LV_PART_MAIN);
+    int32_t pad_right = lv_obj_get_style_pad_right(chart->chart, LV_PART_MAIN);
+    int32_t pad_bottom = lv_obj_get_style_pad_bottom(chart->chart, LV_PART_MAIN);
+
+    int32_t content_x1 = chart_coords.x1 + pad_left;
+    int32_t content_x2 = chart_coords.x2 - pad_right;
+    int32_t content_y1 = chart_coords.y1 + pad_top;
+    int32_t content_y2 = chart_coords.y2 - pad_bottom;
+    int32_t content_width = content_x2 - content_x1;
+    int32_t content_height = content_y2 - content_y1;
+
+    if (content_width <= 0 || content_height <= 0) {
+        return;
+    }
+
+    float freq_range = chart->freq_max - chart->freq_min;
+    float amp_range = chart->amp_max - chart->amp_min;
+
+    if (freq_range <= 0.0f || amp_range <= 0.0f) {
+        return;
+    }
+
+    for (int i = 0; i < MAX_SERIES; i++) {
+        FrequencySeriesData* series = &chart->series[i];
+        if (series->id == -1 || !series->has_peak || !series->visible || !series->lv_series) {
+            continue;
+        }
+
+        // Calculate pixel position directly from peak frequency and amplitude
+        // X: linear interpolation across frequency range
+        float freq_frac = (series->peak_freq - chart->freq_min) / freq_range;
+        freq_frac = std::max(0.0f, std::min(1.0f, freq_frac));
+        int32_t abs_x = content_x1 + static_cast<int32_t>(freq_frac * content_width);
+
+        // Y: linear interpolation across amplitude range (Y axis is inverted: top = max)
+        float amp_frac = (series->peak_amplitude - chart->amp_min) / amp_range;
+        amp_frac = std::max(0.0f, std::min(1.0f, amp_frac));
+        int32_t abs_y = content_y2 - static_cast<int32_t>(amp_frac * content_height);
+
+        // Glow circle: larger, semi-transparent, lighter tint
+        constexpr int32_t GLOW_RADIUS = 10;
+        lv_draw_rect_dsc_t glow_dsc;
+        lv_draw_rect_dsc_init(&glow_dsc);
+        glow_dsc.bg_color = lv_color_mix(series->color, lv_color_white(), LV_OPA_40);
+        glow_dsc.bg_opa = LV_OPA_30;
+        glow_dsc.radius = LV_RADIUS_CIRCLE;
+        glow_dsc.border_width = 0;
+
+        lv_area_t glow_area;
+        glow_area.x1 = abs_x - GLOW_RADIUS;
+        glow_area.y1 = abs_y - GLOW_RADIUS;
+        glow_area.x2 = abs_x + GLOW_RADIUS;
+        glow_area.y2 = abs_y + GLOW_RADIUS;
+        lv_draw_rect(layer, &glow_dsc, &glow_area);
+
+        // Solid dot: smaller, fully opaque, series color
+        constexpr int32_t DOT_RADIUS = 5;
+        lv_draw_rect_dsc_t dot_dsc;
+        lv_draw_rect_dsc_init(&dot_dsc);
+        dot_dsc.bg_color = series->color;
+        dot_dsc.bg_opa = LV_OPA_COVER;
+        dot_dsc.radius = LV_RADIUS_CIRCLE;
+        dot_dsc.border_width = 0;
+
+        lv_area_t dot_area;
+        dot_area.x1 = abs_x - DOT_RADIUS;
+        dot_area.y1 = abs_y - DOT_RADIUS;
+        dot_area.x2 = abs_x + DOT_RADIUS;
+        dot_area.y2 = abs_y + DOT_RADIUS;
+        lv_draw_rect(layer, &dot_dsc, &dot_area);
+
+        spdlog::trace("[FreqChart] Drew peak dot for series {} at ({}, {})", series->id, abs_x,
+                      abs_y);
+    }
+}
+
+// ============================================================================
+// Axis Label Draw Callbacks
+// ============================================================================
+
+/**
+ * @brief Draw X-axis frequency labels below the chart content area
+ *
+ * Renders frequency values (0, 50, 100, 150, 200 Hz) at evenly spaced
+ * positions below the chart. Uses the same font/color styling pattern
+ * as ui_temp_graph.cpp axis labels.
+ */
+static void draw_x_axis_labels_cb(lv_event_t* e) {
+    lv_obj_t* chart_obj = lv_event_get_target_obj(e);
+    lv_layer_t* layer = lv_event_get_layer(e);
+    auto* chart = static_cast<ui_frequency_response_chart_t*>(lv_event_get_user_data(e));
+
+    if (!layer || !chart) {
+        return;
+    }
+
+    // Get chart bounds and content area
+    lv_area_t coords;
+    lv_obj_get_coords(chart_obj, &coords);
+
+    int32_t pad_left = lv_obj_get_style_pad_left(chart_obj, LV_PART_MAIN);
+    int32_t pad_right = lv_obj_get_style_pad_right(chart_obj, LV_PART_MAIN);
+    int32_t pad_bottom = lv_obj_get_style_pad_bottom(chart_obj, LV_PART_MAIN);
+
+    int32_t content_x1 = coords.x1 + pad_left;
+    int32_t content_x2 = coords.x2 - pad_right;
+    int32_t content_width = content_x2 - content_x1;
+
+    if (content_width <= 0) {
+        return;
+    }
+
+    // Label style: small, muted text
+    const lv_font_t* label_font = theme_manager_get_font("font_small");
+    int32_t label_height = theme_manager_get_font_height(label_font);
+    int32_t space_xs = theme_manager_get_spacing("space_xs");
+
+    lv_draw_label_dsc_t label_dsc;
+    lv_draw_label_dsc_init(&label_dsc);
+    label_dsc.color = theme_manager_get_color("text_muted");
+    label_dsc.font = label_font;
+    label_dsc.align = LV_TEXT_ALIGN_CENTER;
+    label_dsc.opa = LV_OPA_COVER;
+
+    // Position labels just below the chart content area
+    int32_t label_y = coords.y2 - pad_bottom + space_xs;
+
+    // Draw labels at round frequency values
+    float freq_range = chart->freq_max - chart->freq_min;
+    if (freq_range <= 0.0f) {
+        return;
+    }
+
+    // Choose frequency tick interval based on range
+    float tick_interval = 50.0f;
+    if (freq_range <= 100.0f) {
+        tick_interval = 25.0f;
+    }
+
+    // Persistent label buffers (LVGL may defer drawing)
+    static char freq_labels[8][12];
+    int label_idx = 0;
+
+    for (float freq = chart->freq_min; freq <= chart->freq_max && label_idx < 8;
+         freq += tick_interval) {
+        float frac = (freq - chart->freq_min) / freq_range;
+        int32_t x = content_x1 + static_cast<int32_t>(frac * content_width);
+
+        // Format label
+        char* buf = freq_labels[label_idx++];
+        if (freq == 0.0f) {
+            snprintf(buf, 12, "0 Hz");
+        } else {
+            snprintf(buf, 12, "%.0f", freq);
+        }
+
+        // Center label on tick position
+        lv_area_t label_area;
+        label_area.x1 = x - 24;
+        label_area.y1 = label_y;
+        label_area.x2 = x + 24;
+        label_area.y2 = label_y + label_height;
+
+        label_dsc.text = buf;
+        lv_draw_label(layer, &label_dsc, &label_area);
+    }
+}
+
+/**
+ * @brief Draw Y-axis amplitude labels along the left side of the chart
+ *
+ * Renders amplitude values at horizontal grid division positions. Values
+ * are formatted in scientific notation for large amplitudes or as decimals
+ * for small values.
+ */
+static void draw_y_axis_labels_cb(lv_event_t* e) {
+    lv_obj_t* chart_obj = lv_event_get_target_obj(e);
+    lv_layer_t* layer = lv_event_get_layer(e);
+    auto* chart = static_cast<ui_frequency_response_chart_t*>(lv_event_get_user_data(e));
+
+    if (!layer || !chart) {
+        return;
+    }
+
+    // Get chart bounds and content area
+    lv_area_t coords;
+    lv_obj_get_coords(chart_obj, &coords);
+
+    int32_t pad_top = lv_obj_get_style_pad_top(chart_obj, LV_PART_MAIN);
+    int32_t pad_bottom = lv_obj_get_style_pad_bottom(chart_obj, LV_PART_MAIN);
+
+    int32_t content_y1 = coords.y1 + pad_top;
+    int32_t content_y2 = coords.y2 - pad_bottom;
+    int32_t content_height = content_y2 - content_y1;
+
+    if (content_height <= 0) {
+        return;
+    }
+
+    // Label style: small, muted text, right-aligned to sit left of chart area
+    const lv_font_t* label_font = theme_manager_get_font("font_small");
+    int32_t label_height = theme_manager_get_font_height(label_font);
+
+    lv_draw_label_dsc_t label_dsc;
+    lv_draw_label_dsc_init(&label_dsc);
+    label_dsc.color = theme_manager_get_color("text_muted");
+    label_dsc.font = label_font;
+    label_dsc.align = LV_TEXT_ALIGN_RIGHT;
+    label_dsc.opa = LV_OPA_COVER;
+
+    // Y-axis label area: left padding area of the chart
+    int32_t label_width = lv_obj_get_style_pad_left(chart_obj, LV_PART_MAIN) - 2;
+    if (label_width <= 0) {
+        return;
+    }
+
+    // Draw labels at each horizontal division (matching grid lines)
+    constexpr int H_DIVISIONS = 4;
+    float amp_range = chart->amp_max - chart->amp_min;
+
+    // Persistent label buffers
+    static char amp_labels[8][12];
+
+    for (int i = 0; i <= H_DIVISIONS; i++) {
+        int32_t y = content_y1 + (content_height * i) / H_DIVISIONS;
+
+        // Amplitude value at this division (top = max, bottom = min)
+        float amp = chart->amp_max - (amp_range * i) / H_DIVISIONS;
+
+        // Format amplitude value compactly
+        char* buf = amp_labels[i];
+        if (amp == 0.0f) {
+            snprintf(buf, 12, "0");
+        } else if (amp >= 1e9f) {
+            snprintf(buf, 12, "%.0fe9", amp / 1e9f);
+        } else if (amp >= 1e6f) {
+            snprintf(buf, 12, "%.0fM", amp / 1e6f);
+        } else if (amp >= 1e3f) {
+            snprintf(buf, 12, "%.0fk", amp / 1e3f);
+        } else if (amp >= 1.0f) {
+            snprintf(buf, 12, "%.0f", amp);
+        } else if (amp >= 0.01f) {
+            snprintf(buf, 12, "%.2f", amp);
+        } else if (amp >= 0.001f) {
+            snprintf(buf, 12, "%.3f", amp);
+        } else {
+            // Very small values: use scientific-ish notation
+            snprintf(buf, 12, "%.0e", amp);
+        }
+
+        // Position label centered vertically on the grid line
+        lv_area_t label_area;
+        label_area.x1 = coords.x1;
+        label_area.y1 = y - label_height / 2;
+        label_area.x2 = coords.x1 + label_width;
+        label_area.y2 = y + label_height / 2;
+
+        label_dsc.text = buf;
+        lv_draw_label(layer, &label_dsc, &label_area);
+    }
+}
+
+// ============================================================================
 // Hardware Adaptation
 // ============================================================================
 
@@ -535,8 +901,8 @@ void ui_frequency_response_chart_configure_for_platform(ui_frequency_response_ch
         break;
     case helix::PlatformTier::EMBEDDED:
     default:
-        chart->max_points = 0;
-        chart->chart_mode = false;
+        chart->max_points = helix::PlatformCapabilities::BASIC_CHART_POINTS;
+        chart->chart_mode = true;
         break;
     }
 
@@ -551,12 +917,32 @@ void ui_frequency_response_chart_configure_for_platform(ui_frequency_response_ch
             lv_chart_set_point_count(chart->chart, static_cast<uint32_t>(chart->max_points));
             lv_chart_set_axis_range(chart->chart, LV_CHART_AXIS_PRIMARY_Y, 0, 1000);
 
+            // Padding for axis labels
+            const lv_font_t* axis_font = theme_manager_get_font("font_small");
+            int32_t axis_label_h = theme_manager_get_font_height(axis_font);
+            int32_t space_xs = theme_manager_get_spacing("space_xs");
+            int32_t space_sm = theme_manager_get_spacing("space_sm");
+            // Left padding: room for Y-axis labels
+            lv_obj_set_style_pad_left(chart->chart, 36 + space_xs, LV_PART_MAIN);
+            // Bottom padding: room for X-axis labels
+            lv_obj_set_style_pad_bottom(chart->chart, space_sm + axis_label_h + space_xs,
+                                        LV_PART_MAIN);
+            // Small top/right padding for visual breathing room
+            lv_obj_set_style_pad_top(chart->chart, space_sm, LV_PART_MAIN);
+            lv_obj_set_style_pad_right(chart->chart, space_sm, LV_PART_MAIN);
+
             // Style
             lv_obj_set_style_bg_opa(chart->chart, LV_OPA_COVER, LV_PART_MAIN);
             lv_obj_set_style_border_width(chart->chart, 0, LV_PART_MAIN);
             lv_obj_set_style_line_width(chart->chart, 2, LV_PART_ITEMS);
             lv_obj_set_style_width(chart->chart, 0, LV_PART_INDICATOR);
             lv_obj_set_style_height(chart->chart, 0, LV_PART_INDICATOR);
+
+            // Register draw callbacks for grid lines, axis labels, and peak dots
+            lv_obj_add_event_cb(chart->chart, draw_freq_grid_lines_cb, LV_EVENT_DRAW_MAIN, chart);
+            lv_obj_add_event_cb(chart->chart, draw_x_axis_labels_cb, LV_EVENT_DRAW_POST, chart);
+            lv_obj_add_event_cb(chart->chart, draw_y_axis_labels_cb, LV_EVENT_DRAW_POST, chart);
+            lv_obj_add_event_cb(chart->chart, draw_peak_dots_cb, LV_EVENT_DRAW_POST, chart);
 
             // Create LVGL series for existing series data
             for (int i = 0; i < MAX_SERIES; i++) {

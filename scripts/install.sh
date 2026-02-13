@@ -787,6 +787,96 @@ detect_init_system() {
     exit 1
 }
 
+# Check that Klipper and Moonraker are running (AD5M + K1 only)
+# These platforms require local Klipper/Moonraker; without them HelixScreen
+# has nothing to connect to. Warns and prompts for confirmation.
+check_klipper_ecosystem() {
+    local platform=$1
+
+    # Only relevant for embedded platforms with local Klipper
+    case "$platform" in
+        ad5m|k1) ;;
+        *) return 0 ;;
+    esac
+
+    local warnings=""
+
+    # Check Klipper process
+    # Klipper runs as "klippy" (python module) or "klipper" (service name)
+    if ! ps | grep -v grep | grep -q -e '[Kk]lipper' -e '[Kk]lippy'; then
+        warnings="Klipper does not appear to be running."
+    fi
+
+    # Check Moonraker process
+    if ! ps | grep -v grep | grep -q '[Mm]oonraker'; then
+        if [ -n "$warnings" ]; then
+            warnings="$warnings
+Moonraker does not appear to be running."
+        else
+            warnings="Moonraker does not appear to be running."
+        fi
+    fi
+
+    # If Moonraker process is up, verify it responds on the expected port
+    if ps | grep -v grep | grep -q '[Mm]oonraker'; then
+        if command -v wget >/dev/null 2>&1; then
+            if ! wget -q -O /dev/null --timeout=5 "http://127.0.0.1:7125/server/info" 2>/dev/null; then
+                if [ -n "$warnings" ]; then
+                    warnings="$warnings
+Moonraker is running but not responding on http://127.0.0.1:7125."
+                else
+                    warnings="Moonraker is running but not responding on http://127.0.0.1:7125."
+                fi
+            fi
+        elif command -v curl >/dev/null 2>&1; then
+            if ! curl -sf --connect-timeout 5 "http://127.0.0.1:7125/server/info" >/dev/null 2>&1; then
+                if [ -n "$warnings" ]; then
+                    warnings="$warnings
+Moonraker is running but not responding on http://127.0.0.1:7125."
+                else
+                    warnings="Moonraker is running but not responding on http://127.0.0.1:7125."
+                fi
+            fi
+        fi
+    fi
+
+    # Everything looks good
+    if [ -z "$warnings" ]; then
+        log_success "Klipper and Moonraker are running"
+        return 0
+    fi
+
+    # Show warnings and prompt
+    log_warn ""
+    log_warn "WARNING: Klipper ecosystem check failed:"
+    # Print each warning line separately
+    echo "$warnings" | while IFS= read -r line; do
+        log_warn "  - $line"
+    done
+    log_warn ""
+    log_warn "HelixScreen requires Klipper and Moonraker to function."
+    log_warn "It will install but won't work until these services are available."
+
+    # Non-interactive mode: just warn and continue
+    if [ ! -t 0 ]; then
+        log_warn "Non-interactive mode: continuing anyway."
+        return 0
+    fi
+
+    printf "Continue anyway? [y/N] "
+    read -r answer
+    case "$answer" in
+        [Yy]|[Yy][Ee][Ss])
+            log_info "Continuing installation..."
+            return 0
+            ;;
+        *)
+            log_error "Installation cancelled."
+            exit 1
+            ;;
+    esac
+}
+
 # ============================================
 # Module: forgex.sh
 # ============================================
@@ -1479,6 +1569,7 @@ show_manual_install_instructions() {
     if [ "$platform" = "ad5m" ]; then
         # AD5M /tmp is a tiny tmpfs (~54MB), use /data/ instead
         printf '%b\n' "     ${CYAN}scp -O helixscreen-${platform}.tar.gz root@<this-ip>:/data/${NC}"
+        printf '%b\n' "     ${YELLOW}Windows: use WSL, WinSCP (SCP mode), or PuTTY pscp${NC}"
         printf '\n'
         printf '%b\n' "  4. Run the installer with the local file:"
         printf '%b\n' "     ${CYAN}sh /data/install.sh --local /data/helixscreen-${platform}.tar.gz${NC}"
@@ -1662,10 +1753,16 @@ validate_binary_architecture() {
         return 1
     fi
 
-    # Read first 20 bytes of ELF header using dd + hexdump
-    # hexdump -v -e is POSIX and available in BusyBox
+    # Read first 20 bytes of ELF header as space-separated hex
+    # Try hexdump first (BusyBox), fall back to od (POSIX), then xxd
     local header
     header=$(dd if="$binary" bs=1 count=20 2>/dev/null | hexdump -v -e '1/1 "%02x "' 2>/dev/null) || true
+    if [ -z "$header" ]; then
+        header=$(dd if="$binary" bs=1 count=20 2>/dev/null | od -A n -t x1 -v 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed 's/^ //;s/ $//') || true
+    fi
+    if [ -z "$header" ]; then
+        header=$(dd if="$binary" bs=1 count=20 2>/dev/null | xxd -p 2>/dev/null | sed 's/../& /g;s/ $//') || true
+    fi
 
     if [ -z "$header" ]; then
         log_error "Cannot read binary header (file may be empty or corrupted)"
@@ -1768,7 +1865,7 @@ extract_release() {
 
     if [ "$platform" = "ad5m" ] || [ "$platform" = "k1" ]; then
         # BusyBox tar doesn't support -z
-        if ! gunzip -c "$tarball" | $SUDO tar xf -; then
+        if ! gunzip -c "$tarball" | tar xf -; then
             # Check if it was a space issue vs actual corruption
             local post_mb
             post_mb=$(df "$tmp_check_dir" 2>/dev/null | tail -1 | awk '{print int($4/1024)}')
@@ -1784,7 +1881,7 @@ extract_release() {
             exit 1
         fi
     else
-        if ! $SUDO tar -xzf "$tarball"; then
+        if ! tar -xzf "$tarball"; then
             local post_mb
             post_mb=$(df "$tmp_check_dir" 2>/dev/null | tail -1 | awk '{print int($4/1024)}')
             if [ -n "$post_mb" ] && [ "$post_mb" -lt 5 ]; then
@@ -2763,6 +2860,7 @@ main() {
     install_runtime_deps "$platform"
     check_disk_space "$platform"
     detect_init_system
+    check_klipper_ecosystem "$platform"
 
     # Get version (skip if using local tarball)
     if [ -n "$local_tarball" ]; then

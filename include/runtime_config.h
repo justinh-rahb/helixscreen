@@ -97,6 +97,8 @@ struct RuntimeConfig {
 
     // Development/debugging options
     bool show_memory_overlay = false; ///< Show memory stats overlay (--show-memory, M key toggle)
+    bool mock_crash =
+        false; ///< Write synthetic crash.txt on startup (--mock-crash, requires --test)
 
     /**
      * @brief Check if verbose subject debugging is enabled

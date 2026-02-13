@@ -63,8 +63,24 @@ TEST_CASE("Network validation: Invalid ports", "[validation][network][port]") {
     REQUIRE(is_valid_port("abc") == false);
     REQUIRE(is_valid_port("12.34") == false);
     REQUIRE(is_valid_port("80a") == false);
-    REQUIRE(is_valid_port(" 80") == false);
-    REQUIRE(is_valid_port("80 ") == false);
+    REQUIRE(is_valid_port("   ") == false);
+}
+
+TEST_CASE("Network validation: Whitespace trimming", "[validation][network][trim]") {
+    // Port: leading/trailing whitespace should be trimmed
+    REQUIRE(is_valid_port(" 80") == true);
+    REQUIRE(is_valid_port("80 ") == true);
+    REQUIRE(is_valid_port("  7125  ") == true);
+    REQUIRE(is_valid_port("\t443\t") == true);
+    REQUIRE(is_valid_port(" 0") == false);      // Still invalid after trim
+    REQUIRE(is_valid_port(" 65536 ") == false); // Still invalid after trim
+
+    // IP/hostname: leading/trailing whitespace should be trimmed
+    REQUIRE(is_valid_ip_or_hostname(" 192.168.1.1") == true);
+    REQUIRE(is_valid_ip_or_hostname("192.168.1.1 ") == true);
+    REQUIRE(is_valid_ip_or_hostname("  printer.local  ") == true);
+    REQUIRE(is_valid_ip_or_hostname("\t127.0.0.1\t") == true);
+    REQUIRE(is_valid_ip_or_hostname("  ") == false); // All whitespace
 }
 
 TEST_CASE("Network validation: Edge cases", "[validation][network][edge]") {

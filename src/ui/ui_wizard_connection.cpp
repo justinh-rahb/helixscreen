@@ -149,7 +149,7 @@ void WizardConnectionStep::init_subjects() {
 
     // Load existing values from config if available
     Config* config = Config::get_instance();
-    std::string default_ip = "";
+    std::string default_ip = "127.0.0.1";
     std::string default_port = "7125"; // Default Moonraker port
 
     try {

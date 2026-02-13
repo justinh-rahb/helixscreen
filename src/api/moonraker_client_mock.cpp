@@ -17,8 +17,10 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <map>
 #include <random>
+#include <sstream>
 
 // Delegating constructor - uses default speedup of 1.0
 MoonrakerClientMock::MoonrakerClientMock(PrinterType type) : MoonrakerClientMock(type, 1.0) {}
@@ -3541,6 +3543,97 @@ void MoonrakerClientMock::dispatch_gcode_response(const std::string& line) {
     spdlog::trace("[MoonrakerClientMock] Dispatched G-code response: {}", line);
 }
 
+namespace {
+
+/**
+ * @brief Write a mock Klipper-format shaper calibration CSV
+ *
+ * Generates ~50 frequency bins from 5-200 Hz with a realistic spectrum:
+ * base noise floor, a resonance peak, and shaper attenuation curves.
+ */
+void write_mock_shaper_csv(const std::string& path, char axis) {
+    std::ofstream ofs(path);
+    if (!ofs.is_open()) {
+        spdlog::warn("[MoonrakerClientMock] Failed to write mock CSV to {}", path);
+        return;
+    }
+
+    // Shaper definitions: name, fitted frequency
+    struct ShaperDef {
+        const char* name;
+        float freq;
+    };
+    static const ShaperDef shapers[] = {
+        {"zv", 59.0f}, {"mzv", 53.8f}, {"ei", 56.2f}, {"2hump_ei", 71.8f}, {"3hump_ei", 89.6f},
+    };
+    constexpr int num_shapers = 5;
+
+    // Write header line
+    ofs << "freq,psd_x,psd_y,psd_z,psd_xyz";
+    for (int i = 0; i < num_shapers; ++i) {
+        ofs << "," << shapers[i].name << "(" << std::fixed << std::setprecision(1)
+            << shapers[i].freq << ")";
+    }
+    ofs << "\n";
+
+    // RNG for noise variation
+    std::mt19937 rng(42 + static_cast<unsigned>(axis)); // Deterministic per-axis
+    std::uniform_real_distribution<float> noise_dist(0.8f, 1.2f);
+
+    // Resonance peak parameters — should agree with optimal shaper frequencies above
+    const float peak_freq = (axis == 'x' || axis == 'X') ? 53.8f : 48.2f;
+    const float peak_width = 8.0f; // Hz bandwidth of resonance
+    const float peak_amp = 0.02f;  // Peak amplitude
+    const float noise_floor = 5e-4f;
+
+    // Generate ~50 bins from 5 to 200 Hz (step ~4 Hz)
+    for (float freq = 5.0f; freq <= 200.0f; freq += 4.0f) {
+        // Raw PSD: noise floor + Lorentzian resonance peak
+        float df = freq - peak_freq;
+        float resonance = peak_amp / (1.0f + (df * df) / (peak_width * peak_width));
+        float base_psd = noise_floor * noise_dist(rng) + resonance;
+
+        // High-frequency rolloff above 120 Hz
+        if (freq > 120.0f) {
+            base_psd *= std::exp(-(freq - 120.0f) / 60.0f);
+        }
+
+        // PSD for each axis direction (main axis gets full signal)
+        float psd_main = base_psd;
+        float psd_cross = base_psd * 0.15f * noise_dist(rng); // Cross-axis coupling
+        float psd_z = base_psd * 0.08f * noise_dist(rng);
+        float psd_xyz = psd_main + psd_cross + psd_z;
+
+        float psd_x = (axis == 'x' || axis == 'X') ? psd_main : psd_cross;
+        float psd_y = (axis == 'y' || axis == 'Y') ? psd_main : psd_cross;
+
+        ofs << std::scientific << std::setprecision(3) << freq << "," << psd_x << "," << psd_y
+            << "," << psd_z << "," << psd_xyz;
+
+        // Shaper response curves: attenuate near their fitted frequencies
+        for (int i = 0; i < num_shapers; ++i) {
+            float shaper_freq_val = shapers[i].freq;
+            // Simple notch-filter model: strong attenuation near fitted freq
+            float dist = std::abs(freq - shaper_freq_val);
+            float attenuation;
+            if (dist < 15.0f) {
+                // Near the notch: strong attenuation
+                attenuation = 0.05f + 0.95f * (dist / 15.0f) * (dist / 15.0f);
+            } else {
+                attenuation = 1.0f;
+            }
+            float shaper_val = psd_xyz * attenuation;
+            ofs << "," << shaper_val;
+        }
+        ofs << "\n";
+    }
+
+    ofs.close();
+    spdlog::info("[MoonrakerClientMock] Wrote mock shaper CSV to {}", path);
+}
+
+} // anonymous namespace
+
 void MoonrakerClientMock::dispatch_shaper_calibrate_response(char axis) {
     // Timer-based dispatch for realistic progress animation
     // Matches PID_CALIBRATE timer pattern (line 1389)
@@ -3628,6 +3721,11 @@ void MoonrakerClientMock::dispatch_shaper_calibrate_response(char axis) {
             }
 
             if (final_step == 1) {
+                // Write actual CSV file so frequency response chart has data
+                std::string csv_path = std::string("/tmp/calibration_data_") + s->axis_lower +
+                                       std::string("_mock.csv");
+                write_mock_shaper_csv(csv_path, s->axis_lower);
+
                 snprintf(
                     buf, sizeof(buf),
                     "Shaper calibration data written to /tmp/calibration_data_%c_mock.csv file",

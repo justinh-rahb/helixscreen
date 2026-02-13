@@ -18,23 +18,26 @@ make pi-test                         # Build on thelio + deploy + run
 scripts/setup-worktree.sh feature/my-branch  # Symlinks deps, builds fast
 ```
 
-**Panels:** home, controls, motion, nozzle-temp, bed-temp, extrusion, filament, settings, advanced, print-select
+**Nav panels:** home, print-select, controls, filament, settings, advanced
+**Overlays:** motion, print-status, console, bed-mesh, input-shaper, macros, spoolman, ams, pid-calibration, zoffset-calibration, screws-tilt, history-dashboard, history-list, power, notification-history
 **Screenshots:** Press 'S' in UI, or `./scripts/screenshot.sh helix-screen output-name [panel]`
 
 ---
 
-## Lazy Docs (load when needed)
+## Docs (load when needed)
+
+Full index: **`docs/devel/CLAUDE.md`** (auto-loaded when working in docs/devel/)
+
+Most commonly needed:
 
 | Doc | When |
 |-----|------|
-| `docs/LVGL9_XML_GUIDE.md` | XML layouts, observer cleanup, XML gotchas |
-| `docs/ENVIRONMENT_VARIABLES.md` | Runtime env, mock config |
-| `docs/BUILD_SYSTEM.md` | Build, Makefile |
-| `docs/MOONRAKER_SECURITY_REVIEW.md` | Moonraker/security |
-| `docs/LOGGING.md` | Adding spdlog calls, choosing info vs debug vs trace |
-| `docs/PRINT_START_PROFILES.md` | Print start profiles: adding new printers, JSON schema, all phases |
-| `docs/SOUND_SYSTEM.md` | Sound system dev guide: architecture, JSON schema, adding themes/backends |
-| `docs/SOUND_SETTINGS.md` | Sound system user guide: settings, themes, troubleshooting |
+| `docs/devel/LVGL9_XML_GUIDE.md` | XML layouts, widgets, bindings, observer cleanup |
+| `docs/devel/MODAL_SYSTEM.md` | Modal architecture: ui_dialog, modal_button_row, Modal pattern |
+| `docs/devel/FILAMENT_MANAGEMENT.md` | AMS, AFC, Happy Hare, ValgACE, Tool Changer |
+| `docs/devel/ENVIRONMENT_VARIABLES.md` | Runtime env vars, mock config |
+| `docs/devel/LOGGING.md` | spdlog levels: info vs debug vs trace |
+| `docs/devel/BUILD_SYSTEM.md` | Makefile, cross-compilation |
 
 ---
 
@@ -102,6 +105,35 @@ Use `ObserverGuard` for RAII cleanup. See `observer_factory.h` for `observe_int_
 | Subject init order | Register components → init subjects → create XML |
 | Widget lookup | `lv_obj_find_by_name()` not `lv_obj_get_child()` |
 | Overlays | `ui_nav_push_overlay()`/`ui_nav_go_back()` |
+| Modals (simple) | `Modal::show("component_name")` / `Modal::hide(dialog)` |
+| Modals (subclass) | Extend `Modal`, implement `get_name()` + `component_name()`, override `on_ok()`/`on_cancel()` |
+| Confirmation dialog | `ui_modal_show_confirmation(title, msg, severity, btn_text, on_confirm, on_cancel, data)` |
+| Modal buttons (XML) | `<modal_button_row primary_text="Save" primary_callback="on_save"/>` |
+
+---
+
+## Where Things Live
+
+**Singletons** (all `::instance()`):
+`PrinterState` (all printer data/subjects), `SettingsManager` (persistent settings), `NavigationManager` (panel/overlay stack), `UpdateQueue` (thread-safe UI updates), `SoundManager`, `DisplayManager`, `ModalStack`, `PrinterDetector` (printer DB + capabilities)
+
+**Entry flow**: `main.cpp` → `Application` → `DisplayManager` → panels via `NavigationManager`
+
+**Key directories**:
+| Path | Contents |
+|------|----------|
+| `src/ui/panels/` | Panel classes (HomePanel, SettingsPanel, etc.) |
+| `src/ui/overlays/` | Overlay classes (MotionOverlay, AmsPanel, etc.) |
+| `src/ui/modals/` | Modal dialogs (extend `Modal`) |
+| `src/printer/` | PrinterState, MoonrakerAPI, macro/filament managers |
+| `src/system/` | Config, settings, update checker, sound, telemetry |
+| `src/application/` | App lifecycle, display, input, runtime config |
+| `ui_xml/` | All XML layouts (loaded at runtime — no rebuild needed) |
+| `ui_xml/components/` | Reusable XML components |
+| `assets/` | Fonts, images, sounds, printer DB JSON |
+| `config/` | Default config files, env templates |
+
+**Runtime config** (on device): `~/helixscreen/config/` — settings.json, printer_database.json, helixscreen.env
 
 ---
 

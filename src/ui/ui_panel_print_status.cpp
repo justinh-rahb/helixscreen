@@ -739,8 +739,10 @@ void PrintStatusPanel::update_all_displays() {
     helix::fmt::format_percent(current_progress_, progress_text_buf_, sizeof(progress_text_buf_));
     lv_subject_copy_string(&progress_text_subject_, progress_text_buf_);
 
-    // Layer text
-    std::snprintf(layer_text_buf_, sizeof(layer_text_buf_), "Layer %d / %d", current_layer_,
+    // Layer text (prefix with ~ when estimated from progress)
+    const char* layer_fmt =
+        printer_state_.has_real_layer_data() ? "Layer %d / %d" : "Layer ~%d / %d";
+    std::snprintf(layer_text_buf_, sizeof(layer_text_buf_), layer_fmt, current_layer_,
                   total_layers_);
     lv_subject_copy_string(&layer_text_subject_, layer_text_buf_);
 
@@ -1419,8 +1421,10 @@ void PrintStatusPanel::on_print_layer_changed(int current_layer) {
         return;
     }
 
-    // Update the layer text display
-    std::snprintf(layer_text_buf_, sizeof(layer_text_buf_), "Layer %d / %d", current_layer_,
+    // Update the layer text display (prefix with ~ when estimated from progress)
+    const char* layer_fmt =
+        printer_state_.has_real_layer_data() ? "Layer %d / %d" : "Layer ~%d / %d";
+    std::snprintf(layer_text_buf_, sizeof(layer_text_buf_), layer_fmt, current_layer_,
                   total_layers_);
     lv_subject_copy_string(&layer_text_subject_, layer_text_buf_);
 
@@ -2194,7 +2198,9 @@ void PrintStatusPanel::set_layer(int current, int total) {
     total_layers_ = total;
     if (!subjects_initialized_)
         return;
-    std::snprintf(layer_text_buf_, sizeof(layer_text_buf_), "Layer %d / %d", current_layer_,
+    const char* layer_fmt =
+        printer_state_.has_real_layer_data() ? "Layer %d / %d" : "Layer ~%d / %d";
+    std::snprintf(layer_text_buf_, sizeof(layer_text_buf_), layer_fmt, current_layer_,
                   total_layers_);
     lv_subject_copy_string(&layer_text_subject_, layer_text_buf_);
 }

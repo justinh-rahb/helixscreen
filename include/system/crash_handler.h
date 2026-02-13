@@ -76,4 +76,14 @@ nlohmann::json read_crash_file(const std::string& crash_file_path);
  */
 void remove_crash_file(const std::string& crash_file_path);
 
+/**
+ * @brief Write a synthetic crash file for testing the crash reporter UI
+ *
+ * Creates a realistic-looking crash.txt at the given path with a fake
+ * SIGSEGV, current version, and sample backtrace addresses.
+ *
+ * @param crash_file_path Path where the mock crash file will be written
+ */
+void write_mock_crash_file(const std::string& crash_file_path);
+
 } // namespace crash_handler

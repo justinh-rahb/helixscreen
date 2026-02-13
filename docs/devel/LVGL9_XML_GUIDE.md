@@ -2,7 +2,7 @@
 
 Comprehensive guide to LVGL 9.4's declarative XML UI system with reactive data binding, based on practical experience building the HelixScreen UI.
 
-**Last Updated:** 2025-12-18
+**Last Updated:** 2026-02-12
 
 ---
 
@@ -604,6 +604,104 @@ Visual separators with theme-aware colors.
 
 **Built-in defaults:** 1px width/height, `text_secondary` color at 50% opacity
 
+#### ui_markdown
+
+Markdown viewer widget that renders markdown content as native LVGL widgets. Wraps the `lv_markdown` library (which uses md4c for parsing) and automatically applies theme-aware styling from design tokens.
+
+```xml
+<!-- Dynamic content via subject binding -->
+<ui_markdown bind_text="update_release_notes" width="100%"/>
+
+<!-- Static content -->
+<ui_markdown text="# Hello\nSome **bold** text" width="100%"/>
+```
+
+**Attributes:**
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `bind_text` | string | Binds to a string subject for dynamic markdown content |
+| `text` | string | Sets static markdown content directly |
+| `name` | string | Widget name for `lv_obj_find_by_name()` lookup |
+| `width` | size | Width (typically `100%`). Height is always `LV_SIZE_CONTENT` |
+
+All standard `lv_obj` attributes (`width`, `height`, `align`, `hidden`, etc.) are also supported.
+
+**Supported Markdown Elements:**
+
+- Headings (H1-H6)
+- Bold (`**bold**`), italic (`*italic*`), bold-italic (`***both***`)
+- Inline code (`` `code` ``)
+- Fenced code blocks (` ``` `)
+- Unordered lists (`- item`) with nesting
+- Ordered lists (`1. item`) with nesting
+- Blockquotes (`> quote`)
+- Horizontal rules (`---`)
+
+**Theme-Aware Styling:**
+
+The widget automatically picks up colors, fonts, and spacing from the active theme. No manual styling is needed. The mapping is:
+
+| Element | Font Token | Color Token |
+|---------|-----------|-------------|
+| Body text | `font_body` | `text` |
+| H1 | `font_heading` | `primary` |
+| H2 | `font_heading` | `secondary` |
+| H3-H4 | `font_body` | `text` |
+| H5-H6 | `font_small` | `text_muted` |
+| Inline code | `font_small` | `text` on `elevated_bg` |
+| Code blocks | `font_small` | `text` on `elevated_bg` |
+| Blockquote border | -- | `primary` |
+| Horizontal rule | -- | `text_muted` |
+
+Spacing uses `space_sm` (paragraph), `space_xxs` (line), and `space_lg` (list indent).
+
+Bold and italic use faux rendering (letter spacing for bold, underline for italic) since separate bold/italic font files are not shipped.
+
+**Usage Pattern -- Scrollable Container:**
+
+The widget uses `LV_SIZE_CONTENT` for height, growing to fit its content. For long content, wrap it in a scrollable container:
+
+```xml
+<ui_card width="100%" height="400" style_pad_all="#space_lg">
+  <lv_obj width="100%" height="100%" scrollable="true"
+          style_pad_all="0" style_border_width="0" style_bg_opa="0" style_radius="0">
+    <ui_markdown name="my_markdown" width="100%" bind_text="my_content"/>
+  </lv_obj>
+</ui_card>
+```
+
+This pattern is used by the test panel. Another approach uses `flex_grow` to fill available space (used by the telemetry info modal):
+
+```xml
+<lv_obj width="100%" flex_grow="1"
+        style_pad_left="#space_lg" style_pad_right="#space_lg"
+        scrollable="true" scroll_snap_y="none">
+  <ui_markdown name="info_text" width="100%" bind_text="my_subject"/>
+</lv_obj>
+```
+
+**Setting Content from C++:**
+
+For subject-bound widgets, update the subject and the widget updates automatically. For programmatic setup (e.g., the test panel), use `lv_markdown_set_text()` directly:
+
+```cpp
+lv_obj_t* md = lv_obj_find_by_name(lv_screen_active(), "my_markdown");
+lv_markdown_set_text(md, "# Title\nSome **bold** markdown content.");
+```
+
+**Registration:**
+
+The widget is registered via `ui_markdown_init()` in `xml_registration.cpp`. This must be called after `lv_xml_init()` and after the theme is initialized. No XML file registration is needed -- it is a custom C++ widget, not an XML component.
+
+**Limitations and Gotchas:**
+
+- No image/link support -- markdown images and hyperlinks are not rendered
+- LVGL spangroups do not support per-span background styles, so inline code background color (`code_bg_color`) has no visible effect
+- Theme changes at runtime do not automatically re-style existing markdown widgets (the style is applied at creation time)
+- The `text` attribute in XML does not support literal newlines; use `\n` for line breaks in static content
+- When using `bind_text`, the observer does not use `ObserverGuard` -- the observer is cleaned up automatically when the widget is deleted via LVGL's built-in observer-object tracking
+
 #### Widget Defaults Quick Reference
 
 | Widget | Don't Specify (Built-in) |
@@ -613,6 +711,7 @@ Visual separators with theme-aware colors.
 | `text_*` | `style_text_font`, `style_text_color` |
 | `icon` | Font selection |
 | `divider_*` | `style_bg_color`, width/height (1px) |
+| `ui_markdown` | All styling (theme-aware fonts, colors, spacing) |
 
 ---
 
@@ -1061,6 +1160,15 @@ lv_obj_update_layout(panel);  // Required for grid layouts
 ```
 
 **Note:** SIZE_CONTENT disables flex wrapping - use explicit width if you need `row_wrap`.
+
+#### 6. lv_bar value=0 Bug (Upstream)
+
+Bar shows FULL instead of empty when created with `cur_value=0` and XML sets `value=0`. `lv_bar_set_value()` returns early without invalidation because old == new. Workaround: set to 1 then 0.
+
+```cpp
+lv_bar_set_value(bar, 1, LV_ANIM_OFF);
+lv_bar_set_value(bar, 0, LV_ANIM_OFF);
+```
 
 ### Debugging Checklist
 

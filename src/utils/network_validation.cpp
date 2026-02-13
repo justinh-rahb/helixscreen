@@ -3,9 +3,22 @@
 
 #include "utils/network_validation.h"
 
+#include <algorithm>
 #include <cctype>
 
-bool is_valid_ip_or_hostname(const std::string& host) {
+// Trim leading and trailing whitespace from user input
+static std::string trim(const std::string& s) {
+    auto start =
+        std::find_if_not(s.begin(), s.end(), [](unsigned char c) { return std::isspace(c); });
+    auto end = std::find_if_not(s.rbegin(), s.rend(), [](unsigned char c) {
+                   return std::isspace(c);
+               }).base();
+    return (start < end) ? std::string(start, end) : std::string();
+}
+
+bool is_valid_ip_or_hostname(const std::string& host_raw) {
+    std::string host = trim(host_raw);
+
     if (host.empty()) {
         return false;
     }
@@ -13,13 +26,6 @@ bool is_valid_ip_or_hostname(const std::string& host) {
     // RFC 1035: Total hostname max 253 characters
     if (host.length() > 253) {
         return false;
-    }
-
-    // Check for whitespace anywhere - always invalid
-    for (char c : host) {
-        if (std::isspace(c)) {
-            return false;
-        }
     }
 
     // Determine if this looks like an IP address pattern (digits, dots, and possibly
@@ -140,7 +146,9 @@ bool is_valid_ip_or_hostname(const std::string& host) {
     return true;
 }
 
-bool is_valid_port(const std::string& port_str) {
+bool is_valid_port(const std::string& port_str_raw) {
+    std::string port_str = trim(port_str_raw);
+
     if (port_str.empty()) {
         return false;
     }

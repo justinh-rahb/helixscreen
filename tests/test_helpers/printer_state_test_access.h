@@ -12,6 +12,7 @@ class PrinterPrintStateTestAccess {
   public:
     static void reset_extra(PrinterPrintState& pps) {
         pps.estimated_print_time_ = 0;
+        pps.has_real_layer_data_ = false;
     }
 };
 

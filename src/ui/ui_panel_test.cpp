@@ -6,6 +6,7 @@
 #include "ui_keyboard.h"
 
 #include "app_globals.h"
+#include "lv_markdown.h"
 #include "printer_state.h"
 #include "static_panel_registry.h"
 #include "theme_manager.h"
@@ -58,6 +59,9 @@ void TestPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
         ui_keyboard_register_textarea(keyboard_textarea);
         spdlog::info("[{}] Registered keyboard for textarea", get_name());
     }
+
+    // Populate markdown viewer with sample content exercising all elements
+    populate_markdown();
 }
 
 // ============================================================================
@@ -121,6 +125,74 @@ void TestPanel::populate_labels() {
     spdlog::info("[{}] Setup complete: {} ({}x{}, max={}), switch={}x{}, row={}px", get_name(),
                  size_category, hor_res, ver_res, greater_res, switch_width, switch_height,
                  row_height);
+}
+
+void TestPanel::populate_markdown() {
+    lv_obj_t* md_widget = lv_obj_find_by_name(lv_screen_active(), "markdown_test");
+    if (!md_widget) {
+        spdlog::warn("[{}] markdown_test widget not found", get_name());
+        return;
+    }
+
+    // Sample markdown exercising every supported element
+    static const char* sample_md =
+        "# Heading 1\n"
+        "## Heading 2\n"
+        "### Heading 3\n"
+        "#### Heading 4\n"
+        "##### Heading 5\n"
+        "###### Heading 6\n"
+        "\n"
+        "Regular paragraph text with **bold**, *italic*, and ***bold italic*** "
+        "emphasis styles. Also some `inline code` in the middle.\n"
+        "\n"
+        "---\n"
+        "\n"
+        "## Lists\n"
+        "\n"
+        "Unordered list:\n"
+        "\n"
+        "- First item\n"
+        "- Second item with **bold**\n"
+        "- Third item with `code`\n"
+        "  - Nested item one\n"
+        "  - Nested item two\n"
+        "- Back to top level\n"
+        "\n"
+        "Ordered list:\n"
+        "\n"
+        "1. Step one\n"
+        "2. Step two\n"
+        "3. Step three\n"
+        "   1. Sub-step A\n"
+        "   2. Sub-step B\n"
+        "\n"
+        "---\n"
+        "\n"
+        "## Code\n"
+        "\n"
+        "Inline: use `lv_markdown_set_text()` to render.\n"
+        "\n"
+        "Fenced code block:\n"
+        "\n"
+        "```\n"
+        "void setup() {\n"
+        "    auto* widget = lv_markdown_create(parent);\n"
+        "    lv_markdown_set_text(widget, md);\n"
+        "}\n"
+        "```\n"
+        "\n"
+        "## Blockquote\n"
+        "\n"
+        "> This is a blockquote with **bold** text.\n"
+        "> It can span multiple lines.\n"
+        "\n"
+        "---\n"
+        "\n"
+        "End of test. All supported elements exercised above.\n";
+
+    lv_markdown_set_text(md_widget, sample_md);
+    spdlog::info("[{}] Markdown test content set", get_name());
 }
 
 // ============================================================================

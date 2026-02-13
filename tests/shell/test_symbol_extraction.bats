@@ -53,21 +53,14 @@
     grep -A2 '^symbols:' Makefile | grep -q '$(TARGET).sym'
 }
 
-@test "release.yml extracts symbols for all platforms" {
+@test "release.yml builds generate symbol maps for all platforms" {
     local yml=".github/workflows/release.yml"
     [ -f "$yml" ]
 
-    # Each platform should have a symbol extraction step
+    # Symbol extraction is handled by the 'all' build target (all → strip → symbols)
+    # Verify each platform uploads its .sym file from the build output
     for platform in pi pi32 ad5m k1 k2; do
-        grep -q "make symbols PLATFORM_TARGET=${platform}" "$yml"
-    done
-}
-
-@test "release.yml strips binary for all platforms" {
-    local yml=".github/workflows/release.yml"
-
-    for platform in pi pi32 ad5m k1 k2; do
-        grep -q "make strip PLATFORM_TARGET=${platform}" "$yml"
+        grep -q "build/${platform}/bin/helix-screen.sym" "$yml"
     done
 }
 

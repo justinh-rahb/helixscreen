@@ -614,16 +614,17 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Configure for BASIC tier li
 }
 
 TEST_CASE_METHOD(FrequencyResponseChartTestFixture,
-                 "Configure for EMBEDDED tier enables table mode",
+                 "Configure for EMBEDDED tier enables chart mode with 50 points",
                  "[frequency_response_chart][platform]") {
     ui_frequency_response_chart_t* chart = ui_frequency_response_chart_create(screen);
     REQUIRE(chart != nullptr);
 
     ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::EMBEDDED);
 
-    // EMBEDDED tier should use table mode, not chart mode
-    REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == false);
-    REQUIRE(ui_frequency_response_chart_get_max_points(chart) == 0);
+    // EMBEDDED tier now uses chart mode with same limits as BASIC
+    REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == true);
+    REQUIRE(ui_frequency_response_chart_get_max_points(chart) ==
+            PlatformCapabilities::BASIC_CHART_POINTS);
 
     ui_frequency_response_chart_destroy(chart);
 }
@@ -643,9 +644,10 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "Get max points returns tier
         REQUIRE(ui_frequency_response_chart_get_max_points(chart) == 50);
     }
 
-    SECTION("EMBEDDED tier returns 0 points") {
+    SECTION("EMBEDDED tier returns 50 points (same as BASIC)") {
         ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::EMBEDDED);
-        REQUIRE(ui_frequency_response_chart_get_max_points(chart) == 0);
+        REQUIRE(ui_frequency_response_chart_get_max_points(chart) ==
+                PlatformCapabilities::BASIC_CHART_POINTS);
     }
 
     SECTION("Get max points from NULL chart returns 0") {
@@ -671,9 +673,9 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture,
         REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == true);
     }
 
-    SECTION("EMBEDDED tier is table mode") {
+    SECTION("EMBEDDED tier is chart mode (same as BASIC)") {
         ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::EMBEDDED);
-        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == false);
+        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == true);
     }
 
     SECTION("is_chart_mode from NULL chart returns false") {
@@ -721,14 +723,14 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "BASIC tier downsampling",
     ui_frequency_response_chart_destroy(chart);
 }
 
-TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "EMBEDDED tier stores data for table view",
+TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "EMBEDDED tier downsamples like BASIC tier",
                  "[frequency_response_chart][downsampling][platform]") {
     ui_frequency_response_chart_t* chart = ui_frequency_response_chart_create(screen);
     REQUIRE(chart != nullptr);
 
     ui_frequency_response_chart_configure_for_platform(chart, PlatformTier::EMBEDDED);
 
-    SECTION("Data with 500 points stores for table but no chart points") {
+    SECTION("Data with 500 points downsamples to ~50 points") {
         int id = ui_frequency_response_chart_add_series(chart, "X Axis", lv_color_hex(0xFF4444));
 
         const size_t input_count = 500;
@@ -742,10 +744,10 @@ TEST_CASE_METHOD(FrequencyResponseChartTestFixture, "EMBEDDED tier stores data f
 
         ui_frequency_response_chart_set_data(chart, id, freqs.data(), amps.data(), input_count);
 
-        // EMBEDDED tier has no chart points
-        REQUIRE(ui_frequency_response_chart_get_max_points(chart) == 0);
-        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == false);
-        // Data should still be stored for table view - implementation detail
+        // EMBEDDED tier now uses chart mode with same limits as BASIC
+        REQUIRE(ui_frequency_response_chart_get_max_points(chart) ==
+                PlatformCapabilities::BASIC_CHART_POINTS);
+        REQUIRE(ui_frequency_response_chart_is_chart_mode(chart) == true);
     }
 
     ui_frequency_response_chart_destroy(chart);

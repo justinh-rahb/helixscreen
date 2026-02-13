@@ -350,7 +350,20 @@ void Config::init(const std::string& config_path) {
     if (stat(config_path.c_str(), &buffer) == 0) {
         // Load existing config
         spdlog::info("[Config] Loading config from {}", config_path);
-        data = json::parse(std::fstream(config_path));
+        try {
+            data = json::parse(std::fstream(config_path));
+        } catch (const json::exception& e) {
+            spdlog::error("[Config] Failed to parse {}: {}", config_path, e.what());
+            spdlog::warn("[Config] Config file is corrupt — resetting to defaults");
+
+            // Backup the corrupt file for diagnosis
+            std::string backup_path = config_path + ".corrupt";
+            std::rename(config_path.c_str(), backup_path.c_str());
+            spdlog::info("[Config] Corrupt config backed up to {}", backup_path);
+
+            data = get_default_config("127.0.0.1", false);
+            config_modified = true;
+        }
 
         // Run display config migration (moves root-level display_* to /display/)
         if (migrate_display_config(data)) {

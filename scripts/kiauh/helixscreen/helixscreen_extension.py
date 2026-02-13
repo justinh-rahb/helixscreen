@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+from __future__ import annotations
+
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -8,34 +10,9 @@ from extensions.base_extension import BaseExtension
 from extensions.helixscreen import (
     HELIXSCREEN_INSTALLER_URL,
     HELIXSCREEN_SERVICE_NAME,
+    find_install_dir as _find_install_dir,
 )
 from utils.input_utils import get_confirm
-
-# Platform-dependent install locations
-_INSTALL_PATHS = [
-    Path.home().joinpath("helixscreen"),
-    Path("/opt/helixscreen"),
-    Path("/usr/data/helixscreen"),
-    Path("/root/printer_software/helixscreen"),
-]
-
-
-def _find_install_dir() -> Optional[Path]:
-    """Find the actual HelixScreen install directory."""
-    for path in _INSTALL_PATHS:
-        if path.exists() and path.joinpath("helix-screen").exists():
-            return path
-    # Also scan /home/*/helixscreen
-    home = Path("/home")
-    if home.is_dir():
-        try:
-            for home_dir in home.iterdir():
-                candidate = home_dir.joinpath("helixscreen")
-                if candidate.exists() and candidate.joinpath("helix-screen").exists():
-                    return candidate
-        except PermissionError:
-            pass
-    return None
 
 
 # noinspection PyMethodMayBeStatic

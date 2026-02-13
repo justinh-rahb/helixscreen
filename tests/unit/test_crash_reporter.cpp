@@ -1,0 +1,512 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+/**
+ * @file test_crash_reporter.cpp
+ * @brief TDD tests for CrashReporter singleton - crash report collection,
+ *        formatting, GitHub URL generation, and file lifecycle.
+ *
+ * Written TDD-style before implementation. Tests WILL FAIL if CrashReporter
+ * is removed or its interface changes.
+ */
+
+#include "system/crash_reporter.h"
+
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <string>
+#include <vector>
+
+#include "../catch_amalgamated.hpp"
+#include "hv/json.hpp"
+
+using json = nlohmann::json;
+namespace fs = std::filesystem;
+
+// ============================================================================
+// Fixture: isolated temp directory with singleton reset
+// ============================================================================
+
+class CrashReporterTestFixture {
+  public:
+    CrashReporterTestFixture() {
+        temp_dir_ = fs::temp_directory_path() /
+                    ("helix_crash_reporter_test_" +
+                     std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directories(temp_dir_);
+
+        // Reset singleton
+        auto& cr = CrashReporter::instance();
+        cr.shutdown();
+        cr.init(temp_dir_.string());
+    }
+
+    ~CrashReporterTestFixture() {
+        CrashReporter::instance().shutdown();
+        std::error_code ec;
+        fs::remove_all(temp_dir_, ec);
+    }
+
+    void write_crash_file(int signal = 11, const std::string& name = "SIGSEGV",
+                          const std::string& version = "0.9.9",
+                          const std::vector<std::string>& bt = {"0x400abc", "0x400def"}) {
+        std::string crash_path = (temp_dir_ / "crash.txt").string();
+        std::ofstream ofs(crash_path);
+        ofs << "signal:" << signal << "\n";
+        ofs << "name:" << name << "\n";
+        ofs << "version:" << version << "\n";
+        ofs << "timestamp:1707350400\n";
+        ofs << "uptime:3600\n";
+        for (const auto& addr : bt) {
+            ofs << "bt:" << addr << "\n";
+        }
+    }
+
+    void write_log_file(const std::string& content,
+                        const std::string& filename = "helix-screen.log") {
+        std::ofstream ofs((temp_dir_ / filename).string());
+        ofs << content;
+    }
+
+    fs::path temp_dir_;
+};
+
+// ============================================================================
+// Detection Tests [crash_reporter]
+// ============================================================================
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: has_crash_report returns true when crash.txt exists",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    REQUIRE(cr.has_crash_report());
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: has_crash_report returns false when no crash.txt",
+                 "[crash_reporter]") {
+    auto& cr = CrashReporter::instance();
+    REQUIRE_FALSE(cr.has_crash_report());
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: has_crash_report returns false after consume_crash_file",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    REQUIRE(cr.has_crash_report());
+
+    cr.consume_crash_file();
+    REQUIRE_FALSE(cr.has_crash_report());
+}
+
+// ============================================================================
+// Report Collection [crash_reporter]
+// ============================================================================
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: collect_report parses signal from crash.txt", "[crash_reporter]") {
+    write_crash_file(6, "SIGABRT");
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    REQUIRE(report.signal == 6);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: collect_report parses signal name",
+                 "[crash_reporter]") {
+    write_crash_file(11, "SIGSEGV");
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    REQUIRE(report.signal_name == "SIGSEGV");
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: collect_report parses backtrace addresses", "[crash_reporter]") {
+    std::vector<std::string> bt = {"0x400abc", "0x400def", "0x401000"};
+    write_crash_file(11, "SIGSEGV", "0.9.9", bt);
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+
+    REQUIRE(report.backtrace.size() == 3);
+    REQUIRE(report.backtrace[0] == "0x400abc");
+    REQUIRE(report.backtrace[1] == "0x400def");
+    REQUIRE(report.backtrace[2] == "0x401000");
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: collect_report handles missing optional fields gracefully",
+                 "[crash_reporter]") {
+    // Write a minimal crash file with only required fields
+    std::ofstream ofs((temp_dir_ / "crash.txt").string());
+    ofs << "signal:11\n";
+    ofs << "name:SIGSEGV\n";
+    ofs << "version:0.9.9\n";
+    ofs << "timestamp:1707350400\n";
+    ofs << "uptime:3600\n";
+    ofs.close();
+
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+
+    // Required fields parsed correctly
+    REQUIRE(report.signal == 11);
+    REQUIRE(report.signal_name == "SIGSEGV");
+    REQUIRE(report.app_version == "0.9.9");
+
+    // Optional fields have sensible defaults
+    REQUIRE(report.backtrace.empty());
+    REQUIRE(report.printer_model.empty());
+    REQUIRE(report.klipper_version.empty());
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: collect_report includes platform key",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+
+    // Platform should be detected at runtime (e.g. "linux-arm64", "darwin-x86_64")
+    REQUIRE_FALSE(report.platform.empty());
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: collect_report includes RAM and CPU info", "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+
+    // RAM and CPU should be non-negative (0 is acceptable if detection fails)
+    REQUIRE(report.ram_total_mb >= 0);
+    REQUIRE(report.cpu_cores >= 0);
+}
+
+// ============================================================================
+// Log Tail [crash_reporter]
+// ============================================================================
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: get_log_tail returns last 50 lines",
+                 "[crash_reporter]") {
+    // Write 100 lines
+    std::string content;
+    for (int i = 1; i <= 100; i++) {
+        content += "line " + std::to_string(i) + "\n";
+    }
+    write_log_file(content);
+
+    auto& cr = CrashReporter::instance();
+    std::string tail = cr.get_log_tail(50);
+
+    // Should contain line 51 through line 100
+    REQUIRE(tail.find("line 51") != std::string::npos);
+    REQUIRE(tail.find("line 100") != std::string::npos);
+    // Should NOT contain line 1
+    REQUIRE(tail.find("line 1\n") == std::string::npos);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: get_log_tail handles files shorter than 50 lines",
+                 "[crash_reporter]") {
+    std::string content;
+    for (int i = 1; i <= 10; i++) {
+        content += "short line " + std::to_string(i) + "\n";
+    }
+    write_log_file(content);
+
+    auto& cr = CrashReporter::instance();
+    std::string tail = cr.get_log_tail(50);
+
+    // Should contain all 10 lines
+    REQUIRE(tail.find("short line 1") != std::string::npos);
+    REQUIRE(tail.find("short line 10") != std::string::npos);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: get_log_tail returns empty string for missing log file",
+                 "[crash_reporter]") {
+    // No log file written
+    auto& cr = CrashReporter::instance();
+    std::string tail = cr.get_log_tail(50);
+    REQUIRE(tail.empty());
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: get_log_tail handles empty log file",
+                 "[crash_reporter]") {
+    write_log_file("");
+
+    auto& cr = CrashReporter::instance();
+    std::string tail = cr.get_log_tail(50);
+    REQUIRE(tail.empty());
+}
+
+// ============================================================================
+// Report Formatting [crash_reporter]
+// ============================================================================
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: report_to_json includes all required fields", "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    json j = cr.report_to_json(report);
+
+    REQUIRE(j.contains("signal"));
+    REQUIRE(j.contains("signal_name"));
+    REQUIRE(j.contains("app_version"));
+    REQUIRE(j.contains("timestamp"));
+    REQUIRE(j.contains("uptime_seconds"));
+    REQUIRE(j.contains("backtrace"));
+    REQUIRE(j.contains("platform"));
+    REQUIRE(j.contains("display_backend"));
+    REQUIRE(j.contains("ram_mb"));
+    REQUIRE(j.contains("cpu_cores"));
+    REQUIRE(j.contains("printer_model"));
+    REQUIRE(j.contains("klipper_version"));
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: report_to_json log_tail is array of lines", "[crash_reporter]") {
+    write_crash_file();
+    write_log_file("line one\nline two\nline three\n");
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    json j = cr.report_to_json(report);
+
+    REQUIRE(j.contains("log_tail"));
+    REQUIRE(j["log_tail"].is_array());
+    REQUIRE(j["log_tail"].size() == 3);
+    REQUIRE(j["log_tail"][0] == "line one");
+    REQUIRE(j["log_tail"][1] == "line two");
+    REQUIRE(j["log_tail"][2] == "line three");
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: report_to_json omits log_tail when empty", "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    json j = cr.report_to_json(report);
+
+    REQUIRE_FALSE(j.contains("log_tail"));
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: report_to_json backtrace is array of strings",
+                 "[crash_reporter]") {
+    write_crash_file(11, "SIGSEGV", "0.9.9", {"0xaaa", "0xbbb"});
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    json j = cr.report_to_json(report);
+
+    REQUIRE(j["backtrace"].is_array());
+    REQUIRE(j["backtrace"].size() == 2);
+    REQUIRE(j["backtrace"][0].is_string());
+    REQUIRE(j["backtrace"][1].is_string());
+    REQUIRE(j["backtrace"][0] == "0xaaa");
+    REQUIRE(j["backtrace"][1] == "0xbbb");
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: report_to_text is human-readable with signal info",
+                 "[crash_reporter]") {
+    write_crash_file(11, "SIGSEGV", "1.0.0");
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    std::string text = cr.report_to_text(report);
+
+    REQUIRE(text.find("SIGSEGV") != std::string::npos);
+    REQUIRE(text.find("11") != std::string::npos);
+    REQUIRE(text.find("1.0.0") != std::string::npos);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: report_to_text includes section headers",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    std::string text = cr.report_to_text(report);
+
+    // Should have identifiable sections for readability
+    // Check for common section markers (e.g. headers, separators)
+    REQUIRE(text.find("Signal") != std::string::npos);
+    REQUIRE(text.find("Backtrace") != std::string::npos);
+    REQUIRE(text.find("Version") != std::string::npos);
+}
+
+// ============================================================================
+// GitHub URL Generation [crash_reporter]
+// ============================================================================
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: generate_github_url produces valid URL",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    std::string url = cr.generate_github_url(report);
+
+    REQUIRE(url.find("https://github.com") == 0);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: generate_github_url stays under 2000 chars", "[crash_reporter]") {
+    // Create a report with a large backtrace
+    std::vector<std::string> large_bt;
+    for (int i = 0; i < 100; i++) {
+        large_bt.push_back("0x" + std::to_string(0x400000 + i * 0x100));
+    }
+    write_crash_file(11, "SIGSEGV", "0.9.9", large_bt);
+
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    std::string url = cr.generate_github_url(report);
+
+    // GitHub URLs over ~2000 chars get rejected by browsers
+    REQUIRE(url.size() <= 2000);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: generate_github_url includes signal and version in title",
+                 "[crash_reporter]") {
+    write_crash_file(6, "SIGABRT", "1.2.3");
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    std::string url = cr.generate_github_url(report);
+
+    // URL-encoded title should contain signal name and version
+    REQUIRE(url.find("SIGABRT") != std::string::npos);
+    REQUIRE(url.find("1.2.3") != std::string::npos);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: generate_github_url truncates long backtraces",
+                 "[crash_reporter]") {
+    // Create a report with a very large backtrace
+    std::vector<std::string> huge_bt;
+    for (int i = 0; i < 200; i++) {
+        huge_bt.push_back("0x" + std::to_string(0x400000 + i));
+    }
+    write_crash_file(11, "SIGSEGV", "0.9.9", huge_bt);
+
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    std::string url = cr.generate_github_url(report);
+
+    // URL must be valid length even with huge backtrace
+    REQUIRE(url.size() <= 2000);
+    // Should still start with the GitHub URL
+    REQUIRE(url.find("https://github.com") == 0);
+}
+
+// ============================================================================
+// File Save [crash_reporter]
+// ============================================================================
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: save_to_file creates crash_report.txt in config dir",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+    cr.save_to_file(report);
+
+    REQUIRE(fs::exists(temp_dir_ / "crash_report.txt"));
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: save_to_file content matches report_to_text", "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+
+    std::string expected_text = cr.report_to_text(report);
+    cr.save_to_file(report);
+
+    // Read the saved file
+    std::ifstream ifs((temp_dir_ / "crash_report.txt").string());
+    std::string saved_content((std::istreambuf_iterator<char>(ifs)),
+                              std::istreambuf_iterator<char>());
+
+    REQUIRE(saved_content == expected_text);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: save_to_file returns true on success",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    auto report = cr.collect_report();
+
+    REQUIRE(cr.save_to_file(report) == true);
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: save_to_file returns false on bad path",
+                 "[crash_reporter]") {
+    // Re-init with a non-existent directory that cannot be created
+    auto& cr = CrashReporter::instance();
+    cr.shutdown();
+    cr.init("/nonexistent/path/that/should/not/exist");
+
+    CrashReporter::CrashReport report;
+    report.signal = 11;
+    report.signal_name = "SIGSEGV";
+    report.app_version = "0.9.9";
+
+    REQUIRE(cr.save_to_file(report) == false);
+
+    // Re-init back to temp dir for fixture cleanup
+    cr.shutdown();
+    cr.init(temp_dir_.string());
+}
+
+// ============================================================================
+// Singleton Lifecycle [crash_reporter]
+// ============================================================================
+
+TEST_CASE_METHOD(CrashReporterTestFixture,
+                 "CrashReporter: init with config_dir sets crash file path", "[crash_reporter]") {
+    // Write crash file and verify it is detected via the configured path
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    REQUIRE(cr.has_crash_report());
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: re-init resets state cleanly",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    REQUIRE(cr.has_crash_report());
+
+    // Create a second temp directory
+    fs::path temp_dir_2 =
+        fs::temp_directory_path() /
+        ("helix_crash_reporter_test2_" +
+         std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    fs::create_directories(temp_dir_2);
+
+    // Re-init with new dir (no crash file there)
+    cr.shutdown();
+    cr.init(temp_dir_2.string());
+    REQUIRE_FALSE(cr.has_crash_report());
+
+    // Cleanup second temp dir
+    cr.shutdown();
+    std::error_code ec;
+    fs::remove_all(temp_dir_2, ec);
+
+    // Restore original init for fixture teardown
+    cr.init(temp_dir_.string());
+}
+
+TEST_CASE_METHOD(CrashReporterTestFixture, "CrashReporter: shutdown clears state",
+                 "[crash_reporter]") {
+    write_crash_file();
+    auto& cr = CrashReporter::instance();
+    REQUIRE(cr.has_crash_report());
+
+    cr.shutdown();
+
+    // After shutdown, has_crash_report should return false (no config dir set)
+    REQUIRE_FALSE(cr.has_crash_report());
+
+    // Re-init for fixture teardown
+    cr.init(temp_dir_.string());
+}

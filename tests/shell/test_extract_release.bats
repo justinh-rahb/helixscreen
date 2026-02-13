@@ -239,6 +239,55 @@ echo "tmpfs       51200     48640  2560       95% /tmp"
 
 # --- Legacy config migration ---
 
+# --- Non-root user with SUDO set (issue #34) ---
+
+@test "extract_release: extracted files are user-owned not root-owned" {
+    # Simulates non-root user scenario where SUDO would be set.
+    # The key invariant: tar runs WITHOUT $SUDO, so extracted files
+    # belong to the current user and can be read/deleted without elevation.
+    create_test_tarball "pi"
+
+    # Verify tar in extract_release does NOT use $SUDO by checking
+    # extracted files are owned by current user
+    extract_release "pi"
+
+    # If extraction used $SUDO tar, files would be root-owned and this
+    # user couldn't read them. The binary must be readable for arch validation.
+    [ -r "$INSTALL_DIR/bin/helix-screen" ]
+}
+
+@test "extract_release: cleanup succeeds without sudo after arch mismatch" {
+    # Regression test for issue #34: rm -rf cleanup must work without $SUDO
+    # because extracted files should be user-owned (tar runs without $SUDO)
+    create_wrong_arch_tarball "pi"
+
+    run extract_release "pi"
+    [ "$status" -ne 0 ]
+
+    # Extract dir must be fully cleaned up — no leftover root-owned files
+    [ ! -d "$TMP_DIR/extract" ]
+}
+
+@test "extract_release: cleanup succeeds without sudo after missing binary" {
+    create_tarball_no_binary
+
+    run extract_release "ad5m"
+    [ "$status" -ne 0 ]
+
+    # Extract dir must be fully cleaned up
+    [ ! -d "$TMP_DIR/extract" ]
+}
+
+@test "extract_release: binary readable for architecture validation" {
+    # The validate_binary_architecture function uses dd to read the binary.
+    # If tar extracted as root, dd would fail with permission denied.
+    create_test_tarball "pi32"
+
+    run extract_release "pi32"
+    [ "$status" -eq 0 ]
+    [ -f "$INSTALL_DIR/bin/helix-screen" ]
+}
+
 @test "extract_release: preserves legacy config location" {
     mkdir -p "$INSTALL_DIR/bin"
     echo "old" > "$INSTALL_DIR/bin/helix-screen"

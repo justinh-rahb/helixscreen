@@ -211,6 +211,7 @@ Located in the `display` section:
     "gcode_3d_enabled": true,
     "bed_mesh_render_mode": 0,
     "bed_mesh_show_zero_plane": true,
+    "printer_image": "",
     "calibration": {
       "valid": false
     }
@@ -296,6 +297,18 @@ Can also be overridden via `HELIX_GCODE_MODE` env var (`3D` or `2D`).
 **Type:** boolean
 **Default:** `true`
 **Description:** Show translucent reference plane at Z=0 in bed mesh 3D view. Helps visualize where the nozzle touches the bed.
+
+### `printer_image`
+**Type:** string
+**Default:** `""` (auto-detect)
+**Description:** Printer image displayed on the Home Panel and in the Printer Manager. The value determines which image is used:
+- `""` (empty string or absent) — **Auto-detect**: HelixScreen selects an image based on the printer type reported by Klipper
+- `"shipped:voron-24r2"` — Use a specific shipped image by name (see `assets/images/printers/` for available images)
+- `"custom:my-printer"` — Use a custom image that was imported from `config/custom_images/`
+
+Custom images are PNG or JPEG files placed in `config/custom_images/`. They are automatically converted to optimized LVGL binary format (300px and 150px variants) when the Printer Image picker overlay is opened. Maximum file size is 5MB, maximum resolution is 2048x2048 pixels.
+
+This setting can also be changed via the Printer Manager overlay (tap the printer image on the Home Panel).
 
 ### `calibration`
 **Type:** object
@@ -1052,6 +1065,7 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
     "gcode_3d_enabled": true,
     "bed_mesh_render_mode": 0,
     "bed_mesh_show_zero_plane": true,
+    "printer_image": "",
     "calibration": {
       "valid": false
     }

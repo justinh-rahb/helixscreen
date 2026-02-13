@@ -183,4 +183,140 @@ TEST_CASE("Layer tracking: set_print_layer_current setter", "[layer_tracking][se
         state.update_from_status(status);
         REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 12);
     }
+
+    SECTION("setter marks has_real_layer_data true") {
+        REQUIRE_FALSE(state.has_real_layer_data());
+        state.set_print_layer_current(5);
+        // Flag is set inside the async lambda, so drain the queue first
+        UpdateQueueTestAccess::drain(helix::ui::UpdateQueue::instance());
+        REQUIRE(state.has_real_layer_data());
+    }
+}
+
+// ============================================================================
+// Progress-based layer estimation fallback
+// ============================================================================
+
+TEST_CASE("Layer tracking: progress-based estimation fallback", "[layer_tracking][estimation]") {
+    lv_init_safe();
+
+    PrinterState& state = get_printer_state();
+    PrinterStateTestAccess::reset(state);
+    state.init_subjects(false);
+
+    // Start printing
+    json printing = {{"print_stats", {{"state", "printing"}}}};
+    state.update_from_status(printing);
+
+    // Set total layers from metadata (this is how it works in practice)
+    state.set_print_layer_total(320);
+
+    SECTION("estimates layer from progress when no real layer data") {
+        REQUIRE_FALSE(state.has_real_layer_data());
+
+        // 50% progress → ~160/320
+        json progress = {{"virtual_sdcard", {{"progress", 0.50}}}};
+        state.update_from_status(progress);
+
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 160);
+    }
+
+    SECTION("estimates at low progress") {
+        json progress = {{"virtual_sdcard", {{"progress", 0.01}}}};
+        state.update_from_status(progress);
+
+        // 1% of 320 = 3.2, rounded = 3. But clamped to min 1.
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) >= 1);
+    }
+
+    SECTION("estimates at high progress") {
+        json progress = {{"virtual_sdcard", {{"progress", 0.99}}}};
+        state.update_from_status(progress);
+
+        // 99% of 320 = 316.8 → 317
+        int estimated = lv_subject_get_int(state.get_print_layer_current_subject());
+        REQUIRE(estimated >= 315);
+        REQUIRE(estimated <= 320);
+    }
+
+    SECTION("does not estimate when total_layers is 0") {
+        state.set_print_layer_total(0);
+
+        json progress = {{"virtual_sdcard", {{"progress", 0.50}}}};
+        state.update_from_status(progress);
+
+        // Should stay at 0 — no total to estimate from
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 0);
+    }
+
+    SECTION("stops estimating once real data arrives from print_stats.info") {
+        // First: estimation active
+        json progress = {{"virtual_sdcard", {{"progress", 0.50}}}};
+        state.update_from_status(progress);
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 160);
+        REQUIRE_FALSE(state.has_real_layer_data());
+
+        // Real data arrives
+        json real_layer = {{"print_stats", {{"info", {{"current_layer", 142}}}}}};
+        state.update_from_status(real_layer);
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 142);
+        REQUIRE(state.has_real_layer_data());
+
+        // Further progress updates should NOT overwrite real data
+        json progress2 = {{"virtual_sdcard", {{"progress", 0.55}}}};
+        state.update_from_status(progress2);
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 142);
+    }
+
+    SECTION("stops estimating once real data arrives from gcode fallback") {
+        json progress = {{"virtual_sdcard", {{"progress", 0.50}}}};
+        state.update_from_status(progress);
+        REQUIRE_FALSE(state.has_real_layer_data());
+
+        // Gcode fallback sets real data
+        state.set_print_layer_current(150);
+        UpdateQueueTestAccess::drain(helix::ui::UpdateQueue::instance());
+        REQUIRE(state.has_real_layer_data());
+
+        // Progress update should NOT overwrite
+        json progress2 = {{"virtual_sdcard", {{"progress", 0.55}}}};
+        state.update_from_status(progress2);
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 150);
+    }
+
+    SECTION("does not estimate in terminal state even without real data") {
+        // Set total layers and make some progress
+        json progress = {{"virtual_sdcard", {{"progress", 0.50}}}};
+        state.update_from_status(progress);
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 160);
+
+        // Print completes
+        json complete = {{"print_stats", {{"state", "complete"}}}};
+        state.update_from_status(complete);
+
+        // Progress update arrives after completion — should NOT change layer
+        json progress2 = {{"virtual_sdcard", {{"progress", 0.99}}}};
+        state.update_from_status(progress2);
+        REQUIRE(lv_subject_get_int(state.get_print_layer_current_subject()) == 160);
+    }
+
+    SECTION("has_real_layer_data resets on new print") {
+        // Get real data
+        json real_layer = {{"print_stats", {{"info", {{"current_layer", 42}}}}}};
+        state.update_from_status(real_layer);
+        REQUIRE(state.has_real_layer_data());
+
+        // Simulate new print starting (state goes to standby then printing)
+        json standby = {{"print_stats", {{"state", "standby"}}}};
+        state.update_from_status(standby);
+
+        // Reset via the same mechanism as real code
+        PrinterStateTestAccess::reset(state);
+        state.init_subjects(false);
+
+        json printing2 = {{"print_stats", {{"state", "printing"}}}};
+        state.update_from_status(printing2);
+
+        REQUIRE_FALSE(state.has_real_layer_data());
+    }
 }

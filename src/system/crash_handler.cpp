@@ -376,3 +376,26 @@ void crash_handler::remove_crash_file(const std::string& crash_file_path) {
         spdlog::warn("[CrashHandler] Failed to remove crash file: {}", ec.message());
     }
 }
+
+void crash_handler::write_mock_crash_file(const std::string& crash_file_path) {
+    std::ofstream ofs(crash_file_path);
+    if (!ofs.good()) {
+        spdlog::error("[CrashHandler] Cannot write mock crash file: {}", crash_file_path);
+        return;
+    }
+
+    time_t now = time(nullptr);
+
+    ofs << "signal:11\n";
+    ofs << "name:SIGSEGV\n";
+    ofs << "version:" << HELIX_VERSION << "\n";
+    ofs << "timestamp:" << now << "\n";
+    ofs << "uptime:1234\n";
+    ofs << "bt:0x00400abc\n";
+    ofs << "bt:0x00400def\n";
+    ofs << "bt:0x00401234\n";
+    ofs << "bt:0x00405678\n";
+    ofs << "bt:0x00409abc\n";
+
+    spdlog::info("[CrashHandler] Wrote mock crash file: {}", crash_file_path);
+}

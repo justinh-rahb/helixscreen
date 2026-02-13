@@ -24,8 +24,8 @@
 - **Uses**: 12 | **Velocity**: 0 | **Learned**: 2025-12-14 | **Last**: 2026-01-08 | **Category**: gotcha | **Type**: constraint
 > Avoid mutex locks in destructors during static destruction phase. Other objects may already be destroyed, causing deadlock or crash on exit
 
-### [L014] [***--|***--] Register all XML components
-- **Uses**: 26 | **Velocity**: 1 | **Learned**: 2025-12-14 | **Last**: 2026-02-05 | **Category**: gotcha | **Type**: constraint
+### [L014] [***--|****-] Register all XML components
+- **Uses**: 27 | **Velocity**: 2 | **Learned**: 2025-12-14 | **Last**: 2026-02-11 | **Category**: gotcha | **Type**: constraint
 > When adding new XML components, must add lv_xml_component_register_from_file() call in main.cpp. Forgetting causes silent failures
 
 ### [L020] [***--|*----] ObserverGuard for cleanup
@@ -152,4 +152,8 @@
 ### [L065] [-----|-----] No test-only methods on production classes
 - **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-11 | **Last**: 2026-02-11 | **Category**: patterns
 > WRONG: Adding public methods like reset_for_testing(), clear_startup_grace_period_for_testing() on production classes. Pollutes API, ships test code to users, creates coupling. FOUND: 40+ instances across AbortManager (15 callback simulators), sensor managers, printer state classes. RIGHT: Use friend class pattern — add 'friend class FooTestAccess;' in private section, define FooTestAccess in the test .cpp file with static methods that access private members. Example: FilamentSensorManagerTestAccess::reset(mgr) instead of mgr.reset_for_testing(). For state machine callbacks (like AbortManager), consider a testable interface/mock instead of exposing every internal transition.
+
+### [L066] [-----|-----] LVGL XML flex layout patterns
+- **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-11 | **Last**: 2026-02-11 | **Category**: layout
+> Key patterns for LVGL 9 XML flex layouts: (1) Items that need to share a line MUST be in ONE container - separate containers in a column flow are ALWAYS on separate lines. (2) Use flex_grow=1 spacer (width=1 height=1 style_pad_all=0) to push groups apart within a row. (3) For wrapping content like chips/swatches, use row_wrap on one container with all items inside. (4) Slider knobs extend beyond track - add right padding on slider containers near scrollbars.
 

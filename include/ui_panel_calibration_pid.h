@@ -140,6 +140,24 @@ class PIDCalibrationPanel : public OverlayBase {
     }
 
     /**
+     * @brief Request demo results injection after next on_activate()
+     *
+     * Sets a pending flag so that on_activate() will call inject_demo_results()
+     * after finishing its normal reset. Call before show().
+     */
+    void request_demo_inject() {
+        demo_inject_pending_ = true;
+    }
+
+    /**
+     * @brief Inject demo results for screenshot/demo mode
+     *
+     * Populates the panel with realistic PID calibration results
+     * matching mock backend values, then transitions to COMPLETE state.
+     */
+    void inject_demo_results();
+
+    /**
      * @brief Set TempControlPanel for graph registration
      *
      * @param tcp TempControlPanel that manages temperature graph updates
@@ -178,6 +196,9 @@ class PIDCalibrationPanel : public OverlayBase {
     static constexpr int BED_MIN_TEMP = 40;
     static constexpr int BED_MAX_TEMP = 110;
     static constexpr int BED_DEFAULT_TEMP = 60;
+
+    // Demo mode: inject results after on_activate() resets state
+    bool demo_inject_pending_ = false;
 
     // PID results
     float result_kp_ = 0;

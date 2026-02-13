@@ -13,6 +13,7 @@
 #include "ui_panel_ams.h"
 #include "ui_panel_print_status.h"
 #include "ui_panel_temp_control.h"
+#include "ui_printer_manager_overlay.h"
 #include "ui_subject_registry.h"
 #include "ui_temperature_utils.h"
 #include "ui_update_queue.h"
@@ -31,6 +32,8 @@
 #include "observer_factory.h"
 #include "prerendered_images.h"
 #include "printer_detector.h"
+#include "printer_image_manager.h"
+#include "printer_images.h"
 #include "printer_state.h"
 #include "runtime_config.h"
 #include "settings_manager.h"
@@ -175,6 +178,7 @@ void HomePanel::init_subjects() {
     lv_xml_register_event_cb(nullptr, "temp_clicked_cb", temp_clicked_cb);
     lv_xml_register_event_cb(nullptr, "printer_status_clicked_cb", printer_status_clicked_cb);
     lv_xml_register_event_cb(nullptr, "network_clicked_cb", network_clicked_cb);
+    lv_xml_register_event_cb(nullptr, "printer_manager_clicked_cb", printer_manager_clicked_cb);
     lv_xml_register_event_cb(nullptr, "ams_clicked_cb", ams_clicked_cb);
 
     // Computed subject for filament status visibility:
@@ -342,6 +346,9 @@ void HomePanel::on_activate() {
         tip_rotation_timer_ = lv_timer_create(tip_rotation_timer_cb, 60000, this);
         spdlog::debug("[{}] Resumed tip rotation timer", get_name());
     }
+
+    // Re-check printer image (may have changed in settings overlay)
+    refresh_printer_image();
 
     // Start Spoolman polling for AMS mini status updates
     AmsState::instance().start_spoolman_polling();
@@ -656,6 +663,29 @@ void HomePanel::handle_network_clicked() {
     overlay.show();
 }
 
+void HomePanel::handle_printer_manager_clicked() {
+    // Gate behind beta features flag
+    Config* config = Config::get_instance();
+    if (!config || !config->is_beta_features_enabled()) {
+        spdlog::debug("[{}] Printer Manager requires beta features", get_name());
+        return;
+    }
+
+    spdlog::info("[{}] Printer image clicked - opening Printer Manager overlay", get_name());
+
+    auto& overlay = get_printer_manager_overlay();
+
+    if (!overlay.are_subjects_initialized()) {
+        overlay.init_subjects();
+        overlay.register_callbacks();
+        overlay.create(parent_screen_);
+        NavigationManager::instance().register_overlay_instance(overlay.get_root(), &overlay);
+    }
+
+    // Push overlay onto navigation stack
+    ui_nav_push_overlay(overlay.get_root());
+}
+
 void HomePanel::handle_ams_clicked() {
     spdlog::info("[{}] AMS indicator clicked - opening AMS panel overlay", get_name());
 
@@ -803,40 +833,8 @@ void HomePanel::reload_from_config() {
     std::string printer_type = config->get<std::string>(helix::wizard::PRINTER_TYPE, "");
     printer_state_.set_printer_type_sync(printer_type);
 
-    // Update printer image based on configured printer type
-    if (!printer_type.empty()) {
-        // Look up image filename from printer database
-        std::string image_filename = PrinterDetector::get_image_for_printer(printer_type);
-        std::string image_path;
-
-        if (!image_filename.empty()) {
-            // Strip .png extension to get base name for prerendered lookup
-            std::string base_name = image_filename;
-            if (base_name.size() > 4 && base_name.substr(base_name.size() - 4) == ".png") {
-                base_name = base_name.substr(0, base_name.size() - 4);
-            }
-
-            // Use prerendered .bin if available (faster on embedded), else fallback to PNG
-            lv_display_t* disp = lv_display_get_default();
-            int screen_width = disp ? lv_display_get_horizontal_resolution(disp) : 800;
-            image_path = helix::get_prerendered_printer_path(base_name, screen_width);
-        } else {
-            // Fall back to generic CoreXY image
-            spdlog::info("[{}] No specific image for '{}' - using generic CoreXY", get_name(),
-                         printer_type);
-            image_path = "A:assets/images/printers/generic-corexy.png";
-        }
-
-        // Find and update the printer_image widget
-        if (panel_) {
-            lv_obj_t* printer_image = lv_obj_find_by_name(panel_, "printer_image");
-            if (printer_image) {
-                lv_image_set_src(printer_image, image_path.c_str());
-                spdlog::debug("[{}] Printer image: '{}' for '{}'", get_name(), image_path,
-                              printer_type);
-            }
-        }
-    }
+    // Update printer image
+    refresh_printer_image();
 
     // Update printer type/host overlay
     // Always visible (even for localhost) to maintain consistent flex layout.
@@ -855,6 +853,37 @@ void HomePanel::reload_from_config() {
         lv_subject_copy_string(&printer_type_subject_, printer_type_buffer_);
         lv_subject_copy_string(&printer_host_subject_, printer_host_buffer_);
         lv_subject_set_int(&printer_info_visible_, 1);
+    }
+}
+
+void HomePanel::refresh_printer_image() {
+    if (!panel_)
+        return;
+
+    lv_display_t* disp = lv_display_get_default();
+    int screen_width = disp ? lv_display_get_horizontal_resolution(disp) : 800;
+
+    // Check for user-selected printer image (custom or shipped override)
+    auto& pim = helix::PrinterImageManager::instance();
+    std::string custom_path = pim.get_active_image_path(screen_width);
+    if (!custom_path.empty()) {
+        lv_obj_t* img = lv_obj_find_by_name(panel_, "printer_image");
+        if (img) {
+            lv_image_set_src(img, custom_path.c_str());
+            spdlog::debug("[{}] User-selected printer image: '{}'", get_name(), custom_path);
+        }
+        return;
+    }
+
+    // Auto-detect from printer type using PrinterImages
+    Config* config = Config::get_instance();
+    std::string printer_type =
+        config ? config->get<std::string>(helix::wizard::PRINTER_TYPE, "") : "";
+    std::string image_path = PrinterImages::get_best_printer_image(printer_type);
+    lv_obj_t* img = lv_obj_find_by_name(panel_, "printer_image");
+    if (img) {
+        lv_image_set_src(img, image_path.c_str());
+        spdlog::debug("[{}] Printer image: '{}' for '{}'", get_name(), image_path, printer_type);
     }
 }
 
@@ -914,6 +943,14 @@ void HomePanel::network_clicked_cb(lv_event_t* e) {
     (void)e;
     extern HomePanel& get_global_home_panel();
     get_global_home_panel().handle_network_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void HomePanel::printer_manager_clicked_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[HomePanel] printer_manager_clicked_cb");
+    (void)e;
+    extern HomePanel& get_global_home_panel();
+    get_global_home_panel().handle_printer_manager_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 

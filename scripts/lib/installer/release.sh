@@ -138,6 +138,7 @@ show_manual_install_instructions() {
     if [ "$platform" = "ad5m" ]; then
         # AD5M /tmp is a tiny tmpfs (~54MB), use /data/ instead
         printf '%b\n' "     ${CYAN}scp -O helixscreen-${platform}.tar.gz root@<this-ip>:/data/${NC}"
+        printf '%b\n' "     ${YELLOW}Windows: use WSL, WinSCP (SCP mode), or PuTTY pscp${NC}"
         printf '\n'
         printf '%b\n' "  4. Run the installer with the local file:"
         printf '%b\n' "     ${CYAN}sh /data/install.sh --local /data/helixscreen-${platform}.tar.gz${NC}"
@@ -321,10 +322,16 @@ validate_binary_architecture() {
         return 1
     fi
 
-    # Read first 20 bytes of ELF header using dd + hexdump
-    # hexdump -v -e is POSIX and available in BusyBox
+    # Read first 20 bytes of ELF header as space-separated hex
+    # Try hexdump first (BusyBox), fall back to od (POSIX), then xxd
     local header
     header=$(dd if="$binary" bs=1 count=20 2>/dev/null | hexdump -v -e '1/1 "%02x "' 2>/dev/null) || true
+    if [ -z "$header" ]; then
+        header=$(dd if="$binary" bs=1 count=20 2>/dev/null | od -A n -t x1 -v 2>/dev/null | tr '\n' ' ' | tr -s ' ' | sed 's/^ //;s/ $//') || true
+    fi
+    if [ -z "$header" ]; then
+        header=$(dd if="$binary" bs=1 count=20 2>/dev/null | xxd -p 2>/dev/null | sed 's/../& /g;s/ $//') || true
+    fi
 
     if [ -z "$header" ]; then
         log_error "Cannot read binary header (file may be empty or corrupted)"
@@ -427,7 +434,7 @@ extract_release() {
 
     if [ "$platform" = "ad5m" ] || [ "$platform" = "k1" ]; then
         # BusyBox tar doesn't support -z
-        if ! gunzip -c "$tarball" | $SUDO tar xf -; then
+        if ! gunzip -c "$tarball" | tar xf -; then
             # Check if it was a space issue vs actual corruption
             local post_mb
             post_mb=$(df "$tmp_check_dir" 2>/dev/null | tail -1 | awk '{print int($4/1024)}')
@@ -443,7 +450,7 @@ extract_release() {
             exit 1
         fi
     else
-        if ! $SUDO tar -xzf "$tarball"; then
+        if ! tar -xzf "$tarball"; then
             local post_mb
             post_mb=$(df "$tmp_check_dir" 2>/dev/null | tail -1 | awk '{print int($4/1024)}')
             if [ -n "$post_mb" ] && [ "$post_mb" -lt 5 ]; then

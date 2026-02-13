@@ -72,6 +72,14 @@ class TestPanel : public PanelBase {
      * switch/row dimensions based on screen resolution.
      */
     void populate_labels();
+
+    /**
+     * @brief Populate markdown viewer with sample content
+     *
+     * Sets a comprehensive markdown sample exercising all supported
+     * elements (headings, emphasis, code, lists, blockquotes, HR).
+     */
+    void populate_markdown();
 };
 
 // Global instance accessor (needed by main.cpp)

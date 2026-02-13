@@ -7,7 +7,9 @@
   <consts>
     <!-- Step metadata (read by wizard orchestrator) -->
     <str name="step_title" value="Printer Setup: Input Shaping" value_tag="Printer Setup: Input Shaping"/>
-    <str name="step_subtitle" value="Calibrate input shaping to reduce ringing artifacts in prints" value_tag="Calibrate input shaping to reduce ringing artifacts in prints"/>
+    <str name="step_subtitle"
+         value="Calibrate input shaping to reduce ringing artifacts in prints"
+         value_tag="Calibrate input shaping to reduce ringing artifacts in prints"/>
     <int name="step_order" value="9"/>
   </consts>
   <view name="wizard_input_shaper_root"
@@ -22,37 +24,54 @@
       <!-- Info section -->
       <lv_obj width="100%" flex_flow="column" style_pad_all="0" style_pad_gap="#space_sm">
         <text_body width="100%"
-                   text="Input shaping reduces vibration artifacts (ringing) in your prints." translation_tag="Input shaping reduces vibration artifacts (ringing) in your prints." style_text_align="center"/>
+                   text="Input shaping reduces vibration artifacts (ringing) in your prints."
+                   translation_tag="Input shaping reduces vibration artifacts (ringing) in your prints."
+                   style_text_align="center"/>
         <text_small width="100%"
-                    text="An accelerometer was detected on your printer." translation_tag="An accelerometer was detected on your printer." style_text_align="center"
+                    text="An accelerometer was detected on your printer."
+                    translation_tag="An accelerometer was detected on your printer." style_text_align="center"
                     style_text_color="#text_muted"/>
       </lv_obj>
 
       <!-- Status display -->
-      <lv_obj width="100%" flex_flow="column" style_pad_all="0" style_pad_gap="#space_sm">
+      <lv_obj width="100%"
+              flex_flow="column" style_pad_all="0" style_pad_gap="#space_sm" style_flex_cross_place="center">
         <text_body width="100%" bind_text="wizard_input_shaper_status" style_text_align="center"/>
 
-        <!-- Progress bar (visible during calibration) -->
+        <!-- Progress bar (visible during calibration, centered) -->
         <lv_bar name="calibration_progress_bar"
                 width="80%" height="16" bind_value="wizard_input_shaper_progress" min_value="0" max_value="100"
                 style_bg_color="#card_bg" style_radius="#border_radius">
           <bind_flag_if_eq subject="wizard_input_shaper_progress" flag="hidden" ref_value="0"/>
         </lv_bar>
+
+        <!-- Completion help text (shown only when calibration finishes, progress==100) -->
+        <text_small width="100%"
+                    text="Recalibrate or view detailed results anytime in Settings."
+                    translation_tag="Recalibrate or view detailed results anytime in Settings."
+                    style_text_align="center" style_text_color="#text_muted">
+          <bind_flag_if_not_eq subject="wizard_input_shaper_progress" flag="hidden" ref_value="100"/>
+        </text_small>
       </lv_obj>
 
       <!-- Spacer -->
       <lv_obj flex_grow="1"/>
 
-      <!-- Start calibration button (centered) -->
+      <!-- Start calibration button (centered, hidden once calibration started) -->
       <ui_button name="start_calibration_btn"
-                 width="#wizard_button_width" height="#button_height" text="Start Calibration" translation_tag="Start Calibration">
+                 width="#wizard_button_width" height="#button_height" text="Start Calibration"
+                 translation_tag="Start Calibration">
         <event_cb trigger="clicked" callback="on_start_is_calibration"/>
+        <bind_flag_if_eq subject="wizard_input_shaper_started" flag="hidden" ref_value="1"/>
       </ui_button>
 
-      <!-- Help text -->
+      <!-- Help text (hidden once calibration starts) -->
       <text_small width="100%"
-                  text="You can skip this and calibrate later in Settings." translation_tag="You can skip this and calibrate later in Settings."
-                  style_text_align="center" style_text_color="#text_muted"/>
+                  text="You can skip this and calibrate later in Settings."
+                  translation_tag="You can skip this and calibrate later in Settings." style_text_align="center"
+                  style_text_color="#text_muted">
+        <bind_flag_if_eq subject="wizard_input_shaper_started" flag="hidden" ref_value="1"/>
+      </text_small>
 
     </ui_card>
   </view>

@@ -96,7 +96,7 @@ platform_wait_for_services() {
     # Check if moonraker is even enabled (ForgeX can disable it)
     local moonraker_disabled
     moonraker_disabled=$(/usr/sbin/chroot "$FORGEX_CHROOT" /bin/sh -c \
-        '/opt/config/mod/.shell/commands/zconf.sh /opt/config/mod_data/variables.cfg --get "disable_moonraker" "0"' 2>/dev/null) || true
+        'cd / 2>/dev/null; /opt/config/mod/.shell/commands/zconf.sh /opt/config/mod_data/variables.cfg --get "disable_moonraker" "0"' 2>/dev/null) || true
     if [ "$moonraker_disabled" = "1" ]; then
         echo "Moonraker disabled, skipping wait"
         return 0

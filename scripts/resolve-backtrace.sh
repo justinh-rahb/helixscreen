@@ -14,7 +14,7 @@
 set -euo pipefail
 
 readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/helixscreen/symbols"
-readonly R2_BASE_URL="${HELIX_R2_URL:-https://releases.helixscreen.com}/symbols"
+readonly R2_BASE_URL="${HELIX_R2_URL:-https://releases.helixscreen.org}/symbols"
 
 usage() {
     echo "Usage: $(basename "$0") <version> <platform> <addr1> [addr2] ..."

@@ -3,6 +3,7 @@
 
 #include "subject_managed_panel.h"
 
+#include <atomic>
 #include <lvgl.h>
 #include <string>
 
@@ -212,6 +213,14 @@ class PrinterPrintState {
     void set_print_layer_current(int layer);
 
     /**
+     * @brief Check if real layer data has been received from slicer/Moonraker.
+     * When false, layer count is estimated from print progress.
+     */
+    bool has_real_layer_data() const {
+        return has_real_layer_data_;
+    }
+
+    /**
      * @brief Set print start phase and update message/progress
      *
      * Thread-safe: Uses helix::async::invoke() for main-thread execution.
@@ -361,6 +370,11 @@ class PrinterPrintState {
 
     // Slicer estimated total print time (not a subject - no XML binding needed)
     int estimated_print_time_ = 0;
+
+    // Layer tracking: true when real layer data received from print_stats.info or gcode fallback.
+    // When false, current_layer is estimated from progress * total_layers.
+    // Atomic: written from background thread (gcode fallback), read from main thread (UI).
+    std::atomic<bool> has_real_layer_data_{false};
 
     // String buffers for subject storage
     char print_filename_buf_[256]{};

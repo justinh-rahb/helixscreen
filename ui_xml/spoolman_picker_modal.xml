@@ -11,7 +11,7 @@
   </consts>
   <!-- Modal card (backdrop created programmatically) -->
   <view name="spoolman_picker_modal"
-        extends="ui_card" width="#modal_width" height="content" align="center" style_pad_all="#space_md"
+        extends="ui_dialog" width="#modal_width" height="content" align="center" style_pad_all="#space_md"
         flex_flow="column" style_flex_main_place="start" style_flex_cross_place="start" style_pad_gap="#space_sm"
         scrollable="false" style_max_height="#modal_max_height">
     <!-- Header row -->
@@ -30,9 +30,7 @@
             width="100%" height="80" flex_flow="column" style_flex_main_place="center" style_flex_cross_place="center"
             scrollable="false">
       <bind_flag_if_not_eq subject="ams_picker_state" flag="hidden" ref_value="0"/>
-      <lv_spinner width="32"
-                  height="32" style_arc_width_indicator="2" style_arc_color="#primary"
-                  style_arc_opa_main="0"/>
+      <lv_spinner width="32" height="32" style_arc_width_indicator="2" style_arc_color="#primary" style_arc_opa_main="0"/>
       <text_small text="Loading spools..." translation_tag="Loading spools..."/>
     </lv_obj>
     <!-- Empty state -->
@@ -50,7 +48,8 @@
     </lv_obj>
     <!-- Unlink button (for clearing assignment) -->
     <ui_button name="btn_unlink"
-               width="100%" height="#button_height_sm" text="Clear Assignment" translation_tag="Clear Assignment" variant="secondary" hidden="true">
+               width="100%" height="#button_height_sm" text="Clear Assignment" translation_tag="Clear Assignment"
+               variant="secondary" hidden="true">
       <event_cb trigger="clicked" callback="spoolman_picker_unlink_cb"/>
     </ui_button>
   </view>

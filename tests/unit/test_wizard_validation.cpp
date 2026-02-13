@@ -69,8 +69,8 @@ TEST_CASE("Port validation: Invalid ports", "[wizard][validation][port]") {
     REQUIRE(is_valid_port("abc") == false);   // Non-numeric
     REQUIRE(is_valid_port("12.34") == false); // Decimal
     REQUIRE(is_valid_port("80a") == false);   // Mixed
-    REQUIRE(is_valid_port(" 80") == false);   // Leading space
-    REQUIRE(is_valid_port("80 ") == false);   // Trailing space
+    REQUIRE(is_valid_port(" 80") == true);    // Leading space (trimmed)
+    REQUIRE(is_valid_port("80 ") == true);    // Trailing space (trimmed)
 }
 
 // ============================================================================

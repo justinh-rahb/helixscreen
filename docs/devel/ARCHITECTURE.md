@@ -226,7 +226,7 @@ app_layout.xml
 
 **All new code should use class-based patterns.** This applies to:
 - **UI panels** (SubjectManagedPanel or PanelBase)
-- **Modals** (ModalBase)
+- **Modals** (Modal)
 - **Backend managers** (WiFiManager, EthernetManager, MoonrakerClient)
 - **Domain state classes** (Printer*State decomposition)
 - **Services and utilities**
@@ -1082,6 +1082,88 @@ if (!ui_nav_go_back()) {
 ## Extended Systems
 
 These systems extend the core architecture for specific features:
+
+### Modal System (ui_dialog)
+
+All modal dialogs use the `ui_dialog` XML component for consistent theming and layout. The system standardizes dialog creation across the codebase:
+
+- **`ui_dialog`** - Custom XML widget registered via `ui_dialog_register()`. Uses LVGL's built-in button grey for background, automatically adapting to light/dark mode. Used as the base container in all modal XML files.
+- **`modal_button_row`** - Reusable XML component for consistent button layouts (OK/Cancel, Yes/No, etc.) at the bottom of modals.
+- **Modal pattern** - Class-based modals inherit lifecycle management. Dynamically created modal buttons are wired imperatively since they are generated at runtime (see Legitimate Exception #11).
+
+**XML usage:**
+```xml
+<ui_dialog>
+  <text_heading text="Confirm Action"/>
+  <text_body bind_text="dialog_message"/>
+  <modal_button_row name="buttons"/>
+</ui_dialog>
+```
+
+**Files:** `include/ui_dialog.h`, `ui_xml/modal_button_row.xml`, `ui_xml/*_modal.xml`, `ui_xml/*_dialog.xml`
+
+### Config Migration System
+
+Versioned schema migration for `helixconfig.json` that automatically upgrades configuration between releases. The `Config` class tracks a `config_version` integer (currently `CURRENT_CONFIG_VERSION = 2`) and applies migrations sequentially on load:
+
+- **Version tracking** - Each config file stores its schema version; missing version implies v0
+- **Sequential migrations** - Migrations run in order (v0->v1->v2) on startup, each transforming the JSON structure
+- **Key consolidation** - Example: flat keys (`display_rotate`, `display_sleep_sec`, `touch_calibrated`) migrated into nested objects (`/display/rotate`, `/input/calibration/valid`)
+- **Non-destructive** - Existing new-format values are preserved; only old-format keys are migrated and removed
+- **Auto-save** - Config is saved after migration completes
+
+**Files:** `include/config.h`, `src/system/config.cpp`
+**Tests:** 20+ migration test cases in `tests/unit/test_config.cpp`
+
+### Exclude Objects System
+
+Allows users to exclude individual objects from the current print (Klipper's `exclude_object` module):
+
+- **PrinterExcludedObjectsState** - Domain class managing excluded/defined object lists with a version subject that increments on changes. Uses `SubjectManager` for subject lifecycle and `std::unordered_set` for excluded object names (sets are not natively supported by LVGL subjects).
+- **PrintExcludeObjectManager** - Coordinates the confirmation flow for excluding objects, preventing accidental exclusion.
+- **ExcludeObjectsListOverlay** - Scrollable list overlay showing all defined objects with status indicators (current/idle/excluded), tap-to-exclude, and optional G-code object thumbnails via `GCodeObjectThumbnailRenderer`.
+- **ExcludeObjectModal** - Confirmation modal before excluding an object.
+
+**Files:** `include/printer_excluded_objects_state.h`, `include/ui_exclude_objects_list_overlay.h`, `include/ui_print_exclude_object_manager.h`, `ui_xml/exclude_objects_list_overlay.xml`, `ui_xml/exclude_object_modal.xml`
+
+### Frequency Response Chart Widget
+
+Custom chart widget for visualizing accelerometer frequency response data during input shaper calibration:
+
+- **Platform-adaptive rendering** - Configures for EMBEDDED (50 points, simplified), BASIC (50 points), or STANDARD (200 points with animations) tiers
+- **Multi-series support** - Separate data series for X/Y axis measurements with independent visibility toggle
+- **Peak marking** - Vertical markers at detected resonance frequencies
+- **Auto-downsampling** - Data exceeding the platform's max points is downsampled while preserving frequency range endpoints
+- **Shaper overlay chips** - Interactive toggles to show/hide recommended shaper frequency bands
+
+**Files:** `include/ui_frequency_response_chart.h`, `src/ui/ui_frequency_response_chart.cpp`
+
+### Markdown Viewer Widget (ui_markdown)
+
+Theme-aware markdown rendering widget registered as an XML custom component:
+
+- **XML integration** - Used as `<ui_markdown bind_text="subject_name"/>` or `<ui_markdown text="# Static content"/>`
+- **Theme-aware** - Reads colors from design tokens for headings, body, links, and code blocks
+- **Subject binding** - Supports `bind_text` for reactive markdown content updates
+- **RAII cleanup** - Automatic resource management via user data pattern
+- **lv_markdown backend** - Wraps the `lv_markdown` library (git submodule)
+
+**Files:** `include/ui_markdown.h`, `src/ui/ui_markdown.cpp`
+
+### Update System
+
+Async update checking and in-place installation system:
+
+- **UpdateChecker** - Singleton that checks GitHub releases API and R2 CDN for newer versions. Rate-limited to 1 check per hour. Background thread for HTTP, results marshaled to LVGL thread via `ui_async_call()`.
+- **Three update channels** - Stable (GitHub releases), Beta (pre-releases), Dev (custom URL)
+- **Download pipeline** - Confirm -> Download -> Verify (SHA-256 + ELF architecture validation) -> Install (`install.sh`)
+- **Safety guards** - Downloads blocked during active prints, explicit user confirmation required
+- **Version dismissal** - Users can dismiss specific versions (persisted to config)
+- **Auto-check** - 15-second initial delay, then 24-hour periodic checks
+- **Notification modal** - Uses `ui_markdown` widget for release notes display
+- **LVGL subjects** - Status, progress, version text all bound to UI via subjects
+
+**Files:** `include/system/update_checker.h`, `src/system/update_checker.cpp`, `ui_xml/update_notify_modal.xml`, `ui_xml/update_download_modal.xml`
 
 ### Print Start Phase Detection
 

@@ -50,8 +50,8 @@ TEST_CASE("Wizard Connection: IP address validation", "[wizard][connection][vali
     SECTION("Invalid hostnames") {
         REQUIRE(is_valid_ip_or_hostname("") == false);               // Empty
         REQUIRE(is_valid_ip_or_hostname(" ") == false);              // Whitespace
-        REQUIRE(is_valid_ip_or_hostname("printer ") == false);       // Trailing space
-        REQUIRE(is_valid_ip_or_hostname(" printer") == false);       // Leading space
+        REQUIRE(is_valid_ip_or_hostname("printer ") == true);        // Trailing space (trimmed)
+        REQUIRE(is_valid_ip_or_hostname(" printer") == true);        // Leading space (trimmed)
         REQUIRE(is_valid_ip_or_hostname("my printer") == false);     // Space in middle
         REQUIRE(is_valid_ip_or_hostname("printer!") == false);       // Special char
         REQUIRE(is_valid_ip_or_hostname("printer@local") == false);  // @ symbol
@@ -112,9 +112,9 @@ TEST_CASE("Wizard Connection: Port validation", "[wizard][connection][validation
         REQUIRE(is_valid_port("-80") == false);   // Negative standard port
         REQUIRE(is_valid_port("") == false);      // Empty string
         REQUIRE(is_valid_port(" ") == false);     // Whitespace
-        REQUIRE(is_valid_port("80 ") == false);   // Trailing space
-        REQUIRE(is_valid_port(" 80") == false);   // Leading space
-        REQUIRE(is_valid_port("8 0") == false);   // Space in middle
+        REQUIRE(is_valid_port("80 ") == true);    // Trailing space (trimmed)
+        REQUIRE(is_valid_port(" 80") == true);    // Leading space (trimmed)
+        REQUIRE(is_valid_port("8 0") == false);   // Space in middle (not just whitespace trim)
     }
 
     SECTION("Non-numeric input") {
@@ -143,8 +143,8 @@ TEST_CASE("Wizard Connection: Port validation", "[wizard][connection][validation
         REQUIRE(is_valid_port("2") == true);     // One above min
 
         // Common typos
-        REQUIRE(is_valid_port("7125 ") == false); // Trailing space (common copy-paste error)
-        REQUIRE(is_valid_port(" 7125") == false); // Leading space
+        REQUIRE(is_valid_port("7125 ") == true);  // Trailing space (trimmed)
+        REQUIRE(is_valid_port(" 7125") == true);  // Leading space (trimmed)
         REQUIRE(is_valid_port("71 25") == false); // Space in middle
         REQUIRE(is_valid_port("7,125") == false); // Comma separator
         REQUIRE(is_valid_port("7.125") == false); // Dot separator

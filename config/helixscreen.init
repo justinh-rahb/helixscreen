@@ -59,6 +59,11 @@ stop_splash() {
 }
 
 start() {
+    # Ensure valid CWD before anything else.
+    # The installer or boot system may leave us in a deleted/unmounted directory,
+    # which causes "getcwd: cannot access parent directories" errors from sh and chroot.
+    cd / 2>/dev/null || true
+
     echo "Starting $DESC..."
 
     # Platform-specific pre-start (e.g., flag files for firmware coordination)

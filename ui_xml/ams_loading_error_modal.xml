@@ -30,26 +30,18 @@
     <lv_obj width="100%"
             height="content" style_pad_all="#space_lg" flex_flow="column" style_pad_gap="#space_md" scrollable="false">
       <!-- Error message text -->
-      <text_body name="error_message" width="100%" text="An error occurred while loading filament." translation_tag="An error occurred while loading filament." long_mode="wrap"/>
+      <text_body name="error_message"
+                 width="100%" text="An error occurred while loading filament."
+                 translation_tag="An error occurred while loading filament." long_mode="wrap"/>
       <!-- Hint text -->
       <text_small name="error_hint"
-                  width="100%" text="Check the filament path and try again." translation_tag="Check the filament path and try again." style_text_color="#text_muted"
+                  width="100%" text="Check the filament path and try again."
+                  translation_tag="Check the filament path and try again." style_text_color="#text_muted"
                   long_mode="wrap"/>
     </lv_obj>
-    <!-- Horizontal divider above buttons -->
-    <divider_horizontal/>
-    <!-- Action buttons row -->
-    <lv_obj width="100%" height="#button_height" style_pad_all="0" style_pad_gap="0" flex_flow="row" scrollable="false">
-      <!-- Cancel button -->
-      <ui_button name="btn_cancel" height="100%" text="Close" translation_tag="Close" variant="secondary" flex_grow="1" style_radius="0">
-        <event_cb trigger="clicked" callback="ams_loading_error_cancel_cb"/>
-      </ui_button>
-      <!-- Vertical divider -->
-      <divider_vertical/>
-      <!-- Retry button -->
-      <ui_button name="btn_retry" height="100%" text="Retry" translation_tag="Retry" flex_grow="1" style_radius="0">
-        <event_cb trigger="clicked" callback="ams_loading_error_retry_cb"/>
-      </ui_button>
-    </lv_obj>
+    <!-- Action buttons -->
+    <modal_button_row secondary_text="Close"
+                      secondary_callback="ams_loading_error_cancel_cb" primary_text="Retry"
+                      primary_callback="ams_loading_error_retry_cb"/>
   </view>
 </component>

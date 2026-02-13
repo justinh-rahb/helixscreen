@@ -20,13 +20,17 @@ Fast, beautiful, and built for every Klipper printer — from a Creality K1 to a
 
 ---
 
-> **Beta Release — v0.9.12**
+> **Beta Release — v0.9.13**
 >
 > Core features are complete and stabilizing. We're looking for testers across different printer setups.
 >
 > **Tested on:** Voron 2.4 (Raspberry Pi 5), Voron 0.2, Doron Velta, RatRig V-Core, FlashForge Adventurer 5M Pro ([Forge-X](https://github.com/DrA1ex/ff5m) firmware)
 >
 > **Raspberry Pi:** Both 64-bit and 32-bit Raspberry Pi OS are supported.
+>
+> **QIDI:** Supported with auto-detection heuristics and print start profile.
+>
+> **Snapmaker U1:** Cross-compile target with 480x320 display support.
 >
 > **Creality K1:** Binaries are included in the release but have **not been tested on hardware**. If you have a K1, we'd love your help verifying it works!
 >
@@ -36,7 +40,7 @@ Fast, beautiful, and built for every Klipper printer — from a Creality K1 to a
 
 ---
 
-**Quick Links:** [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) · [FAQ](#faq) · [Contributing](docs/DEVELOPMENT.md#contributing) · [Roadmap](docs/ROADMAP.md) · [Community](#community)
+**Quick Links:** [Features](#features) · [Screenshots](#screenshots) · [Installation](#installation) · [User Guide](docs/user/USER_GUIDE.md) · [FAQ](#faq) · [Contributing](docs/DEVELOPMENT.md#contributing) · [Roadmap](docs/ROADMAP.md) · [Community](#community)
 
 ---
 
@@ -78,17 +82,19 @@ See [docs/GALLERY.md](docs/GALLERY.md) for all screenshots.
 
 ## Features
 
-**Printer Control** — Print management, motion controls, temperature presets, fan control, Z-offset
+**Printer Control** — Print management, motion controls, temperature presets, fan control, Z-offset, live filament consumption tracking
 
 **Multi-Material** — AFC, Happy Hare, tool changers, ValgACE, Spoolman integration
 
-**Visualization** — G-code layer preview, 3D bed mesh, print thumbnails
+**Visualization** — G-code layer preview, 3D bed mesh, print thumbnails, frequency response charts
 
-**Calibration** — Input shaper, bed mesh, screws tilt, PID tuning, firmware retraction
+**Calibration** — Input shaper with frequency response charts, PID tuning with live temp graph, bed mesh, screws tilt, Z-offset, firmware retraction
 
-**Integrations** — HelixPrint plugin, power devices, print history, timelapse, exclude objects
+**Integrations** — HelixPrint plugin, power devices, print history, timelapse, exclude objects, sound alerts
 
-**System** — First-run wizard, 31 panels + 17 overlays, light/dark themes, responsive from 800×480 to 1024×600+ (480×320 is a work-in-progress)
+**Display** — Auto-detecting layout system (800×480, 1024×600, 1920×480 ultrawide), display rotation (0/90/180/270), light/dark themes
+
+**System** — First-run wizard with telemetry opt-in, KIAUH installer, bundled uninstaller, versioned config migration, 60 printer models with auto-detection
 
 ## Installation
 
@@ -134,10 +140,10 @@ Beta status. Core features are stable and improving with each release. Suitable 
 More features, way less resource usage (~10MB RAM vs ~50MB for KlipperScreen), and actively developed. See the [comparison table](#why-helixscreen).
 
 **Which printers are supported?**
-Any Klipper + Moonraker printer. Tested on Voron 2.4, Voron 0.2, Doron Velta, RatRig V-Core, and FlashForge Adventurer 5M Pro. Both 64-bit and 32-bit Raspberry Pi OS are supported. Creality K1 and K2 series binaries are available but untested. The wizard auto-discovers your printer's capabilities.
+Any Klipper + Moonraker printer. Tested on Voron 2.4, Voron 0.2, Doron Velta, RatRig V-Core, FlashForge Adventurer 5M Pro, and QIDI printers. Snapmaker U1 support included. Both 64-bit and 32-bit Raspberry Pi OS are supported. Creality K1 and K2 series binaries are available but untested. The wizard auto-discovers your printer's capabilities.
 
 **What screen sizes are supported?**
-800×480 and up (including 1024×600) work well. Smaller displays like 480×320 are a work-in-progress — they'll run but may have some layout overlap issues.
+800×480, 1024×600, and 1920×480 (ultrawide) are fully supported with auto-detecting layout system. Display rotation (0/90/180/270) is supported. Smaller displays like 480×320 (Snapmaker U1) are a work-in-progress.
 
 **What multi-material systems work?**
 AFC (Box Turtle), Happy Hare (ERCF, 3MS, Tradrack), tool changers, and ValgACE.
@@ -160,7 +166,7 @@ See [docs/user/TROUBLESHOOTING.md](docs/user/TROUBLESHOOTING.md) for more soluti
 ### User Guides
 | Guide | Description |
 |-------|-------------|
-| [Installation](docs/user/INSTALL.md) | Setup for Pi, K1, K2, AD5M |
+| [Installation](docs/user/INSTALL.md) | Setup for Pi, K1, K2, AD5M, QIDI, Snapmaker U1 |
 | [User Guide](docs/user/USER_GUIDE.md) | Using HelixScreen |
 | [FAQ](docs/user/FAQ.md) | Common questions |
 | [Troubleshooting](docs/user/TROUBLESHOOTING.md) | Problem solutions |

@@ -4,20 +4,37 @@
 #include "ui_panel_input_shaper.h"
 
 #include "ui_emergency_stop.h"
+#include "ui_frequency_response_chart.h"
 #include "ui_modal.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
 #include "ui_toast.h"
 
+#include "async_helpers.h"
 #include "format_utils.h"
 #include "lvgl/src/others/translation/lv_translation.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
+#include "platform_capabilities.h"
 #include "static_panel_registry.h"
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
+#include <random>
+
+// Shaper overlay colors (distinct, visible on dark bg) — shared by chart and legend
+static constexpr uint32_t SHAPER_OVERLAY_COLORS[] = {
+    0x4FC3F7, // ZV - light blue
+    0x66BB6A, // MZV - green
+    0xFFA726, // EI - orange
+    0xAB47BC, // 2HUMP_EI - purple
+    0xEF5350, // 3HUMP_EI - red
+};
+static constexpr size_t NUM_SHAPER_COLORS =
+    sizeof(SHAPER_OVERLAY_COLORS) / sizeof(SHAPER_OVERLAY_COLORS[0]);
 
 // ============================================================================
 // GLOBAL INSTANCE AND ROW CLICK HANDLER
@@ -153,6 +170,38 @@ void ui_panel_input_shaper_register_callbacks() {
         get_global_input_shaper_panel().handle_help_clicked();
     });
 
+    // Chip toggle callbacks for frequency response chart overlays
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_x_0_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_x_clicked(0);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_x_1_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_x_clicked(1);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_x_2_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_x_clicked(2);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_x_3_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_x_clicked(3);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_x_4_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_x_clicked(4);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_y_0_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_y_clicked(0);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_y_1_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_y_clicked(1);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_y_2_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_y_clicked(2);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_y_3_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_y_clicked(3);
+    });
+    lv_xml_register_event_cb(nullptr, "input_shaper_chip_y_4_cb", [](lv_event_t*) {
+        get_global_input_shaper_panel().handle_chip_y_clicked(4);
+    });
+
     // Initialize subjects BEFORE XML creation
     auto& panel = get_global_input_shaper_panel();
     panel.init_subjects();
@@ -246,6 +295,30 @@ void InputShaperPanel::init_subjects() {
                               "is_result_y_max_accel", subjects_);
     UI_MANAGED_SUBJECT_INT(is_result_y_quality_, 0, "is_result_y_quality", subjects_);
 
+    // Frequency response chart gating
+    UI_MANAGED_SUBJECT_INT(is_x_has_freq_data_, 0, "is_x_has_freq_data", subjects_);
+    UI_MANAGED_SUBJECT_INT(is_y_has_freq_data_, 0, "is_y_has_freq_data", subjects_);
+
+    // Legend shaper label subjects (one per axis, updated on chip toggle)
+    UI_MANAGED_SUBJECT_STRING_N(is_x_legend_shaper_label_, is_x_legend_shaper_label_buf_,
+                                CHIP_LABEL_BUF, "", "is_x_legend_shaper_label", subjects_);
+    UI_MANAGED_SUBJECT_STRING_N(is_y_legend_shaper_label_, is_y_legend_shaper_label_buf_,
+                                CHIP_LABEL_BUF, "", "is_y_legend_shaper_label", subjects_);
+
+    // Chip label and active subjects
+    auto init_chip = [this](ChipRow& chip, const char* axis, size_t idx) {
+        char name[48];
+        snprintf(name, sizeof(name), "is_%s_chip_%zu_label", axis, idx);
+        UI_MANAGED_SUBJECT_STRING_N(chip.label, chip.label_buf, CHIP_LABEL_BUF, "", name,
+                                    subjects_);
+        snprintf(name, sizeof(name), "is_%s_chip_%zu_active", axis, idx);
+        UI_MANAGED_SUBJECT_INT(chip.active, 0, name, subjects_);
+    };
+    for (size_t i = 0; i < MAX_SHAPERS; i++) {
+        init_chip(x_chips_[i], "x", i);
+        init_chip(y_chips_[i], "y", i);
+    }
+
     subjects_initialized_ = true;
     spdlog::debug("[InputShaper] Subjects initialized and registered");
 }
@@ -294,6 +367,13 @@ void InputShaperPanel::setup_widgets() {
 
     // Set initial state
     set_state(State::IDLE);
+
+    // Create frequency response chart widgets inside containers
+    create_chart_widgets();
+
+    // Find legend dot widgets for programmatic color updates
+    legend_x_shaper_dot_ = lv_obj_find_by_name(overlay_root_, "legend_x_shaper_dot");
+    legend_y_shaper_dot_ = lv_obj_find_by_name(overlay_root_, "legend_y_shaper_dot");
 
     spdlog::debug("[InputShaper] Widget setup complete");
 }
@@ -348,17 +428,21 @@ void InputShaperPanel::on_activate() {
         auto alive = alive_;
         api_->get_input_shaper_config(
             [this, alive](const InputShaperConfig& config) {
-                if (!alive->load())
-                    return;
-                populate_current_config(config);
+                helix::async::invoke([this, alive, config]() {
+                    if (!alive->load())
+                        return;
+                    populate_current_config(config);
+                });
             },
             [this, alive](const MoonrakerError& err) {
-                if (!alive->load())
-                    return;
-                spdlog::debug("[InputShaper] Could not query config: {}", err.message);
-                // Not an error - just means config not available
-                InputShaperConfig empty;
-                populate_current_config(empty);
+                helix::async::invoke([this, alive, msg = err.message]() {
+                    if (!alive->load())
+                        return;
+                    spdlog::debug("[InputShaper] Could not query config: {}", msg);
+                    // Not an error - just means config not available
+                    InputShaperConfig empty;
+                    populate_current_config(empty);
+                });
             });
     }
 
@@ -366,6 +450,12 @@ void InputShaperPanel::on_activate() {
     if (std::getenv("INPUT_SHAPER_AUTO_START")) {
         spdlog::info("[InputShaper] Auto-starting X calibration (INPUT_SHAPER_AUTO_START set)");
         start_with_preflight('X');
+    }
+
+    // Demo mode: inject results after on_activate() finishes its reset
+    if (demo_inject_pending_) {
+        demo_inject_pending_ = false;
+        inject_demo_results();
     }
 }
 
@@ -388,6 +478,16 @@ void InputShaperPanel::cleanup() {
 
     // Signal to async callbacks that this panel is being destroyed [L012]
     alive_->store(false);
+
+    // Destroy chart widgets
+    if (x_chart_.chart) {
+        ui_frequency_response_chart_destroy(x_chart_.chart);
+        x_chart_.chart = nullptr;
+    }
+    if (y_chart_.chart) {
+        ui_frequency_response_chart_destroy(y_chart_.chart);
+        y_chart_.chart = nullptr;
+    }
 
     // Unregister from NavigationManager before cleaning up
     if (overlay_root_) {
@@ -715,9 +815,11 @@ void InputShaperPanel::apply_y_after_x() {
             if (api_) {
                 api_->get_input_shaper_config(
                     [this, alive](const InputShaperConfig& config) {
-                        if (!alive->load())
-                            return;
-                        populate_current_config(config);
+                        helix::async::invoke([this, alive, config]() {
+                            if (!alive->load())
+                                return;
+                            populate_current_config(config);
+                        });
                     },
                     [](const MoonrakerError&) {});
             }
@@ -862,6 +964,10 @@ void InputShaperPanel::populate_current_config(const InputShaperConfig& config) 
 }
 
 void InputShaperPanel::clear_results() {
+    // Clear frequency response charts
+    clear_chart('X');
+    clear_chart('Y');
+
     // Clear per-axis result cards
     lv_subject_set_int(&is_results_has_x_, 0);
     lv_subject_set_int(&is_results_has_y_, 0);
@@ -932,7 +1038,7 @@ void InputShaperPanel::populate_axis_result(char axis, const InputShaperResult& 
     if (axis == 'X') {
         lv_subject_set_int(&is_results_has_x_, 1);
 
-        snprintf(is_result_x_shaper_buf_, sizeof(is_result_x_shaper_buf_), "%s @ %s",
+        snprintf(is_result_x_shaper_buf_, sizeof(is_result_x_shaper_buf_), "Optimal: %s @ %s",
                  type_upper.c_str(), freq_buf);
         lv_subject_copy_string(&is_result_x_shaper_, is_result_x_shaper_buf_);
 
@@ -952,7 +1058,7 @@ void InputShaperPanel::populate_axis_result(char axis, const InputShaperResult& 
     } else {
         lv_subject_set_int(&is_results_has_y_, 1);
 
-        snprintf(is_result_y_shaper_buf_, sizeof(is_result_y_shaper_buf_), "%s @ %s",
+        snprintf(is_result_y_shaper_buf_, sizeof(is_result_y_shaper_buf_), "Optimal: %s @ %s",
                  type_upper.c_str(), freq_buf);
         lv_subject_copy_string(&is_result_y_shaper_, is_result_y_shaper_buf_);
 
@@ -1025,6 +1131,354 @@ void InputShaperPanel::populate_axis_result(char axis, const InputShaperResult& 
 
     spdlog::debug("[InputShaper] Populated {} axis comparison table with {} shapers", axis,
                   result.all_shapers.size());
+
+    // Populate frequency response chart if data available
+    populate_chart(axis, result);
+}
+
+// ============================================================================
+// FREQUENCY RESPONSE CHART
+// ============================================================================
+
+void InputShaperPanel::create_chart_widgets() {
+    auto tier = helix::PlatformCapabilities::detect().tier;
+
+    // Create X axis chart
+    lv_obj_t* x_container = lv_obj_find_by_name(overlay_root_, "chart_container_x");
+    if (x_container) {
+        x_chart_.chart = ui_frequency_response_chart_create(x_container);
+        if (x_chart_.chart) {
+            ui_frequency_response_chart_configure_for_platform(x_chart_.chart, tier);
+            ui_frequency_response_chart_set_freq_range(x_chart_.chart, 0.0f, 200.0f);
+        }
+    }
+
+    // Create Y axis chart
+    lv_obj_t* y_container = lv_obj_find_by_name(overlay_root_, "chart_container_y");
+    if (y_container) {
+        y_chart_.chart = ui_frequency_response_chart_create(y_container);
+        if (y_chart_.chart) {
+            ui_frequency_response_chart_configure_for_platform(y_chart_.chart, tier);
+            ui_frequency_response_chart_set_freq_range(y_chart_.chart, 0.0f, 200.0f);
+        }
+    }
+
+    spdlog::debug("[InputShaper] Chart widgets created (tier: {})",
+                  helix::platform_tier_to_string(tier));
+}
+
+void InputShaperPanel::populate_chart(char axis, const InputShaperResult& result) {
+    auto& chart_data = (axis == 'X') ? x_chart_ : y_chart_;
+    auto& chips = (axis == 'X') ? x_chips_ : y_chips_;
+    auto& has_freq_data = (axis == 'X') ? is_x_has_freq_data_ : is_y_has_freq_data_;
+
+    // Check if freq data available
+    if (result.freq_response.empty() || !chart_data.chart) {
+        lv_subject_set_int(&has_freq_data, 0);
+        return;
+    }
+
+    lv_subject_set_int(&has_freq_data, 1);
+
+    // Store the data
+    chart_data.freq_response = result.freq_response;
+    chart_data.shaper_curves = result.shaper_curves;
+
+    // Extract frequencies and amplitudes
+    std::vector<float> freqs;
+    std::vector<float> amps;
+    freqs.reserve(result.freq_response.size());
+    amps.reserve(result.freq_response.size());
+    for (const auto& [f, a] : result.freq_response) {
+        freqs.push_back(f);
+        amps.push_back(a);
+    }
+
+    // Find max amplitude for Y range
+    float max_amp = *std::max_element(amps.begin(), amps.end());
+    ui_frequency_response_chart_set_amplitude_range(chart_data.chart, 0.0f, max_amp * 1.1f);
+
+    // Add raw PSD series (always visible, semi-transparent light color)
+    chart_data.raw_series_id =
+        ui_frequency_response_chart_add_series(chart_data.chart, "Raw PSD", lv_color_hex(0xB0B0B0));
+    ui_frequency_response_chart_set_data(chart_data.chart, chart_data.raw_series_id, freqs.data(),
+                                         amps.data(), freqs.size());
+
+    // Mark peak frequency
+    auto peak_it = std::max_element(amps.begin(), amps.end());
+    if (peak_it != amps.end()) {
+        size_t peak_idx = static_cast<size_t>(std::distance(amps.begin(), peak_it));
+        ui_frequency_response_chart_mark_peak(chart_data.chart, chart_data.raw_series_id,
+                                              freqs[peak_idx], *peak_it);
+    }
+
+    // Add shaper overlay series
+    for (size_t i = 0; i < chart_data.shaper_curves.size() && i < MAX_SHAPERS; i++) {
+        const auto& curve = chart_data.shaper_curves[i];
+
+        // Set chip label (uppercase name)
+        std::string upper_name = curve.name;
+        for (auto& c : upper_name)
+            c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        snprintf(chips[i].label_buf, CHIP_LABEL_BUF, "%s", upper_name.c_str());
+        lv_subject_copy_string(&chips[i].label, chips[i].label_buf);
+
+        // Add chart series (initially hidden except recommended)
+        lv_color_t color = lv_color_hex(SHAPER_OVERLAY_COLORS[i % NUM_SHAPER_COLORS]);
+        chart_data.shaper_series_ids[i] =
+            ui_frequency_response_chart_add_series(chart_data.chart, curve.name.c_str(), color);
+
+        // Set shaper data (use same frequency bins, shaper's filtered values)
+        if (!curve.values.empty()) {
+            ui_frequency_response_chart_set_data(chart_data.chart, chart_data.shaper_series_ids[i],
+                                                 freqs.data(), curve.values.data(),
+                                                 std::min(freqs.size(), curve.values.size()));
+        }
+
+        // Pre-select the recommended shaper, hide others
+        bool is_recommended = (curve.name == result.shaper_type);
+        chart_data.shaper_visible[i] = is_recommended;
+        ui_frequency_response_chart_show_series(chart_data.chart, chart_data.shaper_series_ids[i],
+                                                is_recommended);
+        lv_subject_set_int(&chips[i].active, is_recommended ? 1 : 0);
+    }
+
+    // Clear unused chips
+    for (size_t i = chart_data.shaper_curves.size(); i < MAX_SHAPERS; i++) {
+        snprintf(chips[i].label_buf, CHIP_LABEL_BUF, "");
+        lv_subject_copy_string(&chips[i].label, chips[i].label_buf);
+        lv_subject_set_int(&chips[i].active, 0);
+    }
+
+    // Update legend to reflect initially selected shaper
+    update_legend(axis);
+
+    spdlog::debug("[InputShaper] Chart populated for {} axis: {} freq bins, {} shaper curves", axis,
+                  freqs.size(), chart_data.shaper_curves.size());
+}
+
+void InputShaperPanel::clear_chart(char axis) {
+    auto& chart_data = (axis == 'X') ? x_chart_ : y_chart_;
+    auto& chips = (axis == 'X') ? x_chips_ : y_chips_;
+    auto& has_freq_data = (axis == 'X') ? is_x_has_freq_data_ : is_y_has_freq_data_;
+
+    lv_subject_set_int(&has_freq_data, 0);
+
+    if (chart_data.chart) {
+        ui_frequency_response_chart_clear(chart_data.chart);
+        // Remove all series
+        if (chart_data.raw_series_id >= 0) {
+            ui_frequency_response_chart_remove_series(chart_data.chart, chart_data.raw_series_id);
+            chart_data.raw_series_id = -1;
+        }
+        for (size_t i = 0; i < MAX_SHAPERS; i++) {
+            if (chart_data.shaper_series_ids[i] >= 0) {
+                ui_frequency_response_chart_remove_series(chart_data.chart,
+                                                          chart_data.shaper_series_ids[i]);
+                chart_data.shaper_series_ids[i] = -1;
+            }
+            chart_data.shaper_visible[i] = false;
+        }
+    }
+
+    chart_data.freq_response.clear();
+    chart_data.shaper_curves.clear();
+
+    // Clear chip labels
+    for (size_t i = 0; i < MAX_SHAPERS; i++) {
+        snprintf(chips[i].label_buf, CHIP_LABEL_BUF, "");
+        lv_subject_copy_string(&chips[i].label, chips[i].label_buf);
+        lv_subject_set_int(&chips[i].active, 0);
+    }
+}
+
+void InputShaperPanel::toggle_shaper_overlay(char axis, int index) {
+    if (index < 0 || index >= static_cast<int>(MAX_SHAPERS))
+        return;
+
+    auto& chart_data = (axis == 'X') ? x_chart_ : y_chart_;
+    auto& chips = (axis == 'X') ? x_chips_ : y_chips_;
+
+    if (chart_data.shaper_series_ids[index] < 0)
+        return;
+
+    chart_data.shaper_visible[index] = !chart_data.shaper_visible[index];
+    ui_frequency_response_chart_show_series(chart_data.chart, chart_data.shaper_series_ids[index],
+                                            chart_data.shaper_visible[index]);
+    lv_subject_set_int(&chips[index].active, chart_data.shaper_visible[index] ? 1 : 0);
+
+    // Update legend to reflect new active shaper
+    update_legend(axis);
+
+    spdlog::debug("[InputShaper] Toggled {} axis shaper overlay {}: {}", axis, index,
+                  chart_data.shaper_visible[index]);
+}
+
+void InputShaperPanel::update_legend(char axis) {
+    auto& chart_data = (axis == 'X') ? x_chart_ : y_chart_;
+    auto& chips = (axis == 'X') ? x_chips_ : y_chips_;
+    auto& legend_label = (axis == 'X') ? is_x_legend_shaper_label_ : is_y_legend_shaper_label_;
+    auto& legend_label_buf =
+        (axis == 'X') ? is_x_legend_shaper_label_buf_ : is_y_legend_shaper_label_buf_;
+    lv_obj_t* legend_dot = (axis == 'X') ? legend_x_shaper_dot_ : legend_y_shaper_dot_;
+
+    // Find the last visible shaper to display in the legend
+    // Prefer the highest-index visible shaper (most recently toggled on)
+    int active_idx = -1;
+    for (int i = static_cast<int>(MAX_SHAPERS) - 1; i >= 0; i--) {
+        if (chart_data.shaper_visible[i] && chart_data.shaper_series_ids[i] >= 0) {
+            active_idx = i;
+            break;
+        }
+    }
+
+    if (active_idx >= 0) {
+        // Copy chip label text (already uppercase) to legend label
+        snprintf(legend_label_buf, CHIP_LABEL_BUF, "%s", chips[active_idx].label_buf);
+        lv_subject_copy_string(&legend_label, legend_label_buf);
+
+        // Update dot color to match the active shaper's series color
+        if (legend_dot) {
+            lv_color_t color = lv_color_hex(SHAPER_OVERLAY_COLORS[active_idx % NUM_SHAPER_COLORS]);
+            lv_obj_set_style_bg_color(legend_dot, color, LV_PART_MAIN);
+        }
+    } else {
+        // No shaper visible — clear legend label
+        snprintf(legend_label_buf, CHIP_LABEL_BUF, "");
+        lv_subject_copy_string(&legend_label, legend_label_buf);
+    }
+}
+
+void InputShaperPanel::handle_chip_x_clicked(int index) {
+    toggle_shaper_overlay('X', index);
+}
+
+void InputShaperPanel::handle_chip_y_clicked(int index) {
+    toggle_shaper_overlay('Y', index);
+}
+
+// ============================================================================
+// DEMO INJECTION
+// ============================================================================
+
+void InputShaperPanel::inject_demo_results() {
+    spdlog::info("[InputShaper] Injecting demo results for screenshot mode");
+
+    // Mock shaper options (from moonraker_client_mock.cpp:3550-3553)
+    auto make_shaper_options = []() -> std::vector<ShaperOption> {
+        return {
+            {"zv", 59.0f, 5.2f, 0.045f, 13400.0f},      {"mzv", 53.8f, 1.6f, 0.130f, 4000.0f},
+            {"ei", 56.2f, 0.7f, 0.120f, 4600.0f},       {"2hump_ei", 71.8f, 0.0f, 0.076f, 8800.0f},
+            {"3hump_ei", 89.6f, 0.0f, 0.076f, 8800.0f},
+        };
+    };
+
+    // Generate frequency response data matching write_mock_shaper_csv()
+    // (moonraker_client_mock.cpp:3424-3503)
+    auto generate_freq_data = [](char axis) {
+        std::vector<std::pair<float, float>> freq_response;
+        std::vector<ShaperResponseCurve> shaper_curves;
+
+        // Shaper fitted frequencies
+        struct ShaperDef {
+            const char* name;
+            float freq;
+        };
+        static const ShaperDef shaper_defs[] = {
+            {"zv", 59.0f}, {"mzv", 53.8f}, {"ei", 56.2f}, {"2hump_ei", 71.8f}, {"3hump_ei", 89.6f},
+        };
+
+        // Initialize shaper curves
+        for (const auto& sd : shaper_defs) {
+            ShaperResponseCurve curve;
+            curve.name = sd.name;
+            curve.frequency = sd.freq;
+            shaper_curves.push_back(curve);
+        }
+
+        // Resonance peak parameters (from mock)
+        const float peak_freq = (axis == 'X') ? 53.8f : 48.2f;
+        const float peak_width = 8.0f;
+        const float peak_amp = 0.02f;
+        const float noise_floor = 5e-4f;
+
+        std::mt19937 rng(42 + static_cast<unsigned>(axis));
+        std::uniform_real_distribution<float> noise_dist(0.8f, 1.2f);
+
+        // Generate ~50 bins from 5-200 Hz (step ~4 Hz)
+        for (float freq = 5.0f; freq <= 200.0f; freq += 4.0f) {
+            float df = freq - peak_freq;
+            float resonance = peak_amp / (1.0f + (df * df) / (peak_width * peak_width));
+            float base_psd = noise_floor * noise_dist(rng) + resonance;
+
+            if (freq > 120.0f) {
+                base_psd *= std::exp(-(freq - 120.0f) / 60.0f);
+            }
+
+            // Combined PSD (main + cross + z)
+            float psd_main = base_psd;
+            float psd_cross = base_psd * 0.15f * noise_dist(rng);
+            float psd_z = base_psd * 0.08f * noise_dist(rng);
+            float psd_xyz = psd_main + psd_cross + psd_z;
+
+            freq_response.push_back({freq, psd_xyz});
+
+            // Shaper attenuation curves
+            for (size_t i = 0; i < 5; i++) {
+                float shaper_freq_val = shaper_defs[i].freq;
+                float dist = std::abs(freq - shaper_freq_val);
+                float attenuation;
+                if (dist < 15.0f) {
+                    attenuation = 0.05f + 0.95f * (dist / 15.0f) * (dist / 15.0f);
+                } else {
+                    attenuation = 1.0f;
+                }
+                shaper_curves[i].values.push_back(psd_xyz * attenuation);
+            }
+        }
+
+        return std::make_pair(freq_response, shaper_curves);
+    };
+
+    // Build X result
+    InputShaperResult x_result;
+    x_result.axis = 'X';
+    x_result.shaper_type = "mzv";
+    x_result.shaper_freq = 53.8f;
+    x_result.max_accel = 4000.0f;
+    x_result.smoothing = 0.130f;
+    x_result.vibrations = 1.6f;
+    x_result.all_shapers = make_shaper_options();
+    auto [x_freq, x_curves] = generate_freq_data('X');
+    x_result.freq_response = std::move(x_freq);
+    x_result.shaper_curves = std::move(x_curves);
+
+    // Build Y result
+    InputShaperResult y_result;
+    y_result.axis = 'Y';
+    y_result.shaper_type = "mzv";
+    y_result.shaper_freq = 53.8f;
+    y_result.max_accel = 4000.0f;
+    y_result.smoothing = 0.130f;
+    y_result.vibrations = 1.6f;
+    y_result.all_shapers = make_shaper_options();
+    auto [y_freq, y_curves] = generate_freq_data('Y');
+    y_result.freq_response = std::move(y_freq);
+    y_result.shaper_curves = std::move(y_curves);
+
+    // Store recommendation for Apply button
+    recommended_type_ = "mzv";
+    recommended_freq_ = 53.8f;
+    x_result_ = x_result;
+
+    // Populate both axes (uses existing private methods)
+    lv_subject_set_int(&is_results_has_x_, 0);
+    lv_subject_set_int(&is_results_has_y_, 0);
+
+    populate_axis_result('X', x_result);
+    populate_axis_result('Y', y_result);
+
+    set_state(State::RESULTS);
 }
 
 // ============================================================================

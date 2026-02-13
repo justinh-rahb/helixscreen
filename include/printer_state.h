@@ -491,6 +491,14 @@ class PrinterState {
     }
 
     /**
+     * @brief Check if real layer data has been received from slicer/Moonraker.
+     * When false, layer count is estimated from print progress.
+     */
+    bool has_real_layer_data() const {
+        return print_domain_.has_real_layer_data();
+    }
+
+    /**
      * @brief Set slicer's estimated total print time (from file metadata)
      *
      * Used as fallback for remaining time when print_duration is still 0.

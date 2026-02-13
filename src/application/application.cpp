@@ -40,6 +40,7 @@
 #include "ui_bed_mesh.h"
 #include "ui_card.h"
 #include "ui_component_header_bar.h"
+#include "ui_crash_report_modal.h"
 #include "ui_dialog.h"
 #include "ui_emergency_stop.h"
 #include "ui_error_reporting.h"
@@ -96,8 +97,10 @@
 #include "data_root_resolver.h"
 #include "led/ui_led_control_overlay.h"
 #include "printer_detector.h"
+#include "printer_image_manager.h"
 #include "settings_manager.h"
 #include "system/crash_handler.h"
+#include "system/crash_reporter.h"
 #include "system/telemetry_manager.h"
 #include "system/update_checker.h"
 #include "theme_manager.h"
@@ -280,10 +283,21 @@ int Application::run(int argc, char** argv) {
     // Initialize UpdateChecker before panel subjects (subjects must exist for XML binding)
     UpdateChecker::instance().init();
 
+    // Initialize CrashReporter (independent of telemetry)
+    // Write mock crash file first if --mock-crash flag is set (requires --test)
+    if (get_runtime_config()->mock_crash) {
+        crash_handler::write_mock_crash_file("config/crash.txt");
+        spdlog::info("[Application] Wrote mock crash file for testing");
+    }
+    CrashReporter::instance().init("config");
+
     // Initialize TelemetryManager (opt-in, default OFF)
     // Note: record_session() is called after init_panel_subjects() so that
     // SettingsManager subjects are ready and the enabled state can be synced.
     TelemetryManager::instance().init();
+
+    // Initialize PrinterImageManager (custom image import/resolution)
+    helix::PrinterImageManager::instance().init("config");
 
     // Phase 9c: Initialize panel subjects with API injection
     // Panels receive API at construction - no deferred set_api() needed
@@ -309,6 +323,15 @@ int Application::run(int argc, char** argv) {
     if (!init_ui()) {
         shutdown();
         return 1;
+    }
+
+    // Check for crash from previous session (after UI exists, before wizard)
+    if (CrashReporter::instance().has_crash_report()) {
+        spdlog::info("[Application] Previous crash detected — showing crash report dialog");
+        auto report = CrashReporter::instance().collect_report();
+        auto* modal = new CrashReportModal();
+        modal->set_report(report);
+        modal->show_modal(lv_screen_active());
     }
 
     // Phase 12: Run wizard if needed
@@ -1180,6 +1203,9 @@ void Application::create_overlays() {
         auto& overlay = get_global_pid_cal_panel();
         // init_subjects already called by SubjectInitializer
         overlay.set_api(m_moonraker->api());
+        if (get_runtime_config()->test_mode) {
+            overlay.request_demo_inject();
+        }
         if (overlay.create(m_screen)) {
             overlay.show();
         }
@@ -1197,6 +1223,9 @@ void Application::create_overlays() {
     if (m_args.overlays.input_shaper) {
         auto& panel = get_global_input_shaper_panel();
         panel.set_api(m_moonraker->client(), m_moonraker->api());
+        if (get_runtime_config()->test_mode) {
+            panel.request_demo_inject();
+        }
         if (panel.create(m_screen)) {
             panel.show();
         }

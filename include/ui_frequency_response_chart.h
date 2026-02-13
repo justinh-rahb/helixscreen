@@ -32,7 +32,7 @@
  * @endcode
  *
  * Hardware Adaptation:
- * - EMBEDDED tier: Table view only (is_chart_mode = false), no chart rendering
+ * - EMBEDDED tier: Simplified chart with max 50 data points (same as BASIC)
  * - BASIC tier: Simplified chart with max 50 data points
  * - STANDARD tier: Full chart with max 200 data points and animations
  *
@@ -218,7 +218,7 @@ lv_obj_t* ui_frequency_response_chart_get_obj(ui_frequency_response_chart_t* cha
  *
  * Adjusts chart rendering mode and data point limits based on hardware
  * capabilities:
- * - EMBEDDED: Table mode only (is_chart_mode = false), max 0 chart points
+ * - EMBEDDED: Simplified chart, max 50 points (same as BASIC)
  * - BASIC: Simplified chart, max 50 points
  * - STANDARD: Full chart with animations, max 200 points
  *
@@ -235,7 +235,7 @@ void ui_frequency_response_chart_configure_for_platform(ui_frequency_response_ch
  * platform tier. Data beyond this limit will be downsampled.
  *
  * @param chart Chart instance
- * @return Max points (200 for STANDARD, 50 for BASIC, 0 for EMBEDDED)
+ * @return Max points (200 for STANDARD, 50 for BASIC/EMBEDDED)
  */
 size_t ui_frequency_response_chart_get_max_points(ui_frequency_response_chart_t* chart);
 

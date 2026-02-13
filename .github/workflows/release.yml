@@ -26,6 +26,19 @@ jobs:
     - name: Install bats
       run: sudo apt-get update -qq && sudo apt-get install -y bats
 
+    - name: Verify bundled installers are up-to-date
+      run: |
+        bash scripts/bundle-installer.sh -o /tmp/install-regen.sh
+        bash scripts/bundle-uninstaller.sh -o /tmp/uninstall-regen.sh
+        diff scripts/install.sh /tmp/install-regen.sh || {
+          echo "::error::scripts/install.sh is stale — run: bash scripts/bundle-installer.sh -o scripts/install.sh"
+          exit 1
+        }
+        diff scripts/uninstall.sh /tmp/uninstall-regen.sh || {
+          echo "::error::scripts/uninstall.sh is stale — run: bash scripts/bundle-uninstaller.sh -o scripts/uninstall.sh"
+          exit 1
+        }
+
     - name: Run shell tests
       run: make test-shell
 
@@ -73,21 +86,8 @@ jobs:
           helixscreen/toolchain-pi \
           make PLATFORM_TARGET=pi SKIP_OPTIONAL_DEPS=1 -j$(nproc)
 
-    - name: Extract symbol map
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-pi \
-          make symbols PLATFORM_TARGET=pi SKIP_OPTIONAL_DEPS=1
-
-    - name: Strip binary
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-pi \
-          make strip PLATFORM_TARGET=pi SKIP_OPTIONAL_DEPS=1
+    # Symbol extraction and stripping are handled by the 'all' target
+    # (all → strip → symbols → nm, then strip). No separate steps needed.
 
     - name: Fix build directory ownership
       run: sudo chown -R $(id -u):$(id -g) build/
@@ -161,22 +161,6 @@ jobs:
           helixscreen/toolchain-pi32 \
           make PLATFORM_TARGET=pi32 SKIP_OPTIONAL_DEPS=1 -j$(nproc)
 
-    - name: Extract symbol map
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-pi32 \
-          make symbols PLATFORM_TARGET=pi32 SKIP_OPTIONAL_DEPS=1
-
-    - name: Strip binary
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-pi32 \
-          make strip PLATFORM_TARGET=pi32 SKIP_OPTIONAL_DEPS=1
-
     - name: Fix build directory ownership
       run: sudo chown -R $(id -u):$(id -g) build/
 
@@ -248,22 +232,6 @@ jobs:
           -w /src \
           helixscreen/toolchain-ad5m \
           make PLATFORM_TARGET=ad5m SKIP_OPTIONAL_DEPS=1 -j$(nproc)
-
-    - name: Extract symbol map
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-ad5m \
-          make symbols PLATFORM_TARGET=ad5m SKIP_OPTIONAL_DEPS=1
-
-    - name: Strip binary
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-ad5m \
-          make strip PLATFORM_TARGET=ad5m SKIP_OPTIONAL_DEPS=1
 
     - name: Fix build directory ownership
       run: sudo chown -R $(id -u):$(id -g) build/
@@ -337,22 +305,6 @@ jobs:
           helixscreen/toolchain-k1 \
           make PLATFORM_TARGET=k1 SKIP_OPTIONAL_DEPS=1 -j$(nproc)
 
-    - name: Extract symbol map
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-k1 \
-          make symbols PLATFORM_TARGET=k1 SKIP_OPTIONAL_DEPS=1
-
-    - name: Strip binary
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-k1 \
-          make strip PLATFORM_TARGET=k1 SKIP_OPTIONAL_DEPS=1
-
     - name: Fix build directory ownership
       run: sudo chown -R $(id -u):$(id -g) build/
 
@@ -425,22 +377,6 @@ jobs:
           helixscreen/toolchain-k2 \
           make PLATFORM_TARGET=k2 SKIP_OPTIONAL_DEPS=1 -j$(nproc)
 
-    - name: Extract symbol map
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-k2 \
-          make symbols PLATFORM_TARGET=k2 SKIP_OPTIONAL_DEPS=1
-
-    - name: Strip binary
-      run: |
-        docker run --rm \
-          -v "${{ github.workspace }}":/src \
-          -w /src \
-          helixscreen/toolchain-k2 \
-          make strip PLATFORM_TARGET=k2 SKIP_OPTIONAL_DEPS=1
-
     - name: Fix build directory ownership
       run: sudo chown -R $(id -u):$(id -g) build/
 
@@ -496,6 +432,8 @@ jobs:
         mkdir -p release-files
         find artifacts -name '*.tar.gz' -exec mv {} release-files/ \;
         find artifacts -name '*.zip' -exec mv {} release-files/ \;
+        # Include install.sh so users can download it directly from the release
+        cp scripts/install.sh release-files/
         echo "Release files:"
         ls -lh release-files/
 
@@ -599,6 +537,7 @@ jobs:
         files: |
           release-files/*.tar.gz
           release-files/*.zip
+          release-files/install.sh
         fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -707,23 +646,25 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+        RELEASE_NOTES: ${{ steps.notes.outputs.notes }}
+        RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        R2_BUCKET: ${{ vars.R2_BUCKET_NAME || 'helixscreen-releases' }}
+        R2_PUBLIC_URL: ${{ vars.R2_PUBLIC_URL }}
+        UPLOAD_CHANNELS: ${{ steps.channels.outputs.channels }}
       run: |
         chmod +x scripts/generate-manifest.sh
-        BUCKET="${{ vars.R2_BUCKET_NAME || 'helixscreen-releases' }}"
-        VERSION="${{ steps.version.outputs.version }}"
-        TAG="${{ steps.version.outputs.tag }}"
-        NOTES="${{ steps.notes.outputs.notes }}"
 
-        for CHANNEL in ${{ steps.channels.outputs.channels }}; do
+        for CHANNEL in $UPLOAD_CHANNELS; do
           echo "=== Uploading to ${CHANNEL} channel ==="
 
           # Generate channel-specific manifest
           scripts/generate-manifest.sh \
-            --version "$VERSION" \
-            --tag "$TAG" \
-            --notes "$NOTES" \
+            --version "$RELEASE_VERSION" \
+            --tag "$RELEASE_TAG" \
+            --notes "$RELEASE_NOTES" \
             --dir release-files \
-            --base-url "${{ vars.R2_PUBLIC_URL }}/${CHANNEL}" \
+            --base-url "${R2_PUBLIC_URL}/${CHANNEL}" \
             --output "release-files/manifest-${CHANNEL}.json"
 
           echo "Generated manifest for ${CHANNEL}:"
@@ -733,14 +674,14 @@ jobs:
           for tarball in release-files/*.tar.gz release-files/*.zip; do
             filename=$(basename "$tarball")
             echo "Uploading ${CHANNEL}/${filename}..."
-            aws s3 cp "$tarball" "s3://${BUCKET}/${CHANNEL}/${filename}" \
+            aws s3 cp "$tarball" "s3://${R2_BUCKET}/${CHANNEL}/${filename}" \
               --endpoint-url "$R2_ENDPOINT"
           done
 
           # Upload manifest
           echo "Uploading ${CHANNEL}/manifest.json..."
           aws s3 cp "release-files/manifest-${CHANNEL}.json" \
-            "s3://${BUCKET}/${CHANNEL}/manifest.json" \
+            "s3://${R2_BUCKET}/${CHANNEL}/manifest.json" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type "application/json"
 
@@ -753,15 +694,15 @@ jobs:
           [ -f "$symfile" ] || continue
           filename=$(basename "$symfile")
           platform="${filename%.sym}"
-          echo "Uploading symbols/v${VERSION}/${platform}.sym..."
+          echo "Uploading symbols/v${RELEASE_VERSION}/${platform}.sym..."
           aws s3 cp "$symfile" \
-            "s3://${BUCKET}/symbols/v${VERSION}/${platform}.sym" \
+            "s3://${R2_BUCKET}/symbols/v${RELEASE_VERSION}/${platform}.sym" \
             --endpoint-url "$R2_ENDPOINT" \
             --content-type "text/plain"
         done
         echo "=== Symbol map upload complete ==="
 
         echo "All uploads complete!"
-        for CHANNEL in ${{ steps.channels.outputs.channels }}; do
-          echo "  ${CHANNEL}: ${{ vars.R2_PUBLIC_URL }}/${CHANNEL}/manifest.json"
+        for CHANNEL in $UPLOAD_CHANNELS; do
+          echo "  ${CHANNEL}: ${R2_PUBLIC_URL}/${CHANNEL}/manifest.json"
         done

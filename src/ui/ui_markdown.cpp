@@ -21,38 +21,72 @@ namespace {
 
 /**
  * @brief Build a theme-aware markdown style from current design tokens
+ *
+ * Maps our theme system's responsive fonts, colors, and spacing to the
+ * lv_markdown_style_t fields so the markdown renderer matches the app's
+ * look and feel across screen sizes and light/dark themes.
  */
 void build_theme_style(lv_markdown_style_t& style) {
     lv_markdown_style_init(&style);
 
-    // Body text — use default font, theme text color
-    style.body_font = LV_FONT_DEFAULT;
+    // Body text — responsive body font + theme text color
+    style.body_font = theme_manager_get_font("font_body");
     style.body_color = theme_manager_get_color("text");
 
-    // Headings — all use text color (no separate heading color token)
-    for (int i = 0; i < 6; i++) {
-        style.heading_font[i] = nullptr; // fallback to body_font
-        style.heading_color[i] = theme_manager_get_color("text");
-    }
+    // Headings — H1/H2 use heading font, H3/H4 use body, H5/H6 use small
+    // H1/H2 get primary accent color, H3/H4 get bright text, H5/H6 get muted
+    const lv_font_t* font_heading = theme_manager_get_font("font_heading");
+    const lv_font_t* font_body = theme_manager_get_font("font_body");
+    const lv_font_t* font_small = theme_manager_get_font("font_small");
+
+    style.heading_font[0] = font_heading; // H1
+    style.heading_font[1] = font_heading; // H2
+    style.heading_font[2] = font_body;    // H3
+    style.heading_font[3] = font_body;    // H4
+    style.heading_font[4] = font_small;   // H5
+    style.heading_font[5] = font_small;   // H6
+
+    lv_color_t primary = theme_manager_get_color("primary");
+    lv_color_t secondary = theme_manager_get_color("secondary");
+    lv_color_t text_color = theme_manager_get_color("text");
+    lv_color_t text_muted = theme_manager_get_color("text_muted");
+
+    style.heading_color[0] = primary;    // H1 — primary accent
+    style.heading_color[1] = secondary;  // H2 — secondary accent
+    style.heading_color[2] = text_color; // H3 — bright
+    style.heading_color[3] = text_color; // H4 — bright
+    style.heading_color[4] = text_muted; // H5 — muted
+    style.heading_color[5] = text_muted; // H6 — muted
 
     // Emphasis — NULL triggers faux bold (letter spacing) and underline fallbacks
+    // We don't ship separate bold/italic font files, so rely on the fallbacks
     style.bold_font = nullptr;
     style.italic_font = nullptr;
     style.bold_italic_font = nullptr;
 
-    // Code styling
-    style.code_font = nullptr; // fallback to body_font
+    // Inline code — small font, muted text on elevated surface
+    style.code_font = font_small;
     style.code_color = theme_manager_get_color("text");
-    style.code_bg_color = theme_manager_get_color("card_bg");
-    style.code_block_bg_color = theme_manager_get_color("card_bg");
+    style.code_bg_color = theme_manager_get_color("elevated_bg");
+    style.code_corner_radius = theme_manager_get_spacing("space_xxs");
 
-    // Blockquote and horizontal rule
-    style.blockquote_border_color = theme_manager_get_color("text_muted");
+    // Fenced code blocks — same elevated surface, with padding
+    style.code_block_bg_color = theme_manager_get_color("elevated_bg");
+    style.code_block_corner_radius = theme_manager_get_spacing("space_xs");
+    style.code_block_pad = theme_manager_get_spacing("space_sm");
+
+    // Blockquotes — left border in muted color
+    style.blockquote_border_color = theme_manager_get_color("primary");
+    style.blockquote_border_width = 3;
+    style.blockquote_pad_left = theme_manager_get_spacing("space_md");
+
+    // Horizontal rules
     style.hr_color = theme_manager_get_color("text_muted");
 
-    // Spacing
-    style.paragraph_spacing = 8;
-    style.line_spacing = 4;
+    // Spacing — use themed spacing tokens for responsive values
+    style.paragraph_spacing = theme_manager_get_spacing("space_sm");
+    style.line_spacing = theme_manager_get_spacing("space_xxs");
+    style.list_indent = theme_manager_get_spacing("space_lg");
 }
 
 /**

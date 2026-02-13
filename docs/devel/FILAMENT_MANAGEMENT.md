@@ -1,0 +1,717 @@
+# Filament Management (Developer Guide)
+
+Multi-material system support in HelixScreen: architecture, backend implementations, mock testing, and extension guide.
+
+**User-facing doc**: [docs/user/USER_GUIDE.md](user/USER_GUIDE.md) (filament panel usage, slot operations, troubleshooting)
+
+---
+
+## Architecture Overview
+
+HelixScreen uses a backend abstraction layer to support multiple multi-filament and multi-tool systems through a single UI. The `AmsBackend` interface hides all backend-specific protocols and exposes a uniform API for the UI layer.
+
+```
+                         ┌─────────────┐
+                         │  AmsState   │  Singleton LVGL subject bridge
+                         │ (ams_state) │  Thread-safe subject updates
+                         └──────┬──────┘
+                                │ owns
+                    ┌───────────▼───────────┐
+                    │     AmsBackend        │  Abstract interface
+                    │  (ams_backend.h)      │  Factory: create() / create_mock()
+                    └───────────┬───────────┘
+           ┌──────────┬────────┼─────────┬───────────┐
+           ▼          ▼        ▼         ▼           ▼
+    ┌──────────┐ ┌────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐
+    │Happy Hare│ │  AFC   │ │ValgACE │ │  Tool    │ │  Mock    │
+    │ Backend  │ │Backend │ │Backend │ │ Changer  │ │ Backend  │
+    └──────────┘ └────────┘ └────────┘ └──────────┘ └──────────┘
+         │            │          │           │            │
+    Moonraker    Moonraker    REST API   Moonraker    In-memory
+    WebSocket    WebSocket    Polling    WebSocket    simulation
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `include/ams_backend.h` | Abstract interface with factory methods |
+| `include/ams_types.h` | Shared types: `AmsType`, `SlotInfo`, `AmsAction`, `PathTopology`, etc. |
+| `include/ams_error.h` | Error types with user-friendly messages |
+| `include/ams_state.h` | LVGL subject bridge (singleton) |
+| `include/ams_backend_happy_hare.h` | Happy Hare MMU implementation |
+| `include/ams_backend_afc.h` | AFC (Armored Turtle / Box Turtle) implementation |
+| `include/ams_backend_valgace.h` | ValgACE (AnyCubic ACE Pro) implementation |
+| `include/ams_backend_toolchanger.h` | Physical tool changer (viesturz/klipper-toolchanger) |
+| `include/ams_backend_mock.h` | Mock backend for development and testing |
+| `src/printer/ams_backend.cpp` | Factory method implementations |
+| `include/printer_discovery.h` | Hardware detection from Klipper object list |
+| `include/ui_ams_context_menu.h` | Slot context menu (load, unload, edit, spoolman) |
+| `include/ui_ams_device_operations_overlay.h` | Device operations overlay (home, recover, bypass, etc.) |
+
+### Data Flow
+
+1. **Discovery**: `PrinterDiscovery::parse_objects()` scans Klipper's `printer.objects.list` for `mmu`, `AFC`, `toolchanger`, `AFC_stepper lane*`, `AFC_hub *`, `tool T*` objects.
+2. **Backend Creation**: `AmsState::init_backend_from_hardware()` calls `AmsBackend::create()` with the detected `AmsType` and Moonraker dependencies.
+3. **State Sync**: Backend emits events (`STATE_CHANGED`, `SLOT_CHANGED`, etc.) which `AmsState` translates to LVGL subject updates.
+4. **UI Binding**: XML widgets bind to subjects (`ams_type`, `ams_action`, `current_slot`, `slots_version`, etc.) for reactive updates.
+
+### Threading Model
+
+All Moonraker/libhv callbacks arrive on a background thread. Backends update internal state under mutex, then `AmsState` posts subject updates to the LVGL thread via `lv_async_call()`. The UI never directly accesses backend state.
+
+---
+
+## Supported Backends
+
+### AmsType Enum
+
+```cpp
+enum class AmsType {
+    NONE = 0,         // No AMS detected
+    HAPPY_HARE = 1,   // Happy Hare MMU (mmu object in Moonraker)
+    AFC = 2,          // AFC-Klipper-Add-On (AFC object, lane_data database)
+    VALGACE = 3,      // AnyCubic ACE Pro via ValgACE Klipper driver
+    TOOL_CHANGER = 4  // Physical tool changer (viesturz/klipper-toolchanger)
+};
+```
+
+Helper functions: `is_tool_changer()` and `is_filament_system()` distinguish between the two categories.
+
+---
+
+## Happy Hare (MMU)
+
+Happy Hare is a Klipper add-on for ERCF, Tradrack, and other selector-based multi-filament systems.
+
+### Detection
+
+Klipper object `mmu` in `printer.objects.list` sets `AmsType::HAPPY_HARE`.
+
+### Moonraker Variables
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `printer.mmu.gate` | int | Current gate (-1=none, -2=bypass) |
+| `printer.mmu.tool` | int | Current tool number |
+| `printer.mmu.filament` | string | "Loaded" or "Unloaded" |
+| `printer.mmu.action` | string | "Idle", "Loading", "Unloading", "Forming Tip", etc. |
+| `printer.mmu.gate_status` | int[] | Per-gate: -1=unknown, 0=empty, 1=available, 2=from_buffer |
+| `printer.mmu.gate_color_rgb` | int[] | Per-gate RGB colors (0xRRGGBB) |
+| `printer.mmu.gate_material` | string[] | Per-gate material names |
+| `printer.mmu.filament_pos` | int | 0-8 filament position for path visualization |
+
+### G-code Commands
+
+| Command | Action |
+|---------|--------|
+| `MMU_LOAD GATE={n}` | Load filament from gate |
+| `MMU_UNLOAD` | Unload current filament |
+| `MMU_SELECT GATE={n}` | Select gate without loading |
+| `T{n}` | Tool change (unload + load) |
+| `MMU_HOME` | Home the selector (reset) |
+| `MMU_RECOVER` | Attempt error recovery |
+| `MMU_TTG_MAP TOOL={n} GATE={g}` | Set tool-to-gate mapping |
+| `MMU_SELECT_BYPASS` | Select bypass position |
+
+### Path Topology
+
+`PathTopology::LINEAR` -- Selector picks one input from multiple gates. Filament path: `SPOOL -> PREP -> LANE -> HUB (selector) -> OUTPUT (bowden) -> TOOLHEAD -> NOZZLE`.
+
+Happy Hare's `filament_pos` (0-8) maps to `PathSegment` via `path_segment_from_happy_hare_pos()`.
+
+### Capabilities
+
+| Feature | Supported | Editable |
+|---------|-----------|----------|
+| Endless Spool | Yes | Read-only (configured in `mmu_vars.cfg`) |
+| Tool Mapping | Yes | Yes (via `MMU_TTG_MAP`) |
+| Bypass Mode | Yes | Yes (selector position -2) |
+| Spoolman | Yes | -- |
+| Auto-Heat on Load | No | UI manages preheat |
+| Dryer | No | -- |
+
+### Reset vs Recover
+
+- **Reset** (`reset()`) sends `MMU_HOME` to home the selector. Used for general state reset.
+- **Recover** (`recover()`) sends `MMU_RECOVER` to attempt error recovery without full re-homing.
+
+---
+
+## AFC (Armored Turtle / Box Turtle)
+
+AFC-Klipper-Add-On is a hub-based multi-filament system. Multiple lanes feed through a hub/merger to a single toolhead.
+
+### Detection
+
+Klipper object `AFC` in `printer.objects.list` sets `AmsType::AFC`. Lane names come from `AFC_stepper lane*` objects, hub names from `AFC_hub *` objects.
+
+### Data Sources
+
+AFC state comes from multiple Klipper objects:
+
+**Per-lane state** (`AFC_stepper lane{N}`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `prep` | bool | Prep sensor triggered |
+| `load` | bool | Load sensor triggered |
+| `loaded_to_hub` | bool | Filament reached hub |
+| `tool_loaded` | bool | Filament loaded to toolhead |
+| `status` | string | "Loaded", "None", "Ready" |
+| `color` | string | Filament color hex (`#RRGGBB`) |
+| `material` | string | Material type from Spoolman |
+| `spool_id` | int | Spoolman spool ID |
+| `weight` | float | Remaining weight in grams |
+| `buffer_status` | string | Buffer state (e.g., "Advancing") |
+| `filament_status` | string | Readiness (e.g., "Ready", "Not Ready") |
+| `dist_hub` | float | Distance to hub in mm |
+
+**Hub state** (`AFC_hub {name}`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `state` | bool | Hub sensor triggered |
+| `afc_bowden_length` | float | Bowden tube length from hub to toolhead (mm) |
+
+**Extruder state** (`AFC_extruder extruder`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tool_start_status` | bool | Toolhead entry sensor |
+| `tool_end_status` | bool | Toolhead exit/nozzle sensor |
+| `lane_loaded` | string | Currently loaded lane name |
+
+**Global state** (`AFC`):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `current_lane` | string | Active lane name (or null) |
+| `current_state` | string | "Idle", "Loading", "Unloading", etc. |
+| `error_state` | bool | AFC error flag |
+| `lanes[]` | string[] | List of lane names |
+| `quiet_mode` | bool | Quiet mode state |
+| `led_state` | bool | LED strip on/off |
+
+**Moonraker database** (AFC namespace, `lane_data` key -- v1.0.32+):
+
+```json
+{
+  "lane1": {"color": "FF0000", "material": "PLA", "loaded": false},
+  "lane2": {"color": "00FF00", "material": "PETG", "loaded": true}
+}
+```
+
+### G-code Commands
+
+| Command | Action |
+|---------|--------|
+| `AFC_LOAD LANE={name}` | Load filament from lane |
+| `AFC_UNLOAD` | Unload current filament |
+| `AFC_CUT LANE={name}` | Cut filament (if cutter installed) |
+| `AFC_HOME` | Home the AFC system (reset) |
+| `AFC_RESET` | Reset from error state (recover) |
+| `T{n}` | Tool change (unload + load) |
+| `SET_MAP LANE={name} MAP=T{n}` | Set lane-to-tool mapping |
+| `SET_BOWDEN_LENGTH UNIT={unit_name} LENGTH={mm}` | Set bowden tube length for a unit |
+| `SET_RUNOUT LANE={name} RUNOUT={backup_lane}` | Set endless spool backup |
+| `RESET_AFC_MAPPING RUNOUT=no` | Reset tool mappings only |
+| `AFC_CALIBRATION` | Run calibration wizard |
+| `AFC_PARK` | Park the AFC system |
+| `AFC_BRUSH` | Run brush cleaning sequence |
+| `AFC_RESET_MOTOR_TIME` | Reset motor run-time counter |
+| `TURN_ON_AFC_LED` / `TURN_OFF_AFC_LED` | Toggle LED strip |
+| `AFC_QUIET_MODE` | Toggle quiet mode |
+
+### Path Topology
+
+`PathTopology::HUB` -- Multiple lanes merge into a common hub/merger. Sensor-based position inference:
+
+```
+No sensors            -> SPOOL (filament present but not advanced)
+prep only             -> HUB (past prep, approaching hub)
+prep + hub            -> TOOLHEAD (past hub, approaching toolhead)
+prep + hub + toolhead -> NOZZLE (fully loaded)
+```
+
+See `path_segment_from_afc_sensors()` in `ams_types.h`.
+
+### AFC-Specific Features
+
+#### Hub Bowden Length
+
+The bowden tube length from hub to toolhead is read from `AFC_hub.afc_bowden_length` and exposed as a slider in the device actions UI. Adjustable via `SET_BOWDEN_LENGTH LENGTH={mm}` G-code.
+
+#### Per-Lane Stepper Fields
+
+Each `AFC_stepper` object provides sensor states (`prep`, `load`, `loaded_to_hub`), buffer state (`buffer_status`), filament readiness (`filament_status`), and distance to hub (`dist_hub`). These are cached in the `LaneSensors` struct per lane (up to 16 lanes).
+
+#### Buffer Objects
+
+AFC tracks buffer state per lane. The `buffer_status` field indicates the current buffer operation (e.g., "Advancing"). Buffer names are discovered from the Klipper object list.
+
+#### Global State
+
+The `AFC` Klipper object provides global state: `current_lane`, `current_state`, `error_state`, `quiet_mode`, and `led_state`. These drive the UI status display and device action toggles.
+
+#### Maintenance Mode
+
+The device operations overlay exposes AFC maintenance actions:
+
+| Action | G-code | Description |
+|--------|--------|-------------|
+| Test All Lanes | `AFC_TEST_LANES` | Run test sequence on all lanes |
+| Change Blade | `AFC_CHANGE_BLADE` | Initiate blade change procedure |
+| Park | `AFC_PARK` | Park the AFC system |
+| Clean Brush | `AFC_BRUSH` | Run nozzle cleaning brush cycle |
+| Reset Motor Timer | `AFC_RESET_MOTOR_TIME` | Reset motor run-time counter |
+
+#### LED Toggle
+
+The LED toggle sends `TURN_ON_AFC_LED` or `TURN_OFF_AFC_LED` based on the current `afc_led_state_`. The button label and icon dynamically reflect the current state.
+
+#### Quiet Mode
+
+Quiet mode reduces motor noise at the cost of speed. Toggled via `AFC_QUIET_MODE` G-code. The current state is tracked via `afc_quiet_mode_` from the `AFC.quiet_mode` printer object field.
+
+#### Per-Lane Reset
+
+AFC supports resetting individual lanes via `reset_lane(slot_index)`, which sends `AFC_RESET LANE={name}`. This resets a single lane to a known good state without affecting others.
+
+#### Reset vs Recover
+
+- **Reset** (`reset()`) sends `AFC_HOME` to home the entire AFC system.
+- **Recover** (`recover()`) sends `AFC_RESET` to recover from error state. Less disruptive than a full home.
+- **Per-lane reset** (`reset_lane()`) targets a single lane with `AFC_RESET LANE={name}`.
+
+### Capabilities
+
+| Feature | Supported | Editable |
+|---------|-----------|----------|
+| Endless Spool | Yes | Yes (per-slot via `SET_RUNOUT`) |
+| Tool Mapping | Yes | Yes (via `SET_MAP`) |
+| Bypass Mode | Yes | Hardware sensor (auto-detect on Box Turtle) |
+| Spoolman | Yes | -- |
+| Auto-Heat on Load | Yes | AFC uses `default_material_temps` from config |
+| Dryer | No | -- |
+| Device Actions | Yes | Calibration, Speed, Maintenance, LED/Modes |
+
+### AFC Version Differences
+
+| Feature | v1.0.0 | v1.0.32+ |
+|---------|--------|----------|
+| `AFC_stepper lane*` objects | Full sensor data | Same |
+| `lane_data` in Moonraker DB | Not available | Available (richer data) |
+| TD1 sensor support | No | Yes |
+| Auto-level during home | No | Yes |
+
+The backend detects the installed version by querying the `afc-install` database namespace and sets `has_lane_data_db_` for v1.0.32+. The version check uses `version_at_least()`.
+
+---
+
+## ValgACE (AnyCubic ACE Pro)
+
+ValgACE is the Klipper driver for AnyCubic ACE Pro hardware. Unlike the other backends, ValgACE uses a REST polling model rather than WebSocket subscriptions.
+
+### Detection
+
+ValgACE is detected via a REST probe to `/server/ace/info`. Since ValgACE does not appear in `printer.objects.list`, the `AmsState::probe_valgace()` method is called during backend initialization to check for its presence.
+
+### REST Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/server/ace/info` | GET | System information (model, version, slot count) |
+| `/server/ace/status` | GET | Current state (dryer, loaded slot, action) |
+| `/server/ace/slots` | GET | Slot information (colors, materials, status) |
+
+### G-code Commands
+
+| Command | Action |
+|---------|--------|
+| `ACE_CHANGE_TOOL TOOL={n}` | Load slot (or -1 to unload) |
+| `ACE_START_DRYING TEMP={t} DURATION={m}` | Start drying |
+| `ACE_STOP_DRYING` | Stop drying |
+
+### Threading
+
+A background polling thread runs at ~500ms intervals when the backend is active. State is cached under `state_mutex_` protection. Events are emitted on the polling thread.
+
+### Capabilities
+
+| Feature | Supported | Editable |
+|---------|-----------|----------|
+| Endless Spool | No | -- |
+| Tool Mapping | No | Fixed 1:1 mapping |
+| Bypass Mode | No | -- |
+| Spoolman | No | -- |
+| Auto-Heat on Load | No | -- |
+| Dryer | Yes | Built-in hardware dryer |
+
+### Dryer Control
+
+ValgACE is the primary backend with integrated dryer support. The `DryerInfo` struct provides:
+
+- Current/target temperature
+- Duration and remaining time
+- Fan speed control
+- Hardware capability limits (min/max temp, max duration)
+
+Drying presets are derived from the filament database via `get_default_drying_presets()`.
+
+---
+
+## Tool Changer (viesturz/klipper-toolchanger)
+
+Physical tool changers have multiple complete toolheads that are swapped on the carriage, fundamentally different from filament-switching systems.
+
+### Detection
+
+Klipper object `toolchanger` in `printer.objects.list` sets `AmsType::TOOL_CHANGER`. Individual tool names come from `tool T*` objects (e.g., `tool T0`, `tool T1`).
+
+### Key Differences from Filament Systems
+
+- Each "slot" is a complete toolhead with its own extruder
+- No hub/selector -- path topology is `PARALLEL`
+- "Loading" means mounting the tool to the carriage
+- No bypass mode (each tool IS the path)
+- Tool mapping is fixed (tools ARE slots)
+
+### Klipper Objects
+
+**Global** (`toolchanger`):
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `status` | string | "ready", "changing", "error", "uninitialized" |
+| `tool` | string | Current tool name ("T0") or null |
+| `tool_number` | int | Current tool number (-1 if none) |
+| `tool_numbers` | int[] | All tool numbers [0, 1, 2] |
+| `tool_names` | string[] | All tool names ["T0", "T1", "T2"] |
+
+**Per-tool** (`tool T{n}`):
+
+| Variable | Type | Description |
+|----------|------|-------------|
+| `active` | bool | Is this tool selected? |
+| `mounted` | bool | Is this tool mounted on carriage? |
+| `gcode_x_offset` | float | X offset |
+| `gcode_y_offset` | float | Y offset |
+| `gcode_z_offset` | float | Z offset |
+| `extruder` | string | Associated extruder name |
+| `fan` | string | Associated fan name |
+
+### G-code Commands
+
+| Command | Action |
+|---------|--------|
+| `SELECT_TOOL TOOL=T{n}` | Mount specified tool |
+| `UNSELECT_TOOL` | Unmount current tool (park it) |
+| `T{n}` | Tool change macro |
+
+### Path Topology
+
+`PathTopology::PARALLEL` -- Each slot has its own independent path to a separate toolhead. No converging path visualization needed.
+
+### Capabilities
+
+| Feature | Supported | Editable |
+|---------|-----------|----------|
+| Endless Spool | No | -- |
+| Tool Mapping | No | Fixed (tools ARE slots) |
+| Bypass Mode | No | Not applicable |
+| Spoolman | No | -- |
+| Auto-Heat on Load | No | -- |
+| Dryer | No | -- |
+| Device Actions | No | -- |
+
+### Discovery Sequence
+
+Tool names must be provided via `set_discovered_tools()` before calling `start()`. The caller (typically `AmsState::init_backend_from_hardware()`) extracts tool names from `PrinterDiscovery::get_tool_names()`.
+
+---
+
+## Context Menu Actions
+
+The `AmsContextMenu` (`ui_ams_context_menu.h`) provides per-slot operations:
+
+| Action | Description | Availability |
+|--------|-------------|------------|
+| **Load** | Load filament from this slot | When slot has filament (status != EMPTY) |
+| **Unload** | Unload filament from extruder | When filament is loaded to extruder |
+| **Edit** | Edit slot properties (color, material, brand) | Always |
+| **Spoolman** | Assign a Spoolman spool to this slot | Always |
+
+The context menu also includes inline dropdowns for:
+
+- **Tool Mapping**: Assign which tool number maps to this slot (if backend supports it)
+- **Endless Spool Backup**: Set backup slot for runout (if backend supports it)
+
+These dropdowns are populated from `backend->get_tool_mapping()` and `backend->get_endless_spool_config()`.
+
+---
+
+## Device Operations Overlay
+
+The `AmsDeviceOperationsOverlay` (`ui_ams_device_operations_overlay.h`) consolidates device-specific controls:
+
+### Fixed Actions (all backends)
+
+| Action | G-code (varies by backend) | Description |
+|--------|---------------------------|-------------|
+| Home | `MMU_HOME` / `AFC_HOME` | Reset to home position |
+| Recover | `MMU_RECOVER` / `AFC_RESET` | Attempt error recovery |
+| Abort | `cancel()` | Cancel current operation |
+| Bypass Toggle | `enable_bypass()` / `disable_bypass()` | Toggle bypass mode (if supported) |
+
+### Dynamic Actions (backend-specific)
+
+Each backend can expose dynamic device actions via `get_device_sections()` and `get_device_actions()`. The UI renders them as buttons, toggles, sliders, or dropdowns based on `ActionType`.
+
+AFC exposes four sections: **Calibration**, **Speed Settings**, **Maintenance**, and **LED & Modes**. See the [AFC-Specific Features](#afc-specific-features) section for details.
+
+---
+
+## Mock Mode for Testing
+
+The `AmsBackendMock` simulates any of the supported backend types for UI development and testing.
+
+### Activation
+
+Mock mode is activated when `RuntimeConfig::should_mock_ams()` returns true (typically via the `--test` CLI flag). The factory method `AmsBackend::create()` automatically returns a mock backend in this case.
+
+### Environment Variables
+
+| Variable | Values | Default | Description |
+|----------|--------|---------|-------------|
+| `HELIX_AMS_GATES` | 1-16 | 4 | Number of simulated slots |
+| `HELIX_MOCK_AMS_TYPE` | `afc`, `box_turtle`, `boxturtle`, `toolchanger`, `tool_changer`, `tc` | Happy Hare | AMS type to simulate |
+| `HELIX_MOCK_AMS_REALISTIC` | `1`, `true` | Disabled | Multi-phase operations (HEATING -> LOADING -> CHECKING) |
+| `HELIX_MOCK_DRYER` | `1`, `true` | Disabled | Simulate integrated dryer |
+| `HELIX_MOCK_DRYER_SPEED` | Integer | 60 | Dryer speed multiplier (60 = 1 real sec = 1 sim min) |
+
+### Mock AFC Mode
+
+```bash
+HELIX_MOCK_AMS_TYPE=afc ./build/bin/helix-screen --test
+```
+
+When AFC mock mode is enabled:
+
+- Reports `AmsType::AFC` with type name "AFC (Mock)"
+- Uses `PathTopology::HUB` (4 lanes merge through hub)
+- Configures 4 lanes with realistic filament data (PLA, PETG, ABS, ASA)
+- Sets AFC-specific device sections: Calibration, Maintenance, Speed Settings, LEDs & Modes
+- Includes mock device actions: calibration wizard, bowden length slider, speed multipliers, lane tests, blade change, park, brush, motor reset, LED toggle, quiet mode toggle
+- Uses `TipMethod::CUT`
+- Editable endless spool with pre-configured backup mapping
+- Supports auto-heat on load
+
+### Mock Tool Changer Mode
+
+```bash
+HELIX_MOCK_AMS_TYPE=toolchanger ./build/bin/helix-screen --test
+```
+
+- Reports `AmsType::TOOL_CHANGER`
+- Uses `PathTopology::PARALLEL`
+- Disables bypass mode
+- Labels slots as "T0", "T1", etc.
+
+### Mock Realistic Mode
+
+```bash
+HELIX_MOCK_AMS_REALISTIC=1 ./build/bin/helix-screen --test
+```
+
+Enables multi-phase operation simulation with realistic timing:
+
+- **Load**: HEATING -> LOADING (segment animation) -> CHECKING -> IDLE
+- **Unload**: HEATING -> CUTTING -> UNLOADING (animation) -> IDLE
+- Timing respects `--sim-speed` flag with +/-20-30% variance
+
+### Mock-Specific Test Methods
+
+The mock backend exposes additional methods for unit testing:
+
+| Method | Description |
+|--------|-------------|
+| `simulate_error(AmsResult)` | Trigger a specific error condition |
+| `simulate_pause()` | Set PAUSED state (user intervention required) |
+| `resume()` | Resume from PAUSED state |
+| `set_operation_delay(ms)` | Set simulated operation delay |
+| `force_slot_status(slot, status)` | Force a specific slot status |
+| `set_has_hardware_bypass_sensor(bool)` | Toggle hardware vs virtual bypass sensor |
+| `set_endless_spool_supported(bool)` | Toggle endless spool support |
+| `set_endless_spool_editable(bool)` | Toggle AFC-style (editable) vs Happy Hare-style (read-only) |
+| `set_device_sections(sections)` | Set custom device sections for testing |
+| `set_device_actions(actions)` | Set custom device actions for testing |
+
+---
+
+## Developer Guide: Adding a New Backend
+
+### 1. Define the AmsType
+
+Add a new value to `AmsType` in `ams_types.h`:
+
+```cpp
+enum class AmsType {
+    // ... existing values ...
+    MY_SYSTEM = 5  // New system type
+};
+```
+
+Update `ams_type_to_string()`, `ams_type_from_string()`, and the `is_filament_system()` / `is_tool_changer()` helpers as appropriate.
+
+### 2. Add Detection in PrinterDiscovery
+
+In `printer_discovery.h`, add detection logic in `parse_objects()`:
+
+```cpp
+else if (name == "my_system") {
+    has_mmu_ = true;
+    mmu_type_ = AmsType::MY_SYSTEM;
+}
+```
+
+Add any component discovery (lane names, tool names, etc.) as needed.
+
+### 3. Implement the Backend Class
+
+Create `include/ams_backend_mysystem.h` and `src/printer/ams_backend_mysystem.cpp`. Implement all pure virtual methods from `AmsBackend`:
+
+**Required overrides:**
+
+- `start()`, `stop()`, `is_running()` -- Lifecycle
+- `set_event_callback()` -- Event registration
+- `get_system_info()`, `get_type()`, `get_slot_info()`, `get_current_action()`, `get_current_tool()`, `get_current_slot()`, `is_filament_loaded()` -- State queries
+- `get_topology()`, `get_filament_segment()`, `get_slot_filament_segment()`, `infer_error_segment()` -- Path visualization
+- `load_filament()`, `unload_filament()`, `select_slot()`, `change_tool()` -- Operations
+- `recover()`, `reset()`, `cancel()` -- Recovery
+- `set_slot_info()`, `set_tool_mapping()` -- Configuration
+- `enable_bypass()`, `disable_bypass()`, `is_bypass_active()` -- Bypass mode
+
+**Optional overrides (with default implementations):**
+
+- `reset_lane()` -- Per-lane reset (default: NOT_SUPPORTED)
+- `get_dryer_info()`, `start_drying()`, `stop_drying()`, `update_drying()` -- Dryer control
+- `get_endless_spool_capabilities()`, `get_endless_spool_config()`, `set_endless_spool_backup()` -- Endless spool
+- `get_tool_mapping_capabilities()`, `get_tool_mapping()` -- Tool mapping
+- `get_device_sections()`, `get_device_actions()`, `execute_device_action()` -- Device-specific actions
+- `set_discovered_lanes()`, `set_discovered_tools()` -- Discovery configuration
+- `supports_auto_heat_on_load()` -- Auto-heat capability
+
+### 4. Wire into the Factory
+
+In `src/printer/ams_backend.cpp`, add cases to both `create()` overloads:
+
+```cpp
+case AmsType::MY_SYSTEM:
+    return std::make_unique<AmsBackendMySystem>(api, client);
+```
+
+### 5. Add Mock Support
+
+In `src/printer/ams_backend.cpp`, extend the `HELIX_MOCK_AMS_TYPE` environment variable handling:
+
+```cpp
+if (type_str == "mysystem") {
+    mock->set_my_system_mode(true);
+}
+```
+
+Add corresponding `set_my_system_mode()` to `AmsBackendMock` if the new system has unique UI characteristics that need simulation.
+
+### 6. Update AmsState (if needed)
+
+If the new backend has special discovery requirements, update `AmsState::init_backend_from_hardware()` accordingly. For example, ValgACE uses REST probing since it does not appear in Klipper's object list.
+
+### 7. Add Tests
+
+Write tests for:
+- State parsing from Moonraker JSON
+- G-code command generation
+- Error handling and recovery
+- Tool/slot mapping
+- Path segment computation
+
+See `tests/unit/test_ams_backend_happy_hare.cpp`, `test_ams_tool_mapping.cpp`, `test_ams_endless_spool.cpp`, and `test_ams_device_actions.cpp` for patterns.
+
+---
+
+## Troubleshooting
+
+### Common Issues by Backend
+
+#### Happy Hare
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| "No multi-filament system detected" | `mmu` object not in Klipper | Verify Happy Hare is installed and `[mmu]` section exists in printer.cfg |
+| Gate status all "Unknown" | Subscription not receiving updates | Check Moonraker connection, verify `printer.mmu` is subscribable |
+| Tool mapping not updating | Stale TTG map | Try reset tool mappings (sends 1:1 mapping for all tools) |
+| Bypass button disabled | Hardware bypass sensor detected | System auto-detects bypass via sensor, manual toggle not available |
+
+#### AFC
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| "No multi-filament system detected" | `AFC` object not in Klipper | Verify AFC-Klipper-Add-On is installed |
+| Lane count wrong | Discovery mismatch | Check that `AFC_stepper lane*` objects appear in `printer.objects.list` |
+| No filament colors/materials | AFC version too old or no Spoolman | `lane_data` database requires v1.0.32+; assign spools in Spoolman |
+| Device actions missing | Backend not returning sections | Verify AFC backend is connected (not mock) |
+| Bowden length slider shows wrong range | Default 450mm being used | Hub data may not be received yet; wait for state sync |
+| Quiet mode not toggling | G-code not recognized | Verify AFC firmware supports `AFC_QUIET_MODE` command |
+
+#### ValgACE
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| ACE Pro not detected | REST probe failed | Verify ValgACE plugin is installed, check `/server/ace/info` endpoint |
+| Stale state | Polling interval | ValgACE polls at 500ms; state may lag slightly |
+| Dryer not controllable | Connection issue | Check Moonraker connection and ValgACE plugin status |
+
+#### Tool Changer
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| No tools shown | `toolchanger` object missing | Verify klipper-toolchanger is installed |
+| Wrong tool count | Discovery mismatch | Check that `tool T*` objects appear in `printer.objects.list` |
+| "Uninitialized" status | Tools not homed | Run `T0` or `SELECT_TOOL TOOL=T0` to initialize |
+
+### Debug Logging
+
+Run with `-vv` (DEBUG) or `-vvv` (TRACE) to see backend-specific logging:
+
+```bash
+./build/bin/helix-screen --test -vv
+```
+
+All backends log with prefixes:
+
+| Prefix | Backend |
+|--------|---------|
+| `[AMS Backend]` | Factory/creation |
+| `[AMS Happy Hare]` / `[AmsBackendHappyHare]` | Happy Hare |
+| `[AMS AFC]` | AFC |
+| `[AMS ValgACE]` | ValgACE |
+| `[AMS ToolChanger]` | Tool Changer |
+| `[AmsBackendMock]` | Mock |
+
+### Error Result Codes
+
+See `ams_error.h` for the full `AmsResult` enum. Key results:
+
+| Result | Recoverable | Typical Cause |
+|--------|-------------|---------------|
+| `FILAMENT_JAM` | Yes | Filament stuck in path |
+| `SLOT_BLOCKED` | Yes | Slot obstructed |
+| `EXTRUDER_COLD` | Yes | Nozzle below load temp |
+| `LOAD_FAILED` | Yes | Load did not complete |
+| `UNLOAD_FAILED` | Yes | Unload did not complete |
+| `BUSY` | No (wait) | Another operation in progress |
+| `NOT_SUPPORTED` | No | Feature not available on this backend |
+| `HOMING_FAILED` | Yes | Selector home failed |
+
+`AmsErrorHelper` provides factory methods for creating user-friendly error messages with suggestions for each error type.

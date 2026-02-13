@@ -13,7 +13,7 @@ HelixScreen uses class-based patterns for all new code. For architectural ration
 **Canonical example:** `include/ui_panel_motion.h` + `src/ui_panel_motion.cpp`
 
 ```cpp
-class ExamplePanel : public SubjectManagedPanel {  // Auto observer cleanup
+class ExamplePanel : public PanelBase {  // Use SubjectManager subjects_; member for auto cleanup
 public:
     explicit ExamplePanel(lv_obj_t* parent);
     ~ExamplePanel() override;
@@ -32,7 +32,7 @@ private:
 };
 ```
 
-**Note:** Use `SubjectManagedPanel` base class for automatic observer cleanup on destruction.
+**Note:** Use `PanelBase` with a `SubjectManager subjects_;` member for automatic observer cleanup on destruction.
 
 ### Manager Pattern (Backend)
 
@@ -62,7 +62,7 @@ private:
 **Canonical example:** `src/ui_wizard_*.cpp`
 
 ```cpp
-class ConfirmDialog : public ModalBase {
+class ConfirmDialog : public Modal {
 public:
     void show(const std::string& title, ConfirmCallback on_confirm);
     void dismiss() override;
@@ -507,6 +507,146 @@ style_flex_cross_place="center"
 | Hardcoded colors in C++ | `ui_theme_get_color("card_bg")` | [Responsive Design Tokens](#responsive-design-tokens) |
 | `lv_subject_set_*()` from WebSocket | `ui_async_call()` or `ui_queue_update()` | [Threading Model](#threading-model) |
 | Raw `lv_subject_add_observer_*()` | `observe_int_async<Panel>()` from factory | [Observer Factory](#observer-factory-critical) |
+
+---
+
+## modal_button_row Component
+
+Standard Ok/Cancel button row for modals. Used at the bottom of modal XML layouts.
+
+```xml
+<modal_button_row
+    primary_text="Save"
+    secondary_text="Cancel"
+    primary_callback="on_save_clicked"
+    secondary_callback="on_cancel_clicked"
+    show_secondary="true"/>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `primary_text` | string | `"OK"` | Right button label |
+| `secondary_text` | string | `"Cancel"` | Left button label |
+| `primary_callback` | string | — | XML event callback name for primary |
+| `secondary_callback` | string | — | XML event callback name for secondary |
+| `primary_bg_color` | string | `""` | Optional color override for primary button |
+| `show_secondary` | string | `"true"` | Set `"false"` to hide cancel button |
+
+**Note:** `primary_bg_color` and `show_secondary` are declared but not yet wired in the component template. They are currently no-ops.
+
+Renders a horizontal divider + two equal-width buttons. See any `*_modal.xml` for usage examples.
+
+---
+
+## ui_markdown Widget
+
+Theme-aware markdown viewer registered as an XML custom widget. Wraps `lv_markdown`.
+
+```xml
+<!-- Bind to a subject (reactive updates) -->
+<ui_markdown bind_text="release_notes_subject" width="100%"/>
+
+<!-- Static text -->
+<ui_markdown text="# Title\nSome **bold** text" width="100%"/>
+```
+
+- Uses `LV_SIZE_CONTENT` for height (grows to fit). Wrap in a scrollable container for long content.
+- Theme-aware: colors pulled from design tokens automatically.
+- Initialize with `ui_markdown_init()` after `lv_xml_init()` and theme init.
+
+**Header:** `include/ui_markdown.h` | **Source:** `src/ui/ui_markdown.cpp`
+
+---
+
+## Shaper CSV Parser
+
+Parses Klipper input shaper calibration CSV files for frequency response charting.
+
+```cpp
+#include "shaper_csv_parser.h"
+
+auto data = helix::calibration::parse_shaper_csv("/tmp/calibration_data_x.csv", 'X');
+
+// data.frequencies    - frequency bins (Hz)
+// data.raw_psd        - raw PSD for requested axis
+// data.shaper_curves  - per-shaper filtered responses (name, freq, values)
+```
+
+**Header:** `include/shaper_csv_parser.h` | **Tests:** `tests/unit/test_shaper_csv_parser.cpp`
+
+---
+
+## Layout System / LayoutManager
+
+Auto-detects screen aspect ratio and loads alternative XML layouts. Themes control colors; layouts control structure.
+
+```cpp
+auto& lm = helix::LayoutManager::instance();
+lm.init(display_width, display_height);      // Auto-detect
+lm.set_override("ultrawide");                // Force layout
+
+std::string path = lm.resolve_xml_path("home_panel.xml");
+// Returns "ui_xml/ultrawide/home_panel.xml" if override exists,
+// otherwise "ui_xml/home_panel.xml"
+```
+
+| Layout | Detection | Example Screens |
+|--------|-----------|-----------------|
+| `standard` | 4:3 to ~16:9 | 800x480, 1024x600 |
+| `ultrawide` | ratio > 2.5:1 | 1920x480 |
+| `portrait` | ratio < 0.8:1 | 480x800 |
+| `tiny` | max dim <= 480, landscape | 480x320 |
+| `tiny_portrait` | max dim <= 480, portrait | 320x480 |
+
+CLI: `--layout ultrawide` | Config: `display.layout` in helixconfig.json
+
+**Full docs:** [LAYOUT_SYSTEM.md](LAYOUT_SYSTEM.md) | **Header:** `include/layout_manager.h`
+
+---
+
+## Config Migration Pattern
+
+Versioned migration system for upgrading existing user configs on update.
+
+**Adding a migration:**
+1. Bump `CURRENT_CONFIG_VERSION` in `include/config.h`
+2. Write `migrate_vN_to_vM()` in `src/system/config.cpp` (anonymous namespace)
+3. Add `if (version < M) migrate_vN_to_vM(config);` in `run_versioned_migrations()`
+4. Update `get_default_config()` if the new key needs a default for fresh installs
+5. Write tests in `tests/unit/test_config.cpp` with tags `[config][migration][versioning]`
+
+**Rules:** Migrations are append-only, idempotent, never overwrite user data, and log what they do.
+
+**Full docs:** [CONFIG_MIGRATION.md](CONFIG_MIGRATION.md) | **Key files:** `include/config.h`, `src/system/config.cpp`
+
+---
+
+## Modal System
+
+Unified modal system with RAII lifecycle, backdrop, stacking, and animations.
+
+```cpp
+// Simple modal (no subclass):
+lv_obj_t* dialog = Modal::show("print_cancel_confirm_modal");
+Modal::hide(dialog);
+
+// Confirmation dialog helper:
+ui_modal_show_confirmation("Delete?", "Cannot undo.",
+    ModalSeverity::Warning, "Delete",
+    on_confirm_cb, on_cancel_cb, this);
+
+// Alert (single OK button):
+ui_modal_show_alert("Done", "Operation complete.");
+
+// Subclassed modal:
+class MyModal : public Modal {
+    const char* get_name() const override { return "My Modal"; }
+    const char* component_name() const override { return "my_modal"; }
+    void on_ok() override { save(); Modal::on_ok(); }
+};
+```
+
+**Header:** `include/ui_modal.h` | **Source:** `src/ui/ui_modal.cpp`
 
 ---
 

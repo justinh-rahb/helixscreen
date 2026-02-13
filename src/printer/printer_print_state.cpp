@@ -101,6 +101,7 @@ void PrinterPrintState::reset_for_new_print() {
     // Filename is Moonraker's source of truth - it updates when the print actually starts.
     lv_subject_set_int(&print_progress_, 0);
     lv_subject_set_int(&print_layer_current_, 0);
+    has_real_layer_data_ = false;
     lv_subject_set_int(&print_duration_, 0);
     lv_subject_set_int(&print_elapsed_, 0);
     lv_subject_set_int(&print_filament_used_, 0);
@@ -210,6 +211,10 @@ void PrinterPrintState::update_from_status(const nlohmann::json& status) {
 
             if (info.contains("current_layer") && info["current_layer"].is_number()) {
                 int current_layer = info["current_layer"].get<int>();
+                if (!has_real_layer_data_) {
+                    spdlog::info("[LayerTracker] Receiving real layer data from print_stats.info");
+                    has_real_layer_data_ = true;
+                }
                 if (current_layer != lv_subject_get_int(&print_layer_current_)) {
                     spdlog::debug("[LayerTracker] current_layer={} (from print_stats.info)",
                                   current_layer);
@@ -308,6 +313,26 @@ void PrinterPrintState::update_from_status(const nlohmann::json& status) {
             if (!is_terminal_state || progress_pct >= current_progress) {
                 lv_subject_set_int(&print_progress_, progress_pct);
             }
+
+            // Fallback: estimate current layer from progress when slicer doesn't
+            // emit SET_PRINT_STATS_INFO (so print_stats.info has no layer data).
+            // Uses total_layers from file metadata × progress percentage.
+            if (!has_real_layer_data_ && !is_terminal_state && progress_pct > 0) {
+                int total = lv_subject_get_int(&print_layer_total_);
+                if (total > 0) {
+                    int estimated = (progress_pct * total + 50) / 100; // round
+                    if (estimated < 1)
+                        estimated = 1;
+                    if (estimated > total)
+                        estimated = total;
+                    int current = lv_subject_get_int(&print_layer_current_);
+                    if (estimated != current) {
+                        spdlog::debug("[LayerTracker] Estimated layer {}/{} from progress {}%",
+                                      estimated, total, progress_pct);
+                        lv_subject_set_int(&print_layer_current_, estimated);
+                    }
+                }
+            }
         }
     }
 }
@@ -360,7 +385,13 @@ void PrinterPrintState::set_print_layer_total(int total) {
 
 void PrinterPrintState::set_print_layer_current(int layer) {
     spdlog::debug("[LayerTracker] set_print_layer_current({}) via gcode fallback", layer);
-    helix::async::invoke([this, layer]() { lv_subject_set_int(&print_layer_current_, layer); });
+    helix::async::invoke([this, layer]() {
+        if (!has_real_layer_data_) {
+            spdlog::info("[LayerTracker] Receiving real layer data from gcode response");
+            has_real_layer_data_ = true;
+        }
+        lv_subject_set_int(&print_layer_current_, layer);
+    });
 }
 
 void PrinterPrintState::set_print_start_state(PrintStartPhase phase, const char* message,

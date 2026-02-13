@@ -148,3 +148,93 @@ detect_init_system() {
     log_error "Neither systemd nor /etc/init.d found."
     exit 1
 }
+
+# Check that Klipper and Moonraker are running (AD5M + K1 only)
+# These platforms require local Klipper/Moonraker; without them HelixScreen
+# has nothing to connect to. Warns and prompts for confirmation.
+check_klipper_ecosystem() {
+    local platform=$1
+
+    # Only relevant for embedded platforms with local Klipper
+    case "$platform" in
+        ad5m|k1) ;;
+        *) return 0 ;;
+    esac
+
+    local warnings=""
+
+    # Check Klipper process
+    # Klipper runs as "klippy" (python module) or "klipper" (service name)
+    if ! ps | grep -v grep | grep -q -e '[Kk]lipper' -e '[Kk]lippy'; then
+        warnings="Klipper does not appear to be running."
+    fi
+
+    # Check Moonraker process
+    if ! ps | grep -v grep | grep -q '[Mm]oonraker'; then
+        if [ -n "$warnings" ]; then
+            warnings="$warnings
+Moonraker does not appear to be running."
+        else
+            warnings="Moonraker does not appear to be running."
+        fi
+    fi
+
+    # If Moonraker process is up, verify it responds on the expected port
+    if ps | grep -v grep | grep -q '[Mm]oonraker'; then
+        if command -v wget >/dev/null 2>&1; then
+            if ! wget -q -O /dev/null --timeout=5 "http://127.0.0.1:7125/server/info" 2>/dev/null; then
+                if [ -n "$warnings" ]; then
+                    warnings="$warnings
+Moonraker is running but not responding on http://127.0.0.1:7125."
+                else
+                    warnings="Moonraker is running but not responding on http://127.0.0.1:7125."
+                fi
+            fi
+        elif command -v curl >/dev/null 2>&1; then
+            if ! curl -sf --connect-timeout 5 "http://127.0.0.1:7125/server/info" >/dev/null 2>&1; then
+                if [ -n "$warnings" ]; then
+                    warnings="$warnings
+Moonraker is running but not responding on http://127.0.0.1:7125."
+                else
+                    warnings="Moonraker is running but not responding on http://127.0.0.1:7125."
+                fi
+            fi
+        fi
+    fi
+
+    # Everything looks good
+    if [ -z "$warnings" ]; then
+        log_success "Klipper and Moonraker are running"
+        return 0
+    fi
+
+    # Show warnings and prompt
+    log_warn ""
+    log_warn "WARNING: Klipper ecosystem check failed:"
+    # Print each warning line separately
+    echo "$warnings" | while IFS= read -r line; do
+        log_warn "  - $line"
+    done
+    log_warn ""
+    log_warn "HelixScreen requires Klipper and Moonraker to function."
+    log_warn "It will install but won't work until these services are available."
+
+    # Non-interactive mode: just warn and continue
+    if [ ! -t 0 ]; then
+        log_warn "Non-interactive mode: continuing anyway."
+        return 0
+    fi
+
+    printf "Continue anyway? [y/N] "
+    read -r answer
+    case "$answer" in
+        [Yy]|[Yy][Ee][Ss])
+            log_info "Continuing installation..."
+            return 0
+            ;;
+        *)
+            log_error "Installation cancelled."
+            exit 1
+            ;;
+    esac
+}
