@@ -336,9 +336,12 @@ TEST_CASE_METHOD(CrashTestFixture, "Crash: TelemetryManager enqueues crash event
     }
     REQUIRE(found_crash);
 
-    // Crash file should have been deleted
-    REQUIRE_FALSE(crash_handler::has_crash_file(tm_crash_path));
+    // Crash file is intentionally NOT deleted by TelemetryManager —
+    // CrashReporter owns the lifecycle and removes it after user interaction
+    REQUIRE(crash_handler::has_crash_file(tm_crash_path));
 
+    // Clean up for other tests
+    fs::remove(tm_crash_path);
     tm.shutdown();
 }
 
@@ -377,9 +380,12 @@ TEST_CASE_METHOD(CrashTestFixture, "Crash: when disabled, crash event is not enq
         REQUIRE_FALSE(event["event"] == "crash");
     }
 
-    // Crash file should still be cleaned up
-    REQUIRE_FALSE(crash_handler::has_crash_file((temp_dir() / "crash.txt").string()));
+    // Crash file is intentionally NOT deleted by TelemetryManager —
+    // CrashReporter owns the lifecycle and removes it after user interaction
+    REQUIRE(crash_handler::has_crash_file((temp_dir() / "crash.txt").string()));
 
+    // Clean up for other tests
+    fs::remove(temp_dir() / "crash.txt");
     tm.shutdown();
 }
 

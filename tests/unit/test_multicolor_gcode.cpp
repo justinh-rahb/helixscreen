@@ -15,7 +15,6 @@
 #include "gcode_parser.h"
 
 #include <fstream>
-#include <sstream>
 
 #include "../catch_amalgamated.hpp"
 
@@ -271,24 +270,145 @@ TEST_CASE("MultiColor - End-to-end integration", "[gcode][multicolor][integratio
     }
 }
 
-TEST_CASE("MultiColor - OrcaCube test file", "[gcode][multicolor][integration][file]") {
-    const char* filename = "assets/OrcaCube_ABS_Multicolor.gcode";
+TEST_CASE("MultiColor - Synthetic multi-layer multi-tool file",
+          "[gcode][multicolor][integration]") {
+    // Simulates an OrcaSlicer-style 4-color print with multiple layers,
+    // tool changes, and wipe tower — exercises the full parsing pipeline
+    // without needing an external gcode file.
+    GCodeParser parser;
 
-    std::ifstream file(filename);
-    if (!file.is_open()) {
-        SKIP("OrcaCube file not found: " << filename);
+    // OrcaSlicer-style metadata header
+    parser.parse_line("; extruder_colour = #ED1C24;#00C1AE;#F4E2C1;#000000");
+    parser.parse_line("; filament_colour = #ED1C24;#00C1AE;#F4E2C1;#000000");
+
+    int tool_change_count = 0;
+    auto tool_change = [&](int t) {
+        parser.parse_line("T" + std::to_string(t));
+        tool_change_count++;
+    };
+
+    // Layer 1 (Z=0.2): T0 perimeters, T1 infill, wipe tower
+    parser.parse_line(";LAYER_CHANGE");
+    parser.parse_line(";Z:0.2");
+    tool_change(0);
+    parser.parse_line("G1 X10 Y10 Z0.2 E0");
+    parser.parse_line("G1 X50 Y10 E2");
+    parser.parse_line("G1 X50 Y50 E4");
+    parser.parse_line("G1 X10 Y50 E6");
+    parser.parse_line("G1 X10 Y10 E8");
+    parser.parse_line("; WIPE_TOWER_START");
+    parser.parse_line("G1 X80 Y10 E9");
+    parser.parse_line("G1 X90 Y10 E10");
+    parser.parse_line("; WIPE_TOWER_END");
+    tool_change(1);
+    parser.parse_line("G1 X20 Y20 E11");
+    parser.parse_line("G1 X40 Y20 E12");
+    parser.parse_line("G1 X40 Y40 E13");
+
+    // Layer 2 (Z=0.4): All 4 tools with transitions
+    parser.parse_line(";LAYER_CHANGE");
+    parser.parse_line(";Z:0.4");
+    tool_change(0);
+    parser.parse_line("G1 X10 Y10 Z0.4 E14");
+    parser.parse_line("G1 X50 Y10 E16");
+    tool_change(2);
+    parser.parse_line("G1 X50 Y50 E18");
+    parser.parse_line("G1 X10 Y50 E20");
+    tool_change(3);
+    parser.parse_line("G1 X30 Y30 E22");
+    parser.parse_line("G1 X35 Y35 E23");
+    tool_change(1);
+    parser.parse_line("G1 X20 Y20 E24");
+    parser.parse_line("G1 X40 Y40 E26");
+
+    // Layer 3 (Z=0.6): Rapid tool changes (stress test)
+    parser.parse_line(";LAYER_CHANGE");
+    parser.parse_line(";Z:0.6");
+    for (int i = 0; i < 8; i++) {
+        tool_change(i % 4);
+        parser.parse_line("G1 X" + std::to_string(10 + i * 5) + " Y" + std::to_string(10 + i * 3) +
+                          " Z0.6 E" + std::to_string(27 + i));
     }
+
+    auto result = parser.finalize();
+
+    SECTION("4-color palette parsed correctly") {
+        REQUIRE(result.tool_color_palette.size() == 4);
+        REQUIRE(result.tool_color_palette[0] == "#ED1C24"); // Red
+        REQUIRE(result.tool_color_palette[1] == "#00C1AE"); // Teal
+        REQUIRE(result.tool_color_palette[2] == "#F4E2C1"); // Beige
+        REQUIRE(result.tool_color_palette[3] == "#000000"); // Black
+    }
+
+    SECTION("Multi-layer structure") {
+        REQUIRE(result.layers.size() == 3);
+        REQUIRE(result.total_segments > 0);
+
+        // Each layer should have segments
+        for (size_t i = 0; i < result.layers.size(); i++) {
+            INFO("Layer " << i << " has " << result.layers[i].segments.size() << " segments");
+            REQUIRE(result.layers[i].segments.size() > 0);
+        }
+    }
+
+    SECTION("Tool changes tracked") {
+        REQUIRE(tool_change_count == 14);
+
+        // Layer 1: starts T0, switches to T1
+        REQUIRE(result.layers[0].segments[0].tool_index == 0);
+
+        // Layer 2: uses all 4 tools
+        bool saw_tool[4] = {};
+        for (const auto& seg : result.layers[1].segments) {
+            REQUIRE(seg.tool_index >= 0);
+            REQUIRE(seg.tool_index < 4);
+            saw_tool[seg.tool_index] = true;
+        }
+        for (int t = 0; t < 4; t++) {
+            INFO("Tool " << t << " should appear in layer 2");
+            REQUIRE(saw_tool[t]);
+        }
+    }
+
+    SECTION("Wipe tower segments detected") {
+        bool found_wipe_tower = false;
+        for (const auto& seg : result.layers[0].segments) {
+            if (seg.object_name == "__WIPE_TOWER__") {
+                found_wipe_tower = true;
+                break;
+            }
+        }
+        REQUIRE(found_wipe_tower);
+    }
+
+    SECTION("Geometry builds with tool colors") {
+        GeometryBuilder builder;
+        builder.set_tool_color_palette(result.tool_color_palette);
+        builder.set_use_height_gradient(false);
+
+        SimplificationOptions opts;
+        opts.enable_merging = false;
+
+        auto geometry = builder.build(result, opts);
+
+        REQUIRE(geometry.vertices.size() > 0);
+        REQUIRE(geometry.color_palette.size() > 0);
+    }
+}
+
+TEST_CASE("MultiColor - Benchbin MMU3 real file", "[gcode][multicolor][integration][file]") {
+    std::string test_file = "assets/test_gcodes/Benchbin_MK4_MMU3.gcode";
+
+    std::ifstream file(test_file);
+    REQUIRE(file.is_open());
 
     GCodeParser parser;
     std::string line;
-    int line_count = 0;
     int tool_change_count = 0;
 
     while (std::getline(file, line)) {
         parser.parse_line(line);
-        line_count++;
 
-        // Count tool changes
         if (line.length() >= 2 && line[0] == 'T' && std::isdigit(line[1]) &&
             (line.length() == 2 || std::isspace(line[2]))) {
             tool_change_count++;
@@ -297,21 +417,30 @@ TEST_CASE("MultiColor - OrcaCube test file", "[gcode][multicolor][integration][f
 
     auto result = parser.finalize();
 
-    SECTION("Verify OrcaCube metadata") {
+    SECTION("4-color PrusaSlicer MMU palette") {
         REQUIRE(result.tool_color_palette.size() == 4);
-        REQUIRE(result.tool_color_palette[0] == "#ED1C24"); // Red
-        REQUIRE(result.tool_color_palette[1] == "#00C1AE"); // Teal
+        REQUIRE(result.tool_color_palette[0] == "#E7BD00"); // Yellow
+        REQUIRE(result.tool_color_palette[1] == "#00C502"); // Green
         REQUIRE(result.tool_color_palette[2] == "#F4E2C1"); // Beige
-        REQUIRE(result.tool_color_palette[3] == "#000000"); // Black
+        REQUIRE(result.tool_color_palette[3] == "#ED1C24"); // Red
     }
 
-    SECTION("Verify OrcaCube structure") {
-        REQUIRE(tool_change_count == 51);
-        REQUIRE(result.layers.size() > 0);
+    SECTION("Structure with many tool changes") {
+        REQUIRE(tool_change_count > 100);
+        REQUIRE(result.layers.size() > 10);
         REQUIRE(result.total_segments > 0);
+    }
 
-        INFO("Parsed " << line_count << " lines, " << result.layers.size() << " layers, "
-                       << result.total_segments << " segments");
+    SECTION("Geometry builds from real file") {
+        GeometryBuilder builder;
+        builder.set_tool_color_palette(result.tool_color_palette);
+        builder.set_use_height_gradient(false);
+
+        SimplificationOptions opts;
+        auto geometry = builder.build(result, opts);
+
+        REQUIRE(geometry.vertices.size() > 0);
+        REQUIRE(geometry.color_palette.size() > 0);
     }
 }
 
