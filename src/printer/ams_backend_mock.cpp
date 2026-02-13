@@ -1473,7 +1473,7 @@ void AmsBackendMock::set_multi_unit_mode(bool enabled) {
         topology_ = PathTopology::HUB;
 
         system_info_.units.clear();
-        system_info_.total_slots = 8;
+        system_info_.total_slots = 6; // 4 (Box Turtle) + 2 (Night Owl)
 
         // Unit 0: "Box Turtle 1" - 4 slots
         {
@@ -1487,6 +1487,8 @@ void AmsBackendMock::set_multi_unit_mode(bool enabled) {
             unit.has_encoder = false;
             unit.has_toolhead_sensor = true;
             unit.has_slot_sensors = true;
+            unit.has_hub_sensor = true;
+            unit.hub_sensor_triggered = true; // Active unit has filament at hub
 
             const struct {
                 uint32_t color;
@@ -1522,18 +1524,20 @@ void AmsBackendMock::set_multi_unit_mode(bool enabled) {
             system_info_.units.push_back(unit);
         }
 
-        // Unit 1: "Box Turtle 2" - 4 slots
+        // Unit 1: "Night Owl" - 2 slots (Night Owls are 2-lane units)
         {
             AmsUnit unit;
             unit.unit_index = 1;
-            unit.name = "Box Turtle 2";
-            unit.slot_count = 4;
+            unit.name = "Night Owl";
+            unit.slot_count = 2;
             unit.first_slot_global_index = 4;
             unit.connected = true;
-            unit.firmware_version = "1.0.32-mock";
-            unit.has_encoder = false;
+            unit.firmware_version = "2.1.0-mock";
+            unit.has_encoder = true;
             unit.has_toolhead_sensor = true;
             unit.has_slot_sensors = true;
+            unit.has_hub_sensor = true;
+            unit.hub_sensor_triggered = false; // Inactive unit, no filament at hub
 
             const struct {
                 uint32_t color;
@@ -1543,11 +1547,9 @@ void AmsBackendMock::set_multi_unit_mode(bool enabled) {
             } slots[] = {
                 {0x1E88E5, "Blue", "PETG", SlotStatus::AVAILABLE},
                 {0xFDD835, "Yellow", "ABS", SlotStatus::AVAILABLE},
-                {0x8E24AA, "Purple", "PA-CF", SlotStatus::AVAILABLE},
-                {0xFF6F00, "Orange", "TPU", SlotStatus::AVAILABLE},
             };
 
-            for (int i = 0; i < 4; i++) {
+            for (int i = 0; i < 2; i++) {
                 SlotInfo slot;
                 slot.slot_index = i;
                 slot.global_index = 4 + i;

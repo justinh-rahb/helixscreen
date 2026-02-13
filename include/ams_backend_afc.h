@@ -240,6 +240,7 @@ class AmsBackendAfc : public AmsBackend {
     friend class AmsBackendAfcTestHelper;
     friend class AmsBackendAfcEndlessSpoolHelper;
     friend class AmsBackendAfcMultiUnitHelper;
+    friend class HubSensorTestHelper;
 
   private:
     /**
@@ -315,11 +316,12 @@ class AmsBackendAfc : public AmsBackend {
     void parse_afc_stepper(const std::string& lane_name, const nlohmann::json& data);
 
     /**
-     * @brief Parse AFC_hub object for hub sensor state
+     * @brief Parse AFC_hub object for per-hub sensor state
      *
+     * @param hub_name Name of the hub (e.g., "Turtle_1")
      * @param data JSON object from AFC_hub
      */
-    void parse_afc_hub(const nlohmann::json& data);
+    void parse_afc_hub(const std::string& hub_name, const nlohmann::json& data);
 
     /**
      * @brief Parse AFC_extruder object for toolhead sensor states
@@ -365,7 +367,7 @@ class AmsBackendAfc : public AmsBackend {
      * @brief Compute filament segment from sensor states (no locking)
      *
      * Internal helper called from locked contexts to avoid deadlock.
-     * Uses lane_sensors_[], hub_sensor_, tool_start_sensor_, tool_end_sensor_.
+     * Uses lane_sensors_[], hub_sensors_, tool_start_sensor_, tool_end_sensor_.
      *
      * @return PathSegment indicating filament position
      */
@@ -443,9 +445,9 @@ class AmsBackendAfc : public AmsBackend {
     std::array<LaneSensors, 16> lane_sensors_{}; ///< Sensor state for each lane
 
     // Hub and toolhead sensors (from AFC_hub and AFC_extruder objects)
-    bool hub_sensor_{false};        ///< Hub sensor triggered
-    bool tool_start_sensor_{false}; ///< Toolhead entry sensor
-    bool tool_end_sensor_{false};   ///< Toolhead exit/nozzle sensor
+    std::unordered_map<std::string, bool> hub_sensors_; ///< Per-hub sensor state, keyed by hub name
+    bool tool_start_sensor_{false};                     ///< Toolhead entry sensor
+    bool tool_end_sensor_{false};                       ///< Toolhead exit/nozzle sensor
 
     // Global state
     bool error_state_{false};               ///< AFC error state

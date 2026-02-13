@@ -7,36 +7,72 @@
         extends="lv_obj" width="#overlay_panel_width" height="100%" align="right_mid" style_pad_all="0"
         style_border_width="0" style_bg_opa="255" style_bg_color="#card_bg" scrollable="false" flex_flow="column">
     <!-- Header Bar -->
-    <header_bar name="overlay_header" title="System Overview" title_tag="System Overview"/>
-    <!-- Content Area -->
+    <header_bar name="overlay_header" title="Multi Filament System Overview" title_tag="Multi Filament System Overview"/>
+    <!-- Content Area: Two-column layout -->
     <lv_obj name="overview_content"
             width="100%" flex_grow="1" style_pad_all="#space_lg" style_pad_gap="#space_md" scrollable="false"
-            flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center">
-      <!-- Unit Cards Row - horizontal layout for unit summary cards -->
-      <lv_obj name="unit_cards_row"
-              width="100%" height="content" style_pad_all="0" style_pad_gap="#space_md"
-              flex_flow="row" style_flex_main_place="center" style_flex_cross_place="start"
-              scrollable="false">
-        <!-- Unit cards created dynamically by AmsOverviewPanel::create_unit_cards() -->
+            flex_flow="row" style_flex_main_place="start" style_flex_cross_place="start">
+      <!-- Left column (cards + canvas) -->
+      <lv_obj name="left_column"
+              height="100%" flex_grow="3" style_pad_all="0" style_pad_gap="#space_sm" flex_flow="column"
+              style_flex_main_place="start" style_flex_cross_place="center" scrollable="false">
+        <!-- Unit Cards Row - horizontal layout for unit summary cards -->
+        <lv_obj name="unit_cards_row"
+                width="100%" height="content" style_pad_all="0" style_pad_gap="#space_md" flex_flow="row"
+                style_flex_main_place="center" style_flex_cross_place="start" scrollable="false">
+          <!-- Unit cards created dynamically by AmsOverviewPanel::create_unit_cards() -->
+        </lv_obj>
+        <!-- System Path Area - shows unit outputs → hub → toolhead + bypass path -->
+        <lv_obj name="system_path_area" width="100%" flex_grow="1" style_pad_all="0" scrollable="false">
+          <!-- Path canvas created programmatically with status text drawn to left of nozzle -->
+        </lv_obj>
       </lv_obj>
-      <!-- System Path Area - shows unit outputs → combiner → toolhead -->
-      <lv_obj name="system_path_area"
-              width="100%" flex_grow="1" style_pad_all="0" scrollable="false">
-        <!-- Path canvas will be created programmatically in Milestone 3 -->
+      <!-- Right column (loaded info + action buttons) -->
+      <lv_obj name="right_column"
+              height="100%" flex_grow="1" style_pad_all="#space_md" style_pad_gap="#space_sm" flex_flow="column"
+              style_flex_main_place="start" style_flex_cross_place="center" scrollable="false" style_min_width="140">
+        <!-- Currently Loaded heading -->
+        <text_heading name="loaded_heading" text="Currently Loaded"/>
+        <!-- Loaded filament info (vertical) -->
+        <lv_obj name="loaded_info_col"
+                width="100%" height="content" style_pad_all="0" style_pad_gap="#space_xs" flex_flow="column"
+                style_flex_main_place="start" style_flex_cross_place="start" scrollable="false">
+          <!-- Color swatch + material name row -->
+          <lv_obj name="loaded_swatch_row"
+                  width="100%" height="content" style_pad_all="0" style_pad_gap="#space_sm" flex_flow="row"
+                  style_flex_main_place="start" style_flex_cross_place="center" scrollable="false">
+            <!-- Color swatch -->
+            <lv_obj name="overview_swatch"
+                    width="20" height="20" style_radius="4" style_bg_color="#text_muted" style_bg_opa="255"
+                    style_border_width="1" style_border_color="#text_muted" style_border_opa="80" scrollable="false"
+                    clickable="false"/>
+            <!-- Material name -->
+            <text_body name="overview_material" bind_text="ams_current_material_text"/>
+          </lv_obj>
+          <!-- Slot label (unit + slot) -->
+          <text_small name="overview_slot" bind_text="ams_current_slot_text" style_text_color="#text_muted"/>
+          <!-- Weight (hidden when no weight data) -->
+          <text_small name="overview_weight" bind_text="ams_current_weight_text" style_text_color="#text_muted">
+            <bind_flag_if_eq subject="ams_current_has_weight" flag="hidden" ref_value="0"/>
+          </text_small>
+          <!-- Status text -->
+          <text_small name="overview_status" bind_text="ams_action_detail" style_text_color="#text_muted"/>
+        </lv_obj>
+        <!-- Spacer to push buttons to bottom -->
+        <lv_obj width="1" flex_grow="1" style_bg_opa="0" style_border_width="0" scrollable="false"/>
+        <!-- Action Buttons -->
+        <ui_button name="btn_unload"
+                   width="100%" variant="secondary" icon="tray_arrow_up" text="Unload" translation_tag="Unload">
+          <bind_state_if_eq subject="ams_filament_loaded" state="disabled" ref_value="0"/>
+          <event_cb trigger="clicked" callback="on_ams_overview_unload_clicked"/>
+        </ui_button>
+        <ui_button name="btn_reset" width="100%" variant="secondary" icon="refresh" text="Reset" translation_tag="Reset">
+          <event_cb trigger="clicked" callback="on_ams_overview_reset_clicked"/>
+        </ui_button>
+        <ui_button name="btn_settings" width="100%" icon="settings" text="Settings" translation_tag="Settings">
+          <event_cb trigger="clicked" callback="on_ams_overview_settings_clicked"/>
+        </ui_button>
       </lv_obj>
-      <!-- Status Section -->
-      <lv_obj name="status_section"
-              width="100%" height="content" style_pad_all="#space_sm" flex_flow="row" style_flex_main_place="center"
-              style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
-        <!-- Status label - bound to ams_action_detail subject -->
-        <text_body name="overview_status_label" bind_text="ams_action_detail" style_text_align="center" flex_grow="1"/>
-      </lv_obj>
-      <!-- Flex spacer - pushes settings button to bottom -->
-      <lv_obj width="1" style_pad_all="0" scrollable="false" flex_grow="1"/>
-      <!-- Settings Button (full width, primary variant by default) -->
-      <ui_button name="btn_settings" width="100%" icon="settings" text="Settings" translation_tag="Settings">
-        <event_cb trigger="clicked" callback="on_ams_overview_settings_clicked"/>
-      </ui_button>
     </lv_obj>
   </view>
 </component>

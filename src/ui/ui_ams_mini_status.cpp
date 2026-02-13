@@ -66,6 +66,15 @@ static lv_color_t lighten_color(lv_color_t c, uint8_t amt) {
 }
 
 /**
+ * @brief Per-unit row info for multi-unit stacked display
+ */
+struct UnitRowInfo {
+    int first_slot = 0; // Index into slots[] array
+    int slot_count = 0;
+    lv_obj_t* row_container = nullptr; // Row container for this unit's bars
+};
+
+/**
  * @brief User data stored on each ams_mini_status widget
  */
 struct AmsMiniStatusData {
@@ -73,6 +82,10 @@ struct AmsMiniStatusData {
     int32_t height = 32;
     int slot_count = 0;
     int max_visible = AMS_MINI_STATUS_MAX_VISIBLE;
+
+    // Multi-unit support
+    int unit_count = 0;       // Number of AMS units (0 or 1 = single row, 2+ = stacked rows)
+    UnitRowInfo unit_rows[8]; // Max 8 units
 
     // Child objects
     lv_obj_t* container = nullptr;      // Main container
@@ -171,7 +184,73 @@ static void update_slot_bar(SlotBarData* slot) {
     }
 }
 
-/** Rebuild the bars based on slot_count and max_visible */
+/**
+ * @brief Create a slot container with bar_bg, bar_fill, and status_line
+ *
+ * Creates the slot container as a child of the given parent (either bars_container
+ * or a unit row container). Shared by single-unit and multi-unit paths.
+ */
+static void create_slot_container(SlotBarData* slot, lv_obj_t* parent) {
+    slot->slot_container = lv_obj_create(parent);
+    lv_obj_remove_flag(slot->slot_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(slot->slot_container, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_set_style_bg_opa(slot->slot_container, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_style_border_width(slot->slot_container, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(slot->slot_container, 0, LV_PART_MAIN);
+    lv_obj_set_flex_flow(slot->slot_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(slot->slot_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
+                          LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(slot->slot_container, STATUS_LINE_GAP_PX, LV_PART_MAIN);
+
+    // Bar background (outline container)
+    slot->bar_bg = lv_obj_create(slot->slot_container);
+    lv_obj_remove_flag(slot->bar_bg, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(slot->bar_bg, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_set_style_border_width(slot->bar_bg, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(slot->bar_bg, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(slot->bar_bg, BAR_BORDER_RADIUS_PX, LV_PART_MAIN);
+
+    // Fill inside bar_bg
+    slot->bar_fill = lv_obj_create(slot->bar_bg);
+    lv_obj_remove_flag(slot->bar_fill, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(slot->bar_fill, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_set_style_border_width(slot->bar_fill, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(slot->bar_fill, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(slot->bar_fill, BAR_BORDER_RADIUS_PX, LV_PART_MAIN);
+    lv_obj_set_width(slot->bar_fill, LV_PCT(100));
+
+    // Status line below bar_bg (green=loaded, red=error only)
+    slot->status_line = lv_obj_create(slot->slot_container);
+    lv_obj_remove_flag(slot->status_line, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(slot->status_line, LV_OBJ_FLAG_EVENT_BUBBLE);
+    lv_obj_set_style_border_width(slot->status_line, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(slot->status_line, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(slot->status_line, BAR_BORDER_RADIUS_PX / 2, LV_PART_MAIN);
+}
+
+/**
+ * @brief Create or get a unit row container for multi-unit stacked layout
+ */
+static lv_obj_t* ensure_unit_row(AmsMiniStatusData* data, int unit_index) {
+    UnitRowInfo* row = &data->unit_rows[unit_index];
+    if (!row->row_container) {
+        row->row_container = lv_obj_create(data->bars_container);
+        lv_obj_remove_flag(row->row_container, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(row->row_container, LV_OBJ_FLAG_EVENT_BUBBLE);
+        lv_obj_set_style_bg_opa(row->row_container, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_set_style_border_width(row->row_container, 0, LV_PART_MAIN);
+        lv_obj_set_style_pad_all(row->row_container, 0, LV_PART_MAIN);
+        lv_obj_set_flex_flow(row->row_container, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(row->row_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END,
+                              LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(row->row_container, theme_manager_get_spacing("space_xxs"),
+                                    LV_PART_MAIN);
+        lv_obj_set_size(row->row_container, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    }
+    return row->row_container;
+}
+
+/** Rebuild the bars based on slot_count, max_visible, and unit_count */
 static void rebuild_bars(AmsMiniStatusData* data) {
     if (!data || !data->bars_container)
         return;
@@ -179,85 +258,161 @@ static void rebuild_bars(AmsMiniStatusData* data) {
     int visible_count = std::min(data->slot_count, data->max_visible);
     int overflow_count = data->slot_count - visible_count;
 
-    // Calculate bar width to fit within container
+    // Calculate dimensions from container
     lv_obj_update_layout(data->container);
     int32_t container_width = lv_obj_get_content_width(data->container);
     int32_t container_height = lv_obj_get_content_height(data->container);
 
-    int32_t gap = theme_manager_get_spacing("space_xxs"); // Responsive 2-4px gap
-
-    // Use 90% of container width for bars (leave 10% margin for centering)
-    int32_t total_bar_space = (container_width * 90) / 100;
-    int32_t total_gaps = (visible_count > 1) ? (visible_count - 1) * gap : 0;
-    int32_t bar_width = (total_bar_space - total_gaps) / std::max(1, visible_count);
-    bar_width = std::clamp(bar_width, MIN_BAR_WIDTH_PX, MAX_BAR_WIDTH_PX);
+    int32_t gap = theme_manager_get_spacing("space_xxs");
 
     // Calculate bar height - use container height if data->height is 0 (XML-based responsive)
     int32_t effective_height = data->height > 0 ? data->height : container_height;
     if (effective_height < 20) {
         effective_height = 32; // Minimum fallback height
     }
-    int32_t total_slot_height = (effective_height * 2) / 3;
-    int32_t bar_height = total_slot_height - STATUS_LINE_HEIGHT_PX - STATUS_LINE_GAP_PX;
 
-    // Create/update bars
-    for (int i = 0; i < AMS_MINI_STATUS_MAX_VISIBLE; i++) {
-        SlotBarData* slot = &data->slots[i];
+    bool is_multi_unit = (data->unit_count >= 2);
 
-        if (i < visible_count) {
-            // Show this slot
-            if (!slot->slot_container) {
-                // Create slot container (column flex: bar on top, status line below)
-                slot->slot_container = lv_obj_create(data->bars_container);
-                lv_obj_remove_flag(slot->slot_container, LV_OBJ_FLAG_SCROLLABLE);
-                lv_obj_add_flag(slot->slot_container,
-                                LV_OBJ_FLAG_EVENT_BUBBLE); // Pass clicks to parent
-                lv_obj_set_style_bg_opa(slot->slot_container, LV_OPA_TRANSP, LV_PART_MAIN);
-                lv_obj_set_style_border_width(slot->slot_container, 0, LV_PART_MAIN);
-                lv_obj_set_style_pad_all(slot->slot_container, 0, LV_PART_MAIN);
-                lv_obj_set_flex_flow(slot->slot_container, LV_FLEX_FLOW_COLUMN);
-                lv_obj_set_flex_align(slot->slot_container, LV_FLEX_ALIGN_START,
-                                      LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-                lv_obj_set_style_pad_row(slot->slot_container, STATUS_LINE_GAP_PX, LV_PART_MAIN);
+    if (is_multi_unit) {
+        // === Multi-unit stacked layout ===
+        // bars_container becomes a column, each unit gets its own row
 
-                // Create bar background (outline container)
-                slot->bar_bg = lv_obj_create(slot->slot_container);
-                lv_obj_remove_flag(slot->bar_bg, LV_OBJ_FLAG_SCROLLABLE);
-                lv_obj_add_flag(slot->bar_bg, LV_OBJ_FLAG_EVENT_BUBBLE); // Pass clicks to parent
-                lv_obj_set_style_border_width(slot->bar_bg, 0, LV_PART_MAIN);
-                lv_obj_set_style_pad_all(slot->bar_bg, 0, LV_PART_MAIN);
-                lv_obj_set_style_radius(slot->bar_bg, BAR_BORDER_RADIUS_PX, LV_PART_MAIN);
+        lv_obj_set_flex_flow(data->bars_container, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(data->bars_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER,
+                              LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_row(data->bars_container, gap, LV_PART_MAIN);
+        // Reset column padding (not used in column flow)
+        lv_obj_set_style_pad_column(data->bars_container, 0, LV_PART_MAIN);
 
-                // Create fill inside bar_bg
-                slot->bar_fill = lv_obj_create(slot->bar_bg);
-                lv_obj_remove_flag(slot->bar_fill, LV_OBJ_FLAG_SCROLLABLE);
-                lv_obj_add_flag(slot->bar_fill, LV_OBJ_FLAG_EVENT_BUBBLE); // Pass clicks to parent
-                lv_obj_set_style_border_width(slot->bar_fill, 0, LV_PART_MAIN);
-                lv_obj_set_style_pad_all(slot->bar_fill, 0, LV_PART_MAIN);
-                lv_obj_set_style_radius(slot->bar_fill, BAR_BORDER_RADIUS_PX, LV_PART_MAIN);
-                lv_obj_set_width(slot->bar_fill, LV_PCT(100));
+        // Reduce bar height per row to fit stacked rows
+        int32_t row_gap_total = (data->unit_count - 1) * gap;
+        int32_t available_height = effective_height - row_gap_total;
+        int32_t per_row_height = available_height / data->unit_count;
+        if (per_row_height < 12)
+            per_row_height = 12; // Minimum per-row height
 
-                // Create status line as sibling BELOW bar_bg (green=loaded, red=error only)
-                slot->status_line = lv_obj_create(slot->slot_container);
-                lv_obj_remove_flag(slot->status_line, LV_OBJ_FLAG_SCROLLABLE);
-                lv_obj_add_flag(slot->status_line,
-                                LV_OBJ_FLAG_EVENT_BUBBLE); // Pass clicks to parent
-                lv_obj_set_style_border_width(slot->status_line, 0, LV_PART_MAIN);
-                lv_obj_set_style_pad_all(slot->status_line, 0, LV_PART_MAIN);
-                lv_obj_set_style_radius(slot->status_line, BAR_BORDER_RADIUS_PX / 2, LV_PART_MAIN);
+        int32_t total_slot_height = (per_row_height * 2) / 3;
+        int32_t bar_height = total_slot_height - STATUS_LINE_HEIGHT_PX - STATUS_LINE_GAP_PX;
+        if (bar_height < 6)
+            bar_height = 6;
+
+        // Delete any row containers beyond current unit_count
+        for (int u = data->unit_count; u < 8; ++u) {
+            if (data->unit_rows[u].row_container) {
+                lv_obj_delete(data->unit_rows[u].row_container);
+                data->unit_rows[u].row_container = nullptr;
+            }
+        }
+
+        // Process each unit row
+        for (int u = 0; u < data->unit_count && u < 8; ++u) {
+            UnitRowInfo* row_info = &data->unit_rows[u];
+            lv_obj_t* row = ensure_unit_row(data, u);
+
+            // Calculate bar width for this row based on its slot count
+            int row_slots =
+                std::min(row_info->slot_count, data->max_visible - row_info->first_slot);
+            if (row_slots < 0)
+                row_slots = 0;
+
+            int32_t total_bar_space = (container_width * 90) / 100;
+            int32_t total_gaps = (row_slots > 1) ? (row_slots - 1) * gap : 0;
+            int32_t bar_width = (total_bar_space - total_gaps) / std::max(1, row_slots);
+            bar_width = std::clamp(bar_width, MIN_BAR_WIDTH_PX, MAX_BAR_WIDTH_PX);
+
+            // Create/update slots in this unit row
+            for (int s = 0; s < row_info->slot_count; ++s) {
+                int global_idx = row_info->first_slot + s;
+                if (global_idx >= AMS_MINI_STATUS_MAX_VISIBLE)
+                    break;
+
+                SlotBarData* slot = &data->slots[global_idx];
+
+                if (global_idx < visible_count) {
+                    if (!slot->slot_container) {
+                        // Create new slot container in this row
+                        create_slot_container(slot, row);
+                    } else if (lv_obj_get_parent(slot->slot_container) != row) {
+                        // Reparent slot container into correct unit row
+                        lv_obj_set_parent(slot->slot_container, row);
+                    }
+
+                    // Set sizes
+                    lv_obj_set_size(slot->slot_container, bar_width, total_slot_height);
+                    lv_obj_set_size(slot->bar_bg, bar_width, bar_height);
+                    lv_obj_set_size(slot->status_line, bar_width, STATUS_LINE_HEIGHT_PX);
+
+                    lv_obj_remove_flag(slot->slot_container, LV_OBJ_FLAG_HIDDEN);
+                    update_slot_bar(slot);
+                } else {
+                    if (slot->slot_container) {
+                        lv_obj_add_flag(slot->slot_container, LV_OBJ_FLAG_HIDDEN);
+                    }
+                }
             }
 
-            // Set sizes
-            lv_obj_set_size(slot->slot_container, bar_width, total_slot_height);
-            lv_obj_set_size(slot->bar_bg, bar_width, bar_height);
-            lv_obj_set_size(slot->status_line, bar_width, STATUS_LINE_HEIGHT_PX);
+            lv_obj_remove_flag(row, LV_OBJ_FLAG_HIDDEN);
+        }
 
-            lv_obj_remove_flag(slot->slot_container, LV_OBJ_FLAG_HIDDEN);
-            update_slot_bar(slot);
-        } else {
-            // Hide this slot
-            if (slot->slot_container) {
-                lv_obj_add_flag(slot->slot_container, LV_OBJ_FLAG_HIDDEN);
+        spdlog::debug("[AmsMiniStatus] Multi-unit layout: {} units, {} total slots",
+                      data->unit_count, visible_count);
+
+    } else {
+        // === Single-unit layout (original behavior) ===
+
+        // Clean up any leftover unit row containers from a previous multi-unit state
+        // Reparent any slot containers back to bars_container first
+        for (int u = 0; u < 8; ++u) {
+            if (data->unit_rows[u].row_container) {
+                // Move children back to bars_container before deleting the row
+                for (int i = 0; i < AMS_MINI_STATUS_MAX_VISIBLE; ++i) {
+                    SlotBarData* slot = &data->slots[i];
+                    if (slot->slot_container && lv_obj_get_parent(slot->slot_container) ==
+                                                    data->unit_rows[u].row_container) {
+                        lv_obj_set_parent(slot->slot_container, data->bars_container);
+                    }
+                }
+                lv_obj_delete(data->unit_rows[u].row_container);
+                data->unit_rows[u].row_container = nullptr;
+            }
+        }
+
+        // Restore bars_container to row flex flow
+        lv_obj_set_flex_flow(data->bars_container, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(data->bars_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_END,
+                              LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(data->bars_container, gap, LV_PART_MAIN);
+        lv_obj_set_style_pad_row(data->bars_container, 0, LV_PART_MAIN);
+
+        int32_t total_slot_height = (effective_height * 2) / 3;
+        int32_t bar_height = total_slot_height - STATUS_LINE_HEIGHT_PX - STATUS_LINE_GAP_PX;
+
+        // Use 90% of container width for bars (leave 10% margin for centering)
+        int32_t total_bar_space = (container_width * 90) / 100;
+        int32_t total_gaps = (visible_count > 1) ? (visible_count - 1) * gap : 0;
+        int32_t bar_width = (total_bar_space - total_gaps) / std::max(1, visible_count);
+        bar_width = std::clamp(bar_width, MIN_BAR_WIDTH_PX, MAX_BAR_WIDTH_PX);
+
+        // Create/update bars
+        for (int i = 0; i < AMS_MINI_STATUS_MAX_VISIBLE; i++) {
+            SlotBarData* slot = &data->slots[i];
+
+            if (i < visible_count) {
+                if (!slot->slot_container) {
+                    create_slot_container(slot, data->bars_container);
+                }
+
+                // Set sizes
+                lv_obj_set_size(slot->slot_container, bar_width, total_slot_height);
+                lv_obj_set_size(slot->bar_bg, bar_width, bar_height);
+                lv_obj_set_size(slot->status_line, bar_width, STATUS_LINE_HEIGHT_PX);
+
+                lv_obj_remove_flag(slot->slot_container, LV_OBJ_FLAG_HIDDEN);
+                update_slot_bar(slot);
+            } else {
+                if (slot->slot_container) {
+                    lv_obj_add_flag(slot->slot_container, LV_OBJ_FLAG_HIDDEN);
+                }
             }
         }
     }
@@ -507,6 +662,19 @@ static void sync_from_ams_state(AmsMiniStatusData* data) {
 
     int slot_count = lv_subject_get_int(AmsState::instance().get_slot_count_subject());
     data->slot_count = slot_count;
+
+    // Get multi-unit info from system info
+    AmsSystemInfo info = backend->get_system_info();
+    data->unit_count = static_cast<int>(info.units.size());
+    for (int u = 0; u < data->unit_count && u < 8; ++u) {
+        data->unit_rows[u].first_slot = info.units[u].first_slot_global_index;
+        data->unit_rows[u].slot_count = info.units[u].slot_count;
+    }
+    // Clear any stale unit rows beyond current count
+    for (int u = data->unit_count; u < 8; ++u) {
+        data->unit_rows[u].first_slot = 0;
+        data->unit_rows[u].slot_count = 0;
+    }
 
     // Populate each slot from backend slot info
     for (int i = 0; i < slot_count && i < AMS_MINI_STATUS_MAX_VISIBLE; ++i) {

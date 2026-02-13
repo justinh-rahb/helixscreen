@@ -3,10 +3,14 @@
 
 #include "ui_panel_ams_overview.h"
 
+#include "ui_ams_device_operations_overlay.h"
+#include "ui_error_reporting.h"
+#include "ui_event_safety.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
 #include "ui_panel_ams.h"
 #include "ui_panel_common.h"
+#include "ui_system_path_canvas.h"
 #include "ui_utils.h"
 
 #include "ams_backend.h"
@@ -33,7 +37,9 @@ static constexpr int32_t MINI_BAR_MIN_WIDTH_PX = 6;
 /// Maximum bar width for mini slot bars
 static constexpr int32_t MINI_BAR_MAX_WIDTH_PX = 14;
 
-/// Height of each mini slot bar (matches ams_unit_card.xml #mini_bar_height)
+/// Height of each mini slot bar
+/// TODO: Replace with theme_manager_get_spacing("ams_bars_height") to use
+/// the responsive value from globals.xml instead of this compile-time constant.
 static constexpr int32_t MINI_BAR_HEIGHT_PX = 40;
 
 /// Border radius for bar corners
@@ -53,10 +59,60 @@ static std::atomic<AmsOverviewPanel*> g_overview_panel_instance{nullptr};
 // ============================================================================
 
 static void on_settings_clicked_xml(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[AMS Overview] on_settings_clicked");
     LV_UNUSED(e);
-    spdlog::debug("[AMS Overview] Settings button clicked");
-    // Delegate to the AMS device operations overlay (same as AMS detail panel)
-    // This will be wired up when the detail panel infrastructure is available
+
+    spdlog::info("[AMS Overview] Opening AMS Device Operations overlay");
+
+    auto& overlay = helix::ui::get_ams_device_operations_overlay();
+    if (!overlay.are_subjects_initialized()) {
+        overlay.init_subjects();
+        overlay.register_callbacks();
+    }
+
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    lv_obj_t* parent = lv_obj_get_screen(target);
+    overlay.show(parent);
+
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+static void on_unload_clicked_xml(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[AMS Overview] on_unload_clicked");
+    LV_UNUSED(e);
+
+    spdlog::info("[AMS Overview] Unload requested");
+
+    AmsBackend* backend = AmsState::instance().get_backend();
+    if (backend) {
+        AmsError error = backend->unload_filament();
+        if (error.result != AmsResult::SUCCESS) {
+            NOTIFY_ERROR("Unload failed: {}", error.user_msg);
+        }
+    } else {
+        NOTIFY_WARNING("AMS not available");
+    }
+
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+static void on_reset_clicked_xml(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[AMS Overview] on_reset_clicked");
+    LV_UNUSED(e);
+
+    spdlog::info("[AMS Overview] Reset requested");
+
+    AmsBackend* backend = AmsState::instance().get_backend();
+    if (backend) {
+        AmsError error = backend->reset();
+        if (error.result != AmsResult::SUCCESS) {
+            NOTIFY_ERROR("Reset failed: {}", error.user_msg);
+        }
+    } else {
+        NOTIFY_WARNING("AMS not available");
+    }
+
+    LVGL_SAFE_EVENT_CB_END();
 }
 
 // ============================================================================
@@ -111,6 +167,16 @@ void AmsOverviewPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
         return;
     }
 
+    // Find system path area and create path canvas widget
+    lv_obj_t* path_area = lv_obj_find_by_name(panel_, "system_path_area");
+    if (path_area) {
+        system_path_ = ui_system_path_canvas_create(path_area);
+        if (system_path_) {
+            lv_obj_set_size(system_path_, LV_PCT(100), LV_PCT(100));
+            spdlog::debug("[{}] Created system path canvas", get_name());
+        }
+    }
+
     // Store global instance for callback access
     g_overview_panel_instance.store(this);
 
@@ -163,6 +229,9 @@ void AmsOverviewPanel::refresh_units() {
             update_unit_card(unit_cards_[i], info.units[i], current_slot);
         }
     }
+
+    // Update system path visualization
+    refresh_system_path(info, current_slot);
 }
 
 void AmsOverviewPanel::create_unit_cards(const AmsSystemInfo& info) {
@@ -196,9 +265,25 @@ void AmsOverviewPanel::create_unit_cards(const AmsSystemInfo& info) {
         lv_obj_add_event_cb(uc.card, on_unit_card_clicked, LV_EVENT_CLICKED, this);
 
         // Find child widgets declared in XML
+        uc.logo_image = lv_obj_find_by_name(uc.card, "unit_logo");
         uc.name_label = lv_obj_find_by_name(uc.card, "unit_name");
         uc.bars_container = lv_obj_find_by_name(uc.card, "bars_container");
         uc.slot_count_label = lv_obj_find_by_name(uc.card, "slot_count");
+
+        // Set logo image based on AMS system type
+        if (uc.logo_image) {
+            // Try unit name first (e.g., "Box Turtle 1", "Night Owl"),
+            // fall back to system type name (e.g., "AFC", "Happy Hare")
+            const char* logo_path = AmsState::get_logo_path(unit.name);
+            if (!logo_path || !logo_path[0]) {
+                logo_path = AmsState::get_logo_path(info.type_name);
+            }
+            if (logo_path && logo_path[0]) {
+                lv_image_set_src(uc.logo_image, logo_path);
+            } else {
+                lv_obj_add_flag(uc.logo_image, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
 
         // Set dynamic content only — unit name and slot count vary per unit
         if (uc.name_label) {
@@ -219,8 +304,8 @@ void AmsOverviewPanel::create_unit_cards(const AmsSystemInfo& info) {
         unit_cards_.push_back(uc);
     }
 
-    spdlog::debug("[{}] Created {} unit cards from XML", get_name(),
-                  static_cast<int>(unit_cards_.size()));
+    spdlog::debug("[{}] Created {} unit cards from XML (bypass={})", get_name(),
+                  static_cast<int>(unit_cards_.size()), info.supports_bypass);
 }
 
 void AmsOverviewPanel::update_unit_card(UnitCard& card, const AmsUnit& unit, int current_slot) {
@@ -357,6 +442,105 @@ void AmsOverviewPanel::create_mini_bars(UnitCard& card, const AmsUnit& unit, int
 }
 
 // ============================================================================
+// System Path
+// ============================================================================
+
+void AmsOverviewPanel::refresh_system_path(const AmsSystemInfo& info, int current_slot) {
+    if (!system_path_)
+        return;
+
+    int unit_count = static_cast<int>(info.units.size());
+    ui_system_path_canvas_set_unit_count(system_path_, unit_count);
+
+    // Calculate and set X positions based on unit card positions
+    // Force layout so we can get accurate card positions
+    if (cards_row_) {
+        lv_obj_update_layout(cards_row_);
+    }
+
+    for (int i = 0; i < unit_count && i < static_cast<int>(unit_cards_.size()); ++i) {
+        if (unit_cards_[i].card) {
+            // Get card center X relative to the system path widget's parent
+            lv_obj_update_layout(unit_cards_[i].card);
+            lv_area_t card_coords;
+            lv_obj_get_coords(unit_cards_[i].card, &card_coords);
+
+            // Get system path widget position for relative offset
+            if (system_path_) {
+                lv_area_t path_coords;
+                lv_obj_get_coords(system_path_, &path_coords);
+                int32_t card_center_x = (card_coords.x1 + card_coords.x2) / 2 - path_coords.x1;
+                ui_system_path_canvas_set_unit_x(system_path_, i, card_center_x);
+            }
+        }
+    }
+
+    // Set active unit based on current slot
+    int active_unit = info.get_active_unit_index();
+    ui_system_path_canvas_set_active_unit(system_path_, active_unit);
+
+    // Set filament color from active slot
+    if (current_slot >= 0) {
+        const SlotInfo* slot = info.get_slot_global(current_slot);
+        if (slot) {
+            ui_system_path_canvas_set_active_color(system_path_, slot->color_rgb);
+        }
+    }
+
+    // Set whether filament is fully loaded
+    ui_system_path_canvas_set_filament_loaded(system_path_, info.filament_loaded);
+
+    // Set bypass path state (bypass is drawn inside the canvas, no card needed)
+    if (info.supports_bypass) {
+        bool bypass_active = (current_slot == -2);
+        ui_system_path_canvas_set_bypass(system_path_, true, bypass_active, 0x888888);
+    } else {
+        ui_system_path_canvas_set_bypass(system_path_, false, false, 0x888888);
+    }
+
+    // Set per-unit hub sensor states
+    for (int i = 0; i < unit_count && i < static_cast<int>(info.units.size()); ++i) {
+        ui_system_path_canvas_set_unit_hub_sensor(system_path_, i, info.units[i].has_hub_sensor,
+                                                  info.units[i].hub_sensor_triggered);
+    }
+
+    // Set toolhead sensor state
+    {
+        auto segment = static_cast<PathSegment>(
+            lv_subject_get_int(AmsState::instance().get_path_filament_segment_subject()));
+        bool toolhead_triggered = (segment >= PathSegment::TOOLHEAD);
+
+        bool has_toolhead = false;
+        for (const auto& unit : info.units) {
+            if (unit.has_toolhead_sensor)
+                has_toolhead = true;
+        }
+
+        ui_system_path_canvas_set_toolhead_sensor(system_path_, has_toolhead, toolhead_triggered);
+    }
+
+    // Update currently loaded swatch color (imperative — color subject is int, not CSS)
+    if (panel_) {
+        lv_obj_t* swatch = lv_obj_find_by_name(panel_, "overview_swatch");
+        if (swatch) {
+            lv_color_t color = lv_color_hex(static_cast<uint32_t>(
+                lv_subject_get_int(AmsState::instance().get_current_color_subject())));
+            lv_obj_set_style_bg_color(swatch, color, 0);
+            lv_obj_set_style_border_color(swatch, color, 0);
+        }
+    }
+
+    // Set status text from action detail subject (drawn to left of nozzle)
+    lv_subject_t* action_subject = AmsState::instance().get_ams_action_detail_subject();
+    if (action_subject) {
+        const char* action_text = lv_subject_get_string(action_subject);
+        ui_system_path_canvas_set_status_text(system_path_, action_text);
+    }
+
+    ui_system_path_canvas_refresh(system_path_);
+}
+
+// ============================================================================
 // Event Handling
 // ============================================================================
 
@@ -387,6 +571,7 @@ void AmsOverviewPanel::clear_panel_reference() {
     g_overview_panel_instance.store(nullptr);
 
     // Clear widget references
+    system_path_ = nullptr;
     panel_ = nullptr;
     parent_screen_ = nullptr;
     cards_row_ = nullptr;
@@ -415,6 +600,11 @@ static void ensure_overview_registered() {
 
     // Register XML event callbacks before component registration
     lv_xml_register_event_cb(nullptr, "on_ams_overview_settings_clicked", on_settings_clicked_xml);
+    lv_xml_register_event_cb(nullptr, "on_ams_overview_unload_clicked", on_unload_clicked_xml);
+    lv_xml_register_event_cb(nullptr, "on_ams_overview_reset_clicked", on_reset_clicked_xml);
+
+    // Register the system path canvas widget
+    ui_system_path_canvas_register();
 
     // Register the XML components (unit card must be registered before overview panel)
     lv_xml_register_component_from_file("A:ui_xml/ams_unit_card.xml");

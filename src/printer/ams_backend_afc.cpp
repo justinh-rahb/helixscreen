@@ -293,9 +293,11 @@ PathSegment AmsBackendAfc::compute_filament_segment_unlocked() const {
         return PathSegment::TOOLHEAD;
     }
 
-    // Check hub sensor
-    if (hub_sensor_) {
-        return PathSegment::OUTPUT;
+    // Check hub sensors (any hub triggered means filament past hub)
+    for (const auto& [name, triggered] : hub_sensors_) {
+        if (triggered) {
+            return PathSegment::OUTPUT;
+        }
     }
 
     // Check per-lane sensors for the current lane
@@ -400,7 +402,7 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
         for (const auto& hub_name : hub_names_) {
             std::string key = "AFC_hub " + hub_name;
             if (params.contains(key) && params[key].is_object()) {
-                parse_afc_hub(params[key]);
+                parse_afc_hub(hub_name, params[key]);
                 state_changed = true;
             }
         }
@@ -770,13 +772,23 @@ void AmsBackendAfc::parse_afc_stepper(const std::string& lane_name, const nlohma
     }
 }
 
-void AmsBackendAfc::parse_afc_hub(const nlohmann::json& data) {
-    // Parse AFC_hub object for hub sensor state
+void AmsBackendAfc::parse_afc_hub(const std::string& hub_name, const nlohmann::json& data) {
+    // Parse AFC_hub object for per-hub sensor state
     // { "state": true }
 
     if (data.contains("state") && data["state"].is_boolean()) {
-        hub_sensor_ = data["state"].get<bool>();
-        spdlog::trace("[AMS AFC] Hub sensor: {}", hub_sensor_);
+        bool state = data["state"].get<bool>();
+        hub_sensors_[hub_name] = state;
+        spdlog::trace("[AMS AFC] Hub sensor {}: {}", hub_name, state);
+
+        // Update the matching AmsUnit's hub_sensor_triggered for real-time state
+        for (auto& unit : system_info_.units) {
+            if (unit.name == hub_name) {
+                unit.has_hub_sensor = true;
+                unit.hub_sensor_triggered = state;
+                break;
+            }
+        }
     }
 
     // Store bowden length from hub — in multi-hub setups, all hubs share the same
@@ -1096,6 +1108,7 @@ void AmsBackendAfc::initialize_lanes(const std::vector<std::string>& lane_names)
     unit.has_encoder = false;        // AFC typically uses optical sensors, not encoders
     unit.has_toolhead_sensor = true; // Most AFC setups have toolhead sensor
     unit.has_slot_sensors = true;    // AFC has per-lane sensors
+    unit.has_hub_sensor = true;      // AFC hubs have filament sensors
 
     // Initialize gates with defaults
     for (int i = 0; i < lane_count; ++i) {
@@ -1186,6 +1199,13 @@ void AmsBackendAfc::reorganize_units_from_map() {
         unit.connected = true;
         unit.has_toolhead_sensor = true;
         unit.has_slot_sensors = true;
+        unit.has_hub_sensor = true; // AFC hubs have filament sensors
+
+        // Set hub sensor triggered state from per-hub map
+        auto hub_it = hub_sensors_.find(unit_name);
+        if (hub_it != hub_sensors_.end()) {
+            unit.hub_sensor_triggered = hub_it->second;
+        }
 
         for (int i = 0; i < unit.slot_count; ++i) {
             SlotInfo slot;

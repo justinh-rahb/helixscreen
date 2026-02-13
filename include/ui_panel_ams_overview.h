@@ -58,6 +58,7 @@ class AmsOverviewPanel : public PanelBase {
     // === Unit Card Management ===
     struct UnitCard {
         lv_obj_t* card = nullptr;             // Card container (clickable)
+        lv_obj_t* logo_image = nullptr;       // AMS type logo
         lv_obj_t* name_label = nullptr;       // Unit name
         lv_obj_t* bars_container = nullptr;   // Mini status bars
         lv_obj_t* slot_count_label = nullptr; // "4 slots"
@@ -66,6 +67,7 @@ class AmsOverviewPanel : public PanelBase {
 
     std::vector<UnitCard> unit_cards_;
     lv_obj_t* cards_row_ = nullptr;
+    lv_obj_t* system_path_ = nullptr;
 
     // === Observers ===
     ObserverGuard slots_version_observer_;
@@ -74,6 +76,7 @@ class AmsOverviewPanel : public PanelBase {
     void create_unit_cards(const AmsSystemInfo& info);
     void update_unit_card(UnitCard& card, const AmsUnit& unit, int current_slot);
     void create_mini_bars(UnitCard& card, const AmsUnit& unit, int current_slot);
+    void refresh_system_path(const AmsSystemInfo& info, int current_slot);
 
     // === Event Handling ===
     static void on_unit_card_clicked(lv_event_t* e);

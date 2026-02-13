@@ -36,8 +36,18 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
     void set_tool_start_sensor(bool state) {
         tool_start_sensor_ = state;
     }
+    void set_hub_sensor(const std::string& hub_name, bool state) {
+        hub_sensors_[hub_name] = state;
+    }
+
+    // Convenience overload for single-hub backward compat in tests
     void set_hub_sensor(bool state) {
-        hub_sensor_ = state;
+        // Set/clear on a default hub name for single-hub tests
+        if (state) {
+            hub_sensors_["default"] = true;
+        } else {
+            hub_sensors_.clear();
+        }
     }
 
     void set_current_lane(const std::string& lane_name) {
@@ -167,6 +177,13 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
         }
     }
 
+    // Set up multi-unit configuration and trigger reorganize
+    void
+    setup_multi_unit(const std::unordered_map<std::string, std::vector<std::string>>& unit_map) {
+        unit_lane_map_ = unit_map;
+        reorganize_units_from_map();
+    }
+
     // For persistence tests: capture G-code commands
     std::vector<std::string> captured_gcodes;
 
@@ -266,7 +283,21 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
         return lane_sensors_[index];
     }
     bool get_hub_sensor() const {
-        return hub_sensor_;
+        // Returns true if any hub sensor is triggered (backward compat)
+        for (const auto& [name, triggered] : hub_sensors_) {
+            if (triggered)
+                return true;
+        }
+        return false;
+    }
+
+    bool get_hub_sensor(const std::string& hub_name) const {
+        auto it = hub_sensors_.find(hub_name);
+        return it != hub_sensors_.end() && it->second;
+    }
+
+    const std::unordered_map<std::string, bool>& get_hub_sensors() const {
+        return hub_sensors_;
     }
     bool get_tool_start_sensor() const {
         return tool_start_sensor_;

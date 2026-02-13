@@ -54,6 +54,7 @@
 #include "ui_notification_manager.h"
 #include "ui_overlay_network_settings.h"
 #include "ui_panel_ams.h"
+#include "ui_panel_ams_overview.h"
 #include "ui_panel_bed_mesh.h"
 #include "ui_panel_calibration_pid.h"
 #include "ui_panel_calibration_zoffset.h"
@@ -1224,15 +1225,9 @@ void Application::create_overlays() {
     }
 
     if (m_args.overlays.ams) {
-        auto& ams_panel = get_global_ams_panel();
-        if (!ams_panel.are_subjects_initialized()) {
-            ams_panel.init_subjects();
-        }
-        lv_obj_t* panel_obj = ams_panel.get_panel();
-        if (panel_obj) {
-            ams_panel.on_activate();
-            ui_nav_push_overlay(panel_obj);
-        }
+        // Use multi-unit-aware navigation: shows overview for multi-unit,
+        // detail panel directly for single-unit
+        navigate_to_ams_panel();
     }
 
     if (m_args.overlays.spoolman) {

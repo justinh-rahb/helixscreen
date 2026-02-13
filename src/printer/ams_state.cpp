@@ -65,6 +65,17 @@ const char* AmsState::get_logo_path(const std::string& type_name) {
         lower_name = lower_name.substr(0, paren_pos);
     }
 
+    // Strip trailing unit numbers like "box turtle 1" → "box turtle"
+    while (!lower_name.empty() && lower_name.back() == ' ') {
+        lower_name.pop_back();
+    }
+    while (!lower_name.empty() && std::isdigit(static_cast<unsigned char>(lower_name.back()))) {
+        lower_name.pop_back();
+    }
+    while (!lower_name.empty() && lower_name.back() == ' ') {
+        lower_name.pop_back();
+    }
+
     // Map system names to logo paths
     // Note: All logos are 64x64 white-on-transparent PNGs
     static const std::unordered_map<std::string, const char*> logo_map = {

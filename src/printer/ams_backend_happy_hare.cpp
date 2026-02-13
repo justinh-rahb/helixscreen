@@ -302,6 +302,20 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         filament_pos_ = mmu_data["filament_pos"].get<int>();
         spdlog::trace("[AMS HappyHare] Filament pos: {} -> {}", filament_pos_,
                       path_segment_to_string(path_segment_from_happy_hare_pos(filament_pos_)));
+
+        // Update hub_sensor_triggered on units based on filament position
+        // pos >= 3 means filament is in bowden or further (past the selector/hub)
+        bool past_hub = (filament_pos_ >= 3);
+        for (auto& unit : system_info_.units) {
+            // Active unit: determined by current_slot falling within this unit's range
+            int slot = system_info_.current_slot;
+            if (slot >= unit.first_slot_global_index &&
+                slot < unit.first_slot_global_index + unit.slot_count) {
+                unit.hub_sensor_triggered = past_hub;
+            } else {
+                unit.hub_sensor_triggered = false;
+            }
+        }
     }
 
     // Parse num_units if available (multi-unit Happy Hare setups)
@@ -439,6 +453,7 @@ void AmsBackendHappyHare::initialize_gates(int gate_count) {
         unit.has_encoder = true;
         unit.has_toolhead_sensor = true;
         unit.has_slot_sensors = true;
+        unit.has_hub_sensor = true; // HH selector functions as hub equivalent
 
         for (int i = 0; i < unit_gates; ++i) {
             SlotInfo slot;

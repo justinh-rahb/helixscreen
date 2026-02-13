@@ -588,6 +588,10 @@ struct AmsUnit {
     bool has_toolhead_sensor = false; ///< Has toolhead filament sensor
     bool has_slot_sensors = false;    ///< Has per-slot sensors
 
+    // Hub/combiner sensor (AFC Box Turtle, Night Owl, etc.)
+    bool has_hub_sensor = false;       ///< Unit has a hub/combiner sensor
+    bool hub_sensor_triggered = false; ///< Filament detected at this unit's hub
+
     /**
      * @brief Get slot by local index (within this unit)
      * @param local_index Index within this unit (0 to slot_count-1)
