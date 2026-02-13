@@ -606,7 +606,7 @@ class TelemetryAnalyzer:
 
             self._fmt_distribution(
                 lines,
-                "Phase completion",
+                "Print start phases completed",
                 pr.get("phase_completion_distribution"),
             )
             self._fmt_distribution(
