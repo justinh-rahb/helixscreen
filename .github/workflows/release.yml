@@ -432,6 +432,8 @@ jobs:
         mkdir -p release-files
         find artifacts -name '*.tar.gz' -exec mv {} release-files/ \;
         find artifacts -name '*.zip' -exec mv {} release-files/ \;
+        # Include install.sh so users can download it directly from the release
+        cp scripts/install.sh release-files/
         echo "Release files:"
         ls -lh release-files/
 
@@ -535,6 +537,7 @@ jobs:
         files: |
           release-files/*.tar.gz
           release-files/*.zip
+          release-files/install.sh
         fail_on_unmatched_files: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
