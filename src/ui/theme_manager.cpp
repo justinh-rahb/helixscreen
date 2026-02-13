@@ -680,6 +680,33 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
         return;
     }
 
+    // ========================================================================
+    // Pre-register nav_width using HORIZONTAL breakpoint (before auto-discovery)
+    // ========================================================================
+    // Nav width is a horizontal concern — ultrawide 1920x440 needs large nav
+    // despite having a tiny vertical breakpoint. Register first so auto-discovery
+    // (which uses vertical breakpoint) silently skips it (LVGL ignores duplicates).
+    {
+        const char* nav_suffix;
+        if (hor_res <= 520)
+            nav_suffix = "_tiny";
+        else if (hor_res <= 900)
+            nav_suffix = "_small";
+        else if (hor_res <= 1100)
+            nav_suffix = "_medium";
+        else
+            nav_suffix = "_large";
+
+        // Read nav_width values from navigation_bar.xml consts
+        auto nav_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", nav_suffix);
+        auto nav_it = nav_tokens.find("nav_width");
+        if (nav_it != nav_tokens.end()) {
+            lv_xml_register_const(scope, "nav_width", nav_it->second.c_str());
+            spdlog::trace("[Theme] nav_width: {}px (hor_res={}, suffix={})", nav_it->second,
+                          hor_res, nav_suffix);
+        }
+    }
+
     // Auto-discover all px tokens from all XML files (including optional _tiny)
     auto tiny_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_tiny");
     auto small_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_small");
@@ -717,20 +744,13 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
                   size_label, ver_res, registered);
 
     // ========================================================================
-    // Register computed layout constants (not from globals.xml variants)
+    // Register computed overlay widths (derived from nav_width + gap)
     // ========================================================================
+    // nav_width was pre-registered above using horizontal breakpoint.
+    // Read it back to compute overlay panel widths.
+    const char* nav_width_str = lv_xml_get_const(nullptr, "nav_width");
+    int32_t nav_width = nav_width_str ? std::atoi(nav_width_str) : 94; // fallback
 
-    // Nav width is a horizontal concern — use screen width, not height breakpoint
-    int32_t nav_width;
-    if (hor_res <= 520) {
-        nav_width = UI_NAV_WIDTH_TINY; // 64px for narrow screens (480x320, 480x400)
-    } else if (hor_res <= 900) {
-        nav_width = UI_NAV_WIDTH_MEDIUM; // 94px for 800x480
-    } else {
-        nav_width = UI_NAV_WIDTH_LARGE; // 102px for 1024x600, 1280x720, 1920x440+
-    }
-
-    // Get space_lg value (already registered above)
     const char* space_lg_str = lv_xml_get_const(nullptr, "space_lg");
     int32_t gap = space_lg_str ? std::atoi(space_lg_str) : 16; // fallback to 16px
 
@@ -738,15 +758,11 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
     int32_t overlay_width = hor_res - nav_width - gap; // Standard: screen - nav - gap
     int32_t overlay_width_full = hor_res - nav_width;  // Full: screen - nav (no gap)
 
-    // Register as string constants for XML consumption
-    char nav_width_str[16];
     char overlay_width_str[16];
     char overlay_width_full_str[16];
-    snprintf(nav_width_str, sizeof(nav_width_str), "%d", nav_width);
     snprintf(overlay_width_str, sizeof(overlay_width_str), "%d", overlay_width);
     snprintf(overlay_width_full_str, sizeof(overlay_width_full_str), "%d", overlay_width_full);
 
-    lv_xml_register_const(scope, "nav_width", nav_width_str);
     lv_xml_register_const(scope, "overlay_panel_width", overlay_width_str);
     lv_xml_register_const(scope, "overlay_panel_width_full", overlay_width_full_str);
 
@@ -1859,10 +1875,9 @@ void ui_set_overlay_width(lv_obj_t* obj, lv_obj_t* screen) {
     if (width_str) {
         lv_obj_set_width(obj, std::atoi(width_str));
     } else {
-        // Fallback if theme not initialized: calculate from screen size
+        // Fallback if theme not initialized: estimate from screen size
         lv_coord_t screen_width = lv_obj_get_width(screen);
-        lv_coord_t nav_width = UI_NAV_WIDTH(screen_width);
-        lv_obj_set_width(obj, screen_width - nav_width - 16); // 16px gap fallback
+        lv_obj_set_width(obj, screen_width - 94 - 16); // nav_width medium + gap fallback
         spdlog::warn("[Theme] overlay_panel_width not registered, using fallback");
     }
 }

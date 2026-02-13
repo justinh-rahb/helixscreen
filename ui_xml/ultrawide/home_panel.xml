@@ -1,10 +1,6 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Ultrawide home panel for 1920x480 displays.
-     Horizontal 3-column layout: printer image | tip + print card | status indicators.
-     All widget names, subject bindings, and event callbacks match the standard layout
-     so the shared C++ code (ui_panel_home.cpp) works unchanged. -->
 <component>
   <consts>
     <px name="accent_bar_width" value="4"/>
@@ -21,19 +17,18 @@
 
   <!-- Root: horizontal 3-column layout -->
   <view extends="lv_obj"
-        width="100%" height="100%" style_pad_all="0" style_pad_gap="0" style_border_width="0"
-        flex_flow="row" style_bg_color="#screen_bg" scrollable="false">
+        width="100%" height="100%" style_pad_all="0" style_pad_gap="0" style_border_width="0" flex_flow="row"
+        style_bg_color="#screen_bg" scrollable="false">
 
     <!-- ================================================================ -->
     <!-- COLUMN 1: Printer Image + Info                                   -->
     <!-- ================================================================ -->
     <lv_obj width="#printer_column_width"
-            height="100%" flex_flow="column" style_pad_all="#space_sm" style_pad_gap="0"
-            scrollable="false">
+            height="100%" flex_flow="column" style_pad_all="#space_sm" style_pad_gap="0" scrollable="false">
       <!-- Printer image with connection overlays -->
       <lv_obj name="printer_container"
-              width="100%" flex_grow="1" style_bg_color="#screen_bg" style_pad_all="0"
-              scrollable="false" align="center" flex_flow="row">
+              width="100%" flex_grow="1" style_bg_color="#screen_bg" style_pad_all="0" scrollable="false" align="center"
+              flex_flow="row">
         <lv_image name="printer_image" width="100%" height="100%" align="center" inner_align="contain">
           <bind_style name="image_dimmed" subject="printer_connection_state" ref_value="0"/>
           <bind_style name="image_dimmed" subject="printer_connection_state" ref_value="1"/>
@@ -52,8 +47,8 @@
       <lv_obj name="printer_info_bar" width="100%" style_pad_all="0">
         <bind_flag_if_eq subject="printer_info_visible" flag="hidden" ref_value="0"/>
         <text_small width="100%"
-                    height="content" bind_text="printer_type_text" style_text_color="#text"
-                    style_text_align="center" stroke_width="1" stroke_color="#screen_bg" stroke_opa="180"/>
+                    height="content" bind_text="printer_type_text" style_text_color="#text" style_text_align="center"
+                    stroke_width="1" stroke_color="#screen_bg" stroke_opa="180"/>
       </lv_obj>
     </lv_obj>
 
@@ -61,15 +56,14 @@
     <!-- COLUMN 2: Tip Area + Print Card                                  -->
     <!-- ================================================================ -->
     <lv_obj width="#print_column_width"
-            height="100%" flex_flow="column" style_pad_all="#space_sm" style_pad_gap="#space_sm"
-            scrollable="false">
+            height="100%" flex_flow="column" style_pad_all="#space_sm" style_pad_gap="#space_sm" scrollable="false">
 
       <!-- Tip area with accent bar -->
       <lv_obj width="100%"
-              height="content" flex_flow="row" style_bg_opa="0%" style_radius="0"
-              style_border_width="#accent_bar_width" style_border_side="left" style_border_color="#primary"
-              style_pad_top="#space_xs" style_pad_bottom="#space_xs" style_pad_left="#accent_bar_gap"
-              style_pad_right="0" style_pad_gap="#space_xs" style_flex_track_place="center" clickable="true">
+              height="content" flex_flow="row" style_bg_opa="0%" style_radius="0" style_border_width="#accent_bar_width"
+              style_border_side="left" style_border_color="#primary" style_pad_top="#space_xs"
+              style_pad_bottom="#space_xs" style_pad_left="#accent_bar_gap" style_pad_right="0"
+              style_pad_gap="#space_xs" style_flex_track_place="center" clickable="true">
         <event_cb trigger="clicked" callback="tip_text_clicked_cb"/>
         <text_body text="Tip:" translation_tag="Tip:"/>
         <text_body name="status_text_label" bind_text="status_text" flex_grow="1" long_mode="dot"/>
@@ -106,16 +100,15 @@
 
         <!-- PRINTING STATE -->
         <lv_obj name="print_card_printing"
-                width="100%" height="100%" style_pad_all="#space_sm" flex_flow="row"
-                style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false" hidden="true"
-                clickable="false">
+                width="100%" height="100%" style_pad_all="#space_sm" flex_flow="row" style_flex_cross_place="center"
+                style_pad_gap="#space_sm" scrollable="false" hidden="true" clickable="false">
           <bind_flag_if_eq subject="print_show_progress" flag="hidden" ref_value="0"/>
           <lv_obj width="35%" height="100%" style_pad_all="0" style_bg_opa="0%" scrollable="false" clickable="false">
             <lv_image name="print_card_active_thumb"
                       width="100%" height="100%" src="A:assets/images/benchy_thumbnail_white.png" inner_align="contain"/>
           </lv_obj>
-          <lv_obj flex_grow="1"
-                  height="100%" style_pad_all="0" flex_flow="column" style_flex_main_place="center"
+          <lv_obj height="100%"
+                  flex_grow="1" style_pad_all="0" flex_flow="column" style_flex_main_place="center"
                   style_flex_cross_place="center" style_pad_gap="#space_xs" scrollable="false" clickable="false">
             <ui_button name="estop_button_print"
                        width="#button_height_sm" height="#button_height_sm" variant="danger" style_radius="24"
@@ -139,9 +132,9 @@
     <!-- ================================================================ -->
     <!-- COLUMN 3: Status Indicators                                      -->
     <!-- ================================================================ -->
-    <ui_card name="status_card" height="100%" flex_grow="1" flex_flow="column"
-             style_pad_gap="#space_xs" style_margin_top="#space_sm" style_margin_bottom="#space_sm"
-             style_margin_right="#space_sm">
+    <ui_card name="status_card"
+             height="100%" flex_grow="1" flex_flow="column" style_pad_gap="#space_xs" style_margin_top="#space_sm"
+             style_margin_bottom="#space_sm" style_margin_right="#space_sm">
 
       <!-- Top Row: Printer Status | Network | Notifications | Firmware Restart -->
       <lv_obj width="100%" flex_grow="1" style_pad_all="0" flex_flow="row" style_flex_cross_place="center">
@@ -149,18 +142,19 @@
         <!-- Printer Status -->
         <ui_button name="status_btn_printer"
                    height="100%" variant="ghost" flex_grow="1" flex_flow="column" style_flex_main_place="center"
-                   style_flex_cross_place="center" style_flex_track_place="center" style_border_width="0" focusable="false">
+                   style_flex_cross_place="center" style_flex_track_place="center" style_border_width="0"
+                   focusable="false">
           <event_cb trigger="clicked" callback="printer_status_clicked_cb"/>
-          <icon name="printer_icon_ready" src="printer_3d" size="#icon_size_card" variant="success" hidden="true">
+          <icon name="printer_icon_ready" src="printer_3d" size="#icon_size" variant="success" hidden="true">
             <bind_flag_if_not_eq subject="printer_icon_state" flag="hidden" ref_value="0"/>
           </icon>
-          <icon name="printer_icon_warning" src="printer_3d" size="#icon_size_card" variant="warning" hidden="true">
+          <icon name="printer_icon_warning" src="printer_3d" size="#icon_size" variant="warning" hidden="true">
             <bind_flag_if_not_eq subject="printer_icon_state" flag="hidden" ref_value="1"/>
           </icon>
-          <icon name="printer_icon_error" src="printer_3d" size="#icon_size_card" variant="danger" hidden="true">
+          <icon name="printer_icon_error" src="printer_3d" size="#icon_size" variant="danger" hidden="true">
             <bind_flag_if_not_eq subject="printer_icon_state" flag="hidden" ref_value="2"/>
           </icon>
-          <icon name="printer_icon_disconnected" src="printer_3d" size="#icon_size_card" variant="secondary">
+          <icon name="printer_icon_disconnected" src="printer_3d" size="#icon_size" variant="secondary">
             <bind_flag_if_not_eq subject="printer_icon_state" flag="hidden" ref_value="3"/>
           </icon>
         </ui_button>
@@ -170,24 +164,25 @@
         <!-- Network -->
         <ui_button name="network_btn"
                    height="100%" variant="ghost" flex_grow="1" flex_flow="column" style_flex_main_place="center"
-                   style_flex_cross_place="center" style_flex_track_place="center" style_border_width="0" focusable="false">
+                   style_flex_cross_place="center" style_flex_track_place="center" style_border_width="0"
+                   focusable="false">
           <event_cb trigger="clicked" callback="network_clicked_cb"/>
-          <icon name="net_disconnected" src="wifi_off" size="#icon_size_card" variant="disabled">
+          <icon name="net_disconnected" src="wifi_off" size="#icon_size" variant="disabled">
             <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="0"/>
           </icon>
-          <icon name="net_wifi_1" src="wifi_strength_1_alert" size="#icon_size_card" variant="warning">
+          <icon name="net_wifi_1" src="wifi_strength_1_alert" size="#icon_size" variant="warning">
             <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="1"/>
           </icon>
-          <icon name="net_wifi_2" src="wifi_strength_2" size="#icon_size_card" variant="secondary">
+          <icon name="net_wifi_2" src="wifi_strength_2" size="#icon_size" variant="secondary">
             <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="2"/>
           </icon>
-          <icon name="net_wifi_3" src="wifi_strength_3" size="#icon_size_card" variant="secondary">
+          <icon name="net_wifi_3" src="wifi_strength_3" size="#icon_size" variant="secondary">
             <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="3"/>
           </icon>
-          <icon name="net_wifi_4" src="wifi_strength_4" size="#icon_size_card" variant="secondary">
+          <icon name="net_wifi_4" src="wifi_strength_4" size="#icon_size" variant="secondary">
             <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="4"/>
           </icon>
-          <icon name="net_ethernet" src="ethernet" size="#icon_size_card" variant="success">
+          <icon name="net_ethernet" src="ethernet" size="#icon_size" variant="success">
             <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="5"/>
           </icon>
         </ui_button>
@@ -200,7 +195,7 @@
                 style_flex_track_place="center">
           <lv_obj name="status_notification_container" style_pad_all="0">
             <icon name="status_notification_icon"
-                  src="notifications" size="#icon_size_card" variant="secondary" align="center" clickable="true"
+                  src="notifications" size="#icon_size" variant="secondary" align="center" clickable="true"
                   click_focusable="false">
               <event_cb trigger="clicked" callback="status_notification_history_clicked"/>
             </icon>
@@ -241,10 +236,11 @@
         <!-- Temperature -->
         <ui_button name="temp_btn"
                    height="100%" variant="ghost" flex_grow="1" flex_flow="column" style_flex_main_place="center"
-                   style_flex_cross_place="center" style_flex_track_place="center" style_border_width="0" focusable="false">
+                   style_flex_cross_place="center" style_flex_track_place="center" style_border_width="0"
+                   focusable="false">
           <bind_state_if_not_eq subject="printer_connection_state" state="disabled" ref_value="2"/>
           <event_cb trigger="clicked" callback="temp_clicked_cb"/>
-          <icon name="temp_icon" src="heater" size="#icon_size_card" variant="secondary"/>
+          <icon name="temp_icon" src="heater" size="#icon_size" variant="secondary"/>
           <temp_display name="temp_text_label"
                         width="100%" size="md" show_target="false" bind_current="extruder_temp"
                         bind_target="extruder_target" align="center"/>
@@ -255,10 +251,11 @@
         </divider_vertical>
 
         <!-- Light -->
-        <ui_button name="light_button" height="100%" variant="ghost" flex_grow="1" style_border_width="0" focusable="false">
+        <ui_button name="light_button"
+                   height="100%" variant="ghost" flex_grow="1" style_border_width="0" focusable="false">
           <bind_flag_if_eq subject="printer_has_led" flag="hidden" ref_value="0"/>
           <bind_state_if_not_eq subject="printer_connection_state" state="disabled" ref_value="2"/>
-          <icon name="light_icon" src="lightbulb_outline" size="#icon_size_card" align="center" variant="muted"/>
+          <icon name="light_icon" src="lightbulb_outline" size="#icon_size" align="center" variant="muted"/>
           <event_cb trigger="clicked" callback="light_toggle_cb"/>
         </ui_button>
 

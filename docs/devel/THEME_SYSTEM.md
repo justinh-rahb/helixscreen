@@ -301,7 +301,7 @@ Icon sizes map directly to fixed-size icon fonts (not responsive):
 | `lg` | mdi_icons_48 | Status indicators |
 | `xl` | mdi_icons_64 | Navigation, hero icons |
 
-> **Note:** For responsive icon sizing in cards, use the `icon_size_card` token which selects md/lg/xl based on breakpoint.
+> **Note:** For responsive icon sizing, use the `icon_size` token (`size="#icon_size"`) which selects sm/md/lg/xl based on breakpoint (tiny/small/medium/large).
 
 **Attributes:**
 - `src` - MDI icon name ("home", "settings", "wifi")

@@ -7,11 +7,9 @@
     <!-- ===================================================================== -->
     <!-- Runtime-Registered Layout Constants                                   -->
     <!-- ===================================================================== -->
-    <!-- nav_width and overlay_panel_width are registered at runtime by
-         ui_theme_register_responsive_spacing() based on screen size.
-         DO NOT define them here - LVGL ignores duplicate registrations.
-         Values: nav_width = 64/76/102px (small/medium/large breakpoints)
-                 overlay_panel_width = screen - nav - space_lg gap -->
+    <!-- nav_width is defined in navigation_bar.xml and registered using
+         horizontal breakpoint. overlay_panel_width is computed at runtime as
+         screen - nav_width - space_lg gap. DO NOT define nav_width here. -->
     <!-- UI dimensions -->
     <px name="nav_padding" value="16"/>
     <!-- Modal backdrop opacity (0-255) -->
@@ -67,14 +65,15 @@
     <px name="space_2xl_neg_large" value="-40"/>
 
     <!-- ===================================================================== -->
-    <!-- Responsive Icon Sizes (icon_size_*)                                  -->
+    <!-- Responsive Icon Sizes (icon_size)                                    -->
     <!-- ===================================================================== -->
     <!-- Runtime selects appropriate variant via ui_theme_register_responsive_fonts()
-         Icon sizes for status card icons (home panel temp/network/light)
+         Unified icon size for cards, nav bar, and other standard icons
          Values: xs(16), sm(24), md(32), lg(48), xl(64) -->
-    <string name="icon_size_card_small" value="md"/>
-    <string name="icon_size_card_medium" value="lg"/>
-    <string name="icon_size_card_large" value="xl"/>
+    <string name="icon_size_tiny" value="md"/>
+    <string name="icon_size_small" value="md"/>
+    <string name="icon_size_medium" value="lg"/>
+    <string name="icon_size_large" value="xl"/>
 
     <!-- ===================================================================== -->
     <!-- Responsive Spinner Sizes (spinner_*)                                  -->

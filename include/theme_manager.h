@@ -197,13 +197,8 @@ class ThemeManager {
 // Theme colors: Use theme_manager_get_color() to retrieve from globals.xml
 // Available tokens: primary_color, text_primary, text_secondary, success_color, etc.
 
-// Layout constants
-#define UI_NAV_WIDTH_PERCENT 10 // Nav bar is 1/10th of screen width
-#define UI_NAV_ICON_SIZE 64     // Base icon size for 1024x800
-#define UI_NAV_PADDING 16       // Padding between elements
-
-// Calculate nav width based on actual screen
-#define UI_NAV_WIDTH(screen_w) ((screen_w) / 10)
+// Nav width is defined in navigation_bar.xml as nav_width_tiny/small/medium/large
+// and registered at runtime using horizontal breakpoint (see theme_manager.cpp)
 
 // Responsive breakpoints (based on screen height — vertical space is the constraint)
 // Target hardware: 480x320, 480x400, 1920x440, 800x480, 1024x600, 1280x720
@@ -237,12 +232,6 @@ class ThemeManager {
 
 // Opacity constants (matching globals.xml values)
 #define UI_DISABLED_OPA 128 // disabled_opa - 50% opacity for disabled/dimmed elements
-
-// Responsive navigation bar width (applied in C++ based on screen size)
-#define UI_NAV_WIDTH_TINY 64   // Tiny screens: 42px button + margins
-#define UI_NAV_WIDTH_SMALL 76  // Small screens: 60px button + 8px padding each side
-#define UI_NAV_WIDTH_MEDIUM 94 // Medium screens: 70px button + 12px padding each side
-#define UI_NAV_WIDTH_LARGE 102 // Large screens: 70px button + 16px padding each side
 
 // Semantic fonts: Use theme_manager_get_font() to retrieve responsive fonts from globals.xml
 // Available tokens: font_heading, font_body, font_small
