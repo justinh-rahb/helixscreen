@@ -349,7 +349,9 @@ registry.register_manager("accel", std::make_unique<AccelSensorManager>());
 
 ## Responsive Design Tokens
 
-**Screen breakpoints:** SMALL (≤480px), MEDIUM (481-800px), LARGE (>800px)
+**Screen breakpoints (height-based, 5-tier):** TINY (≤390), SMALL (391-460), MEDIUM (461-550), LARGE (551-700), XLARGE (>700)
+
+_tiny falls back to _small, _xlarge falls back to _large. Core triplet (_small/_medium/_large) is required.
 
 **For theme architecture and rationale, see [ARCHITECTURE.md](ARCHITECTURE.md#custom-helixscreen-theme).**
 
@@ -363,6 +365,8 @@ registry.register_manager("accel", std::make_unique<AccelSensorManager>());
 | `#space_md` | 8px | 10px | 12px |
 | `#space_lg` | 12px | 16px | 20px |
 | `#space_xl` | 16px | 20px | 24px |
+
+> TINY uses _small values, XLARGE uses _large values (unless _tiny/_xlarge overrides are defined).
 
 ### Typography (`#font_*` or semantic components)
 

@@ -4,6 +4,7 @@
 #include "ui_fan_control_overlay.h"
 
 #include "ui_error_reporting.h"
+#include "ui_fan_arc_resize.h"
 #include "ui_global_panel_helper.h"
 #include "ui_nav.h"
 #include "ui_nav_manager.h"
@@ -208,12 +209,10 @@ void FanControlOverlay::populate_fans() {
                 // Find arc for live updates
                 lv_obj_t* arc = lv_obj_find_by_name(card, "dial_arc");
 
-                AutoFanCard card_info;
-                card_info.object_name = fan.object_name;
-                card_info.card = card;
-                card_info.speed_label = speed_label;
-                card_info.arc = arc;
-                auto_fan_cards_.push_back(card_info);
+                // Attach auto-resize for dynamic arc scaling
+                helix::ui::fan_arc_attach_auto_resize(card);
+
+                auto_fan_cards_.push_back({fan.object_name, card, speed_label, arc});
 
                 spdlog::trace("[{}] Created fan_status_card for '{}' ({}%)", get_name(),
                               fan.display_name, fan.speed_percent);
@@ -286,8 +285,6 @@ void FanControlOverlay::send_fan_speed(const std::string& object_name, int speed
 // ============================================================================
 // OBSERVER CALLBACK
 // ============================================================================
-
-// on_fans_version_changed migrated to lambda in on_activate()
 
 void FanControlOverlay::on_fan_speed_changed(lv_observer_t* obs, lv_subject_t* /* subject */) {
     auto* self = static_cast<FanControlOverlay*>(lv_observer_get_user_data(obs));

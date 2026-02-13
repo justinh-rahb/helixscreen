@@ -83,55 +83,46 @@ TEST_CASE("Screen size constants: TINY preset", "[display_resolution][constants]
     REQUIRE(UI_SCREEN_TINY_H == 320);
 }
 
-TEST_CASE("Screen size constants: TINY_ALT preset", "[display_resolution][constants]") {
-    // TINY_ALT is for 480x400 displays (taller than TINY 480x320)
-    REQUIRE(UI_SCREEN_TINY_ALT_W == 480);
-    REQUIRE(UI_SCREEN_TINY_ALT_H == 400);
-
-    SECTION("TINY_ALT has same width as TINY") {
-        REQUIRE(UI_SCREEN_TINY_ALT_W == UI_SCREEN_TINY_W);
-    }
-
-    SECTION("TINY_ALT is taller than TINY") {
-        REQUIRE(UI_SCREEN_TINY_ALT_H > UI_SCREEN_TINY_H);
-    }
-}
-
 TEST_CASE("Screen size constants: SMALL preset", "[display_resolution][constants]") {
-    REQUIRE(UI_SCREEN_SMALL_W == 800);
-    REQUIRE(UI_SCREEN_SMALL_H == 480);
+    REQUIRE(UI_SCREEN_SMALL_W == 480);
+    REQUIRE(UI_SCREEN_SMALL_H == 400);
 }
 
 TEST_CASE("Screen size constants: MEDIUM preset", "[display_resolution][constants]") {
-    REQUIRE(UI_SCREEN_MEDIUM_W == 1024);
-    REQUIRE(UI_SCREEN_MEDIUM_H == 600);
+    REQUIRE(UI_SCREEN_MEDIUM_W == 800);
+    REQUIRE(UI_SCREEN_MEDIUM_H == 480);
 }
 
 TEST_CASE("Screen size constants: LARGE preset", "[display_resolution][constants]") {
-    REQUIRE(UI_SCREEN_LARGE_W == 1280);
-    REQUIRE(UI_SCREEN_LARGE_H == 720);
+    REQUIRE(UI_SCREEN_LARGE_W == 1024);
+    REQUIRE(UI_SCREEN_LARGE_H == 600);
+}
+
+TEST_CASE("Screen size constants: XLARGE preset", "[display_resolution][constants]") {
+    REQUIRE(UI_SCREEN_XLARGE_W == 1280);
+    REQUIRE(UI_SCREEN_XLARGE_H == 720);
 }
 
 TEST_CASE("Screen size constants: size ordering", "[display_resolution][constants]") {
     // Verify presets are ordered by increasing resolution
     SECTION("Width ordering") {
-        REQUIRE(UI_SCREEN_TINY_W <= UI_SCREEN_TINY_ALT_W);
-        REQUIRE(UI_SCREEN_TINY_ALT_W < UI_SCREEN_SMALL_W);
+        REQUIRE(UI_SCREEN_TINY_W <= UI_SCREEN_SMALL_W);
         REQUIRE(UI_SCREEN_SMALL_W < UI_SCREEN_MEDIUM_W);
         REQUIRE(UI_SCREEN_MEDIUM_W < UI_SCREEN_LARGE_W);
+        REQUIRE(UI_SCREEN_LARGE_W < UI_SCREEN_XLARGE_W);
     }
 
     SECTION("Total pixel count ordering") {
         int tiny_pixels = UI_SCREEN_TINY_W * UI_SCREEN_TINY_H;
-        int tiny_alt_pixels = UI_SCREEN_TINY_ALT_W * UI_SCREEN_TINY_ALT_H;
         int small_pixels = UI_SCREEN_SMALL_W * UI_SCREEN_SMALL_H;
         int medium_pixels = UI_SCREEN_MEDIUM_W * UI_SCREEN_MEDIUM_H;
         int large_pixels = UI_SCREEN_LARGE_W * UI_SCREEN_LARGE_H;
+        int xlarge_pixels = UI_SCREEN_XLARGE_W * UI_SCREEN_XLARGE_H;
 
-        REQUIRE(tiny_pixels < tiny_alt_pixels);
-        REQUIRE(tiny_alt_pixels < small_pixels);
+        REQUIRE(tiny_pixels < small_pixels);
         REQUIRE(small_pixels < medium_pixels);
         REQUIRE(medium_pixels < large_pixels);
+        REQUIRE(large_pixels < xlarge_pixels);
     }
 }
 
@@ -139,8 +130,19 @@ TEST_CASE("Screen size constants: size ordering", "[display_resolution][constant
 // Breakpoint Boundary Tests
 // ============================================================================
 
+TEST_CASE("Breakpoint mapping: TINY max boundary", "[display_resolution][breakpoint]") {
+    REQUIRE(UI_BREAKPOINT_TINY_MAX == 390);
+
+    SECTION("390 maps to TINY breakpoint") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(390), "_tiny") == 0);
+    }
+
+    SECTION("391 maps to SMALL breakpoint") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(391), "_small") == 0);
+    }
+}
+
 TEST_CASE("Breakpoint mapping: SMALL max boundary", "[display_resolution][breakpoint]") {
-    // UI_BREAKPOINT_SMALL_MAX = 460 (screen height for small breakpoint)
     REQUIRE(UI_BREAKPOINT_SMALL_MAX == 460);
 
     SECTION("460 maps to SMALL breakpoint") {
@@ -157,15 +159,26 @@ TEST_CASE("Breakpoint mapping: SMALL max boundary", "[display_resolution][breakp
 }
 
 TEST_CASE("Breakpoint mapping: MEDIUM max boundary", "[display_resolution][breakpoint]") {
-    // UI_BREAKPOINT_MEDIUM_MAX = 700 (screen height for medium breakpoint)
-    REQUIRE(UI_BREAKPOINT_MEDIUM_MAX == 700);
+    REQUIRE(UI_BREAKPOINT_MEDIUM_MAX == 550);
 
-    SECTION("700 maps to MEDIUM breakpoint") {
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(700), "_medium") == 0);
+    SECTION("550 maps to MEDIUM breakpoint") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(550), "_medium") == 0);
     }
 
-    SECTION("701 maps to LARGE breakpoint") {
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(701), "_large") == 0);
+    SECTION("551 maps to LARGE breakpoint") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(551), "_large") == 0);
+    }
+}
+
+TEST_CASE("Breakpoint mapping: LARGE max boundary", "[display_resolution][breakpoint]") {
+    REQUIRE(UI_BREAKPOINT_LARGE_MAX == 700);
+
+    SECTION("700 maps to LARGE breakpoint") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(700), "_large") == 0);
+    }
+
+    SECTION("701 maps to XLARGE breakpoint") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(701), "_xlarge") == 0);
     }
 }
 
@@ -174,43 +187,43 @@ TEST_CASE("Breakpoint mapping: MEDIUM max boundary", "[display_resolution][break
 // ============================================================================
 
 TEST_CASE("Breakpoint mapping: TINY screen size", "[display_resolution][breakpoint]") {
-    // TINY is 480x320, height=320 → SMALL breakpoint
+    // TINY is 480x320, height=320 → TINY breakpoint
     int height = UI_SCREEN_TINY_H;
 
     REQUIRE(height == 320);
-    REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(height), "_small") == 0);
+    REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(height), "_tiny") == 0);
 }
 
-TEST_CASE("Breakpoint mapping: TINY_ALT screen size", "[display_resolution][breakpoint]") {
-    // TINY_ALT is 480x400, height=400 → SMALL breakpoint
-    int height = UI_SCREEN_TINY_ALT_H;
+TEST_CASE("Breakpoint mapping: SMALL screen size", "[display_resolution][breakpoint]") {
+    // SMALL is 480x400, height=400 → SMALL breakpoint
+    int height = UI_SCREEN_SMALL_H;
 
     REQUIRE(height == 400);
     REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(height), "_small") == 0);
 }
 
-TEST_CASE("Breakpoint mapping: SMALL screen size", "[display_resolution][breakpoint]") {
-    // SMALL is 800x480, height=480 → MEDIUM breakpoint
-    int height = UI_SCREEN_SMALL_H;
+TEST_CASE("Breakpoint mapping: MEDIUM screen size", "[display_resolution][breakpoint]") {
+    // MEDIUM is 800x480, height=480 → MEDIUM breakpoint
+    int height = UI_SCREEN_MEDIUM_H;
 
     REQUIRE(height == 480);
     REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(height), "_medium") == 0);
 }
 
-TEST_CASE("Breakpoint mapping: MEDIUM screen size", "[display_resolution][breakpoint]") {
-    // MEDIUM is 1024x600, height=600 → MEDIUM breakpoint (was LARGE with max-based)
-    int height = UI_SCREEN_MEDIUM_H;
-
-    REQUIRE(height == 600);
-    REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(height), "_medium") == 0);
-}
-
 TEST_CASE("Breakpoint mapping: LARGE screen size", "[display_resolution][breakpoint]") {
-    // LARGE is 1280x720, height=720 → LARGE breakpoint
+    // LARGE is 1024x600, height=600 → LARGE breakpoint
     int height = UI_SCREEN_LARGE_H;
 
-    REQUIRE(height == 720);
+    REQUIRE(height == 600);
     REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(height), "_large") == 0);
+}
+
+TEST_CASE("Breakpoint mapping: XLARGE screen size", "[display_resolution][breakpoint]") {
+    // XLARGE is 1280x720, height=720 → XLARGE breakpoint
+    int height = UI_SCREEN_XLARGE_H;
+
+    REQUIRE(height == 720);
+    REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(height), "_xlarge") == 0);
 }
 
 TEST_CASE("Breakpoint mapping: ultra-wide display", "[display_resolution][breakpoint]") {
@@ -226,29 +239,29 @@ TEST_CASE("Breakpoint mapping: ultra-wide display", "[display_resolution][breakp
 // ============================================================================
 
 TEST_CASE("Breakpoint mapping: arbitrary resolutions", "[display_resolution][breakpoint]") {
-    SECTION("480x400 (tiny_alt) → SMALL (height=400)") {
+    SECTION("480x400 (small) → SMALL (height=400)") {
         // height=400 ≤460 → SMALL
         REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(400), "_small") == 0);
     }
 
-    SECTION("1920x1080 → LARGE (height=1080)") {
-        // height=1080 >700 → LARGE
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(1080), "_large") == 0);
+    SECTION("1920x1080 → XLARGE (height=1080)") {
+        // height=1080 >700 → XLARGE
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(1080), "_xlarge") == 0);
     }
 
     SECTION("640x480 → MEDIUM (height=480)") {
-        // height=480, 461-700 → MEDIUM
+        // height=480, 461-550 → MEDIUM
         REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(480), "_medium") == 0);
     }
 
-    SECTION("320x240 → SMALL (height=240)") {
-        // height=240 ≤460 → SMALL
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(240), "_small") == 0);
+    SECTION("320x240 → TINY (height=240)") {
+        // height=240 ≤390 → TINY
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(240), "_tiny") == 0);
     }
 
-    SECTION("800x600 → MEDIUM (height=600)") {
-        // height=600, 461-700 → MEDIUM
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(600), "_medium") == 0);
+    SECTION("800x600 → LARGE (height=600)") {
+        // height=600, 551-700 → LARGE
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(600), "_large") == 0);
     }
 
     SECTION("1920x440 ultra-wide → SMALL (height=440)") {
@@ -263,19 +276,19 @@ TEST_CASE("Breakpoint mapping: arbitrary resolutions", "[display_resolution][bre
 
 TEST_CASE("Breakpoint mapping: edge cases", "[display_resolution][breakpoint]") {
     SECTION("Very small resolution") {
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(1), "_small") == 0);
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(1), "_tiny") == 0);
     }
 
     SECTION("Zero resolution") {
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(0), "_small") == 0);
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(0), "_tiny") == 0);
     }
 
     SECTION("Very large resolution") {
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(4000), "_large") == 0);
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(4000), "_xlarge") == 0);
     }
 
     SECTION("8K resolution") {
-        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(7680), "_large") == 0);
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(7680), "_xlarge") == 0);
     }
 }
 

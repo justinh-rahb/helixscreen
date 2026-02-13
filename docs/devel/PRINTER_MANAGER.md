@@ -252,9 +252,9 @@ The XML also uses responsive consts for the image container:
 
 ```xml
 <consts>
-  <px name="pm_image_size_small" value="120"/>   <!-- <= 460px height -->
-  <px name="pm_image_size_medium" value="160"/>  <!-- 461-700px height -->
-  <px name="pm_image_size_large" value="200"/>   <!-- > 700px height -->
+  <px name="pm_image_size_small" value="120"/>   <!-- 391-460px height -->
+  <px name="pm_image_size_medium" value="160"/>  <!-- 461-550px height -->
+  <px name="pm_image_size_large" value="200"/>   <!-- 551-700px height (_xlarge falls back here) -->
 </consts>
 ```
 

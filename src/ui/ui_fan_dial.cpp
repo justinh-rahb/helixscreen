@@ -3,6 +3,7 @@
 
 #include "ui_fan_dial.h"
 
+#include "ui_fan_arc_resize.h"
 #include "ui_utils.h"
 
 #include "format_utils.h"
@@ -56,6 +57,9 @@ FanDial::FanDial(lv_obj_t* parent, const std::string& name, const std::string& f
     lv_obj_add_event_cb(arc_, on_arc_value_changed, LV_EVENT_VALUE_CHANGED, this);
     lv_obj_add_event_cb(btn_off_, on_off_clicked, LV_EVENT_CLICKED, this);
     lv_obj_add_event_cb(btn_on_, on_on_clicked, LV_EVENT_CLICKED, this);
+
+    // Attach auto-resize callback for dynamic arc scaling
+    helix::ui::fan_arc_attach_auto_resize(root_);
 
     // Set initial speed display and button states
     update_speed_label(initial_speed);
@@ -286,12 +290,12 @@ void FanDial::handle_arc_changed() {
 
 void FanDial::label_anim_exec_cb(void* var, int32_t value) {
     auto* self = static_cast<FanDial*>(var);
-    // Update arc position, label text, button states, and knob glow together
-    self->update_speed_label(static_cast<int>(value));
-    self->update_button_states(static_cast<int>(value));
-    self->update_knob_glow(static_cast<int>(value));
+    int percent = static_cast<int>(value);
+    self->update_speed_label(percent);
+    self->update_button_states(percent);
+    self->update_knob_glow(percent);
     if (self->arc_) {
-        lv_arc_set_value(self->arc_, static_cast<int32_t>(value));
+        lv_arc_set_value(self->arc_, value);
     }
 }
 
@@ -303,18 +307,8 @@ void FanDial::anim_completed_cb(lv_anim_t* anim) {
 }
 
 void FanDial::animate_speed_label(int from, int to) {
-    // For no-change or missing label, just set directly
-    if (from == to) {
-        update_speed_label(to);
-        if (arc_) {
-            lv_arc_set_value(arc_, to);
-        }
-        syncing_ = false;
-        return;
-    }
-
-    // Respect animation settings
-    if (!SettingsManager::instance().get_animations_enabled()) {
+    // Skip animation when value unchanged or animations disabled
+    if (from == to || !SettingsManager::instance().get_animations_enabled()) {
         update_speed_label(to);
         if (arc_) {
             lv_arc_set_value(arc_, to);

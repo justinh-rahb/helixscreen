@@ -10,24 +10,28 @@
     <prop name="speed_percent" type="number" default="0"/>
   </api>
   <view name="fan_status_card_root"
-        extends="ui_card" width="#fan_card_width" height="#fan_card_height" flex_flow="column"
+        extends="ui_card" height="#fan_card_height"
+        width="#fan_card_base_width"
+        style_min_width="#fan_card_min_width" style_max_width="#fan_card_max_width"
+        flex_flow="column"
         style_flex_main_place="start" style_flex_cross_place="center"
         style_pad_all="#space_sm" style_pad_gap="#space_xs" scrollable="false">
     <!-- Fan name label at top -->
     <text_small name="name_label" text="$fan_name"/>
-    <!-- Arc display container (matches fan_dial layout) -->
+    <!-- Arc display container - flexes to fill remaining vertical space -->
     <lv_obj name="dial_container"
-            width="#fan_arc_size" height="#fan_arc_size"
-            style_pad_all="0" scrollable="false">
-      <!-- 270-degree arc display (read-only, muted gray colors, no knob) -->
+            width="100%" flex_grow="1"
+            style_pad_all="0" scrollable="false"
+            style_flex_main_place="center" style_flex_cross_place="center">
+      <!-- 270-degree arc display (size set dynamically by C++ SIZE_CHANGED callback, read-only) -->
       <lv_arc name="dial_arc"
-              width="#fan_arc_size" height="#fan_arc_size" align="center"
+              align="center"
               bg_start_angle="135" bg_end_angle="45"
               start_angle="135" end_angle="135"
               min_value="0" max_value="100" value="$speed_percent"
               rotation="0" mode="normal"
-              style_arc_width="#fan_arc_width" style_arc_color="#border"
-              style_arc_width:indicator="#fan_arc_width" style_arc_color:indicator="#text_muted"
+              style_arc_color="#border"
+              style_arc_color:indicator="#text_muted"
               style_arc_rounded="true" style_arc_rounded:indicator="true"
               style_bg_opa="0" style_border_width="0"
               style_bg_opa:knob="0"
