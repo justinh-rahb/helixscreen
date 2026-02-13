@@ -24,7 +24,7 @@ These docs are **end-user facing**. They must be written for people who are NOT 
 | `guide/motion.md` | Jog pad, homing, distance increments, E-stop |
 | `guide/filament.md` | Extrusion, AMS, Spoolman, dryer control |
 | `guide/calibration.md` | Bed mesh, screws tilt, input shaper, PID |
-| `guide/settings.md` | All settings panels |
+| `guide/settings.md` | All settings panels (display, sound, LED, network, sensors) |
 | `guide/advanced.md` | Console, macros, power, history, timelapse |
 | `guide/beta-features.md` | Beta activation, feature list, update channels |
 | `guide/tips.md` | Workflow tips, troubleshooting, panel reference |

@@ -13,7 +13,7 @@ Complete guide to using HelixScreen, the touchscreen UI for Klipper 3D printers.
 | Home | Home | Monitor status, start prints, view temperatures |
 | Tune | Controls | Move axes, set temperatures, control fans |
 | Spool | Filament | Load/unload filament, manage AMS slots |
-| Gear | Settings | Configure display, sound, network, sensors |
+| Gear | Settings | Configure display, sound, LED, network, sensors |
 | More | Advanced | Calibration, history, macros, system tools |
 
 ---
@@ -52,7 +52,7 @@ Bed mesh visualization, screws tilt adjust, input shaper resonance testing, Z-of
 ![Bed Mesh](../images/screenshot-bed-mesh-panel.png)
 
 ### [Settings](guide/settings.md)
-Display, theme, sound, network, sensors, touch calibration, hardware health, safety, machine limits, and factory reset.
+Display, theme, sound, LED, network, sensors, touch calibration, hardware health, safety, machine limits, and factory reset.
 
 ![Settings](../images/screenshot-settings-panel.png)
 

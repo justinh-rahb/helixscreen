@@ -16,6 +16,7 @@ Complete reference for HelixScreen configuration options.
 - [Output Settings](#output-settings)
 - [Network Settings](#network-settings)
 - [Printer Settings](#printer-settings)
+- [LED Settings](#led-settings)
 - [Moonraker Settings](#moonraker-settings)
 - [G-code Viewer Settings](#g-code-viewer-settings)
 - [AMS Settings](#ams-settings)
@@ -474,10 +475,91 @@ Located in the `printer` section:
 **Type:** string
 **Description:** Klipper fan name for hotend cooling.
 
+---
+
+## LED Settings
+
+Located in the `printer.leds` section. Configured via **Settings > LED Settings**.
+
 ### `leds.strip`
 **Type:** string
 **Default:** `"None"`
-**Description:** Klipper LED strip name, or `"None"` if no controllable LEDs.
+**Description:** Legacy single LED strip name, or `"None"` if no controllable LEDs. Superseded by `leds.selected_strips` for multi-strip control.
+
+### `leds.selected_strips`
+**Type:** array of strings
+**Default:** `[]`
+**Description:** Klipper LED strip IDs to control (e.g., `["neopixel caselight", "dotstar toolhead"]`). Supports neopixel, dotstar, led, and WLED strips. Configured via **Settings > LED Settings**.
+
+### `leds.led_on_at_start`
+**Type:** boolean
+**Default:** `false`
+**Description:** Automatically turn on selected LED strips when Klipper becomes ready. Useful for chamber lights that should always be on. This setting has moved from `output.led_on_at_start` to here, though the legacy location is still read for backward compatibility.
+
+### `leds.last_color`
+**Type:** integer
+**Default:** `16777215` (white)
+**Description:** Last used LED color as an integer RGB value (e.g., `16777215` = white, `16711680` = red, `65280` = green, `255` = blue). Remembered between sessions.
+
+### `leds.last_brightness`
+**Type:** integer
+**Default:** `100`
+**Range:** `0` - `100`
+**Description:** Last used brightness percentage. Remembered between sessions.
+
+### `leds.color_presets`
+**Type:** array of integers
+**Default:** `[16777215, 16711680, 65280, 255, 16776960, 16711935, 65535]`
+**Description:** Preset color values (integer RGB) shown in the color picker. Default presets are white, red, green, blue, yellow, magenta, and cyan.
+
+### `leds.auto_state`
+**Type:** object
+**Description:** Automatic state-based LED lighting configuration. When enabled, LEDs change automatically based on printer state.
+
+```json
+{
+  "auto_state": {
+    "enabled": false,
+    "mappings": {
+      "idle": { "action": "brightness", "brightness": 50, "color": 0 },
+      "heating": { "action": "color", "color": 16711680, "brightness": 100 },
+      "printing": { "action": "brightness", "brightness": 100, "color": 0 },
+      "paused": { "action": "effect", "effect_name": "breathing", "color": 0, "brightness": 100 },
+      "error": { "action": "color", "color": 16711680, "brightness": 100 },
+      "complete": { "action": "color", "color": 65280, "brightness": 100 }
+    }
+  }
+}
+```
+
+- `enabled` — Boolean, enable/disable automatic state-based lighting
+- `mappings` — Object mapping printer state keys (`idle`, `heating`, `printing`, `paused`, `error`, `complete`) to actions
+- Each mapping has an `action` type: `"off"`, `"brightness"`, `"color"`, `"effect"`, `"wled_preset"`, or `"macro"`
+- Additional fields depend on the action: `brightness` (0-100), `color` (integer RGB), `effect_name` (string), `wled_preset` (integer), `macro` (string)
+
+### `leds.macro_devices`
+**Type:** array of objects
+**Default:** `[]`
+**Description:** Custom LED macro devices shown as cards in the LED control overlay. Each device object:
+
+```json
+{
+  "name": "Chamber Light",
+  "type": "on_off",
+  "on_macro": "LIGHTS_ON",
+  "off_macro": "LIGHTS_OFF",
+  "toggle_macro": "",
+  "presets": []
+}
+```
+
+- `name` — Display name for the device card
+- `type` — Device type: `"on_off"` (separate on/off macros), `"toggle"` (single toggle macro), or `"preset"` (multiple named presets)
+- `on_macro` / `off_macro` — Macro names for on/off type
+- `toggle_macro` — Macro name for toggle type
+- `presets` — Array of `{"name": "...", "macro": "..."}` objects for preset type
+
+Configured via **Settings > LED Settings > Macro Devices**.
 
 ### `extra_sensors`
 **Type:** object
@@ -1111,7 +1193,24 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
       "hotend": "heater_fan hotend_fan"
     },
     "leds": {
-      "strip": "caselight"
+      "strip": "caselight",
+      "selected_strips": ["neopixel caselight"],
+      "led_on_at_start": false,
+      "last_color": 16777215,
+      "last_brightness": 100,
+      "color_presets": [16777215, 16711680, 65280, 255, 16776960, 16711935, 65535],
+      "auto_state": {
+        "enabled": false,
+        "mappings": {
+          "idle": { "action": "brightness", "brightness": 50, "color": 0 },
+          "heating": { "action": "color", "color": 16711680, "brightness": 100 },
+          "printing": { "action": "brightness", "brightness": 100, "color": 0 },
+          "paused": { "action": "off" },
+          "error": { "action": "color", "color": 16711680, "brightness": 100 },
+          "complete": { "action": "color", "color": 65280, "brightness": 100 }
+        }
+      },
+      "macro_devices": []
     },
     "extra_sensors": {},
     "hardware": {

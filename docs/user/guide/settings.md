@@ -81,6 +81,53 @@ Manage all printer sensors:
 
 ---
 
+## LED Settings
+
+Tap **LED Settings** in Settings to open the LED configuration overlay.
+
+### LED Strip Selection
+
+Multi-select chips show all detected LED strips from your printer (neopixel, dotstar, led, and WLED strips). Tap a chip to toggle whether HelixScreen controls that strip. You can select multiple strips at once.
+
+### LED On At Start
+
+Toggle this on to automatically turn your LEDs on when Klipper becomes ready. Useful for chamber lights that should always be on.
+
+### Auto-State Lighting
+
+When enabled, your LEDs automatically change based on what the printer is doing. Configure behavior for six printer states: **Idle**, **Heating**, **Printing**, **Paused**, **Error**, and **Complete**.
+
+Each state has an action type dropdown:
+
+| Action | What It Does |
+|--------|--------------|
+| **Off** | LEDs turn off for this state |
+| **Brightness** | Set a brightness level (0-100%) |
+| **Color** | Choose from color presets with a brightness slider |
+| **Effect** | Select a Klipper LED effect (requires `led_effect` plugin) |
+| **WLED Preset** | Choose a WLED preset ID (requires WLED integration) |
+| **Macro** | Run a configured LED macro |
+
+> **Note:** Only actions supported by your hardware are shown. For example, **Effect** only appears if the `led_effect` Klipper plugin is installed, and **WLED Preset** only appears if WLED strips are detected.
+
+### Macro Devices
+
+Define custom LED macro devices that appear as cards in the LED control overlay. Three device types are available:
+
+| Type | Description |
+|------|-------------|
+| **On/Off** | Separate on and off macros |
+| **Toggle** | Single macro that toggles the LED |
+| **Preset** | Multiple named presets, each mapped to a different macro |
+
+Macros are auto-discovered from Klipper — any macro with "led" or "light" in its name appears in the selection list.
+
+- Tap **+** to add a new macro device
+- Tap the **pencil icon** to edit an existing device
+- Tap the **trash icon** to delete a device
+
+---
+
 ## Touch Calibration
 
 > **Note:** This option only appears on touchscreen displays, not in the desktop simulator.
