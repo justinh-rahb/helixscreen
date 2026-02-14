@@ -5,10 +5,7 @@
 
 #include "ui_update_queue.h"
 
-#include "spdlog/spdlog.h"
-
 #include <functional>
-#include <memory>
 #include <type_traits>
 
 /**
@@ -21,13 +18,12 @@
  * @section problem Problem Solved
  * WebSocket callbacks run on libhv's event loop thread. Calling lv_subject_set_*()
  * directly from a background thread triggers lv_obj_invalidate() which asserts
- * if called during LVGL rendering. The traditional solution requires:
- *   1. Defining a context struct with instance pointer and values
- *   2. Defining a static callback function that casts, invokes, and deletes
- *   3. Calling ui_async_call with heap-allocated context
+ * if called during LVGL rendering.
  *
- * This pattern is repeated 7+ times in printer_state.cpp alone, totaling ~150
- * lines of boilerplate. These utilities reduce it to single function calls.
+ * These helpers queue lambdas for execution on the main LVGL thread via
+ * ui_queue_update(). Exception safety is provided by UpdateQueue::process_pending().
+ *
+ * Prefer helix::async::invoke() over raw ui_async_call() for new code.
  *
  * @section usage Usage
  * @code
@@ -72,8 +68,11 @@ namespace helix::async {
 /**
  * @brief Invoke a callable on the LVGL main thread
  *
- * Type-erases any callable (lambda, std::function, function pointer) into
- * a heap-allocated std::function<void()> and schedules it via ui_async_call.
+ * Queues any callable for execution on the main thread before rendering.
+ * This is the preferred way to defer UI work from background threads.
+ *
+ * Exception safety is provided by UpdateQueue::process_pending() — if the
+ * callback throws, the exception is caught and logged, not propagated.
  *
  * @tparam Callable Any invocable type with signature void()
  * @param callable The function/lambda to invoke on the main thread
@@ -85,24 +84,7 @@ namespace helix::async {
  * @endcode
  */
 template <typename Callable> void invoke(Callable&& callable) {
-    // Type-erase into std::function on the heap
-    auto* fn = new std::function<void()>(std::forward<Callable>(callable));
-
-    ui_async_call(
-        [](void* data) {
-            auto* func = static_cast<std::function<void()>*>(data);
-            if (func) {
-                try {
-                    (*func)();
-                } catch (const std::exception& e) {
-                    spdlog::error("[async::invoke] Exception in callback: {}", e.what());
-                } catch (...) {
-                    spdlog::error("[async::invoke] Unknown exception in callback");
-                }
-            }
-            delete func;
-        },
-        fn);
+    ui_queue_update(std::forward<Callable>(callable));
 }
 
 /**
