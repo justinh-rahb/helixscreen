@@ -7,11 +7,9 @@
     <!-- ===================================================================== -->
     <!-- Runtime-Registered Layout Constants                                   -->
     <!-- ===================================================================== -->
-    <!-- nav_width and overlay_panel_width are registered at runtime by
-         ui_theme_register_responsive_spacing() based on screen size.
-         DO NOT define them here - LVGL ignores duplicate registrations.
-         Values: nav_width = 64/76/102px (small/medium/large breakpoints)
-                 overlay_panel_width = screen - nav - space_lg gap -->
+    <!-- nav_width is defined in navigation_bar.xml and registered using
+         horizontal breakpoint. overlay_panel_width is computed at runtime as
+         screen - nav_width - space_lg gap. DO NOT define nav_width here. -->
     <!-- UI dimensions -->
     <px name="nav_padding" value="16"/>
     <!-- Modal backdrop opacity (0-255) -->
@@ -27,8 +25,9 @@
     <!-- Unified Responsive Spacing System (space_*)                         -->
     <!-- ===================================================================== -->
     <!-- Runtime selects appropriate variant via ui_theme_register_responsive_spacing()
-         based on screen height: SMALL (≤460px), MEDIUM (461-700px), LARGE (>700px)
-         Target hardware: 480x320, 1920x440 (SMALL), 800x480, 1024x600 (MEDIUM), 1280x720+ (LARGE)
+         based on screen height: TINY (≤390), SMALL (391-460), MEDIUM (461-550), LARGE (551-700), XLARGE (>700)
+         Target hardware: 480x320 (TINY), 480x400/1920x440 (SMALL), 800x480 (MEDIUM), 1024x600 (LARGE), 1280x720+ (XLARGE)
+         _tiny and _xlarge variants are optional — they fall back to _small and _large respectively.
 
          CRITICAL: Base constants (space_xxs, space_xs, etc.) are registered at
          runtime by ui_theme.cpp - do NOT define them here or responsive overrides
@@ -67,14 +66,15 @@
     <px name="space_2xl_neg_large" value="-40"/>
 
     <!-- ===================================================================== -->
-    <!-- Responsive Icon Sizes (icon_size_*)                                  -->
+    <!-- Responsive Icon Sizes (icon_size)                                    -->
     <!-- ===================================================================== -->
     <!-- Runtime selects appropriate variant via ui_theme_register_responsive_fonts()
-         Icon sizes for status card icons (home panel temp/network/light)
+         Unified icon size for cards, nav bar, and other standard icons
          Values: xs(16), sm(24), md(32), lg(48), xl(64) -->
-    <string name="icon_size_card_small" value="md"/>
-    <string name="icon_size_card_medium" value="lg"/>
-    <string name="icon_size_card_large" value="xl"/>
+    <string name="icon_size_tiny" value="md"/>
+    <string name="icon_size_small" value="md"/>
+    <string name="icon_size_medium" value="lg"/>
+    <string name="icon_size_large" value="xl"/>
 
     <!-- ===================================================================== -->
     <!-- Responsive Spinner Sizes (spinner_*)                                  -->
@@ -112,39 +112,7 @@
     <px name="spinner_arc_xs_medium" value="2"/>
     <px name="spinner_arc_xs_large" value="2"/>
 
-    <!-- ===================================================================== -->
-    <!-- Responsive Fan Dial / Status Card Sizes (fan_*)                       -->
-    <!-- ===================================================================== -->
-    <!-- Runtime selects appropriate variant via ui_theme_register_responsive_spacing()
-         Fan dial and fan status card component dimensions -->
-    <!-- fan_card_width: Overall card width -->
-    <px name="fan_card_width_small" value="140"/>
-    <px name="fan_card_width_medium" value="175"/>
-    <px name="fan_card_width_large" value="200"/>
-    <!-- fan_card_height: Overall card height -->
-    <px name="fan_card_height_small" value="152"/>
-    <px name="fan_card_height_medium" value="190"/>
-    <px name="fan_card_height_large" value="220"/>
-    <!-- fan_arc_size: Arc dial diameter -->
-    <px name="fan_arc_size_small" value="88"/>
-    <px name="fan_arc_size_medium" value="110"/>
-    <px name="fan_arc_size_large" value="132"/>
-    <!-- fan_arc_width: Arc track/indicator width -->
-    <px name="fan_arc_width_small" value="8"/>
-    <px name="fan_arc_width_medium" value="10"/>
-    <px name="fan_arc_width_large" value="12"/>
-    <!-- fan_btn_row_height: Button row container height -->
-    <px name="fan_btn_row_height_small" value="28"/>
-    <px name="fan_btn_row_height_medium" value="32"/>
-    <px name="fan_btn_row_height_large" value="36"/>
-    <!-- fan_btn_width: Off/On button width -->
-    <px name="fan_btn_width_small" value="50"/>
-    <px name="fan_btn_width_medium" value="60"/>
-    <px name="fan_btn_width_large" value="70"/>
-    <!-- fan_btn_height: Off/On button height -->
-    <px name="fan_btn_height_small" value="24"/>
-    <px name="fan_btn_height_medium" value="28"/>
-    <px name="fan_btn_height_large" value="32"/>
+    <!-- Fan card tokens (fan_*) live in fan_tokens.xml -->
 
     <!-- ===================================================================== -->
     <!-- Responsive Keypad Sizes (keypad_*)                                    -->
@@ -208,7 +176,7 @@
     <px name="temp_card_height_small" value="64"/>
     <px name="temp_card_height_medium" value="72"/>
     <px name="temp_card_height_large" value="80"/>
-<!-- detail_metadata_clip_height: Clip container for print file detail overlay -->
+    <!-- detail_metadata_clip_height: Clip container for print file detail overlay -->
     <px name="detail_metadata_clip_height_small" value="92"/>
     <px name="detail_metadata_clip_height_medium" value="112"/>
     <px name="detail_metadata_clip_height_large" value="112"/>

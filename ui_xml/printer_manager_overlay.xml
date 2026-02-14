@@ -6,7 +6,8 @@
 <component>
   <consts>
     <!-- Printer image size: responsive to screen height breakpoints -->
-    <!-- SMALL (≤460px: 480x320, 1920x440), MEDIUM (461-700px: 800x480, 1024x600), LARGE (>700px: 1280x720+) -->
+    <!-- SMALL (391-460: 480x400, 1920x440), MEDIUM (461-550: 800x480), LARGE (551-700: 1024x600), XLARGE (>700: 1280x720+) -->
+    <!-- _tiny falls back to _small, _xlarge falls back to _large -->
     <px name="pm_image_size_small" value="120"/>
     <px name="pm_image_size_medium" value="160"/>
     <px name="pm_image_size_large" value="200"/>

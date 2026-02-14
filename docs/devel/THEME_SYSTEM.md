@@ -135,18 +135,20 @@ lv_color_t bg = theme_manager_get_color("card_bg");
 
 ## Responsive Sizing
 
-### The Triplet System
+### The Breakpoint System
 
-Every responsive value has three variants: `_small`, `_medium`, `_large`. The system automatically selects based on screen resolution.
+Every responsive value requires three core variants: `_small`, `_medium`, `_large`. Optional `_tiny` and `_xlarge` variants can be added where values differ. The system automatically selects based on screen height.
 
-**Breakpoints:**
-| Suffix | Resolution | Target Devices |
-|--------|-----------|----------------|
-| `_small` | ≤480px | 480×320 displays |
-| `_medium` | 481-800px | 800×480 displays |
-| `_large` | >800px | 1024×600, 1280×720+ |
+**Breakpoints (5-tier, height-based):**
+| Suffix | Height | Target Devices | Fallback |
+|--------|--------|----------------|----------|
+| `_tiny` | ≤390px | 480×320 | → `_small` |
+| `_small` | 391-460px | 480×400, 1920×440 | required |
+| `_medium` | 461-550px | 800×480 | required |
+| `_large` | 551-700px | 1024×600 | required |
+| `_xlarge` | >700px | 1280×720+ | → `_large` |
 
-Resolution = max(width, height).
+Height = vertical resolution (the real constraint for layout).
 
 ### Spacing Tokens
 
@@ -301,7 +303,7 @@ Icon sizes map directly to fixed-size icon fonts (not responsive):
 | `lg` | mdi_icons_48 | Status indicators |
 | `xl` | mdi_icons_64 | Navigation, hero icons |
 
-> **Note:** For responsive icon sizing in cards, use the `icon_size_card` token which selects md/lg/xl based on breakpoint.
+> **Note:** For responsive icon sizing, use the `icon_size` token (`size="#icon_size"`) which selects sm/md/lg/xl based on breakpoint (tiny/small/medium/large/xlarge).
 
 **Attributes:**
 - `src` - MDI icon name ("home", "settings", "wifi")
@@ -327,14 +329,16 @@ ui_icon_set_variant(icon, "success");
 #### ui_spinner
 Indeterminate loading spinner with themed arc color.
 
-Spinner sizes are **responsive** - the pixel values vary by screen breakpoint:
+Spinner sizes are **responsive** - the pixel values vary by screen height breakpoint:
 
-| Size | Small (≤480px) | Medium (481-800px) | Large (>800px) |
-|------|----------------|-------------------|----------------|
-| `xs` | 12px / 2px arc | 14px / 2px arc | 16px / 2px arc |
-| `sm` | 16px / 2px arc | 18px / 2px arc | 20px / 2px arc |
-| `md` | 24px / 2px arc | 28px / 3px arc | 32px / 3px arc |
-| `lg` | 48px / 3px arc | 56px / 4px arc | 64px / 4px arc |
+| Size | Small (391-460) | Medium (461-550) | Large (551-700) | XLarge (>700) |
+|------|-----------------|-------------------|-----------------|---------------|
+| `xs` | 12px / 2px arc | 14px / 2px arc | 16px / 2px arc | 16px / 2px arc |
+| `sm` | 16px / 2px arc | 18px / 2px arc | 20px / 2px arc | 20px / 2px arc |
+| `md` | 24px / 2px arc | 28px / 3px arc | 32px / 3px arc | 32px / 3px arc |
+| `lg` | 48px / 3px arc | 56px / 4px arc | 64px / 4px arc | 64px / 4px arc |
+
+> Note: _xlarge falls back to _large unless explicitly defined. _tiny falls back to _small.
 
 ```xml
 <spinner size="lg"/>

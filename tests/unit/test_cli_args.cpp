@@ -228,7 +228,7 @@ TEST_CASE("CliArgs: default values", "[cli_args]") {
     CliArgs args;
 
     SECTION("screen settings default to auto") {
-        REQUIRE(args.screen_size == ScreenSize::SMALL);
+        REQUIRE(args.screen_size == ScreenSize::MEDIUM);
         REQUIRE(args.dpi == -1);
         REQUIRE(args.display_num == -1);
         REQUIRE(args.x_pos == -1);
@@ -304,34 +304,28 @@ TEST_CASE("CliArgs: needs_moonraker_data", "[cli_args]") {
 
 TEST_CASE("ScreenSize enum values", "[cli_args]") {
     SECTION("All enum values are distinct") {
-        REQUIRE(ScreenSize::TINY != ScreenSize::TINY_ALT);
         REQUIRE(ScreenSize::TINY != ScreenSize::SMALL);
         REQUIRE(ScreenSize::TINY != ScreenSize::MEDIUM);
         REQUIRE(ScreenSize::TINY != ScreenSize::LARGE);
-        REQUIRE(ScreenSize::TINY_ALT != ScreenSize::SMALL);
-        REQUIRE(ScreenSize::TINY_ALT != ScreenSize::MEDIUM);
-        REQUIRE(ScreenSize::TINY_ALT != ScreenSize::LARGE);
+        REQUIRE(ScreenSize::TINY != ScreenSize::XLARGE);
         REQUIRE(ScreenSize::SMALL != ScreenSize::MEDIUM);
         REQUIRE(ScreenSize::SMALL != ScreenSize::LARGE);
+        REQUIRE(ScreenSize::SMALL != ScreenSize::XLARGE);
         REQUIRE(ScreenSize::MEDIUM != ScreenSize::LARGE);
+        REQUIRE(ScreenSize::MEDIUM != ScreenSize::XLARGE);
+        REQUIRE(ScreenSize::LARGE != ScreenSize::XLARGE);
     }
 
     SECTION("ScreenSize ordering matches expected breakpoint order") {
-        // Verify enum values are ordered TINY < TINY_ALT < SMALL < MEDIUM < LARGE
-        REQUIRE(static_cast<int>(ScreenSize::TINY) < static_cast<int>(ScreenSize::TINY_ALT));
-        REQUIRE(static_cast<int>(ScreenSize::TINY_ALT) < static_cast<int>(ScreenSize::SMALL));
+        // Verify enum values are ordered TINY < SMALL < MEDIUM < LARGE < XLARGE
+        REQUIRE(static_cast<int>(ScreenSize::TINY) < static_cast<int>(ScreenSize::SMALL));
         REQUIRE(static_cast<int>(ScreenSize::SMALL) < static_cast<int>(ScreenSize::MEDIUM));
         REQUIRE(static_cast<int>(ScreenSize::MEDIUM) < static_cast<int>(ScreenSize::LARGE));
+        REQUIRE(static_cast<int>(ScreenSize::LARGE) < static_cast<int>(ScreenSize::XLARGE));
     }
 
-    SECTION("Default CliArgs screen_size is SMALL") {
+    SECTION("Default CliArgs screen_size is MEDIUM") {
         CliArgs args;
-        REQUIRE(args.screen_size == ScreenSize::SMALL);
-    }
-
-    SECTION("TINY_ALT is between TINY and SMALL") {
-        // TINY_ALT is for 480x400 displays (taller than TINY 480x320)
-        REQUIRE(static_cast<int>(ScreenSize::TINY) < static_cast<int>(ScreenSize::TINY_ALT));
-        REQUIRE(static_cast<int>(ScreenSize::TINY_ALT) < static_cast<int>(ScreenSize::SMALL));
+        REQUIRE(args.screen_size == ScreenSize::MEDIUM);
     }
 }

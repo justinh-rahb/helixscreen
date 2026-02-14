@@ -160,10 +160,10 @@ class ThumbnailProcessor {
      * @brief Get optimal thumbnail target for current display
      *
      * Queries the active LVGL display and returns target dimensions based on
-     * display breakpoint (using max(width, height)):
+     * display height breakpoint (5-tier: TINY/SMALL/MEDIUM/LARGE/XLARGE):
      *
-     * Card sizes:   SMALL (<=480px): 120x120, MEDIUM (<=800px): 160x160, LARGE (>800px): 220x220
-     * Detail sizes: SMALL (<=480px): 200x200, MEDIUM (<=800px): 300x300, LARGE (>800px): 400x400
+     * Card sizes:   SMALL (≤460): 120x120, MEDIUM (≤550): 160x160, LARGE/XLARGE (>550): 220x220
+     * Detail sizes: SMALL (≤460): 200x200, MEDIUM (≤550): 300x300, LARGE/XLARGE (>550): 400x400
      *
      * Always uses ARGB8888 — LVGL converts to display format at render time.
      *

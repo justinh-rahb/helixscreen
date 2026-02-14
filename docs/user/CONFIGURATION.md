@@ -360,7 +360,7 @@ Located in the `output` section:
 ### `led_on_at_start`
 **Type:** boolean
 **Default:** `false`
-**Description:** Automatically turn on the configured LED strip when Klipper becomes ready. Useful for printers with chamber lights that should always be on.
+**Description:** Automatically turn on the configured LED strip when Klipper becomes ready. Useful for printers with chamber lights that should always be on. **Deprecated:** This setting has moved to `printer.leds.led_on_at_start`. The legacy location is still read for backward compatibility.
 
 ---
 
@@ -418,10 +418,19 @@ Located in the `printer` section:
     },
     "fans": {
       "hotend": "heater_fan hotend_fan",
-      "part": "fan"
+      "part": "fan",
+      "chamber": "",
+      "exhaust": ""
     },
     "leds": {
-      "strip": "None"
+      "strip": "",
+      "selected_strips": [],
+      "led_on_at_start": false,
+      "last_color": 16777215,
+      "last_brightness": 100,
+      "color_presets": [16777215, 16711680, 65280, 255, 16776960, 16711935, 65535],
+      "auto_state": { ... },
+      "macro_devices": []
     },
     "extra_sensors": {},
     "hardware": {
@@ -475,6 +484,16 @@ Located in the `printer` section:
 **Type:** string
 **Description:** Klipper fan name for hotend cooling.
 
+### `fans.chamber`
+**Type:** string
+**Default:** `""` (none)
+**Description:** Klipper fan name for chamber fan (e.g., `"fan_generic chamber_fan"`). Leave empty if not available.
+
+### `fans.exhaust`
+**Type:** string
+**Default:** `""` (none)
+**Description:** Klipper fan name for exhaust fan (e.g., `"fan_generic exhaust_fan"`). Leave empty if not available.
+
 ---
 
 ## LED Settings
@@ -483,8 +502,8 @@ Located in the `printer.leds` section. Configured via **Settings > LED Settings*
 
 ### `leds.strip`
 **Type:** string
-**Default:** `"None"`
-**Description:** Legacy single LED strip name, or `"None"` if no controllable LEDs. Superseded by `leds.selected_strips` for multi-strip control.
+**Default:** `""` (empty)
+**Description:** Legacy single LED strip name. Empty string if no controllable LEDs. Superseded by `leds.selected_strips` for multi-strip control.
 
 ### `leds.selected_strips`
 **Type:** array of strings
@@ -1190,10 +1209,12 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
     },
     "fans": {
       "part": "fan",
-      "hotend": "heater_fan hotend_fan"
+      "hotend": "heater_fan hotend_fan",
+      "chamber": "",
+      "exhaust": ""
     },
     "leds": {
-      "strip": "caselight",
+      "strip": "",
       "selected_strips": ["neopixel caselight"],
       "led_on_at_start": false,
       "last_color": 16777215,

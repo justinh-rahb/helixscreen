@@ -124,11 +124,11 @@ Even better - extract the dual-icon pattern itself:
 <!-- CURRENT: Network state icons - 6 icons for 6 states -->
 <lv_button name="network_btn" ...>
   <!-- Disconnected (state 0) -->
-  <icon name="net_disconnected" src="wifi_off" size="#icon_size_card" variant="disabled">
+  <icon name="net_disconnected" src="wifi_off" size="#icon_size" variant="disabled">
     <lv_obj-bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="0"/>
   </icon>
   <!-- WiFi strength 1 (state 1) -->
-  <icon name="net_wifi_1" src="wifi_strength_1_alert" size="#icon_size_card" variant="warning">
+  <icon name="net_wifi_1" src="wifi_strength_1_alert" size="#icon_size" variant="warning">
     <lv_obj-bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="1"/>
   </icon>
   <!-- ... 4 more icons for states 2-5 ... -->
@@ -144,7 +144,7 @@ Even better - extract the dual-icon pattern itself:
 <component>
   <api>
     <prop name="subject" type="string"/>
-    <prop name="size" type="string" default="#icon_size_card"/>
+    <prop name="size" type="string" default="#icon_size"/>
   </api>
   <view extends="lv_obj" width="content" height="content"
         style_bg_opa="0" style_border_width="0" style_pad_all="0">
@@ -157,7 +157,7 @@ Even better - extract the dual-icon pattern itself:
 ### Usage with Slots (LVGL 9.5)
 
 ```xml
-<state_icon subject="home_network_icon_state" size="#icon_size_card">
+<state_icon subject="home_network_icon_state" size="#icon_size">
   <state_icon-state_0>
     <icon src="wifi_off" variant="disabled"/>
   </state_icon-state_0>

@@ -50,10 +50,37 @@
     },
     "fans": {
       "hotend": "heater_fan hotend_fan",
-      "part": "fan"
+      "part": "fan",
+      "chamber": "",
+      "exhaust": ""
     },
     "leds": {
-      "strip": "None"
+      "strip": "",
+      "_strip_comment": "Legacy single LED strip name. Superseded by selected_strips for multi-strip control.",
+      "selected_strips": [],
+      "_selected_strips_comment": "Klipper LED strip IDs to control (e.g., [\"neopixel caselight\"]). Configured via Settings > LED Settings.",
+      "led_on_at_start": false,
+      "_led_on_at_start_comment": "Automatically turn on selected LED strips when Klipper becomes ready. Default: false.",
+      "last_color": 16777215,
+      "_last_color_comment": "Last used LED color as integer RGB (16777215 = white). Remembered between sessions.",
+      "last_brightness": 100,
+      "_last_brightness_comment": "Last used brightness percentage (0-100). Remembered between sessions.",
+      "color_presets": [16777215, 16711680, 65280, 255, 16776960, 16711935, 65535],
+      "_color_presets_comment": "Preset colors (integer RGB) shown in the color picker. Default: white, red, green, blue, yellow, magenta, cyan.",
+      "auto_state": {
+        "enabled": false,
+        "mappings": {
+          "idle": { "action": "brightness", "brightness": 50, "color": 0 },
+          "heating": { "action": "color", "color": 16711680, "brightness": 100 },
+          "printing": { "action": "brightness", "brightness": 100, "color": 0 },
+          "paused": { "action": "off" },
+          "error": { "action": "color", "color": 16711680, "brightness": 100 },
+          "complete": { "action": "color", "color": 65280, "brightness": 100 }
+        },
+        "_comment": "Automatic state-based LED lighting. Actions: off, brightness, color, effect, wled_preset, macro."
+      },
+      "macro_devices": [],
+      "_macro_devices_comment": "Custom LED macro devices shown as cards in LED control overlay. Each: {name, type (on_off|toggle|preset), on_macro, off_macro, toggle_macro, presets}."
     },
     "extra_sensors": {},
     "hardware": {

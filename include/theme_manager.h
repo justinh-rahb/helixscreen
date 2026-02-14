@@ -5,7 +5,8 @@
  * @file theme_manager.h
  * @brief Responsive design token system with breakpoints, spacing, and theme colors
  *
- * @pattern Singleton with breakpoint suffixes (_small/_medium/_large) and light/dark variants
+ * @pattern Singleton with breakpoint suffixes (_small/_medium/_large/_xlarge) and light/dark
+ * variants
  * @threading Main thread only
  * @gotchas theme_manager_get_color() looks up tokens; theme_manager_parse_color() parses hex
  * literals only
@@ -197,32 +198,32 @@ class ThemeManager {
 // Theme colors: Use theme_manager_get_color() to retrieve from globals.xml
 // Available tokens: primary_color, text_primary, text_secondary, success_color, etc.
 
-// Layout constants
-#define UI_NAV_WIDTH_PERCENT 10 // Nav bar is 1/10th of screen width
-#define UI_NAV_ICON_SIZE 64     // Base icon size for 1024x800
-#define UI_NAV_PADDING 16       // Padding between elements
-
-// Calculate nav width based on actual screen
-#define UI_NAV_WIDTH(screen_w) ((screen_w) / 10)
+// Nav width is defined in navigation_bar.xml as nav_width_tiny/small/medium/large
+// and registered at runtime using horizontal breakpoint (see theme_manager.cpp)
 
 // Responsive breakpoints (based on screen height — vertical space is the constraint)
 // Target hardware: 480x320, 480x400, 1920x440, 800x480, 1024x600, 1280x720
-#define UI_BREAKPOINT_SMALL_MAX 460 // height ≤460 → SMALL
-#define UI_BREAKPOINT_MEDIUM_MAX                                                                   \
-    700 // height 461-700 → MEDIUM
-        // height >700 → LARGE
+// 5-tier system: TINY (≤390) → SMALL (391-460) → MEDIUM (461-550) → LARGE (551-700) → XLARGE (>700)
+// _tiny is optional with fallback to _small — only define _tiny where values differ
+// _xlarge is optional with fallback to _large — only define _xlarge where values differ
+#define UI_BREAKPOINT_TINY_MAX 390   // height ≤390 → TINY (480x320)
+#define UI_BREAKPOINT_SMALL_MAX 460  // height 391-460 → SMALL (480x400, 1920x440)
+#define UI_BREAKPOINT_MEDIUM_MAX 550 // height 461-550 → MEDIUM (800x480)
+#define UI_BREAKPOINT_LARGE_MAX                                                                    \
+    700 // height 551-700 → LARGE (1024x600)
+        // height >700 → XLARGE (1280x720+)
 
-// Screen size targets (reference only, use breakpoints above for logic)
-#define UI_SCREEN_LARGE_W 1280
-#define UI_SCREEN_LARGE_H 720
-#define UI_SCREEN_MEDIUM_W 1024
-#define UI_SCREEN_MEDIUM_H 600
-#define UI_SCREEN_SMALL_W 800
-#define UI_SCREEN_SMALL_H 480
+// Screen size presets for CLI (-s flag) — named to match responsive breakpoints
 #define UI_SCREEN_TINY_W 480
 #define UI_SCREEN_TINY_H 320
-#define UI_SCREEN_TINY_ALT_W 480
-#define UI_SCREEN_TINY_ALT_H 400
+#define UI_SCREEN_SMALL_W 480
+#define UI_SCREEN_SMALL_H 400
+#define UI_SCREEN_MEDIUM_W 800
+#define UI_SCREEN_MEDIUM_H 480
+#define UI_SCREEN_LARGE_W 1024
+#define UI_SCREEN_LARGE_H 600
+#define UI_SCREEN_XLARGE_W 1280
+#define UI_SCREEN_XLARGE_H 720
 
 // Spacing tokens available (use theme_manager_get_spacing() to read values):
 //   space_xxs: 2/3/4px  (small/medium/large breakpoints)
@@ -234,12 +235,6 @@ class ThemeManager {
 
 // Opacity constants (matching globals.xml values)
 #define UI_DISABLED_OPA 128 // disabled_opa - 50% opacity for disabled/dimmed elements
-
-// Responsive navigation bar width (applied in C++ based on screen size)
-#define UI_NAV_WIDTH_TINY 64   // Tiny screens: 42px button + margins
-#define UI_NAV_WIDTH_SMALL 76  // Small screens: 60px button + 8px padding each side
-#define UI_NAV_WIDTH_MEDIUM 94 // Medium screens: 70px button + 12px padding each side
-#define UI_NAV_WIDTH_LARGE 102 // Large screens: 70px button + 16px padding each side
 
 // Semantic fonts: Use theme_manager_get_font() to retrieve responsive fonts from globals.xml
 // Available tokens: font_heading, font_body, font_small
@@ -262,7 +257,8 @@ void theme_manager_init(lv_display_t* display, bool use_dark_mode);
  * Useful for testing and debugging responsive behavior.
  *
  * @param resolution Screen height (vertical resolution)
- * @return "_small" (≤460), "_medium" (461-700), or "_large" (>700)
+ * @return "_tiny" (≤390), "_small" (391-460), "_medium" (461-550), "_large" (551-700), or "_xlarge"
+ * (>700)
  */
 const char* theme_manager_get_breakpoint_suffix(int32_t resolution);
 

@@ -591,8 +591,8 @@ static void theme_manager_register_color_pairs(lv_xml_component_scope_t* scope, 
  * These static constants are registered first so dynamic variants can override them.
  */
 static void theme_manager_register_static_constants(lv_xml_component_scope_t* scope) {
-    const std::vector<std::string> skip_suffixes = {"_light", "_dark", "_small", "_medium",
-                                                    "_large"};
+    const std::vector<std::string> skip_suffixes = {"_light",  "_dark",  "_tiny",  "_small",
+                                                    "_medium", "_large", "_xlarge"};
 
     auto has_dynamic_suffix = [&](const std::string& name) {
         for (const auto& suffix : skip_suffixes) {
@@ -640,12 +640,16 @@ static void theme_manager_register_static_constants(lv_xml_component_scope_t* sc
  * @return Suffix string: "_small" (≤460), "_medium" (461-700), or "_large" (>700)
  */
 const char* theme_manager_get_breakpoint_suffix(int32_t resolution) {
-    if (resolution <= UI_BREAKPOINT_SMALL_MAX) {
+    if (resolution <= UI_BREAKPOINT_TINY_MAX) {
+        return "_tiny";
+    } else if (resolution <= UI_BREAKPOINT_SMALL_MAX) {
         return "_small";
     } else if (resolution <= UI_BREAKPOINT_MEDIUM_MAX) {
         return "_medium";
-    } else {
+    } else if (resolution <= UI_BREAKPOINT_LARGE_MAX) {
         return "_large";
+    } else {
+        return "_xlarge";
     }
 }
 
@@ -667,9 +671,11 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
 
     // Use screen height for breakpoint selection — vertical space is the constraint
     const char* size_suffix = theme_manager_get_breakpoint_suffix(ver_res);
-    const char* size_label = (ver_res <= UI_BREAKPOINT_SMALL_MAX)    ? "SMALL"
+    const char* size_label = (ver_res <= UI_BREAKPOINT_TINY_MAX)     ? "TINY"
+                             : (ver_res <= UI_BREAKPOINT_SMALL_MAX)  ? "SMALL"
                              : (ver_res <= UI_BREAKPOINT_MEDIUM_MAX) ? "MEDIUM"
-                                                                     : "LARGE";
+                             : (ver_res <= UI_BREAKPOINT_LARGE_MAX)  ? "LARGE"
+                                                                     : "XLARGE";
 
     lv_xml_component_scope_t* scope = lv_xml_component_get_scope("globals");
     if (!scope) {
@@ -677,26 +683,65 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
         return;
     }
 
-    // Auto-discover all px tokens from all XML files
+    // ========================================================================
+    // Pre-register nav_width using HORIZONTAL breakpoint (before auto-discovery)
+    // ========================================================================
+    // Nav width is a horizontal concern — ultrawide 1920x440 needs large nav
+    // despite having a tiny vertical breakpoint. Register first so auto-discovery
+    // (which uses vertical breakpoint) silently skips it (LVGL ignores duplicates).
+    {
+        const char* nav_suffix;
+        if (hor_res <= 520)
+            nav_suffix = "_tiny";
+        else if (hor_res <= 900)
+            nav_suffix = "_small";
+        else if (hor_res <= 1100)
+            nav_suffix = "_medium";
+        else
+            nav_suffix = "_large";
+
+        // Read nav_width values from navigation_bar.xml consts
+        auto nav_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", nav_suffix);
+        auto nav_it = nav_tokens.find("nav_width");
+        if (nav_it != nav_tokens.end()) {
+            lv_xml_register_const(scope, "nav_width", nav_it->second.c_str());
+            spdlog::trace("[Theme] nav_width: {}px (hor_res={}, suffix={})", nav_it->second,
+                          hor_res, nav_suffix);
+        }
+    }
+
+    // Auto-discover all px tokens from all XML files (including optional _tiny and _xlarge)
+    auto tiny_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_tiny");
     auto small_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_small");
     auto medium_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_medium");
     auto large_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_large");
+    auto xlarge_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_xlarge");
 
     int registered = 0;
     for (const auto& [base_name, small_val] : small_tokens) {
-        // Verify all three variants exist
+        // Verify _small/_medium/_large triplet exists (required)
         auto medium_it = medium_tokens.find(base_name);
         auto large_it = large_tokens.find(base_name);
 
         if (medium_it != medium_tokens.end() && large_it != large_tokens.end()) {
             // Select appropriate variant based on breakpoint
             const char* value = nullptr;
-            if (strcmp(size_suffix, "_small") == 0) {
+            if (strcmp(size_suffix, "_tiny") == 0) {
+                // Use _tiny if available, otherwise fall back to _small
+                auto tiny_it = tiny_tokens.find(base_name);
+                value =
+                    (tiny_it != tiny_tokens.end()) ? tiny_it->second.c_str() : small_val.c_str();
+            } else if (strcmp(size_suffix, "_small") == 0) {
                 value = small_val.c_str();
             } else if (strcmp(size_suffix, "_medium") == 0) {
                 value = medium_it->second.c_str();
-            } else {
+            } else if (strcmp(size_suffix, "_large") == 0) {
                 value = large_it->second.c_str();
+            } else {
+                // _xlarge: use xlarge if available, otherwise fall back to _large
+                auto xlarge_it = xlarge_tokens.find(base_name);
+                value = (xlarge_it != xlarge_tokens.end()) ? xlarge_it->second.c_str()
+                                                           : large_it->second.c_str();
             }
             spdlog::trace("[Theme] Registering spacing {}: selected={}", base_name, value);
             lv_xml_register_const(scope, base_name.c_str(), value);
@@ -708,20 +753,13 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
                   size_label, ver_res, registered);
 
     // ========================================================================
-    // Register computed layout constants (not from globals.xml variants)
+    // Register computed overlay widths (derived from nav_width + gap)
     // ========================================================================
+    // nav_width was pre-registered above using horizontal breakpoint.
+    // Read it back to compute overlay panel widths.
+    const char* nav_width_str = lv_xml_get_const(nullptr, "nav_width");
+    int32_t nav_width = nav_width_str ? std::atoi(nav_width_str) : 94; // fallback
 
-    // Nav width is a horizontal concern — use screen width, not height breakpoint
-    int32_t nav_width;
-    if (hor_res <= 520) {
-        nav_width = UI_NAV_WIDTH_TINY; // 64px for narrow screens (480x320, 480x400)
-    } else if (hor_res <= 900) {
-        nav_width = UI_NAV_WIDTH_MEDIUM; // 94px for 800x480
-    } else {
-        nav_width = UI_NAV_WIDTH_LARGE; // 102px for 1024x600, 1280x720, 1920x440+
-    }
-
-    // Get space_lg value (already registered above)
     const char* space_lg_str = lv_xml_get_const(nullptr, "space_lg");
     int32_t gap = space_lg_str ? std::atoi(space_lg_str) : 16; // fallback to 16px
 
@@ -729,15 +767,11 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
     int32_t overlay_width = hor_res - nav_width - gap; // Standard: screen - nav - gap
     int32_t overlay_width_full = hor_res - nav_width;  // Full: screen - nav (no gap)
 
-    // Register as string constants for XML consumption
-    char nav_width_str[16];
     char overlay_width_str[16];
     char overlay_width_full_str[16];
-    snprintf(nav_width_str, sizeof(nav_width_str), "%d", nav_width);
     snprintf(overlay_width_str, sizeof(overlay_width_str), "%d", overlay_width);
     snprintf(overlay_width_full_str, sizeof(overlay_width_full_str), "%d", overlay_width_full);
 
-    lv_xml_register_const(scope, "nav_width", nav_width_str);
     lv_xml_register_const(scope, "overlay_panel_width", overlay_width_str);
     lv_xml_register_const(scope, "overlay_panel_width_full", overlay_width_full_str);
 
@@ -760,9 +794,11 @@ void theme_manager_register_responsive_fonts(lv_display_t* display) {
 
     // Use screen height for breakpoint selection — vertical space is the constraint
     const char* size_suffix = theme_manager_get_breakpoint_suffix(ver_res);
-    const char* size_label = (ver_res <= UI_BREAKPOINT_SMALL_MAX)    ? "SMALL"
+    const char* size_label = (ver_res <= UI_BREAKPOINT_TINY_MAX)     ? "TINY"
+                             : (ver_res <= UI_BREAKPOINT_SMALL_MAX)  ? "SMALL"
                              : (ver_res <= UI_BREAKPOINT_MEDIUM_MAX) ? "MEDIUM"
-                                                                     : "LARGE";
+                             : (ver_res <= UI_BREAKPOINT_LARGE_MAX)  ? "LARGE"
+                                                                     : "XLARGE";
 
     lv_xml_component_scope_t* scope = lv_xml_component_get_scope("globals");
     if (!scope) {
@@ -770,26 +806,38 @@ void theme_manager_register_responsive_fonts(lv_display_t* display) {
         return;
     }
 
-    // Auto-discover all string tokens from all XML files
+    // Auto-discover all string tokens from all XML files (including optional _tiny and _xlarge)
+    auto tiny_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_tiny");
     auto small_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_small");
     auto medium_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_medium");
     auto large_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_large");
+    auto xlarge_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_xlarge");
 
     int registered = 0;
     for (const auto& [base_name, small_val] : small_tokens) {
-        // Verify all three variants exist
+        // Verify _small/_medium/_large triplet exists (required)
         auto medium_it = medium_tokens.find(base_name);
         auto large_it = large_tokens.find(base_name);
 
         if (medium_it != medium_tokens.end() && large_it != large_tokens.end()) {
             // Select appropriate variant based on breakpoint
             const char* value = nullptr;
-            if (strcmp(size_suffix, "_small") == 0) {
+            if (strcmp(size_suffix, "_tiny") == 0) {
+                // Use _tiny if available, otherwise fall back to _small
+                auto tiny_it = tiny_tokens.find(base_name);
+                value =
+                    (tiny_it != tiny_tokens.end()) ? tiny_it->second.c_str() : small_val.c_str();
+            } else if (strcmp(size_suffix, "_small") == 0) {
                 value = small_val.c_str();
             } else if (strcmp(size_suffix, "_medium") == 0) {
                 value = medium_it->second.c_str();
-            } else {
+            } else if (strcmp(size_suffix, "_large") == 0) {
                 value = large_it->second.c_str();
+            } else {
+                // _xlarge: use xlarge if available, otherwise fall back to _large
+                auto xlarge_it = xlarge_tokens.find(base_name);
+                value = (xlarge_it != xlarge_tokens.end()) ? xlarge_it->second.c_str()
+                                                           : large_it->second.c_str();
             }
             spdlog::trace("[Theme] Registering font {}: selected={}", base_name, value);
             lv_xml_register_const(scope, base_name.c_str(), value);
@@ -1843,10 +1891,9 @@ void ui_set_overlay_width(lv_obj_t* obj, lv_obj_t* screen) {
     if (width_str) {
         lv_obj_set_width(obj, std::atoi(width_str));
     } else {
-        // Fallback if theme not initialized: calculate from screen size
+        // Fallback if theme not initialized: estimate from screen size
         lv_coord_t screen_width = lv_obj_get_width(screen);
-        lv_coord_t nav_width = UI_NAV_WIDTH(screen_width);
-        lv_obj_set_width(obj, screen_width - nav_width - 16); // 16px gap fallback
+        lv_obj_set_width(obj, screen_width - 94 - 16); // nav_width medium + gap fallback
         spdlog::warn("[Theme] overlay_panel_width not registered, using fallback");
     }
 }
@@ -2261,13 +2308,15 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
         return warnings;
     }
 
-    // Validate responsive px sets (_small/_medium/_large)
+    // Validate responsive px sets (_small/_medium/_large required, _tiny optional)
     {
+        auto tiny_tokens = theme_manager_parse_all_xml_for_suffix(directory, "px", "_tiny");
         auto small_tokens = theme_manager_parse_all_xml_for_suffix(directory, "px", "_small");
         auto medium_tokens = theme_manager_parse_all_xml_for_suffix(directory, "px", "_medium");
         auto large_tokens = theme_manager_parse_all_xml_for_suffix(directory, "px", "_large");
 
         // Collect all base names that have at least one responsive suffix
+        // _tiny is optional — only _small/_medium/_large are required for a complete set
         std::unordered_map<std::string, int> base_names;
         for (const auto& [name, _] : small_tokens) {
             base_names[name] |= 1; // bit 0 = _small
@@ -2279,7 +2328,7 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
             base_names[name] |= 4; // bit 2 = _large
         }
 
-        // Check for incomplete sets
+        // Check for incomplete sets (_small/_medium/_large must be complete)
         for (const auto& [base_name, flags] : base_names) {
             if (flags != 7) { // Not all three present (111 in binary)
                 std::vector<std::string> found;
@@ -2316,6 +2365,14 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
 
                 warnings.push_back("Incomplete responsive set for '" + base_name + "': found " +
                                    found_str + " but missing " + missing_str);
+            }
+        }
+
+        // Warn about _tiny tokens without corresponding _small (likely a typo)
+        for (const auto& [name, _] : tiny_tokens) {
+            if (small_tokens.find(name) == small_tokens.end()) {
+                warnings.push_back("Token '" + name +
+                                   "' has _tiny but no _small (tiny falls back to small)");
             }
         }
     }
@@ -2389,11 +2446,28 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
 
         // Step 2: Add base names for responsive constants (_small/_medium/_large -> base)
         // These get registered at runtime as the base name
+        // Also include _tiny and _xlarge tokens — they are optional but valid definitions
         auto small_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_small");
         auto medium_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_medium");
         auto large_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_large");
+        auto tiny_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_tiny");
+        auto xlarge_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_xlarge");
         for (const auto& [base_name, _] : small_px) {
             if (medium_px.count(base_name) && large_px.count(base_name)) {
+                defined_constants.insert(base_name);
+            }
+        }
+        // _tiny tokens with a valid _small/_medium/_large set are also defined
+        for (const auto& [base_name, _] : tiny_px) {
+            if (small_px.count(base_name) && medium_px.count(base_name) &&
+                large_px.count(base_name)) {
+                defined_constants.insert(base_name);
+            }
+        }
+        // _xlarge tokens with a valid _small/_medium/_large set are also defined
+        for (const auto& [base_name, _] : xlarge_px) {
+            if (small_px.count(base_name) && medium_px.count(base_name) &&
+                large_px.count(base_name)) {
                 defined_constants.insert(base_name);
             }
         }
@@ -2401,8 +2475,23 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
         auto small_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_small");
         auto medium_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_medium");
         auto large_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_large");
+        auto tiny_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_tiny");
+        auto xlarge_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_xlarge");
         for (const auto& [base_name, _] : small_str) {
             if (medium_str.count(base_name) && large_str.count(base_name)) {
+                defined_constants.insert(base_name);
+            }
+        }
+        for (const auto& [base_name, _] : tiny_str) {
+            if (small_str.count(base_name) && medium_str.count(base_name) &&
+                large_str.count(base_name)) {
+                defined_constants.insert(base_name);
+            }
+        }
+        // _xlarge string tokens with valid triplet are also defined
+        for (const auto& [base_name, _] : xlarge_str) {
+            if (small_str.count(base_name) && medium_str.count(base_name) &&
+                large_str.count(base_name)) {
                 defined_constants.insert(base_name);
             }
         }

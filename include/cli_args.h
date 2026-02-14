@@ -18,9 +18,10 @@
 namespace helix {
 
 /**
- * @brief Screen size presets
+ * @brief Screen size presets (match responsive breakpoints)
+ * TINY=480x320, SMALL=480x400, MEDIUM=800x480, LARGE=1024x600, XLARGE=1280x720
  */
-enum class ScreenSize { TINY, TINY_ALT, SMALL, MEDIUM, LARGE };
+enum class ScreenSize { TINY, SMALL, MEDIUM, LARGE, XLARGE };
 
 /**
  * @brief Overlay panel flags (grouped for clarity)
@@ -81,7 +82,7 @@ struct OverlayFlags {
  */
 struct CliArgs {
     // Screen settings
-    ScreenSize screen_size = ScreenSize::SMALL;
+    ScreenSize screen_size = ScreenSize::MEDIUM;
     int dpi = -1;         // -1 = use default
     int display_num = -1; // -1 = not set
     int x_pos = -1;       // -1 = not set

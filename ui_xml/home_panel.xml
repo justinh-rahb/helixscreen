@@ -176,19 +176,19 @@
                      focusable="false">
             <event_cb trigger="clicked" callback="printer_status_clicked_cb"/>
             <!-- Ready (green) - state 0 -->
-            <icon name="printer_icon_ready" src="printer_3d" size="#icon_size_card" variant="success" hidden="true">
+            <icon name="printer_icon_ready" src="printer_3d" size="#icon_size" variant="success" hidden="true">
               <bind_flag_if_not_eq subject="printer_icon_state" flag="hidden" ref_value="0"/>
             </icon>
             <!-- Warning (orange) - state 1 -->
-            <icon name="printer_icon_warning" src="printer_3d" size="#icon_size_card" variant="warning" hidden="true">
+            <icon name="printer_icon_warning" src="printer_3d" size="#icon_size" variant="warning" hidden="true">
               <bind_flag_if_not_eq subject="printer_icon_state" flag="hidden" ref_value="1"/>
             </icon>
             <!-- Error (red) - state 2 -->
-            <icon name="printer_icon_error" src="printer_3d" size="#icon_size_card" variant="danger" hidden="true">
+            <icon name="printer_icon_error" src="printer_3d" size="#icon_size" variant="danger" hidden="true">
               <bind_flag_if_not_eq subject="printer_icon_state" flag="hidden" ref_value="2"/>
             </icon>
             <!-- Disconnected (gray) - state 3 (default) -->
-            <icon name="printer_icon_disconnected" src="printer_3d" size="#icon_size_card" variant="secondary">
+            <icon name="printer_icon_disconnected" src="printer_3d" size="#icon_size" variant="secondary">
               <bind_flag_if_not_eq subject="printer_icon_state" flag="hidden" ref_value="3"/>
             </icon>
           </ui_button>
@@ -205,27 +205,27 @@
                      focusable="false">
             <event_cb trigger="clicked" callback="network_clicked_cb"/>
             <!-- Disconnected (state 0) -->
-            <icon name="net_disconnected" src="wifi_off" size="#icon_size_card" variant="disabled">
+            <icon name="net_disconnected" src="wifi_off" size="#icon_size" variant="disabled">
               <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="0"/>
             </icon>
             <!-- WiFi strength 1 - weak (state 1) - warning color -->
-            <icon name="net_wifi_1" src="wifi_strength_1_alert" size="#icon_size_card" variant="warning">
+            <icon name="net_wifi_1" src="wifi_strength_1_alert" size="#icon_size" variant="warning">
               <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="1"/>
             </icon>
             <!-- WiFi strength 2 - fair (state 2) -->
-            <icon name="net_wifi_2" src="wifi_strength_2" size="#icon_size_card" variant="secondary">
+            <icon name="net_wifi_2" src="wifi_strength_2" size="#icon_size" variant="secondary">
               <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="2"/>
             </icon>
             <!-- WiFi strength 3 - good (state 3) -->
-            <icon name="net_wifi_3" src="wifi_strength_3" size="#icon_size_card" variant="secondary">
+            <icon name="net_wifi_3" src="wifi_strength_3" size="#icon_size" variant="secondary">
               <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="3"/>
             </icon>
             <!-- WiFi strength 4 - strong (state 4) -->
-            <icon name="net_wifi_4" src="wifi_strength_4" size="#icon_size_card" variant="secondary">
+            <icon name="net_wifi_4" src="wifi_strength_4" size="#icon_size" variant="secondary">
               <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="4"/>
             </icon>
             <!-- Ethernet (state 5) - success color indicates active wired connection -->
-            <icon name="net_ethernet" src="ethernet" size="#icon_size_card" variant="success">
+            <icon name="net_ethernet" src="ethernet" size="#icon_size" variant="success">
               <bind_flag_if_not_eq subject="home_network_icon_state" flag="hidden" ref_value="5"/>
             </icon>
             <!-- Label commented out - icons are self-explanatory and text wraps badly in narrow cells -->
@@ -241,7 +241,7 @@
                   style_flex_track_place="center">
             <lv_obj name="status_notification_container" style_pad_all="0">
               <icon name="status_notification_icon"
-                    src="notifications" size="#icon_size_card" variant="secondary" align="center" clickable="true"
+                    src="notifications" size="#icon_size" variant="secondary" align="center" clickable="true"
                     click_focusable="false">
                 <event_cb trigger="clicked" callback="status_notification_history_clicked"/>
               </icon>
@@ -290,7 +290,7 @@
                      focusable="false">
             <bind_state_if_not_eq subject="printer_connection_state" state="disabled" ref_value="2"/>
             <event_cb trigger="clicked" callback="temp_clicked_cb"/>
-            <icon name="temp_icon" src="heater" size="#icon_size_card" variant="secondary"/>
+            <icon name="temp_icon" src="heater" size="#icon_size" variant="secondary"/>
             <temp_display name="temp_text_label"
                           width="100%" size="md" show_target="false" bind_current="extruder_temp"
                           bind_target="extruder_target" align="center"/>
@@ -307,7 +307,7 @@
             <bind_flag_if_eq subject="printer_has_led" flag="hidden" ref_value="0"/>
             <bind_state_if_not_eq subject="printer_connection_state" state="disabled" ref_value="2"/>
             <!-- Dynamic icon - source and color set by C++ based on LED brightness/color -->
-            <icon name="light_icon" src="lightbulb_outline" size="#icon_size_card" align="center" variant="muted"/>
+            <icon name="light_icon" src="lightbulb_outline" size="#icon_size" align="center" variant="muted"/>
             <event_cb trigger="clicked" callback="light_toggle_cb"/>
             <event_cb trigger="long_pressed" callback="light_long_press_cb"/>
           </ui_button>

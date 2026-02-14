@@ -4,31 +4,37 @@
 <!-- FanDial: Reusable Bambu-style 270-degree rotary arc fan control widget -->
 <!-- Usage: <fan_dial fan_name="Part Fan" fan_id="fan" initial_value="0"/> -->
 <component>
+  <!-- Responsive fan tokens live in fan_tokens.xml (separate file to avoid
+       component-scope conflicts with responsive suffix resolution) -->
   <api>
     <prop name="fan_name" type="string" default="Fan"/>
     <prop name="fan_id" type="string" default="fan"/>
     <prop name="initial_value" type="number" default="0"/>
   </api>
   <view name="fan_dial_root"
-        extends="ui_card" width="#fan_card_width" height="#fan_card_height" flex_flow="column"
+        extends="ui_card" height="#fan_card_height"
+        width="#fan_card_base_width"
+        style_min_width="#fan_card_min_width" style_max_width="#fan_card_max_width"
+        flex_flow="column"
         style_flex_main_place="start" style_flex_cross_place="center"
         style_pad_all="#space_sm" style_pad_gap="#space_xs" scrollable="false"
         style_clip_content="false">
     <!-- Fan name label at top -->
     <text_small name="name_label" text="$fan_name"/>
-    <!-- Arc dial container with centered percentage display -->
+    <!-- Arc dial container - flexes to fill remaining vertical space -->
     <lv_obj name="dial_container"
-            width="#fan_arc_size" height="#fan_arc_size"
-            style_pad_all="0" scrollable="false">
-      <!-- 270-degree arc dial -->
+            width="100%" flex_grow="1"
+            style_pad_all="0" scrollable="false"
+            style_flex_main_place="center" style_flex_cross_place="center">
+      <!-- 270-degree arc dial (size set dynamically by C++ SIZE_CHANGED callback) -->
       <lv_arc name="dial_arc"
-              width="#fan_arc_size" height="#fan_arc_size" align="center"
+              align="center"
               bg_start_angle="135" bg_end_angle="45"
               start_angle="135" end_angle="135"
               min_value="0" max_value="100" value="$initial_value"
               rotation="0" mode="normal"
-              style_arc_width="#fan_arc_width" style_arc_color="#border"
-              style_arc_width:indicator="#fan_arc_width" style_arc_color:indicator="#primary"
+              style_arc_color="#border"
+              style_arc_color:indicator="#primary"
               style_arc_rounded="true" style_arc_rounded:indicator="true"
               style_bg_opa="0" style_border_width="0">
         <event_cb trigger="value_changed" callback="on_fan_dial_value_changed"/>
@@ -42,10 +48,10 @@
             style_pad_all="0" scrollable="false" flex_flow="row"
             style_flex_main_place="space_evenly" style_flex_cross_place="center"
             style_pad_gap="#space_xs">
-      <ui_button name="btn_off" width="#fan_btn_width" height="#fan_btn_height" text="Off" translation_tag="Off" variant="secondary">
+      <ui_button name="btn_off" width="#fan_btn_max_width" height="#fan_btn_height" text="Off" translation_tag="Off" variant="secondary">
         <event_cb trigger="clicked" callback="on_fan_dial_off_clicked"/>
       </ui_button>
-      <ui_button name="btn_on" width="#fan_btn_width" height="#fan_btn_height" text="On" translation_tag="On" variant="secondary">
+      <ui_button name="btn_on" width="#fan_btn_max_width" height="#fan_btn_height" text="On" translation_tag="On" variant="secondary">
         <event_cb trigger="clicked" callback="on_fan_dial_on_clicked"/>
       </ui_button>
     </lv_obj>
