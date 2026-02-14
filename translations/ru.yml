@@ -1,12 +1,12 @@
 locale: ru
 translations:
-  ' elapsed · ': ' elapsed · '
-  ' left': ' left'
+  ' elapsed · ': ' истёк · '
+  ' left': ' осталось'
   + Add Preset: + Добавить пресет
-  '- Check [resonance_tester] in printer.cfg': '- Проверьте [resonance_tester] в printer.cfg'
+  '- Check [resonance_tester] in printer.cfg': '- Проверьте блок [resonance_tester] в printer.cfg'
   '- Ensure ADXL345 is connected': '- Убедитесь, что ADXL345 подключен'
-  '- Try Measure Noise first': '- Сначала попробуйте измерить шум'
-  0.4-2mm direct drive, 4-6mm bowden: 0.4-2мм прямой привод, 4-6мм боуден
+  '- Try Measure Noise first': '- Сначала попробуйте измерить шум акселерометра'
+  0.4-2mm direct drive, 4-6mm bowden: 0.4-2мм для директа, 4-6мм для боудена
   1. Printer homes and probes the bed: 1. Принтер паркуется и зондирует стол
   1. Printer will home and probe each screw: 1. Принтер запаркуется и проверит каждый винт
   2. Place paper between nozzle and bed: 2. Положите бумагу между соплом и столом
@@ -252,7 +252,7 @@ translations:
   Empty slots disable the associated functionality: Пустые слоты отключают связанный функционал
   Enable: Включить
   Enable Monitoring: Включить мониторинг
-  Enable Retraction: Включить ретракт
+  Enable Retraction: Включить аппаратный ретракт
   Enable Timelapse: Включить таймлапс
   Enable UI motion effects: Включить эффекты движения интерфейса
   Enable WiFi to scan: Включите WiFi для сканирования
@@ -321,7 +321,7 @@ translations:
   Firmware Restart: Перезапуск прошивки
   Firmware restarting...: Перезапуск прошивки...
   Flat Concentric Rings (existing ams_slot): Плоские концентрические кольца (существующий ams_slot)
-  Flow Rate: Скорость потока
+  Flow Rate: Множитель потока
   Forming tip...: Формирование кончика...
   Framerate: Частота кадров
   Front: Спереди
@@ -372,12 +372,12 @@ translations:
   Indexing G-code...: Индексация G-code...
   Initializing...: Инициализация...
   Input: Ввод
-  Input Shaper: Компенсатор вибраций
+  Input Shaper: Input Shaper
   Input Shaping: Компенсация вибраций
-  Input shaper calibration sensors: Датчики калибровки компенсатора вибраций
+  Input shaper calibration sensors: Датчики калибровки Input Shaper'а
   Input shaper settings applied!: Настройки компенсатора вибраций применены!
   Input shaping reduces ringing and ghosting artifacts caused by printer vibrations during fast movements.: Компенсация вибраций уменьшает артефакты звона и двоения, вызванные вибрациями принтера при быстрых перемещениях.
-  Input shaping reduces vibration artifacts (ringing) in your prints.: Компенсация вибраций уменьшает артефакты вибрации (звон) в ваших отпечатках.
+  Input shaping reduces vibration artifacts (ringing) in your prints.: Input Shaper уменьшает артефакты вибрации (эхо) в ваших отпечатках.
   Install: Установить
   Install HelixPrint Plugin: Установить плагин HelixPrint
   Install Plugin: Установить плагин
@@ -444,10 +444,10 @@ translations:
   Macro for bed mesh calibration: Макрос для калибровки сетки стола
   Macro for chamber/bed heat soak: Макрос для прогрева камеры/стола
   Macro for physical bed leveling (QGL/Z-Tilt): Макрос для механического выравнивания стола (QGL/Z-Tilt)
-  Macro to cancel an active print: Макрос для отмены активной печати
+  Macro to cancel an active print: Макрос для отмены текущей печати
   Macro to clean/wipe the nozzle: Макрос для очистки/протирки сопла
   Macro to load filament into extruder: Макрос для загрузки филамента в экструдер
-  Macro to pause an active print: Макрос для паузы активной печати
+  Macro to pause an active print: Макрос для паузы текущей печати
   Macro to purge/prime the nozzle: Макрос для продувки/подготовки сопла
   Macro to resume a paused print: Макрос для возобновления приостановленной печати
   Macro to unload filament from extruder: Макрос для выгрузки филамента из экструдера
@@ -480,7 +480,7 @@ translations:
   Motion: Движение
   'Motion: XYZ': 'Движение: XYZ'
   Motors Off: Отключить моторы
-  Move paper back and forth while adjusting. Stop when paper catches slightly but still slides.: Двигайте бумагу вперёд-назад во время регулировки. Остановитесь, когда бумага слегка цепляется, но ещё скользит.
+  Move paper back and forth while adjusting. Stop when paper catches slightly but still slides.: Перемещайте бумагу вперёд-назад во время регулировки. Остановитесь, когда бумага слегка цепляется, но ещё скользит.
   Movement speed: Скорость движения
   ? Moves the print head to measure vibration frequencies on each axis. Takes 2-3 minutes. The printer will make noise — this is normal.
   : Перемещает печатающую головку для измерения частот вибрации по каждой оси. Занимает 2-3 минуты. Принтер будет шуметь — это нормально.
@@ -561,7 +561,7 @@ translations:
   Password cannot be empty: Пароль не может быть пустым
   Pause: Пауза
   Paused: Приостановлено
-  Paused (attention needed): Приостановлено (требуется внимание)
+  Paused (attention needed): Приостановлено (требует внимания)
   Peak Freq: Пиковая частота
   'Peak:': 'Пик:'
   Phase Tracking: Отслеживание фазы
@@ -574,7 +574,7 @@ translations:
   Play a test beep: Воспроизвести тестовый сигнал
   Please enter a theme name: Введите название темы
   Please wait while the printer homes and probes.: Пожалуйста, подождите, пока принтер паркуется и зондирует.
-  Please wait while the printer probes each screw position.: Пожалуйста, подождите, пока принтер проверяет позицию каждого винта.
+  Please wait while the printer probes each screw position.: Пожалуйста, подождите, пока принтер возьмет пробу на позиции каждого винта.
   Plugin already installed: Плагин уже установлен
   Plugin disabled: Плагин отключен
   Plugin installed successfully: Плагин успешно установлен
@@ -596,10 +596,10 @@ translations:
   Print Complete: Печать завершена
   Print Complete!: Печать завершена!
   Print Completion Alert: Уведомление о завершении печати
-  Print Details: Детали печати
+  Print Details: Информация о печати
   Print Failed: Печать не удалась
   Print File: Файл печати
-  Print Files: Файлы печати
+  Print Files: Файлы Gcode
   Print History: История печати
   Print Hours: Часы печати
   Print Objects: Объекты печати
@@ -613,7 +613,7 @@ translations:
   Printer Image: Изображение принтера
   Printer Manager: Менеджер принтеров
   Printer Name: Название принтера
-  Printer Shutdown: Выключение принтера
+  Printer Shutdown: Остановка принтера
   Printer Type: Тип принтера
   Printer name: Название принтера
   Printer ready: Принтер готов
@@ -621,8 +621,8 @@ translations:
   Prints Trend: Тренд печатей
   'Private:': 'Закрытая:'
   Probe: Зонд
-  Probe Sensor: Датчик зонда
-  Probe Sensors: Датчики зонда
+  Probe Sensor: Датчик пробы
+  Probe Sensors: Датчики пробы
   Probing Bed Mesh: Зондирование сетки стола
   Probing Bed Screws...: Проверка винтов стола...
   Probing Bed...: Зондирование стола...
@@ -681,7 +681,7 @@ translations:
   Retry: Повторить
   Review detected hardware validation issues: Просмотр обнаруженных проблем валидации оборудования
   Review your changes: Просмотр ваших изменений
-  'Role:': 'Роль:'
+  'Role:': 'Тип:'
   Runout Sensor: Датчик окончания
   SHIPPED IMAGES: ВСТРОЕННЫЕ ИЗОБРАЖЕНИЯ
   SOFTWARE: ПО
@@ -697,8 +697,8 @@ translations:
   Save Hardware: Сохранить оборудование
   Save Printer Configuration: Сохранить конфигурацию принтера
   Save Theme As: Сохранить тему как
-  Save Z-Offset: Сохранить Z-смещение
-  Save Z-Offset?: Сохранить Z-смещение?
+  Save Z-Offset: Сохранить Z-Offset
+  Save Z-Offset?: Сохранить Z-Offset?
   Save changes to persist them across restarts?: Сохранить изменения, чтобы они сохранились после перезапуска?
   Saved Z-Offset: Сохранённый Z-Offset
   Saved to crash_report.txt (QR not available): Сохранено в crash_report.txt (QR недоступен)
@@ -708,8 +708,8 @@ translations:
   Saving will restart Klipper and CANCEL any active print!: Сохранение перезапустит Klipper и ОТМЕНИТ любую активную печать!
   Scanning for networks...: Поиск сетей...
   Screen Dim: Затемнение экрана
-  Screen dims to lower brightness after period of inactivity: Экран затемняется после периода неактивности
-  Screen will dim after the selected period of inactivity: Экран затемнится после выбранного периода неактивности
+  Screen dims to lower brightness after period of inactivity: Экран затемняется после периода простоя
+  Screen will dim after the selected period of inactivity: Экран затемнится после выбранного периода простоя
   Screws Tilt: Наклон винтов
   Scroll Speed: Скорость прокрутки
   Search filename...: Поиск файла...
@@ -717,7 +717,7 @@ translations:
   Security: Безопасность
   See exactly what data will be sent: 'Посмотрите, какие именно данные будут отправлены'
   Select: Выбрать
-  Select 'None' if you don't have a filament sensor, or if you don't want to pause on runout.: Выберите 'Нет', если у вас нет датчика филамента или вы не хотите паузу при окончании.
+  Select 'None' if you don't have a filament sensor, or if you don't want to pause on runout.: Выберите 'Нет', если у вас нет датчика филамента или пауза по окончании филамента не нужна.
   Select 'None' if you have a dedicated probe, or don't use bed mesh leveling.: Выберите 'Нет', если у вас отдельный зонд или вы не используете сетку стола.
   Select Filament: Выбрать филамент
   Select G-Code File: Выбрать файл G-Code
@@ -753,11 +753,11 @@ translations:
   'Specular:': 'Отражение:'
   Speed Settings: Настройки скорости
   Speed of prime movement: Скорость движения подачи
-  Speed of retraction movement: Скорость движения ретракта
+  Speed of retraction movement: Скорость ретракта
   Spool Visualization (Pseudo-3D Canvas): Визуализация катушки (псевдо-3D)
   Spoolman: Spoolman
   Spoolman has no spools configured: В Spoolman нет настроенных катушек
-  Square Corner Velocity: Скорость прямых углов
+  Square Corner Velocity: Square Corner Velocity
   Standby: Режим ожидания
   Start: Старт
   Start Anyway: Начать всё равно
@@ -813,7 +813,7 @@ translations:
   Theme Preset: Пресет темы
   Theme changes apply after restart.: Изменения темы применяются после перезапуска.
   Theme, brightness, and sleep settings: Тема, яркость и настройки сна
-  This calibration uses the paper friction method to set your Z-offset.: Эта калибровка использует метод трения бумаги для установки Z-смещения.
+  This calibration uses the paper friction method to set your Z-offset.: Эта калибровка использует метод трения бумаги об сопло для установки Z-смещения.
   This is exactly the data that will be sent: 'Это именно те данные, которые будут отправлены'
   This is what data would be sent if enabled: Эти данные были бы отправлены при включении
   This may take up to 30 seconds: Это может занять до 30 секунд
@@ -860,7 +860,7 @@ translations:
   Unload: Выгрузить
   Unload Filament: Выгрузить филамент
   Unloading filament...: Выгрузка филамента...
-  Unretract Extra: Дополнительный возврат
+  Unretract Extra: Дополнительная подача
   Unretract Speed: Скорость возврата
   Update Available: Доступно обновление
   Update Channel: Канал обновлений
@@ -925,7 +925,7 @@ translations:
   Z probes for bed leveling and mesh generation: Z-зонды для выравнивания стола и создания сетки
   Z-Offset: Z-смещение
   Z-Offset Calibration: Калибровка Z-смещения
-  'Z-Offset:': 'Z-смещение:'
+  'Z-Offset:': 'Z-Offset:'
   Z-Tilt: Z-наклон
   Z-Tilt Adjust: Регулировка Z-наклона
   Z-offset is auto-saved by firmware: Z-смещение автосохраняется прошивкой
