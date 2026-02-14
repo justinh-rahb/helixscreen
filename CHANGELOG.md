@@ -494,6 +494,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.9.20]: https://github.com/prestonbrown/helixscreen/compare/v0.9.19...v0.9.20
 [0.9.19]: https://github.com/prestonbrown/helixscreen/compare/v0.9.18...v0.9.19
 [0.9.18]: https://github.com/prestonbrown/helixscreen/compare/v0.9.17...v0.9.18
 [0.9.17]: https://github.com/prestonbrown/helixscreen/compare/v0.9.16...v0.9.17
@@ -508,8 +509,6 @@ Initial tagged release. Foundation for all subsequent development.
 [0.9.8]: https://github.com/prestonbrown/helixscreen/compare/v0.9.7...v0.9.8
 [0.9.7]: https://github.com/prestonbrown/helixscreen/compare/v0.9.6...v0.9.7
 [0.9.6]: https://github.com/prestonbrown/helixscreen/compare/v0.9.5...v0.9.6
-[0.9.20]: https://github.com/prestonbrown/helixscreen/compare/v0.9.19...v0.9.20
-[0.9.19]: https://github.com/prestonbrown/helixscreen/compare/v0.9.18...v0.9.19
 [0.9.5]: https://github.com/prestonbrown/helixscreen/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/prestonbrown/helixscreen/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/prestonbrown/helixscreen/compare/v0.9.2...v0.9.3
