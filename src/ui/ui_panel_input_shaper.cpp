@@ -1616,29 +1616,5 @@ void InputShaperPanel::handle_help_clicked() {
 
         "Lower vibration % is better. Lower smoothing preserves detail.";
 
-    const char* attrs[] = {"title", "Input Shaper Help", "message", help_message, nullptr};
-
-    ui_modal_configure(ModalSeverity::Info, false, "Got It", nullptr);
-    lv_obj_t* help_dialog = ui_modal_show("modal_dialog", attrs);
-
-    if (!help_dialog) {
-        spdlog::error("[InputShaper] Failed to show help modal");
-        return;
-    }
-
-    // Wire up Ok button to close
-    lv_obj_t* ok_btn = lv_obj_find_by_name(help_dialog, "btn_primary");
-    if (ok_btn) {
-        lv_obj_set_user_data(ok_btn, help_dialog);
-        lv_obj_add_event_cb(
-            ok_btn,
-            [](lv_event_t* e) {
-                auto* btn = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-                auto* dialog = static_cast<lv_obj_t*>(lv_obj_get_user_data(btn));
-                if (dialog) {
-                    ui_modal_hide(dialog);
-                }
-            },
-            LV_EVENT_CLICKED, nullptr);
-    }
+    ui_modal_show_alert("Input Shaper Help", help_message, ModalSeverity::Info, "Got It");
 }
