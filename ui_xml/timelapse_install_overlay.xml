@@ -35,7 +35,7 @@
                 style_pad_row="#space_sm" style_bg_opa="0">
           <text_body width="100%"
                      text="Connect to your printer via SSH and run:"
-                     style_text_color="#text_secondary"
+                     style_text_color="#text_muted"
                      long_mode="wrap"/>
           <lv_obj width="100%" height="content"
                   style_bg_color="#overlay_bg" style_radius="#border_radius"
