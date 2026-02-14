@@ -3,8 +3,7 @@
 
 #include "probe_sensor_manager.h"
 
-#include "ui_update_queue.h"
-
+#include "async_helpers.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -14,15 +13,6 @@
 // not the main LVGL thread. We must defer subject updates to the main thread
 // via ui_async_call to avoid the "Invalidate area not allowed during rendering"
 // assertion.
-
-namespace {
-
-/// @brief Async callback to update subjects on the main LVGL thread
-void async_update_probe_subjects_callback(void* /*user_data*/) {
-    helix::sensors::ProbeSensorManager::instance().update_subjects_on_main_thread();
-}
-
-} // namespace
 
 namespace helix::sensors {
 
@@ -156,8 +146,9 @@ void ProbeSensorManager::update_from_status(const nlohmann::json& status) {
                 spdlog::debug("[ProbeSensorManager] sync_mode: updating subjects synchronously");
                 update_subjects();
             } else {
-                spdlog::debug("[ProbeSensorManager] async_mode: deferring via ui_async_call");
-                ui_async_call(async_update_probe_subjects_callback, nullptr);
+                spdlog::debug("[ProbeSensorManager] async_mode: deferring via async::invoke");
+                helix::async::invoke(
+                    [] { ProbeSensorManager::instance().update_subjects_on_main_thread(); });
             }
         }
     }

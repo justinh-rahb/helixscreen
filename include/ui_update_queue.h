@@ -254,10 +254,14 @@ inline void ui_update_queue_shutdown() {
 }
 
 /**
- * @brief Drop-in replacement for lv_async_call
+ * @brief Drop-in replacement for lv_async_call (low-level, no exception safety)
  *
  * Has the EXACT same signature as lv_async_call() but uses the UI update queue
  * to ensure callbacks run BEFORE rendering, not during.
+ *
+ * WARNING: Callbacks are invoked without try-catch. If your callback invokes C++
+ * code that may throw, use helix::async::invoke() instead — it wraps callbacks
+ * with exception handling to prevent std::terminate() / SIGABRT.
  *
  * Migration: Simply replace `lv_async_call(` with `ui_async_call(`
  *
