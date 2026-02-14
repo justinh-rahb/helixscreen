@@ -26,15 +26,15 @@ struct RecoveryContent {
 RecoveryContent get_recovery_content(RecoveryReason reason) {
     switch (reason) {
     case RecoveryReason::SHUTDOWN:
-        return {"Printer Shutdown",
-                "Klipper has entered shutdown state. This may be due to an emergency stop, "
-                "thermal runaway, or configuration error."};
+        return {lv_tr("Printer Shutdown"),
+                lv_tr("Klipper has entered shutdown state. This may be due to an emergency stop, "
+                      "thermal runaway, or configuration error.")};
     case RecoveryReason::DISCONNECTED:
-        return {"Printer Firmware Disconnected",
-                "Klipper firmware has disconnected from the host. "
-                "Try restarting Klipper or performing a firmware restart."};
+        return {lv_tr("Printer Firmware Disconnected"),
+                lv_tr("Klipper firmware has disconnected from the host. "
+                      "Try restarting Klipper or performing a firmware restart.")};
     default:
-        return {"Printer Error", "An unexpected printer error occurred."};
+        return {lv_tr("Printer Error"), lv_tr("An unexpected printer error occurred.")};
     }
 }
 } // namespace

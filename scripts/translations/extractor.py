@@ -42,6 +42,12 @@ CARET_DIRECTION_PATTERN = re.compile(r'^\^')  # Direction labels like ^ FRONT
 SNAKE_CASE_PATTERN = re.compile(r'^[a-z][a-z0-9]*(_[a-z0-9]+)+$')  # snake_case identifiers
 URL_PATTERN = re.compile(r'https?://')  # URLs
 MATERIAL_TEMP_PATTERN = re.compile(r'^[A-Z]+ \d+$')  # Material presets like "PLA 205", "ABS 100"
+# Temperature values: "60°C", "200°C", "210°C / 60°C", "200-230°C"
+TEMP_VALUE_PATTERN = re.compile(r'^\d[\d\-–]*°C(\s*/\s*\d+°C)?$')
+# Pure measurement values: "10mm", "5mm", "850g" (units handled by formatters)
+MEASUREMENT_PATTERN = re.compile(r'^\d+(\.\d+)?\s*(mm|cm|g|kg|ml|l|s|ms)$')
+# Numeric data placeholders: " 0 / 0", "0 / 0"
+NUMERIC_PLACEHOLDER_PATTERN = re.compile(r'^\s*\d+\s*/\s*\d+\s*$')
 
 # Short tokens and non-translatable exact strings
 NON_TRANSLATABLE = {"true", "false", "xl", "lg", "md", "sm", "xs", "#RRGGBB"}
@@ -56,6 +62,8 @@ LANGUAGE_NAMES = {
 
 # C++ patterns that indicate translatable text
 CPP_TRANSLATABLE_PATTERNS = [
+    # lv_tr("text") - explicitly marked for translation
+    r'lv_tr\s*\(\s*"([^"]+)"',
     # lv_label_set_text(label, "text")
     r'lv_label_set_text\s*\([^,]+,\s*"([^"]+)"',
     # return "Status Text"  (for status strings)
@@ -158,6 +166,19 @@ def should_skip_text(text: str) -> bool:
     if MATERIAL_TEMP_PATTERN.match(stripped):
         return True
 
+    # Skip temperature values like "60°C", "200-230°C", "210°C / 60°C"
+    if TEMP_VALUE_PATTERN.match(stripped):
+        return True
+
+    # Skip pure measurement values like "10mm", "850g" (unit formatting is locale-specific
+    # but should be handled by formatter utilities, not in translation strings)
+    if MEASUREMENT_PATTERN.match(stripped):
+        return True
+
+    # Skip numeric data placeholders like " 0 / 0"
+    if NUMERIC_PLACEHOLDER_PATTERN.match(stripped):
+        return True
+
     return False
 
 
@@ -204,8 +225,15 @@ def extract_strings_from_cpp(cpp_path: Path) -> Set[str]:
         return result
 
     for pattern in CPP_TRANSLATABLE_PATTERNS:
+        is_lv_tr = "lv_tr" in pattern
         for match in re.finditer(pattern, content):
             text = match.group(1)
+
+            # lv_tr() strings are explicitly marked - always include them
+            if is_lv_tr:
+                if text and text.strip():
+                    result.add(text)
+                continue
 
             # Get surrounding context to check for skip patterns
             start = max(0, match.start() - 50)

@@ -20,6 +20,7 @@
 #include "ui_update_queue.h"
 
 #include "config.h"
+#include "lvgl/src/others/translation/lv_translation.h"
 #include "prerendered_images.h"
 #include "printer_image_manager.h"
 #include "printer_images.h"
@@ -388,7 +389,8 @@ void PrinterImageOverlay::populate_usb_images(const std::string& mount_path) {
     spdlog::debug("[{}] Found {} importable images on USB", get_name(), image_paths.size());
 
     if (image_paths.empty()) {
-        lv_subject_copy_string(&usb_status_subject_, "No PNG or JPEG images found on USB drive");
+        lv_subject_copy_string(&usb_status_subject_,
+                               lv_tr("No PNG or JPEG images found on USB drive"));
         return;
     }
 

@@ -14,6 +14,7 @@
 
 #include "app_globals.h"
 #include "led/led_controller.h"
+#include "lvgl/src/others/translation/lv_translation.h"
 #include "lvgl/src/xml/lv_xml.h"
 #include "moonraker_api.h"
 #include "observer_factory.h"
@@ -516,7 +517,7 @@ void LedControlOverlay::populate_wled() {
         // Fallback to numbered presets
         for (int i = 1; i <= 5; ++i) {
             char buf[16];
-            snprintf(buf, sizeof(buf), "Preset %d", i);
+            snprintf(buf, sizeof(buf), "%s %d", lv_tr("Preset"), i);
             entries.push_back({i, buf});
         }
     } else {
@@ -600,12 +601,13 @@ void LedControlOverlay::populate_macros() {
 void LedControlOverlay::populate_macro_controls(const LedMacroInfo& macro) {
     switch (macro.type) {
     case MacroLedType::ON_OFF:
-        add_macro_chip("Turn On", macro.display_name, &LedControlOverlay::handle_macro_on);
-        add_macro_chip("Turn Off", macro.display_name, &LedControlOverlay::handle_macro_off);
+        add_macro_chip(lv_tr("Turn On"), macro.display_name, &LedControlOverlay::handle_macro_on);
+        add_macro_chip(lv_tr("Turn Off"), macro.display_name, &LedControlOverlay::handle_macro_off);
         break;
 
     case MacroLedType::TOGGLE:
-        add_macro_chip("Toggle", macro.display_name, &LedControlOverlay::handle_macro_toggle);
+        add_macro_chip(lv_tr("Toggle"), macro.display_name,
+                       &LedControlOverlay::handle_macro_toggle);
         break;
 
     case MacroLedType::PRESET:

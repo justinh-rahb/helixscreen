@@ -24,6 +24,7 @@
 #include "app_globals.h"
 #include "config.h"
 #include "hv/requests.h"
+#include "lvgl/src/others/translation/lv_translation.h"
 #include "printer_state.h"
 #include "spdlog/spdlog.h"
 #include "version.h"
@@ -1222,8 +1223,8 @@ void UpdateChecker::dismiss_current_version() {
     spdlog::info("[UpdateChecker] Dismissed version: {}", version);
 
     // Add history-only notification so user can find the update later
-    std::string msg = fmt::format("v{} is available. Tap to update.", version);
-    ui_notification_info_with_action("Update Available", msg.c_str(), "show_update_modal");
+    std::string msg = fmt::format(lv_tr("v{} is available. Tap to update."), version);
+    ui_notification_info_with_action(lv_tr("Update Available"), msg.c_str(), "show_update_modal");
 }
 
 // ============================================================================

@@ -17,6 +17,7 @@
 #include "device_display_name.h"
 #include "led/led_auto_state.h"
 #include "led/led_controller.h"
+#include "lvgl/src/others/translation/lv_translation.h"
 #include "static_panel_registry.h"
 #include "theme_manager.h"
 
@@ -880,14 +881,14 @@ void LedSettingsOverlay::handle_save_macro_device(int index) {
     updated[index].display_name = display_name;
 
     if (display_name.empty()) {
-        ui_toast_show(ToastSeverity::ERROR, "Device name is required");
+        ui_toast_show(ToastSeverity::ERROR, lv_tr("Device name is required"));
         return;
     }
 
     // Check for duplicate on/off macros
     if (updated[index].type == helix::led::MacroLedType::ON_OFF &&
         updated[index].on_macro == updated[index].off_macro && !updated[index].on_macro.empty()) {
-        ui_toast_show(ToastSeverity::ERROR, "On and Off macros must be different");
+        ui_toast_show(ToastSeverity::ERROR, lv_tr("On and Off macros must be different"));
         return;
     }
 

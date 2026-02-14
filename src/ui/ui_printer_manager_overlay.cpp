@@ -20,6 +20,7 @@
 #include "app_globals.h"
 #include "config.h"
 #include "helix_version.h"
+#include "lvgl/src/others/translation/lv_translation.h"
 #include "printer_detector.h"
 #include "printer_image_manager.h"
 #include "printer_images.h"
@@ -150,7 +151,7 @@ void PrinterManagerOverlay::on_chip_leds_clicked(lv_event_t* e) {
     (void)e;
     spdlog::debug("[Printer Manager] LEDs chip clicked");
     // TODO: Navigate to LED settings when available
-    ui_toast_show(ToastSeverity::INFO, "LED settings coming soon", 2000);
+    ui_toast_show(ToastSeverity::INFO, lv_tr("LED settings coming soon"), 2000);
 }
 
 void PrinterManagerOverlay::on_chip_adxl_clicked(lv_event_t* e) {
