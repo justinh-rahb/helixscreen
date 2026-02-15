@@ -23,6 +23,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -31,6 +32,31 @@
 // ============================================================================
 
 DEFINE_GLOBAL_PANEL(SpoolmanPanel, g_spoolman_panel, get_global_spoolman_panel)
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Parse a hex color string (with or without '#' prefix) into an lv_color_t.
+ * Returns fallback_color if the string is empty or unparseable.
+ */
+static lv_color_t parse_spool_color(const std::string& color_hex, lv_color_t fallback_color) {
+    if (color_hex.empty()) {
+        return fallback_color;
+    }
+
+    const char* hex = color_hex.c_str();
+    if (hex[0] == '#') {
+        hex++;
+    }
+
+    unsigned int color_val = 0;
+    if (sscanf(hex, "%x", &color_val) == 1) {
+        return lv_color_hex(color_val);
+    }
+    return fallback_color;
+}
 
 // ============================================================================
 // Constructor
@@ -168,34 +194,70 @@ void SpoolmanPanel::refresh_spools() {
     api->get_spoolman_spools(
         [this](const std::vector<SpoolInfo>& spools) {
             spdlog::info("[{}] Received {} spools from Spoolman", get_name(), spools.size());
-            cached_spools_ = spools;
 
-            // Also get active spool ID
+            // Also get active spool ID before updating UI
             MoonrakerAPI* api_inner = get_moonraker_api();
             if (!api_inner) {
                 spdlog::warn("[{}] API unavailable for status check", get_name());
-                active_spool_id_ = -1;
-                populate_spool_list();
+                // Schedule UI update on main thread
+                auto* data = new std::pair<SpoolmanPanel*, std::vector<SpoolInfo>>(this, spools);
+                ui_async_call(
+                    [](void* ud) {
+                        auto* ctx =
+                            static_cast<std::pair<SpoolmanPanel*, std::vector<SpoolInfo>>*>(ud);
+                        ctx->first->cached_spools_ = std::move(ctx->second);
+                        ctx->first->active_spool_id_ = -1;
+                        ctx->first->populate_spool_list();
+                        delete ctx;
+                    },
+                    data);
                 return;
             }
 
             api_inner->get_spoolman_status(
-                [this](bool /*connected*/, int active_id) {
-                    active_spool_id_ = active_id;
-                    spdlog::debug("[{}] Active spool ID: {}", get_name(), active_spool_id_);
-                    populate_spool_list();
+                [this, spools](bool /*connected*/, int active_id) {
+                    spdlog::debug("[{}] Active spool ID: {}", get_name(), active_id);
+                    // Schedule UI update on main thread
+                    auto* data = new std::tuple<SpoolmanPanel*, std::vector<SpoolInfo>, int>(
+                        this, spools, active_id);
+                    ui_async_call(
+                        [](void* ud) {
+                            auto* ctx = static_cast<
+                                std::tuple<SpoolmanPanel*, std::vector<SpoolInfo>, int>*>(ud);
+                            auto* self = std::get<0>(*ctx);
+                            self->cached_spools_ = std::move(std::get<1>(*ctx));
+                            self->active_spool_id_ = std::get<2>(*ctx);
+                            self->populate_spool_list();
+                            delete ctx;
+                        },
+                        data);
                 },
-                [this](const MoonrakerError& err) {
+                [this, spools](const MoonrakerError& err) {
                     spdlog::warn("[{}] Failed to get active spool: {}", get_name(), err.message);
-                    active_spool_id_ = -1;
-                    populate_spool_list();
+                    auto* data =
+                        new std::pair<SpoolmanPanel*, std::vector<SpoolInfo>>(this, spools);
+                    ui_async_call(
+                        [](void* ud) {
+                            auto* ctx =
+                                static_cast<std::pair<SpoolmanPanel*, std::vector<SpoolInfo>>*>(ud);
+                            ctx->first->cached_spools_ = std::move(ctx->second);
+                            ctx->first->active_spool_id_ = -1;
+                            ctx->first->populate_spool_list();
+                            delete ctx;
+                        },
+                        data);
                 });
         },
         [this](const MoonrakerError& err) {
             spdlog::error("[{}] Failed to fetch spools: {}", get_name(), err.message);
-            cached_spools_.clear();
-            show_empty_state();
-            ui_toast_show(ToastSeverity::ERROR, lv_tr("Failed to load spools"), 3000);
+            ui_async_call(
+                [](void* ud) {
+                    auto* self = static_cast<SpoolmanPanel*>(ud);
+                    self->cached_spools_.clear();
+                    self->show_empty_state();
+                    ui_toast_show(ToastSeverity::ERROR, lv_tr("Failed to load spools"), 3000);
+                },
+                this);
         });
 }
 
@@ -226,6 +288,16 @@ void SpoolmanPanel::update_spool_count() {
                  cached_spools_.size() == 1 ? "" : "s");
         lv_subject_copy_string(&header_title_subject_, buf);
     }
+}
+
+// ============================================================================
+// Cache Lookup
+// ============================================================================
+
+const SpoolInfo* SpoolmanPanel::find_cached_spool(int spool_id) const {
+    auto it = std::find_if(cached_spools_.begin(), cached_spools_.end(),
+                           [spool_id](const SpoolInfo& s) { return s.id == spool_id; });
+    return it != cached_spools_.end() ? &(*it) : nullptr;
 }
 
 // ============================================================================
@@ -275,18 +347,8 @@ void SpoolmanPanel::update_row_visuals(lv_obj_t* row, const SpoolInfo& spool) {
     // Update 3D spool canvas
     lv_obj_t* canvas = lv_obj_find_by_name(row, "spool_canvas");
     if (canvas) {
-        // Parse color from hex string (e.g., "FF5722" or "#FF5722")
-        lv_color_t color = theme_manager_get_color("text_muted"); // Default gray
-        if (!spool.color_hex.empty()) {
-            std::string hex = spool.color_hex;
-            if (!hex.empty() && hex[0] == '#') {
-                hex = hex.substr(1);
-            }
-            unsigned int color_val = 0;
-            if (sscanf(hex.c_str(), "%x", &color_val) == 1) {
-                color = lv_color_hex(color_val); // parse spool color_hex
-            }
-        }
+        lv_color_t color =
+            parse_spool_color(spool.color_hex, theme_manager_get_color("text_muted"));
         ui_spool_canvas_set_color(canvas, color);
 
         // Fill level: remaining_percent / 100
@@ -325,10 +387,10 @@ void SpoolmanPanel::update_row_visuals(lv_obj_t* row, const SpoolInfo& spool) {
         lv_label_set_text(percent_label, percent_buf);
     }
 
-    // Low stock warning (< 100g)
+    // Low stock warning
     lv_obj_t* low_stock_icon = lv_obj_find_by_name(row, "low_stock_indicator");
     if (low_stock_icon) {
-        if (spool.remaining_weight_g < 100.0) {
+        if (spool.is_low()) {
             lv_obj_remove_flag(low_stock_icon, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_add_flag(low_stock_icon, LV_OBJ_FLAG_HIDDEN);
@@ -399,15 +461,7 @@ void SpoolmanPanel::handle_spool_clicked(lv_obj_t* row, lv_point_t click_pt) {
 
     spdlog::info("[{}] Spool {} clicked", get_name(), spool_id);
 
-    // Find the matching SpoolInfo from cache
-    const SpoolInfo* spool = nullptr;
-    for (const auto& s : cached_spools_) {
-        if (s.id == spool_id) {
-            spool = &s;
-            break;
-        }
-    }
-
+    const SpoolInfo* spool = find_cached_spool(spool_id);
     if (!spool) {
         spdlog::warn("[{}] Spool {} not found in cache", get_name(), spool_id);
         return;
@@ -463,14 +517,10 @@ void SpoolmanPanel::set_active_spool(int spool_id) {
         [this, spool_id]() {
             spdlog::info("[{}] Set active spool to {}", get_name(), spool_id);
 
-            // Find the spool name for toast (safe on any thread — reads cached data)
-            std::string spool_name = "Spool " + std::to_string(spool_id);
-            for (const auto& s : cached_spools_) {
-                if (s.id == spool_id) {
-                    spool_name = s.display_name();
-                    break;
-                }
-            }
+            // Find the spool name for toast (safe on any thread -- reads cached data)
+            const SpoolInfo* found = find_cached_spool(spool_id);
+            std::string spool_name =
+                found ? found->display_name() : "Spool " + std::to_string(spool_id);
 
             // Update UI on main thread
             ui_async_call(
@@ -505,15 +555,7 @@ void SpoolmanPanel::set_active_spool(int spool_id) {
 // ============================================================================
 
 void SpoolmanPanel::show_edit_modal(int spool_id) {
-    // Find the spool in cache
-    const SpoolInfo* spool = nullptr;
-    for (const auto& s : cached_spools_) {
-        if (s.id == spool_id) {
-            spool = &s;
-            break;
-        }
-    }
-
+    const SpoolInfo* spool = find_cached_spool(spool_id);
     if (!spool) {
         spdlog::warn("[{}] Cannot edit - spool {} not in cache", get_name(), spool_id);
         return;
@@ -537,16 +579,11 @@ void SpoolmanPanel::show_edit_modal(int spool_id) {
 
 void SpoolmanPanel::delete_spool(int spool_id) {
     // Build confirmation message with spool info
+    const SpoolInfo* spool = find_cached_spool(spool_id);
     std::string spool_desc;
-    for (const auto& s : cached_spools_) {
-        if (s.id == spool_id) {
-            std::string vendor_prefix = s.vendor.empty() ? "" : s.vendor + " ";
-            spool_desc = vendor_prefix + s.display_name() + " (#" + std::to_string(spool_id) + ")";
-            break;
-        }
-    }
-
-    if (spool_desc.empty()) {
+    if (spool) {
+        spool_desc = spool->display_name() + " (#" + std::to_string(spool_id) + ")";
+    } else {
         spool_desc = "Spool #" + std::to_string(spool_id);
     }
 
@@ -559,6 +596,12 @@ void SpoolmanPanel::delete_spool(int spool_id) {
     ui_modal_show_confirmation(
         "Delete Spool?", message.c_str(), ModalSeverity::Warning, "Delete",
         [](lv_event_t* /*e*/) {
+            // Close the confirmation dialog immediately
+            lv_obj_t* top = Modal::get_top();
+            if (top) {
+                Modal::hide(top);
+            }
+
             int id = s_pending_delete_id;
             spdlog::info("[Spoolman] Confirmed delete of spool {}", id);
 

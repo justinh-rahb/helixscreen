@@ -84,12 +84,12 @@ bool SpoolmanContextMenu::show_for_spool(lv_obj_t* parent, const SpoolInfo& spoo
 // ============================================================================
 
 void SpoolmanContextMenu::on_created(lv_obj_t* menu_obj) {
-    // Header line 1: "Vendor Material" (e.g., "Polymaker PLA")
+    // Header: "Vendor Material" (e.g., "Polymaker PLA")
     lv_obj_t* header = lv_obj_find_by_name(menu_obj, "spool_header");
     if (header) {
         std::string name;
         if (!pending_spool_.vendor.empty()) {
-            name += pending_spool_.vendor;
+            name = pending_spool_.vendor;
         }
         if (!pending_spool_.material.empty()) {
             if (!name.empty()) {
@@ -103,7 +103,7 @@ void SpoolmanContextMenu::on_created(lv_obj_t* menu_obj) {
         lv_label_set_text(header, name.c_str());
     }
 
-    // Header line 2: Color name (e.g., "Jet Black")
+    // Color subtitle (e.g., "Jet Black") -- hidden when no color name
     lv_obj_t* color_label = lv_obj_find_by_name(menu_obj, "spool_color_label");
     if (color_label) {
         if (pending_spool_.color_name.empty()) {
@@ -113,16 +113,14 @@ void SpoolmanContextMenu::on_created(lv_obj_t* menu_obj) {
         }
     }
 
-    // Header line 3: Vendor (hide if already shown in header)
+    // Vendor subtitle is unused (vendor already in header); hide the XML element
     lv_obj_t* vendor_label = lv_obj_find_by_name(menu_obj, "spool_vendor_label");
     if (vendor_label) {
-        // Vendor is already in the header, hide this line
         lv_obj_add_flag(vendor_label, LV_OBJ_FLAG_HIDDEN);
     }
 
     // Prevent context menu buttons from triggering scroll on the underlying list
     lv_obj_remove_flag(menu_obj, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
-    uint32_t child_count = lv_obj_get_child_count(menu_obj);
     lv_obj_t* card = lv_obj_find_by_name(menu_obj, "context_menu");
     if (card) {
         lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLL_ON_FOCUS);

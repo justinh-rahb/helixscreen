@@ -22,7 +22,7 @@ ContextMenu::~ContextMenu() {
 
 ContextMenu::ContextMenu(ContextMenu&& other) noexcept
     : menu_(other.menu_), parent_(other.parent_), item_index_(other.item_index_),
-      action_callback_(std::move(other.action_callback_)) {
+      click_point_(other.click_point_), action_callback_(std::move(other.action_callback_)) {
     other.menu_ = nullptr;
     other.parent_ = nullptr;
     other.item_index_ = -1;
@@ -34,6 +34,7 @@ ContextMenu& ContextMenu::operator=(ContextMenu&& other) noexcept {
         menu_ = other.menu_;
         parent_ = other.parent_;
         item_index_ = other.item_index_;
+        click_point_ = other.click_point_;
         action_callback_ = std::move(other.action_callback_);
         other.menu_ = nullptr;
         other.parent_ = nullptr;

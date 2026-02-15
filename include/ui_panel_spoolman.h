@@ -86,6 +86,8 @@ class SpoolmanPanel : public OverlayBase {
     char header_title_buf_[64];
 
     // ========== Private Methods ==========
+    [[nodiscard]] const SpoolInfo* find_cached_spool(int spool_id) const;
+
     void populate_spool_list();
     void update_row_visuals(lv_obj_t* row, const SpoolInfo& spool);
     void update_active_indicators();
