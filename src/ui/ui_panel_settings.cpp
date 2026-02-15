@@ -190,7 +190,8 @@ static void on_update_channel_changed(lv_event_t* e) {
             // Revert to previous value
             int current = SettingsManager::instance().get_update_channel();
             lv_dropdown_set_selected(dropdown, static_cast<uint32_t>(current));
-            ui_toast_show(ToastSeverity::WARNING, "Dev channel requires dev_url in config", 3000);
+            ui_toast_show(ToastSeverity::WARNING, lv_tr("Dev channel requires dev_url in config"),
+                          3000);
             rejected = true;
         }
     }
@@ -227,12 +228,12 @@ static void on_version_clicked(lv_event_t*) {
         // Show countdown - say "enable" or "disable" based on current state
         Config* config = Config::get_instance();
         bool currently_on = config && config->is_beta_features_enabled();
-        const char* action = currently_on ? "disable" : "enable";
-        ui_toast_show(ToastSeverity::INFO,
-                      fmt::format("{} more tap{} to {} beta features", remaining,
-                                  remaining == 1 ? "" : "s", action)
-                          .c_str(),
-                      1000);
+        const char* action = currently_on ? lv_tr("disable") : lv_tr("enable");
+        std::string msg =
+            remaining == 1
+                ? fmt::format(lv_tr("1 more tap to {} beta features"), action)
+                : fmt::format(lv_tr("{} more taps to {} beta features"), remaining, action);
+        ui_toast_show(ToastSeverity::INFO, msg.c_str(), 1000);
     } else if (remaining == 0) {
         // Toggle beta_features config flag and reactive subject
         Config* config = Config::get_instance();
@@ -384,7 +385,7 @@ void SettingsPanel::init_subjects() {
     // Touch calibration status - show "Calibrated" or "Not calibrated" in row description
     Config* config = Config::get_instance();
     bool is_calibrated = config && config->get<bool>("/input/calibration/valid", false);
-    const char* status_text = is_calibrated ? "Calibrated" : "Not calibrated";
+    const char* status_text = is_calibrated ? lv_tr("Calibrated") : lv_tr("Not calibrated");
     UI_MANAGED_SUBJECT_STRING(touch_cal_status_subject_, touch_cal_status_buf_, status_text,
                               "touch_cal_status", subjects_);
 
@@ -709,7 +710,7 @@ void SettingsPanel::setup_action_handlers() {
 void SettingsPanel::populate_info_rows() {
     // === Version (subject used by About overlay and About row description) ===
     lv_subject_copy_string(&version_value_subject_, helix_version());
-    std::string about_desc = std::string("Current Version: ") + helix_version();
+    std::string about_desc = std::string(lv_tr("Current Version")) + ": " + helix_version();
     lv_subject_copy_string(&about_version_description_subject_, about_desc.c_str());
     spdlog::trace("[{}]   Version subject: {}", get_name(), helix_version());
 
@@ -1023,8 +1024,8 @@ void SettingsPanel::handle_touch_calibration_clicked() {
     overlay.set_auto_start(true);
     overlay.show([this](bool success) {
         if (success) {
-            // Update status to "Calibrated" when calibration completes successfully
-            lv_subject_copy_string(&touch_cal_status_subject_, "Calibrated");
+            // Update status when calibration completes successfully
+            lv_subject_copy_string(&touch_cal_status_subject_, lv_tr("Calibrated"));
             spdlog::info("[{}] Touch calibration completed - updated status", get_name());
         }
     });
@@ -1032,7 +1033,7 @@ void SettingsPanel::handle_touch_calibration_clicked() {
 
 void SettingsPanel::handle_restart_helix_clicked() {
     spdlog::info("[SettingsPanel] Restart HelixScreen requested");
-    ui_toast_show(ToastSeverity::INFO, "Restarting HelixScreen...", 1500);
+    ui_toast_show(ToastSeverity::INFO, lv_tr("Restarting HelixScreen..."), 1500);
 
     // Schedule restart after brief delay to let toast display
     ui_async_call(
@@ -1104,7 +1105,8 @@ void SettingsPanel::show_update_download_modal() {
 
     // Set to Confirming state with version info
     auto info = UpdateChecker::instance().get_cached_update();
-    std::string text = info ? ("Download v" + info->version + "?") : "Download update?";
+    std::string text = info ? fmt::format(lv_tr("Download v{}?"), info->version)
+                            : std::string(lv_tr("Download update?"));
     UpdateChecker::instance().report_download_status(UpdateChecker::DownloadStatus::Confirming, 0,
                                                      text);
 }

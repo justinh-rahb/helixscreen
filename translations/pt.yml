@@ -7,6 +7,7 @@ translations:
   '- Ensure ADXL345 is connected': '- Certifique-se de que o ADXL345 está conectado'
   '- Try Measure Noise first': '- Tente Medir Ruído primeiro'
   0.4-2mm direct drive, 4-6mm bowden: 0.4-2mm direct drive, 4-6mm bowden
+  1 more tap to {} beta features: ''
   1. Printer homes and probes the bed: 1. A impressora faz home e sonda a mesa
   1. Printer will home and probe each screw: 1. A impressora fará home e sondará cada parafuso
   2. Place paper between nozzle and bed: 2. Coloque papel entre o bico e a mesa
@@ -115,6 +116,7 @@ translations:
   Calibrate All: Calibrar Tudo
   Calibrate X: Calibrar X
   Calibrate Y: Calibrar Y
+  Calibrated: ''
   Calibrating...: Calibrando...
   Calibration: Calibração
   Calibration & Tools: Calibração e Ferramentas
@@ -122,6 +124,7 @@ translations:
   Calibration Failed: Calibração Falhou
   Calibration saved but cannot apply on SDL display: Calibração salva mas não pode ser aplicada no display SDL
   Cancel: Cancelar
+  Cancel Escalation: ''
   Cancel Print: Cancelar Impressão
   Cancelled: Cancelado
   Chamber: Câmara
@@ -213,6 +216,7 @@ translations:
   Delete File?: Excluir Arquivo?
   Delete Profile?: Excluir Perfil?
   'Delta:': 'Delta:'
+  Dev channel requires dev_url in config: ''
   Device Operations: Operações do Dispositivo
   Device name is required: Nome do dispositivo é obrigatório
   Disable: Desabilitar
@@ -228,6 +232,8 @@ translations:
   Don't Save: Não Salvar
   Don't ask again: Não perguntar novamente
   Done: Concluído
+  Download update?: ''
+  Download v{}?: ''
   Downloading...: Baixando...
   Drop shadow strength (0 = disabled): Intensidade da sombra (0 = desabilitado)
   Dryer: Secador
@@ -269,6 +275,8 @@ translations:
   Enter password: Digite a senha
   Error: Erro
   Error state: Estado de erro
+  Escalate to emergency stop if cancel doesn't respond: ''
+  Escalation Timeout: ''
   Ethernet: Ethernet
   Events appear here after sessions and prints: Eventos aparecem aqui após sessões e impressões
   Exclude: Excluir
@@ -491,6 +499,7 @@ translations:
   NEWLY DISCOVERED: RECÉM DESCOBERTO
   NOTIFICATIONS: NOTIFICAÇÕES
   Name: Nome
+  Named actions in the LED control panel (long-press).: ''
   Network Address: Endereço de Rede
   Network Name: Nome da Rede
   Network Name (SSID): Nome da Rede (SSID)
@@ -527,6 +536,7 @@ translations:
   No sensors detected: Nenhum sensor detectado
   No spools available: Nenhum carretel disponível
   Not Now: Agora Não
+  Not calibrated: ''
   Not connected: Não conectado
   Not connected to printer: Não conectado à impressora
   Not yet calibrated: Ainda não calibrado
@@ -671,6 +681,7 @@ translations:
   Restart Required: Reinício Necessário
   'Restart failed: not connected': 'Reinício falhou: não conectado'
   Restart the display application: Reiniciar o aplicativo de exibição
+  Restarting HelixScreen...: ''
   Restarting Klipper...: Reiniciando Klipper...
   Resume: Retomar
   Resume Print: Retomar Impressão
@@ -731,6 +742,7 @@ translations:
   Send this crash report to help improve HelixScreen.: Envie este relatório de erro para ajudar a melhorar o HelixScreen.
   Sending...: Enviando...
   Sensors: Sensores
+  Separate on/off macros. HelixScreen tracks the state.: ''
   'Set ': 'Definir '
   Settings: Configurações
   Settings reset to defaults: Configurações restauradas para os padrões
@@ -740,6 +752,7 @@ translations:
   'Shininess:': 'Brilho:'
   Show detailed print preparation status: Mostrar status detalhado de preparação de impressão
   Side: Lateral
+  Single toggle macro. State is not tracked.: ''
   Size: Tamanho
   Skip: Pular
   Sleep While Printing: Suspender Durante Impressão
@@ -827,6 +840,7 @@ translations:
   This will restart Klipper.: Isso reiniciará o Klipper.
   Time: Tempo
   Time Format: Formato de Hora
+  Time to wait before escalating to emergency stop: ''
   Timelapse: Timelapse
   Timelapse Available: Timelapse Disponível
   Timelapse Settings: Configurações de Timelapse
@@ -933,9 +947,12 @@ translations:
   'Z:': 'Z:'
   'Z: 0.000': 'Z: 0.000'
   Zoom: Zoom
+  disable: ''
   elapsed: decorrido
+  enable: ''
   est: est
   layers: camadas
   of: de
   used: usado
   v{} is available. Tap to update.: v{} disponível. Toque para atualizar.
+  '{} more taps to {} beta features': ''

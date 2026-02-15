@@ -8,6 +8,7 @@
   <translation tag="- Ensure ADXL345 is connected" de="- Stellen Sie sicher, dass der ADXL345 angeschlossen ist" en="- Ensure ADXL345 is connected" es="- Asegúrese de que el ADXL345 esté conectado" fr="- Assurez-vous que l&apos;ADXL345 est connecté" it="- Assicurarsi che ADXL345 sia collegato" ja="- ADXL345 が接続されていることを確認してください" pt="- Certifique-se de que o ADXL345 está conectado" ru="- Убедитесь, что ADXL345 подключен" zh="- 确保 ADXL345 已连接"/>
   <translation tag="- Try Measure Noise first" de="- Versuchen Sie zuerst Rauschen messen" en="- Try Measure Noise first" es="- Intente Medir Ruido primero" fr="- Essayez d&apos;abord Mesurer le bruit" it="- Provare prima Misura rumore" ja="- まず「ノイズ測定」をお試しください" pt="- Tente Medir Ruído primeiro" ru="- Сначала попробуйте измерить шум акселерометра" zh="- 先尝试测量噪声"/>
   <translation tag="0.4-2mm direct drive, 4-6mm bowden" de="0,4-2mm Direct Drive, 4-6mm Bowden" en="0.4-2mm direct drive, 4-6mm bowden" es="0.4-2mm extrusión directa, 4-6mm bowden" fr="0.4-2mm entraînement direct, 4-6mm bowden" it="0,4-2mm direct drive, 4-6mm bowden" ja="0.4-2mm ダイレクトドライブ、4-6mm ボーデン" pt="0.4-2mm direct drive, 4-6mm bowden" ru="0.4-2мм для директа, 4-6мм для боудена" zh="直驱 0.4-2mm，远程挤出 4-6mm"/>
+  <translation tag="1 more tap to {} beta features" en="1 more tap to {} beta features"/>
   <translation tag="1. Printer homes and probes the bed" de="1. Drucker referenziert und prüft das Bett" en="1. Printer homes and probes the bed" es="1. La impresora hace origen y sondea la cama" fr="1. L&apos;imprimante fait l&apos;origine et palpe le plateau" it="1. La stampante esegue homing e sonda il piano" ja="1. プリンターがホーミングしてベッドをプローブします" pt="1. A impressora faz home e sonda a mesa" ru="1. Принтер паркуется и зондирует стол" zh="1. 打印机归位并探测热床"/>
   <translation tag="1. Printer will home and probe each screw" de="1. Drucker referenziert und prüft jede Schraube" en="1. Printer will home and probe each screw" es="1. La impresora hará origen y sondeará cada tornillo" fr="1. L&apos;imprimante fera l&apos;origine et palpera chaque vis" it="1. La stampante eseguirà homing e sonderà ogni vite" ja="1. プリンターがホーミングして各ネジをプローブします" pt="1. A impressora fará home e sondará cada parafuso" ru="1. Принтер запаркуется и проверит каждый винт" zh="1. 打印机将归位并探测每个螺丝位置"/>
   <translation tag="10mm" en="10mm" ru="10мм"/>
@@ -131,6 +132,7 @@
   <translation tag="Calibrate X" de="X kalibrieren" en="Calibrate X" es="Calibrar X" fr="Calibrer X" it="Calibra X" ja="X軸をキャリブレート" pt="Calibrar X" ru="Калибровать X" zh="校准 X 轴"/>
   <translation tag="Calibrate Y" de="Y kalibrieren" en="Calibrate Y" es="Calibrar Y" fr="Calibrer Y" it="Calibra Y" ja="Y軸をキャリブレート" pt="Calibrar Y" ru="Калибровать Y" zh="校准 Y 轴"/>
   <translation tag="Calibrate resonance compensation" en="Calibrate resonance compensation" ru="Калибровка компенсации резонанса"/>
+  <translation tag="Calibrated" en="Calibrated"/>
   <translation tag="Calibrating..." de="Kalibriere..." en="Calibrating..." es="Calibrando..." fr="Calibration..." it="Calibrazione in corso..." ja="キャリブレーション中..." pt="Calibrando..." ru="Калибровка..." zh="正在校准..."/>
   <translation tag="Calibration" de="Kalibrierung" en="Calibration" es="Calibración" fr="Calibration" it="Calibrazione" ja="キャリブレーション" pt="Calibração" ru="Калибровка" zh="校准"/>
   <translation tag="Calibration &amp; Tools" de="Kalibrierung &amp; Werkzeuge" en="Calibration &amp; Tools" es="Calibración y herramientas" fr="Calibration et outils" it="Calibrazione e Strumenti" ja="キャリブレーションとツール" pt="Calibração e Ferramentas" ru="Калибровка и инструменты" zh="校准与工具"/>
@@ -138,6 +140,7 @@
   <translation tag="Calibration Failed" de="Kalibrierung fehlgeschlagen" en="Calibration Failed" es="Calibración Fallida" fr="Calibration échouée" it="Calibrazione fallita" ja="キャリブレーション失敗" pt="Calibração Falhou" ru="Ошибка калибровки" zh="校准失败"/>
   <translation tag="Calibration saved but cannot apply on SDL display" de="Kalibrierung gespeichert, kann aber auf SDL-Display nicht angewendet werden" en="Calibration saved but cannot apply on SDL display" es="Calibración guardada pero no se puede aplicar en pantalla SDL" fr="Calibration enregistrée mais impossible à appliquer sur un écran SDL" it="Calibrazione salvata ma non applicabile su display SDL" ja="キャリブレーションは保存されましたが SDL ディスプレイには適用できません" pt="Calibração salva mas não pode ser aplicada no display SDL" ru="Калибровка сохранена, но не может быть применена на SDL дисплее" zh="校准已保存，但无法在 SDL 显示上应用"/>
   <translation tag="Cancel" de="Abbrechen" en="Cancel" es="Cancelar" fr="Annuler" it="Annulla" ja="キャンセル" pt="Cancelar" ru="Отмена" zh="取消"/>
+  <translation tag="Cancel Escalation" en="Cancel Escalation"/>
   <translation tag="Cancel Print" de="Druck abbrechen" en="Cancel Print" es="Cancelar Impresión" fr="Annuler l&apos;impression" it="Annulla stampa" ja="印刷をキャンセル" pt="Cancelar Impressão" ru="Отменить печать" zh="取消打印"/>
   <translation tag="Cancelled" de="Abgebrochen" en="Cancelled" es="Cancelado" fr="Annulé" it="Annullato" ja="キャンセル済み" pt="Cancelado" ru="Отменено" zh="已取消"/>
   <translation tag="Chamber" de="Kammer" en="Chamber" es="Cámara" fr="Enceinte" it="Camera" ja="チャンバー" pt="Câmara" ru="Камера" zh="腔体"/>
@@ -229,6 +232,7 @@
   <translation tag="Delete File?" de="Datei löschen?" en="Delete File?" es="¿Eliminar Archivo?" fr="Supprimer le fichier ?" it="Eliminare file?" ja="ファイルを削除しますか？" pt="Excluir Arquivo?" ru="Удалить файл?" zh="删除文件？"/>
   <translation tag="Delete Profile?" de="Profil löschen?" en="Delete Profile?" es="¿Eliminar Perfil?" fr="Supprimer le profil ?" it="Eliminare profilo?" ja="プロファイルを削除しますか？" pt="Excluir Perfil?" ru="Удалить профиль?" zh="删除配置？"/>
   <translation tag="Delta:" de="Delta:" en="Delta:" es="Delta:" fr="Delta :" it="Delta:" ja="差分:" pt="Delta:" ru="Дельта:" zh="差值："/>
+  <translation tag="Dev channel requires dev_url in config" en="Dev channel requires dev_url in config"/>
   <translation tag="Device Operations" de="Geräteoperationen" en="Device Operations" es="Operaciones de Dispositivo" fr="Opérations de l&apos;appareil" it="Operazioni dispositivo" ja="デバイス操作" pt="Operações do Dispositivo" ru="Операции с устройством" zh="设备操作"/>
   <translation tag="Device name is required" de="Gerätename ist erforderlich" en="Device name is required" es="El nombre del dispositivo es requerido" fr="Le nom de l&apos;appareil est requis" it="Il nome dispositivo è obbligatorio" ja="デバイス名は必須です" pt="Nome do dispositivo é obrigatório" ru="Требуется название устройства" zh="设备名称为必填项"/>
   <translation tag="Disable" de="Deaktivieren" en="Disable" es="Desactivar" fr="Désactiver" it="Disabilita" ja="無効化" pt="Desabilitar" ru="Отключить" zh="禁用"/>
@@ -244,6 +248,8 @@
   <translation tag="Don&apos;t Save" de="Nicht speichern" en="Don&apos;t Save" es="No Guardar" fr="Ne pas enregistrer" it="Non salvare" ja="保存しない" pt="Não Salvar" ru="Не сохранять" zh="不保存"/>
   <translation tag="Don&apos;t ask again" de="Nicht erneut fragen" en="Don&apos;t ask again" es="No volver a preguntar" fr="Ne plus demander" it="Non chiedere più" ja="今後表示しない" pt="Não perguntar novamente" ru="Больше не спрашивать" zh="不再询问"/>
   <translation tag="Done" de="Fertig" en="Done" es="Listo" fr="Terminé" it="Fatto" ja="完了" pt="Concluído" ru="Готово" zh="完成"/>
+  <translation tag="Download update?" en="Download update?"/>
+  <translation tag="Download v{}?" en="Download v{}?"/>
   <translation tag="Downloading..." de="Wird heruntergeladen..." en="Downloading..." es="Descargando..." fr="Téléchargement..." it="Download in corso..." ja="ダウンロード中..." pt="Baixando..." ru="Загрузка..." zh="下载中..."/>
   <translation tag="Drop shadow strength (0 = disabled)" de="Schattenstärke (0 = deaktiviert)" en="Drop shadow strength (0 = disabled)" es="Intensidad de sombra (0 = desactivada)" fr="Intensité de l&apos;ombre portée (0 = désactivé)" it="Intensità ombra (0 = disabilitata)" ja="影の強さ (0 = 無効)" pt="Intensidade da sombra (0 = desabilitado)" ru="Интенсивность тени (0 = отключено)" zh="阴影强度（0 = 禁用）"/>
   <translation tag="Dryer" de="Trockner" en="Dryer" es="Secador" fr="Sécheur" it="Essiccatore" ja="ドライヤー" pt="Secador" ru="Сушилка" zh="干燥器"/>
@@ -285,6 +291,8 @@
   <translation tag="Enter password" de="Passwort eingeben" en="Enter password" es="Ingrese contraseña" fr="Entrez le mot de passe" it="Inserisci password" ja="パスワードを入力" pt="Digite a senha" ru="Введите пароль" zh="输入密码"/>
   <translation tag="Error" de="Fehler" en="Error" es="Error" fr="Erreur" it="Errore" ja="エラー" pt="Erro" ru="Ошибка" zh="错误"/>
   <translation tag="Error state" de="Fehlerzustand" en="Error state" es="Estado de error" fr="État d&apos;erreur" it="Stato errore" ja="エラー状態" pt="Estado de erro" ru="Состояние ошибки" zh="错误状态"/>
+  <translation tag="Escalate to emergency stop if cancel doesn&apos;t respond" en="Escalate to emergency stop if cancel doesn&apos;t respond"/>
+  <translation tag="Escalation Timeout" en="Escalation Timeout"/>
   <translation tag="Ethernet" de="Ethernet" en="Ethernet" es="Ethernet" fr="Ethernet" it="Ethernet" ja="イーサネット" pt="Ethernet" ru="Ethernet" zh="以太网"/>
   <translation tag="Events appear here after sessions and prints" de="Ereignisse erscheinen hier nach Sitzungen und Drucken" en="Events appear here after sessions and prints" es="Los eventos aparecen aquí después de sesiones e impresiones" fr="Les événements apparaissent ici après les sessions et impressions" it="Gli eventi appaiono qui dopo sessioni e stampe" ja="セッションと印刷の後にイベントがここに表示されます" pt="Eventos aparecem aqui após sessões e impressões" ru="События появятся здесь после сессий и печатей" zh="会话和打印后事件将显示在此处"/>
   <translation tag="Exclude" de="Ausschließen" en="Exclude" es="Excluir" fr="Exclure" it="Escludi" ja="除外" pt="Excluir" ru="Исключить" zh="排除"/>
@@ -513,6 +521,7 @@
   <translation tag="NEWLY DISCOVERED" de="NEU ENTDECKT" en="NEWLY DISCOVERED" es="RECIÉN DESCUBIERTO" fr="NOUVELLEMENT DÉCOUVERT" it="APPENA RILEVATO" ja="新規検出" pt="RECÉM DESCOBERTO" ru="НЕДАВНО ОБНАРУЖЕНО" zh="新发现"/>
   <translation tag="NOTIFICATIONS" de="BENACHRICHTIGUNGEN" en="NOTIFICATIONS" es="NOTIFICACIONES" fr="NOTIFICATIONS" it="NOTIFICHE" ja="通知" pt="NOTIFICAÇÕES" ru="УВЕДОМЛЕНИЯ" zh="通知"/>
   <translation tag="Name" de="Name" en="Name" es="Nombre" fr="Nom" it="Nome" ja="名前" pt="Nome" ru="Название" zh="名称"/>
+  <translation tag="Named actions in the LED control panel (long-press)." en="Named actions in the LED control panel (long-press)."/>
   <translation tag="Network Address" de="Netzwerkadresse" en="Network Address" es="Dirección de Red" fr="Adresse réseau" it="Indirizzo di rete" ja="ネットワークアドレス" pt="Endereço de Rede" ru="Сетевой адрес" zh="网络地址"/>
   <translation tag="Network Name" de="Netzwerkname" en="Network Name" es="Nombre de Red" fr="Nom du réseau" it="Nome rete" ja="ネットワーク名" pt="Nome da Rede" ru="Название сети" zh="网络名称"/>
   <translation tag="Network Name (SSID)" de="Netzwerkname (SSID)" en="Network Name (SSID)" es="Nombre de Red (SSID)" fr="Nom du réseau (SSID)" it="Nome rete (SSID)" ja="ネットワーク名 (SSID)" pt="Nome da Rede (SSID)" ru="Название сети (SSID)" zh="网络名称 (SSID)"/>
@@ -550,6 +559,7 @@
   <translation tag="No sensors detected" de="Keine Sensoren erkannt" en="No sensors detected" es="No se detectaron sensores" fr="Aucun capteur détecté" it="Nessun sensore rilevato" ja="センサーが検出されませんでした" pt="Nenhum sensor detectado" ru="Датчики не обнаружены" zh="未检测到传感器"/>
   <translation tag="No spools available" de="Keine Spulen verfügbar" en="No spools available" es="No hay bobinas disponibles" fr="Aucune bobine disponible" it="Nessuna bobina disponibile" ja="利用可能なスプールがありません" pt="Nenhum carretel disponível" ru="Катушки недоступны" zh="无可用料盘"/>
   <translation tag="Not Now" de="Nicht jetzt" en="Not Now" es="Ahora No" fr="Pas maintenant" it="Non ora" ja="今はしない" pt="Agora Não" ru="Не сейчас" zh="暂不"/>
+  <translation tag="Not calibrated" en="Not calibrated"/>
   <translation tag="Not connected" de="Nicht verbunden" en="Not connected" es="No conectado" fr="Non connecté" it="Non connesso" ja="未接続" pt="Não conectado" ru="Не подключен" zh="未连接"/>
   <translation tag="Not connected to printer" de="Nicht mit Drucker verbunden" en="Not connected to printer" es="No conectado a la impresora" fr="Non connecté à l&apos;imprimante" it="Non connesso alla stampante" ja="プリンターに未接続" pt="Não conectado à impressora" ru="Нет подключения к принтеру" zh="未连接到打印机"/>
   <translation tag="Not yet calibrated" de="Noch nicht kalibriert" en="Not yet calibrated" es="Aún no calibrado" fr="Pas encore calibré" it="Non ancora calibrato" ja="未キャリブレーション" pt="Ainda não calibrado" ru="Ещё не откалибровано" zh="尚未校准"/>
@@ -699,6 +709,7 @@
   <translation tag="Restart Required" de="Neustart erforderlich" en="Restart Required" es="Reinicio Requerido" fr="Redémarrage requis" it="Riavvio richiesto" ja="再起動が必要です" pt="Reinício Necessário" ru="Требуется перезапуск" zh="需要重启"/>
   <translation tag="Restart failed: not connected" de="Neustart fehlgeschlagen: nicht verbunden" en="Restart failed: not connected" es="Reinicio fallido: no conectado" fr="Échec du redémarrage : non connecté" it="Riavvio fallito: non connesso" ja="再起動に失敗: 未接続" pt="Reinício falhou: não conectado" ru="Перезапуск не удался: нет подключения" zh="重启失败: 未连接"/>
   <translation tag="Restart the display application" de="Anzeigeanwendung neu starten" en="Restart the display application" es="Reiniciar la aplicación de pantalla" fr="Redémarrer l&apos;application d&apos;affichage" it="Riavvia l&apos;applicazione display" ja="ディスプレイアプリケーションを再起動" pt="Reiniciar o aplicativo de exibição" ru="Перезапустить приложение дисплея" zh="重启显示应用程序"/>
+  <translation tag="Restarting HelixScreen..." en="Restarting HelixScreen..."/>
   <translation tag="Restarting Klipper..." de="Klipper wird neu gestartet..." en="Restarting Klipper..." es="Reiniciando Klipper..." fr="Redémarrage de Klipper..." it="Riavvio Klipper..." ja="Klipper を再起動中..." pt="Reiniciando Klipper..." ru="Перезапуск Klipper..." zh="正在重启 Klipper..."/>
   <translation tag="Resume" de="Fortsetzen" en="Resume" es="Reanudar" fr="Reprendre" it="Riprendi" ja="再開" pt="Retomar" ru="Продолжить" zh="恢复"/>
   <translation tag="Resume Print" de="Druck fortsetzen" en="Resume Print" es="Reanudar Impresión" fr="Reprendre l&apos;impression" it="Riprendi stampa" ja="印刷を再開" pt="Retomar Impressão" ru="Продолжить печать" zh="恢复打印"/>
@@ -762,6 +773,7 @@
   <translation tag="Send this crash report to help improve HelixScreen." de="Senden Sie diesen Absturzbericht, um HelixScreen zu verbessern." en="Send this crash report to help improve HelixScreen." es="Envíe este reporte de fallo para ayudar a mejorar HelixScreen." fr="Envoyez ce rapport de crash pour aider à améliorer HelixScreen." it="Invia questo report di crash per migliorare HelixScreen." ja="HelixScreen の改善にこのクラッシュレポートを送信してください。" pt="Envie este relatório de erro para ajudar a melhorar o HelixScreen." ru="Отправьте этот отчёт об ошибке, чтобы помочь улучшить HelixScreen." zh="发送此崩溃报告以帮助改进 HelixScreen。"/>
   <translation tag="Sending..." de="Wird gesendet..." en="Sending..." es="Enviando..." fr="Envoi..." it="Invio..." ja="送信中..." pt="Enviando..." ru="Отправка..." zh="正在发送..."/>
   <translation tag="Sensors" de="Sensoren" en="Sensors" es="Sensores" fr="Capteurs" it="Sensori" ja="センサー" pt="Sensores" ru="Датчики" zh="传感器"/>
+  <translation tag="Separate on/off macros. HelixScreen tracks the state." en="Separate on/off macros. HelixScreen tracks the state."/>
   <translation tag="Set " de="Setzen " en="Set " es="Establecer " fr="Définir " it="Imposta " ja="設定 " pt="Definir " ru="Установить " zh="设置 "/>
   <translation tag="Settings" de="Einstellungen" en="Settings" es="Ajustes" fr="Paramètres" it="Impostazioni" ja="設定" pt="Configurações" ru="Настройки" zh="设置"/>
   <translation tag="Settings reset to defaults" de="Einstellungen auf Standardwerte zurückgesetzt" en="Settings reset to defaults" es="Ajustes restablecidos a valores predeterminados" fr="Paramètres réinitialisés par défaut" it="Impostazioni ripristinate ai valori predefiniti" ja="設定をデフォルトにリセットしました" pt="Configurações restauradas para os padrões" ru="Настройки сброшены к значениям по умолчанию" zh="设置已重置为默认值"/>
@@ -772,6 +784,7 @@
   <translation tag="Shininess:" de="Glanz:" en="Shininess:" es="Brillo:" fr="Brillance :" it="Lucentezza:" ja="光沢:" pt="Brilho:" ru="Блеск:" zh="光泽度："/>
   <translation tag="Show detailed print preparation status" de="Detaillierten Druckvorbereitungsstatus anzeigen" en="Show detailed print preparation status" es="Mostrar estado detallado de preparación de impresión" fr="Afficher l&apos;état détaillé de la préparation d&apos;impression" it="Mostra stato dettagliato preparazione stampa" ja="詳細な印刷準備ステータスを表示" pt="Mostrar status detalhado de preparação de impressão" ru="Показывать детальный статус подготовки к печати" zh="显示详细的打印准备状态"/>
   <translation tag="Side" de="Seite" en="Side" es="Lado" fr="Côté" it="Lato" ja="側面" pt="Lateral" ru="Сбоку" zh="侧面"/>
+  <translation tag="Single toggle macro. State is not tracked." en="Single toggle macro. State is not tracked."/>
   <translation tag="Size" de="Größe" en="Size" es="Tamaño" fr="Taille" it="Dimensione" ja="サイズ" pt="Tamanho" ru="Размер" zh="大小"/>
   <translation tag="Skip" de="Überspringen" en="Skip" es="Omitir" fr="Passer" it="Salta" ja="スキップ" pt="Pular" ru="Пропустить" zh="跳过"/>
   <translation tag="Sleep While Printing" de="Ruhemodus beim Drucken" en="Sleep While Printing" es="Apagar pantalla al imprimir" fr="Veille pendant impression" it="Sospensione Durante Stampa" ja="印刷中のスリープ" pt="Suspender Durante Impressão" ru="Спящий режим при печати" zh="打印时休眠"/>
@@ -860,6 +873,7 @@
   <translation tag="This will restart Klipper." de="Dies startet Klipper neu." en="This will restart Klipper." es="Esto reiniciará Klipper." fr="Cela redémarrera Klipper." it="Questo riavvierà Klipper." ja="これにより Klipper が再起動します。" pt="Isso reiniciará o Klipper." ru="Это перезапустит Klipper." zh="这将重启 Klipper。"/>
   <translation tag="Time" de="Zeit" en="Time" es="Hora" fr="Temps" it="Tempo" ja="時間" pt="Tempo" ru="Время" zh="时间"/>
   <translation tag="Time Format" de="Zeitformat" en="Time Format" es="Formato de Hora" fr="Format de l&apos;heure" it="Formato ora" ja="時間形式" pt="Formato de Hora" ru="Формат времени" zh="时间格式"/>
+  <translation tag="Time to wait before escalating to emergency stop" en="Time to wait before escalating to emergency stop"/>
   <translation tag="Timelapse" de="Zeitraffer" en="Timelapse" es="Timelapse" fr="Timelapse" it="Timelapse" ja="タイムラプス" pt="Timelapse" ru="Таймлапс" zh="延时摄影"/>
   <translation tag="Timelapse Available" de="Zeitraffer verfügbar" en="Timelapse Available" es="Timelapse Disponible" fr="Timelapse disponible" it="Timelapse disponibile" ja="タイムラプス利用可能" pt="Timelapse Disponível" ru="Таймлапс доступен" zh="延时摄影可用"/>
   <translation tag="Timelapse Settings" de="Zeitraffer-Einstellungen" en="Timelapse Settings" es="Configuración de Timelapse" fr="Paramètres du timelapse" it="Impostazioni timelapse" ja="タイムラプス設定" pt="Configurações de Timelapse" ru="Настройки таймлапса" zh="延时摄影设置"/>
@@ -968,11 +982,14 @@
   <translation tag="Z:" de="Z:" en="Z:" es="Z:" fr="Z:" it="Z:" ja="Z:" pt="Z:" ru="Z:" zh="Z:"/>
   <translation tag="Z: 0.000" de="Z: 0.000" en="Z: 0.000" es="Z: 0.000" fr="Z: 0.000" it="Z: 0.000" ja="Z: 0.000" pt="Z: 0.000" ru="Z: 0.000" zh="Z: 0.000"/>
   <translation tag="Zoom" de="Zoom" en="Zoom" es="Zoom" fr="Zoom" it="Zoom" ja="ズーム" pt="Zoom" ru="Масштаб" zh="缩放"/>
+  <translation tag="disable" en="disable"/>
   <translation tag="elapsed" de="vergangen" en="elapsed" es="transcurrido" fr="écoulé" it="trascorso" ja="経過" pt="decorrido" ru="прошло" zh="已用时"/>
+  <translation tag="enable" en="enable"/>
   <translation tag="est" de="est" en="est" es="est" fr="est" it="est" ja="est" pt="est" ru="est" zh="est"/>
   <translation tag="layers" de="Schichten" en="layers" es="capas" fr="couches" it="layer" ja="レイヤー" pt="camadas" ru="слои" zh="层"/>
   <translation tag="mzv @ 36.7 Hz" en="mzv @ 36.7 Hz" ru="mzv @ 36.7 Hz"/>
   <translation tag="of" de="von" en="of" es="de" fr="de" it="di" ja="の" pt="de" ru="из" zh="的"/>
   <translation tag="used" de="verbraucht" en="used" es="usado" fr="utilisé" it="usato" ja="使用" pt="usado" ru="использ." zh="已使用"/>
   <translation tag="v{} is available. Tap to update." de="v{} ist verfügbar. Tippen zum Aktualisieren." en="v{} is available. Tap to update." es="v{} disponible. Toque para actualizar." fr="v{} est disponible. Appuyez pour mettre à jour." it="v{} disponibile. Tocca per aggiornare." ja="v{} が利用可能です。タップして更新してください。" pt="v{} disponível. Toque para atualizar." ru="v{} доступна. Нажмите для обновления." zh="v{} 可用。点击以更新。"/>
+  <translation tag="{} more taps to {} beta features" en="{} more taps to {} beta features"/>
 </translations>
