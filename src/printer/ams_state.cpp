@@ -1041,6 +1041,11 @@ void AmsState::update_modal_text_subjects() {
 void AmsState::refresh_spoolman_weights() {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
 
+    // Mock backends use fake spoolman IDs that don't exist in real Spoolman
+    if (get_runtime_config()->should_mock_ams()) {
+        return;
+    }
+
     if (!api_) {
         return;
     }
