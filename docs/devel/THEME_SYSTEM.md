@@ -10,6 +10,8 @@ The reactive theme system enables **live theme switching** (dark/light modes) wi
 
 > **DATA in C++, APPEARANCE in XML, Shared Styles connect them.**
 
+> **Note:** The theme system handles colors, spacing tokens, and typography. For structural layout changes across different screen shapes (ultrawide, portrait, tiny), see the [Layout System](LAYOUT_SYSTEM.md) — themes and layouts are independent and any combination works.
+
 - **Data** (C++): Printer state, temperatures, positions
 - **Appearance** (XML): Layout, colors via tokens, spacing via tokens
 - **Shared Styles** (`theme_core.c`): LVGL `lv_style_t` objects that apply colors and update reactively

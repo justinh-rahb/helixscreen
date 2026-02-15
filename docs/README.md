@@ -15,7 +15,7 @@ Welcome to the HelixScreen documentation. Choose your path:
 | [**Configuration**](user/CONFIGURATION.md) | All settings explained |
 | [**Troubleshooting**](user/TROUBLESHOOTING.md) | Solutions to common problems |
 | [**FAQ**](user/FAQ.md) | Quick answers to common questions |
-| [**Plugin Development**](user/PLUGIN_DEVELOPMENT.md) | Create custom plugins |
+| [**Plugin Development**](devel/PLUGIN_DEVELOPMENT.md) | Create custom plugins |
 
 ---
 
@@ -76,9 +76,9 @@ Welcome to the HelixScreen documentation. Choose your path:
 | Document | Description |
 |----------|-------------|
 | [**Installer**](devel/INSTALLER.md) | Installation system, KIAUH, platforms, shell tests |
-| [**QIDI Support**](devel/QIDI_SUPPORT.md) | QIDI Q1 Pro / Plus platform guide |
-| [**Snapmaker U1 Support**](devel/SNAPMAKER_U1_SUPPORT.md) | Snapmaker U1 toolchanger platform guide |
-| [**Creality K2 Support**](devel/CREALITY_K2_SUPPORT.md) | Creality K2 series platform guide |
+| [**QIDI Support**](devel/printers/QIDI_SUPPORT.md) | QIDI Q1 Pro / Plus platform guide |
+| [**Snapmaker U1 Support**](devel/printers/SNAPMAKER_U1_SUPPORT.md) | Snapmaker U1 toolchanger platform guide |
+| [**Creality K2 Support**](devel/printers/CREALITY_K2_SUPPORT.md) | Creality K2 series platform guide |
 
 ---
 
@@ -120,7 +120,7 @@ docs/
 │   ├── CONFIGURATION.md      # Settings reference
 │   ├── TROUBLESHOOTING.md    # Common problems
 │   ├── FAQ.md                # Frequently asked questions
-│   └── PLUGIN_DEVELOPMENT.md # Plugin creation guide
+│   └── (see devel/PLUGIN_DEVELOPMENT.md)
 │
 ├── devel/                    # DEVELOPER DOCUMENTATION
 │   ├── CLAUDE.md             # Full developer doc index
