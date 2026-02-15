@@ -118,6 +118,23 @@
                         label="E-Stop Confirmation" label_tag="E-Stop Confirmation" icon="alert_octagon"
                         description="Require confirmation before emergency stop"
                         description_tag="Require confirmation before emergency stop" callback="on_estop_confirm_changed"/>
+    <!-- Cancel Escalation Toggle -->
+    <setting_toggle_row name="row_cancel_escalation"
+                        label="Cancel Escalation" label_tag="Cancel Escalation" icon="alert_octagon"
+                        description="Escalate to emergency stop if cancel doesn't respond"
+                        description_tag="Escalate to emergency stop if cancel doesn't respond"
+                        subject="settings_cancel_escalation_enabled" callback="on_cancel_escalation_changed"/>
+    <!-- Cancel Escalation Timeout (visible only when escalation enabled) -->
+    <lv_obj name="container_cancel_escalation_timeout" width="100%" style_pad_all="0" scrollable="false">
+      <bind_flag_if_eq subject="settings_cancel_escalation_enabled" flag="hidden" ref_value="0"/>
+      <setting_dropdown_row name="row_cancel_escalation_timeout"
+                            label="Escalation Timeout" label_tag="Escalation Timeout" icon="clock"
+                            description="Time to wait before escalating to emergency stop"
+                            description_tag="Time to wait before escalating to emergency stop"
+                            options="15 seconds&#10;30 seconds&#10;60 seconds&#10;120 seconds"
+                            bind_selected="settings_cancel_escalation_timeout"
+                            callback="on_cancel_escalation_timeout_changed"/>
+    </lv_obj>
     <!-- ================================================================== -->
     <!-- SYSTEM SECTION -->
     <!-- ================================================================== -->
