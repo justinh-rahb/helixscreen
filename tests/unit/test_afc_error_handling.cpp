@@ -76,9 +76,6 @@ class AfcErrorHandlingHelper : public AmsBackendAfc {
         return last_seen_message_;
     }
 
-    // Track emitted events
-    std::vector<std::pair<std::string, std::string>> emitted_events;
-
   private:
     // Override execute_gcode to prevent null pointer access
     AmsError execute_gcode(const std::string& /*gcode*/) override {
@@ -240,18 +237,9 @@ TEST_CASE("AFC Error Handling: Edge cases", "[afc][error_handling][edge]") {
     AfcErrorHandlingHelper afc;
     ActionPromptManager::set_instance(nullptr);
 
-    SECTION("Message with missing type field is handled gracefully") {
-        nlohmann::json afc_data;
-        afc_data["message"]["message"] = "No type field";
-        // No "type" field
-
-        nlohmann::json params;
-        params["AFC"] = afc_data;
-
-        nlohmann::json notification;
-        notification["params"] = nlohmann::json::array({params, 0.0});
+    SECTION("Message with empty type field is handled gracefully") {
         afc.feed_afc_message("No type field", "");
-        // Should not crash, message still tracked
+        // Should not crash, message still tracked (defaults to info toast)
         REQUIRE(afc.get_last_seen_message() == "No type field");
     }
 

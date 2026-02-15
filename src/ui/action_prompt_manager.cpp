@@ -12,8 +12,8 @@
 
 namespace helix {
 
-// Static instance pointer for cross-TU access
-ActionPromptManager* ActionPromptManager::s_instance = nullptr;
+// Static instance pointer for cross-TU access (atomic for thread-safe reads from websocket thread)
+std::atomic<ActionPromptManager*> ActionPromptManager::s_instance{nullptr};
 
 // ============================================================================
 // Static Parsing Functions

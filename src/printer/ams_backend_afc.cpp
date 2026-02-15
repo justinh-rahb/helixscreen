@@ -521,9 +521,9 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
                                              "AFC") != std::string::npos;
 
                 if (afc_prompt_active) {
-                    // Notification history only (no toast) - user has the modal
-                    spdlog::debug("[AMS AFC] Message suppressed (AFC prompt active): {}", msg_text);
-                    ui_notification_info("AFC", msg_text.c_str());
+                    // Notification history only (no toast) - user already has the modal
+                    spdlog::debug("[AMS AFC] Toast suppressed (AFC prompt active): {}", msg_text);
+                    ui_notification_info_with_action("AFC", msg_text.c_str(), "afc_message");
                 } else {
                     // Show toast based on message type
                     if (msg_type == "error") {

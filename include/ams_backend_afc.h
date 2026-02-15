@@ -482,13 +482,16 @@ class AmsBackendAfc : public AmsBackend {
     bool tool_end_sensor_{false};                       ///< Toolhead exit/nozzle sensor
 
     // Global state
-    bool error_state_{false};               ///< AFC error state
-    bool bypass_active_{false};             ///< Bypass mode active (external spool)
-    bool afc_quiet_mode_{false};            ///< AFC quiet mode state
-    bool afc_led_state_{false};             ///< AFC LED state
-    std::string current_lane_name_;         ///< Currently active lane name
-    std::string last_error_msg_;            ///< Last emitted error event message (dedup)
-    std::string last_seen_message_;         ///< Last displayed message text (toast dedup)
+    bool error_state_{false};       ///< AFC error state
+    bool bypass_active_{false};     ///< Bypass mode active (external spool)
+    bool afc_quiet_mode_{false};    ///< AFC quiet mode state
+    bool afc_led_state_{false};     ///< AFC LED state
+    std::string current_lane_name_; ///< Currently active lane name
+    // Two dedup trackers: last_error_msg_ prevents duplicate emit_event(EVENT_ERROR),
+    // last_seen_message_ prevents duplicate toast/notification display. Both reset
+    // when the AFC message field clears.
+    std::string last_error_msg_;
+    std::string last_seen_message_;
     std::vector<std::string> hub_names_;    ///< Discovered hub names
     std::vector<std::string> buffer_names_; ///< Discovered buffer names
     float bowden_length_{450.0f};           ///< Bowden tube length from hub (default 450mm)

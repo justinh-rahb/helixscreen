@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -120,19 +121,20 @@ class ActionPromptManager {
      * @param instance Pointer to the active manager, or nullptr to clear
      */
     static void set_instance(ActionPromptManager* instance) {
-        s_instance = instance;
+        s_instance.store(instance, std::memory_order_release);
     }
 
     /**
      * @brief Check if an action prompt is currently being displayed
      *
-     * Thread-safe static accessor. Returns false if no instance is set
-     * or if the manager is not in the SHOWING state.
+     * Thread-safe static accessor (s_instance is atomic). Returns false
+     * if no instance is set or if the manager is not in the SHOWING state.
+     * See current_prompt_name() for relaxed consistency notes.
      *
      * @return true if a prompt is currently visible
      */
     [[nodiscard]] static bool is_showing() {
-        auto* inst = s_instance;
+        auto* inst = s_instance.load(std::memory_order_acquire);
         return inst != nullptr && inst->has_active_prompt();
     }
 
@@ -142,10 +144,15 @@ class ActionPromptManager {
      * Returns the title from prompt_begin if a prompt is currently showing.
      * Returns empty string if no prompt is active or no instance is set.
      *
+     * Note: Relaxed consistency — prompt state is only mutated on the main
+     * thread, so reads from the websocket thread may see stale data. Worst
+     * case is a false negative on toast suppression (toast shows when it
+     * could have been suppressed), which is the safe default.
+     *
      * @return Current prompt title, or empty string
      */
     [[nodiscard]] static std::string current_prompt_name() {
-        auto* inst = s_instance;
+        auto* inst = s_instance.load(std::memory_order_acquire);
         if (inst == nullptr) {
             return {};
         }
@@ -286,7 +293,7 @@ class ActionPromptManager {
 
   private:
     // Static instance for cross-TU access
-    static ActionPromptManager* s_instance;
+    static std::atomic<ActionPromptManager*> s_instance;
 
     // State machine
     State m_state = State::IDLE;
