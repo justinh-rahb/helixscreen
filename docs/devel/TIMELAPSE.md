@@ -14,6 +14,9 @@ HelixScreen does not implement timelapse recording itself. It provides:
 2. **Install wizard** -- guides users through SSH install, moonraker.conf configuration, and restart/verification
 3. **Settings UI** -- configures the plugin (enable/disable, recording mode, framerate, auto-render)
 4. **Print status toggle** -- quick enable/disable button on the print status panel
+5. **Real-time event handling** -- subscribes to WebSocket `notify_timelapse_event` for frame capture and render progress tracking
+6. **Render progress notifications** -- toast notifications at 25% intervals during rendering, plus success/error alerts
+7. **Video management** -- list, render, and delete timelapse videos from the settings overlay
 
 All actual frame capture, rendering, and video storage is handled by the moonraker-timelapse plugin on the printer.
 
@@ -109,6 +112,11 @@ All timelapse API methods are in `MoonrakerAPI` (declared in `moonraker_api.h`, 
 | `set_timelapse_enabled()` | POST | `/machine/timelapse/settings?enabled=True/False` |
 | `get_webcam_list()` | GET | `/server/webcams/list` |
 | `restart_moonraker()` | POST | `/server/restart` |
+| `render_timelapse()` | POST | `/machine/timelapse/render` |
+| `save_timelapse_frames()` | POST | `/machine/timelapse/saveframes` |
+| `get_last_frame_info()` | GET | `/machine/timelapse/lastframeinfo` |
+| `list_files("timelapse")` | GET | `/server/files/list?root=timelapse` |
+| `delete_file("timelapse/...")` | DELETE | `/server/files/timelapse/...` |
 
 ---
 
@@ -193,4 +201,5 @@ The timelapse settings overlay (Phase 1) was extended with video management capa
 | `ui_xml/beta_feature.xml` | Beta feature wrapper component |
 | `include/timelapse_state.h` | TimelapseState singleton class |
 | `src/printer/timelapse_state.cpp` | Event dispatch, subject management, render notifications |
+| `tests/unit/test_timelapse_state.cpp` | Unit tests for TimelapseState event handling and notifications |
 | `docs/plans/TIMELAPSE_FEATURE.md` | Full design doc with future phases |
