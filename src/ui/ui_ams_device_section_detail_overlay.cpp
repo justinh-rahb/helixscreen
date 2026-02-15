@@ -8,6 +8,7 @@
 
 #include "ui_ams_device_section_detail_overlay.h"
 
+#include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav_manager.h"
 
@@ -423,21 +424,27 @@ void AmsDeviceSectionDetailOverlay::on_action_clicked(lv_event_t* e) {
             spdlog::warn("[AmsDeviceSectionDetailOverlay] Invalid action index: {}", index);
         } else {
             const std::string& action_id = overlay.action_ids_[index];
-            spdlog::info("[AmsDeviceSectionDetailOverlay] Action clicked: {}", action_id);
+            spdlog::debug("[AmsDeviceSectionDetailOverlay] Action clicked: {}", action_id);
 
             // Execute via backend
             AmsBackend* backend = AmsState::instance().get_backend();
             if (!backend) {
                 spdlog::warn("[AmsDeviceSectionDetailOverlay] No backend available for action");
             } else {
+                // Find label for the toast
+                std::string label = action_id;
+                for (const auto& act : overlay.cached_actions_) {
+                    if (act.id == action_id) {
+                        label = act.label;
+                        break;
+                    }
+                }
+
                 AmsError result = backend->execute_device_action(action_id);
                 if (result.success()) {
-                    spdlog::info(
-                        "[AmsDeviceSectionDetailOverlay] Action '{}' executed successfully",
-                        action_id);
+                    NOTIFY_INFO("{} started", label);
                 } else {
-                    spdlog::error("[AmsDeviceSectionDetailOverlay] Action '{}' failed: {}",
-                                  action_id, result.technical_msg);
+                    NOTIFY_ERROR("{}", result.user_msg);
                 }
             }
         }
@@ -461,22 +468,29 @@ void AmsDeviceSectionDetailOverlay::on_toggle_changed(lv_event_t* e) {
         } else {
             const std::string& action_id = overlay.action_ids_[index];
             bool new_value = lv_obj_has_state(sw, LV_STATE_CHECKED);
-            spdlog::info("[AmsDeviceSectionDetailOverlay] Toggle changed: {} = {}", action_id,
-                         new_value);
+            spdlog::debug("[AmsDeviceSectionDetailOverlay] Toggle changed: {} = {}", action_id,
+                          new_value);
 
             // Execute via backend with the new value
             AmsBackend* backend = AmsState::instance().get_backend();
             if (!backend) {
                 spdlog::warn("[AmsDeviceSectionDetailOverlay] No backend available for toggle");
             } else {
+                // Find label for notification
+                std::string label = action_id;
+                for (const auto& act : overlay.cached_actions_) {
+                    if (act.id == action_id) {
+                        label = act.label;
+                        break;
+                    }
+                }
+
                 // For toggles, pass the new value as a parameter
                 AmsError result = backend->execute_device_action(action_id, std::any(new_value));
                 if (result.success()) {
-                    spdlog::info("[AmsDeviceSectionDetailOverlay] Toggle '{}' set to {}", action_id,
-                                 new_value);
+                    NOTIFY_INFO("{} {}", label, new_value ? "enabled" : "disabled");
                 } else {
-                    spdlog::error("[AmsDeviceSectionDetailOverlay] Toggle '{}' failed: {}",
-                                  action_id, result.technical_msg);
+                    NOTIFY_ERROR("{}", result.user_msg);
                     // Revert the toggle state on failure
                     if (new_value) {
                         lv_obj_remove_state(sw, LV_STATE_CHECKED);
@@ -546,20 +560,33 @@ void AmsDeviceSectionDetailOverlay::on_slider_released(lv_event_t* e) {
             int32_t int_val = lv_slider_get_value(slider);
             float float_val = static_cast<float>(int_val);
 
-            spdlog::info("[AmsDeviceSectionDetailOverlay] Slider released: {} = {}", action_id,
-                         float_val);
+            spdlog::debug("[AmsDeviceSectionDetailOverlay] Slider released: {} = {}", action_id,
+                          float_val);
 
             AmsBackend* backend = AmsState::instance().get_backend();
             if (!backend) {
                 spdlog::warn("[AmsDeviceSectionDetailOverlay] No backend available for slider");
             } else {
+                // Find label and unit for notification
+                std::string label = action_id;
+                std::string unit;
+                for (const auto& act : overlay.cached_actions_) {
+                    if (act.id == action_id) {
+                        label = act.label;
+                        unit = act.unit;
+                        break;
+                    }
+                }
+
                 AmsError result = backend->execute_device_action(action_id, std::any(float_val));
                 if (result.success()) {
-                    spdlog::info("[AmsDeviceSectionDetailOverlay] Slider '{}' set to {}", action_id,
-                                 float_val);
+                    if (!unit.empty()) {
+                        NOTIFY_INFO("{} set to {} {}", label, int_val, unit);
+                    } else {
+                        NOTIFY_INFO("{} set to {}", label, int_val);
+                    }
                 } else {
-                    spdlog::error("[AmsDeviceSectionDetailOverlay] Slider '{}' failed: {}",
-                                  action_id, result.technical_msg);
+                    NOTIFY_ERROR("{}", result.user_msg);
                 }
             }
         }
@@ -590,8 +617,17 @@ void AmsDeviceSectionDetailOverlay::on_dropdown_changed(lv_event_t* e) {
             lv_dropdown_get_selected_str(dropdown, buf, sizeof(buf));
             std::string selected_str(buf);
 
-            spdlog::info("[AmsDeviceSectionDetailOverlay] Dropdown changed: {} = '{}' (index {})",
-                         action_id, selected_str, selected);
+            spdlog::debug("[AmsDeviceSectionDetailOverlay] Dropdown changed: {} = '{}' (index {})",
+                          action_id, selected_str, selected);
+
+            // Find label for notification
+            std::string label = action_id;
+            for (const auto& act : overlay.cached_actions_) {
+                if (act.id == action_id) {
+                    label = act.label;
+                    break;
+                }
+            }
 
             // Execute via backend with the selected option string
             AmsBackend* backend = AmsState::instance().get_backend();
@@ -600,11 +636,9 @@ void AmsDeviceSectionDetailOverlay::on_dropdown_changed(lv_event_t* e) {
             } else {
                 AmsError result = backend->execute_device_action(action_id, std::any(selected_str));
                 if (result.success()) {
-                    spdlog::info("[AmsDeviceSectionDetailOverlay] Dropdown '{}' set to '{}'",
-                                 action_id, selected_str);
+                    NOTIFY_INFO("{} set to {}", label, selected_str);
                 } else {
-                    spdlog::error("[AmsDeviceSectionDetailOverlay] Dropdown '{}' failed: {}",
-                                  action_id, result.technical_msg);
+                    NOTIFY_ERROR("{}", result.user_msg);
                 }
             }
         }
