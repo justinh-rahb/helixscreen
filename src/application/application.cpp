@@ -83,6 +83,7 @@
 #include "ui_settings_hardware_health.h"
 #include "ui_settings_sensors.h"
 #include "ui_severity_card.h"
+#include "ui_status_pill.h"
 #include "ui_switch.h"
 #include "ui_temp_display.h"
 #include "ui_theme_editor_overlay.h"
@@ -721,6 +722,7 @@ bool Application::init_assets() {
 
 bool Application::register_widgets() {
     ui_icon_register_widget();
+    ui_status_pill_register_widget();
     ui_switch_register();
     ui_card_register();
     ui_temp_display_init();
