@@ -216,7 +216,7 @@ void AmsDeviceSectionDetailOverlay::create_action_control(
 
         // Button label
         lv_obj_t* btn_label = lv_label_create(btn);
-        lv_label_set_text(btn_label, action.label.c_str());
+        lv_label_set_text(btn_label, lv_tr(action.label.c_str()));
         lv_obj_center(btn_label);
 
         // Store action ID in vector, pass index as user_data
@@ -240,7 +240,7 @@ void AmsDeviceSectionDetailOverlay::create_action_control(
     case helix::printer::ActionType::TOGGLE: {
         // Label on left
         lv_obj_t* label = lv_label_create(row);
-        lv_label_set_text(label, action.label.c_str());
+        lv_label_set_text(label, lv_tr(action.label.c_str()));
         lv_obj_set_style_text_color(label, theme_manager_get_color("text"), 0);
 
         // Switch on right
@@ -270,7 +270,7 @@ void AmsDeviceSectionDetailOverlay::create_action_control(
     case helix::printer::ActionType::INFO: {
         // Label on left
         lv_obj_t* label = lv_label_create(row);
-        lv_label_set_text(label, action.label.c_str());
+        lv_label_set_text(label, lv_tr(action.label.c_str()));
         lv_obj_set_style_text_color(label, theme_manager_get_color("text"), 0);
 
         // Value on right
@@ -295,7 +295,7 @@ void AmsDeviceSectionDetailOverlay::create_action_control(
     case helix::printer::ActionType::SLIDER: {
         // Label on left — fixed width so sliders align across rows
         lv_obj_t* label = lv_label_create(row);
-        lv_label_set_text(label, action.label.c_str());
+        lv_label_set_text(label, lv_tr(action.label.c_str()));
         lv_obj_set_style_text_color(label, theme_manager_get_color("text"), 0);
         lv_obj_set_width(label, LV_PCT(30));
         lv_label_set_long_mode(label, LV_LABEL_LONG_DOT);
@@ -355,7 +355,7 @@ void AmsDeviceSectionDetailOverlay::create_action_control(
     case helix::printer::ActionType::DROPDOWN: {
         // Label on left
         lv_obj_t* label = lv_label_create(row);
-        lv_label_set_text(label, action.label.c_str());
+        lv_label_set_text(label, lv_tr(action.label.c_str()));
         lv_obj_set_style_text_color(label, theme_manager_get_color("text"), 0);
 
         // Dropdown on right
@@ -442,7 +442,7 @@ void AmsDeviceSectionDetailOverlay::on_action_clicked(lv_event_t* e) {
 
                 AmsError result = backend->execute_device_action(action_id);
                 if (result.success()) {
-                    NOTIFY_INFO("{} started", label);
+                    NOTIFY_INFO("{} {}", lv_tr(label.c_str()), lv_tr("started"));
                 } else {
                     NOTIFY_ERROR("{}", result.user_msg);
                 }
@@ -488,7 +488,8 @@ void AmsDeviceSectionDetailOverlay::on_toggle_changed(lv_event_t* e) {
                 // For toggles, pass the new value as a parameter
                 AmsError result = backend->execute_device_action(action_id, std::any(new_value));
                 if (result.success()) {
-                    NOTIFY_INFO("{} {}", label, new_value ? "enabled" : "disabled");
+                    NOTIFY_INFO("{} {}", lv_tr(label.c_str()),
+                                new_value ? lv_tr("enabled") : lv_tr("disabled"));
                 } else {
                     NOTIFY_ERROR("{}", result.user_msg);
                     // Revert the toggle state on failure
@@ -581,9 +582,10 @@ void AmsDeviceSectionDetailOverlay::on_slider_released(lv_event_t* e) {
                 AmsError result = backend->execute_device_action(action_id, std::any(float_val));
                 if (result.success()) {
                     if (!unit.empty()) {
-                        NOTIFY_INFO("{} set to {} {}", label, int_val, unit);
+                        NOTIFY_INFO("{} {} {} {}", lv_tr(label.c_str()), lv_tr("set to"), int_val,
+                                    unit);
                     } else {
-                        NOTIFY_INFO("{} set to {}", label, int_val);
+                        NOTIFY_INFO("{} {} {}", lv_tr(label.c_str()), lv_tr("set to"), int_val);
                     }
                 } else {
                     NOTIFY_ERROR("{}", result.user_msg);
@@ -636,7 +638,7 @@ void AmsDeviceSectionDetailOverlay::on_dropdown_changed(lv_event_t* e) {
             } else {
                 AmsError result = backend->execute_device_action(action_id, std::any(selected_str));
                 if (result.success()) {
-                    NOTIFY_INFO("{} set to {}", label, selected_str);
+                    NOTIFY_INFO("{} {} {}", lv_tr(label.c_str()), lv_tr("set to"), selected_str);
                 } else {
                     NOTIFY_ERROR("{}", result.user_msg);
                 }
