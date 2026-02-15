@@ -24,7 +24,7 @@ std::vector<DeviceAction> afc_default_actions() {
     // Calibration section
     actions.push_back({
         .id = "calibration_wizard",
-        .label = "Calibration Wizard",
+        .label = "Run Calibration Wizard",
         .icon = "play",
         .section = "calibration",
         .description = "Interactive calibration for all lanes",
@@ -59,7 +59,7 @@ std::vector<DeviceAction> afc_default_actions() {
     // Speed section
     actions.push_back({
         .id = "speed_fwd",
-        .label = "Forward Speed",
+        .label = "Forward Multiplier",
         .icon = "fast-forward",
         .section = "speed",
         .description = "Speed multiplier for forward moves",
@@ -76,7 +76,7 @@ std::vector<DeviceAction> afc_default_actions() {
 
     actions.push_back({
         .id = "speed_rev",
-        .label = "Reverse Speed",
+        .label = "Reverse Multiplier",
         .icon = "rewind",
         .section = "speed",
         .description = "Speed multiplier for reverse moves",
@@ -94,7 +94,7 @@ std::vector<DeviceAction> afc_default_actions() {
     // Maintenance section
     actions.push_back({
         .id = "test_lanes",
-        .label = "Test Lanes",
+        .label = "Test All Lanes",
         .icon = "test-tube",
         .section = "maintenance",
         .description = "Run test sequence on all lanes",
@@ -145,7 +145,7 @@ std::vector<DeviceAction> afc_default_actions() {
 
     actions.push_back({
         .id = "brush",
-        .label = "Brush",
+        .label = "Clean Brush",
         .icon = "broom",
         .section = "maintenance",
         .description = "Run brush cleaning sequence",
@@ -162,7 +162,7 @@ std::vector<DeviceAction> afc_default_actions() {
 
     actions.push_back({
         .id = "reset_motor",
-        .label = "Reset Motor",
+        .label = "Reset Motor Timer",
         .icon = "timer-refresh",
         .section = "maintenance",
         .description = "Reset motor run-time counter",
@@ -180,7 +180,7 @@ std::vector<DeviceAction> afc_default_actions() {
     // LED & Modes section
     actions.push_back({
         .id = "led_toggle",
-        .label = "LED On",
+        .label = "Turn On LEDs",
         .icon = "lightbulb-on",
         .section = "led",
         .description = "Toggle AFC LED strip",
@@ -197,7 +197,7 @@ std::vector<DeviceAction> afc_default_actions() {
 
     actions.push_back({
         .id = "quiet_mode",
-        .label = "Quiet Mode",
+        .label = "Toggle Quiet Mode",
         .icon = "volume-off",
         .section = "led",
         .description = "Enable/disable quiet operation mode",

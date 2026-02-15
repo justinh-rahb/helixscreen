@@ -5,6 +5,7 @@
 
 #include "ui_error_reporting.h"
 
+#include "afc_defaults.h"
 #include "lvgl/src/others/translation/lv_translation.h"
 #include "moonraker_api.h"
 
@@ -29,11 +30,14 @@ AmsBackendAfc::AmsBackendAfc(MoonrakerAPI* api, MoonrakerClient* client)
     system_info_.filament_loaded = false;
     system_info_.action = AmsAction::IDLE;
     system_info_.total_slots = 0;
-    // AFC capabilities - may vary by configuration
-    system_info_.supports_endless_spool = true;
-    system_info_.supports_spoolman = true;
-    system_info_.supports_tool_mapping = true;
-    system_info_.supports_bypass = true; // AFC supports bypass via bypass_state
+    // AFC capabilities from shared defaults
+    auto caps = helix::printer::afc_default_capabilities();
+    system_info_.supports_endless_spool = caps.supports_endless_spool;
+    system_info_.supports_spoolman = caps.supports_spoolman;
+    system_info_.supports_tool_mapping = caps.supports_tool_mapping;
+    system_info_.supports_bypass = caps.supports_bypass;
+    system_info_.supports_purge = caps.supports_purge;
+    system_info_.tip_method = caps.tip_method;
     // Default to hardware sensor - AFC BoxTurtle typically has physical bypass sensor
     // TODO: Detect from AFC configuration whether bypass sensor is virtual or hardware
     system_info_.has_hardware_bypass_sensor = true;
@@ -1958,14 +1962,7 @@ bool AmsBackendAfc::get_macro_var_bool(const std::string& key, bool default_val)
 // ============================================================================
 
 std::vector<helix::printer::DeviceSection> AmsBackendAfc::get_device_sections() const {
-    return {{"calibration", "Calibration", 0, "Bowden length and lane calibration"},
-            {"speed", "Speed Settings", 1, "Move speed multipliers"},
-            {"maintenance", "Maintenance", 2, "Lane tests and motor resets"},
-            {"led", "LED & Modes", 3, "LED control and quiet mode"},
-            {"hub", "Hub & Cutter", 4, "Blade change and parking"},
-            {"tip_forming", "Tip Forming", 5, "Tip shaping configuration"},
-            {"purge", "Purge & Wipe", 6, "Purge tower and brush settings"},
-            {"config", "Configuration", 7, "System configuration and mapping"}};
+    return helix::printer::afc_default_sections();
 }
 
 std::vector<helix::printer::DeviceAction> AmsBackendAfc::get_device_actions() const {
@@ -1973,30 +1970,26 @@ std::vector<helix::printer::DeviceAction> AmsBackendAfc::get_device_actions() co
     using helix::printer::ActionType;
     using helix::printer::DeviceAction;
 
-    std::vector<DeviceAction> actions;
+    // Start from shared defaults for static actions
+    auto actions = helix::printer::afc_default_actions();
 
-    // Calibration section: wizard
-    actions.push_back(DeviceAction{
-        "calibration_wizard",
-        "Run Calibration Wizard",
-        "play",
-        "calibration",
-        "Interactive calibration for all lanes",
-        ActionType::BUTTON,
-        {}, // no value for button
-        {}, // no options
-        0,
-        0,  // min/max not used
-        "", // no unit
-        -1, // system-wide
-        true,
-        "" // enabled
-    });
+    // Overlay dynamic values onto default actions
+    for (auto& a : actions) {
+        if (a.id == "bowden_length") {
+            a.current_value = bowden_length_;
+            a.max_value = std::max(2000.0f, bowden_length_ * 1.5f);
+        }
+        if (a.id == "led_toggle") {
+            a.label = afc_led_state_ ? "Turn Off LEDs" : "Turn On LEDs";
+            a.icon = afc_led_state_ ? "lightbulb-off" : "lightbulb-on";
+        }
+    }
 
-    // Calibration section: bowden length
-    // Multi-extruder (toolchanger): per-extruder bowden sliders
-    // Single extruder: single global bowden slider
+    // Multi-extruder: replace single bowden with per-extruder sliders
     if (num_extruders_ > 1 && !extruders_.empty()) {
+        actions.erase(std::remove_if(actions.begin(), actions.end(),
+                                     [](const DeviceAction& a) { return a.id == "bowden_length"; }),
+                      actions.end());
         for (int i = 0; i < static_cast<int>(extruders_.size()); ++i) {
             std::string id = "bowden_T" + std::to_string(i);
             std::string label = "Bowden Length (T" + std::to_string(i) + ")";
@@ -2017,154 +2010,7 @@ std::vector<helix::printer::DeviceAction> AmsBackendAfc::get_device_actions() co
                              true,
                              ""});
         }
-    } else {
-        actions.push_back(DeviceAction{"bowden_length",
-                                       "Bowden Length",
-                                       "ruler",
-                                       "calibration",
-                                       "Distance from hub to toolhead",
-                                       ActionType::SLIDER,
-                                       bowden_length_,
-                                       {},
-                                       100.0f,
-                                       std::max(2000.0f, bowden_length_ * 1.5f),
-                                       "mm",
-                                       -1,
-                                       true,
-                                       ""});
     }
-
-    // Speed section
-    actions.push_back(DeviceAction{"speed_fwd",
-                                   "Forward Multiplier",
-                                   "fast-forward",
-                                   "speed",
-                                   "Speed multiplier for forward moves",
-                                   ActionType::SLIDER,
-                                   1.0f,
-                                   {},
-                                   0.5f,
-                                   2.0f,
-                                   "x",
-                                   -1,
-                                   true,
-                                   ""});
-    actions.push_back(DeviceAction{"speed_rev",
-                                   "Reverse Multiplier",
-                                   "rewind",
-                                   "speed",
-                                   "Speed multiplier for reverse moves",
-                                   ActionType::SLIDER,
-                                   1.0f,
-                                   {},
-                                   0.5f,
-                                   2.0f,
-                                   "x",
-                                   -1,
-                                   true,
-                                   ""});
-
-    // Maintenance section
-    actions.push_back(DeviceAction{"test_lanes",
-                                   "Test All Lanes",
-                                   "test-tube",
-                                   "maintenance",
-                                   "Run test sequence on all lanes",
-                                   ActionType::BUTTON,
-                                   {},
-                                   {},
-                                   0,
-                                   0,
-                                   "",
-                                   -1,
-                                   true,
-                                   ""});
-    actions.push_back(DeviceAction{"change_blade",
-                                   "Change Blade",
-                                   "box-cutter",
-                                   "maintenance",
-                                   "Initiate blade change procedure",
-                                   ActionType::BUTTON,
-                                   {},
-                                   {},
-                                   0,
-                                   0,
-                                   "",
-                                   -1,
-                                   true,
-                                   ""});
-    actions.push_back(DeviceAction{"park",
-                                   "Park",
-                                   "parking",
-                                   "maintenance",
-                                   "Park the AFC system",
-                                   ActionType::BUTTON,
-                                   {},
-                                   {},
-                                   0,
-                                   0,
-                                   "",
-                                   -1,
-                                   true,
-                                   ""});
-    actions.push_back(DeviceAction{"brush",
-                                   "Clean Brush",
-                                   "broom",
-                                   "maintenance",
-                                   "Run brush cleaning sequence",
-                                   ActionType::BUTTON,
-                                   {},
-                                   {},
-                                   0,
-                                   0,
-                                   "",
-                                   -1,
-                                   true,
-                                   ""});
-    actions.push_back(DeviceAction{"reset_motor",
-                                   "Reset Motor Timer",
-                                   "timer-refresh",
-                                   "maintenance",
-                                   "Reset motor run-time counter",
-                                   ActionType::BUTTON,
-                                   {},
-                                   {},
-                                   0,
-                                   0,
-                                   "",
-                                   -1,
-                                   true,
-                                   ""});
-
-    // LED & Modes section
-    actions.push_back(DeviceAction{"led_toggle",
-                                   afc_led_state_ ? "Turn Off LEDs" : "Turn On LEDs",
-                                   afc_led_state_ ? "lightbulb-off" : "lightbulb-on",
-                                   "led",
-                                   "Toggle AFC LED strip",
-                                   ActionType::BUTTON,
-                                   {},
-                                   {},
-                                   0,
-                                   0,
-                                   "",
-                                   -1,
-                                   true,
-                                   ""});
-    actions.push_back(DeviceAction{"quiet_mode",
-                                   "Toggle Quiet Mode",
-                                   "volume-off",
-                                   "led",
-                                   "Enable/disable quiet operation mode",
-                                   ActionType::BUTTON,
-                                   {},
-                                   {},
-                                   0,
-                                   0,
-                                   "",
-                                   -1,
-                                   true,
-                                   ""});
 
     // ---- Config-backed actions (Hub & Cutter, Tip Forming, Purge) ----
 
