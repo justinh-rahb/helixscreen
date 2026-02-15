@@ -17,7 +17,7 @@ using namespace helix::printer;
 
 TEST_CASE("AFC default sections count", "[defaults][afc]") {
     auto sections = afc_default_sections();
-    REQUIRE(sections.size() == 8);
+    REQUIRE(sections.size() == 7);
 }
 
 TEST_CASE("AFC default sections have required fields", "[defaults][afc]") {
@@ -48,10 +48,9 @@ TEST_CASE("AFC default sections contain known IDs", "[defaults][afc]") {
         ids.insert(s.id);
     }
 
-    REQUIRE(ids.count("calibration") == 1);
+    REQUIRE(ids.count("setup") == 1);
     REQUIRE(ids.count("speed") == 1);
     REQUIRE(ids.count("maintenance") == 1);
-    REQUIRE(ids.count("led") == 1);
     REQUIRE(ids.count("hub") == 1);
     REQUIRE(ids.count("tip_forming") == 1);
     REQUIRE(ids.count("purge") == 1);
@@ -72,7 +71,7 @@ TEST_CASE("AFC default sections have unique IDs", "[defaults][afc]") {
 
 TEST_CASE("AFC default actions count", "[defaults][afc]") {
     auto actions = afc_default_actions();
-    REQUIRE(actions.size() == 11);
+    REQUIRE(actions.size() == 23);
 }
 
 TEST_CASE("AFC default actions have required fields", "[defaults][afc]") {
@@ -105,6 +104,18 @@ TEST_CASE("AFC default actions contain known IDs", "[defaults][afc]") {
     REQUIRE(ids.count("reset_motor") == 1);
     REQUIRE(ids.count("led_toggle") == 1);
     REQUIRE(ids.count("quiet_mode") == 1);
+    REQUIRE(ids.count("hub_cut_enabled") == 1);
+    REQUIRE(ids.count("hub_cut_dist") == 1);
+    REQUIRE(ids.count("hub_bowden_length") == 1);
+    REQUIRE(ids.count("assisted_retract") == 1);
+    REQUIRE(ids.count("ramming_volume") == 1);
+    REQUIRE(ids.count("unloading_speed_start") == 1);
+    REQUIRE(ids.count("cooling_tube_length") == 1);
+    REQUIRE(ids.count("cooling_tube_retraction") == 1);
+    REQUIRE(ids.count("purge_enabled") == 1);
+    REQUIRE(ids.count("purge_length") == 1);
+    REQUIRE(ids.count("brush_enabled") == 1);
+    REQUIRE(ids.count("save_restart") == 1);
 }
 
 TEST_CASE("AFC default actions have unique IDs", "[defaults][afc]") {
@@ -140,8 +151,8 @@ TEST_CASE("AFC default actions have correct section assignments", "[defaults][af
         return nullptr;
     };
 
-    REQUIRE(find("calibration_wizard")->section == "calibration");
-    REQUIRE(find("bowden_length")->section == "calibration");
+    REQUIRE(find("calibration_wizard")->section == "setup");
+    REQUIRE(find("bowden_length")->section == "setup");
     REQUIRE(find("speed_fwd")->section == "speed");
     REQUIRE(find("speed_rev")->section == "speed");
     REQUIRE(find("test_lanes")->section == "maintenance");
@@ -149,8 +160,20 @@ TEST_CASE("AFC default actions have correct section assignments", "[defaults][af
     REQUIRE(find("park")->section == "maintenance");
     REQUIRE(find("brush")->section == "maintenance");
     REQUIRE(find("reset_motor")->section == "maintenance");
-    REQUIRE(find("led_toggle")->section == "led");
-    REQUIRE(find("quiet_mode")->section == "led");
+    REQUIRE(find("led_toggle")->section == "setup");
+    REQUIRE(find("quiet_mode")->section == "setup");
+    REQUIRE(find("hub_cut_enabled")->section == "hub");
+    REQUIRE(find("hub_cut_dist")->section == "hub");
+    REQUIRE(find("hub_bowden_length")->section == "hub");
+    REQUIRE(find("assisted_retract")->section == "hub");
+    REQUIRE(find("ramming_volume")->section == "tip_forming");
+    REQUIRE(find("unloading_speed_start")->section == "tip_forming");
+    REQUIRE(find("cooling_tube_length")->section == "tip_forming");
+    REQUIRE(find("cooling_tube_retraction")->section == "tip_forming");
+    REQUIRE(find("purge_enabled")->section == "purge");
+    REQUIRE(find("purge_length")->section == "purge");
+    REQUIRE(find("brush_enabled")->section == "purge");
+    REQUIRE(find("save_restart")->section == "config");
 }
 
 TEST_CASE("AFC default BUTTON actions have correct defaults", "[defaults][afc]") {
@@ -165,8 +188,14 @@ TEST_CASE("AFC default BUTTON actions have correct defaults", "[defaults][afc]")
         REQUIRE(a.max_value == 0);
         REQUIRE(a.unit.empty());
         REQUIRE(a.slot_index == -1);
-        REQUIRE(a.enabled);
-        REQUIRE(a.disable_reason.empty());
+        // save_restart is initially disabled (no unsaved changes)
+        if (a.id == "save_restart") {
+            REQUIRE_FALSE(a.enabled);
+            REQUIRE(a.disable_reason == "No unsaved changes");
+        } else {
+            REQUIRE(a.enabled);
+            REQUIRE(a.disable_reason.empty());
+        }
     }
 }
 

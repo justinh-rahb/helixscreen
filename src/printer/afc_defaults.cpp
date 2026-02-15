@@ -7,26 +7,25 @@ namespace helix::printer {
 
 std::vector<DeviceSection> afc_default_sections() {
     return {
-        {"calibration", "Calibration", 0, "Bowden length and lane calibration"},
+        {"setup", "Setup", 0, "Calibration, LED, and system configuration"},
         {"speed", "Speed Settings", 1, "Move speed multipliers"},
         {"maintenance", "Maintenance", 2, "Lane tests and motor resets"},
-        {"led", "LED & Modes", 3, "LED control and quiet mode"},
-        {"hub", "Hub & Cutter", 4, "Blade change and parking"},
-        {"tip_forming", "Tip Forming", 5, "Tip shaping configuration"},
-        {"purge", "Purge & Wipe", 6, "Purge tower and brush settings"},
-        {"config", "Configuration", 7, "System configuration and mapping"},
+        {"hub", "Hub & Cutter", 3, "Blade change and parking"},
+        {"tip_forming", "Tip Forming", 4, "Tip shaping configuration"},
+        {"purge", "Purge & Wipe", 5, "Purge tower and brush settings"},
+        {"config", "Configuration", 6, "System configuration and mapping"},
     };
 }
 
 std::vector<DeviceAction> afc_default_actions() {
     std::vector<DeviceAction> actions;
 
-    // Calibration section
+    // Setup section (calibration + LED)
     actions.push_back({
         .id = "calibration_wizard",
         .label = "Run Calibration Wizard",
         .icon = "play",
-        .section = "calibration",
+        .section = "setup",
         .description = "Interactive calibration for all lanes",
         .type = ActionType::BUTTON,
         .current_value = {},
@@ -43,7 +42,7 @@ std::vector<DeviceAction> afc_default_actions() {
         .id = "bowden_length",
         .label = "Bowden Length",
         .icon = "ruler",
-        .section = "calibration",
+        .section = "setup",
         .description = "Distance from hub to toolhead",
         .type = ActionType::SLIDER,
         .current_value = std::any(450.0f),
@@ -177,12 +176,12 @@ std::vector<DeviceAction> afc_default_actions() {
         .disable_reason = "",
     });
 
-    // LED & Modes section
+    // Setup section (LED & Modes)
     actions.push_back({
         .id = "led_toggle",
         .label = "Turn On LEDs",
         .icon = "lightbulb-on",
-        .section = "led",
+        .section = "setup",
         .description = "Toggle AFC LED strip",
         .type = ActionType::BUTTON,
         .current_value = {},
@@ -199,7 +198,7 @@ std::vector<DeviceAction> afc_default_actions() {
         .id = "quiet_mode",
         .label = "Toggle Quiet Mode",
         .icon = "volume-off",
-        .section = "led",
+        .section = "setup",
         .description = "Enable/disable quiet operation mode",
         .type = ActionType::BUTTON,
         .current_value = {},
@@ -210,6 +209,214 @@ std::vector<DeviceAction> afc_default_actions() {
         .slot_index = -1,
         .enabled = true,
         .disable_reason = "",
+    });
+
+    // Hub & Cutter section
+    actions.push_back({
+        .id = "hub_cut_enabled",
+        .label = "Cutter Enabled",
+        .icon = "content-cut",
+        .section = "hub",
+        .description = "Enable or disable the hub cutter",
+        .type = ActionType::TOGGLE,
+        .current_value = std::any(false),
+        .options = {},
+        .min_value = 0,
+        .max_value = 0,
+        .unit = "",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    actions.push_back({
+        .id = "hub_cut_dist",
+        .label = "Cut Distance",
+        .icon = "ruler",
+        .section = "hub",
+        .description = "Distance for hub cutter operation",
+        .type = ActionType::SLIDER,
+        .current_value = std::any(50.0f),
+        .options = {},
+        .min_value = 0.0f,
+        .max_value = 100.0f,
+        .unit = "mm",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    actions.push_back({
+        .id = "hub_bowden_length",
+        .label = "Hub Bowden Length",
+        .icon = "ruler",
+        .section = "hub",
+        .description = "Bowden tube length from hub to toolhead",
+        .type = ActionType::SLIDER,
+        .current_value = std::any(450.0f),
+        .options = {},
+        .min_value = 100.0f,
+        .max_value = 2000.0f,
+        .unit = "mm",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    actions.push_back({
+        .id = "assisted_retract",
+        .label = "Assisted Retract",
+        .icon = "arrow-u-left-top",
+        .section = "hub",
+        .description = "Enable assisted retraction at hub",
+        .type = ActionType::TOGGLE,
+        .current_value = std::any(false),
+        .options = {},
+        .min_value = 0,
+        .max_value = 0,
+        .unit = "",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    // Tip Forming section
+    actions.push_back({
+        .id = "ramming_volume",
+        .label = "Ramming Volume",
+        .icon = "hydraulic-oil-level",
+        .section = "tip_forming",
+        .description = "Volume of filament used during ramming",
+        .type = ActionType::SLIDER,
+        .current_value = std::any(0.0f),
+        .options = {},
+        .min_value = 0.0f,
+        .max_value = 100.0f,
+        .unit = "mm³",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    actions.push_back({
+        .id = "unloading_speed_start",
+        .label = "Unloading Start Speed",
+        .icon = "speedometer",
+        .section = "tip_forming",
+        .description = "Initial speed for filament unloading",
+        .type = ActionType::SLIDER,
+        .current_value = std::any(80.0f),
+        .options = {},
+        .min_value = 0.0f,
+        .max_value = 200.0f,
+        .unit = "mm/s",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    actions.push_back({
+        .id = "cooling_tube_length",
+        .label = "Cooling Tube Length",
+        .icon = "thermometer-minus",
+        .section = "tip_forming",
+        .description = "Length of the cooling tube section",
+        .type = ActionType::SLIDER,
+        .current_value = std::any(15.0f),
+        .options = {},
+        .min_value = 0.0f,
+        .max_value = 100.0f,
+        .unit = "mm",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    actions.push_back({
+        .id = "cooling_tube_retraction",
+        .label = "Cooling Tube Retraction",
+        .icon = "thermometer-minus",
+        .section = "tip_forming",
+        .description = "Retraction distance in the cooling tube",
+        .type = ActionType::SLIDER,
+        .current_value = std::any(0.0f),
+        .options = {},
+        .min_value = 0.0f,
+        .max_value = 100.0f,
+        .unit = "mm",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    // Purge & Wipe section
+    actions.push_back({
+        .id = "purge_enabled",
+        .label = "Enable Purge",
+        .icon = "water",
+        .section = "purge",
+        .description = "Enable purging during tool changes",
+        .type = ActionType::TOGGLE,
+        .current_value = std::any(false),
+        .options = {},
+        .min_value = 0,
+        .max_value = 0,
+        .unit = "",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    actions.push_back({
+        .id = "purge_length",
+        .label = "Purge Length",
+        .icon = "ruler",
+        .section = "purge",
+        .description = "Length of filament to purge",
+        .type = ActionType::SLIDER,
+        .current_value = std::any(50.0f),
+        .options = {},
+        .min_value = 0.0f,
+        .max_value = 200.0f,
+        .unit = "mm",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    actions.push_back({
+        .id = "brush_enabled",
+        .label = "Enable Brush Wipe",
+        .icon = "broom",
+        .section = "purge",
+        .description = "Enable brush wipe after purging",
+        .type = ActionType::TOGGLE,
+        .current_value = std::any(false),
+        .options = {},
+        .min_value = 0,
+        .max_value = 0,
+        .unit = "",
+        .slot_index = -1,
+        .enabled = true,
+        .disable_reason = "",
+    });
+
+    // Configuration section
+    actions.push_back({
+        .id = "save_restart",
+        .label = "Save & Restart",
+        .icon = "content-save",
+        .section = "config",
+        .description = "Save configuration and restart Klipper",
+        .type = ActionType::BUTTON,
+        .current_value = {},
+        .options = {},
+        .min_value = 0,
+        .max_value = 0,
+        .unit = "",
+        .slot_index = -1,
+        .enabled = false,
+        .disable_reason = "No unsaved changes",
     });
 
     return actions;
