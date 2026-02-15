@@ -1677,7 +1677,7 @@ release-snapmaker-u1: | build/snapmaker-u1/bin/helix-screen
 	@cp -r ui_xml config $(RELEASE_DIR)/helixscreen/
 	@rm -f $(RELEASE_DIR)/helixscreen/config/helixconfig.json $(RELEASE_DIR)/helixscreen/config/helixconfig-test.json
 	@mkdir -p $(RELEASE_DIR)/helixscreen/scripts
-	@cp scripts/install.sh $(RELEASE_DIR)/helixscreen/scripts/
+	@cp scripts/install.sh $(RELEASE_DIR)/helixscreen/scripts/ 2>/dev/null || true
 	@cp scripts/uninstall.sh $(RELEASE_DIR)/helixscreen/scripts/ 2>/dev/null || true
 	@mkdir -p $(RELEASE_DIR)/helixscreen/assets
 	@for asset in $(RELEASE_ASSETS); do \
