@@ -16,12 +16,25 @@
     <lv_obj name="search_row"
             width="100%" height="content" flex_flow="row" style_flex_main_place="start" style_flex_cross_place="center"
             style_pad_column="#space_md" style_pad_left="#space_lg" style_pad_right="#space_lg"
-            style_pad_top="#space_sm" style_pad_bottom="#space_sm">
-      <text_input name="search_box"
-                  placeholder_text="Search spools..." placeholder_tag="Search spools..." flex_grow="1" style_min_width="120"
-                  style_max_height="#input_height">
-        <event_cb trigger="value_changed" callback="on_spoolman_search_changed"/>
-      </text_input>
+            style_pad_top="#space_sm" style_pad_bottom="#space_sm" scrollable="false">
+      <!-- Search container: styled to look like input, holds textarea + clear button -->
+      <lv_obj name="search_container"
+              flex_grow="1" height="#input_height" flex_flow="row" style_flex_cross_place="center"
+              style_bg_color="#elevated_bg" style_bg_opa="255" style_radius="#border_radius"
+              style_border_color="#border" style_border_width="1"
+              style_pad_left="#space_md" style_pad_right="#space_xs" style_pad_gap="0"
+              scrollable="false">
+        <text_input name="search_box"
+                    placeholder_text="Search spools..." placeholder_tag="Search spools..." flex_grow="1"
+                    style_bg_opa="0" style_border_width="0" style_pad_all="0" style_pad_left="0" style_pad_right="0">
+          <event_cb trigger="value_changed" callback="on_spoolman_search_changed"/>
+        </text_input>
+        <!-- Clear button (Android-style, hidden when empty) -->
+        <icon name="search_clear_btn" src="close_circle" size="sm" variant="secondary"
+              hidden="true" clickable="true">
+          <event_cb trigger="clicked" callback="on_spoolman_search_clear"/>
+        </icon>
+      </lv_obj>
     </lv_obj>
     <!-- Content Area -->
     <lv_obj name="overlay_content"
