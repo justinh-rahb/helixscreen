@@ -693,29 +693,41 @@ static void setup_slot_observers(AmsSlotData* data) {
     lv_subject_t* current_slot_subject = state.get_current_slot_subject();
     lv_subject_t* filament_loaded_subject = state.get_filament_loaded_subject();
 
-    // Create observers with factory pattern (RAII cleanup via ObserverGuard)
+    // Capture container (lv_obj_t*) instead of data pointer to prevent
+    // use-after-free when deferred callback executes after widget deletion.
+    // The registry lookup acts as a validity check. (fixes #83)
+    lv_obj_t* obj = data->container;
     if (color_subject) {
         data->color_observer =
-            observe_int_sync<AmsSlotData>(color_subject, data, [](AmsSlotData* d, int color_int) {
-                apply_slot_color(d, color_int);
+            observe_int_sync<lv_obj_t>(color_subject, obj, [](lv_obj_t* o, int color_int) {
+                auto* d = get_slot_data(o);
+                if (d)
+                    apply_slot_color(d, color_int);
             });
     }
     if (status_subject) {
         data->status_observer =
-            observe_int_sync<AmsSlotData>(status_subject, data, [](AmsSlotData* d, int status_int) {
-                apply_slot_status(d, status_int);
+            observe_int_sync<lv_obj_t>(status_subject, obj, [](lv_obj_t* o, int status_int) {
+                auto* d = get_slot_data(o);
+                if (d)
+                    apply_slot_status(d, status_int);
             });
     }
     if (current_slot_subject) {
-        data->current_slot_observer = observe_int_sync<AmsSlotData>(
-            current_slot_subject, data, [](AmsSlotData* d, int current_slot) {
-                apply_current_slot_highlight(d, current_slot);
+        data->current_slot_observer = observe_int_sync<lv_obj_t>(
+            current_slot_subject, obj, [](lv_obj_t* o, int current_slot) {
+                auto* d = get_slot_data(o);
+                if (d)
+                    apply_current_slot_highlight(d, current_slot);
             });
     }
     if (filament_loaded_subject) {
         // When filament_loaded changes, re-evaluate highlight using current_slot value
-        data->filament_loaded_observer = observe_int_sync<AmsSlotData>(
-            filament_loaded_subject, data, [](AmsSlotData* d, int /*loaded*/) {
+        data->filament_loaded_observer = observe_int_sync<lv_obj_t>(
+            filament_loaded_subject, obj, [](lv_obj_t* o, int /*loaded*/) {
+                auto* d = get_slot_data(o);
+                if (!d)
+                    return;
                 lv_subject_t* slot_subject = AmsState::instance().get_current_slot_subject();
                 if (slot_subject) {
                     apply_current_slot_highlight(d, lv_subject_get_int(slot_subject));

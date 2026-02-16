@@ -538,9 +538,15 @@ lv_obj_t* ui_ams_mini_status_create(lv_obj_t* parent, int32_t height) {
 
     lv_subject_t* slots_version_subject = AmsState::instance().get_slots_version_subject();
     if (slots_version_subject) {
-        data->slots_version_observer = observe_int_sync<AmsMiniStatusData>(
-            slots_version_subject, data,
-            [](AmsMiniStatusData* d, int /* version */) { sync_from_ams_state(d); });
+        // Capture container (lv_obj_t*) instead of data pointer to prevent
+        // use-after-free when deferred callback executes after widget deletion.
+        // The registry lookup acts as a validity check. (fixes #83)
+        data->slots_version_observer = observe_int_sync<lv_obj_t>(
+            slots_version_subject, container, [](lv_obj_t* obj, int /* version */) {
+                auto* d = get_data(obj);
+                if (d)
+                    sync_from_ams_state(d);
+            });
 
         // Sync initial state if AMS already has data
         lv_subject_t* slot_count_subject = AmsState::instance().get_slot_count_subject();
@@ -781,9 +787,15 @@ static void* ui_ams_mini_status_xml_create(lv_xml_parser_state_t* state, const c
 
     lv_subject_t* slots_version_subject = AmsState::instance().get_slots_version_subject();
     if (slots_version_subject) {
-        data->slots_version_observer = observe_int_sync<AmsMiniStatusData>(
-            slots_version_subject, data,
-            [](AmsMiniStatusData* d, int /* version */) { sync_from_ams_state(d); });
+        // Capture container (lv_obj_t*) instead of data pointer to prevent
+        // use-after-free when deferred callback executes after widget deletion.
+        // The registry lookup acts as a validity check. (fixes #83)
+        data->slots_version_observer = observe_int_sync<lv_obj_t>(
+            slots_version_subject, container, [](lv_obj_t* obj, int /* version */) {
+                auto* d = get_data(obj);
+                if (d)
+                    sync_from_ams_state(d);
+            });
 
         // Sync initial state if AMS already has data
         lv_subject_t* slot_count_subject = AmsState::instance().get_slot_count_subject();
