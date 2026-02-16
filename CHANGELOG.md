@@ -5,6 +5,37 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-02-15
+
+Major feature release bringing full Spoolman spool management, a guided spool creation wizard, multi-unit AMS support for AFC and Happy Hare, probe management, and a Klipper config editor. Also adds Elegoo Centauri Carbon 1 support and fixes several crash bugs.
+
+### Added
+- **Spoolman Management**: Browse, search, edit, and delete spools with virtualized list, context menu, and inline edit modal
+- **New Spool Wizard** (beta): 3-step guided creation (Vendor → Filament → Spool Details) with dual-source data from Spoolman server and SpoolmanDB catalog, atomic creation with rollback
+- **Multi-unit AMS**: Support for multiple AMS/AFC/Happy Hare units with per-unit overview panel, shared spool grid components, and error/buffer health visualization
+- **Probe Management** (beta): BLTouch panel with deploy/retract/self-test, probe type detection for Cartographer, Beacon, Tap, and Klicky
+- **Klipper Config Editor**: Structure parser with include resolution, targeted edits, and post-edit health check with automatic backup restore
+- **Elegoo Centauri Carbon 1**: Platform support with dedicated build toolchain and presets
+- AFC error notifications with deduplication and action prompt suppression
+- Android-style clear button for all search inputs
+- Toast notifications for AMS device actions
+- Internationalization for remaining hardcoded UI strings
+
+### Fixed
+- Crash from re-entrant observer destruction during callback dispatch (fixes #82)
+- Use-after-free when destroying widgets from event callbacks (fixes #80)
+- AMS slot tray visibility behind badge/halo overlays
+- AFC buffer fault warnings not clearing on recovery
+- Happy Hare reason_for_pause not clearing on idle
+- Icon font validation locale handling
+- Focus on close/context menu buttons causing unintended list scroll
+- Modal dialog bind_text subject references missing @ prefix
+
+### Changed
+- AMS detail views refactored to shared ams_unit_detail and ams_loaded_card components
+- Spoolman and history panel search inputs use shared text_input clear button
+- R2 release retention policy added to prune old releases
+
 ## [0.9.24] - 2026-02-15
 
 ### Fixed
@@ -541,8 +572,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
-[0.9.22]: https://github.com/prestonbrown/helixscreen/compare/v0.9.21...v0.9.22
-[0.9.21]: https://github.com/prestonbrown/helixscreen/compare/v0.9.20...v0.9.21
+[0.10.0]: https://github.com/prestonbrown/helixscreen/compare/v0.9.24...v0.10.0
 [0.9.24]: https://github.com/prestonbrown/helixscreen/compare/v0.9.23...v0.9.24
 [0.9.23]: https://github.com/prestonbrown/helixscreen/compare/v0.9.22...v0.9.23
 [0.9.22]: https://github.com/prestonbrown/helixscreen/compare/v0.9.21...v0.9.22

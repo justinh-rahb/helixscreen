@@ -221,23 +221,11 @@ KLIPPER_USER=""
 KLIPPER_HOME=""
 
 # Detect platform
-# Returns: "ad5m", "cc1", "k1", "pi", "pi32", or "unsupported"
+# Returns: "ad5m", "k1", "pi", "pi32", or "unsupported"
 detect_platform() {
     local arch kernel
     arch=$(uname -m)
     kernel=$(uname -r)
-
-    # Check for Centauri Carbon 1 (armv7l with Open Centauri firmware)
-    # Must be checked BEFORE AD5M since both share kernel 5.4.61
-    # Detection: Open Centauri markers OR Allwinner R528 SoC (sun8iw20)
-    if [ "$arch" = "armv7l" ]; then
-        if [ -d "/opt/open-centauri" ] \
-            || grep -q "OpenCentauri" /etc/hostname 2>/dev/null \
-            || grep -q "sun8iw20" /proc/device-tree/compatible 2>/dev/null; then
-            echo "cc1"
-            return
-        fi
-    fi
 
     # Check for AD5M (armv7l with specific kernel)
     if [ "$arch" = "armv7l" ]; then

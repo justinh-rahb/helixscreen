@@ -53,7 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [pi, pi32, ad5m, k1, k2]
+        platform: [pi, pi32, ad5m, cc1, k1, k2]
         include:
           - platform: pi
             display_name: "Raspberry Pi"
@@ -61,6 +61,8 @@ jobs:
             display_name: "Raspberry Pi 32-bit"
           - platform: ad5m
             display_name: "Adventurer 5M"
+          - platform: cc1
+            display_name: "Elegoo Centauri Carbon 1"
           - platform: k1
             display_name: "Creality K1 Series"
           - platform: k2
