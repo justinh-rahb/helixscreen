@@ -4,6 +4,7 @@
 #include "ui_ams_edit_modal.h"
 
 #include "ui_error_reporting.h"
+#include "ui_update_queue.h"
 
 #include "ams_state.h"
 #include "filament_database.h"
@@ -269,12 +270,7 @@ void AmsEditModal::fetch_vendors_from_spoolman() {
 
     api_->get_spoolman_spools(
         [this, guard](const std::vector<SpoolInfo>& spools) {
-            // Check if modal still exists before using 'this'
-            if (guard.expired()) {
-                return;
-            }
-
-            // Extract unique vendors from spools
+            // Extract vendor list on this thread (WebSocket), then marshal to main
             std::set<std::string> unique_vendors;
             unique_vendors.insert("Generic"); // Always have Generic as first option
             for (const auto& spool : spools) {
@@ -283,22 +279,30 @@ void AmsEditModal::fetch_vendors_from_spoolman() {
                 }
             }
 
-            // Build vendor list and options string
-            vendor_list_.clear();
-            vendor_options_.clear();
+            // Build vendor list and options string (local copies, no member access)
+            std::vector<std::string> vendors;
+            std::string options;
             for (const auto& vendor : unique_vendors) {
-                if (!vendor_options_.empty()) {
-                    vendor_options_ += '\n';
+                if (!options.empty()) {
+                    options += '\n';
                 }
-                vendor_options_ += vendor;
-                vendor_list_.push_back(vendor);
+                options += vendor;
+                vendors.push_back(vendor);
             }
 
-            vendors_loaded_ = true;
-            spdlog::debug("[AmsEditModal] Loaded {} vendors from Spoolman", vendor_list_.size());
-
-            // Update the dropdown if modal is still visible
-            update_vendor_dropdown();
+            // Marshal member writes to main thread
+            ui_queue_update([this, guard, vendors = std::move(vendors),
+                             options = std::move(options)]() mutable {
+                if (guard.expired()) {
+                    return;
+                }
+                vendor_list_ = std::move(vendors);
+                vendor_options_ = std::move(options);
+                vendors_loaded_ = true;
+                spdlog::debug("[AmsEditModal] Loaded {} vendors from Spoolman",
+                              vendor_list_.size());
+                update_vendor_dropdown();
+            });
         },
         [](const MoonrakerError& err) {
             spdlog::warn("[AmsEditModal] Failed to fetch Spoolman spools for vendor list: {}",
@@ -762,17 +766,21 @@ void AmsEditModal::handle_sync_spoolman() {
     api_->update_spoolman_spool_weight(
         spool_id, new_weight,
         [this, spool_id, guard]() {
-            // Check if modal still exists before using 'this'
-            if (guard.expired()) {
-                spdlog::trace("[AmsEditModal] Spoolman sync callback ignored - modal destroyed");
-                return;
-            }
-            spdlog::info("[AmsEditModal] Spoolman spool {} weight synced successfully", spool_id);
-            NOTIFY_SUCCESS("Synced to Spoolman");
+            // Marshal to main thread — callback fires on WebSocket thread
+            ui_queue_update([this, spool_id, guard]() {
+                if (guard.expired()) {
+                    spdlog::trace(
+                        "[AmsEditModal] Spoolman sync callback ignored - modal destroyed");
+                    return;
+                }
+                spdlog::info("[AmsEditModal] Spoolman spool {} weight synced successfully",
+                             spool_id);
+                NOTIFY_SUCCESS("Synced to Spoolman");
 
-            // Update original to match - no longer "dirty"
-            original_info_.remaining_weight_g = working_info_.remaining_weight_g;
-            update_sync_button_state();
+                // Update original to match - no longer "dirty"
+                original_info_.remaining_weight_g = working_info_.remaining_weight_g;
+                update_sync_button_state();
+            });
         },
         [](const MoonrakerError& err) {
             spdlog::error("[AmsEditModal] Failed to sync to Spoolman: {}", err.message);
