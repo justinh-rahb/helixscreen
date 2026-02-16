@@ -14,8 +14,6 @@
 
 #include "lvgl/lvgl.h"
 
-#include <spdlog/spdlog.h>
-
 #include <utility>
 
 /**
@@ -50,9 +48,9 @@ class ObserverGuard {
         if (observer_) {
             if (lv_is_initialized()) {
                 lv_observer_remove(observer_);
-            } else {
-                spdlog::warn("[ObserverGuard] LVGL already torn down, releasing observer");
             }
+            // If LVGL is already torn down, just release — don't log,
+            // as spdlog may also be destroyed during static cleanup
             observer_ = nullptr;
         }
     }
