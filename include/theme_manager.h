@@ -251,6 +251,15 @@ class ThemeManager {
 void theme_manager_init(lv_display_t* display, bool use_dark_mode);
 
 /**
+ * @brief Deinitialize theme subjects before lv_deinit()
+ *
+ * Must be called during shutdown BEFORE lv_deinit() to prevent crash
+ * in lv_observer_remove(). Deinits theme_changed_subject and swatch
+ * description subjects, removing all observer callbacks from widgets.
+ */
+void theme_manager_deinit();
+
+/**
  * @brief Get breakpoint suffix for a given resolution
  *
  * Returns the suffix string used to select responsive variants from globals.xml.

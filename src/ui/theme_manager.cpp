@@ -40,6 +40,13 @@ static lv_subject_t theme_changed_subject;
 static int32_t theme_generation = 0;
 static bool theme_subject_initialized = false;
 
+// Swatch description subjects for theme editor (file-scope for deinit access)
+static constexpr size_t SWATCH_DESC_COUNT = 16;
+static constexpr size_t SWATCH_DESC_BUF_SIZE = 32;
+static lv_subject_t swatch_desc_subjects[SWATCH_DESC_COUNT];
+static char swatch_desc_bufs[SWATCH_DESC_COUNT][SWATCH_DESC_BUF_SIZE];
+static bool swatch_descs_initialized = false;
+
 // Color-swap map for container theming (replaces name-based heuristics)
 struct ColorSwapEntry {
     lv_color_t from;
@@ -927,12 +934,7 @@ static void theme_manager_register_semantic_colors(lv_xml_component_scope_t* sco
 
     // Swatch descriptions for theme editor - registered as string subjects
     // so bind_text="swatch_N_desc" works in XML (consts don't resolve for bind_text)
-    static constexpr size_t SWATCH_DESC_BUF_SIZE = 32;
-    static lv_subject_t swatch_desc_subjects[16];
-    static char swatch_desc_bufs[16][SWATCH_DESC_BUF_SIZE];
-    static bool swatch_descs_initialized = false;
-
-    static constexpr const char* swatch_descriptions[16] = {
+    static constexpr const char* swatch_descriptions[SWATCH_DESC_COUNT] = {
         "App background",    "Panel/sidebar background", "Card surfaces",
         "Elevated surfaces", "Borders and dividers",     "Primary text",
         "Secondary text",    "Subtle/hint text",         "Primary accent",
@@ -942,7 +944,7 @@ static void theme_manager_register_semantic_colors(lv_xml_component_scope_t* sco
     };
 
     if (!swatch_descs_initialized) {
-        for (size_t i = 0; i < 16; ++i) {
+        for (size_t i = 0; i < SWATCH_DESC_COUNT; ++i) {
             lv_subject_init_string(&swatch_desc_subjects[i], swatch_desc_bufs[i], nullptr,
                                    SWATCH_DESC_BUF_SIZE, swatch_descriptions[i]);
             char key[24];
@@ -1130,6 +1132,25 @@ void theme_manager_init(lv_display_t* display, bool use_dark_mode_param) {
     } else {
         spdlog::error("[Theme] Failed to initialize HelixScreen theme");
     }
+}
+
+void theme_manager_deinit() {
+    // Deinitialize subjects BEFORE lv_deinit() to prevent crash in lv_observer_remove().
+    // lv_subject_deinit() removes all observers from each subject AND removes the
+    // unsubscribe_on_delete_cb from widgets. Without this, lv_deinit() -> obj_delete_core()
+    // fires stale callbacks that try to remove from corrupted observer linked lists.
+    if (theme_subject_initialized) {
+        lv_subject_deinit(&theme_changed_subject);
+        theme_subject_initialized = false;
+        theme_generation = 0;
+    }
+    if (swatch_descs_initialized) {
+        for (size_t i = 0; i < SWATCH_DESC_COUNT; ++i) {
+            lv_subject_deinit(&swatch_desc_subjects[i]);
+        }
+        swatch_descs_initialized = false;
+    }
+    spdlog::trace("[Theme] Deinitialized theme subjects");
 }
 
 /**
