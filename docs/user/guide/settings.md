@@ -356,4 +356,44 @@ Clears all HelixScreen settings and restarts the Setup Wizard. Does not affect K
 
 ---
 
+## Help & Support
+
+Three quick links to get help or share diagnostic information:
+
+| Action | What It Does |
+|--------|--------------|
+| **Upload Debug Bundle** | Collects logs and system info into a debug bundle for support. Opens a dialog where you can review and upload the bundle, then share the resulting code with the HelixScreen team. |
+| **Discord Community** | Join the HelixScreen Discord server at **discord.gg/helixscreen** for community help, feature discussions, and feedback. |
+| **Documentation** | Visit **docs.helixscreen.org** for guides, configuration reference, and troubleshooting. |
+
+### Debug Bundles
+
+When you need help troubleshooting an issue:
+
+1. Tap **Upload Debug Bundle** in Settings
+2. The bundle collects your logs, system info, and configuration (no personal data)
+3. Tap **Upload** to send the bundle
+4. Share the resulting code with the HelixScreen team on Discord or GitHub
+
+---
+
+## About
+
+View system information and manage updates:
+
+| Item | Description |
+|------|-------------|
+| **Printer Name** | The name of your connected printer |
+| **Current Version** | Your installed HelixScreen version |
+| **Update Channel** | Choose Stable, Beta, or Dev (only visible after enabling beta features) |
+| **Check for Updates** | Check for and install new versions |
+| **Klipper** | Installed Klipper version |
+| **Moonraker** | Installed Moonraker version |
+| **OS** | Operating system version |
+| **Print Hours** | Total print hours tracked (tap to open the history dashboard) |
+
+> **Tip:** Tap the **Current Version** row seven times to unlock beta features. This enables the Update Channel selector and access to experimental features in Settings.
+
+---
+
 **Next:** [Advanced Features](advanced.md) | **Prev:** [Calibration & Tuning](calibration.md) | [Back to User Guide](../USER_GUIDE.md)
