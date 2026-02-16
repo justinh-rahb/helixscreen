@@ -35,6 +35,7 @@
 #include "subject_initializer.h"
 #include "temperature_history_manager.h"
 #include "timelapse_state.h"
+#include "wizard_config_paths.h"
 
 // UI headers
 #include "ui_ams_mini_status.h"
@@ -1076,12 +1077,32 @@ bool Application::run_wizard() {
 
     spdlog::info("[Application] Starting first-run wizard");
 
-    // When re-running wizard (--wizard), clear expected hardware so it gets
-    // re-populated from fresh wizard selections on completion
+    // When re-running wizard (--wizard), clear all wizard-managed config so
+    // stale hardware selections don't trigger false hardware health warnings
     if (m_args.force_wizard && m_config) {
-        spdlog::info("[Application] Re-running wizard — clearing expected hardware");
+        spdlog::info("[Application] Re-running wizard — clearing wizard configuration");
+
+        // Clear hardware validation state
         m_config->set<nlohmann::json>(m_config->df() + "hardware/expected",
                                       nlohmann::json::array());
+        m_config->set<nlohmann::json>(m_config->df() + "hardware/optional",
+                                      nlohmann::json::array());
+        m_config->set<nlohmann::json>(m_config->df() + "hardware/last_snapshot",
+                                      nlohmann::json::object());
+
+        // Clear wizard hardware selections (heaters, fans, LEDs, sensors)
+        const char* wizard_paths[] = {
+            helix::wizard::BED_HEATER,    helix::wizard::HOTEND_HEATER, helix::wizard::BED_SENSOR,
+            helix::wizard::HOTEND_SENSOR, helix::wizard::HOTEND_FAN,    helix::wizard::PART_FAN,
+            helix::wizard::CHAMBER_FAN,   helix::wizard::EXHAUST_FAN,   helix::wizard::LED_STRIP,
+        };
+        for (const auto* path : wizard_paths) {
+            m_config->set<std::string>(path, "");
+        }
+        m_config->set<nlohmann::json>(helix::wizard::LED_SELECTED, nlohmann::json::array());
+        m_config->set<nlohmann::json>(m_config->df() + "filament_sensors/sensors",
+                                      nlohmann::json::array());
+
         m_config->save();
     }
 
