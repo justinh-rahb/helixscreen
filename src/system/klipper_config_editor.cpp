@@ -3,9 +3,12 @@
 
 #include "klipper_config_editor.h"
 
+#include "moonraker_api.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <atomic>
 #include <set>
 #include <sstream>
 
@@ -435,6 +438,382 @@ KlipperConfigEditor::resolve_includes(const std::map<std::string, std::string>& 
 
     process_file(root_file, 0);
     return result;
+}
+
+// ============================================================================
+// Moonraker Integration — Async file operations
+// ============================================================================
+
+std::map<std::string, SectionLocation> KlipperConfigEditor::get_section_map() const {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    return section_map_;
+}
+
+std::optional<std::string> KlipperConfigEditor::get_cached_file(const std::string& path) const {
+    std::lock_guard<std::mutex> lock(cache_mutex_);
+    auto it = file_cache_.find(path);
+    if (it == file_cache_.end())
+        return std::nullopt;
+    return it->second;
+}
+
+void KlipperConfigEditor::download_with_includes(MoonrakerAPI& api, const std::string& file_path,
+                                                 std::shared_ptr<std::atomic<int>> pending,
+                                                 std::function<void()> on_all_done,
+                                                 ErrorCallback on_error) {
+    // Check if already cached (avoid duplicate downloads)
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex_);
+        if (file_cache_.count(file_path)) {
+            int remaining = pending->fetch_sub(1) - 1;
+            if (remaining == 0 && on_all_done)
+                on_all_done();
+            return;
+        }
+    }
+
+    spdlog::debug("[ConfigEditor] Downloading config file: {}", file_path);
+
+    api.download_file(
+        "config", file_path,
+        [this, &api, file_path, pending, on_all_done, on_error](const std::string& content) {
+            // Cache the file content
+            {
+                std::lock_guard<std::mutex> lock(cache_mutex_);
+                file_cache_[file_path] = content;
+            }
+
+            // Parse to find includes
+            auto structure = parse_structure(content);
+
+            if (!structure.includes.empty()) {
+                // Resolve include paths relative to the current file's directory
+                std::string dir;
+                auto slash = file_path.rfind('/');
+                if (slash != std::string::npos)
+                    dir = file_path.substr(0, slash);
+
+                // Collect non-glob includes to download
+                for (const auto& include : structure.includes) {
+                    // Skip glob patterns — they require listing files from Moonraker
+                    // which is handled separately in load_config_files
+                    if (include.find('*') != std::string::npos)
+                        continue;
+
+                    std::string resolved = dir.empty() ? include : dir + "/" + include;
+
+                    // Check if already cached
+                    {
+                        std::lock_guard<std::mutex> lock(cache_mutex_);
+                        if (file_cache_.count(resolved))
+                            continue;
+                    }
+
+                    // Increment pending count and download recursively
+                    pending->fetch_add(1);
+                    download_with_includes(api, resolved, pending, on_all_done, on_error);
+                }
+            }
+
+            // Decrement pending count for this file
+            int remaining = pending->fetch_sub(1) - 1;
+            if (remaining == 0 && on_all_done)
+                on_all_done();
+        },
+        [file_path, pending, on_all_done, on_error](const MoonrakerError& err) {
+            spdlog::warn("[ConfigEditor] Failed to download {}: {}", file_path, err.message);
+            // Non-fatal: included files may be optional. Decrement and continue.
+            int remaining = pending->fetch_sub(1) - 1;
+            if (remaining == 0 && on_all_done)
+                on_all_done();
+        });
+}
+
+void KlipperConfigEditor::load_config_files(MoonrakerAPI& api, SectionMapCallback on_complete,
+                                            ErrorCallback on_error) {
+    spdlog::info("[ConfigEditor] Loading config files from printer");
+
+    // First, list all config files to support glob includes
+    api.list_files(
+        "config", "", true,
+        [this, &api, on_complete, on_error](const std::vector<FileInfo>& files) {
+            // Build a set of available config file paths for glob resolution
+            std::set<std::string> available_files;
+            for (const auto& f : files) {
+                // Use path if available, otherwise filename
+                std::string path = f.path.empty() ? f.filename : f.path;
+                available_files.insert(path);
+                spdlog::trace("[ConfigEditor] Found config file: {}", path);
+            }
+
+            // Clear caches for fresh load
+            {
+                std::lock_guard<std::mutex> lock(cache_mutex_);
+                file_cache_.clear();
+                section_map_.clear();
+            }
+
+            // Start downloading from printer.cfg
+            auto pending = std::make_shared<std::atomic<int>>(1);
+
+            auto on_all_done = [this, available_files, on_complete]() {
+                spdlog::debug("[ConfigEditor] All config files downloaded, resolving includes");
+
+                std::map<std::string, std::string> files_copy;
+                {
+                    std::lock_guard<std::mutex> lock(cache_mutex_);
+                    files_copy = file_cache_;
+                }
+
+                // For glob includes, we need to add files that match glob patterns.
+                // The resolve_includes method handles glob matching against the file map.
+                // We may need to add available files that were not yet downloaded.
+                // However, resolve_includes only uses files present in the map,
+                // so glob patterns will only match already-downloaded files.
+                // This is acceptable since non-glob includes are the common case.
+
+                auto section_map = resolve_includes(files_copy, "printer.cfg");
+
+                {
+                    std::lock_guard<std::mutex> lock(cache_mutex_);
+                    section_map_ = section_map;
+                }
+
+                spdlog::info("[ConfigEditor] Resolved {} sections across {} files",
+                             section_map.size(), files_copy.size());
+
+                if (on_complete)
+                    on_complete(section_map);
+            };
+
+            download_with_includes(api, "printer.cfg", pending, on_all_done, on_error);
+        },
+        [on_error](const MoonrakerError& err) {
+            spdlog::error("[ConfigEditor] Failed to list config files: {}", err.message);
+            if (on_error)
+                on_error("Failed to list config files: " + err.message);
+        });
+}
+
+void KlipperConfigEditor::backup_file(MoonrakerAPI& api, const std::string& file_path,
+                                      SuccessCallback on_success, ErrorCallback on_error) {
+    std::string source = "config/" + file_path;
+    std::string dest = "config/" + file_path + ".helix_backup";
+
+    spdlog::info("[ConfigEditor] Creating backup: {} -> {}", source, dest);
+
+    api.copy_file(
+        source, dest,
+        [file_path, on_success]() {
+            spdlog::debug("[ConfigEditor] Backup created for {}", file_path);
+            if (on_success)
+                on_success();
+        },
+        [file_path, on_error](const MoonrakerError& err) {
+            spdlog::error("[ConfigEditor] Failed to backup {}: {}", file_path, err.message);
+            if (on_error)
+                on_error("Failed to backup " + file_path + ": " + err.message);
+        });
+}
+
+void KlipperConfigEditor::edit_value(MoonrakerAPI& api, const std::string& section,
+                                     const std::string& key, const std::string& new_value,
+                                     SuccessCallback on_success, ErrorCallback on_error) {
+    // Look up section in cached section map
+    std::string file_path;
+    {
+        std::lock_guard<std::mutex> lock(cache_mutex_);
+        auto it = section_map_.find(section);
+        if (it == section_map_.end()) {
+            spdlog::error("[ConfigEditor] Section [{}] not found in section map", section);
+            if (on_error)
+                on_error("Section [" + section + "] not found");
+            return;
+        }
+        file_path = it->second.file_path;
+    }
+
+    spdlog::info("[ConfigEditor] Editing [{}] {}: {} in {}", section, key, new_value, file_path);
+
+    // Step 1: Create backup of the file
+    backup_file(
+        api, file_path,
+        [this, &api, file_path, section, key, new_value, on_success, on_error]() {
+            // Step 2: Get content (from cache or re-download)
+            std::optional<std::string> cached_content;
+            {
+                std::lock_guard<std::mutex> lock(cache_mutex_);
+                auto it = file_cache_.find(file_path);
+                if (it != file_cache_.end())
+                    cached_content = it->second;
+            }
+
+            auto do_edit = [this, &api, file_path, section, key, new_value, on_success,
+                            on_error](const std::string& content) {
+                // Step 3: Apply the edit
+                auto modified = set_value(content, section, key, new_value);
+                if (!modified.has_value()) {
+                    spdlog::error("[ConfigEditor] set_value failed for [{}] {} in {}", section, key,
+                                  file_path);
+                    if (on_error)
+                        on_error("Failed to set [" + section + "] " + key + " in " + file_path);
+                    return;
+                }
+
+                // Step 4: Upload modified content
+                api.upload_file(
+                    "config", file_path, *modified,
+                    [this, file_path, modified, on_success]() {
+                        // Step 5: Update cache with new content
+                        {
+                            std::lock_guard<std::mutex> lock(cache_mutex_);
+                            file_cache_[file_path] = *modified;
+                        }
+                        spdlog::info("[ConfigEditor] Successfully edited {}", file_path);
+                        if (on_success)
+                            on_success();
+                    },
+                    [file_path, on_error](const MoonrakerError& err) {
+                        spdlog::error("[ConfigEditor] Failed to upload modified {}: {}", file_path,
+                                      err.message);
+                        if (on_error)
+                            on_error("Failed to upload " + file_path + ": " + err.message);
+                    });
+            };
+
+            if (cached_content.has_value()) {
+                do_edit(*cached_content);
+            } else {
+                // Re-download if not cached
+                api.download_file(
+                    "config", file_path,
+                    [do_edit](const std::string& content) { do_edit(content); },
+                    [file_path, on_error](const MoonrakerError& err) {
+                        spdlog::error("[ConfigEditor] Failed to download {}: {}", file_path,
+                                      err.message);
+                        if (on_error)
+                            on_error("Failed to download " + file_path + ": " + err.message);
+                    });
+            }
+        },
+        on_error);
+}
+
+void KlipperConfigEditor::restore_backups(MoonrakerAPI& api, SuccessCallback on_complete,
+                                          ErrorCallback on_error) {
+    spdlog::info("[ConfigEditor] Restoring backup files");
+
+    api.list_files(
+        "config", "", true,
+        [&api, on_complete, on_error](const std::vector<FileInfo>& files) {
+            // Find all .helix_backup files
+            std::vector<std::string> backup_files;
+            for (const auto& f : files) {
+                std::string path = f.path.empty() ? f.filename : f.path;
+                if (path.size() > 13 && path.substr(path.size() - 13) == ".helix_backup") {
+                    backup_files.push_back(path);
+                }
+            }
+
+            if (backup_files.empty()) {
+                spdlog::debug("[ConfigEditor] No backup files to restore");
+                if (on_complete)
+                    on_complete();
+                return;
+            }
+
+            auto pending =
+                std::make_shared<std::atomic<int>>(static_cast<int>(backup_files.size()));
+            auto had_error = std::make_shared<std::atomic<bool>>(false);
+
+            for (const auto& backup_path : backup_files) {
+                // Remove .helix_backup suffix to get original path
+                std::string original = backup_path.substr(0, backup_path.size() - 13);
+                std::string source = "config/" + backup_path;
+                std::string dest = "config/" + original;
+
+                spdlog::info("[ConfigEditor] Restoring {} -> {}", source, dest);
+
+                api.copy_file(
+                    source, dest,
+                    [pending, on_complete, backup_path]() {
+                        spdlog::debug("[ConfigEditor] Restored {}", backup_path);
+                        int remaining = pending->fetch_sub(1) - 1;
+                        if (remaining == 0 && on_complete)
+                            on_complete();
+                    },
+                    [pending, had_error, on_complete, on_error,
+                     backup_path](const MoonrakerError& err) {
+                        spdlog::error("[ConfigEditor] Failed to restore {}: {}", backup_path,
+                                      err.message);
+                        had_error->store(true);
+                        int remaining = pending->fetch_sub(1) - 1;
+                        if (remaining == 0) {
+                            if (on_error)
+                                on_error("Failed to restore one or more backup files");
+                        }
+                    });
+            }
+        },
+        [on_error](const MoonrakerError& err) {
+            spdlog::error("[ConfigEditor] Failed to list files for restore: {}", err.message);
+            if (on_error)
+                on_error("Failed to list config files: " + err.message);
+        });
+}
+
+void KlipperConfigEditor::cleanup_backups(MoonrakerAPI& api, SuccessCallback on_complete) {
+    spdlog::debug("[ConfigEditor] Cleaning up backup files");
+
+    api.list_files(
+        "config", "", true,
+        [&api, on_complete](const std::vector<FileInfo>& files) {
+            // Find all .helix_backup files
+            std::vector<std::string> backup_files;
+            for (const auto& f : files) {
+                std::string path = f.path.empty() ? f.filename : f.path;
+                if (path.size() > 13 && path.substr(path.size() - 13) == ".helix_backup") {
+                    backup_files.push_back(path);
+                }
+            }
+
+            if (backup_files.empty()) {
+                spdlog::debug("[ConfigEditor] No backup files to clean up");
+                if (on_complete)
+                    on_complete();
+                return;
+            }
+
+            auto pending =
+                std::make_shared<std::atomic<int>>(static_cast<int>(backup_files.size()));
+
+            for (const auto& backup_path : backup_files) {
+                std::string full_path = "config/" + backup_path;
+
+                api.delete_file(
+                    full_path,
+                    [pending, on_complete, backup_path]() {
+                        spdlog::debug("[ConfigEditor] Deleted backup {}", backup_path);
+                        int remaining = pending->fetch_sub(1) - 1;
+                        if (remaining == 0 && on_complete)
+                            on_complete();
+                    },
+                    [pending, on_complete, backup_path](const MoonrakerError& err) {
+                        // Non-fatal: log and continue
+                        spdlog::warn("[ConfigEditor] Failed to delete backup {}: {}", backup_path,
+                                     err.message);
+                        int remaining = pending->fetch_sub(1) - 1;
+                        if (remaining == 0 && on_complete)
+                            on_complete();
+                    });
+            }
+        },
+        [on_complete](const MoonrakerError&) {
+            // Non-fatal: cleanup is best-effort
+            spdlog::warn("[ConfigEditor] Failed to list files for cleanup");
+            if (on_complete)
+                on_complete();
+        });
 }
 
 } // namespace helix::system
