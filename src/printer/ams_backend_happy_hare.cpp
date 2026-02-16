@@ -732,6 +732,16 @@ AmsError AmsBackendHappyHare::set_slot_info(int slot_index, const SlotInfo& info
         // Capture old spoolman_id BEFORE updating (needed to detect clearing)
         old_spoolman_id = slot->spoolman_id;
 
+        // Detect whether anything actually changed
+        bool changed =
+            slot->color_name != info.color_name || slot->color_rgb != info.color_rgb ||
+            slot->material != info.material || slot->brand != info.brand ||
+            slot->spoolman_id != info.spoolman_id || slot->spool_name != info.spool_name ||
+            slot->remaining_weight_g != info.remaining_weight_g ||
+            slot->total_weight_g != info.total_weight_g ||
+            slot->nozzle_temp_min != info.nozzle_temp_min ||
+            slot->nozzle_temp_max != info.nozzle_temp_max || slot->bed_temp != info.bed_temp;
+
         // Update local state
         slot->color_name = info.color_name;
         slot->color_rgb = info.color_rgb;
@@ -745,8 +755,10 @@ AmsError AmsBackendHappyHare::set_slot_info(int slot_index, const SlotInfo& info
         slot->nozzle_temp_max = info.nozzle_temp_max;
         slot->bed_temp = info.bed_temp;
 
-        spdlog::info("[AMS HappyHare] Updated slot {} info: {} {}", slot_index, info.material,
-                     info.color_name);
+        if (changed) {
+            spdlog::info("[AMS HappyHare] Updated slot {} info: {} {}", slot_index, info.material,
+                         info.color_name);
+        }
     }
 
     // Persist via MMU_GATE_MAP command (Happy Hare stores in mmu_vars.cfg automatically)
