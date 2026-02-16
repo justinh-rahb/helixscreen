@@ -95,6 +95,11 @@ void SubjectInitializer::init_core_and_state() {
     // Phase 3: AMS and filament sensor subjects
     init_ams_subjects();
 
+    // Phase 4: Navigation subjects — MUST register AFTER PrinterState/AmsState
+    // so that in reverse deinit order, NavigationManager cleans up its observers
+    // on PrinterState subjects BEFORE PrinterState deinits those subjects.
+    ui_nav_init();
+
     spdlog::debug("[SubjectInitializer] Core and state subjects initialized");
 }
 
@@ -125,7 +130,6 @@ void SubjectInitializer::init_post(const RuntimeConfig& runtime_config) {
 void SubjectInitializer::init_core_subjects() {
     spdlog::trace("[SubjectInitializer] Initializing core subjects");
     app_globals_init_subjects();            // Global subjects (notification subject, etc.)
-    ui_nav_init();                          // Navigation system (icon colors, active panel)
     ui_printer_status_icon_init_subjects(); // Printer icon state
     ui_status_bar_init_subjects();          // Notification badge subjects
 }
