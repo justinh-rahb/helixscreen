@@ -5,6 +5,7 @@
 
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,12 @@ struct ConfigStructure {
     std::optional<ConfigKey> find_key(const std::string& section, const std::string& key) const;
 };
 
+/// Which file a section was found in (for include resolution)
+struct SectionLocation {
+    std::string file_path; ///< Path relative to config root
+    ConfigSection section; ///< Section info from that file
+};
+
 class KlipperConfigEditor {
   public:
     ConfigStructure parse_structure(const std::string& content) const;
@@ -50,6 +57,15 @@ class KlipperConfigEditor {
     std::optional<std::string> add_key(const std::string& content, const std::string& section,
                                        const std::string& key, const std::string& value,
                                        const std::string& delimiter = ": ") const;
+
+    /// Resolve all includes and build a section -> file mapping
+    /// @param files Map of filename -> content (for unit testing without Moonraker)
+    /// @param root_file Starting file to resolve from
+    /// @param max_depth Maximum include recursion depth (default 5)
+    /// @return Map of section_name -> SectionLocation
+    std::map<std::string, SectionLocation>
+    resolve_includes(const std::map<std::string, std::string>& files, const std::string& root_file,
+                     int max_depth = 5) const;
 
     /// Comment out a key (prefix with #) — safer than deleting
     /// Returns modified content, or std::nullopt if key not found

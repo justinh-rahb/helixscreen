@@ -3,7 +3,10 @@
 
 #include "klipper_config_editor.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
+#include <set>
 #include <sstream>
 
 namespace helix::system {
@@ -307,6 +310,131 @@ std::optional<std::string> KlipperConfigEditor::remove_key(const std::string& co
 
     bool trailing = !content.empty() && content.back() == '\n';
     return join_lines(lines, trailing);
+}
+
+namespace {
+
+/// Get the directory portion of a file path (everything before the last '/')
+std::string get_directory(const std::string& path) {
+    auto pos = path.rfind('/');
+    if (pos == std::string::npos)
+        return "";
+    return path.substr(0, pos);
+}
+
+/// Resolve a relative include path against the directory of the including file
+std::string resolve_path(const std::string& current_file, const std::string& include_path) {
+    std::string dir = get_directory(current_file);
+    if (dir.empty())
+        return include_path;
+    return dir + "/" + include_path;
+}
+
+/// Simple glob pattern matching for Klipper include patterns (supports '*' wildcard)
+bool glob_match(const std::string& pattern, const std::string& text) {
+    size_t pi = 0, ti = 0;
+    size_t star_pi = std::string::npos, star_ti = 0;
+
+    while (ti < text.size()) {
+        if (pi < pattern.size() && (pattern[pi] == text[ti] || pattern[pi] == '?')) {
+            ++pi;
+            ++ti;
+        } else if (pi < pattern.size() && pattern[pi] == '*') {
+            star_pi = pi;
+            star_ti = ti;
+            ++pi;
+        } else if (star_pi != std::string::npos) {
+            pi = star_pi + 1;
+            ++star_ti;
+            ti = star_ti;
+        } else {
+            return false;
+        }
+    }
+
+    while (pi < pattern.size() && pattern[pi] == '*')
+        ++pi;
+
+    return pi == pattern.size();
+}
+
+/// Find all files in the map that match a glob pattern (resolved relative to current file)
+std::vector<std::string> match_glob(const std::map<std::string, std::string>& files,
+                                    const std::string& current_file,
+                                    const std::string& include_pattern) {
+    std::string resolved = resolve_path(current_file, include_pattern);
+    std::vector<std::string> matches;
+
+    for (const auto& [filename, _] : files) {
+        if (glob_match(resolved, filename)) {
+            matches.push_back(filename);
+        }
+    }
+
+    // Sort for deterministic ordering
+    std::sort(matches.begin(), matches.end());
+    return matches;
+}
+
+} // namespace
+
+std::map<std::string, SectionLocation>
+KlipperConfigEditor::resolve_includes(const std::map<std::string, std::string>& files,
+                                      const std::string& root_file, int max_depth) const {
+    std::map<std::string, SectionLocation> result;
+    std::set<std::string> visited;
+
+    // Recursive lambda: process a file and its includes
+    // depth starts at 0 for the root file
+    std::function<void(const std::string&, int)> process_file;
+    process_file = [&](const std::string& file_path, int depth) {
+        // Cycle detection
+        if (visited.count(file_path))
+            return;
+        visited.insert(file_path);
+
+        // Depth check — root is depth 0, max_depth=5 allows depths 0..5 (6 levels total)
+        if (depth > max_depth) {
+            spdlog::debug("klipper_config_editor: max include depth {} reached at {}", max_depth,
+                          file_path);
+            return;
+        }
+
+        // Find file content
+        auto it = files.find(file_path);
+        if (it == files.end()) {
+            spdlog::debug("klipper_config_editor: included file not found: {}", file_path);
+            return;
+        }
+
+        auto structure = parse_structure(it->second);
+
+        // Process includes first (so the current file's sections override included ones)
+        for (const auto& include_pattern : structure.includes) {
+            bool has_wildcard = include_pattern.find('*') != std::string::npos;
+
+            if (has_wildcard) {
+                auto matched = match_glob(files, file_path, include_pattern);
+                for (const auto& match : matched) {
+                    process_file(match, depth + 1);
+                }
+            } else {
+                std::string resolved = resolve_path(file_path, include_pattern);
+                process_file(resolved, depth + 1);
+            }
+        }
+
+        // Add this file's sections (overwrites any from includes — last wins)
+        for (const auto& [name, section] : structure.sections) {
+            SectionLocation loc;
+            loc.file_path = file_path;
+            loc.section = section;
+            result[name] = loc;
+        }
+    };
+
+    process_file(root_file, 0);
+    return result;
 }
 
 } // namespace helix::system

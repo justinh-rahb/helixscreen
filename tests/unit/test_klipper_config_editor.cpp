@@ -205,3 +205,100 @@ TEST_CASE("KlipperConfigEditor - value editing", "[config][editor]") {
         REQUIRE(result->find("samples_result: average") != std::string::npos);
     }
 }
+
+TEST_CASE("KlipperConfigEditor - include resolution", "[config][includes]") {
+    KlipperConfigEditor editor;
+
+    SECTION("Resolves simple include") {
+        std::map<std::string, std::string> files;
+        files["printer.cfg"] = "[include hardware.cfg]\n[printer]\nkinematics: corexy\n";
+        files["hardware.cfg"] = "[probe]\npin: PA1\nz_offset: 1.5\n";
+
+        auto result = editor.resolve_includes(files, "printer.cfg");
+        REQUIRE(result.count("probe") == 1);
+        REQUIRE(result["probe"].file_path == "hardware.cfg");
+        REQUIRE(result.count("printer") == 1);
+        REQUIRE(result["printer"].file_path == "printer.cfg");
+    }
+
+    SECTION("Resolves nested includes") {
+        std::map<std::string, std::string> files;
+        files["printer.cfg"] = "[include hardware/main.cfg]\n[printer]\nkinematics: corexy\n";
+        files["hardware/main.cfg"] = "[include probe.cfg]\n[stepper_x]\nstep_pin: PA1\n";
+        files["hardware/probe.cfg"] = "[probe]\npin: PB6\n";
+
+        auto result = editor.resolve_includes(files, "printer.cfg");
+        REQUIRE(result.count("probe") == 1);
+        REQUIRE(result["probe"].file_path == "hardware/probe.cfg");
+        REQUIRE(result.count("stepper_x") == 1);
+        REQUIRE(result["stepper_x"].file_path == "hardware/main.cfg");
+    }
+
+    SECTION("Detects circular includes without infinite loop") {
+        std::map<std::string, std::string> files;
+        files["a.cfg"] = "[include b.cfg]\n[section_a]\nkey: val\n";
+        files["b.cfg"] = "[include a.cfg]\n[section_b]\nkey: val\n";
+
+        auto result = editor.resolve_includes(files, "a.cfg");
+        REQUIRE(result.count("section_a") == 1);
+        REQUIRE(result.count("section_b") == 1);
+    }
+
+    SECTION("Caps recursion depth at max_depth") {
+        std::map<std::string, std::string> files;
+        files["l0.cfg"] = "[include l1.cfg]\n[s0]\nk: v\n";
+        files["l1.cfg"] = "[include l2.cfg]\n[s1]\nk: v\n";
+        files["l2.cfg"] = "[include l3.cfg]\n[s2]\nk: v\n";
+        files["l3.cfg"] = "[include l4.cfg]\n[s3]\nk: v\n";
+        files["l4.cfg"] = "[include l5.cfg]\n[s4]\nk: v\n";
+        files["l5.cfg"] = "[include l6.cfg]\n[s5]\nk: v\n";
+        files["l6.cfg"] = "[deep]\nk: v\n";
+
+        // With max_depth=5, l6.cfg should NOT be reached
+        auto result = editor.resolve_includes(files, "l0.cfg", 5);
+        REQUIRE(result.count("s0") == 1);
+        REQUIRE(result.count("s5") == 1);
+        REQUIRE(result.count("deep") == 0);
+    }
+
+    SECTION("Handles missing included file gracefully") {
+        std::map<std::string, std::string> files;
+        files["printer.cfg"] = "[include nonexistent.cfg]\n[printer]\nkinematics: corexy\n";
+
+        auto result = editor.resolve_includes(files, "printer.cfg");
+        REQUIRE(result.count("printer") == 1);
+    }
+
+    SECTION("Resolves relative paths from including file directory") {
+        std::map<std::string, std::string> files;
+        files["printer.cfg"] = "[include hardware/sensors.cfg]\n";
+        files["hardware/sensors.cfg"] = "[include probe.cfg]\n";
+        files["hardware/probe.cfg"] = "[probe]\npin: PA1\n";
+
+        auto result = editor.resolve_includes(files, "printer.cfg");
+        REQUIRE(result.count("probe") == 1);
+        REQUIRE(result["probe"].file_path == "hardware/probe.cfg");
+    }
+
+    SECTION("Resolves glob patterns") {
+        std::map<std::string, std::string> files;
+        files["printer.cfg"] = "[include macros/*.cfg]\n[printer]\nkinematics: corexy\n";
+        files["macros/start.cfg"] = "[gcode_macro START]\ngcode:\n    G28\n";
+        files["macros/end.cfg"] = "[gcode_macro END]\ngcode:\n    M84\n";
+
+        auto result = editor.resolve_includes(files, "printer.cfg");
+        REQUIRE(result.count("gcode_macro START") == 1);
+        REQUIRE(result.count("gcode_macro END") == 1);
+    }
+
+    SECTION("Last section wins for duplicates") {
+        std::map<std::string, std::string> files;
+        files["printer.cfg"] = "[include override.cfg]\n[probe]\npin: PA1\n";
+        files["override.cfg"] = "[probe]\npin: PB6\n";
+
+        auto result = editor.resolve_includes(files, "printer.cfg");
+        REQUIRE(result.count("probe") == 1);
+        // printer.cfg is processed after its includes, so its [probe] wins
+        REQUIRE(result["probe"].file_path == "printer.cfg");
+    }
+}
