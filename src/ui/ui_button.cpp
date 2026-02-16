@@ -552,7 +552,8 @@ void ui_button_apply(lv_xml_parser_state_t* state, const char** attrs) {
 
     if (bind_text_val && bind_text_val[0] != '\0') {
         // bind_text is always a subject name (LVGL standard)
-        subject_name = bind_text_val;
+        // Strip '@' prefix if present (for consistency with text="@subject" convention)
+        subject_name = (bind_text_val[0] == '@') ? bind_text_val + 1 : bind_text_val;
         fmt_attr = lv_xml_get_value_of(attrs, "bind_text-fmt");
     } else if (text_val && text_val[0] == '@') {
         // text="@subject" — strip '@' prefix

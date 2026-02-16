@@ -261,11 +261,13 @@ TEST_CASE_METHOD(UiButtonTestFixture,
 }
 
 // ============================================================================
-// bind_text Tests — @ prefix convention for subject vs literal
+// bind_text Tests — bind_text always resolves as subject name
 // ============================================================================
 
-TEST_CASE_METHOD(UiButtonTestFixture, "ui_button bind_text with literal string sets static text",
+TEST_CASE_METHOD(UiButtonTestFixture,
+                 "ui_button bind_text with non-existent subject falls back to literal",
                  "[ui_button][xml][bind_text][quick]") {
+    // No subject named "Save" exists — falls back to literal text
     const char* attrs[] = {"bind_text", "Save", nullptr};
 
     lv_obj_t* btn = create_button(attrs);
@@ -279,10 +281,10 @@ TEST_CASE_METHOD(UiButtonTestFixture, "ui_button bind_text with literal string s
 }
 
 TEST_CASE_METHOD(UiButtonTestFixture,
-                 "ui_button bind_text with @ prefix binds to subject reactively",
+                 "ui_button bind_text resolves subject by name and reacts to changes",
                  "[ui_button][xml][bind_text][quick]") {
-    // @ prefix tells ui_button to resolve as a subject name
-    const char* attrs[] = {"bind_text", "@test_text_subject", nullptr};
+    // bind_text always tries to resolve as a subject name (LVGL standard)
+    const char* attrs[] = {"bind_text", "test_text_subject", nullptr};
 
     lv_obj_t* btn = create_button(attrs);
     REQUIRE(btn != nullptr);
@@ -306,11 +308,10 @@ TEST_CASE_METHOD(UiButtonTestFixture,
 }
 
 TEST_CASE_METHOD(UiButtonTestFixture,
-                 "ui_button bind_text without @ never resolves subject even if name matches",
+                 "ui_button bind_text with @ prefix strips it and resolves subject",
                  "[ui_button][xml][bind_text][quick]") {
-    // Without @ prefix, "test_text_subject" should be literal text,
-    // NOT resolved as a subject — even though a subject with that name exists
-    const char* attrs[] = {"bind_text", "test_text_subject", nullptr};
+    // @ prefix is stripped for backward compatibility with text="@subject" convention
+    const char* attrs[] = {"bind_text", "@test_text_subject", nullptr};
 
     lv_obj_t* btn = create_button(attrs);
     REQUIRE(btn != nullptr);
@@ -319,14 +320,12 @@ TEST_CASE_METHOD(UiButtonTestFixture,
 
     lv_obj_t* label = find_button_label(btn);
     REQUIRE(label != nullptr);
-    // Should show the literal string, not the subject's value ("Close")
-    REQUIRE(strcmp(lv_label_get_text(label), "test_text_subject") == 0);
+    REQUIRE(strcmp(lv_label_get_text(label), "Close") == 0);
 }
 
-TEST_CASE_METHOD(
-    UiButtonTestFixture,
-    "ui_button bind_text with @ prefix for missing subject warns and uses name as text",
-    "[ui_button][xml][bind_text][quick]") {
+TEST_CASE_METHOD(UiButtonTestFixture,
+                 "ui_button bind_text with @ prefix for missing subject uses name as fallback",
+                 "[ui_button][xml][bind_text][quick]") {
     const char* attrs[] = {"bind_text", "@nonexistent_subject", nullptr};
 
     lv_obj_t* btn = create_button(attrs);
@@ -334,7 +333,7 @@ TEST_CASE_METHOD(
 
     process_lvgl(10);
 
-    // Should gracefully fall back to using the subject name as literal text
+    // Should gracefully fall back to using the subject name (without @) as literal text
     lv_obj_t* label = find_button_label(btn);
     REQUIRE(label != nullptr);
     REQUIRE(strcmp(lv_label_get_text(label), "nonexistent_subject") == 0);
@@ -344,7 +343,7 @@ TEST_CASE_METHOD(UiButtonTestFixture,
                  "ui_button bind_text with text attr creates label then bind_text binds it",
                  "[ui_button][xml][bind_text][quick]") {
     // text= creates the label during create, bind_text= binds it during apply
-    const char* attrs[] = {"text", "Initial", "bind_text", "@test_text_subject", nullptr};
+    const char* attrs[] = {"text", "Initial", "bind_text", "test_text_subject", nullptr};
 
     lv_obj_t* btn = create_button(attrs);
     REQUIRE(btn != nullptr);
