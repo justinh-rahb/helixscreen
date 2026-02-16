@@ -6,8 +6,7 @@ translations:
   + Add Preset: + プリセットを追加
   + Create New Filament: '+ 新しいフィラメントを作成'
   + Create New Vendor: '+ 新しいベンダーを作成'
-  '- Check [resonance_tester] in printer.cfg': '- printer.cfg の [resonance_tester]
-    を確認してください'
+  '- Check [resonance_tester] in printer.cfg': '- printer.cfg の [resonance_tester] を確認してください'
   '- Ensure ADXL345 is connected': '- ADXL345 が接続されていることを確認してください'
   '- Try Measure Noise first': '- まず「ノイズ測定」をお試しください'
   0 slots: '{0} スロット'
@@ -80,8 +79,7 @@ translations:
   Apply Changes: 変更を適用
   Applying...: 適用中...
   Are you sure you want to cancel this print? All progress will be lost.: この印刷をキャンセルしますか？すべての進行状況が失われます。
-  Assign Klipper macros to control LEDs via on/off, toggle, or presets: Klipper マクロを割り当ててオン/オフ、トグル、プリセットで
-    LED を制御
+  Assign Klipper macros to control LEDs via on/off, toggle, or presets: Klipper マクロを割り当ててオン/オフ、トグル、プリセットで LED を制御
   Assign Spool: スプールを割り当て
   Assign a role to enable sensor monitoring: センサー監視を有効にするには役割を割り当ててください
   Assigning to Slot 1: スロット1に割り当て中
@@ -126,6 +124,7 @@ translations:
   Both: 両方
   Brightness: 明るさ
   Browse: 参照
+  Bundle Uploaded: ''
   Button taps and navigation sounds: ボタンタップとナビゲーション音
   Bypass: バイパス
   Bypass Mode: バイパスモード
@@ -178,6 +177,8 @@ translations:
   Close: 閉じる
   Closer: 近く
   Closer = more squish | Farther = less squish: 近い = より圧縮 | 遠い = 圧縮少なめ
+  Collect logs and system info for support: ''
+  Collecting data...: ''
   Color: 色
   Color Mismatch: 色の不一致
   Color Sensors: カラーセンサー
@@ -258,12 +259,14 @@ translations:
   Disable Motors?: モーターを無効にしますか？
   Discard: 破棄
   Discard Changes?: 変更を破棄しますか？
+  Discord Community: ''
   Discovered Printers: 検出されたプリンター
   Dismiss: 閉じる
   Display Settings: ディスプレイ設定
   Display Sleep: ディスプレイスリープ
   Do not power off your printer.: プリンターの電源を切らないでください。
   Do not touch the printer during calibration: キャリブレーション中はプリンターに触れないでください
+  Documentation: ''
   Don't Save: 保存しない
   Don't ask again: 今後表示しない
   Done: 完了
@@ -378,9 +381,12 @@ translations:
   G-code Console: G-code コンソール
   G-code Preview: G-code プレビュー
   G-code commands will appear here: G-code コマンドがここに表示されます
+  Get help and share feedback: ''
   'Ghost:': 'Ghost:'
   Got it: 了解
   Gray: グレー
+  Guides and reference: ''
+  HELP & SUPPORT: ''
   Happy Hare MMU: Happy Hare MMU
   Hardware: ハードウェア
   Hardware Health: ハードウェア状態
@@ -390,9 +396,7 @@ translations:
   Hardware marked as optional: ハードウェアをオプションに設定しました
   Hardware saved to config: ハードウェアを設定に保存しました
   Have a piece of paper ready.: 紙を1枚用意してください。
-  ? Have your bed adjustment tool (screwdriver, hex-key, etc.) ready if your bed isn't
-    adjusted with                              thumb wheels or some other built-in
-    mechanism.
+  ? Have your bed adjustment tool (screwdriver, hex-key, etc.) ready if your bed isn't adjusted with                              thumb wheels or some other built-in mechanism.
   : ベッドがサムホイールなどの内蔵機構で調整できない場合は、ベッド調整ツール（ドライバー、六角レンチなど）を用意してください。
   Heading: 見出し
   Heat Soak: ヒートソーク
@@ -403,8 +407,7 @@ translations:
   Heating...: 加熱中...
   HelixScreen: HelixScreen
   HelixScreen Crashed: HelixScreen がクラッシュしました
-  HelixScreen will integrate with your filament changer for multi-spool/color print operations.: HelixScreen
-    はマルチスプール/カラー印刷操作のためにフィラメントチェンジャーと連携します。
+  HelixScreen will integrate with your filament changer for multi-spool/color print operations.: HelixScreen はマルチスプール/カラー印刷操作のためにフィラメントチェンジャーと連携します。
   Help improve HelixScreen?: HelixScreenの改善に協力しますか？
   Higher = faster: 高い = 速い
   Home: ホーム
@@ -425,6 +428,7 @@ translations:
   Ignore: 無視
   In Progress: 進行中
   Inactive: 非アクティブ
+  Include Klipper/Moonraker logs: ''
   Indexing G-code...: G-codeをインデックス中...
   Initializing...: 初期化中...
   Input: 入力
@@ -438,8 +442,7 @@ translations:
   Install HelixPrint Plugin: HelixPrint プラグインをインストール
   Install Plugin: プラグインをインストール
   Install Update: 更新をインストール
-  'Install the HelixPrint plugin to enable fast G-code modifications. Run this command via SSH on your printer:': '高速
-    G-code 修正を有効にするために HelixPrint プラグインをインストールしてください。プリンターで SSH 経由でこのコマンドを実行してください:'
+  'Install the HelixPrint plugin to enable fast G-code modifications. Run this command via SSH on your printer:': '高速 G-code 修正を有効にするために HelixPrint プラグインをインストールしてください。プリンターで SSH 経由でこのコマンドを実行してください:'
   Install the timelapse plugin via SSH,\nthen tap \"Check Again\".: SSHでタイムラプスプラグインをインストールし、\n「再確認」をタップしてください。
   Install timelapse plugin: タイムラプスプラグインをインストール
   Installation Failed: インストール失敗
@@ -456,8 +459,7 @@ translations:
   Keyboard Test (Gboard-style): キーボードテスト（Gboard風）
   Klipper: Klipper
   'Klipper firmware has disconnected from the host. ': 'Klipper ファームウェアがホストから切断されました。 '
-  'Klipper has entered shutdown state. This may be due to an emergency stop, ': 'Klipper
-    がシャットダウン状態になりました。緊急停止が原因の可能性があります。 '
+  'Klipper has entered shutdown state. This may be due to an emergency stop, ': 'Klipper がシャットダウン状態になりました。緊急停止が原因の可能性があります。 '
   Klipper will restart to apply changes: 変更を適用するために Klipper が再起動します
   Klipper will restart to apply changes.: 変更を適用するために Klipper が再起動します。
   Klipper will restart to apply new PID values.: 新しい PID 値を適用するために Klipper が再起動します。
@@ -548,8 +550,7 @@ translations:
   Motors Off: モーターオフ
   Move paper back and forth while adjusting. Stop when paper catches slightly but still slides.: 調整中は紙を前後に動かしてください。紙がわずかに引っかかりながらも滑る状態で止めてください。
   Movement speed: 移動速度
-  ? Moves the print head to measure vibration frequencies on each axis. Takes 2-3
-    minutes. The printer will make noise — this is normal.
+  ? Moves the print head to measure vibration frequencies on each axis. Takes 2-3 minutes. The printer will make noise — this is normal.
   : プリントヘッドを移動させて各軸の振動周波数を測定します。2〜3分かかります。プリンターから音がしますが、これは正常です。
   Multi Filament System Overview: マルチフィラメントシステム概要
   Multi-Filament: マルチフィラメント
@@ -654,8 +655,7 @@ translations:
   Phase tracking enabled: フェーズトラッキング有効
   Phase tracking update failed: フェーズトラッキングの更新に失敗
   Pick Color: 色を選択
-  Place PNG or JPEG files in config/custom_images/ to add custom images: カスタム画像を追加するには
-    config/custom_images/ に PNG または JPEG ファイルを配置してください
+  Place PNG or JPEG files in config/custom_images/ to add custom images: カスタム画像を追加するには config/custom_images/ に PNG または JPEG ファイルを配置してください
   Place plugins in the plugins directory to extend HelixScreen: HelixScreen を拡張するには、プラグインディレクトリにプラグインを配置してください
   Play a test beep: テストビープ音を再生
   Please enter a theme name: テーマ名を入力してください
@@ -847,6 +847,7 @@ translations:
   Setup Timelapse: タイムラプスを設定
   Shadow Intensity: 影の強度
   Share Usage Data: 使用データを共有
+  'Share this code in Discord or support:': ''
   'Shininess:': '光沢:'
   Show detailed print preparation status: 詳細な印刷準備ステータスを表示
   Side: 側面
@@ -919,12 +920,9 @@ translations:
   Test Network: ネットワークテスト
   Test Sound: テストサウンド
   Test probe repeatability: プローブの再現性をテスト
-  Thanks! Anonymous usage data helps improve HelixScreen.: ご協力ありがとうございます！匿名の使用データが
-    HelixScreen の改善に役立ちます。
-  Thanks! TOTALLY anonymous usage data helps improve HelixScreen.: ご協力ありがとうございます！完全匿名の使用データが
-    HelixScreen の改善に役立ちます。
-  ? The HelixPrint plugin enables fast G-code modifications directly on your printer—like
-    skipping bed mesh for quick reprints.
+  Thanks! Anonymous usage data helps improve HelixScreen.: ご協力ありがとうございます！匿名の使用データが HelixScreen の改善に役立ちます。
+  Thanks! TOTALLY anonymous usage data helps improve HelixScreen.: ご協力ありがとうございます！完全匿名の使用データが HelixScreen の改善に役立ちます。
+  ? The HelixPrint plugin enables fast G-code modifications directly on your printer—like skipping bed mesh for quick reprints.
   : HelixPrint プラグインは、クイック再印刷のためのベッドメッシュスキップなど、プリンター上で直接高速 G-code 修正を可能にします。
   The heater will cycle on and off several times.: ヒーターは数回オン/オフを繰り返します。
   'The runout sensor indicates no filament is loaded. ': 'フィラメント切れセンサーがフィラメント未装填を検出しました。 '
@@ -935,21 +933,18 @@ translations:
   Theme Preset: テーマプリセット
   Theme changes apply after restart.: テーマの変更は再起動後に適用されます。
   Theme, brightness, and sleep settings: テーマ、明るさ、スリープ設定
-  This calibration uses the paper friction method to set your Z-offset.: このキャリブレーションは紙の摩擦方式を使用して
-    Z-offset を設定します。
+  This calibration uses the paper friction method to set your Z-offset.: このキャリブレーションは紙の摩擦方式を使用して Z-offset を設定します。
   This cannot be undone.: この操作は元に戻せません。
   This is exactly the data that will be sent: これが送信されるデータです
   This is what data would be sent if enabled: これは有効にした場合に送信されるデータです
   This may take up to 30 seconds: 最大30秒かかる場合があります
-  ? This plugin lets HelixScreen control print start options like bed mesh and QGL.
-    Once installed, use Configure PRINT_START below to enable optional steps.
-  : このプラグインにより、HelixScreen がベッドメッシュや QGL などの印刷開始オプションを制御できます。インストール後、以下の「PRINT_START
-    を設定」を使用してオプションの手順を有効にしてください。
+  ? This plugin lets HelixScreen control print start options like bed mesh and QGL. Once installed, use Configure PRINT_START below to enable optional steps.
+  : このプラグインにより、HelixScreen がベッドメッシュや QGL などの印刷開始オプションを制御できます。インストール後、以下の「PRINT_START を設定」を使用してオプションの手順を有効にしてください。
   This tool probes each bed screw and tells you how much to adjust.: このツールは各ベッドネジをプローブし、どのくらい調整が必要かを教えます。
-  'This will apply the Z-offset to your endstop and restart Klipper to save the ': 'Z-offset
-    をエンドストップに適用し、保存のために Klipper を再起動します。 '
-  'This will apply the Z-offset to your probe and restart Klipper to save the ': 'Z-offset
-    をプローブに適用し、保存のために Klipper を再起動します。 '
+  'This will apply the Z-offset to your endstop and restart Klipper to save the ': 'Z-offset をエンドストップに適用し、保存のために Klipper を再起動します。 '
+  'This will apply the Z-offset to your probe and restart Klipper to save the ': 'Z-offset をプローブに適用し、保存のために Klipper を再起動します。 '
+  ? This will collect system info, logs, settings, and printer data to help diagnose issues. No passwords or sensitive data will be included.
+  : ''
   This will immediately halt all printer operations. The printer will require a restart to resume.: これはすべてのプリンター操作を直ちに停止します。再開するにはプリンターの再起動が必要です。
   This will reset all settings to defaults. This action cannot be undone.: これはすべての設定をデフォルトにリセットします。この操作は元に戻せません。
   This will restart Klipper.: これにより Klipper が再起動します。
@@ -1002,6 +997,9 @@ translations:
   Update Channel: 更新チャンネル
   Update Failed: 更新失敗
   Update Installed: 更新完了
+  Upload: ''
+  Upload Debug Bundle: ''
+  Upload Failed: ''
   Upload gcode files to get started: 開始するには gcode ファイルをアップロードしてください
   Use G10/G11 firmware retraction: G10/G11 ファームウェアリトラクションを使用
   Use printer type to select image: プリンタータイプで画像を選択
@@ -1034,8 +1032,7 @@ translations:
   Webcam: ウェブカメラ
   Website (optional): ウェブサイト（オプション）
   Week: 週
-  ? Weight data is synced from Spoolman to display remaining filament. Changes are
-    also synced when prints start, pause, or complete.
+  ? Weight data is synced from Spoolman to display remaining filament. Changes are also synced when prints start, pause, or complete.
   : 残りのフィラメントを表示するために、重量データが Spoolman から同期されます。印刷の開始、一時停止、完了時にも変更が同期されます。
   Weight sync settings: 重量同期設定
   What We Collect: 収集する情報

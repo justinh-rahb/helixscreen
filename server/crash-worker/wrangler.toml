@@ -9,10 +9,17 @@ GITHUB_REPO = "prestonbrown/helixscreen"
 # Secrets (set via wrangler secret put):
 # INGEST_API_KEY - matches key baked into HelixScreen binary
 # GITHUB_TOKEN - GitHub PAT with Issues: Read and write scope
+# ADMIN_API_KEY - Admin API key for retrieving debug bundles
 
 [[routes]]
 pattern = "crash.helixscreen.org/*"
 zone_name = "helixscreen.org"
+
+# Debug bundle storage
+[[r2_buckets]]
+binding = "DEBUG_BUNDLES"
+bucket_name = "helix-debug-bundles"
+jurisdiction = "eu"
 
 # Rate limiting: 5 crash reports per IP per 60 seconds
 # Prevents crash loops from flooding GitHub with duplicate issues
@@ -22,3 +29,11 @@ namespace_id = "1002"
 [ratelimits.simple]
 limit = 5
 period = 60
+
+# Rate limiting for debug bundles: 3 per IP per 5 minutes
+[[ratelimits]]
+name = "DEBUG_BUNDLE_LIMITER"
+namespace_id = "1003"
+[ratelimits.simple]
+limit = 3
+period = 300

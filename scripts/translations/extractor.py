@@ -32,6 +32,8 @@ TEXT_ATTRIBUTES = {"text", "label", "description", "title", "subtitle"}
 VARIABLE_PATTERN = re.compile(r"\$\w+")  # $variable
 ICON_PATTERN = re.compile(r"^#icon_")  # #icon_xxx
 NUMERIC_PATTERN = re.compile(r"^[\d.]+%?$")  # 123 or 100%
+# XML numeric character references: &#xF0026; or &#983078;
+XML_NUMERIC_ENTITY_PATTERN = re.compile(r"&#x([0-9A-Fa-f]+);|&#(\d+);")
 FONT_NAME_PATTERN = re.compile(r"^(mdi_icons_|noto_sans_)\w+$")  # Font names
 HEX_COLOR_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")  # #RRGGBB hex colors
 SIZE_ATTR_PATTERN = re.compile(r'^size=')  # XML size attribute values
@@ -88,6 +90,30 @@ CPP_SKIP_PATTERNS = [
 ]
 
 
+def _decode_xml_entities(text: str) -> str:
+    """Decode XML entities including numeric character references.
+
+    Handles named entities (&amp; etc.) and numeric references
+    (&#xF0026; hex, &#983078; decimal) used for icon codepoints.
+    """
+    # Decode named entities
+    text = text.replace("&amp;", "&")
+    text = text.replace("&lt;", "<")
+    text = text.replace("&gt;", ">")
+    text = text.replace("&quot;", '"')
+    text = text.replace("&apos;", "'")
+
+    # Decode numeric character references (&#xHEX; and &#DECIMAL;)
+    def _replace_numeric_entity(m):
+        if m.group(1):  # hex: &#xNNNN;
+            return chr(int(m.group(1), 16))
+        else:  # decimal: &#NNNN;
+            return chr(int(m.group(2)))
+
+    text = XML_NUMERIC_ENTITY_PATTERN.sub(_replace_numeric_entity, text)
+    return text
+
+
 def should_skip_text(text: str) -> bool:
     """Determine if text should be skipped (not translatable)."""
     if not text or not text.strip():
@@ -109,8 +135,15 @@ def should_skip_text(text: str) -> bool:
     if NUMERIC_PATTERN.match(text.strip()):
         return True
 
-    # Skip icon codepoints (Private Use Area Unicode)
-    if all(ord(c) >= 0xE000 for c in text):
+    # Skip icon codepoints (Unicode Private Use Area ranges)
+    # BMP PUA: U+E000–U+F8FF, Supplementary PUA-A: U+F0000–U+FFFFD,
+    # Supplementary PUA-B: U+100000–U+10FFFD
+    if text and all(
+        (0xE000 <= ord(c) <= 0xF8FF)
+        or (0xF0000 <= ord(c) <= 0xFFFFD)
+        or (0x100000 <= ord(c) <= 0x10FFFD)
+        for c in text
+    ):
         return True
 
     # Skip font names, hex colors, size attributes
@@ -346,12 +379,8 @@ def extract_strings_from_xml(xml_path: Path) -> Set[str]:
             if "bind_text=" in line:
                 continue
 
-            # Decode XML entities
-            text = text.replace("&amp;", "&")
-            text = text.replace("&lt;", "<")
-            text = text.replace("&gt;", ">")
-            text = text.replace("&quot;", '"')
-            text = text.replace("&apos;", "'")
+            # Decode XML entities (named + numeric character references)
+            text = _decode_xml_entities(text)
 
             if not should_skip_text(text):
                 result.add(text)
@@ -396,12 +425,8 @@ def extract_strings_with_locations(xml_path: Path) -> Dict[str, List[Tuple[str, 
 
             text = match.group(1)
 
-            # Decode XML entities
-            text = text.replace("&amp;", "&")
-            text = text.replace("&lt;", "<")
-            text = text.replace("&gt;", ">")
-            text = text.replace("&quot;", '"')
-            text = text.replace("&apos;", "'")
+            # Decode XML entities (named + numeric character references)
+            text = _decode_xml_entities(text)
 
             if should_skip_text(text):
                 continue

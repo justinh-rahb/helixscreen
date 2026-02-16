@@ -6,6 +6,7 @@
 #include "ui_ams_device_operations_overlay.h"
 #include "ui_ams_spoolman_overlay.h"
 #include "ui_change_host_modal.h"
+#include "ui_debug_bundle_modal.h"
 #include "ui_emergency_stop.h"
 #include "ui_event_safety.h"
 #include "ui_modal.h"
@@ -872,6 +873,22 @@ void SettingsPanel::handle_about_clicked() {
     overlay.show(parent_screen_);
 }
 
+void SettingsPanel::handle_debug_bundle_clicked() {
+    spdlog::info("[SettingsPanel] Upload Debug Bundle clicked");
+    auto* modal = new DebugBundleModal();
+    modal->show_modal(lv_screen_active());
+}
+
+void SettingsPanel::handle_discord_clicked() {
+    spdlog::info("[SettingsPanel] Discord clicked");
+    ui_toast_show(ToastSeverity::INFO, "Join us at discord.gg/helixscreen", 5000);
+}
+
+void SettingsPanel::handle_docs_clicked() {
+    spdlog::info("[SettingsPanel] Documentation clicked");
+    ui_toast_show(ToastSeverity::INFO, "Visit docs.helixscreen.org", 5000);
+}
+
 void SettingsPanel::handle_sound_settings_clicked() {
     spdlog::debug("[{}] Sound Settings clicked - delegating to SoundSettingsOverlay", get_name());
 
@@ -1226,6 +1243,24 @@ void SettingsPanel::on_about_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void SettingsPanel::on_debug_bundle_clicked(lv_event_t* /*e*/) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_debug_bundle_clicked");
+    get_global_settings_panel().handle_debug_bundle_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void SettingsPanel::on_discord_clicked(lv_event_t* /*e*/) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_discord_clicked");
+    get_global_settings_panel().handle_discord_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void SettingsPanel::on_docs_clicked(lv_event_t* /*e*/) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_docs_clicked");
+    get_global_settings_panel().handle_docs_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
 void SettingsPanel::on_telemetry_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_telemetry_changed");
     auto* toggle = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
@@ -1436,6 +1471,13 @@ void register_settings_panel_callbacks() {
     lv_xml_register_event_cb(nullptr, "on_change_host_clicked",
                              SettingsPanel::on_change_host_clicked);
     lv_xml_register_event_cb(nullptr, "on_about_clicked", SettingsPanel::on_about_clicked);
+
+    // Help & Support callbacks
+    lv_xml_register_event_cb(nullptr, "on_debug_bundle_clicked",
+                             SettingsPanel::on_debug_bundle_clicked);
+    lv_xml_register_event_cb(nullptr, "on_discord_clicked", SettingsPanel::on_discord_clicked);
+    lv_xml_register_event_cb(nullptr, "on_docs_clicked", SettingsPanel::on_docs_clicked);
+
     lv_xml_register_event_cb(nullptr, "on_check_updates_clicked", on_check_updates_clicked);
     lv_xml_register_event_cb(nullptr, "on_install_update_clicked", on_install_update_clicked);
 }

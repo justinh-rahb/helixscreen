@@ -434,7 +434,7 @@ STB_INC := -isystem lib/tinygl/include-demo
 INCLUDES := -I. -I$(INC_DIR) -Isrc/generated -isystem lib -isystem lib/glm $(LVGL_INC) $(LIBHV_INC) $(SPDLOG_INC) $(TINYGL_INC) $(STB_INC) $(LV_MARKDOWN_INC) $(WPA_INC) $(SDL2_INC)
 
 # Common linker flags (used by both macOS and Linux)
-LDFLAGS_COMMON := $(SDL2_LIBS) $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) -lm -lpthread
+LDFLAGS_COMMON := $(SDL2_LIBS) $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) -lz -lm -lpthread
 
 # Platform-specific configuration
 # Cross-compilation targets (pi, ad5m, k1) are Linux-based embedded systems
@@ -455,16 +455,16 @@ ifneq ($(CROSS_COMPILE),)
         LDFLAGS := -Wl,-Bstatic \
             $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(LIBNL_LIBS) -lstdc++fs \
             -Wl,-Bdynamic \
-            -lstdc++ -lm -lpthread -lrt -ldl -latomic -lgcc_s
+            -lstdc++ -lz -lm -lpthread -lrt -ldl -latomic -lgcc_s
     else ifeq ($(PLATFORM_TARGET),k1)
         # K1 uses musl - fully static, no system library paths needed
         # -latomic: Required for 64-bit atomics on 32-bit MIPS (std::atomic<int64_t>)
-        LDFLAGS := $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(LIBNL_LIBS) -latomic -ldl -lm -lpthread
+        LDFLAGS := $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(LIBNL_LIBS) -latomic -ldl -lz -lm -lpthread
     else ifeq ($(PLATFORM_TARGET),k2)
         # K2 uses musl - fully static, no system library paths needed (same as K1)
-        LDFLAGS := $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(LIBNL_LIBS) -ldl -lm -lpthread
+        LDFLAGS := $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(LIBNL_LIBS) -ldl -lz -lm -lpthread
     else
-        LDFLAGS := -L/usr/lib/$(TARGET_TRIPLE) $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(LIBNL_LIBS) $(SYSTEMD_LIBS) -ldl -lm -lpthread
+        LDFLAGS := -L/usr/lib/$(TARGET_TRIPLE) $(LIBHV_LIBS) $(TINYGL_LIB) $(FMT_LIBS) $(WPA_CLIENT_LIB) $(LIBNL_LIBS) $(SYSTEMD_LIBS) -ldl -lz -lm -lpthread
     endif
     ifeq ($(ENABLE_SSL),yes)
         ifeq ($(PLATFORM_TARGET),pi)

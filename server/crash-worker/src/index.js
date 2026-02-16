@@ -4,12 +4,15 @@
 // Receives crash reports from HelixScreen devices and creates GitHub issues.
 //
 // Endpoints:
-//   GET  /           - Health check
-//   POST /v1/report  - Submit a crash report (requires X-API-Key)
+//   GET  /                      - Health check
+//   POST /v1/report             - Submit a crash report (requires X-API-Key)
+//   POST /v1/debug-bundle       - Upload debug bundle (requires X-API-Key)
+//   GET  /v1/debug-bundle/:code - Retrieve debug bundle (requires X-Admin-Key)
 //
 // Secrets (configure via `wrangler secret put`):
 //   INGEST_API_KEY  - API key baked into HelixScreen binaries
 //   GITHUB_TOKEN    - GitHub PAT with repo scope
+//   ADMIN_API_KEY   - Admin API key for retrieving debug bundles
 
 export default {
   async fetch(request, env) {
@@ -35,6 +38,16 @@ export default {
     // Crash report ingestion
     if (url.pathname === "/v1/report" && request.method === "POST") {
       return handleCrashReport(request, env);
+    }
+
+    // Debug bundle upload
+    if (url.pathname === "/v1/debug-bundle" && request.method === "POST") {
+      return handleDebugBundleUpload(request, env);
+    }
+
+    // Debug bundle retrieval
+    if (url.pathname.startsWith("/v1/debug-bundle/") && request.method === "GET") {
+      return handleDebugBundleRetrieve(request, env, url);
     }
 
     return jsonResponse(404, { error: "Not found" });
@@ -215,6 +228,90 @@ ${r.log_tail.join("\n")}
 }
 
 /**
+ * Generate a random share code using an unambiguous character set.
+ * Excludes I, O, 0, 1 to avoid confusion when reading codes aloud.
+ */
+function generateShareCode(length = 8) {
+  const charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const values = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(values, (v) => charset[v % charset.length]).join("");
+}
+
+/**
+ * Handle an incoming debug bundle upload.
+ * Validates the API key and payload, stores in R2, returns a share code.
+ */
+async function handleDebugBundleUpload(request, env) {
+  // --- Authentication ---
+  const apiKey = request.headers.get("X-API-Key");
+  if (!apiKey || apiKey !== env.INGEST_API_KEY) {
+    return jsonResponse(401, { error: "Unauthorized: invalid or missing API key" });
+  }
+
+  // --- Rate limiting (per client IP) ---
+  const clientIP = request.headers.get("CF-Connecting-IP") || "unknown";
+  const { success } = await env.DEBUG_BUNDLE_LIMITER.limit({ key: clientIP });
+  if (!success) {
+    return jsonResponse(429, { error: "Rate limit exceeded — try again later" });
+  }
+
+  // --- Read and validate body ---
+  const body = await request.arrayBuffer();
+  if (!body || body.byteLength === 0) {
+    return jsonResponse(400, { error: "Empty body" });
+  }
+
+  const maxSize = 500 * 1024; // 500KB
+  if (body.byteLength > maxSize) {
+    return jsonResponse(413, { error: "Payload too large (max 500KB)" });
+  }
+
+  // --- Store in R2 with a share code ---
+  const shareCode = generateShareCode();
+  await env.DEBUG_BUNDLES.put(shareCode, body, {
+    httpMetadata: {
+      contentType: "application/json",
+      contentEncoding: "gzip",
+    },
+  });
+
+  return jsonResponse(201, { share_code: shareCode });
+}
+
+/**
+ * Retrieve a debug bundle by share code.
+ * Requires admin API key for access.
+ */
+async function handleDebugBundleRetrieve(request, env, url) {
+  // --- Authentication (admin key) ---
+  const adminKey = request.headers.get("X-Admin-Key");
+  if (!adminKey || adminKey !== env.ADMIN_API_KEY) {
+    return jsonResponse(401, { error: "Unauthorized: invalid or missing admin key" });
+  }
+
+  // --- Extract share code from URL ---
+  const code = url.pathname.split("/").pop();
+  if (!code) {
+    return jsonResponse(400, { error: "Missing share code" });
+  }
+
+  // --- Retrieve from R2 ---
+  const object = await env.DEBUG_BUNDLES.get(code);
+  if (!object) {
+    return jsonResponse(404, { error: "Debug bundle not found" });
+  }
+
+  return new Response(object.body, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Encoding": "gzip",
+      ...corsHeaders(),
+    },
+  });
+}
+
+/**
  * Build a JSON response with CORS headers.
  */
 function jsonResponse(status, data) {
@@ -236,6 +333,6 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, X-API-Key",
+    "Access-Control-Allow-Headers": "Content-Type, X-API-Key, X-Admin-Key",
   };
 }

@@ -220,6 +220,9 @@ class SettingsPanel : public PanelBase {
     void handle_telemetry_view_data_clicked();
 
     void handle_about_clicked();
+    void handle_debug_bundle_clicked();
+    void handle_discord_clicked();
+    void handle_docs_clicked();
     void handle_display_settings_clicked();
     void handle_filament_sensors_clicked();
     void handle_ams_settings_clicked();
@@ -269,6 +272,9 @@ class SettingsPanel : public PanelBase {
     static void on_estop_confirm_changed(lv_event_t* e);
     static void on_cancel_escalation_changed(lv_event_t* e);
     static void on_about_clicked(lv_event_t* e);
+    static void on_debug_bundle_clicked(lv_event_t* e);
+    static void on_discord_clicked(lv_event_t* e);
+    static void on_docs_clicked(lv_event_t* e);
     static void on_telemetry_changed(lv_event_t* e);
     static void on_display_settings_clicked(lv_event_t* e);
     static void on_filament_sensors_clicked(lv_event_t* e);
