@@ -8,7 +8,9 @@
 # framebuffer access.
 
 detect_fb_resolution() {
-    local fb_size width height
+    fb_size=""
+    width=""
+    height=""
 
     if [ -r /sys/class/graphics/fb0/virtual_size ]; then
         fb_size=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null)
@@ -72,7 +74,7 @@ platform_pre_start() {
     export HELIX_CACHE_DIR="/usr/data/helixscreen/cache"
 
     # Auto-preset screen size for Nebula Pad class devices (480x272).
-    local fb_res
+    fb_res=""
     fb_res=$(detect_fb_resolution) || fb_res=""
     if [ "$fb_res" = "480x272" ]; then
         export HELIX_SCREEN_SIZE="micro"
