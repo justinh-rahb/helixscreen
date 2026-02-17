@@ -54,6 +54,7 @@
 #include <string>
 #include <vector>
 
+namespace helix {
 /**
  * @brief Unique identifier for notification subscriptions
  *
@@ -76,6 +77,11 @@ using RequestId = uint64_t;
 
 /** @brief Invalid request ID constant */
 constexpr RequestId INVALID_REQUEST_ID = 0;
+} // namespace helix
+using helix::INVALID_REQUEST_ID;
+using helix::INVALID_SUBSCRIPTION_ID;
+using helix::RequestId;
+using helix::SubscriptionId;
 
 /**
  * @brief Connection state for Moonraker WebSocket

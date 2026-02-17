@@ -31,8 +31,11 @@ struct PrintHistoryStats {
     size_t size_bytes = 0; ///< Size from most recent job for this filename
 };
 
+namespace helix {
 /// Observer callback when history data changes
 using HistoryChangedCallback = std::function<void()>;
+} // namespace helix
+using helix::HistoryChangedCallback;
 
 /**
  * @brief Centralized print history cache with observer notification

@@ -177,6 +177,7 @@ std::vector<SpoolInfo> filter_spools(const std::vector<SpoolInfo>& spools,
 // Spoolman Callback Types
 // ============================================================================
 
+namespace helix {
 /// Spool list callback
 using SpoolListCallback = std::function<void(const std::vector<SpoolInfo>&)>;
 
@@ -200,3 +201,12 @@ using VendorCreateCallback = std::function<void(const VendorInfo&)>;
 
 /// Single filament creation callback (returns the created filament)
 using FilamentCreateCallback = std::function<void(const FilamentInfo&)>;
+} // namespace helix
+using helix::FilamentCreateCallback;
+using helix::FilamentListCallback;
+using helix::FilamentUsageCallback;
+using helix::SpoolCallback;
+using helix::SpoolCreateCallback;
+using helix::SpoolListCallback;
+using helix::VendorCreateCallback;
+using helix::VendorListCallback;

@@ -18,8 +18,11 @@ class PanelBase;
 class OverlayBase;
 class IPanelLifecycle;
 
+namespace helix {
 /// Callback type for overlay close notifications
 using OverlayCloseCallback = std::function<void()>;
+} // namespace helix
+using helix::OverlayCloseCallback;
 
 /**
  * @brief Navigation panel identifiers

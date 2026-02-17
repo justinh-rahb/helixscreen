@@ -281,6 +281,7 @@ struct MachineLimits {
 // Calibration Callback Types
 // ============================================================================
 
+namespace helix {
 /// Bed screw results callback
 using ScrewTiltCallback = std::function<void(const std::vector<ScrewTiltResult>&)>;
 
@@ -289,3 +290,7 @@ using InputShaperCallback = std::function<void(const InputShaperResult&)>;
 
 /// Machine limits callback
 using MachineLimitsCallback = std::function<void(const MachineLimits&)>;
+} // namespace helix
+using helix::InputShaperCallback;
+using helix::MachineLimitsCallback;
+using helix::ScrewTiltCallback;

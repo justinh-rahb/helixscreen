@@ -97,8 +97,11 @@ struct ThemePalette {
     int shadow_offset_y = 2;
 };
 
+namespace helix {
 /// Style configure function type - applies palette colors to a style.
 using StyleConfigureFn = void (*)(lv_style_t* style, const ThemePalette& palette);
+} // namespace helix
+using helix::StyleConfigureFn;
 
 /// Style entry - binds a role to its style and configure function.
 struct StyleEntry {
