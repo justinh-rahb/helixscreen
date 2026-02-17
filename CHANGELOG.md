@@ -5,6 +5,20 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.2] - 2026-02-16
+
+### Added
+- Filament type tracking in print outcome telemetry events
+- Discord notifications on successful releases
+
+### Fixed
+- Crash from null font pointer in AMS mini status overflow label (fixes #90, #91)
+- Navigation bar buttons not filling available width, with lingering focus rings
+
+### Changed
+- Nozzle icon extracted into reusable component with consolidated tool badge logic
+- Telemetry worker updated to support schema v2 nested fields
+
 ## [0.10.1] - 2026-02-16
 
 ### Added
@@ -606,6 +620,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.10.2]: https://github.com/prestonbrown/helixscreen/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/prestonbrown/helixscreen/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/prestonbrown/helixscreen/compare/v0.9.24...v0.10.0
 [0.9.24]: https://github.com/prestonbrown/helixscreen/compare/v0.9.23...v0.9.24

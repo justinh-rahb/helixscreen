@@ -270,6 +270,63 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Notify Discord
+      if: success() && secrets.DISCORD_WEBHOOK_URL != ''
+      continue-on-error: true
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        VERSION="${GITHUB_REF_NAME}"
+        RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${VERSION}"
+
+        # Extract changelog entry from CHANGELOG.md
+        PLAIN_VERSION="${VERSION#v}"
+        CHANGELOG=""
+        if [ -f CHANGELOG.md ]; then
+          CHANGELOG=$(awk -v ver="$PLAIN_VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]")) found=1
+              next
+            }
+            found { print }
+          ' CHANGELOG.md)
+        fi
+
+        # Truncate to fit Discord embed limit (4096 chars) with room for wrapper
+        if [ ${#CHANGELOG} -gt 3800 ]; then
+          CHANGELOG="${CHANGELOG:0:3800}..."
+        fi
+
+        # Escape for JSON: backslashes, double quotes, newlines
+        CHANGELOG_JSON=$(printf '%s' "$CHANGELOG" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+
+        # Determine embed color: green for stable, yellow for prerelease
+        if [[ "$VERSION" == *-* ]]; then
+          COLOR=16761095  # #FFD700 gold
+          TITLE="HelixScreen ${VERSION} (Pre-release)"
+        else
+          COLOR=3066993   # #2ECC71 green
+          TITLE="HelixScreen ${VERSION} Released"
+        fi
+
+        # Build and send Discord webhook payload
+        curl -s -o /dev/null -w "%{http_code}" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"embeds\": [{
+              \"title\": \"${TITLE}\",
+              \"url\": \"${RELEASE_URL}\",
+              \"description\": ${CHANGELOG_JSON},
+              \"color\": ${COLOR},
+              \"footer\": {
+                \"text\": \"GitHub Actions\"
+              },
+              \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+            }]
+          }" \
+          "$DISCORD_WEBHOOK_URL"
+
   # ============================================================================
   # Upload release artifacts to R2 for auto-update
   # ============================================================================

@@ -259,6 +259,19 @@ class FilamentPanel : public PanelBase {
     lv_obj_t* temp_group_ = nullptr;
     lv_obj_t* temp_graph_card_ = nullptr;
 
+    // Multi-filament card widgets (extruder dropdown + AMS row)
+    lv_obj_t* ams_status_card_ = nullptr;
+    lv_obj_t* extruder_selector_group_ = nullptr;
+    lv_obj_t* extruder_dropdown_ = nullptr;
+    lv_obj_t* btn_manage_slots_ = nullptr;
+    lv_obj_t* ams_manage_row_ = nullptr;
+    ObserverGuard tools_version_observer_;
+
+    void populate_extruder_dropdown();
+    void update_multi_filament_card_visibility();
+    void handle_extruder_changed();
+    static void on_extruder_dropdown_changed(lv_event_t* e);
+
     // Temperature observer bundle (nozzle + bed current/target)
     helix::ui::TemperatureObserverBundle<FilamentPanel> temp_observers_;
     ObserverGuard ams_type_observer_; ///< Adjusts temp card size when AMS hidden

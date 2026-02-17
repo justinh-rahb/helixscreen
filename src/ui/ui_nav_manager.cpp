@@ -862,6 +862,10 @@ void NavigationManager::wire_events(lv_obj_t* navbar) {
         }
 
         lv_obj_add_event_cb(btn, nav_button_clicked_cb, LV_EVENT_CLICKED, (void*)(uintptr_t)i);
+
+        // Remove focus ring — nav buttons use icon color swap for active state
+        lv_obj_remove_flag(btn, LV_OBJ_FLAG_CLICK_FOCUSABLE);
+        lv_group_remove_obj(btn);
     }
 
     // Register connection state observer for redirect on disconnect

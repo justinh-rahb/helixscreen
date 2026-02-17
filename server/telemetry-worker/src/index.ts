@@ -324,22 +324,22 @@ export default {
           const [crashByVerRes, sessionByVerRes, signalRes, uptimeRes] =
             await Promise.all(queries.map((q) => executeQuery(queryConfig, q)));
 
-          const crashByVer = crashByVerRes as { data: Array<{ version: string; crash_count: number }> };
-          const sessionByVer = sessionByVerRes as { data: Array<{ version: string; session_count: number }> };
+          const crashByVer = crashByVerRes as { data: Array<{ ver: string; crash_count: number }> };
+          const sessionByVer = sessionByVerRes as { data: Array<{ ver: string; session_count: number }> };
           const signalData = signalRes as { data: Array<{ signal: string; count: number }> };
           const uptimeData = uptimeRes as { data: Array<{ avg_uptime_sec: number }> };
 
           // Build session count lookup
           const sessionMap = new Map<string, number>();
           for (const row of sessionByVer.data ?? []) {
-            sessionMap.set(row.version, row.session_count);
+            sessionMap.set(row.ver, row.session_count);
           }
 
           return json({
             by_version: (crashByVer.data ?? []).map((r) => {
-              const sessionCount = sessionMap.get(r.version) ?? 0;
+              const sessionCount = sessionMap.get(r.ver) ?? 0;
               return {
-                version: r.version,
+                version: r.ver,
                 crash_count: r.crash_count,
                 session_count: sessionCount,
                 rate: sessionCount > 0 ? r.crash_count / sessionCount : 0,
@@ -369,23 +369,23 @@ export default {
             await Promise.all(queries.map((q) => executeQuery(queryConfig, q)));
 
           const statsData = statsRes as {
-            data: Array<{ version: string; total_sessions: number; total_crashes: number; active_devices: number }>;
+            data: Array<{ ver: string; total_sessions: number; total_crashes: number; active_devices: number }>;
           };
           const printStatsData = printStatsRes as {
-            data: Array<{ version: string; print_successes: number; print_total: number }>;
+            data: Array<{ ver: string; print_successes: number; print_total: number }>;
           };
 
           // Build print stats lookup
           const printMap = new Map<string, { successes: number; total: number }>();
           for (const row of printStatsData.data ?? []) {
-            printMap.set(row.version, { successes: row.print_successes, total: row.print_total });
+            printMap.set(row.ver, { successes: row.print_successes, total: row.print_total });
           }
 
           return json({
             versions: (statsData.data ?? []).map((r) => {
-              const prints = printMap.get(r.version) ?? { successes: 0, total: 0 };
+              const prints = printMap.get(r.ver) ?? { successes: 0, total: 0 };
               return {
-                version: r.version,
+                version: r.ver,
                 active_devices: r.active_devices,
                 crash_rate: r.total_sessions > 0 ? r.total_crashes / r.total_sessions : 0,
                 print_success_rate: prints.total > 0 ? prints.successes / prints.total : 0,

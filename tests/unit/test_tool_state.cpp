@@ -518,3 +518,191 @@ TEST_CASE("ToolState: toolhead.extruder works for implicit single tool",
 
     ts.deinit_subjects();
 }
+
+// ============================================================================
+// Multi-extruder (no toolchanger) tests
+// ============================================================================
+
+TEST_CASE("ToolState: multi-extruder without toolchanger creates multiple tools",
+          "[tool][tool-state][multi-extruder]") {
+    lv_init_safe();
+
+    ToolState& ts = ToolState::instance();
+    ts.deinit_subjects();
+    ts.init_subjects(false);
+
+    // Two extruders, no toolchanger object
+    helix::PrinterDiscovery hw;
+    nlohmann::json objects =
+        nlohmann::json::array({"extruder", "extruder1", "heater_bed", "fan", "gcode_move"});
+    hw.parse_objects(objects);
+    ts.init_tools(hw);
+
+    REQUIRE(ts.tool_count() == 2);
+    REQUIRE(ts.is_multi_tool() == true);
+    REQUIRE(lv_subject_get_int(ts.get_tool_count_subject()) == 2);
+
+    const auto& tools = ts.tools();
+    REQUIRE(tools[0].name == "T0");
+    REQUIRE(tools[0].extruder_name.value() == "extruder");
+    REQUIRE(tools[0].active == true);
+    REQUIRE(tools[0].fan_name.value() == "fan");
+
+    REQUIRE(tools[1].name == "T1");
+    REQUIRE(tools[1].extruder_name.value() == "extruder1");
+    REQUIRE(tools[1].active == false);
+    REQUIRE_FALSE(tools[1].fan_name.has_value());
+
+    ts.deinit_subjects();
+}
+
+TEST_CASE("ToolState: single extruder without toolchanger still creates 1 tool",
+          "[tool][tool-state][multi-extruder]") {
+    lv_init_safe();
+
+    ToolState& ts = ToolState::instance();
+    ts.deinit_subjects();
+    ts.init_subjects(false);
+
+    helix::PrinterDiscovery hw;
+    nlohmann::json objects = nlohmann::json::array({"extruder", "heater_bed", "fan", "gcode_move"});
+    hw.parse_objects(objects);
+    ts.init_tools(hw);
+
+    REQUIRE(ts.tool_count() == 1);
+    REQUIRE(ts.is_multi_tool() == false);
+
+    const auto& tools = ts.tools();
+    REQUIRE(tools[0].name == "T0");
+    REQUIRE(tools[0].extruder_name.value() == "extruder");
+    REQUIRE(tools[0].fan_name.value() == "fan");
+
+    ts.deinit_subjects();
+}
+
+TEST_CASE("ToolState: three extruders without toolchanger", "[tool][tool-state][multi-extruder]") {
+    lv_init_safe();
+
+    ToolState& ts = ToolState::instance();
+    ts.deinit_subjects();
+    ts.init_subjects(false);
+
+    helix::PrinterDiscovery hw;
+    nlohmann::json objects = nlohmann::json::array(
+        {"extruder", "extruder1", "extruder2", "heater_bed", "fan", "gcode_move"});
+    hw.parse_objects(objects);
+    ts.init_tools(hw);
+
+    REQUIRE(ts.tool_count() == 3);
+    REQUIRE(ts.is_multi_tool() == true);
+
+    REQUIRE(ts.tools()[0].extruder_name.value() == "extruder");
+    REQUIRE(ts.tools()[1].extruder_name.value() == "extruder1");
+    REQUIRE(ts.tools()[2].extruder_name.value() == "extruder2");
+    REQUIRE(ts.tools()[2].name == "T2");
+
+    ts.deinit_subjects();
+}
+
+TEST_CASE("ToolState: multi-extruder tracks active via toolhead.extruder",
+          "[tool][tool-state][multi-extruder]") {
+    lv_init_safe();
+
+    ToolState& ts = ToolState::instance();
+    ts.deinit_subjects();
+    ts.init_subjects(false);
+
+    helix::PrinterDiscovery hw;
+    nlohmann::json objects =
+        nlohmann::json::array({"extruder", "extruder1", "heater_bed", "gcode_move"});
+    hw.parse_objects(objects);
+    ts.init_tools(hw);
+
+    REQUIRE(ts.active_tool_index() == 0);
+
+    // Klipper reports active extruder changed
+    nlohmann::json status = {{"toolhead", {{"extruder", "extruder1"}}}};
+    ts.update_from_status(status);
+
+    REQUIRE(ts.active_tool_index() == 1);
+    REQUIRE(lv_subject_get_int(ts.get_active_tool_subject()) == 1);
+    REQUIRE(ts.nozzle_label() == "Nozzle T1");
+
+    ts.deinit_subjects();
+}
+
+// ============================================================================
+// request_tool_change tests
+// ============================================================================
+
+TEST_CASE("ToolState: request_tool_change with invalid index calls error",
+          "[tool][tool-state][tool-change]") {
+    lv_init_safe();
+
+    ToolState& ts = ToolState::instance();
+    ts.deinit_subjects();
+    ts.init_subjects(false);
+
+    helix::PrinterDiscovery hw;
+    nlohmann::json objects =
+        nlohmann::json::array({"extruder", "extruder1", "heater_bed", "gcode_move"});
+    hw.parse_objects(objects);
+    ts.init_tools(hw);
+
+    bool error_called = false;
+    ts.request_tool_change(5, nullptr, nullptr, [&](const std::string& msg) {
+        error_called = true;
+        REQUIRE(msg.find("Invalid") != std::string::npos);
+    });
+
+    REQUIRE(error_called);
+
+    ts.deinit_subjects();
+}
+
+TEST_CASE("ToolState: request_tool_change for already-active tool calls success",
+          "[tool][tool-state][tool-change]") {
+    lv_init_safe();
+
+    ToolState& ts = ToolState::instance();
+    ts.deinit_subjects();
+    ts.init_subjects(false);
+
+    helix::PrinterDiscovery hw;
+    nlohmann::json objects =
+        nlohmann::json::array({"extruder", "extruder1", "heater_bed", "gcode_move"});
+    hw.parse_objects(objects);
+    ts.init_tools(hw);
+
+    bool success_called = false;
+    ts.request_tool_change(0, nullptr, [&]() { success_called = true; }, nullptr);
+
+    REQUIRE(success_called);
+
+    ts.deinit_subjects();
+}
+
+TEST_CASE("ToolState: request_tool_change with no API calls error",
+          "[tool][tool-state][tool-change]") {
+    lv_init_safe();
+
+    ToolState& ts = ToolState::instance();
+    ts.deinit_subjects();
+    ts.init_subjects(false);
+
+    helix::PrinterDiscovery hw;
+    nlohmann::json objects =
+        nlohmann::json::array({"extruder", "extruder1", "heater_bed", "gcode_move"});
+    hw.parse_objects(objects);
+    ts.init_tools(hw);
+
+    bool error_called = false;
+    ts.request_tool_change(1, nullptr, nullptr, [&](const std::string& msg) {
+        error_called = true;
+        REQUIRE(msg.find("No API") != std::string::npos);
+    });
+
+    REQUIRE(error_called);
+
+    ts.deinit_subjects();
+}

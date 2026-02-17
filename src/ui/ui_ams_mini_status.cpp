@@ -11,7 +11,6 @@
 
 #include "ams_backend.h"
 #include "ams_state.h"
-#include "lvgl/src/xml/lv_xml.h"
 #include "lvgl/src/xml/lv_xml_parser.h"
 #include "lvgl/src/xml/parsers/lv_xml_obj_parser.h"
 #include "observer_factory.h"
@@ -513,9 +512,9 @@ lv_obj_t* ui_ams_mini_status_create(lv_obj_t* parent, int32_t height) {
     lv_label_set_text(data_ptr->overflow_label, "+0");
     lv_obj_set_style_text_color(data_ptr->overflow_label, theme_manager_get_color("text_muted"),
                                 LV_PART_MAIN);
-    const char* font_xs_name = lv_xml_get_const(nullptr, "font_xs");
-    const lv_font_t* font_xs =
-        font_xs_name ? lv_xml_get_font(nullptr, font_xs_name) : &noto_sans_12;
+    const lv_font_t* font_xs = theme_manager_get_font("font_xs");
+    if (!font_xs)
+        font_xs = &noto_sans_12;
     lv_obj_set_style_text_font(data_ptr->overflow_label, font_xs, LV_PART_MAIN);
     lv_obj_add_flag(data_ptr->overflow_label, LV_OBJ_FLAG_HIDDEN);
 
@@ -763,9 +762,9 @@ static void* ui_ams_mini_status_xml_create(lv_xml_parser_state_t* state, const c
     lv_label_set_text(data_ptr->overflow_label, "+0");
     lv_obj_set_style_text_color(data_ptr->overflow_label, theme_manager_get_color("text_muted"),
                                 LV_PART_MAIN);
-    const char* font_xs_name = lv_xml_get_const(nullptr, "font_xs");
-    const lv_font_t* font_xs =
-        font_xs_name ? lv_xml_get_font(nullptr, font_xs_name) : &noto_sans_12;
+    const lv_font_t* font_xs = theme_manager_get_font("font_xs");
+    if (!font_xs)
+        font_xs = &noto_sans_12;
     lv_obj_set_style_text_font(data_ptr->overflow_label, font_xs, LV_PART_MAIN);
     lv_obj_add_flag(data_ptr->overflow_label, LV_OBJ_FLAG_HIDDEN);
 
