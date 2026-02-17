@@ -2041,6 +2041,21 @@ extract_release() {
             log_info "Backed up existing configuration (legacy location)"
         fi
 
+        # Remove stale .old from a previous failed install before the swap.
+        # On Linux, mv dir existing-nonempty-dir fails — it does NOT overwrite.
+        # Without this, a leftover .old from a prior failed update blocks every
+        # future update with "Failed to backup existing installation."
+        # Always use $SUDO because .old may contain root-owned files (e.g.
+        # platform/hooks.sh installed via $SUDO cp by deploy_platform_hooks).
+        if [ -d "${INSTALL_DIR}.old" ]; then
+            log_info "Removing stale backup from previous install attempt..."
+            $SUDO rm -rf "${INSTALL_DIR}.old" || {
+                log_error "Failed to remove stale ${INSTALL_DIR}.old — cannot proceed."
+                rm -rf "$extract_dir"
+                exit 1
+            }
+        fi
+
         # Atomic swap: move old install to .old backup
         if ! $(file_sudo "${INSTALL_DIR}") mv "${INSTALL_DIR}" "${INSTALL_DIR}.old"; then
             log_error "Failed to backup existing installation."
@@ -2082,7 +2097,12 @@ extract_release() {
 # Remove backup of previous installation (call after service starts successfully)
 cleanup_old_install() {
     if [ -d "${INSTALL_DIR}.old" ]; then
-        $(file_sudo "${INSTALL_DIR}.old") rm -rf "${INSTALL_DIR}.old"
+        # Always use $SUDO here: deploy_platform_hooks installs platform/hooks.sh as root
+        # (via "$SUDO cp" + "$SUDO chmod"), so the .old directory contains root-owned files
+        # that the service user cannot remove without elevated privileges.
+        # The || true prevents a cleanup failure from failing the entire install -- the
+        # update already succeeded at this point; a leftover .old directory is harmless.
+        $SUDO rm -rf "${INSTALL_DIR}.old" || true
         log_info "Cleaned up previous installation backup"
     fi
 }

@@ -999,9 +999,92 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
         return;
     }
 
-    spdlog::info("[UpdateChecker] Running: {} --local {} --update", install_script, tarball_path);
+    // Write installer output to a persistent log file so it survives even if this
+    // process is killed mid-install (e.g. stop_service kills the cgroup).
+    std::string install_log = tarball_path + ".install.log";
 
-    auto ret = safe_exec({install_script, "--local", tarball_path, "--update"}, true);
+    spdlog::info("[UpdateChecker] Running: {} --local {} --update", install_script, tarball_path);
+    spdlog::info("[UpdateChecker] install_script exists/executable: access={}", access(install_script.c_str(), X_OK));
+    spdlog::info("[UpdateChecker] tarball_path exists/readable:     access={}", access(tarball_path.c_str(), R_OK));
+    spdlog::info("[UpdateChecker] extracted_dir: {}", extracted_dir);
+    spdlog::info("[UpdateChecker] install log:   {}", install_log);
+    {
+        // Log current process context
+        char cwd_buf[PATH_MAX] = {};
+        const char* cwd = getcwd(cwd_buf, sizeof(cwd_buf));
+        spdlog::info("[UpdateChecker] cwd={} uid={} euid={}", cwd ? cwd : "(error)", getuid(), geteuid());
+    }
+    {
+        // Log tarball file size
+        struct stat st{};
+        if (stat(tarball_path.c_str(), &st) == 0) {
+            spdlog::info("[UpdateChecker] tarball size: {} bytes", st.st_size);
+        } else {
+            spdlog::error("[UpdateChecker] stat({}) failed: {}", tarball_path, strerror(errno));
+        }
+    }
+
+    // Fork install.sh with its output redirected to a persistent log file.
+    // Using a file instead of a pipe means we get the full output even if this
+    // process is killed by systemd's stop_service during the install step.
+    int ret = -1;
+    {
+        int log_fd = open(install_log.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
+        if (log_fd < 0) {
+            spdlog::warn("[UpdateChecker] Could not open install log {}: {}", install_log,
+                         strerror(errno));
+        }
+
+        pid_t pid = fork();
+        if (pid < 0) {
+            spdlog::error("[UpdateChecker] fork() for install failed: {}", strerror(errno));
+            if (log_fd >= 0) close(log_fd);
+        } else if (pid == 0) {
+            // Child: redirect stdout+stderr to log file
+            if (log_fd >= 0) {
+                dup2(log_fd, STDOUT_FILENO);
+                dup2(log_fd, STDERR_FILENO);
+                close(log_fd);
+            }
+            // Use setsid() so install.sh gets its own session and won't be killed
+            // by the SIGTERM that systemd sends to the helix-screen cgroup.
+            setsid();
+            const char* argv[] = {install_script.c_str(), "--local", tarball_path.c_str(),
+                                  "--update", nullptr};
+            execv(install_script.c_str(), const_cast<char**>(argv));
+            _exit(127);
+        } else {
+            // Parent: close our copy of the log fd and wait
+            if (log_fd >= 0) close(log_fd);
+            int status = 0;
+            if (waitpid(pid, &status, 0) < 0) {
+                spdlog::error("[UpdateChecker] waitpid(install) failed: {}", strerror(errno));
+            } else {
+                ret = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+                spdlog::info("[UpdateChecker] install.sh exited with code {}", ret);
+            }
+        }
+
+        // Read back the install log and emit every line through spdlog
+        FILE* lf = fopen(install_log.c_str(), "r");
+        if (lf) {
+            char line[512];
+            spdlog::info("[UpdateChecker] ---- install.sh output ----");
+            while (fgets(line, sizeof(line), lf)) {
+                // Strip trailing newline
+                size_t len = strlen(line);
+                while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+                    line[--len] = '\0';
+                }
+                spdlog::info("[install.sh] {}", line);
+            }
+            spdlog::info("[UpdateChecker] ---- end install.sh output ----");
+            fclose(lf);
+        } else {
+            spdlog::warn("[UpdateChecker] Could not read install log {}", install_log);
+        }
+        std::remove(install_log.c_str());
+    }
 
     // Clean up tarball and extracted installer regardless of result
     std::remove(tarball_path.c_str());
