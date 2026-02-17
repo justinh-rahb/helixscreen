@@ -5,12 +5,15 @@
 
 #include "subject_managed_panel.h"
 
+#include <functional>
 #include <lvgl.h>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "hv/json.hpp"
+
+class MoonrakerAPI;
 
 namespace helix {
 
@@ -78,6 +81,12 @@ class ToolState {
 
     /// Returns "Nozzle" for single-tool, "Nozzle T0" for multi-tool (active tool).
     [[nodiscard]] std::string nozzle_label() const;
+
+    /// Request a tool change, delegating to AMS backend or falling back to ACTIVATE_EXTRUDER.
+    /// Callbacks are invoked asynchronously from the API response.
+    void request_tool_change(int tool_index, MoonrakerAPI* api,
+                             std::function<void()> on_success = nullptr,
+                             std::function<void(const std::string&)> on_error = nullptr);
 
     /// Returns tool name (e.g. "T0") for the given extruder name, or empty if not found.
     [[nodiscard]] std::string tool_name_for_extruder(const std::string& extruder_name) const;

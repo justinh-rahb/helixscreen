@@ -98,6 +98,9 @@ FilamentPanel::FilamentPanel(PrinterState& printer_state, MoonrakerAPI* api)
     // Cooldown button
     lv_xml_register_event_cb(nullptr, "on_filament_cooldown", on_cooldown_clicked);
 
+    // Extruder selector dropdown
+    lv_xml_register_event_cb(nullptr, "on_extruder_dropdown_changed", on_extruder_dropdown_changed);
+
     // Subscribe to PrinterState temperatures using bundle pattern
     // NOTE: Observers must defer UI updates via ui_async_call to avoid render-phase assertions
     // [L029]
@@ -109,10 +112,15 @@ FilamentPanel::FilamentPanel(PrinterState& printer_state, MoonrakerAPI* api)
         [](FilamentPanel* self, int raw) { self->bed_target_ = centi_to_degrees(raw); },
         [](FilamentPanel* self) { self->update_all_temps(); });
 
-    // Subscribe to active tool changes for dynamic nozzle label
+    // Subscribe to active tool changes for dynamic nozzle label + dropdown sync
     active_tool_observer_ = observe_int_sync<FilamentPanel>(
         helix::ToolState::instance().get_active_tool_subject(), this,
-        [](FilamentPanel* self, int /* tool_idx */) { self->update_nozzle_label(); });
+        [](FilamentPanel* self, int tool_idx) {
+            self->update_nozzle_label();
+            if (self->extruder_dropdown_ && tool_idx >= 0) {
+                lv_dropdown_set_selected(self->extruder_dropdown_, static_cast<uint32_t>(tool_idx));
+            }
+        });
     update_nozzle_label();
 }
 
@@ -236,6 +244,25 @@ void FilamentPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     temp_group_ = lv_obj_find_by_name(panel_, "temp_group");
     temp_graph_card_ = lv_obj_find_by_name(panel_, "temp_graph_card");
 
+    // Find multi-filament card widgets
+    ams_status_card_ = lv_obj_find_by_name(panel_, "ams_status_card");
+    extruder_selector_group_ = lv_obj_find_by_name(panel_, "extruder_selector_group");
+    extruder_dropdown_ = lv_obj_find_by_name(panel_, "extruder_dropdown");
+    btn_manage_slots_ = lv_obj_find_by_name(panel_, "btn_manage_slots");
+    ams_manage_row_ = lv_obj_find_by_name(panel_, "ams_manage_row");
+
+    // Populate extruder dropdown and set card visibility
+    populate_extruder_dropdown();
+    update_multi_filament_card_visibility();
+
+    // Rebuild dropdown if tool list changes
+    tools_version_observer_ =
+        observe_int_sync<FilamentPanel>(helix::ToolState::instance().get_tools_version_subject(),
+                                        this, [](FilamentPanel* self, int) {
+                                            self->populate_extruder_dropdown();
+                                            self->update_multi_filament_card_visibility();
+                                        });
+
     // Subscribe to AMS type to expand temp graph when no AMS present [L020] [L029]
     ams_type_observer_ = ObserverGuard(
         AmsState::instance().get_ams_type_subject(),
@@ -260,6 +287,9 @@ void FilamentPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
                         lv_obj_set_flex_grow(panel->temp_group_, 1);
                         lv_obj_set_flex_grow(panel->temp_graph_card_, 1);
                     }
+
+                    // Update multi-filament card visibility (AMS state changed)
+                    panel->update_multi_filament_card_visibility();
                 },
                 self);
         },
@@ -728,6 +758,114 @@ void FilamentPanel::handle_purge_button() {
                           this);
             NOTIFY_ERROR("Purge failed: {}", error.user_message());
         });
+}
+
+// ============================================================================
+// EXTRUDER DROPDOWN
+// ============================================================================
+
+void FilamentPanel::update_multi_filament_card_visibility() {
+    if (!ams_status_card_)
+        return;
+
+    bool has_ams = (lv_subject_get_int(AmsState::instance().get_ams_type_subject()) != 0);
+    bool multi_tool = helix::ToolState::instance().is_multi_tool();
+
+    // Card visible when AMS present or multi-tool
+    if (has_ams || multi_tool) {
+        lv_obj_remove_flag(ams_status_card_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(ams_status_card_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // AMS row visible only when AMS backend is present
+    if (ams_manage_row_) {
+        if (has_ams) {
+            lv_obj_remove_flag(ams_manage_row_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(ams_manage_row_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    spdlog::debug("[{}] Multi-filament card: ams={}, multi_tool={}", get_name(), has_ams,
+                  multi_tool);
+}
+
+void FilamentPanel::populate_extruder_dropdown() {
+    if (!extruder_dropdown_)
+        return;
+
+    auto& ts = helix::ToolState::instance();
+    if (!ts.is_multi_tool()) {
+        if (extruder_selector_group_)
+            lv_obj_add_flag(extruder_selector_group_, LV_OBJ_FLAG_HIDDEN);
+        if (btn_manage_slots_)
+            lv_obj_remove_flag(btn_manage_slots_, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    // Multi-tool: show dropdown group, hide Manage button
+    if (extruder_selector_group_)
+        lv_obj_remove_flag(extruder_selector_group_, LV_OBJ_FLAG_HIDDEN);
+    if (btn_manage_slots_)
+        lv_obj_add_flag(btn_manage_slots_, LV_OBJ_FLAG_HIDDEN);
+
+    // Build options string ("T0\nT1\nT2")
+    std::string options;
+    for (const auto& tool : ts.tools()) {
+        if (!options.empty())
+            options += '\n';
+        options += tool.name;
+    }
+    lv_dropdown_set_options(extruder_dropdown_, options.c_str());
+
+    // Sync selection to active tool
+    int active = ts.active_tool_index();
+    if (active >= 0 && active < ts.tool_count()) {
+        lv_dropdown_set_selected(extruder_dropdown_, static_cast<uint32_t>(active));
+    }
+
+    spdlog::debug("[{}] Extruder dropdown populated: {} tools, active=T{}", get_name(),
+                  ts.tool_count(), active);
+}
+
+void FilamentPanel::handle_extruder_changed() {
+    if (!extruder_dropdown_)
+        return;
+
+    int selected = static_cast<int>(lv_dropdown_get_selected(extruder_dropdown_));
+    auto& ts = helix::ToolState::instance();
+
+    if (selected == ts.active_tool_index())
+        return;
+
+    spdlog::info("[{}] User selected extruder T{}", get_name(), selected);
+
+    ts.request_tool_change(
+        selected, api_, [selected]() { NOTIFY_SUCCESS("Switched to T{}", selected); },
+        [this](const std::string& err) {
+            NOTIFY_ERROR("Tool change failed: {}", err);
+            // Revert dropdown to actual active tool on UI thread
+            ui_async_call(
+                [](void* ctx) {
+                    auto* panel = static_cast<FilamentPanel*>(ctx);
+                    if (panel->extruder_dropdown_) {
+                        int active = helix::ToolState::instance().active_tool_index();
+                        if (active >= 0) {
+                            lv_dropdown_set_selected(panel->extruder_dropdown_,
+                                                     static_cast<uint32_t>(active));
+                        }
+                    }
+                },
+                this);
+        });
+}
+
+void FilamentPanel::on_extruder_dropdown_changed(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[FilamentPanel] on_extruder_dropdown_changed");
+    LV_UNUSED(e);
+    get_global_filament_panel().handle_extruder_changed();
+    LVGL_SAFE_EVENT_CB_END();
 }
 
 // ============================================================================

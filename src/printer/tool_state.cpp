@@ -11,10 +11,13 @@
 
 #include "tool_state.h"
 
+#include "ams_state.h"
+#include "moonraker_api.h"
 #include "printer_discovery.h"
 #include "state/subject_macros.h"
 #include "static_subject_registry.h"
 
+#include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -102,17 +105,31 @@ void ToolState::init_tools(const helix::PrinterDiscovery& hardware) {
             tools_.push_back(std::move(tool));
         }
     } else {
-        // No tool changer: create 1 implicit tool
-        ToolInfo tool;
-        tool.index = 0;
-        tool.name = "T0";
-        tool.extruder_name = "extruder";
-        tool.heater_name = std::nullopt;
-        tool.fan_name = "fan";
-        tool.active = true;
+        // No tool changer: enumerate extruder heaters to support multi-extruder setups
+        std::vector<std::string> extruder_names;
+        for (const auto& h : hardware.heaters()) {
+            if (h == "extruder" ||
+                (h.size() > 8 && h.rfind("extruder", 0) == 0 && std::isdigit(h[8]))) {
+                extruder_names.push_back(h);
+            }
+        }
+        std::sort(extruder_names.begin(), extruder_names.end());
+        if (extruder_names.empty())
+            extruder_names.push_back("extruder");
 
-        spdlog::debug("[ToolState] Implicit single tool: T0");
-        tools_.push_back(std::move(tool));
+        for (int i = 0; i < static_cast<int>(extruder_names.size()); ++i) {
+            ToolInfo tool;
+            tool.index = i;
+            tool.name = ::fmt::format("T{}", i);
+            tool.extruder_name = extruder_names[i];
+            tool.heater_name = std::nullopt;
+            tool.fan_name = (i == 0) ? std::optional<std::string>("fan") : std::nullopt;
+            tool.active = (i == 0);
+
+            spdlog::debug("[ToolState] Tool {}: name={}, extruder={}", i, tool.name,
+                          tool.extruder_name.value_or("none"));
+            tools_.push_back(std::move(tool));
+        }
     }
 
     active_tool_index_ = 0;
@@ -293,6 +310,62 @@ std::string ToolState::tool_name_for_extruder(const std::string& extruder_name) 
         }
     }
     return {};
+}
+
+void ToolState::request_tool_change(int tool_index, MoonrakerAPI* api,
+                                    std::function<void()> on_success,
+                                    std::function<void(const std::string&)> on_error) {
+    if (tool_index < 0 || tool_index >= static_cast<int>(tools_.size())) {
+        if (on_error)
+            on_error(
+                ::fmt::format("Invalid tool index {} (have {} tools)", tool_index, tools_.size()));
+        return;
+    }
+
+    if (tool_index == active_tool_index_) {
+        spdlog::debug("[ToolState] Tool {} already active, ignoring", tool_index);
+        if (on_success)
+            on_success();
+        return;
+    }
+
+    if (!api) {
+        if (on_error)
+            on_error("No API connection");
+        return;
+    }
+
+    // Try AMS backend first (handles toolchangers, AFC, Happy Hare, etc.)
+    auto* backend = AmsState::instance().get_backend();
+    if (backend) {
+        spdlog::info("[ToolState] Requesting tool change to T{} via AMS backend", tool_index);
+        auto result = backend->change_tool(tool_index);
+        if (result) {
+            if (on_success)
+                on_success();
+        } else {
+            if (on_error)
+                on_error(::fmt::format("Backend tool change failed: {}", result.user_msg));
+        }
+        return;
+    }
+
+    // Fallback: ACTIVATE_EXTRUDER for simple multi-extruder setups
+    const auto& extruder_name = tools_[tool_index].extruder_name.value_or("extruder");
+    std::string gcode = ::fmt::format("ACTIVATE_EXTRUDER EXTRUDER={}", extruder_name);
+    spdlog::info("[ToolState] Requesting tool change to T{} via ACTIVATE_EXTRUDER ({})", tool_index,
+                 extruder_name);
+
+    api->execute_gcode(
+        gcode,
+        [on_success]() {
+            if (on_success)
+                on_success();
+        },
+        [on_error](const MoonrakerError& error) {
+            if (on_error)
+                on_error(error.user_message());
+        });
 }
 
 } // namespace helix
