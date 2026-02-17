@@ -53,6 +53,7 @@ void ui_wizard_deinit_subjects();
  * to avoid polluting globals scope.
  *
  * Responsive values by screen size:
+ * - MICRO (≤299):     list_padding=4,  header=32,  footer=72,  button=96
  * - SMALL (≤480):    list_padding=4,  header=32,  footer=72,  button=110
  * - MEDIUM (481-800): list_padding=6,  header=42,  footer=82,  button=140
  * - LARGE (>800):     list_padding=8,  header=48,  footer=88,  button=160

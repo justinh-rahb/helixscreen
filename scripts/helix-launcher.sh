@@ -144,6 +144,19 @@ DEBUG_MODE="${CLI_DEBUG:-${HELIX_DEBUG:-0}}"
 LOG_DEST="${CLI_LOG_DEST:-${HELIX_LOG_DEST:-auto}}"
 LOG_FILE="${CLI_LOG_FILE:-${HELIX_LOG_FILE:-}}"
 
+# Optional screen size preset from platform hooks/environment.
+# Applied only when caller did not explicitly pass --size/-s.
+if [ -n "${HELIX_SCREEN_SIZE:-}" ]; then
+    case " ${PASSTHROUGH_ARGS} " in
+        *" --size "*|*" -s "*)
+            ;;
+        *)
+            PASSTHROUGH_ARGS="${PASSTHROUGH_ARGS} --size ${HELIX_SCREEN_SIZE}"
+            log "Applying HELIX_SCREEN_SIZE preset: ${HELIX_SCREEN_SIZE}"
+            ;;
+    esac
+fi
+
 # Default display backend to fbdev on embedded Linux targets.
 # DRM atomic modesetting has compatibility issues with some SoCs and breaks
 # framebuffer-based VNC setups. fbdev works reliably across all Pi hardware.

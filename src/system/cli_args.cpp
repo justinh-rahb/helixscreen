@@ -107,7 +107,7 @@ static bool parse_double(const char* str, double& out, const char* name) {
 static void print_help(const char* program_name) {
     printf("Usage: %s [options]\n", program_name);
     printf("Options:\n");
-    printf("  -s, --size <size>    Screen size: tiny, small, medium, large, xlarge (or WxH)\n");
+    printf("  -s, --size <size>    Screen size: micro, tiny, small, medium, large, xlarge (or WxH)\n");
     printf("  -p, --panel <panel>  Initial panel (default: home)\n");
     printf("  -k, --keypad         Show numeric keypad for testing\n");
     printf("  --keyboard           Show keyboard for testing (no textarea)\n");
@@ -166,6 +166,7 @@ static void print_help(const char* program_name) {
     printf("  Print: print-status, print-tune\n");
     printf("  Dev: ams, step-test, test, gcode-test, glyphs\n");
     printf("\nScreen sizes:\n");
+    printf("  micro    = %dx%d\n", UI_SCREEN_MICRO_W, UI_SCREEN_MICRO_H);
     printf("  tiny     = %dx%d\n", UI_SCREEN_TINY_W, UI_SCREEN_TINY_H);
     printf("  small    = %dx%d\n", UI_SCREEN_SMALL_W, UI_SCREEN_SMALL_H);
     printf("  medium   = %dx%d (default)\n", UI_SCREEN_MEDIUM_W, UI_SCREEN_MEDIUM_H);
@@ -360,7 +361,11 @@ bool parse_cli_args(int argc, char** argv, CliArgs& args, int& screen_width, int
                 return false;
             }
             const char* size_arg = argv[++i];
-            if (strcmp(size_arg, "tiny") == 0) {
+            if (strcmp(size_arg, "micro") == 0) {
+                screen_width = UI_SCREEN_MICRO_W;
+                screen_height = UI_SCREEN_MICRO_H;
+                args.screen_size = ScreenSize::MICRO;
+            } else if (strcmp(size_arg, "tiny") == 0) {
                 screen_width = UI_SCREEN_TINY_W;
                 screen_height = UI_SCREEN_TINY_H;
                 args.screen_size = ScreenSize::TINY;
@@ -387,7 +392,9 @@ bool parse_cli_args(int argc, char** argv, CliArgs& args, int& screen_width, int
                     screen_width = w;
                     screen_height = h;
                     // Set screen_size to closest preset based on height (vertical breakpoints)
-                    if (h <= UI_BREAKPOINT_TINY_MAX) {
+                    if (h <= UI_BREAKPOINT_MICRO_MAX) {
+                        args.screen_size = ScreenSize::MICRO;
+                    } else if (h <= UI_BREAKPOINT_TINY_MAX) {
                         args.screen_size = ScreenSize::TINY;
                     } else if (h <= UI_BREAKPOINT_SMALL_MAX) {
                         args.screen_size = ScreenSize::SMALL;
@@ -400,8 +407,8 @@ bool parse_cli_args(int argc, char** argv, CliArgs& args, int& screen_width, int
                     }
                 } else {
                     printf("Unknown screen size: %s\n", size_arg);
-                    printf("Available sizes: tiny, small, medium, large, xlarge (or WxH like "
-                           "480x400)\n");
+                    printf("Available sizes: micro, tiny, small, medium, large, xlarge (or WxH "
+                           "like 480x400)\n");
                     return false;
                 }
             }
