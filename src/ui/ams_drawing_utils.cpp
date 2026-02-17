@@ -2,6 +2,7 @@
 
 #include "ui/ams_drawing_utils.h"
 
+#include "ams_state.h"
 #include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
@@ -288,6 +289,42 @@ void style_slot_bar(const SlotColumn& col, const BarStyleParams& params, int32_t
         } else {
             lv_obj_add_flag(col.status_line, LV_OBJ_FLAG_HIDDEN);
         }
+    }
+}
+
+// ============================================================================
+// Logo Helpers
+// ============================================================================
+
+void apply_logo(lv_obj_t* image, const AmsUnit& unit, const AmsSystemInfo& info) {
+    if (!image) {
+        return;
+    }
+
+    const char* path = AmsState::get_logo_path(unit.name);
+    if (!path || !path[0]) {
+        path = AmsState::get_logo_path(info.type_name);
+    }
+
+    if (path && path[0]) {
+        lv_image_set_src(image, path);
+        lv_obj_remove_flag(image, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(image, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void apply_logo(lv_obj_t* image, const std::string& type_name) {
+    if (!image) {
+        return;
+    }
+
+    const char* path = AmsState::get_logo_path(type_name);
+    if (path && path[0]) {
+        lv_image_set_src(image, path);
+        lv_obj_remove_flag(image, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(image, LV_OBJ_FLAG_HIDDEN);
     }
 }
 

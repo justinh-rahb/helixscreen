@@ -135,4 +135,14 @@ SlotColumn create_slot_column(lv_obj_t* parent, int32_t bar_width, int32_t bar_h
  */
 void style_slot_bar(const SlotColumn& col, const BarStyleParams& params, int32_t bar_radius);
 
+// ============================================================================
+// Logo Helpers
+// ============================================================================
+
+/** Apply logo to image widget: try unit name -> type name -> hide */
+void apply_logo(lv_obj_t* image, const AmsUnit& unit, const AmsSystemInfo& info);
+
+/** Apply logo to image widget: try type name -> hide */
+void apply_logo(lv_obj_t* image, const std::string& type_name);
+
 } // namespace ams_draw

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../lvgl_test_fixture.h"
+#include "ams_state.h"
 #include "ams_types.h"
 #include "theme_manager.h"
 #include "ui/ams_drawing_utils.h"
@@ -343,4 +344,31 @@ TEST_CASE_METHOD(LVGLTestFixture, "ams_draw::style_slot_bar empty state ghosted"
     REQUIRE(lv_obj_get_style_border_opa(col.bar_bg, LV_PART_MAIN) == LV_OPA_20);
     REQUIRE(lv_obj_has_flag(col.bar_fill, LV_OBJ_FLAG_HIDDEN));
     REQUIRE(lv_obj_has_flag(col.status_line, LV_OBJ_FLAG_HIDDEN));
+}
+
+// ============================================================================
+// Logo Helper
+// ============================================================================
+
+TEST_CASE_METHOD(LVGLTestFixture, "ams_draw::apply_logo hides image when no logo found",
+                 "[ams_draw][logo]") {
+    lv_obj_t* img = lv_image_create(test_screen());
+    lv_obj_remove_flag(img, LV_OBJ_FLAG_HIDDEN);
+
+    // Use a type name that won't match any logo
+    ams_draw::apply_logo(img, "NonExistentType12345");
+    REQUIRE(lv_obj_has_flag(img, LV_OBJ_FLAG_HIDDEN));
+}
+
+TEST_CASE_METHOD(LVGLTestFixture, "ams_draw::apply_logo with unit fallback", "[ams_draw][logo]") {
+    lv_obj_t* img = lv_image_create(test_screen());
+
+    AmsUnit unit;
+    unit.name = "NonExistent";
+    AmsSystemInfo info;
+    info.type_name = "AlsoNonExistent";
+
+    ams_draw::apply_logo(img, unit, info);
+    // Both names unknown -> hidden
+    REQUIRE(lv_obj_has_flag(img, LV_OBJ_FLAG_HIDDEN));
 }
