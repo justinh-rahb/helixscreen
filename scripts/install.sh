@@ -1752,7 +1752,9 @@ use_local_tarball() {
         # become dangling if the user passed a relative path.
         # (BusyBox readlink may not support -f, so try realpath first.)
         local abs_src
-        abs_src=$(realpath "$src" 2>/dev/null) || abs_src=$(readlink -f "$src" 2>/dev/null) || abs_src="$src"
+        abs_src=$(realpath "$src" 2>/dev/null)
+        [ -n "$abs_src" ] || abs_src=$(readlink -f "$src" 2>/dev/null)
+        [ -n "$abs_src" ] || abs_src="$src"
 
         # Prefer a symlink to avoid copying large files on constrained devices,
         # but *verify* the staged tarball is readable. Fall back to copying.
