@@ -1325,6 +1325,9 @@ void MoonrakerAPIMock::update_spoolman_spool(int spool_id, const nlohmann::json&
             if (spool_data.contains("comment")) {
                 spool.comment = spool_data["comment"].get<std::string>();
             }
+            if (spool_data.contains("filament_id")) {
+                spool.filament_id = spool_data["filament_id"].get<int>();
+            }
             spdlog::debug("[MoonrakerAPIMock] Updated spool {} with {} fields", spool_id,
                           spool_data.size());
             break;
@@ -1401,8 +1404,23 @@ void MoonrakerAPIMock::get_spoolman_filaments(FilamentListCallback on_success,
     // Build filament list from existing mock spools (deduplicate by vendor+material+color)
     std::vector<FilamentInfo> filaments;
     std::set<std::string> seen;
+    std::set<int> seen_ids; // Track IDs from explicitly created filaments
     int next_id = 1;
 
+    // Include explicitly created filaments first (they have stable IDs)
+    for (const auto& mf : mock_filaments_) {
+        filaments.push_back(mf);
+        seen_ids.insert(mf.id);
+        // Track by key to avoid duplicates with spool-synthesized entries
+        std::string key = mf.vendor_name + "|" + mf.material + "|" + mf.color_name;
+        seen.insert(key);
+        // Ensure auto-assigned IDs don't collide
+        if (mf.id >= next_id) {
+            next_id = mf.id + 1;
+        }
+    }
+
+    // Synthesize filaments from spools (skip duplicates already covered above)
     for (const auto& spool : mock_spools_) {
         std::string key = spool.vendor + "|" + spool.material + "|" + spool.color_name;
         if (seen.find(key) == seen.end()) {
@@ -1423,7 +1441,8 @@ void MoonrakerAPIMock::get_spoolman_filaments(FilamentListCallback on_success,
         }
     }
 
-    spdlog::debug("[MoonrakerAPIMock] Returning {} filaments", filaments.size());
+    spdlog::debug("[MoonrakerAPIMock] Returning {} filaments ({} created + synthesized)",
+                  filaments.size(), mock_filaments_.size());
     if (on_success) {
         on_success(filaments);
     }
@@ -1452,7 +1471,7 @@ void MoonrakerAPIMock::create_spoolman_filament(const nlohmann::json& filament_d
                  filament_data.value("material", "?"), filament_data.value("name", "?"));
 
     FilamentInfo filament;
-    filament.id = static_cast<int>(mock_spools_.size()) + 200;
+    filament.id = next_filament_id_++;
     filament.material = filament_data.value("material", "");
     filament.color_name = filament_data.value("name", "");
     filament.color_hex = filament_data.value("color_hex", "");
@@ -1463,6 +1482,9 @@ void MoonrakerAPIMock::create_spoolman_filament(const nlohmann::json& filament_d
     if (filament_data.contains("vendor_id")) {
         filament.vendor_id = filament_data.value("vendor_id", 0);
     }
+
+    // Persist so subsequent get_spoolman_filaments() includes it
+    mock_filaments_.push_back(filament);
 
     if (on_success) {
         on_success(filament);

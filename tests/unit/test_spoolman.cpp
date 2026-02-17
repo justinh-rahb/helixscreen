@@ -852,6 +852,63 @@ TEST_CASE("filter_spools - empty spool list returns empty", "[filament][filter]"
     REQUIRE(result.empty());
 }
 
+// ============================================================================
+// MoonrakerAPIMock - Filament Persistence & Patching Tests
+// ============================================================================
+
+TEST_CASE("Mock persists created filaments", "[spoolman][mock]") {
+    PrinterState state;
+    MoonrakerClientMock client;
+    MoonrakerAPIMock api(client, state);
+
+    // Create a filament
+    nlohmann::json filament_data;
+    filament_data["material"] = "PETG";
+    filament_data["name"] = "Blue";
+    filament_data["color_hex"] = "#0000FF";
+    filament_data["vendor_id"] = 1;
+
+    FilamentInfo created;
+    api.create_spoolman_filament(
+        filament_data, [&](const FilamentInfo& f) { created = f; }, nullptr);
+    REQUIRE(created.id > 0);
+
+    // Verify it appears in subsequent filament list
+    std::vector<FilamentInfo> filaments;
+    api.get_spoolman_filaments([&](const std::vector<FilamentInfo>& list) { filaments = list; },
+                               nullptr);
+
+    bool found = false;
+    for (const auto& f : filaments) {
+        if (f.id == created.id) {
+            found = true;
+            REQUIRE(f.material == "PETG");
+            REQUIRE(f.color_name == "Blue");
+        }
+    }
+    REQUIRE(found);
+}
+
+TEST_CASE("Mock update_spoolman_spool supports filament_id patch", "[spoolman][mock]") {
+    PrinterState state;
+    MoonrakerClientMock client;
+    MoonrakerAPIMock api(client, state);
+
+    auto& spools = api.get_mock_spools();
+    int spool_id = spools[0].id;
+    int original_filament_id = spools[0].filament_id;
+
+    nlohmann::json patch;
+    patch["filament_id"] = 999;
+
+    bool success = false;
+    api.update_spoolman_spool(spool_id, patch, [&]() { success = true; }, nullptr);
+
+    REQUIRE(success);
+    REQUIRE(spools[0].filament_id == 999);
+    REQUIRE(spools[0].filament_id != original_filament_id);
+}
+
 TEST_CASE("SpoolInfo - realistic spool scenarios", "[filament][integration]") {
     SECTION("Typical PLA spool usage") {
         SpoolInfo spool;

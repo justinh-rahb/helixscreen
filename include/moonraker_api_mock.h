@@ -585,9 +585,11 @@ class MoonrakerAPIMock : public MoonrakerAPI {
     helix::SubscriptionId mock_next_subscription_id_ = 100;
 
     // Mock Spoolman state
-    bool mock_spoolman_enabled_ = true;  ///< Whether Spoolman is "connected"
-    int mock_active_spool_id_ = 1;       ///< Currently active spool ID
-    std::vector<SpoolInfo> mock_spools_; ///< Mock spool inventory
+    bool mock_spoolman_enabled_ = true;        ///< Whether Spoolman is "connected"
+    int mock_active_spool_id_ = 1;             ///< Currently active spool ID
+    std::vector<SpoolInfo> mock_spools_;       ///< Mock spool inventory
+    std::vector<FilamentInfo> mock_filaments_; ///< Persistent filament storage (from create calls)
+    int next_filament_id_ = 300;               ///< Next ID for created filaments
 
     /// Slot-to-spool mapping (AMS slot index → Spoolman spool_id)
     std::map<int, int> slot_spool_map_;
