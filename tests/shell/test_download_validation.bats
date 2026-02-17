@@ -351,6 +351,15 @@ MOCK
     [ -e "$TMP_DIR/helixscreen.tar.gz" ]
 }
 
+@test "use_local_tarball: handles relative source path" {
+    create_valid_gzip "$BATS_TEST_TMPDIR/relative_release.tar.gz" 2048
+    cd "$BATS_TEST_TMPDIR"
+
+    run use_local_tarball "./relative_release.tar.gz"
+    [ "$status" -eq 0 ]
+    [ -r "$TMP_DIR/helixscreen.tar.gz" ]
+}
+
 @test "use_local_tarball: exits with error for missing file" {
     run use_local_tarball "$BATS_TEST_TMPDIR/no_such_file.tar.gz"
     [ "$status" -ne 0 ]
