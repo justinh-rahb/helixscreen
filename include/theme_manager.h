@@ -198,15 +198,19 @@ class ThemeManager {
 // Theme colors: Use theme_manager_get_color() to retrieve from globals.xml
 // Available tokens: primary_color, text_primary, text_secondary, success_color, etc.
 
-// Nav width is defined in navigation_bar.xml as nav_width_tiny/small/medium/large
+// Nav width is defined in navigation_bar.xml as nav_width_micro/tiny/small/medium/large
 // and registered at runtime using horizontal breakpoint (see theme_manager.cpp)
 
 // Responsive breakpoints (based on screen height — vertical space is the constraint)
-// Target hardware: 480x320, 480x400, 1920x440, 800x480, 1024x600, 1280x720
-// 5-tier system: TINY (≤390) → SMALL (391-460) → MEDIUM (461-550) → LARGE (551-700) → XLARGE (>700)
+// Target hardware: 480x272, 480x320, 480x400, 1920x440, 800x480, 1024x600, 1280x720
+// 6-tier system:
+// MICRO (≤299) → TINY (300-390) → SMALL (391-460) → MEDIUM (461-550) → LARGE (551-700) →
+// XLARGE (>700)
+// _micro is optional with fallback to _tiny — only define _micro where values differ
 // _tiny is optional with fallback to _small — only define _tiny where values differ
 // _xlarge is optional with fallback to _large — only define _xlarge where values differ
-#define UI_BREAKPOINT_TINY_MAX 390   // height ≤390 → TINY (480x320)
+#define UI_BREAKPOINT_MICRO_MAX 299  // height ≤299 → MICRO (480x272)
+#define UI_BREAKPOINT_TINY_MAX 390   // height 300-390 → TINY (480x320)
 #define UI_BREAKPOINT_SMALL_MAX 460  // height 391-460 → SMALL (480x400, 1920x440)
 #define UI_BREAKPOINT_MEDIUM_MAX 550 // height 461-550 → MEDIUM (800x480)
 #define UI_BREAKPOINT_LARGE_MAX                                                                    \
@@ -214,6 +218,8 @@ class ThemeManager {
         // height >700 → XLARGE (1280x720+)
 
 // Screen size presets for CLI (-s flag) — named to match responsive breakpoints
+#define UI_SCREEN_MICRO_W 480
+#define UI_SCREEN_MICRO_H 272
 #define UI_SCREEN_TINY_W 480
 #define UI_SCREEN_TINY_H 320
 #define UI_SCREEN_SMALL_W 480
@@ -266,8 +272,8 @@ void theme_manager_deinit();
  * Useful for testing and debugging responsive behavior.
  *
  * @param resolution Screen height (vertical resolution)
- * @return "_tiny" (≤390), "_small" (391-460), "_medium" (461-550), "_large" (551-700), or "_xlarge"
- * (>700)
+ * @return "_micro" (≤299), "_tiny" (300-390), "_small" (391-460), "_medium" (461-550),
+ * "_large" (551-700), or "_xlarge" (>700)
  */
 const char* theme_manager_get_breakpoint_suffix(int32_t resolution);
 

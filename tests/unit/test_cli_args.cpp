@@ -304,6 +304,11 @@ TEST_CASE("CliArgs: needs_moonraker_data", "[cli_args]") {
 
 TEST_CASE("ScreenSize enum values", "[cli_args]") {
     SECTION("All enum values are distinct") {
+        REQUIRE(ScreenSize::MICRO != ScreenSize::TINY);
+        REQUIRE(ScreenSize::MICRO != ScreenSize::SMALL);
+        REQUIRE(ScreenSize::MICRO != ScreenSize::MEDIUM);
+        REQUIRE(ScreenSize::MICRO != ScreenSize::LARGE);
+        REQUIRE(ScreenSize::MICRO != ScreenSize::XLARGE);
         REQUIRE(ScreenSize::TINY != ScreenSize::SMALL);
         REQUIRE(ScreenSize::TINY != ScreenSize::MEDIUM);
         REQUIRE(ScreenSize::TINY != ScreenSize::LARGE);
@@ -317,7 +322,8 @@ TEST_CASE("ScreenSize enum values", "[cli_args]") {
     }
 
     SECTION("ScreenSize ordering matches expected breakpoint order") {
-        // Verify enum values are ordered TINY < SMALL < MEDIUM < LARGE < XLARGE
+        // Verify enum values are ordered MICRO < TINY < SMALL < MEDIUM < LARGE < XLARGE
+        REQUIRE(static_cast<int>(ScreenSize::MICRO) < static_cast<int>(ScreenSize::TINY));
         REQUIRE(static_cast<int>(ScreenSize::TINY) < static_cast<int>(ScreenSize::SMALL));
         REQUIRE(static_cast<int>(ScreenSize::SMALL) < static_cast<int>(ScreenSize::MEDIUM));
         REQUIRE(static_cast<int>(ScreenSize::MEDIUM) < static_cast<int>(ScreenSize::LARGE));

@@ -260,9 +260,15 @@ TEST_CASE("UI Theme: Parse colors from globals.xml", "[ui_theme][color][integrat
 // ============================================================================
 
 TEST_CASE("UI Theme: Breakpoint suffix detection", "[ui_theme][responsive]") {
+    SECTION("Micro breakpoint (height ≤299px)") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(272), "_micro") == 0);
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(299), "_micro") == 0);
+    }
+
     SECTION("Tiny breakpoint (height ≤390px)") {
-        // Heights at or below 390 should select _tiny variants
+        // Heights between 300 and 390 should select _tiny variants
         REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(320), "_tiny") == 0);
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(390), "_tiny") == 0);
     }
 
     SECTION("Small breakpoint (height 391-460px)") {
@@ -293,6 +299,14 @@ TEST_CASE("UI Theme: Breakpoint suffix detection", "[ui_theme][responsive]") {
 }
 
 TEST_CASE("UI Theme: Breakpoint boundary conditions", "[ui_theme][responsive]") {
+    SECTION("Exact boundary: 299 → micro") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(299), "_micro") == 0);
+    }
+
+    SECTION("Exact boundary: 300 → tiny") {
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(300), "_tiny") == 0);
+    }
+
     SECTION("Exact boundary: 460 → small") {
         REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(460), "_small") == 0);
     }
@@ -312,8 +326,13 @@ TEST_CASE("UI Theme: Breakpoint boundary conditions", "[ui_theme][responsive]") 
 
 TEST_CASE("UI Theme: Target hardware resolutions", "[ui_theme][responsive]") {
     // Test against the specific target hardware — breakpoint uses screen HEIGHT
+    SECTION("480x272 (micro screen) → MICRO") {
+        // height=272 ≤299 → MICRO
+        REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(272), "_micro") == 0);
+    }
+
     SECTION("480x320 (tiny screen) → TINY") {
-        // height=320 ≤390 → TINY
+        // height=320, 300-390 → TINY
         REQUIRE(strcmp(theme_manager_get_breakpoint_suffix(320), "_tiny") == 0);
     }
 

@@ -19,9 +19,9 @@ namespace helix {
 
 /**
  * @brief Screen size presets (match responsive breakpoints)
- * TINY=480x320, SMALL=480x400, MEDIUM=800x480, LARGE=1024x600, XLARGE=1280x720
+ * MICRO=480x272, TINY=480x320, SMALL=480x400, MEDIUM=800x480, LARGE=1024x600, XLARGE=1280x720
  */
-enum class ScreenSize { TINY, SMALL, MEDIUM, LARGE, XLARGE };
+enum class ScreenSize { MICRO, TINY, SMALL, MEDIUM, LARGE, XLARGE };
 
 /**
  * @brief Overlay panel flags (grouped for clarity)

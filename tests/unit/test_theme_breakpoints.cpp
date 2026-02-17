@@ -4,9 +4,8 @@
  * @file test_theme_breakpoints.cpp
  * @brief Unit tests for breakpoint suffix selection and responsive token fallback
  *
- * Tests the 5-tier breakpoint system: TINY (≤390), SMALL (391-460),
- * MEDIUM (461-550), LARGE (551-700), XLARGE (>700) and the _tiny/_xlarge
- * fallback behavior.
+ * Tests the 6-tier breakpoint system: MICRO (≤299), TINY (300-390), SMALL (391-460),
+ * MEDIUM (461-550), LARGE (551-700), XLARGE (>700) and optional variant fallback behavior.
  */
 
 #include "theme_manager.h"
@@ -17,7 +16,13 @@
 // Breakpoint suffix selection
 // ============================================================================
 
-TEST_CASE("Breakpoint suffix returns _tiny for heights ≤390", "[theme][breakpoints]") {
+TEST_CASE("Breakpoint suffix returns _micro for heights ≤299", "[theme][breakpoints]") {
+    REQUIRE(std::string(theme_manager_get_breakpoint_suffix(240)) == "_micro");
+    REQUIRE(std::string(theme_manager_get_breakpoint_suffix(272)) == "_micro");
+    REQUIRE(std::string(theme_manager_get_breakpoint_suffix(299)) == "_micro");
+}
+
+TEST_CASE("Breakpoint suffix returns _tiny for heights 300-390", "[theme][breakpoints]") {
     REQUIRE(std::string(theme_manager_get_breakpoint_suffix(320)) == "_tiny");
     REQUIRE(std::string(theme_manager_get_breakpoint_suffix(390)) == "_tiny");
 }
@@ -47,6 +52,7 @@ TEST_CASE("Breakpoint suffix returns _xlarge for heights >700", "[theme][breakpo
 }
 
 TEST_CASE("Breakpoint constants have correct values", "[theme][breakpoints]") {
+    REQUIRE(UI_BREAKPOINT_MICRO_MAX == 299);
     REQUIRE(UI_BREAKPOINT_TINY_MAX == 390);
     REQUIRE(UI_BREAKPOINT_SMALL_MAX == 460);
     REQUIRE(UI_BREAKPOINT_MEDIUM_MAX == 550);
@@ -56,6 +62,12 @@ TEST_CASE("Breakpoint constants have correct values", "[theme][breakpoints]") {
 // ============================================================================
 // Responsive token fallback behavior (XML-based, uses test fixtures)
 // ============================================================================
+
+TEST_CASE("Responsive token discovery includes _micro suffix", "[theme][breakpoints]") {
+    // Verify that _micro tokens are discoverable from XML
+    auto micro_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_micro");
+    REQUIRE(micro_tokens.count("space_lg") > 0);
+}
 
 TEST_CASE("Responsive token discovery includes _tiny suffix", "[theme][breakpoints]") {
     // Verify that _tiny tokens are discoverable from XML
@@ -82,6 +94,15 @@ TEST_CASE("Validation does not require _tiny for complete sets", "[theme][breakp
     for (const auto& warning : warnings) {
         // No warning should complain about missing _tiny
         REQUIRE(warning.find("_tiny") == std::string::npos);
+    }
+}
+
+TEST_CASE("Validation does not require _micro for complete sets", "[theme][breakpoints]") {
+    // _micro is optional — validation should not warn about missing _micro
+    auto warnings = theme_manager_validate_constant_sets("ui_xml");
+
+    for (const auto& warning : warnings) {
+        REQUIRE(warning.find("missing _micro") == std::string::npos);
     }
 }
 

@@ -598,8 +598,8 @@ static void theme_manager_register_color_pairs(lv_xml_component_scope_t* scope, 
  * These static constants are registered first so dynamic variants can override them.
  */
 static void theme_manager_register_static_constants(lv_xml_component_scope_t* scope) {
-    const std::vector<std::string> skip_suffixes = {"_light",  "_dark",  "_tiny",  "_small",
-                                                    "_medium", "_large", "_xlarge"};
+    const std::vector<std::string> skip_suffixes = {"_light",  "_dark",   "_micro", "_tiny",
+                                                    "_small", "_medium", "_large", "_xlarge"};
 
     auto has_dynamic_suffix = [&](const std::string& name) {
         for (const auto& suffix : skip_suffixes) {
@@ -644,10 +644,13 @@ static void theme_manager_register_static_constants(lv_xml_component_scope_t* sc
  * Get the breakpoint suffix for a given resolution
  *
  * @param resolution Screen height (vertical resolution)
- * @return Suffix string: "_small" (≤460), "_medium" (461-700), or "_large" (>700)
+ * @return Suffix string: "_micro" (≤299), "_tiny" (300-390), "_small" (391-460),
+ * "_medium" (461-550), "_large" (551-700), or "_xlarge" (>700)
  */
 const char* theme_manager_get_breakpoint_suffix(int32_t resolution) {
-    if (resolution <= UI_BREAKPOINT_TINY_MAX) {
+    if (resolution <= UI_BREAKPOINT_MICRO_MAX) {
+        return "_micro";
+    } else if (resolution <= UI_BREAKPOINT_TINY_MAX) {
         return "_tiny";
     } else if (resolution <= UI_BREAKPOINT_SMALL_MAX) {
         return "_small";
@@ -678,7 +681,8 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
 
     // Use screen height for breakpoint selection — vertical space is the constraint
     const char* size_suffix = theme_manager_get_breakpoint_suffix(ver_res);
-    const char* size_label = (ver_res <= UI_BREAKPOINT_TINY_MAX)     ? "TINY"
+    const char* size_label = (ver_res <= UI_BREAKPOINT_MICRO_MAX)    ? "MICRO"
+                             : (ver_res <= UI_BREAKPOINT_TINY_MAX)   ? "TINY"
                              : (ver_res <= UI_BREAKPOINT_SMALL_MAX)  ? "SMALL"
                              : (ver_res <= UI_BREAKPOINT_MEDIUM_MAX) ? "MEDIUM"
                              : (ver_res <= UI_BREAKPOINT_LARGE_MAX)  ? "LARGE"
@@ -698,7 +702,9 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
     // (which uses vertical breakpoint) silently skips it (LVGL ignores duplicates).
     {
         const char* nav_suffix;
-        if (hor_res <= 520)
+        if (hor_res <= 480)
+            nav_suffix = "_micro";
+        else if (hor_res <= 520)
             nav_suffix = "_tiny";
         else if (hor_res <= 900)
             nav_suffix = "_small";
@@ -717,7 +723,8 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
         }
     }
 
-    // Auto-discover all px tokens from all XML files (including optional _tiny and _xlarge)
+    // Auto-discover all px tokens from all XML files (including optional _micro/_tiny/_xlarge)
+    auto micro_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_micro");
     auto tiny_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_tiny");
     auto small_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_small");
     auto medium_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_medium");
@@ -733,7 +740,17 @@ void theme_manager_register_responsive_spacing(lv_display_t* display) {
         if (medium_it != medium_tokens.end() && large_it != large_tokens.end()) {
             // Select appropriate variant based on breakpoint
             const char* value = nullptr;
-            if (strcmp(size_suffix, "_tiny") == 0) {
+            if (strcmp(size_suffix, "_micro") == 0) {
+                // Use _micro if available, otherwise fall back to _tiny, then _small
+                auto micro_it = micro_tokens.find(base_name);
+                if (micro_it != micro_tokens.end()) {
+                    value = micro_it->second.c_str();
+                } else {
+                    auto tiny_it = tiny_tokens.find(base_name);
+                    value = (tiny_it != tiny_tokens.end()) ? tiny_it->second.c_str()
+                                                           : small_val.c_str();
+                }
+            } else if (strcmp(size_suffix, "_tiny") == 0) {
                 // Use _tiny if available, otherwise fall back to _small
                 auto tiny_it = tiny_tokens.find(base_name);
                 value =
@@ -801,7 +818,8 @@ void theme_manager_register_responsive_fonts(lv_display_t* display) {
 
     // Use screen height for breakpoint selection — vertical space is the constraint
     const char* size_suffix = theme_manager_get_breakpoint_suffix(ver_res);
-    const char* size_label = (ver_res <= UI_BREAKPOINT_TINY_MAX)     ? "TINY"
+    const char* size_label = (ver_res <= UI_BREAKPOINT_MICRO_MAX)    ? "MICRO"
+                             : (ver_res <= UI_BREAKPOINT_TINY_MAX)   ? "TINY"
                              : (ver_res <= UI_BREAKPOINT_SMALL_MAX)  ? "SMALL"
                              : (ver_res <= UI_BREAKPOINT_MEDIUM_MAX) ? "MEDIUM"
                              : (ver_res <= UI_BREAKPOINT_LARGE_MAX)  ? "LARGE"
@@ -813,7 +831,8 @@ void theme_manager_register_responsive_fonts(lv_display_t* display) {
         return;
     }
 
-    // Auto-discover all string tokens from all XML files (including optional _tiny and _xlarge)
+    // Auto-discover all string tokens from all XML files (including optional _micro/_tiny/_xlarge)
+    auto micro_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_micro");
     auto tiny_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_tiny");
     auto small_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_small");
     auto medium_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "string", "_medium");
@@ -829,7 +848,17 @@ void theme_manager_register_responsive_fonts(lv_display_t* display) {
         if (medium_it != medium_tokens.end() && large_it != large_tokens.end()) {
             // Select appropriate variant based on breakpoint
             const char* value = nullptr;
-            if (strcmp(size_suffix, "_tiny") == 0) {
+            if (strcmp(size_suffix, "_micro") == 0) {
+                // Use _micro if available, otherwise fall back to _tiny, then _small
+                auto micro_it = micro_tokens.find(base_name);
+                if (micro_it != micro_tokens.end()) {
+                    value = micro_it->second.c_str();
+                } else {
+                    auto tiny_it = tiny_tokens.find(base_name);
+                    value = (tiny_it != tiny_tokens.end()) ? tiny_it->second.c_str()
+                                                           : small_val.c_str();
+                }
+            } else if (strcmp(size_suffix, "_tiny") == 0) {
                 // Use _tiny if available, otherwise fall back to _small
                 auto tiny_it = tiny_tokens.find(base_name);
                 value =
@@ -2329,7 +2358,7 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
         return warnings;
     }
 
-    // Validate responsive px sets (_small/_medium/_large required, _tiny optional)
+    // Validate responsive px sets (_small/_medium/_large required, _micro/_tiny optional)
     {
         auto tiny_tokens = theme_manager_parse_all_xml_for_suffix(directory, "px", "_tiny");
         auto small_tokens = theme_manager_parse_all_xml_for_suffix(directory, "px", "_small");
@@ -2337,7 +2366,7 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
         auto large_tokens = theme_manager_parse_all_xml_for_suffix(directory, "px", "_large");
 
         // Collect all base names that have at least one responsive suffix
-        // _tiny is optional — only _small/_medium/_large are required for a complete set
+        // _micro/_tiny are optional — only _small/_medium/_large are required for a complete set
         std::unordered_map<std::string, int> base_names;
         for (const auto& [name, _] : small_tokens) {
             base_names[name] |= 1; // bit 0 = _small
@@ -2467,7 +2496,8 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
 
         // Step 2: Add base names for responsive constants (_small/_medium/_large -> base)
         // These get registered at runtime as the base name
-        // Also include _tiny and _xlarge tokens — they are optional but valid definitions
+        // Also include _micro/_tiny/_xlarge tokens — they are optional but valid definitions
+        auto micro_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_micro");
         auto small_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_small");
         auto medium_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_medium");
         auto large_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_large");
@@ -2475,6 +2505,14 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
         auto xlarge_px = theme_manager_parse_all_xml_for_suffix(directory, "px", "_xlarge");
         for (const auto& [base_name, _] : small_px) {
             if (medium_px.count(base_name) && large_px.count(base_name)) {
+                defined_constants.insert(base_name);
+            }
+        }
+        // _micro tokens with a valid _small/_medium/_large set are also defined
+        // (fallback chain: micro -> tiny -> small)
+        for (const auto& [base_name, _] : micro_px) {
+            if (small_px.count(base_name) && medium_px.count(base_name) &&
+                large_px.count(base_name)) {
                 defined_constants.insert(base_name);
             }
         }
@@ -2493,6 +2531,7 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
             }
         }
 
+        auto micro_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_micro");
         auto small_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_small");
         auto medium_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_medium");
         auto large_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_large");
@@ -2500,6 +2539,12 @@ std::vector<std::string> theme_manager_validate_constant_sets(const char* direct
         auto xlarge_str = theme_manager_parse_all_xml_for_suffix(directory, "string", "_xlarge");
         for (const auto& [base_name, _] : small_str) {
             if (medium_str.count(base_name) && large_str.count(base_name)) {
+                defined_constants.insert(base_name);
+            }
+        }
+        for (const auto& [base_name, _] : micro_str) {
+            if (small_str.count(base_name) && medium_str.count(base_name) &&
+                large_str.count(base_name)) {
                 defined_constants.insert(base_name);
             }
         }

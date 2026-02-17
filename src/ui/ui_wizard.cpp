@@ -290,7 +290,10 @@ void ui_wizard_container_register_responsive_constants() {
     const char* button_width;
     const char* size_label;
 
-    if (greater_res <= UI_BREAKPOINT_SMALL_MAX) { // ≤480: 480x320
+    if (greater_res <= UI_BREAKPOINT_MICRO_MAX) { // ≤299: 480x272 class
+        button_width = "96";
+        size_label = "MICRO";
+    } else if (greater_res <= UI_BREAKPOINT_SMALL_MAX) { // 300-460: 480x320/480x400 class
         button_width = "110";
         size_label = "SMALL";
     } else if (greater_res <= UI_BREAKPOINT_MEDIUM_MAX) { // 481-800: 800x480
