@@ -34,6 +34,8 @@
 
 #include <spdlog/spdlog.h>
 
+using namespace helix;
+
 #include <cstdio>
 #include <cstring>
 #include <limits>
@@ -270,7 +272,7 @@ lv_obj_t* BedMeshPanel::create(lv_obj_t* parent) {
 
     // Apply saved render mode preference from settings
     int saved_mode = SettingsManager::instance().get_bed_mesh_render_mode();
-    auto render_mode = static_cast<bed_mesh_render_mode_t>(saved_mode);
+    auto render_mode = static_cast<BedMeshRenderMode>(saved_mode);
     ui_bed_mesh_set_render_mode(canvas_, render_mode);
     spdlog::debug("[{}] Render mode set from settings: {} ({})", get_name(), saved_mode,
                   saved_mode == 0 ? "Auto" : (saved_mode == 1 ? "3D" : "2D"));

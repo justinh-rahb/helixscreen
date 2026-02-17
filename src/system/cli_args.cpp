@@ -615,9 +615,9 @@ bool parse_cli_args(int argc, char** argv, CliArgs& args, int& screen_width, int
         } else if (strcmp(argv[i], "--gcode-debug-colors") == 0) {
             config.gcode_debug_colors = true;
         } else if (strcmp(argv[i], "--render-2d") == 0) {
-            config.gcode_render_mode = 2; // GCODE_VIEWER_RENDER_2D_LAYER
+            config.gcode_render_mode = 2; // GcodeViewerRenderMode::Layer2D
         } else if (strcmp(argv[i], "--render-3d") == 0) {
-            config.gcode_render_mode = 1; // GCODE_VIEWER_RENDER_3D
+            config.gcode_render_mode = 1; // GcodeViewerRenderMode::Render3D
         } else if (strcmp(argv[i], "--camera") == 0) {
             if (i + 1 >= argc) {
                 printf("Error: --camera requires a string argument\n");

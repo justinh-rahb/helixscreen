@@ -46,6 +46,8 @@
 
 #include <spdlog/spdlog.h>
 
+using namespace helix;
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -394,7 +396,7 @@ lv_obj_t* PrintStatusPanel::create(lv_obj_t* parent) {
 
         if (config->gcode_render_mode >= 0) {
             // Command line takes highest priority
-            auto render_mode = static_cast<gcode_viewer_render_mode_t>(config->gcode_render_mode);
+            auto render_mode = static_cast<GcodeViewerRenderMode>(config->gcode_render_mode);
             ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
             spdlog::debug("[{}]   ✓ Set G-code render mode: {} (cmdline)", get_name(),
                           config->gcode_render_mode);
@@ -405,7 +407,7 @@ lv_obj_t* PrintStatusPanel::create(lv_obj_t* parent) {
         } else {
             // No cmdline or env var - apply saved settings
             int render_mode_val = SettingsManager::instance().get_gcode_render_mode();
-            auto render_mode = static_cast<gcode_viewer_render_mode_t>(render_mode_val);
+            auto render_mode = static_cast<GcodeViewerRenderMode>(render_mode_val);
             ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
             spdlog::debug("[{}]   ✓ Set G-code render mode: {} (settings)", get_name(),
                           render_mode_val);

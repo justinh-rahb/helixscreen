@@ -15,6 +15,8 @@
 
 #include <spdlog/spdlog.h>
 
+using namespace helix;
+
 #include <algorithm>
 #include <cstdlib>
 #include <dirent.h>
@@ -111,7 +113,7 @@ void GcodeTestPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 
     if (rt_config->gcode_render_mode >= 0) {
         // Command line takes highest priority
-        auto render_mode = static_cast<gcode_viewer_render_mode_t>(rt_config->gcode_render_mode);
+        auto render_mode = static_cast<GcodeViewerRenderMode>(rt_config->gcode_render_mode);
         ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
         spdlog::info("[{}] Render mode: {} ({}) [cmdline]", get_name(),
                      rt_config->gcode_render_mode,
@@ -125,7 +127,7 @@ void GcodeTestPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     } else {
         // No cmdline or env var - apply saved settings
         int render_mode_val = SettingsManager::instance().get_gcode_render_mode();
-        auto render_mode = static_cast<gcode_viewer_render_mode_t>(render_mode_val);
+        auto render_mode = static_cast<GcodeViewerRenderMode>(render_mode_val);
         ui_gcode_viewer_set_render_mode(gcode_viewer_, render_mode);
         spdlog::info("[{}] Render mode: {} ({}) [settings]", get_name(), render_mode_val,
                      render_mode_val == 0 ? "Auto" : (render_mode_val == 1 ? "3D" : "2D Layers"));
@@ -647,11 +649,11 @@ void GcodeTestPanel::handle_view_preset(const char* button_name, lv_obj_t* btn) 
         ui_gcode_viewer_set_show_travels(gcode_viewer_, is_checked);
         spdlog::info("[{}] Travel moves: {}", get_name(), is_checked ? "shown" : "hidden");
     } else if (strcmp(button_name, "btn_top") == 0) {
-        ui_gcode_viewer_set_view(gcode_viewer_, GCODE_VIEWER_VIEW_TOP);
+        ui_gcode_viewer_set_view(gcode_viewer_, GcodeViewerPresetView::Top);
     } else if (strcmp(button_name, "btn_front") == 0) {
-        ui_gcode_viewer_set_view(gcode_viewer_, GCODE_VIEWER_VIEW_FRONT);
+        ui_gcode_viewer_set_view(gcode_viewer_, GcodeViewerPresetView::Front);
     } else if (strcmp(button_name, "btn_side") == 0) {
-        ui_gcode_viewer_set_view(gcode_viewer_, GCODE_VIEWER_VIEW_SIDE);
+        ui_gcode_viewer_set_view(gcode_viewer_, GcodeViewerPresetView::Side);
     } else if (strcmp(button_name, "btn_reset") == 0) {
         ui_gcode_viewer_reset_camera(gcode_viewer_);
     }

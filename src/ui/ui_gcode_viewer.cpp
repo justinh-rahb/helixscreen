@@ -29,6 +29,8 @@ constexpr size_t GCODE_FPS_WINDOW_SIZE = 10; // Rolling window of frame times
 #include <lvgl/src/xml/parsers/lv_xml_obj_parser.h>
 #include <spdlog/spdlog.h>
 
+using namespace helix;
+
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
@@ -63,22 +65,22 @@ class GCodeViewerState {
         if (mode_env) {
             if (std::strcmp(mode_env, "3D") == 0) {
 #ifdef ENABLE_TINYGL_3D
-                render_mode_ = GCODE_VIEWER_RENDER_3D;
+                render_mode_ = GcodeViewerRenderMode::Render3D;
                 spdlog::info("[GCode Viewer] HELIX_GCODE_MODE=3D: forcing 3D TinyGL renderer");
 #else
                 spdlog::warn("[GCode Viewer] HELIX_GCODE_MODE=3D ignored: TinyGL not available");
-                render_mode_ = GCODE_VIEWER_RENDER_2D_LAYER;
+                render_mode_ = GcodeViewerRenderMode::Layer2D;
 #endif
             } else if (std::strcmp(mode_env, "2D") == 0) {
-                render_mode_ = GCODE_VIEWER_RENDER_2D_LAYER;
+                render_mode_ = GcodeViewerRenderMode::Layer2D;
                 spdlog::info("[GCode Viewer] HELIX_GCODE_MODE=2D: using 2D layer renderer");
             } else {
                 spdlog::warn("[GCode Viewer] Unknown HELIX_GCODE_MODE='{}', using 2D", mode_env);
-                render_mode_ = GCODE_VIEWER_RENDER_2D_LAYER;
+                render_mode_ = GcodeViewerRenderMode::Layer2D;
             }
         } else {
             // Default: 2D layer renderer (TinyGL is ~3-4 FPS everywhere)
-            render_mode_ = GCODE_VIEWER_RENDER_2D_LAYER;
+            render_mode_ = GcodeViewerRenderMode::Layer2D;
             spdlog::debug("[GCode Viewer] Default render mode: 2D layer");
         }
     }
@@ -157,7 +159,7 @@ class GCodeViewerState {
 
     // G-code data
     std::unique_ptr<helix::gcode::ParsedGCodeFile> gcode_file;
-    gcode_viewer_state_enum_t viewer_state{GCODE_VIEWER_STATE_EMPTY};
+    GcodeViewerState viewer_state{GcodeViewerState::Empty};
 
     // Rendering components (exposed for callbacks)
     std::unique_ptr<helix::gcode::GCodeCamera> camera_;
@@ -226,14 +228,14 @@ class GCodeViewerState {
 
     /// Render mode setting - set by constructor based on HELIX_GCODE_MODE env var
     /// Default is 2D_LAYER (TinyGL is too slow for production use everywhere)
-    gcode_viewer_render_mode_t render_mode_{GCODE_VIEWER_RENDER_2D_LAYER};
+    GcodeViewerRenderMode render_mode_{GcodeViewerRenderMode::Layer2D};
 
     /// Helper to check if currently using 2D layer renderer
     /// AUTO mode now defaults to 2D (no FPS-based detection)
     bool is_using_2d_mode() const {
-        // Only GCODE_VIEWER_RENDER_3D uses 3D renderer
+        // Only GcodeViewerRenderMode::Render3D uses 3D renderer
         // AUTO and 2D_LAYER both use 2D layer renderer
-        return render_mode_ != GCODE_VIEWER_RENDER_3D;
+        return render_mode_ != GcodeViewerRenderMode::Render3D;
     }
 
     // FPS tracking kept for debugging/diagnostics but not used for mode selection
@@ -321,7 +323,7 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
     // In streaming mode, gcode_file is null but streaming_controller_ is set
     bool has_gcode =
         st->gcode_file || (st->streaming_controller_ && st->streaming_controller_->is_open());
-    if (st->viewer_state != GCODE_VIEWER_STATE_LOADED || !has_gcode) {
+    if (st->viewer_state != GcodeViewerState::Loaded || !has_gcode) {
         return;
     }
 
@@ -894,7 +896,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
     }
 
     spdlog::info("[GCode Viewer] Loading file async: {}", file_path);
-    st->viewer_state = GCODE_VIEWER_STATE_LOADING;
+    st->viewer_state = GcodeViewerState::Loading;
     st->first_render = true; // Reset for new file
 
     // Clear any existing data sources (mutually exclusive: streaming XOR full-file)
@@ -1029,7 +1031,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                     // Note: Ghost mode is disabled in streaming mode (requires all layers)
                     // The renderer handles this automatically in set_streaming_controller()
 
-                    st->viewer_state = GCODE_VIEWER_STATE_LOADED;
+                    st->viewer_state = GcodeViewerState::Loaded;
                     st->first_render = false;
 
                     // Trigger initial render
@@ -1041,7 +1043,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                     }
                 } else {
                     spdlog::error("[GCode Viewer] Streaming mode: failed to index {}", r->path);
-                    st->viewer_state = GCODE_VIEWER_STATE_ERROR;
+                    st->viewer_state = GcodeViewerState::Error;
                     st->streaming_controller_.reset();
 
                     if (st->load_callback) {
@@ -1125,7 +1127,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                 // PHASE 2: Build 3D geometry (slow, 1-5s for large files)
                 // This is thread-safe - no OpenGL calls, just CPU work
                 // SKIP entirely for 2D mode - 2D renderer uses ParsedGCodeFile directly
-                if (st->render_mode_ == GCODE_VIEWER_RENDER_3D) {
+                if (st->render_mode_ == GcodeViewerRenderMode::Render3D) {
                     // Check if available memory is low (< 64MB available right now)
                     // When memory is low, ONLY build coarse geometry to save ~50MB
                     auto mem_info = helix::get_system_memory_info();
@@ -1278,7 +1280,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                 // Fit camera to model bounds
                 st->camera_->fit_to_bounds(st->gcode_file->global_bounding_box);
 
-                st->viewer_state = GCODE_VIEWER_STATE_LOADED;
+                st->viewer_state = GcodeViewerState::Loaded;
                 spdlog::debug("[GCode Viewer] State set to LOADED");
 
                 // Auto-apply filament color if enabled, but ONLY for single-color prints
@@ -1320,7 +1322,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                 }
             } else {
                 spdlog::error("[GCode Viewer] Async load failed: {}", r->error_msg);
-                st->viewer_state = GCODE_VIEWER_STATE_ERROR;
+                st->viewer_state = GcodeViewerState::Error;
                 st->gcode_file.reset();
 
                 // Invoke load callback with error status if registered
@@ -1364,7 +1366,7 @@ void ui_gcode_viewer_set_gcode_data(lv_obj_t* obj, void* gcode_data) {
     // Fit camera to model (uses current camera orientation from reset())
     st->camera_->fit_to_bounds(st->gcode_file->global_bounding_box);
 
-    st->viewer_state = GCODE_VIEWER_STATE_LOADED;
+    st->viewer_state = GcodeViewerState::Loaded;
 
     spdlog::info("[GCode Viewer] Set G-code data: {} layers, {} segments",
                  st->gcode_file->layers.size(), st->gcode_file->total_segments);
@@ -1391,15 +1393,15 @@ void ui_gcode_viewer_clear(lv_obj_t* obj) {
     st->streaming_controller_.reset();       // Clear streaming controller (Phase 6)
     st->layer_renderer_2d_.reset();          // Clear 2D renderer to avoid dangling pointer
     st->has_external_color_override = false; // Clear external color override
-    st->viewer_state = GCODE_VIEWER_STATE_EMPTY;
+    st->viewer_state = GcodeViewerState::Empty;
 
     lv_obj_invalidate(obj);
     spdlog::debug("[GCode Viewer] Cleared");
 }
 
-gcode_viewer_state_enum_t ui_gcode_viewer_get_state(lv_obj_t* obj) {
+GcodeViewerState ui_gcode_viewer_get_state(lv_obj_t* obj) {
     gcode_viewer_state_t* st = get_state(obj);
-    return st ? st->viewer_state : GCODE_VIEWER_STATE_EMPTY;
+    return st ? st->viewer_state : GcodeViewerState::Empty;
 }
 
 // ==============================================
@@ -1432,7 +1434,7 @@ bool ui_gcode_viewer_is_paused(lv_obj_t* obj) {
 // Render Mode Control
 // ==============================================
 
-void ui_gcode_viewer_set_render_mode(lv_obj_t* obj, gcode_viewer_render_mode_t mode) {
+void ui_gcode_viewer_set_render_mode(lv_obj_t* obj, GcodeViewerRenderMode mode) {
     gcode_viewer_state_t* st = get_state(obj);
     if (!st)
         return;
@@ -1462,9 +1464,9 @@ void ui_gcode_viewer_set_render_mode(lv_obj_t* obj, gcode_viewer_render_mode_t m
     lv_obj_invalidate(obj);
 }
 
-gcode_viewer_render_mode_t ui_gcode_viewer_get_render_mode(lv_obj_t* obj) {
+GcodeViewerRenderMode ui_gcode_viewer_get_render_mode(lv_obj_t* obj) {
     gcode_viewer_state_t* st = get_state(obj);
-    return st ? st->render_mode_ : GCODE_VIEWER_RENDER_AUTO;
+    return st ? st->render_mode_ : GcodeViewerRenderMode::Auto;
 }
 
 void ui_gcode_viewer_evaluate_render_mode(lv_obj_t* obj) {
@@ -1546,22 +1548,22 @@ void ui_gcode_viewer_reset_camera(lv_obj_t* obj) {
     lv_obj_invalidate(obj);
 }
 
-void ui_gcode_viewer_set_view(lv_obj_t* obj, gcode_viewer_preset_view_t preset) {
+void ui_gcode_viewer_set_view(lv_obj_t* obj, GcodeViewerPresetView preset) {
     gcode_viewer_state_t* st = get_state(obj);
     if (!st)
         return;
 
     switch (preset) {
-    case GCODE_VIEWER_VIEW_ISOMETRIC:
+    case GcodeViewerPresetView::Isometric:
         st->camera_->set_isometric_view();
         break;
-    case GCODE_VIEWER_VIEW_TOP:
+    case GcodeViewerPresetView::Top:
         st->camera_->set_top_view();
         break;
-    case GCODE_VIEWER_VIEW_FRONT:
+    case GcodeViewerPresetView::Front:
         st->camera_->set_front_view();
         break;
-    case GCODE_VIEWER_VIEW_SIDE:
+    case GcodeViewerPresetView::Side:
         st->camera_->set_side_view();
         break;
     }
