@@ -28,6 +28,13 @@
 
 ## Recently Completed
 
+### Multi-Unit AMS ✅
+**Completed:** 2026-02-17
+
+Multi-unit AMS overview panel, shared detail components (DRY refactor), per-slot error visualization with buffer health, AFC/Happy Hare device management overlays, mock backend deduplication via shared defaults modules. Visual verification complete.
+
+**Branch:** `feature/multi-unit-ams` (76 commits, 146 files, +34k/-14k lines)
+
 ### Debug Bundle Upload ✅
 **Completed:** 2026-02-16
 
@@ -242,7 +249,7 @@ See `docs/ARCHITECTURAL_DEBT.md` for the full register.
 **Remaining:**
 - **Application class** (1249 lines) → Extract bootstrapper and runtime
 - **Singleton cascade pattern** → UIPanelContext value object
-- **Code duplication** → SubjectManagedPanel base class (in progress)
+- **Code duplication** → PanelBase/OverlayBase with RAII subjects (complete)
 - **NavigationManager intimacy** → Extract INavigable interface
 
 ---
