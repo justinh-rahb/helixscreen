@@ -120,19 +120,19 @@ export function crashesQueries(days: number): string[] {
   return [
     // By version (crash count + session count for rate)
     `SELECT
-      blob2 as version,
+      blob2 as ver,
       count() as crash_count
     FROM ${dataset}
     WHERE timestamp >= NOW() - INTERVAL '${days}' DAY AND index1 = 'crash' AND blob2 != ''
-    GROUP BY version
+    GROUP BY ver
     ORDER BY crash_count DESC`,
     // Session counts by version (for crash rate denominator)
     `SELECT
-      blob2 as version,
+      blob2 as ver,
       count() as session_count
     FROM ${dataset}
     WHERE timestamp >= NOW() - INTERVAL '${days}' DAY AND index1 = 'session' AND blob2 != ''
-    GROUP BY version`,
+    GROUP BY ver`,
     // By signal
     `SELECT blob3 as signal, count() as count FROM ${dataset} WHERE timestamp >= NOW() - INTERVAL '${days}' DAY AND index1 = 'crash' AND blob3 != '' GROUP BY signal ORDER BY count DESC`,
     // Average uptime
@@ -148,20 +148,20 @@ export function releasesQueries(versions: string[]): string[] {
   return [
     // Per-version stats: sessions, crashes, active devices
     `SELECT
-      blob2 as version,
+      blob2 as ver,
       sumIf(1, index1 = 'session') as total_sessions,
       sumIf(1, index1 = 'crash') as total_crashes,
       countIf(DISTINCT blob1, index1 = 'session') as active_devices
     FROM ${dataset}
     WHERE blob2 IN (${versionList})
-    GROUP BY version`,
+    GROUP BY ver`,
     // Per-version print stats
     `SELECT
-      blob4 as version,
+      blob4 as ver,
       sumIf(1, blob2 = 'success') as print_successes,
       count() as print_total
     FROM ${dataset}
     WHERE index1 = 'print_outcome' AND blob4 IN (${versionList})
-    GROUP BY version`,
+    GROUP BY ver`,
   ];
 }

@@ -18,27 +18,32 @@ export function mapEventToDataPoint(
   const eventType = String(event.event ?? "unknown");
   const deviceId = String(event.device_id ?? "");
 
+  // Support both flat (schema v1) and nested (schema v2) field access
+  const app = (event.app ?? {}) as Record<string, unknown>;
+  const printer = (event.printer ?? {}) as Record<string, unknown>;
+  const host = (event.host ?? {}) as Record<string, unknown>;
+
   if (eventType === "session") {
     return {
       indexes: ["session"],
       blobs: [
         deviceId,
-        String(event.version ?? ""),
-        String(event.platform ?? ""),
-        String(event.printer_model ?? ""),
-        String(event.kinematics ?? ""),
-        String(event.display ?? ""),
-        String(event.locale ?? ""),
-        String(event.theme ?? ""),
-        String(event.arch ?? ""),
+        String(app.version ?? event.version ?? ""),
+        String(app.platform ?? event.platform ?? ""),
+        String(printer.detected_model ?? event.printer_model ?? ""),
+        String(printer.kinematics ?? event.kinematics ?? ""),
+        String(app.display ?? event.display ?? ""),
+        String(app.locale ?? event.locale ?? ""),
+        String(app.theme ?? event.theme ?? ""),
+        String(host.arch ?? event.arch ?? ""),
         "",
         "",
         "",
       ],
       doubles: [
-        Number(event.ram_total_mb ?? 0),
-        Number(event.cpu_cores ?? 0),
-        Number(event.extruder_count ?? 0),
+        Number(host.ram_total_mb ?? event.ram_total_mb ?? 0),
+        Number(host.cpu_cores ?? event.cpu_cores ?? 0),
+        Number(printer.extruder_count ?? event.extruder_count ?? 0),
         0,
         0,
         0,
@@ -55,7 +60,7 @@ export function mapEventToDataPoint(
         deviceId,
         String(event.outcome ?? ""),
         String(event.filament_type ?? ""),
-        String(event.version ?? ""),
+        String(app.version ?? event.version ?? ""),
         "",
         "",
         "",
@@ -83,9 +88,9 @@ export function mapEventToDataPoint(
       indexes: ["crash"],
       blobs: [
         deviceId,
-        String(event.version ?? ""),
+        String(app.version ?? event.version ?? ""),
         String(event.signal_name ?? ""),
-        String(event.platform ?? ""),
+        String(app.platform ?? event.platform ?? ""),
         "",
         "",
         "",
