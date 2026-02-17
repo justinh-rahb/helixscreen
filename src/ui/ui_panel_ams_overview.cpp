@@ -682,11 +682,72 @@ void AmsOverviewPanel::refresh_system_path(const AmsSystemInfo& info, int curren
     bool bypass_active = info.supports_bypass && (current_slot == -2);
     ui_system_path_canvas_set_bypass(system_path_, info.supports_bypass, bypass_active, 0x888888);
 
-    // Set per-unit hub sensor states
+    // Set per-unit hub sensor states and per-unit topology/tool routing
+    auto* backend = AmsState::instance().get_backend();
+    int total_tools = 0;
+    int active_tool = -1;
+
     for (int i = 0; i < unit_count && i < static_cast<int>(info.units.size()); ++i) {
-        ui_system_path_canvas_set_unit_hub_sensor(system_path_, i, info.units[i].has_hub_sensor,
-                                                  info.units[i].hub_sensor_triggered);
+        const auto& unit = info.units[i];
+        ui_system_path_canvas_set_unit_hub_sensor(system_path_, i, unit.has_hub_sensor,
+                                                  unit.hub_sensor_triggered);
+
+        // Per-unit topology
+        PathTopology topo = unit.topology;
+        if (backend) {
+            topo = backend->get_unit_topology(i);
+        }
+        ui_system_path_canvas_set_unit_topology(system_path_, i, static_cast<int>(topo));
+
+        // Per-unit tool routing: derive tool count and first tool from slot mapped_tool data
+        int first_tool = -1;
+        int max_tool = -1;
+        for (const auto& slot : unit.slots) {
+            if (slot.mapped_tool >= 0) {
+                if (first_tool < 0 || slot.mapped_tool < first_tool) {
+                    first_tool = slot.mapped_tool;
+                }
+                if (slot.mapped_tool > max_tool) {
+                    max_tool = slot.mapped_tool;
+                }
+            }
+        }
+
+        int unit_tool_count = 0;
+        if (first_tool >= 0) {
+            // For PARALLEL: each slot maps to a different tool (tool_count = distinct tools)
+            // For HUB: all slots map to same tool (tool_count = 1)
+            unit_tool_count = max_tool - first_tool + 1;
+        } else if (!unit.slots.empty()) {
+            // Fallback: use slot count for parallel, 1 for hub
+            first_tool = total_tools;
+            unit_tool_count =
+                (topo == PathTopology::PARALLEL) ? static_cast<int>(unit.slots.size()) : 1;
+        }
+
+        ui_system_path_canvas_set_unit_tools(system_path_, i, unit_tool_count,
+                                             first_tool >= 0 ? first_tool : total_tools);
+
+        // Track active tool from current slot
+        if (current_slot >= 0 && i == active_unit) {
+            const SlotInfo* active_slot = info.get_slot_global(current_slot);
+            if (active_slot && active_slot->mapped_tool >= 0) {
+                active_tool = active_slot->mapped_tool;
+            }
+        }
+
+        // Two accumulation strategies:
+        // - Units with mapped_tool data: use max tool index (tools may overlap/share)
+        // - Units without mapped_tool: append sequentially after known tools
+        if (first_tool >= 0) {
+            total_tools = std::max(total_tools, max_tool + 1);
+        } else {
+            total_tools += unit_tool_count;
+        }
     }
+
+    ui_system_path_canvas_set_total_tools(system_path_, total_tools);
+    ui_system_path_canvas_set_active_tool(system_path_, active_tool);
 
     // Set toolhead sensor state
     {

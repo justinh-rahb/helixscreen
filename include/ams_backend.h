@@ -196,6 +196,23 @@ class AmsBackend {
     [[nodiscard]] virtual PathTopology get_topology() const = 0;
 
     /**
+     * @brief Get the path topology for a specific unit
+     *
+     * In mixed-topology systems (e.g., Box Turtle + OpenAMS), different units
+     * may have different topologies. This method returns the topology for a
+     * specific unit by index.
+     *
+     * Default implementation falls back to get_topology() for backward compat.
+     *
+     * @param unit_index Index of the unit (0-based)
+     * @return PathTopology for this unit, or system-wide topology if unknown
+     */
+    [[nodiscard]] virtual PathTopology get_unit_topology(int unit_index) const {
+        (void)unit_index;
+        return get_topology();
+    }
+
+    /**
      * @brief Get current filament position in the path
      *
      * Returns which segment the filament is currently at/in.

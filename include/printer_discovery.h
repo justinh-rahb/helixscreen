@@ -227,6 +227,25 @@ class PrinterDiscovery {
                     afc_hub_names_.push_back(hub_name);
                 }
             }
+            // AFC_lane discovery (OpenAMS lanes - same as AFC_stepper but different Klipper object
+            // type)
+            else if (name.rfind("AFC_lane ", 0) == 0) {
+                std::string lane_name = name.substr(9); // Remove "AFC_lane " prefix (9 chars)
+                if (!lane_name.empty()) {
+                    afc_lane_names_.push_back(lane_name); // Same vector as AFC_stepper lanes
+                }
+            }
+            // AFC unit-level objects (BoxTurtle, OpenAMS)
+            else if (name.rfind("AFC_BoxTurtle ", 0) == 0 || name.rfind("AFC_OpenAMS ", 0) == 0) {
+                afc_unit_object_names_.push_back(name); // Store FULL name for Klipper queries
+            }
+            // AFC buffer objects
+            else if (name.rfind("AFC_buffer ", 0) == 0) {
+                std::string buffer_name = name.substr(11); // Remove "AFC_buffer " prefix (11 chars)
+                if (!buffer_name.empty()) {
+                    afc_buffer_names_.push_back(buffer_name);
+                }
+            }
             // Tool changer detection
             else if (name == "toolchanger") {
                 has_tool_changer_ = true;
@@ -325,6 +344,9 @@ class PrinterDiscovery {
         if (!afc_lane_names_.empty()) {
             std::sort(afc_lane_names_.begin(), afc_lane_names_.end());
         }
+        if (!afc_buffer_names_.empty()) {
+            std::sort(afc_buffer_names_.begin(), afc_buffer_names_.end());
+        }
 
         // Sort tool names for consistent ordering
         if (!tool_names_.empty()) {
@@ -412,6 +434,8 @@ class PrinterDiscovery {
         // AMS/MMU discovery
         afc_lane_names_.clear();
         afc_hub_names_.clear();
+        afc_unit_object_names_.clear();
+        afc_buffer_names_.clear();
         tool_names_.clear();
         filament_sensor_names_.clear();
         mmu_encoder_names_.clear();
@@ -624,6 +648,14 @@ class PrinterDiscovery {
     /// @brief Alias for afc_hub_names() - compatibility with PrinterCapabilities API
     [[nodiscard]] const std::vector<std::string>& get_afc_hub_names() const {
         return afc_hub_names_;
+    }
+
+    [[nodiscard]] const std::vector<std::string>& afc_unit_object_names() const {
+        return afc_unit_object_names_;
+    }
+
+    [[nodiscard]] const std::vector<std::string>& afc_buffer_names() const {
+        return afc_buffer_names_;
     }
 
     [[nodiscard]] const std::vector<std::string>& tool_names() const {
@@ -894,6 +926,9 @@ class PrinterDiscovery {
     // AMS/MMU discovery
     std::vector<std::string> afc_lane_names_;
     std::vector<std::string> afc_hub_names_;
+    std::vector<std::string>
+        afc_unit_object_names_; // Full names: "AFC_BoxTurtle Turtle_1", "AFC_OpenAMS AMS_1"
+    std::vector<std::string> afc_buffer_names_; // Buffer suffixes: "TN", "TN1", etc.
     std::vector<std::string> tool_names_;
     std::vector<std::string> filament_sensor_names_;
     std::vector<std::string> mmu_encoder_names_;

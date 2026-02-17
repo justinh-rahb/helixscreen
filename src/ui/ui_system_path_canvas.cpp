@@ -32,6 +32,7 @@ static constexpr float ENTRY_Y_RATIO = 0.05f;    // Top entry points for unit ou
 static constexpr float MERGE_Y_RATIO = 0.25f;    // Where unit lines converge to center
 static constexpr float HUB_Y_RATIO = 0.40f;      // Hub center
 static constexpr float HUB_HEIGHT_RATIO = 0.10f; // Hub box height
+static constexpr float TOOLS_Y_RATIO = 0.62f;    // Tool nozzle row (multi-tool mode)
 static constexpr float NOZZLE_Y_RATIO = 0.72f;   // Nozzle center (well below hub, above bottom)
 
 // ============================================================================
@@ -41,6 +42,7 @@ static constexpr float NOZZLE_Y_RATIO = 0.72f;   // Nozzle center (well below hu
 struct SystemPathData {
     int unit_count = 0;
     static constexpr int MAX_UNITS = 8;
+    static constexpr int MAX_TOOLS = 16;
     int32_t unit_x_positions[MAX_UNITS] = {}; // X center of each unit card
     int active_unit = -1;                     // -1 = none active
     uint32_t active_color = 0x4488FF;         // Filament color of active path
@@ -59,6 +61,13 @@ struct SystemPathData {
     // Toolhead sensor state
     bool has_toolhead_sensor = false;       // System has a toolhead entry sensor
     bool toolhead_sensor_triggered = false; // Filament detected at toolhead
+
+    // Per-unit tool routing (mixed topology support)
+    int unit_tool_count[MAX_UNITS] = {}; // Tools per unit (BT=4, OpenAMS=1)
+    int unit_first_tool[MAX_UNITS] = {}; // First tool index for this unit
+    int unit_topology[MAX_UNITS] = {};   // 0=LINEAR, 1=HUB, 2=PARALLEL
+    int total_tools = 0;                 // Total tool count across all units
+    int active_tool = -1;                // Currently active tool (-1=none)
 
     // Theme-derived colors (cached)
     lv_color_t color_idle;
@@ -236,6 +245,20 @@ static lv_color_t sp_blend(lv_color_t c1, lv_color_t c2, float factor) {
 // Main Draw Callback
 // ============================================================================
 
+// Helper: calculate horizontal X position for a tool in the tools row
+static int32_t calc_tool_x(int tool_index, int total_tools, int32_t x_off, int32_t width) {
+    if (total_tools <= 1) {
+        return x_off + width / 2;
+    }
+    // Distribute tools evenly across 20%-80% of widget width
+    int32_t margin = width / 5;
+    int32_t usable = width - 2 * margin;
+    if (total_tools == 1) {
+        return x_off + width / 2;
+    }
+    return x_off + margin + (usable * tool_index) / (total_tools - 1);
+}
+
 static void system_path_draw_cb(lv_event_t* e) {
     lv_obj_t* obj = lv_event_get_target_obj(e);
     lv_layer_t* layer = lv_event_get_layer(e);
@@ -256,11 +279,15 @@ static void system_path_draw_cb(lv_event_t* e) {
     int32_t x_off = obj_coords.x1;
     int32_t y_off = obj_coords.y1;
 
+    // Determine if multi-tool routing is needed
+    bool multi_tool = (data->total_tools > 1);
+
     // Calculate Y positions
     int32_t entry_y = y_off + (int32_t)(height * ENTRY_Y_RATIO);
     int32_t merge_y = y_off + (int32_t)(height * MERGE_Y_RATIO);
     int32_t hub_y = y_off + (int32_t)(height * HUB_Y_RATIO);
     int32_t hub_h = (int32_t)(height * HUB_HEIGHT_RATIO);
+    int32_t tools_y = y_off + (int32_t)(height * TOOLS_Y_RATIO);
     int32_t nozzle_y = y_off + (int32_t)(height * NOZZLE_Y_RATIO);
     int32_t center_x = x_off + width / 2;
 
@@ -277,176 +304,296 @@ static void system_path_draw_cb(lv_event_t* e) {
     int32_t sensor_r = LV_MAX(5, data->line_width_active);
 
     // Shift center_x left when bypass is supported to make room for bypass path on the right
-    if (data->has_bypass) {
+    if (data->has_bypass && !multi_tool) {
         center_x -= width / 10; // Shift hub/toolhead ~10% left
     }
 
-    // ========================================================================
-    // Draw unit entry lines (one per unit, from entry to merge point)
-    // ========================================================================
-    for (int i = 0; i < data->unit_count && i < SystemPathData::MAX_UNITS; i++) {
-        int32_t unit_x = x_off + data->unit_x_positions[i];
-        bool is_active = (i == data->active_unit);
+    if (multi_tool) {
+        // ====================================================================
+        // MULTI-TOOL MODE: Per-unit routing to individual tool positions
+        // Note: Bypass rendering is intentionally omitted here — bypass mode
+        // is not applicable to multi-extruder toolchanger setups since each
+        // tool has its own filament path.
+        // ====================================================================
 
-        lv_color_t line_color = is_active ? active_color_lv : idle_color;
-        int32_t line_w = is_active ? line_active : line_idle;
+        // Draw unit entry lines and per-unit routing
+        for (int i = 0; i < data->unit_count && i < SystemPathData::MAX_UNITS; i++) {
+            int32_t unit_x = x_off + data->unit_x_positions[i];
+            bool is_active = (i == data->active_unit);
+            int topology = data->unit_topology[i];
+            int tool_count = data->unit_tool_count[i];
+            int first_tool = data->unit_first_tool[i];
 
-        // Hub sensor dot interrupts the vertical segment
-        bool has_sensor = data->unit_has_hub_sensor[i];
-        int32_t sensor_dot_y = entry_y + (merge_y - entry_y) * 3 / 5;
+            lv_color_t line_color = is_active ? active_color_lv : idle_color;
+            int32_t line_w = is_active ? line_active : line_idle;
 
-        if (has_sensor) {
-            // Vertical: entry → dot top, gap for dot, dot bottom → merge
-            draw_vertical_line(layer, unit_x, entry_y, sensor_dot_y - sensor_r, line_color, line_w);
-            draw_vertical_line(layer, unit_x, sensor_dot_y + sensor_r, merge_y, line_color, line_w);
+            // Hub sensor dot on the vertical segment
+            bool has_sensor = data->unit_has_hub_sensor[i];
+            int32_t sensor_dot_y = entry_y + (merge_y - entry_y) * 3 / 5;
 
-            // Draw the sensor dot in the gap
-            bool filled = data->unit_hub_triggered[i];
-            lv_color_t dot_color = filled ? (is_active ? active_color_lv : idle_color) : idle_color;
-            draw_sensor_dot(layer, unit_x, sensor_dot_y, dot_color, filled, sensor_r);
-        } else {
-            // No sensor: uninterrupted vertical line
-            draw_vertical_line(layer, unit_x, entry_y, merge_y, line_color, line_w);
+            if (topology == 2) {
+                // PARALLEL topology (Box Turtle): each lane fans to its own tool
+                // Draw a single entry line from unit card down to merge, then fan out
+                if (has_sensor) {
+                    draw_vertical_line(layer, unit_x, entry_y, sensor_dot_y - sensor_r, line_color,
+                                       line_w);
+                    draw_vertical_line(layer, unit_x, sensor_dot_y + sensor_r, merge_y, line_color,
+                                       line_w);
+                    bool filled = data->unit_hub_triggered[i];
+                    lv_color_t dot_color =
+                        filled ? (is_active ? active_color_lv : idle_color) : idle_color;
+                    draw_sensor_dot(layer, unit_x, sensor_dot_y, dot_color, filled, sensor_r);
+                } else {
+                    draw_vertical_line(layer, unit_x, entry_y, merge_y, line_color, line_w);
+                }
+
+                // Fan out from merge point to each tool position
+                for (int t = 0; t < tool_count && (first_tool + t) < data->total_tools; ++t) {
+                    int tool_idx = first_tool + t;
+                    int32_t tool_x = calc_tool_x(tool_idx, data->total_tools, x_off, width);
+                    bool tool_active = is_active && (tool_idx == data->active_tool);
+
+                    lv_color_t fan_color = tool_active ? active_color_lv : idle_color;
+                    int32_t fan_w = tool_active ? line_active : line_idle;
+
+                    draw_line(layer, unit_x, merge_y, tool_x, tools_y, fan_color, fan_w);
+                }
+            } else {
+                // HUB topology (OpenAMS/default): all lanes converge to hub, then to one tool
+                if (has_sensor) {
+                    draw_vertical_line(layer, unit_x, entry_y, sensor_dot_y - sensor_r, line_color,
+                                       line_w);
+                    draw_vertical_line(layer, unit_x, sensor_dot_y + sensor_r, merge_y, line_color,
+                                       line_w);
+                    bool filled = data->unit_hub_triggered[i];
+                    lv_color_t dot_color =
+                        filled ? (is_active ? active_color_lv : idle_color) : idle_color;
+                    draw_sensor_dot(layer, unit_x, sensor_dot_y, dot_color, filled, sensor_r);
+                } else {
+                    draw_vertical_line(layer, unit_x, entry_y, merge_y, line_color, line_w);
+                }
+
+                // Converge to the first (and only) tool for this hub unit
+                if (tool_count > 0 && first_tool < data->total_tools) {
+                    int32_t tool_x = calc_tool_x(first_tool, data->total_tools, x_off, width);
+
+                    // Draw a small hub box at merge level, centered on tool_x
+                    int32_t mini_hub_w = data->hub_width * 2 / 3;
+                    int32_t mini_hub_h = hub_h * 2 / 3;
+                    int32_t mini_hub_y = merge_y + (tools_y - merge_y) / 3;
+
+                    bool hub_has_filament = is_active && data->filament_loaded;
+                    lv_color_t mini_hub_bg = hub_bg;
+                    if (hub_has_filament) {
+                        mini_hub_bg = sp_blend(hub_bg, active_color_lv, 0.33f);
+                    }
+
+                    // Line from unit to mini hub
+                    draw_line(layer, unit_x, merge_y, tool_x, mini_hub_y - mini_hub_h / 2,
+                              line_color, line_w);
+
+                    draw_hub_box(layer, tool_x, mini_hub_y, mini_hub_w, mini_hub_h, mini_hub_bg,
+                                 hub_border, data->color_text, data->label_font,
+                                 data->border_radius, "Hub");
+
+                    // Line from mini hub to tool
+                    bool tool_active = is_active && (first_tool == data->active_tool);
+                    lv_color_t out_color = tool_active ? active_color_lv : idle_color;
+                    int32_t out_w = tool_active ? line_active : line_idle;
+                    draw_vertical_line(layer, tool_x, mini_hub_y + mini_hub_h / 2, tools_y,
+                                       out_color, out_w);
+                }
+            }
         }
 
-        // Angled segment from unit position at merge_y to hub top
-        draw_line(layer, unit_x, merge_y, center_x, hub_y - hub_h / 2, line_color, line_w);
-    }
+        // Draw tool nozzles at the bottom
+        int32_t small_scale = LV_MAX(6, data->extruder_scale * 3 / 4);
+        for (int t = 0; t < data->total_tools && t < SystemPathData::MAX_TOOLS; ++t) {
+            int32_t tool_x = calc_tool_x(t, data->total_tools, x_off, width);
+            bool is_active_tool = (t == data->active_tool) && data->filament_loaded;
 
-    // ========================================================================
-    // Draw bypass path (if supported) — bypasses the hub entirely
-    // Drawn to the right of the hub area (no external card)
-    // Path: label at top → vertical down past hub → angle to meet output below hub
-    // ========================================================================
-    if (data->has_bypass) {
-        // Bypass is a horizontal spur off the hub's right side at hub center level,
-        // then drops down to merge with the output path below
-        int32_t hub_right = center_x + data->hub_width / 2;
-        int32_t bypass_x = hub_right + width / 8; // endpoint of horizontal spur
-        bool bp_active = data->bypass_active;
+            lv_color_t noz_color = is_active_tool ? active_color_lv : nozzle_color;
+            draw_nozzle_bambu(layer, tool_x, tools_y, noz_color, small_scale);
 
-        lv_color_t bp_color = bp_active ? lv_color_hex(data->bypass_color) : idle_color;
-        int32_t bp_width = bp_active ? line_active : line_idle;
+            // Tool label (T0, T1, etc.) below nozzle
+            if (data->label_font) {
+                char tool_label[8];
+                snprintf(tool_label, sizeof(tool_label), "T%d", t);
 
-        int32_t hub_bottom = hub_y + hub_h / 2;
-        int32_t bypass_merge_y = hub_bottom + (nozzle_y - hub_bottom) / 3;
+                lv_draw_label_dsc_t label_dsc;
+                lv_draw_label_dsc_init(&label_dsc);
+                label_dsc.color = is_active_tool ? active_color_lv : data->color_text;
+                label_dsc.font = data->label_font;
+                label_dsc.align = LV_TEXT_ALIGN_CENTER;
+                label_dsc.text = tool_label;
 
-        // "Bypass" label above the bypass merge point
-        if (data->label_font) {
-            lv_draw_label_dsc_t bp_label_dsc;
-            lv_draw_label_dsc_init(&bp_label_dsc);
-            bp_label_dsc.color = bp_active ? lv_color_hex(data->bypass_color) : data->color_text;
-            bp_label_dsc.font = data->label_font;
-            bp_label_dsc.align = LV_TEXT_ALIGN_CENTER;
-            bp_label_dsc.text = "Bypass";
-
-            int32_t font_h = lv_font_get_line_height(data->label_font);
-            int32_t label_top = bypass_merge_y - font_h - 4;
-            lv_area_t bp_label_area = {bypass_x - 30, label_top, bypass_x + 30, label_top + font_h};
-            lv_draw_label(layer, &bp_label_dsc, &bp_label_area);
+                int32_t font_h = lv_font_get_line_height(data->label_font);
+                int32_t label_top = tools_y + small_scale * 2 + 2;
+                lv_area_t label_area = {tool_x - 15, label_top, tool_x + 15, label_top + font_h};
+                lv_draw_label(layer, &label_dsc, &label_area);
+            }
         }
 
-        // Bypass path: horizontal line below the hub, never touches the hub
-        // Dot at bypass endpoint, then horizontal to center to merge into output path
-        draw_sensor_dot(layer, bypass_x, bypass_merge_y, bp_color, bp_active, sensor_r);
-        draw_line(layer, bypass_x - sensor_r, bypass_merge_y, center_x, bypass_merge_y, bp_color,
-                  bp_width);
-    }
-
-    // ========================================================================
-    // Draw combiner hub
-    // ========================================================================
-    {
-        // Hub only carries filament from units, NOT from bypass (bypass skips the hub)
-        bool hub_has_filament = (data->active_unit >= 0 && data->filament_loaded);
-
-        // Tint hub background with active color when filament passes through (33% blend)
-        lv_color_t hub_bg_tinted = hub_bg;
-        if (hub_has_filament) {
-            hub_bg_tinted = sp_blend(hub_bg, active_color_lv, 0.33f);
-        }
-
-        draw_hub_box(layer, center_x, hub_y, data->hub_width, hub_h, hub_bg_tinted, hub_border,
-                     data->color_text, data->label_font, data->border_radius, "Hub");
-    }
-
-    // ========================================================================
-    // Draw output line from hub to nozzle (with sensor dots)
-    // ========================================================================
-    {
-        bool unit_active = (data->active_unit >= 0 && data->filament_loaded);
-        bool bp_active = (data->bypass_active && data->filament_loaded);
-        bool any_active = unit_active || bp_active;
-
-        int32_t hub_bottom = hub_y + hub_h / 2;
-        int32_t extruder_half_height = data->extruder_scale * 2;
-        int32_t nozzle_top = nozzle_y - extruder_half_height;
-
-        // Bypass merge point (must match the bypass drawing section above)
-        int32_t bypass_merge_y = hub_bottom + (nozzle_y - hub_bottom) / 3;
-
-        // Sensor Y position along the output line (toolhead sensor only — hub sensors are per-unit
-        // now)
-        int32_t toolhead_sensor_y =
-            hub_bottom + (nozzle_top - hub_bottom) * 2 / 3; // 2/3 down from hub to nozzle
-
-        // Determine colors for each segment of the output line
-        lv_color_t active_output_color =
-            bp_active ? lv_color_hex(data->bypass_color) : active_color_lv;
-
-        // Draw the output line in segments around sensor dots
-        if (bp_active) {
-            // Bypass: hub→bypass_merge is idle, bypass_merge→nozzle is colored
-            draw_vertical_line(layer, center_x, hub_bottom, bypass_merge_y, idle_color, line_idle);
-            draw_vertical_line(layer, center_x, bypass_merge_y, nozzle_top,
-                               lv_color_hex(data->bypass_color), line_active);
-        } else if (unit_active) {
-            draw_vertical_line(layer, center_x, hub_bottom, nozzle_top, active_color_lv,
-                               line_active);
-        } else {
-            draw_vertical_line(layer, center_x, hub_bottom, nozzle_top, idle_color, line_idle);
-        }
-
-        // Toolhead entry sensor dot (between hub and nozzle)
-        if (data->has_toolhead_sensor) {
-            bool th_filled = data->toolhead_sensor_triggered;
-            lv_color_t th_dot_color = th_filled ? active_output_color : idle_color;
-            if (!any_active)
-                th_dot_color = idle_color;
-            draw_sensor_dot(layer, center_x, toolhead_sensor_y, th_dot_color, th_filled, sensor_r);
-        }
-
-        // Nozzle color: tinted with filament color when loaded
-        lv_color_t noz_color = nozzle_color;
-        if (bp_active) {
-            noz_color = lv_color_hex(data->bypass_color);
-        } else if (unit_active) {
-            noz_color = active_color_lv;
-        }
-
-        draw_nozzle_bambu(layer, center_x, nozzle_y, noz_color, data->extruder_scale);
-
-        // Draw status text to the LEFT of the nozzle
+        // Draw status text at the bottom
         if (data->status_text[0] && data->label_font) {
             lv_draw_label_dsc_t status_dsc;
             lv_draw_label_dsc_init(&status_dsc);
             status_dsc.color = data->color_text;
             status_dsc.font = data->label_font;
-            status_dsc.align = LV_TEXT_ALIGN_RIGHT;
+            status_dsc.align = LV_TEXT_ALIGN_CENTER;
             status_dsc.text = data->status_text;
 
             int32_t font_h = lv_font_get_line_height(data->label_font);
-            int32_t label_right = center_x - data->extruder_scale * 3; // Right edge, left of nozzle
-            int32_t label_left = x_off + 4;
-            lv_area_t status_area = {label_left, nozzle_y - font_h / 2, label_right,
-                                     nozzle_y + font_h / 2};
+            int32_t status_y = y_off + height - font_h - 2;
+            lv_area_t status_area = {x_off + 4, status_y, x_off + width - 4, status_y + font_h};
             lv_draw_label(layer, &status_dsc, &status_area);
+        }
+
+    } else {
+        // ====================================================================
+        // SINGLE-TOOL MODE: Original hub convergence (unchanged)
+        // ====================================================================
+
+        // Draw unit entry lines (one per unit, from entry to merge point)
+        for (int i = 0; i < data->unit_count && i < SystemPathData::MAX_UNITS; i++) {
+            int32_t unit_x = x_off + data->unit_x_positions[i];
+            bool is_active = (i == data->active_unit);
+
+            lv_color_t line_color = is_active ? active_color_lv : idle_color;
+            int32_t line_w = is_active ? line_active : line_idle;
+
+            // Hub sensor dot interrupts the vertical segment
+            bool has_sensor = data->unit_has_hub_sensor[i];
+            int32_t sensor_dot_y = entry_y + (merge_y - entry_y) * 3 / 5;
+
+            if (has_sensor) {
+                draw_vertical_line(layer, unit_x, entry_y, sensor_dot_y - sensor_r, line_color,
+                                   line_w);
+                draw_vertical_line(layer, unit_x, sensor_dot_y + sensor_r, merge_y, line_color,
+                                   line_w);
+                bool filled = data->unit_hub_triggered[i];
+                lv_color_t dot_color =
+                    filled ? (is_active ? active_color_lv : idle_color) : idle_color;
+                draw_sensor_dot(layer, unit_x, sensor_dot_y, dot_color, filled, sensor_r);
+            } else {
+                draw_vertical_line(layer, unit_x, entry_y, merge_y, line_color, line_w);
+            }
+
+            // Angled segment from unit position at merge_y to hub top
+            draw_line(layer, unit_x, merge_y, center_x, hub_y - hub_h / 2, line_color, line_w);
+        }
+
+        // Draw bypass path (if supported)
+        if (data->has_bypass) {
+            int32_t hub_right = center_x + data->hub_width / 2;
+            int32_t bypass_x = hub_right + width / 8;
+            bool bp_active = data->bypass_active;
+
+            lv_color_t bp_color = bp_active ? lv_color_hex(data->bypass_color) : idle_color;
+            int32_t bp_width = bp_active ? line_active : line_idle;
+
+            int32_t hub_bottom = hub_y + hub_h / 2;
+            int32_t bypass_merge_y = hub_bottom + (nozzle_y - hub_bottom) / 3;
+
+            if (data->label_font) {
+                lv_draw_label_dsc_t bp_label_dsc;
+                lv_draw_label_dsc_init(&bp_label_dsc);
+                bp_label_dsc.color =
+                    bp_active ? lv_color_hex(data->bypass_color) : data->color_text;
+                bp_label_dsc.font = data->label_font;
+                bp_label_dsc.align = LV_TEXT_ALIGN_CENTER;
+                bp_label_dsc.text = "Bypass";
+
+                int32_t font_h = lv_font_get_line_height(data->label_font);
+                int32_t label_top = bypass_merge_y - font_h - 4;
+                lv_area_t bp_label_area = {bypass_x - 30, label_top, bypass_x + 30,
+                                           label_top + font_h};
+                lv_draw_label(layer, &bp_label_dsc, &bp_label_area);
+            }
+
+            draw_sensor_dot(layer, bypass_x, bypass_merge_y, bp_color, bp_active, sensor_r);
+            draw_line(layer, bypass_x - sensor_r, bypass_merge_y, center_x, bypass_merge_y,
+                      bp_color, bp_width);
+        }
+
+        // Draw combiner hub
+        {
+            bool hub_has_filament = (data->active_unit >= 0 && data->filament_loaded);
+            lv_color_t hub_bg_tinted = hub_bg;
+            if (hub_has_filament) {
+                hub_bg_tinted = sp_blend(hub_bg, active_color_lv, 0.33f);
+            }
+            draw_hub_box(layer, center_x, hub_y, data->hub_width, hub_h, hub_bg_tinted, hub_border,
+                         data->color_text, data->label_font, data->border_radius, "Hub");
+        }
+
+        // Draw output line from hub to nozzle (with sensor dots)
+        {
+            bool unit_active = (data->active_unit >= 0 && data->filament_loaded);
+            bool bp_active = (data->bypass_active && data->filament_loaded);
+            bool any_active = unit_active || bp_active;
+
+            int32_t hub_bottom = hub_y + hub_h / 2;
+            int32_t extruder_half_height = data->extruder_scale * 2;
+            int32_t nozzle_top = nozzle_y - extruder_half_height;
+            int32_t bypass_merge_y = hub_bottom + (nozzle_y - hub_bottom) / 3;
+            int32_t toolhead_sensor_y = hub_bottom + (nozzle_top - hub_bottom) * 2 / 3;
+
+            lv_color_t active_output_color =
+                bp_active ? lv_color_hex(data->bypass_color) : active_color_lv;
+
+            if (bp_active) {
+                draw_vertical_line(layer, center_x, hub_bottom, bypass_merge_y, idle_color,
+                                   line_idle);
+                draw_vertical_line(layer, center_x, bypass_merge_y, nozzle_top,
+                                   lv_color_hex(data->bypass_color), line_active);
+            } else if (unit_active) {
+                draw_vertical_line(layer, center_x, hub_bottom, nozzle_top, active_color_lv,
+                                   line_active);
+            } else {
+                draw_vertical_line(layer, center_x, hub_bottom, nozzle_top, idle_color, line_idle);
+            }
+
+            if (data->has_toolhead_sensor) {
+                bool th_filled = data->toolhead_sensor_triggered;
+                lv_color_t th_dot_color = th_filled ? active_output_color : idle_color;
+                if (!any_active)
+                    th_dot_color = idle_color;
+                draw_sensor_dot(layer, center_x, toolhead_sensor_y, th_dot_color, th_filled,
+                                sensor_r);
+            }
+
+            lv_color_t noz_color = nozzle_color;
+            if (bp_active) {
+                noz_color = lv_color_hex(data->bypass_color);
+            } else if (unit_active) {
+                noz_color = active_color_lv;
+            }
+
+            draw_nozzle_bambu(layer, center_x, nozzle_y, noz_color, data->extruder_scale);
+
+            if (data->status_text[0] && data->label_font) {
+                lv_draw_label_dsc_t status_dsc;
+                lv_draw_label_dsc_init(&status_dsc);
+                status_dsc.color = data->color_text;
+                status_dsc.font = data->label_font;
+                status_dsc.align = LV_TEXT_ALIGN_RIGHT;
+                status_dsc.text = data->status_text;
+
+                int32_t font_h = lv_font_get_line_height(data->label_font);
+                int32_t label_right = center_x - data->extruder_scale * 3;
+                int32_t label_left = x_off + 4;
+                lv_area_t status_area = {label_left, nozzle_y - font_h / 2, label_right,
+                                         nozzle_y + font_h / 2};
+                lv_draw_label(layer, &status_dsc, &status_area);
+            }
         }
     }
 
-    spdlog::trace("[SystemPath] Draw: units={}, active={}, loaded={}, bypass={}(active={})",
-                  data->unit_count, data->active_unit, data->filament_loaded, data->has_bypass,
-                  data->bypass_active);
+    spdlog::trace("[SystemPath] Draw: units={}, active={}, loaded={}, tools={}, active_tool={}, "
+                  "bypass={}(active={})",
+                  data->unit_count, data->active_unit, data->filament_loaded, data->total_tools,
+                  data->active_tool, data->has_bypass, data->bypass_active);
 }
 
 // ============================================================================
@@ -659,6 +806,40 @@ void ui_system_path_canvas_set_toolhead_sensor(lv_obj_t* obj, bool has_toolhead_
     if (data) {
         data->has_toolhead_sensor = has_toolhead_sensor;
         data->toolhead_sensor_triggered = toolhead_sensor_triggered;
+        lv_obj_invalidate(obj);
+    }
+}
+
+void ui_system_path_canvas_set_unit_tools(lv_obj_t* obj, int unit_index, int tool_count,
+                                          int first_tool) {
+    auto* data = get_data(obj);
+    if (data && unit_index >= 0 && unit_index < SystemPathData::MAX_UNITS) {
+        data->unit_tool_count[unit_index] = tool_count;
+        data->unit_first_tool[unit_index] = first_tool;
+        lv_obj_invalidate(obj);
+    }
+}
+
+void ui_system_path_canvas_set_unit_topology(lv_obj_t* obj, int unit_index, int topology) {
+    auto* data = get_data(obj);
+    if (data && unit_index >= 0 && unit_index < SystemPathData::MAX_UNITS) {
+        data->unit_topology[unit_index] = topology;
+        lv_obj_invalidate(obj);
+    }
+}
+
+void ui_system_path_canvas_set_total_tools(lv_obj_t* obj, int total_tools) {
+    auto* data = get_data(obj);
+    if (data) {
+        data->total_tools = LV_CLAMP(total_tools, 0, SystemPathData::MAX_TOOLS);
+        lv_obj_invalidate(obj);
+    }
+}
+
+void ui_system_path_canvas_set_active_tool(lv_obj_t* obj, int tool_index) {
+    auto* data = get_data(obj);
+    if (data) {
+        data->active_tool = tool_index;
         lv_obj_invalidate(obj);
     }
 }

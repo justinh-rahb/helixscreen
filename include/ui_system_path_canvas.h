@@ -146,6 +146,46 @@ void ui_system_path_canvas_set_toolhead_sensor(lv_obj_t* obj, bool has_toolhead_
                                                bool toolhead_sensor_triggered);
 
 /**
+ * @brief Set per-unit tool routing info
+ *
+ * For mixed topology systems, each unit can route to different tools:
+ * - PARALLEL units (Box Turtle): 4 lanes fan out to T0-T3 (4 separate tools)
+ * - HUB units (OpenAMS): all lanes converge to 1 tool (e.g., T4)
+ *
+ * @param obj The system_path_canvas widget
+ * @param unit_index Unit index (0-7)
+ * @param tool_count Number of tools this unit feeds (BT=4, OpenAMS=1)
+ * @param first_tool First tool index for this unit (e.g., 0 for BT, 4 for OpenAMS)
+ */
+void ui_system_path_canvas_set_unit_tools(lv_obj_t* obj, int unit_index, int tool_count,
+                                          int first_tool);
+
+/**
+ * @brief Set per-unit topology
+ *
+ * @param obj The system_path_canvas widget
+ * @param unit_index Unit index (0-7)
+ * @param topology 0=LINEAR, 1=HUB, 2=PARALLEL
+ */
+void ui_system_path_canvas_set_unit_topology(lv_obj_t* obj, int unit_index, int topology);
+
+/**
+ * @brief Set total tool count across all units
+ *
+ * @param obj The system_path_canvas widget
+ * @param total_tools Total number of tools (e.g., 6 for BT(4) + OpenAMS(1) + OpenAMS(1))
+ */
+void ui_system_path_canvas_set_total_tools(lv_obj_t* obj, int total_tools);
+
+/**
+ * @brief Set the currently active tool
+ *
+ * @param obj The system_path_canvas widget
+ * @param tool_index Active tool index (0+), or -1 for none
+ */
+void ui_system_path_canvas_set_active_tool(lv_obj_t* obj, int tool_index);
+
+/**
  * @brief Force redraw of the path visualization
  *
  * @param obj The system_path_canvas widget

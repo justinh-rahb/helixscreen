@@ -182,7 +182,9 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
     }
 
     ui_filament_path_canvas_set_slot_count(canvas, slot_count);
-    ui_filament_path_canvas_set_topology(canvas, static_cast<int>(backend->get_topology()));
+    PathTopology topo =
+        (unit_index >= 0) ? backend->get_unit_topology(unit_index) : backend->get_topology();
+    ui_filament_path_canvas_set_topology(canvas, static_cast<int>(topo));
 
     // Sync slot sizing with grid layout
     if (slot_grid) {

@@ -265,6 +265,14 @@ PathTopology AmsBackendAfc::get_topology() const {
     return PathTopology::HUB;
 }
 
+PathTopology AmsBackendAfc::get_unit_topology(int unit_index) const {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    if (unit_index >= 0 && unit_index < static_cast<int>(unit_infos_.size())) {
+        return unit_infos_[unit_index].topology;
+    }
+    return get_topology(); // Fallback to system-wide topology
+}
+
 PathSegment AmsBackendAfc::get_filament_segment() const {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     return compute_filament_segment_unlocked();
@@ -440,6 +448,16 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
             }
         }
 
+        // Parse AFC_lane objects (OpenAMS lanes use this prefix instead of AFC_stepper)
+        // Same JSON schema as AFC_stepper, so reuse parse_afc_stepper
+        for (const auto& lane_name : lane_names_) {
+            std::string key = "AFC_lane " + lane_name;
+            if (params.contains(key) && params[key].is_object()) {
+                parse_afc_stepper(lane_name, params[key]);
+                state_changed = true;
+            }
+        }
+
         // Parse AFC_hub objects for hub sensor state
         // Keys like "AFC_hub Turtle_1"
         for (const auto& hub_name : hub_names_) {
@@ -450,11 +468,22 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
             }
         }
 
-        // Parse AFC_extruder for toolhead sensors
-        if (params.contains("AFC_extruder extruder") &&
-            params["AFC_extruder extruder"].is_object()) {
-            parse_afc_extruder(params["AFC_extruder extruder"]);
-            state_changed = true;
+        // Parse AFC_extruder for toolhead sensors (multi-extruder support)
+        if (!extruder_names_.empty()) {
+            for (const auto& ext_name : extruder_names_) {
+                std::string key = "AFC_extruder " + ext_name;
+                if (params.contains(key) && params[key].is_object()) {
+                    parse_afc_extruder(params[key]);
+                    state_changed = true;
+                }
+            }
+        } else {
+            // Backward compat: single extruder fallback
+            if (params.contains("AFC_extruder extruder") &&
+                params["AFC_extruder extruder"].is_object()) {
+                parse_afc_extruder(params["AFC_extruder extruder"]);
+                state_changed = true;
+            }
         }
 
         // Parse AFC_buffer objects for buffer health and fault data
@@ -462,6 +491,15 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
             std::string key = "AFC_buffer " + buf_name;
             if (params.contains(key) && params[key].is_object()) {
                 parse_afc_buffer(buf_name, params[key]);
+                state_changed = true;
+            }
+        }
+
+        // Parse unit-level Klipper objects (AFC_BoxTurtle, AFC_OpenAMS)
+        for (auto& unit_info : unit_infos_) {
+            if (params.contains(unit_info.klipper_key) &&
+                params[unit_info.klipper_key].is_object()) {
+                parse_afc_unit_object(unit_info, params[unit_info.klipper_key]);
                 state_changed = true;
             }
         }
@@ -594,7 +632,36 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
 
         // Capture unit-to-lane mapping for multi-unit reorganization
         unit_lane_map_.clear();
+        unit_infos_.clear();
+
         for (const auto& unit_json : units_json) {
+            // Handle flat string format: "OpenAMS AMS_1", "Box_Turtle Turtle_1"
+            if (unit_json.is_string()) {
+                std::string unit_str = unit_json.get<std::string>();
+                auto space_pos = unit_str.find(' ');
+                if (space_pos != std::string::npos) {
+                    AfcUnitInfo info;
+                    info.type = unit_str.substr(0, space_pos);
+                    info.name = unit_str.substr(space_pos + 1);
+                    // AFC convention: Klipper object prefix is "AFC_" + type with underscores
+                    // removed. Known mappings: "Box_Turtle" → "AFC_BoxTurtle", "OpenAMS" →
+                    // "AFC_OpenAMS" If this convention breaks for future types, use an explicit
+                    // mapping table.
+                    std::string klipper_type = info.type;
+                    klipper_type.erase(std::remove(klipper_type.begin(), klipper_type.end(), '_'),
+                                       klipper_type.end());
+                    info.klipper_key = "AFC_" + klipper_type + " " + info.name;
+                    unit_infos_.push_back(std::move(info));
+                    spdlog::debug("[AMS AFC] Parsed string unit: type='{}' name='{}' key='{}'",
+                                  unit_infos_.back().type, unit_infos_.back().name,
+                                  unit_infos_.back().klipper_key);
+                } else {
+                    spdlog::debug("[AMS AFC] Skipping unit string with no space: '{}'", unit_str);
+                }
+                continue;
+            }
+
+            // Handle object format (backward compat): {"name": "...", "lanes": [...]}
             if (!unit_json.is_object()) {
                 continue;
             }
@@ -618,7 +685,7 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
             }
         }
 
-        // Update existing unit names and connection status (backward compat)
+        // Update existing unit names and connection status (backward compat for object format)
         for (size_t i = 0; i < units_json.size() && i < system_info_.units.size(); ++i) {
             if (units_json[i].is_object()) {
                 if (units_json[i].contains("name") && units_json[i]["name"].is_string()) {
@@ -631,7 +698,7 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
             }
         }
 
-        // If we got unit-lane data, re-organize into multi-unit layout.
+        // If we got unit-lane data from object format, re-organize into multi-unit layout.
         // NOTE: This runs under mutex_ lock (held by handle_status_update caller),
         // so system_info_ modifications are safe from concurrent get_system_info() reads.
         if (!unit_lane_map_.empty()) {
@@ -663,6 +730,19 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
                 buffer_names_.push_back(buf.get<std::string>());
             }
         }
+    }
+
+    // Extract extruder names from top-level AFC.extruders array (for multi-extruder iteration)
+    // This is a flat string array: ["extruder", "extruder1", ..., "extruder5"]
+    if (afc_data.contains("extruders") && afc_data["extruders"].is_array()) {
+        extruder_names_.clear();
+        for (const auto& ext : afc_data["extruders"]) {
+            if (ext.is_string()) {
+                extruder_names_.push_back(ext.get<std::string>());
+            }
+        }
+        spdlog::debug("[AMS AFC] Discovered {} extruder names from AFC state",
+                      extruder_names_.size());
     }
 
     // Parse global quiet_mode and LED state
@@ -1043,6 +1123,108 @@ void AmsBackendAfc::parse_afc_extruder(const nlohmann::json& data) {
                   tool_end_sensor_, current_lane_name_);
 }
 
+void AmsBackendAfc::parse_afc_unit_object(AfcUnitInfo& unit_info, const nlohmann::json& data) {
+    // Parse unit-level Klipper object (AFC_BoxTurtle or AFC_OpenAMS)
+    // Contains arrays of lanes, extruders, hubs, and buffers belonging to this unit
+
+    if (data.contains("lanes") && data["lanes"].is_array()) {
+        unit_info.lanes.clear();
+        for (const auto& lane : data["lanes"]) {
+            if (lane.is_string()) {
+                unit_info.lanes.push_back(lane.get<std::string>());
+            }
+        }
+    }
+
+    if (data.contains("extruders") && data["extruders"].is_array()) {
+        unit_info.extruders.clear();
+        for (const auto& ext : data["extruders"]) {
+            if (ext.is_string()) {
+                unit_info.extruders.push_back(ext.get<std::string>());
+            }
+        }
+    }
+
+    if (data.contains("hubs") && data["hubs"].is_array()) {
+        unit_info.hubs.clear();
+        for (const auto& hub : data["hubs"]) {
+            if (hub.is_string()) {
+                unit_info.hubs.push_back(hub.get<std::string>());
+            }
+        }
+    }
+
+    if (data.contains("buffers") && data["buffers"].is_array()) {
+        unit_info.buffers.clear();
+        for (const auto& buf : data["buffers"]) {
+            if (buf.is_string()) {
+                unit_info.buffers.push_back(buf.get<std::string>());
+            }
+        }
+    }
+
+    // Derive topology from hub/extruder counts:
+    // - No hubs + multiple extruders → PARALLEL (Box Turtle: 1:1 lane-to-tool)
+    // - Hubs present + single extruder → HUB (OpenAMS: N:1 through hub)
+    // - Default: HUB
+    if (unit_info.hubs.empty() && unit_info.extruders.size() > 1) {
+        unit_info.topology = PathTopology::PARALLEL;
+    } else if (!unit_info.hubs.empty() && unit_info.extruders.size() <= 1) {
+        unit_info.topology = PathTopology::HUB;
+    } else {
+        unit_info.topology = PathTopology::HUB;
+    }
+
+    spdlog::debug("[AMS AFC] Unit object '{}': {} lanes, {} extruders, {} hubs, {} buffers → {}",
+                  unit_info.klipper_key, unit_info.lanes.size(), unit_info.extruders.size(),
+                  unit_info.hubs.size(), unit_info.buffers.size(),
+                  path_topology_to_string(unit_info.topology));
+
+    // Only reorganize when ALL unit_infos_ have received their lane data.
+    // Unit objects may arrive in separate status updates; reorganizing on partial
+    // data creates transient incorrect unit structures visible in the UI.
+    bool all_have_lanes = !unit_infos_.empty();
+    for (const auto& ui : unit_infos_) {
+        if (ui.lanes.empty()) {
+            all_have_lanes = false;
+            break;
+        }
+    }
+    if (all_have_lanes) {
+        reorganize_units_from_unit_info();
+    }
+}
+
+void AmsBackendAfc::reorganize_units_from_unit_info() {
+    // Rebuild unit_lane_map_ from unit_infos_ data and trigger reorganization
+    unit_lane_map_.clear();
+    for (const auto& ui : unit_infos_) {
+        if (!ui.lanes.empty()) {
+            // Use the full "Type Name" as map key for reorganize_units_from_map
+            // which uses unit names for AmsUnit::name
+            std::string display_name = ui.type + " " + ui.name;
+            unit_lane_map_[display_name] = ui.lanes;
+        }
+    }
+
+    if (!unit_lane_map_.empty()) {
+        if (!lanes_initialized_ && !lane_names_.empty()) {
+            initialize_lanes(lane_names_);
+        }
+        if (lanes_initialized_) {
+            reorganize_units_from_map();
+
+            // Set per-unit topology on AmsUnit structs from unit_infos_
+            for (size_t i = 0; i < unit_infos_.size() && i < system_info_.units.size(); ++i) {
+                system_info_.units[i].topology = unit_infos_[i].topology;
+            }
+
+            spdlog::debug("[AMS AFC] Reorganized {} units from unit-level objects",
+                          unit_infos_.size());
+        }
+    }
+}
+
 // ============================================================================
 // Version Detection
 // ============================================================================
@@ -1148,14 +1330,33 @@ void AmsBackendAfc::query_initial_state() {
         objects_to_query[key] = nullptr;
     }
 
+    // Add AFC_lane objects (OpenAMS lanes use this prefix instead of AFC_stepper)
+    for (const auto& lane_name : lane_names_) {
+        std::string key = "AFC_lane " + lane_name;
+        objects_to_query[key] = nullptr;
+    }
+
     // Add AFC_hub objects
     for (const auto& hub_name : hub_names_) {
         std::string key = "AFC_hub " + hub_name;
         objects_to_query[key] = nullptr;
     }
 
-    // Add AFC_extruder
-    objects_to_query["AFC_extruder extruder"] = nullptr;
+    // Add AFC_extruder objects (multi-extruder support)
+    if (!extruder_names_.empty()) {
+        for (const auto& ext_name : extruder_names_) {
+            std::string key = "AFC_extruder " + ext_name;
+            objects_to_query[key] = nullptr;
+        }
+    } else {
+        // Backward compat: single extruder
+        objects_to_query["AFC_extruder extruder"] = nullptr;
+    }
+
+    // Add unit-level Klipper objects (AFC_BoxTurtle, AFC_OpenAMS)
+    for (const auto& unit_info : unit_infos_) {
+        objects_to_query[unit_info.klipper_key] = nullptr;
+    }
 
     nlohmann::json params = {{"objects", objects_to_query}};
 

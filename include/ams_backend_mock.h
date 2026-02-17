@@ -53,6 +53,7 @@ class AmsBackendMock : public AmsBackend {
 
     // Path visualization
     [[nodiscard]] PathTopology get_topology() const override;
+    [[nodiscard]] PathTopology get_unit_topology(int unit_index) const override;
     [[nodiscard]] PathSegment get_filament_segment() const override;
     [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
@@ -267,6 +268,23 @@ class AmsBackendMock : public AmsBackend {
     [[nodiscard]] bool is_multi_unit_mode() const;
 
     /**
+     * @brief Enable mixed topology mode for testing multi-unit mixed hardware
+     *
+     * Simulates J0eB0l's real hardware: 6-tool toolchanger with mixed AFC:
+     * - Unit 0: "Turtle_1" (Box Turtle) - 4 lanes, PARALLEL, 1:1 lane->tool
+     * - Unit 1: "AMS_1" (OpenAMS) - 4 lanes, HUB, 4:1 lane->T4
+     * - Unit 2: "AMS_2" (OpenAMS) - 4 lanes, HUB, 4:1 lane->T5
+     *
+     * @param enabled true to enable mixed topology mode
+     */
+    void set_mixed_topology_mode(bool enabled);
+
+    /**
+     * @brief Check if mixed topology mode is active
+     */
+    [[nodiscard]] bool is_mixed_topology_mode() const;
+
+    /**
      * @brief Set whether endless spool is supported
      * @param supported true to enable endless spool support
      *
@@ -444,8 +462,10 @@ class AmsBackendMock : public AmsBackend {
     bool tool_changer_mode_ = false; ///< Simulate tool changer instead of filament system
 
     // AFC mode (alternative to Happy Hare simulation)
-    bool afc_mode_ = false;        ///< Simulate AFC Box Turtle instead of Happy Hare
-    bool multi_unit_mode_ = false; ///< Simulate multi-unit AFC (2x Box Turtle)
+    bool afc_mode_ = false;                     ///< Simulate AFC Box Turtle instead of Happy Hare
+    bool multi_unit_mode_ = false;              ///< Simulate multi-unit AFC (2x Box Turtle)
+    bool mixed_topology_mode_ = false;          ///< Simulate mixed topology (BT + 2x OpenAMS)
+    std::vector<PathTopology> unit_topologies_; ///< Per-unit topology storage
 
     // Endless spool simulation state
     bool endless_spool_supported_ = true; ///< Whether endless spool is supported

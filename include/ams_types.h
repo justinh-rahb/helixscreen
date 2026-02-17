@@ -625,6 +625,9 @@ struct AmsUnit {
     // Buffer health (AFC TurtleNeck — one buffer per unit, sits between hub and toolhead)
     std::optional<BufferHealth> buffer_health; ///< Buffer fault state (nullopt = no buffer data)
 
+    // Per-unit topology (for mixed-topology setups like Box Turtle + OpenAMS)
+    PathTopology topology = PathTopology::HUB; ///< Filament path topology for this unit
+
     /**
      * @brief Check if any slot in this unit has an error
      * @return true if at least one slot has error.has_value()

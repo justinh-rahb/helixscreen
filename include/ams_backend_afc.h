@@ -63,6 +63,27 @@ struct AfcExtruderInfo {
     std::vector<std::string> available_lanes; ///< Lanes that can feed this extruder
 };
 
+/**
+ * @brief Per-unit info parsed from flat string units and unit-level Klipper objects
+ *
+ * When AFC reports units as flat strings (e.g., "OpenAMS AMS_1", "Box_Turtle Turtle_1"),
+ * this struct stores the parsed type/name and the Klipper object key used to receive
+ * unit-level status updates (e.g., "AFC_OpenAMS AMS_1"). The lanes, extruders, hubs,
+ * and buffers arrays are populated from the unit-level Klipper object data.
+ */
+struct AfcUnitInfo {
+    std::string klipper_key; ///< Klipper object key (e.g., "AFC_BoxTurtle Turtle_1")
+    std::string name;        ///< Unit instance name (e.g., "Turtle_1", "AMS_1")
+    std::string type;        ///< Unit type (e.g., "Box_Turtle", "OpenAMS")
+
+    std::vector<std::string> lanes;     ///< Lane names belonging to this unit
+    std::vector<std::string> extruders; ///< Extruder names for this unit
+    std::vector<std::string> hubs;      ///< Hub names for this unit
+    std::vector<std::string> buffers;   ///< Buffer names for this unit
+
+    PathTopology topology = PathTopology::HUB; ///< Derived topology for this unit
+};
+
 class AmsBackendAfc : public AmsBackend {
   public:
     /**
@@ -97,6 +118,7 @@ class AmsBackendAfc : public AmsBackend {
 
     // Path visualization
     [[nodiscard]] PathTopology get_topology() const override;
+    [[nodiscard]] PathTopology get_unit_topology(int unit_index) const override;
     [[nodiscard]] PathSegment get_filament_segment() const override;
     [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
@@ -369,6 +391,25 @@ class AmsBackendAfc : public AmsBackend {
     void parse_afc_extruder(const nlohmann::json& data);
 
     /**
+     * @brief Parse a unit-level Klipper object (AFC_BoxTurtle, AFC_OpenAMS)
+     *
+     * Reads lanes[], extruders[], hubs[], buffers[] arrays from the unit object
+     * and derives topology (PARALLEL vs HUB) based on hub/extruder counts.
+     *
+     * @param unit_info The AfcUnitInfo to populate
+     * @param data JSON object from the unit-level Klipper object
+     */
+    void parse_afc_unit_object(AfcUnitInfo& unit_info, const nlohmann::json& data);
+
+    /**
+     * @brief Rebuild unit_lane_map_ and reorganize units from unit_infos_ data
+     *
+     * Called after all unit-level objects have been parsed. Rebuilds the
+     * unit-to-lane mapping from unit_infos_ and triggers reorganize_units_from_map().
+     */
+    void reorganize_units_from_unit_info();
+
+    /**
      * @brief Initialize lane structures based on discovered lanes
      *
      * Called when we first receive lane data to create the correct
@@ -521,6 +562,12 @@ class AmsBackendAfc : public AmsBackend {
     int num_extruders_{1}; ///< Number of extruders (1 = standard, 2+ = toolchanger)
     std::vector<AfcExtruderInfo>
         extruders_; ///< Per-extruder info (populated from system.extruders)
+
+    // Unit-level info from flat string units and unit Klipper objects
+    std::vector<AfcUnitInfo> unit_infos_; ///< Parsed from flat string "Type Name" units
+
+    // Extruder names from top-level AFC.extruders array (for multi-extruder iteration)
+    std::vector<std::string> extruder_names_; ///< e.g., {"extruder", "extruder1", ...}
 
     // Path visualization state
     PathSegment error_segment_{PathSegment::NONE}; ///< Inferred error location

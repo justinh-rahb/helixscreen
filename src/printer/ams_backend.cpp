@@ -33,6 +33,9 @@ static std::unique_ptr<AmsBackendMock> create_mock_with_features(int gate_count)
         if (type_str == "toolchanger" || type_str == "tool_changer" || type_str == "tc") {
             mock->set_tool_changer_mode(true);
             spdlog::info("[AMS Backend] Mock tool changer mode enabled via HELIX_MOCK_AMS_TYPE");
+        } else if (type_str == "mixed") {
+            mock->set_mixed_topology_mode(true);
+            spdlog::info("[AMS Backend] Mock mixed topology mode enabled via HELIX_MOCK_AMS_TYPE");
         } else if (type_str == "afc" || type_str == "box_turtle" || type_str == "boxturtle") {
             mock->set_afc_mode(true);
             spdlog::info("[AMS Backend] Mock AFC mode enabled via HELIX_MOCK_AMS_TYPE");
