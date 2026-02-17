@@ -593,6 +593,14 @@ struct SlotInfo {
     [[nodiscard]] bool is_multi_color() const {
         return !multi_color_hexes.empty();
     }
+
+    /**
+     * @brief Check if filament is present in this slot
+     * @return true for AVAILABLE, LOADED, FROM_BUFFER, BLOCKED; false for EMPTY, UNKNOWN
+     */
+    [[nodiscard]] bool is_present() const {
+        return status != SlotStatus::EMPTY && status != SlotStatus::UNKNOWN;
+    }
 };
 
 /**

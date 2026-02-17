@@ -38,6 +38,7 @@
 #include "settings_manager.h"
 #include "static_panel_registry.h"
 #include "theme_manager.h"
+#include "ui/ams_drawing_utils.h"
 #include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
@@ -520,23 +521,12 @@ void AmsPanel::setup_system_header() {
         const AmsUnit& unit = info.units[scoped_unit_index_];
 
         // Try unit-specific logo first, fall back to system logo
-        const char* logo_path = AmsState::get_logo_path(unit.name);
-        if (!logo_path || !logo_path[0]) {
-            logo_path = AmsState::get_logo_path(info.type_name);
-        }
-
-        if (logo_path) {
-            lv_image_set_src(system_logo, logo_path);
-            lv_obj_remove_flag(system_logo, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(system_logo, LV_OBJ_FLAG_HIDDEN);
-        }
+        ams_draw::apply_logo(system_logo, unit, info);
 
         // Override the header title with unit name
         lv_obj_t* title_label = lv_obj_find_by_name(panel_, "system_name");
         if (title_label) {
-            std::string display_name =
-                unit.name.empty() ? ("Unit " + std::to_string(scoped_unit_index_ + 1)) : unit.name;
+            std::string display_name = ams_draw::get_unit_display_name(unit, scoped_unit_index_);
             lv_label_set_text(title_label, display_name.c_str());
         }
 
@@ -545,15 +535,7 @@ void AmsPanel::setup_system_header() {
     }
 
     // Default: show system-level logo (existing behavior)
-    const char* logo_path = AmsState::get_logo_path(info.type_name);
-    if (logo_path) {
-        spdlog::debug("[{}] Setting logo: '{}' -> {}", get_name(), info.type_name, logo_path);
-        lv_image_set_src(system_logo, logo_path);
-        lv_obj_remove_flag(system_logo, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(system_logo, LV_OBJ_FLAG_HIDDEN);
-        spdlog::debug("[{}] No logo for system '{}'", get_name(), info.type_name);
-    }
+    ams_draw::apply_logo(system_logo, info.type_name);
 }
 
 void AmsPanel::rebuild_backend_selector() {
