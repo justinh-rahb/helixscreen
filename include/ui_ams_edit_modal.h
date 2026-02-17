@@ -7,6 +7,7 @@
 #include "ui_modal.h"
 
 #include "ams_types.h"
+#include "spoolman_types.h"
 #include "subject_managed_panel.h"
 
 #include <functional>
@@ -20,10 +21,15 @@ namespace helix::ui {
 
 /**
  * @file ui_ams_edit_modal.h
- * @brief Modal dialog for editing AMS filament slot properties
+ * @brief Unified modal for editing AMS filament slot properties
  *
- * Allows editing vendor, material, color, and remaining weight.
- * Supports syncing changes back to Spoolman if the slot is linked.
+ * Supports two views:
+ * - Form view: manual editing of vendor, material, color, remaining weight
+ * - Picker view: Spoolman spool selection from a scrollable list
+ *
+ * Smart first-view logic shows the picker for empty slots when Spoolman
+ * is available, and the form view otherwise. SpoolmanSlotSaver handles
+ * syncing edits back to Spoolman on save.
  *
  * ## Usage:
  * @code
@@ -110,6 +116,8 @@ class AmsEditModal : public Modal {
     lv_subject_t remaining_pct_subject_;
     lv_subject_t remaining_mode_subject_; ///< 0=view, 1=edit
     lv_subject_t save_btn_text_subject_;  ///< "Save" or "Close"
+    lv_subject_t view_mode_subject_;      ///< 0=form, 1=picker
+    lv_subject_t picker_state_subject_;   ///< 0=loading, 1=empty, 2=content
 
     char slot_indicator_buf_[32] = {0};
     char color_name_buf_[32] = {0};
@@ -137,6 +145,9 @@ class AmsEditModal : public Modal {
     std::vector<std::string> vendor_list_;   ///< Vendor names for index lookup
     bool vendors_loaded_ = false;            ///< True once Spoolman vendors have been fetched
 
+    // === Picker state (Spoolman spool selection) ===
+    std::vector<SpoolInfo> cached_spools_; ///< Cached spools from Spoolman fetch
+
     // === Internal Methods ===
     void fetch_vendors_from_spoolman();
     void update_vendor_dropdown();
@@ -153,6 +164,19 @@ class AmsEditModal : public Modal {
     bool is_dirty() const;
     void update_sync_button_state();
     void show_color_picker();
+
+    // === View switching ===
+    void switch_to_picker();                  ///< Show picker view, populate spools
+    void switch_to_form();                    ///< Show form view
+    void populate_picker();                   ///< Async spool fetch and list population
+    void handle_spool_selected(int spool_id); ///< Auto-fill working_info_ from selected spool
+    void handle_manual_entry();               ///< Switch from picker to form
+    void handle_change_spool();               ///< Switch from form to picker
+    void handle_unlink();                     ///< Clear spoolman_id from working slot
+    void update_spoolman_button_state();      ///< Show/hide change/unlink buttons
+
+    // === Save orchestration ===
+    void fire_completion(bool saved); ///< Common exit path for save/cancel
 
     // === Event Handlers ===
     void handle_close();
@@ -183,6 +207,10 @@ class AmsEditModal : public Modal {
     static void on_sync_spoolman_cb(lv_event_t* e);
     static void on_reset_cb(lv_event_t* e);
     static void on_save_cb(lv_event_t* e);
+    static void on_manual_entry_cb(lv_event_t* e);
+    static void on_change_spool_cb(lv_event_t* e);
+    static void on_unlink_cb(lv_event_t* e);
+    static void on_spool_item_cb(lv_event_t* e);
 
     /**
      * @brief Find AmsEditModal instance from event target
