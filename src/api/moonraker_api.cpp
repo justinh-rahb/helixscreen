@@ -329,6 +329,8 @@ void MoonrakerAPI::database_get_item(const std::string& namespace_name, const st
                                      std::function<void(const json&)> on_success,
                                      ErrorCallback on_error) {
     json params = {{"namespace", namespace_name}, {"key", key}};
+    // Silent: missing keys are expected (first-time reads before any save).
+    // Callers handle errors via their error callback — no need for a toast.
     client_.send_jsonrpc(
         "server.database.get_item", params,
         [on_success](const json& result) {
@@ -339,7 +341,9 @@ void MoonrakerAPI::database_get_item(const std::string& namespace_name, const st
         [on_error](const MoonrakerError& err) {
             if (on_error)
                 on_error(err);
-        });
+        },
+        0,     // timeout_ms: use default
+        true); // silent: suppress RPC_ERROR toast
 }
 
 void MoonrakerAPI::database_post_item(const std::string& namespace_name, const std::string& key,
