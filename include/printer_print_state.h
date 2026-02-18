@@ -382,6 +382,11 @@ class PrinterPrintState {
     // Atomic: written from background thread (gcode fallback), read from main thread (UI).
     std::atomic<bool> has_real_layer_data_{false};
 
+    // Slicer progress from display_status (M73 gcode command)
+    // When active, preferred over virtual_sdcard file-position progress
+    double slicer_progress_ = 0.0;        // Raw 0.0-1.0 from display_status
+    bool slicer_progress_active_ = false; // True once non-zero value seen during print
+
     // String buffers for subject storage
     char print_filename_buf_[256]{};
     char print_display_filename_buf_[128]{};

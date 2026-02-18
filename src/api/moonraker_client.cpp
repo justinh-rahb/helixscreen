@@ -1444,6 +1444,7 @@ void MoonrakerClient::complete_discovery_subscription(std::function<void()> on_c
     subscription_objects["gcode_move"] = nullptr;
     subscription_objects["motion_report"] = nullptr;
     subscription_objects["system_stats"] = nullptr;
+    subscription_objects["display_status"] = nullptr;
 
     // All discovered heaters (extruders, beds, generic heaters)
     for (const auto& heater : heaters_) {

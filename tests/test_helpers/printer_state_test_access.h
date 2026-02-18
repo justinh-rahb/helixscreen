@@ -13,6 +13,8 @@ class PrinterPrintStateTestAccess {
     static void reset_extra(PrinterPrintState& pps) {
         pps.estimated_print_time_ = 0;
         pps.has_real_layer_data_ = false;
+        pps.slicer_progress_ = 0.0;
+        pps.slicer_progress_active_ = false;
     }
 };
 
