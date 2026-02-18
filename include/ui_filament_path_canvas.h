@@ -112,6 +112,17 @@ void ui_filament_path_canvas_set_slot_overlap(lv_obj_t* obj, int32_t overlap);
 void ui_filament_path_canvas_set_slot_width(lv_obj_t* obj, int32_t width);
 
 /**
+ * @brief Set the slot grid widget for live position measurement
+ *
+ * When set, the draw callback measures slot positions directly from the grid's
+ * child widgets, ensuring pixel-perfect alignment at any screen size.
+ *
+ * @param obj The filament_path_canvas widget
+ * @param slot_grid The slot_grid lv_obj containing slot child widgets
+ */
+void ui_filament_path_canvas_set_slot_grid(lv_obj_t* obj, lv_obj_t* slot_grid);
+
+/**
  * @brief Set the active slot (whose path is highlighted)
  *
  * @param obj The filament_path_canvas widget

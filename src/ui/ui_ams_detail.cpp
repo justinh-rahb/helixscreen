@@ -186,13 +186,16 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
         (unit_index >= 0) ? backend->get_unit_topology(unit_index) : backend->get_topology();
     ui_filament_path_canvas_set_topology(canvas, static_cast<int>(topo));
 
-    // Sync slot sizing with grid layout
+    // Pass slot_grid reference so draw callback can read actual slot positions
+    // at render time — avoids setup-vs-draw timing mismatches across breakpoints.
     if (slot_grid) {
+        ui_filament_path_canvas_set_slot_grid(canvas, slot_grid);
+
+        // Still set slot_width/overlap as fallback for get_slot_x() computed positions
         lv_obj_t* slot_area = lv_obj_get_parent(slot_grid);
         lv_obj_update_layout(slot_area);
         int32_t available_width = lv_obj_get_content_width(slot_area);
         auto layout = calculate_ams_slot_layout(available_width, slot_count);
-
         ui_filament_path_canvas_set_slot_width(canvas, layout.slot_width);
         ui_filament_path_canvas_set_slot_overlap(canvas, layout.overlap);
     }

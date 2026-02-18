@@ -96,12 +96,16 @@ struct FilamentPathData {
     int error_segment = 0;               // Error location (0=none)
     int anim_progress = 0;               // Animation progress 0-100 (for segment transition)
     uint32_t filament_color = DEFAULT_FILAMENT_COLOR;
-    int32_t slot_overlap = 0;     // Overlap between slots in pixels (for 5+ gates)
-    int32_t slot_width = 90;      // Dynamic slot width (set by AmsPanel)
-    int32_t slot_grid_offset = 0; // X offset from canvas edge to slot grid start
+    int32_t slot_overlap = 0; // Overlap between slots in pixels (for 5+ gates)
+    int32_t slot_width = 90;  // Dynamic slot width (fallback when slot_grid unavailable)
+
+    // Live slot position measurement: slot_grid pointer + cached spool_container
+    // pointers for pixel-perfect lane alignment at any screen size.
+    lv_obj_t* slot_grid = nullptr;
+    static constexpr int MAX_SLOTS = 16;
+    lv_obj_t* spool_containers[MAX_SLOTS] = {};
 
     // Per-slot filament state (for showing all installed filaments, not just active)
-    static constexpr int MAX_SLOTS = 16;
     SlotFilamentState slot_filament_states[MAX_SLOTS] = {};
 
     // Animation state
@@ -199,23 +203,27 @@ static FilamentPathData* get_data(lv_obj_t* obj) {
 // Helper Functions
 // ============================================================================
 
-// Calculate X position for a slot's entry point
-// Uses ABSOLUTE positioning with dynamic slot width from AmsPanel:
-//   slot_center[i] = card_padding + slot_width/2 + i * (slot_width - overlap)
-// Both slot_width and overlap are set by AmsPanel to match actual slot layout.
-// Slot X positions must account for the card padding offset between the
-// ams_unit_card (which contains the slot grid with padding) and the
-// path_container (which has no padding but the same outer width).
-// The offset is stored in slot_grid_offset, set from actual layout measurements.
-static int32_t get_slot_x(int slot_index, int slot_count, int32_t slot_width, int32_t overlap,
-                          int32_t grid_offset) {
-    if (slot_count <= 1) {
-        return grid_offset + slot_width / 2;
+// Get slot center X relative to the canvas left edge.
+// Primary: uses cached spool_container pointers for pixel-perfect alignment.
+// Fallback: computes position from slot_width/overlap when slot_grid unavailable.
+static int32_t get_slot_x(const FilamentPathData* data, int slot_index, int32_t canvas_x1) {
+    if (slot_index >= 0 && slot_index < FilamentPathData::MAX_SLOTS) {
+        // Use cached spool_container center — the actual visual element we align to
+        lv_obj_t* spool_cont = data->spool_containers[slot_index];
+        if (spool_cont) {
+            lv_area_t coords;
+            lv_obj_get_coords(spool_cont, &coords);
+            return (coords.x1 + coords.x2) / 2 - canvas_x1;
+        }
     }
 
-    int32_t slot_spacing = slot_width - overlap;
-
-    return grid_offset + slot_width / 2 + slot_index * slot_spacing;
+    // Fallback: computed position (no slot_grid available)
+    int32_t slot_width = data->slot_width;
+    if (data->slot_count <= 1) {
+        return slot_width / 2;
+    }
+    int32_t slot_spacing = slot_width - data->slot_overlap;
+    return slot_width / 2 + slot_index * slot_spacing;
 }
 
 // Check if a segment should be drawn as "active" (filament present at or past it)
@@ -630,9 +638,11 @@ static void draw_parallel_topology(lv_event_t* e, FilamentPathData* data) {
 
     // Layout ratios for parallel topology (adjusted for per-slot toolheads)
     constexpr float ENTRY_Y = -0.12f;   // Top entry (connects to spool)
-    constexpr float TOOLHEAD_Y = 0.55f; // Toolhead position per slot
+    constexpr float SENSOR_Y = 0.38f;   // Toolhead entry sensor (analogous to hub topology)
+    constexpr float TOOLHEAD_Y = 0.55f; // Nozzle/toolhead position per slot
 
     int32_t entry_y = y_off + (int32_t)(height * ENTRY_Y);
+    int32_t sensor_y = y_off + (int32_t)(height * SENSOR_Y);
     int32_t toolhead_y = y_off + (int32_t)(height * TOOLHEAD_Y);
 
     // Colors
@@ -642,42 +652,56 @@ static void draw_parallel_topology(lv_event_t* e, FilamentPathData* data) {
     // Line sizes
     int32_t line_idle = data->line_width_idle;
     int32_t line_active = data->line_width_active;
+    int32_t sensor_r = data->sensor_radius;
 
     // Draw each tool as an independent column
     for (int i = 0; i < data->slot_count; i++) {
-        int32_t slot_x = x_off + get_slot_x(i, data->slot_count, data->slot_width,
-                                            data->slot_overlap, data->slot_grid_offset);
+        int32_t slot_x = x_off + get_slot_x(data, i, x_off);
         bool is_mounted = (i == data->active_slot);
 
-        // Get filament color for this tool
+        // Determine filament reach for this slot from per-slot state
         lv_color_t tool_color = idle_color;
         bool has_filament = false;
+        PathSegment slot_segment = PathSegment::NONE;
 
         if (i < FilamentPathData::MAX_SLOTS &&
             data->slot_filament_states[i].segment != PathSegment::NONE) {
             has_filament = true;
             tool_color = lv_color_hex(data->slot_filament_states[i].color);
+            slot_segment = data->slot_filament_states[i].segment;
         }
 
-        // For mounted tool, use active filament color if available
+        // For mounted tool, use active filament color and segment if available
         if (is_mounted && data->filament_segment > 0) {
             tool_color = lv_color_hex(data->filament_color);
             has_filament = true;
+            slot_segment = static_cast<PathSegment>(data->filament_segment);
         }
 
-        // Draw filament path from spool to toolhead
-        lv_color_t path_color = has_filament ? tool_color : idle_color;
-        int32_t path_width = has_filament ? line_active : line_idle;
+        bool at_sensor = has_filament && (slot_segment >= PathSegment::TOOLHEAD);
+        bool at_nozzle = has_filament && (slot_segment >= PathSegment::NOZZLE);
 
-        // Vertical line from entry to toolhead (connect to top of nozzle body)
         int32_t tool_scale = LV_MAX(6, data->extruder_scale * 2 / 3);
         int32_t nozzle_top = toolhead_y - tool_scale * 2; // Top of heater block
-        draw_vertical_line(layer, slot_x, entry_y, nozzle_top, path_color, path_width);
 
-        // Determine nozzle color - mounted tools highlighted, docked dimmed
+        // Entry → sensor line: colored if filament present (even if not yet at sensor)
+        lv_color_t entry_color = has_filament ? tool_color : idle_color;
+        int32_t entry_width = has_filament ? line_active : line_idle;
+        draw_vertical_line(layer, slot_x, entry_y, sensor_y - sensor_r, entry_color, entry_width);
+
+        // Toolhead entry sensor dot
+        lv_color_t sensor_color = at_sensor ? tool_color : idle_color;
+        draw_sensor_dot(layer, slot_x, sensor_y, sensor_color, at_sensor, sensor_r);
+
+        // Sensor → nozzle line: only colored if filament reaches nozzle
+        lv_color_t nozzle_line_color = at_nozzle ? tool_color : idle_color;
+        int32_t nozzle_line_width = at_nozzle ? line_active : line_idle;
+        draw_vertical_line(layer, slot_x, sensor_y + sensor_r, nozzle_top, nozzle_line_color,
+                           nozzle_line_width);
+
+        // Determine nozzle color - only show filament color when actually at nozzle
         lv_color_t noz_color = is_mounted ? nozzle_color : ph_darken(nozzle_color, 60);
-        if (has_filament) {
-            // Show filament color in nozzle when filament is present
+        if (at_nozzle) {
             noz_color = tool_color;
         }
 
@@ -789,8 +813,7 @@ static void filament_path_draw_cb(lv_event_t* e) {
     // Shows all installed filaments' colors, not just the active slot
     // ========================================================================
     for (int i = 0; i < data->slot_count; i++) {
-        int32_t slot_x = x_off + get_slot_x(i, data->slot_count, data->slot_width,
-                                            data->slot_overlap, data->slot_grid_offset);
+        int32_t slot_x = x_off + get_slot_x(data, i, x_off);
         bool is_active_slot = (i == data->active_slot);
 
         // Determine line color and width for this slot's lane
@@ -1144,9 +1167,7 @@ static void filament_path_draw_cb(lv_event_t* e) {
         int32_t tip_x = center_x;
         if ((prev_seg <= PathSegment::PREP || fil_seg <= PathSegment::PREP) &&
             data->active_slot >= 0) {
-            int32_t slot_x =
-                x_off + get_slot_x(data->active_slot, data->slot_count, data->slot_width,
-                                   data->slot_overlap, data->slot_grid_offset);
+            int32_t slot_x = x_off + get_slot_x(data, data->active_slot, x_off);
             if (is_loading) {
                 // Moving from slot toward center
                 if (prev_seg <= PathSegment::PREP && fil_seg > PathSegment::PREP) {
@@ -1204,8 +1225,7 @@ static void filament_path_click_cb(lv_event_t* e) {
 
         if (abs(point.y - toolhead_y) < hit_radius_y) {
             for (int i = 0; i < data->slot_count; i++) {
-                int32_t slot_x = x_off + get_slot_x(i, data->slot_count, data->slot_width,
-                                                    data->slot_overlap, data->slot_grid_offset);
+                int32_t slot_x = x_off + get_slot_x(data, i, x_off);
                 int32_t hit_radius_x = LV_MAX(20, tool_scale * 3);
                 if (abs(point.x - slot_x) < hit_radius_x) {
                     spdlog::debug("[FilamentPath] Toolhead {} clicked (parallel topology)", i);
@@ -1236,8 +1256,7 @@ static void filament_path_click_cb(lv_event_t* e) {
     // Find which slot was clicked
     if (data->slot_callback) {
         for (int i = 0; i < data->slot_count; i++) {
-            int32_t slot_x = x_off + get_slot_x(i, data->slot_count, data->slot_width,
-                                                data->slot_overlap, data->slot_grid_offset);
+            int32_t slot_x = x_off + get_slot_x(data, i, x_off);
             if (abs(point.x - slot_x) < 20) {
                 spdlog::debug("[FilamentPath] Slot {} clicked", i);
                 data->slot_callback(i, data->slot_user_data);
@@ -1439,12 +1458,26 @@ void ui_filament_path_canvas_set_slot_width(lv_obj_t* obj, int32_t width) {
     }
 }
 
-void ui_filament_path_canvas_set_slot_grid_offset(lv_obj_t* obj, int32_t offset) {
+void ui_filament_path_canvas_set_slot_grid(lv_obj_t* obj, lv_obj_t* slot_grid) {
     auto* data = get_data(obj);
-    if (data) {
-        data->slot_grid_offset = LV_MAX(offset, 0);
-        spdlog::trace("[FilamentPath] Slot grid offset set to {}px", data->slot_grid_offset);
-        lv_obj_invalidate(obj);
+    if (!data)
+        return;
+
+    data->slot_grid = slot_grid;
+
+    // Pre-cache spool_container pointers to avoid per-frame lv_obj_find_by_name
+    std::memset(data->spool_containers, 0, sizeof(data->spool_containers));
+    if (slot_grid) {
+        int child_count =
+            LV_MIN((int)lv_obj_get_child_count(slot_grid), FilamentPathData::MAX_SLOTS);
+        for (int i = 0; i < child_count; i++) {
+            lv_obj_t* slot = lv_obj_get_child(slot_grid, i);
+            if (slot) {
+                data->spool_containers[i] = lv_obj_find_by_name(slot, "spool_container");
+            }
+        }
+        spdlog::debug("[FilamentPath] Cached {} spool_container pointers from slot_grid",
+                      child_count);
     }
 }
 
