@@ -2041,6 +2041,16 @@ extract_release() {
             log_info "Backed up existing configuration (legacy location)"
         fi
 
+        # Remove stale .old backup from any previous install attempt
+        if [ -d "${INSTALL_DIR}.old" ]; then
+            log_info "Removing stale backup from previous install..."
+            if ! $SUDO rm -rf "${INSTALL_DIR}.old"; then
+                log_error "Failed to remove stale backup at ${INSTALL_DIR}.old"
+                rm -rf "$extract_dir"
+                exit 1
+            fi
+        fi
+
         # Atomic swap: move old install to .old backup
         if ! $(file_sudo "${INSTALL_DIR}") mv "${INSTALL_DIR}" "${INSTALL_DIR}.old"; then
             log_error "Failed to backup existing installation."
@@ -2056,7 +2066,9 @@ extract_release() {
         # ROLLBACK: restore old installation
         if [ -d "${INSTALL_DIR}.old" ]; then
             log_warn "Rolling back to previous installation..."
-            if $(file_sudo "${INSTALL_DIR}.old") mv "${INSTALL_DIR}.old" "${INSTALL_DIR}"; then
+            # Remove partial new install that may block the rollback mv
+            [ -d "${INSTALL_DIR}" ] && $SUDO rm -rf "${INSTALL_DIR}"
+            if $SUDO mv "${INSTALL_DIR}.old" "${INSTALL_DIR}"; then
                 log_warn "Rollback complete. Previous installation restored."
             else
                 log_error "CRITICAL: Rollback failed! Previous install at ${INSTALL_DIR}.old"
@@ -2082,7 +2094,7 @@ extract_release() {
 # Remove backup of previous installation (call after service starts successfully)
 cleanup_old_install() {
     if [ -d "${INSTALL_DIR}.old" ]; then
-        $(file_sudo "${INSTALL_DIR}.old") rm -rf "${INSTALL_DIR}.old"
+        $SUDO rm -rf "${INSTALL_DIR}.old" || true
         log_info "Cleaned up previous installation backup"
     fi
 }
@@ -2697,14 +2709,14 @@ uninstall() {
     for cache_dir in /root/.cache/helix /tmp/helix_thumbs /.cache/helix /data/helixscreen/cache /usr/data/helixscreen/cache; do
         if [ -d "$cache_dir" ] 2>/dev/null; then
             log_info "Removing cache: $cache_dir"
-            $(file_sudo "$cache_dir") rm -rf "$cache_dir"
+            $SUDO rm -rf "$cache_dir"
         fi
     done
     # Clean up /var/tmp helix files
     for tmp_pattern in /var/tmp/helix_*; do
         if [ -e "$tmp_pattern" ] 2>/dev/null; then
             log_info "Removing cache: $tmp_pattern"
-            $(file_sudo "$tmp_pattern") rm -rf "$tmp_pattern"
+            $SUDO rm -rf "$tmp_pattern"
         fi
     done
 
