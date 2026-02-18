@@ -10,10 +10,17 @@
 //   GET  /v1/debug-bundle/:code - Retrieve debug bundle (requires X-Admin-Key)
 //
 // Secrets (configure via `wrangler secret put`):
-//   INGEST_API_KEY  - API key baked into HelixScreen binaries
-//   GITHUB_TOKEN    - GitHub PAT with repo scope
-//   ADMIN_API_KEY   - Admin API key for retrieving debug bundles
-//   RESEND_API_KEY  - Resend API key for email notifications
+//   INGEST_API_KEY          - API key baked into HelixScreen binaries
+//   GITHUB_APP_PRIVATE_KEY  - GitHub App private key (PEM)
+//   ADMIN_API_KEY           - Admin API key for retrieving debug bundles
+//   RESEND_API_KEY          - Resend API key for email notifications
+
+import {
+  getInstallationToken,
+  crashFingerprint,
+  findExistingIssue,
+  addDuplicateComment,
+} from "./github-app.js";
 
 export default {
   async fetch(request, env) {
@@ -88,13 +95,14 @@ async function handleCrashReport(request, env) {
     });
   }
 
-  // --- Create GitHub issue ---
+  // --- Create GitHub issue (or add comment to existing) ---
   try {
     const issue = await createGitHubIssue(env, body);
-    return jsonResponse(201, {
-      status: "created",
+    return jsonResponse(issue.is_duplicate ? 200 : 201, {
+      status: issue.is_duplicate ? "duplicate" : "created",
       issue_number: issue.number,
       issue_url: issue.html_url,
+      is_duplicate: issue.is_duplicate || false,
     });
   } catch (err) {
     console.error("Failed to create GitHub issue:", err.message);
@@ -114,23 +122,45 @@ function validateRequiredFields(body, fields) {
 
 /**
  * Build a markdown issue body from the crash report and create it via GitHub API.
+ * Uses GitHub App authentication (issues appear as "HelixScreen Crash Reporter [bot]").
+ * Deduplicates by fingerprint — adds a comment to existing issues instead of creating new ones.
  */
 async function createGitHubIssue(env, report) {
+  const [owner, repo] = env.GITHUB_REPO.split("/");
+
+  // Get installation token from GitHub App
+  const token = await getInstallationToken(
+    env.GITHUB_APP_ID,
+    env.GITHUB_APP_PRIVATE_KEY,
+    owner,
+    repo
+  );
+
+  const fingerprint = crashFingerprint(report);
+
+  // Check for existing open issue with same fingerprint
+  const existing = await findExistingIssue(token, owner, repo, fingerprint);
+  if (existing) {
+    await addDuplicateComment(token, owner, repo, existing.number, report, fingerprint);
+    return { number: existing.number, html_url: existing.html_url, is_duplicate: true };
+  }
+
   // Include fault type in title when available (e.g., "SEGV_MAPERR at 0x00000000")
   let title = `Crash: ${report.signal_name} in v${report.app_version}`;
   if (report.fault_code_name && report.fault_addr) {
     title = `Crash: ${report.signal_name} (${report.fault_code_name} at ${report.fault_addr}) in v${report.app_version}`;
   }
-  const body = formatIssueBody(report);
+
+  const body = formatIssueBody(report, fingerprint);
 
   const response = await fetch(
     `https://api.github.com/repos/${env.GITHUB_REPO}/issues`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         Accept: "application/vnd.github+json",
-        "User-Agent": "helix-crash-worker/1.0",
+        "User-Agent": "HelixScreen-Crash-Reporter",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -146,13 +176,14 @@ async function createGitHubIssue(env, report) {
     throw new Error(`GitHub API ${response.status}: ${text}`);
   }
 
-  return response.json();
+  const issue = await response.json();
+  return { number: issue.number, html_url: issue.html_url, is_duplicate: false };
 }
 
 /**
  * Format the crash report into a structured markdown issue body.
  */
-function formatIssueBody(r) {
+function formatIssueBody(r, fingerprint) {
   const timestamp = r.timestamp || new Date().toISOString();
   const uptime = r.uptime_seconds != null ? `${r.uptime_seconds}s` : "unknown";
 
@@ -223,7 +254,10 @@ ${r.log_tail.join("\n")}
 `;
   }
 
-  md += `\n---\n*Auto-reported by HelixScreen crash handler*\n`;
+  md += `\n---\n*Auto-reported by HelixScreen Crash Reporter*\n`;
+  if (fingerprint) {
+    md += `<sub>Fingerprint: \`${fingerprint}\`</sub>\n`;
+  }
 
   return md;
 }

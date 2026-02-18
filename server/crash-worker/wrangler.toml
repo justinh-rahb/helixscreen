@@ -5,14 +5,15 @@ workers_dev = false
 
 [vars]
 GITHUB_REPO = "prestonbrown/helixscreen"
+GITHUB_APP_ID = "2892859"
 NOTIFICATION_EMAIL = "pbrown+helixscreen@brown-house.net"
 EMAIL_FROM = "HelixScreen <noreply@helixscreen.org>"
 
 # Secrets (set via wrangler secret put):
-# INGEST_API_KEY - matches key baked into HelixScreen binary
-# GITHUB_TOKEN - GitHub PAT with Issues: Read and write scope
-# ADMIN_API_KEY - Admin API key for retrieving debug bundles
-# RESEND_API_KEY - Resend API key for email notifications
+# INGEST_API_KEY          - matches key baked into HelixScreen binary
+# GITHUB_APP_PRIVATE_KEY  - GitHub App RSA private key (PEM format)
+# ADMIN_API_KEY           - Admin API key for retrieving debug bundles
+# RESEND_API_KEY          - Resend API key for email notifications
 
 [[routes]]
 pattern = "crash.helixscreen.org/*"
