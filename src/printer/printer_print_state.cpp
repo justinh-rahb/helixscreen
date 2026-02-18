@@ -103,6 +103,8 @@ void PrinterPrintState::reset_for_new_print() {
     lv_subject_set_int(&print_progress_, 0);
     lv_subject_set_int(&print_layer_current_, 0);
     has_real_layer_data_ = false;
+    slicer_progress_ = 0.0;
+    slicer_progress_active_ = false;
     lv_subject_set_int(&print_duration_, 0);
     lv_subject_set_int(&print_elapsed_, 0);
     lv_subject_set_int(&print_filament_used_, 0);
@@ -150,7 +152,7 @@ void PrinterPrintState::update_from_status(const nlohmann::json& status) {
                     spdlog::info("[PrinterPrintState] Print error - setting outcome=ERROR");
                     lv_subject_set_int(&print_outcome_, static_cast<int>(PrintOutcome::ERROR));
                 }
-                // Starting a NEW print: clear the previous outcome
+                // Starting a NEW print: clear the previous outcome and slicer state
                 // (only when transitioning TO PRINTING from a non-PAUSED state)
                 else if (new_state == PrintJobState::PRINTING &&
                          current_state != PrintJobState::PAUSED) {
@@ -158,6 +160,10 @@ void PrinterPrintState::update_from_status(const nlohmann::json& status) {
                         spdlog::info("[PrinterPrintState] New print starting - clearing outcome");
                         lv_subject_set_int(&print_outcome_, static_cast<int>(PrintOutcome::NONE));
                     }
+                    // Reset slicer progress for the new print — each print must
+                    // independently activate slicer tracking via M73
+                    slicer_progress_ = 0.0;
+                    slicer_progress_active_ = false;
                 }
             }
 
@@ -295,42 +301,97 @@ void PrinterPrintState::update_from_status(const nlohmann::json& status) {
         }
     }
 
+    // Parse slicer progress from display_status (M73 gcode command)
+    if (status.contains("display_status")) {
+        const auto& display = status["display_status"];
+        if (display.contains("progress") && display["progress"].is_number()) {
+            double raw = display["progress"].get<double>();
+            slicer_progress_ = raw;
+            if (raw > 0.0 && !slicer_progress_active_) {
+                slicer_progress_active_ = true;
+                spdlog::info("[PrinterPrintState] Slicer progress active (M73 detected)");
+            }
+        }
+    }
+
+    // When slicer progress is active and display_status arrives without virtual_sdcard,
+    // update print_progress_ directly from slicer value
+    if (slicer_progress_active_ && status.contains("display_status") &&
+        !status.contains("virtual_sdcard")) {
+        int progress_pct = static_cast<int>(slicer_progress_ * 100.0 + 0.5);
+        if (progress_pct > 100)
+            progress_pct = 100;
+        if (progress_pct < 0)
+            progress_pct = 0;
+
+        auto current_state = static_cast<PrintJobState>(lv_subject_get_int(&print_state_enum_));
+        bool is_terminal_state =
+            (current_state == PrintJobState::COMPLETE ||
+             current_state == PrintJobState::CANCELLED || current_state == PrintJobState::ERROR);
+        int current_progress = lv_subject_get_int(&print_progress_);
+        if (!is_terminal_state || progress_pct >= current_progress) {
+            lv_subject_set_int(&print_progress_, progress_pct);
+        }
+    }
+
     // Update print progress (virtual_sdcard) - processed AFTER print_stats
     if (status.contains("virtual_sdcard")) {
         const auto& sdcard = status["virtual_sdcard"];
 
         if (sdcard.contains("progress") && sdcard["progress"].is_number()) {
-            int progress_pct = helix::units::json_to_percent(sdcard, "progress");
+            int file_progress_pct = helix::units::json_to_percent(sdcard, "progress");
 
-            // Guard: Don't reset progress to 0 in terminal print states (Complete/Cancelled/Error)
-            // This preserves the 100% display when a print finishes successfully
-            auto current_state = static_cast<PrintJobState>(lv_subject_get_int(&print_state_enum_));
-            bool is_terminal_state = (current_state == PrintJobState::COMPLETE ||
-                                      current_state == PrintJobState::CANCELLED ||
-                                      current_state == PrintJobState::ERROR);
+            // Update print_progress_ subject (skipped when slicer is active
+            // but only file progress arrived — slicer is authoritative)
+            bool skip_progress_update =
+                slicer_progress_active_ && !status.contains("display_status");
 
-            // Allow updates except: progress going backward in terminal state
-            int current_progress = lv_subject_get_int(&print_progress_);
-            if (!is_terminal_state || progress_pct >= current_progress) {
-                lv_subject_set_int(&print_progress_, progress_pct);
+            if (!skip_progress_update) {
+                int progress_pct = file_progress_pct;
+                if (slicer_progress_active_) {
+                    // Slicer active and display_status present — use slicer value
+                    progress_pct = static_cast<int>(slicer_progress_ * 100.0 + 0.5);
+                    if (progress_pct > 100)
+                        progress_pct = 100;
+                    if (progress_pct < 0)
+                        progress_pct = 0;
+                }
+
+                // Guard: Don't reset progress to 0 in terminal print states
+                auto current_state =
+                    static_cast<PrintJobState>(lv_subject_get_int(&print_state_enum_));
+                bool is_terminal_state = (current_state == PrintJobState::COMPLETE ||
+                                          current_state == PrintJobState::CANCELLED ||
+                                          current_state == PrintJobState::ERROR);
+
+                int current_progress = lv_subject_get_int(&print_progress_);
+                if (!is_terminal_state || progress_pct >= current_progress) {
+                    lv_subject_set_int(&print_progress_, progress_pct);
+                }
             }
 
-            // Fallback: estimate current layer from progress when slicer doesn't
-            // emit SET_PRINT_STATS_INFO (so print_stats.info has no layer data).
-            // Uses total_layers from file metadata × progress percentage.
-            if (!has_real_layer_data_ && !is_terminal_state && progress_pct > 0) {
-                int total = lv_subject_get_int(&print_layer_total_);
-                if (total > 0) {
-                    int estimated = (progress_pct * total + 50) / 100; // round
-                    if (estimated < 1)
-                        estimated = 1;
-                    if (estimated > total)
-                        estimated = total;
-                    int current = lv_subject_get_int(&print_layer_current_);
-                    if (estimated != current) {
-                        spdlog::debug("[LayerTracker] Estimated layer {}/{} from progress {}%",
-                                      estimated, total, progress_pct);
-                        lv_subject_set_int(&print_layer_current_, estimated);
+            // Layer estimation: always uses file_progress_pct (file position
+            // correlates better with layer number than time-weighted progress)
+            if (!has_real_layer_data_) {
+                auto current_state =
+                    static_cast<PrintJobState>(lv_subject_get_int(&print_state_enum_));
+                bool is_terminal_state = (current_state == PrintJobState::COMPLETE ||
+                                          current_state == PrintJobState::CANCELLED ||
+                                          current_state == PrintJobState::ERROR);
+                if (!is_terminal_state && file_progress_pct > 0) {
+                    int total = lv_subject_get_int(&print_layer_total_);
+                    if (total > 0) {
+                        int estimated = (file_progress_pct * total + 50) / 100;
+                        if (estimated < 1)
+                            estimated = 1;
+                        if (estimated > total)
+                            estimated = total;
+                        int current = lv_subject_get_int(&print_layer_current_);
+                        if (estimated != current) {
+                            spdlog::debug("[LayerTracker] Estimated layer {}/{} from progress {}%",
+                                          estimated, total, file_progress_pct);
+                            lv_subject_set_int(&print_layer_current_, estimated);
+                        }
                     }
                 }
             }
