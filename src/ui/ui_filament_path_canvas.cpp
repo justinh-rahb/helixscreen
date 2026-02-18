@@ -318,15 +318,8 @@ static void segment_anim_cb(void* var, int32_t value) {
 
     // Defer invalidation to avoid calling during render phase
     // Animation exec callbacks can run during lv_timer_handler() which may overlap with rendering
-    // Check lv_obj_is_valid() in case widget is deleted before callback executes
     helix::ui::async_call(
-        [](void* obj_ptr) {
-            auto* obj = static_cast<lv_obj_t*>(obj_ptr);
-            if (lv_obj_is_valid(obj)) {
-                lv_obj_invalidate(obj);
-            }
-        },
-        obj);
+        obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
 }
 
 // Start error pulse animation
@@ -377,15 +370,8 @@ static void error_pulse_anim_cb(void* var, int32_t value) {
 
     data->error_pulse_opa = static_cast<lv_opa_t>(value);
     // Defer invalidation to avoid calling during render phase
-    // Check lv_obj_is_valid() in case widget is deleted before callback executes
     helix::ui::async_call(
-        [](void* obj_ptr) {
-            auto* obj = static_cast<lv_obj_t*>(obj_ptr);
-            if (lv_obj_is_valid(obj)) {
-                lv_obj_invalidate(obj);
-            }
-        },
-        obj);
+        obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
 }
 
 // Heat pulse animation constants (same timing as error pulse)
@@ -442,13 +428,7 @@ static void heat_pulse_anim_cb(void* var, int32_t value) {
     data->heat_pulse_opa = static_cast<lv_opa_t>(value);
     // Defer invalidation to avoid calling during render phase
     helix::ui::async_call(
-        [](void* obj_ptr) {
-            auto* obj = static_cast<lv_obj_t*>(obj_ptr);
-            if (lv_obj_is_valid(obj)) {
-                lv_obj_invalidate(obj);
-            }
-        },
-        obj);
+        obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
 }
 
 // ============================================================================

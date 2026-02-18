@@ -5,6 +5,7 @@
 
 #include "ui_fonts.h"
 #include "ui_icon_codepoints.h"
+#include "ui_update_queue.h"
 
 #include "lvgl/lvgl.h"
 #include "lvgl/src/xml/lv_xml.h"
@@ -476,16 +477,8 @@ void* ui_button_create(lv_xml_parser_state_t* state, const char** attrs) {
     // created yet. By the time the async callback fires, children will have
     // their fonts and variant styles applied, so contrast and icon-skip
     // logic works correctly.
-    // Check lv_obj_is_valid() in case button is deleted before callback executes
-    // (e.g., cooldown button on filament panel during rapid navigation).
-    lv_async_call(
-        [](void* data) {
-            auto* obj = static_cast<lv_obj_t*>(data);
-            if (lv_obj_is_valid(obj)) {
-                update_button_text_contrast(obj);
-            }
-        },
-        btn);
+    helix::ui::async_call(
+        btn, [](void* data) { update_button_text_contrast(static_cast<lv_obj_t*>(data)); }, btn);
 
     const char* pos_name = icon_on_top      ? "top"
                            : icon_on_bottom ? "bottom"
@@ -619,13 +612,9 @@ void ui_button_apply(lv_xml_parser_state_t* state, const char** attrs) {
                 [](lv_observer_t* obs, lv_subject_t*) {
                     lv_obj_t* parent_btn = static_cast<lv_obj_t*>(lv_observer_get_target_obj(obs));
                     if (parent_btn && lv_obj_is_valid(parent_btn)) {
-                        lv_async_call(
-                            [](void* ud) {
-                                auto* b = static_cast<lv_obj_t*>(ud);
-                                if (lv_obj_is_valid(b)) {
-                                    lv_obj_invalidate(b);
-                                }
-                            },
+                        helix::ui::async_call(
+                            parent_btn,
+                            [](void* ud) { lv_obj_invalidate(static_cast<lv_obj_t*>(ud)); },
                             parent_btn);
                     }
                 },

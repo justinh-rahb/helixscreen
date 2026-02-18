@@ -217,9 +217,8 @@ void LedControlOverlay::on_activate() {
             uint8_t g = static_cast<uint8_t>(color.g * 255.0);
             uint8_t b = static_cast<uint8_t>(color.b * 255.0);
             lv_obj_t* swatch = current_color_swatch_;
-            helix::ui::queue_update([swatch, r, g, b]() {
-                if (swatch)
-                    lv_obj_set_style_bg_color(swatch, lv_color_make(r, g, b), 0);
+            helix::ui::queue_widget_update(swatch, [r, g, b](lv_obj_t* s) {
+                lv_obj_set_style_bg_color(s, lv_color_make(r, g, b), 0);
             });
         });
 

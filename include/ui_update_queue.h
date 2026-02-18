@@ -278,4 +278,81 @@ inline lv_result_t async_call(lv_async_cb_t async_xcb, void* user_data) {
     return LV_RESULT_OK;
 }
 
+// ============================================================================
+// Widget-safe overloads
+//
+// These wrap the base API with an lv_obj_is_valid() guard so async callbacks
+// that outlive their widget are silently dropped instead of crashing.
+// ============================================================================
+
+/**
+ * @brief Queue a UI update with data and widget guard
+ *
+ * Same as queue_update<T> but validates the widget before invoking the callback.
+ * If the widget has been destroyed by the time the callback executes, it is
+ * silently skipped and the data is freed via RAII.
+ *
+ * @tparam T    Type of data to pass
+ * @tparam F    Callback type: void(lv_obj_t*, T*)
+ * @param widget Widget that must still be valid when callback fires
+ * @param data   Data to pass to callback (moved into queue)
+ * @param callback Function to execute with validated widget and data
+ */
+template <typename T, typename F>
+void queue_update(lv_obj_t* widget, std::unique_ptr<T> data, F&& callback) {
+    T* raw_ptr = data.release();
+    queue_update([widget, raw_ptr, cb = std::forward<F>(callback)]() {
+        std::unique_ptr<T> owned(raw_ptr); // RAII: always freed
+        if (!lv_obj_is_valid(widget)) {
+            spdlog::debug("[UpdateQueue] Widget-safe guard: widget destroyed, skipping callback");
+            return;
+        }
+        cb(widget, owned.get());
+    });
+}
+
+/**
+ * @brief Queue a widget update with no extra data
+ *
+ * Convenience wrapper for updates that only need the widget pointer.
+ * The callback is skipped if the widget is no longer valid.
+ *
+ * @tparam F Callback type: void(lv_obj_t*)
+ * @param widget Widget that must still be valid when callback fires
+ * @param callback Function to execute with validated widget
+ */
+template <typename F> void queue_widget_update(lv_obj_t* widget, F&& callback) {
+    queue_update([widget, cb = std::forward<F>(callback)]() {
+        if (!lv_obj_is_valid(widget)) {
+            spdlog::debug("[UpdateQueue] Widget-safe guard: widget destroyed, skipping callback");
+            return;
+        }
+        cb(widget);
+    });
+}
+
+/**
+ * @brief Widget-safe drop-in replacement for lv_async_call
+ *
+ * Same as async_call(cb, user_data) but validates the widget first.
+ * If the widget is destroyed before the callback fires, the callback is skipped.
+ *
+ * @param widget Widget that must still be valid when callback fires
+ * @param async_xcb Callback function (same signature as lv_async_call)
+ * @param user_data User data passed to callback
+ * @return LV_RESULT_OK always (queue never fails)
+ */
+inline lv_result_t async_call(lv_obj_t* widget, lv_async_cb_t async_xcb, void* user_data) {
+    queue_update([widget, async_xcb, user_data]() {
+        if (!lv_obj_is_valid(widget)) {
+            spdlog::debug("[UpdateQueue] Widget-safe guard: widget destroyed, skipping async_call");
+            return;
+        }
+        if (async_xcb) {
+            async_xcb(user_data);
+        }
+    });
+    return LV_RESULT_OK;
+}
+
 } // namespace helix::ui

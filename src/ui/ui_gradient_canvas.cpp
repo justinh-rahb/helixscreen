@@ -276,15 +276,8 @@ void ui_gradient_canvas_redraw(lv_obj_t* obj) {
     if (data) {
         render_gradient_buffer(data);
         // Defer invalidation to avoid calling during render phase
-        // Check lv_obj_is_valid() in case widget is deleted before callback executes
         helix::ui::async_call(
-            [](void* obj_ptr) {
-                auto* obj = static_cast<lv_obj_t*>(obj_ptr);
-                if (lv_obj_is_valid(obj)) {
-                    lv_obj_invalidate(obj);
-                }
-            },
-            obj);
+            obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
     }
 }
 
@@ -296,14 +289,7 @@ void ui_gradient_canvas_set_dither(lv_obj_t* obj, bool enable) {
         data->dither = enable;
         render_gradient_buffer(data);
         // Defer invalidation to avoid calling during render phase
-        // Check lv_obj_is_valid() in case widget is deleted before callback executes
         helix::ui::async_call(
-            [](void* obj_ptr) {
-                auto* obj = static_cast<lv_obj_t*>(obj_ptr);
-                if (lv_obj_is_valid(obj)) {
-                    lv_obj_invalidate(obj);
-                }
-            },
-            obj);
+            obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
     }
 }
