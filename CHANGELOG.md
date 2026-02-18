@@ -5,6 +5,14 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.4] - 2026-02-18
+
+### Fixed
+- Touch input auto-detection scoring improved, fixing misdetection on multi-input systems (#117)
+- `touch_device` config setting now read from the correct location
+- Stale thumbnail no longer persists when a new print is started externally
+- Crash from NULL font pointer in AMS panel backend selector (#110)
+
 ## [0.10.3] - 2026-02-17
 
 Big AMS release — unified slot editor with Spoolman integration, mixed-topology AFC support, error state visualization, and a major DRY refactor of shared drawing utilities across all AMS panels. Also adds 34 new translations and fixes several installer issues.
@@ -674,6 +682,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.10.4]: https://github.com/prestonbrown/helixscreen/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/prestonbrown/helixscreen/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/prestonbrown/helixscreen/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/prestonbrown/helixscreen/compare/v0.10.0...v0.10.1
