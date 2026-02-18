@@ -1842,8 +1842,13 @@ lv_color_t theme_manager_get_color(const char* base_name) {
         return lv_color_hex(0x000000);
     }
 
-    // Nothing found
-    spdlog::error("[Theme] Color not found: {} (no base, no _light/_dark variants)", base_name);
+    // Nothing found — only log error if theme is initialized (otherwise this is
+    // benign, e.g. tests or early init before theme_manager_init() is called)
+    if (current_theme) {
+        spdlog::error("[Theme] Color not found: {} (no base, no _light/_dark variants)", base_name);
+    } else {
+        spdlog::trace("[Theme] Color not found (theme not initialized): {}", base_name);
+    }
     return lv_color_hex(0x000000);
 }
 
@@ -1949,9 +1954,13 @@ int32_t theme_manager_get_spacing(const char* token) {
         return 0;
     }
 
-    const char* value = lv_xml_get_const(nullptr, token);
+    const char* value = lv_xml_get_const_silent(nullptr, token);
     if (!value) {
-        spdlog::warn("[Theme] Spacing token '{}' not found - is theme initialized?", token);
+        if (current_theme) {
+            spdlog::warn("[Theme] Spacing token '{}' not found - is theme initialized?", token);
+        } else {
+            spdlog::trace("[Theme] Spacing token '{}' not found (theme not initialized)", token);
+        }
         return 0;
     }
 
@@ -1975,9 +1984,13 @@ const lv_font_t* theme_manager_get_font(const char* token) {
     }
 
     // Get the font name from the registered constant (e.g., "font_small" -> "noto_sans_16")
-    const char* font_name = lv_xml_get_const(nullptr, token);
+    const char* font_name = lv_xml_get_const_silent(nullptr, token);
     if (!font_name) {
-        spdlog::warn("[Theme] Font token '{}' not found - falling back to default font", token);
+        if (current_theme) {
+            spdlog::warn("[Theme] Font token '{}' not found - falling back to default font", token);
+        } else {
+            spdlog::trace("[Theme] Font token '{}' not found (theme not initialized)", token);
+        }
         return lv_font_get_default();
     }
 

@@ -564,6 +564,11 @@ json& Config::get_json(const std::string& json_path) {
 }
 
 bool Config::save() {
+    if (path.empty()) {
+        spdlog::trace("[Config] Skipping save (no config path set)");
+        return true;
+    }
+
     spdlog::trace("[Config] Saving config to {}", path);
 
     try {
