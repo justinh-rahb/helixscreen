@@ -172,6 +172,7 @@ void register_history_handlers(std::unordered_map<std::string, MethodHandler>& r
     };
 
     // server.history.totals - Get aggregate statistics
+    // Computed from the same mock job data so totals match the job list
     registry["server.history.totals"] =
         [](MoonrakerClientMock* self, const json& params, std::function<void(json)> success_cb,
            std::function<void(const MoonrakerError&)> error_cb) -> bool {
@@ -179,14 +180,31 @@ void register_history_handlers(std::unordered_map<std::string, MethodHandler>& r
         (void)params;
         (void)error_cb;
 
-        // Return exactly what real Moonraker provides - no breakdown counts
-        // (breakdown should be calculated client-side from job list if needed)
+        auto gcode_files = scan_test_gcode_files();
+
+        // Same duration formula as server.history.list
+        auto get_duration_minutes = [](size_t idx) -> int {
+            return 5 + static_cast<int>((idx * 37 + 13) % 296);
+        };
+
+        double total_time = 0.0;
+        double total_filament = 0.0;
+        double longest_job = 0.0;
+        for (size_t i = 0; i < gcode_files.size(); i++) {
+            double duration_sec = get_duration_minutes(i) * 60.0;
+            double filament_mm = get_duration_minutes(i) * 50.0;
+            total_time += duration_sec;
+            total_filament += filament_mm;
+            if (duration_sec > longest_job)
+                longest_job = duration_sec;
+        }
+
         json response = {{"result",
                           {{"job_totals",
-                            {{"total_jobs", 47},
-                             {"total_time", 142.5 * 3600},      // 142.5 hours in seconds
-                             {"total_filament_used", 245000.0}, // 245m in mm
-                             {"longest_job", 5.5 * 3600}}}}}};  // 5.5 hours in seconds
+                            {{"total_jobs", gcode_files.size()},
+                             {"total_time", total_time},
+                             {"total_filament_used", total_filament},
+                             {"longest_job", longest_job}}}}}};
 
         if (success_cb) {
             success_cb(response);
