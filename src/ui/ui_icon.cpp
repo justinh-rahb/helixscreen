@@ -19,7 +19,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <cstdlib>
 #include <cstring>
 
 /**
@@ -52,57 +51,66 @@ static IconSize parse_size(const char* size_str) {
 }
 
 /**
- * Get the MDI font for a given size by querying XML constants
+ * Per-size icon font metadata: XML constant name and hardcoded fallback.
+ */
+struct IconFontEntry {
+    const char* xml_const;
+    const lv_font_t* fallback;
+};
+
+static const IconFontEntry& get_font_entry(IconSize size) {
+    static const IconFontEntry entries[] = {
+        {"icon_font_xs", &mdi_icons_16}, // XS
+        {"icon_font_sm", &mdi_icons_24}, // SM
+        {"icon_font_md", &mdi_icons_32}, // MD
+        {"icon_font_lg", &mdi_icons_48}, // LG
+        {"icon_font_xl", &mdi_icons_64}, // XL
+    };
+    static_assert(sizeof(entries) / sizeof(entries[0]) == static_cast<int>(IconSize::XL) + 1,
+                  "entries array size must match IconSize enum range");
+    return entries[static_cast<int>(size)];
+}
+
+/**
+ * Resolve the MDI font for a given size via XML constants.
  *
- * This enables responsive icon fonts.
- *
- * IMPORTANT: This function will CRASH if a font is not found. This is
- * intentional - silent fallbacks cause visual bugs that are hard to debug.
+ * Resolves once per size and caches the result. Falls back to a hardcoded
+ * font if the XML constant is missing or the font is not compiled,
+ * logging an error on first occurrence.
  */
 static const lv_font_t* get_font_for_size(IconSize size) {
-    const char* font_const_name = nullptr;
+    static const lv_font_t* cached[5] = {};
+    static bool resolved[5] = {};
+    const int idx = static_cast<int>(size);
 
-    // Map icon size to font constant name in globals.xml
-    switch (size) {
-    case IconSize::XS:
-        font_const_name = "icon_font_xs";
-        break;
-    case IconSize::SM:
-        font_const_name = "icon_font_sm";
-        break;
-    case IconSize::MD:
-        font_const_name = "icon_font_md";
-        break;
-    case IconSize::LG:
-        font_const_name = "icon_font_lg";
-        break;
-    case IconSize::XL:
-    default:
-        font_const_name = "icon_font_xl";
-        break;
+    if (resolved[idx]) {
+        return cached[idx];
     }
 
-    // Query font name from XML constant (FAIL FAST if not found)
-    const char* font_name = lv_xml_get_const(nullptr, font_const_name);
-    if (!font_name) {
-        spdlog::critical("[Icon] FATAL: Icon font constant '{}' not found in globals.xml",
-                         font_const_name);
-        spdlog::critical("[Icon] Check that globals.xml defines this constant");
-        std::exit(EXIT_FAILURE);
+    const auto& entry = get_font_entry(size);
+    const lv_font_t* font = nullptr;
+
+    const char* font_name = lv_xml_get_const_silent(nullptr, entry.xml_const);
+    if (font_name) {
+        font = lv_xml_get_font(nullptr, font_name);
+        if (!font) {
+            spdlog::error("[Icon] Font '{}' (from constant '{}') is not compiled — using fallback",
+                          font_name, entry.xml_const);
+        }
+    } else {
+        spdlog::error("[Icon] Font constant '{}' not found in globals.xml — using fallback",
+                      entry.xml_const);
     }
 
-    // Get the actual font (FAIL FAST if not compiled)
-    const lv_font_t* font = lv_xml_get_font(nullptr, font_name);
     if (!font) {
-        spdlog::critical("[Icon] FATAL: Icon font '{}' (from constant '{}') is not compiled!",
-                         font_name, font_const_name);
-        spdlog::critical("[Icon] FIX: Enable the icon font in lv_conf.h or regenerate fonts");
-        std::exit(EXIT_FAILURE);
+        font = entry.fallback;
     }
 
-    spdlog::trace("[Icon] Applied icon font '{}' (from '{}') - line_height={}px", font_name,
-                  font_const_name, lv_font_get_line_height(font));
+    spdlog::debug("[Icon] Using icon font for '{}' — line_height={}px", entry.xml_const,
+                  lv_font_get_line_height(font));
 
+    cached[idx] = font;
+    resolved[idx] = true;
     return font;
 }
 
