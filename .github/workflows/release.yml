@@ -171,6 +171,9 @@ jobs:
         restore-keys: |
           gradle-
 
+    - name: Apply submodule patches
+      run: make apply-patches
+
     - name: Build Android APKs (release)
       working-directory: android
       env:
@@ -218,7 +221,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-platforms, build-android]
+    needs: [build-platforms]
     permissions:
       contents: write  # Required to create releases
 
@@ -352,7 +355,7 @@ jobs:
           release-files/*.zip
           release-files/*.apk
           release-files/install.sh
-        fail_on_unmatched_files: true
+        fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -248,6 +248,9 @@ jobs:
         restore-keys: |
           gradle-
 
+    - name: Apply submodule patches
+      run: make apply-patches
+
     - name: Build Android APK (debug)
       working-directory: android
       run: ./gradlew assembleDebug
