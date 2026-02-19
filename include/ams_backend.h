@@ -245,6 +245,23 @@ class AmsBackend {
      */
     [[nodiscard]] virtual PathSegment infer_error_segment() const = 0;
 
+    /**
+     * @brief Check if a specific slot has a prep/pre-gate sensor
+     *
+     * Returns whether the given slot has a prep sensor that can detect
+     * filament presence. Used by the path canvas to decide whether to
+     * draw a prep sensor dot for each slot.
+     *
+     * Default implementation returns false (no prep sensor).
+     *
+     * @param slot_index Slot index (0 to total_slots-1)
+     * @return true if slot has a prep/pre-gate sensor
+     */
+    [[nodiscard]] virtual bool slot_has_prep_sensor(int slot_index) const {
+        (void)slot_index;
+        return false;
+    }
+
     // ========================================================================
     // Filament Operations
     // ========================================================================

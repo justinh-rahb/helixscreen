@@ -108,6 +108,9 @@ struct FilamentPathData {
     // Per-slot filament state (for showing all installed filaments, not just active)
     SlotFilamentState slot_filament_states[MAX_SLOTS] = {};
 
+    // Per-slot prep sensor capability (true = slot has prep/pre-gate sensor)
+    bool slot_has_prep_sensor[MAX_SLOTS] = {};
+
     // Animation state
     int prev_segment = 0; // Previous segment (for smooth transition)
     AnimDirection anim_direction = AnimDirection::NONE;
@@ -835,11 +838,17 @@ static void filament_path_draw_cb(lv_event_t* e) {
         draw_vertical_line(layer, slot_x, entry_y, prep_y - sensor_r, entry_line_color,
                            entry_line_width);
 
-        // Draw prep sensor dot (AFC topology shows these prominently)
-        if (data->topology == 1) { // HUB topology
+        // Draw prep sensor dot (per-slot capability flag)
+        if (data->slot_has_prep_sensor[i]) {
             bool prep_active = has_filament && is_segment_active(PathSegment::PREP, slot_segment);
-            draw_sensor_dot(layer, slot_x, prep_y, prep_active ? lane_color : idle_color,
-                            prep_active, sensor_r);
+            lv_color_t prep_dot_color = prep_active ? lane_color : idle_color;
+            bool prep_dot_filled = prep_active;
+            // Error on prep dot: only for the active slot when error is at PREP
+            if (has_error && is_active_slot && error_seg == PathSegment::PREP) {
+                prep_dot_color = error_color;
+                prep_dot_filled = true;
+            }
+            draw_sensor_dot(layer, slot_x, prep_y, prep_dot_color, prep_dot_filled, sensor_r);
         }
 
         // Line from prep sensor to hub/merge target
@@ -874,9 +883,20 @@ static void filament_path_draw_cb(lv_event_t* e) {
             // Draw hub sensor dot - colored with filament color if loaded to hub
             bool dot_active = has_filament && slot_at_hub;
             lv_color_t dot_color = dot_active ? lane_color : idle_color;
-            draw_sensor_dot(layer, hub_dot_x, hub_top, dot_color, dot_active, sensor_r);
+            bool dot_filled = dot_active;
+            // Error on hub dot: only for the active slot when error is at HUB
+            if (has_error && is_active_slot && error_seg == PathSegment::HUB) {
+                dot_color = error_color;
+                dot_filled = true;
+            }
+            draw_sensor_dot(layer, hub_dot_x, hub_top, dot_color, dot_filled, sensor_r);
+        } else if (data->topology == 0) {
+            // LINEAR topology: straight vertical lanes dropping into the selector box
+            int32_t hub_top = hub_y - hub_h / 2;
+            draw_vertical_line(layer, slot_x, prep_y + sensor_r, hub_top, merge_line_color,
+                               merge_line_width);
         } else {
-            // Non-hub topologies: converge to center merge point
+            // Other non-hub topologies: converge to center merge point
             draw_line(layer, slot_x, prep_y + sensor_r, center_x, merge_y, merge_line_color,
                       merge_line_width);
         }
@@ -934,8 +954,13 @@ static void filament_path_draw_cb(lv_event_t* e) {
     {
         bool hub_has_filament = false;
 
-        if (data->topology != 1) {
-            // Non-hub topologies: draw single merge→hub line
+        if (data->topology == 0) {
+            // LINEAR topology: lanes go straight to hub box (no merge line needed)
+            if (data->active_slot >= 0 && is_segment_active(PathSegment::HUB, fil_seg)) {
+                hub_has_filament = true;
+            }
+        } else if (data->topology != 1) {
+            // Other non-hub topologies: draw single merge->hub line
             lv_color_t hub_line_color = idle_color;
             int32_t hub_line_width = line_idle;
 
@@ -965,10 +990,14 @@ static void filament_path_draw_cb(lv_event_t* e) {
             }
         }
 
-        // Hub box - tint based on buffer fault state or filament color
+        // Hub box - tint based on error state, buffer fault state, or filament color
         lv_color_t hub_bg_tinted = hub_bg;
         lv_color_t hub_border_final = hub_border;
-        if (data->buffer_fault_state == 2) {
+        if (has_error && error_seg == PathSegment::HUB) {
+            // Error at hub — red tint with pulsing error color
+            hub_bg_tinted = ph_blend(hub_bg, error_color, 0.40f);
+            hub_border_final = error_color;
+        } else if (data->buffer_fault_state == 2) {
             // Fault detected — red tint
             hub_bg_tinted = ph_blend(hub_bg, data->color_error, 0.50f);
             hub_border_final = data->color_error;
@@ -993,9 +1022,17 @@ static void filament_path_draw_cb(lv_event_t* e) {
         }
 
         const char* hub_label = (data->topology == 0) ? "SELECTOR" : "HUB";
-        draw_hub_box(layer, center_x, hub_y, data->hub_width, hub_h, hub_bg_tinted,
-                     hub_border_final, data->color_text, data->label_font, data->border_radius,
-                     hub_label);
+
+        // For LINEAR topology, hub box spans the full slot area width
+        int32_t hub_w = data->hub_width;
+        if (data->topology == 0 && data->slot_count > 1) {
+            int32_t first_slot_x = x_off + get_slot_x(data, 0, x_off);
+            int32_t last_slot_x = x_off + get_slot_x(data, data->slot_count - 1, x_off);
+            hub_w = (last_slot_x - first_slot_x) + sensor_r * 4;
+        }
+
+        draw_hub_box(layer, center_x, hub_y, hub_w, hub_h, hub_bg_tinted, hub_border_final,
+                     data->color_text, data->label_font, data->border_radius, hub_label);
     }
 
     // ========================================================================
@@ -1027,8 +1064,14 @@ static void filament_path_draw_cb(lv_event_t* e) {
         draw_vertical_line(layer, center_x, hub_bottom, output_y - sensor_r, output_color,
                            output_width);
 
-        draw_sensor_dot(layer, center_x, output_y, output_active ? output_color : idle_color,
-                        output_active, sensor_r);
+        lv_color_t output_dot_color = output_active ? output_color : idle_color;
+        bool output_dot_filled = output_active;
+        // Error on output dot: shared dot, always errors when error is at OUTPUT
+        if (has_error && error_seg == PathSegment::OUTPUT) {
+            output_dot_color = error_color;
+            output_dot_filled = true;
+        }
+        draw_sensor_dot(layer, center_x, output_y, output_dot_color, output_dot_filled, sensor_r);
     }
 
     // ========================================================================
@@ -1059,8 +1102,15 @@ static void filament_path_draw_cb(lv_event_t* e) {
                            toolhead_color, toolhead_width);
 
         // Toolhead sensor
-        draw_sensor_dot(layer, center_x, toolhead_y, toolhead_active ? toolhead_color : idle_color,
-                        toolhead_active, sensor_r);
+        lv_color_t toolhead_dot_color = toolhead_active ? toolhead_color : idle_color;
+        bool toolhead_dot_filled = toolhead_active;
+        // Error on toolhead dot: shared dot, always errors when error is at TOOLHEAD
+        if (has_error && error_seg == PathSegment::TOOLHEAD) {
+            toolhead_dot_color = error_color;
+            toolhead_dot_filled = true;
+        }
+        draw_sensor_dot(layer, center_x, toolhead_y, toolhead_dot_color, toolhead_dot_filled,
+                        sensor_r);
     }
 
     // ========================================================================
@@ -1587,6 +1637,17 @@ void ui_filament_path_canvas_set_slot_filament(lv_obj_t* obj, int slot_index, in
         state.color = color;
         spdlog::trace("[FilamentPath] Slot {} filament: segment={}, color=0x{:06X}", slot_index,
                       segment, color);
+        lv_obj_invalidate(obj);
+    }
+}
+
+void ui_filament_path_canvas_set_slot_prep_sensor(lv_obj_t* obj, int slot, bool has_sensor) {
+    auto* data = get_data(obj);
+    if (!data || slot < 0 || slot >= FilamentPathData::MAX_SLOTS)
+        return;
+    if (data->slot_has_prep_sensor[slot] != has_sensor) {
+        data->slot_has_prep_sensor[slot] = has_sensor;
+        spdlog::trace("[FilamentPath] Slot {} prep sensor: {}", slot, has_sensor);
         lv_obj_invalidate(obj);
     }
 }

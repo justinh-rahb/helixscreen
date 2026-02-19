@@ -9,6 +9,7 @@
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <sstream>
 
 using namespace helix;
@@ -207,8 +208,15 @@ PathSegment AmsBackendHappyHare::get_slot_filament_segment(int slot_index) const
         return path_segment_from_happy_hare_pos(filament_pos_);
     }
 
-    // For non-active slots in Happy Hare (linear topology), check slot status
-    // Slots with available filament are assumed to have filament ready at the selector
+    // For non-active slots, check pre-gate sensor first for better visualization
+    if (slot_index >= 0 && slot_index < static_cast<int>(gate_sensors_.size())) {
+        const auto& gs = gate_sensors_[slot_index];
+        if (gs.has_pre_gate_sensor && gs.pre_gate_triggered) {
+            return PathSegment::PREP; // Filament detected at pre-gate sensor
+        }
+    }
+
+    // Fall back to gate_status for slots without pre-gate sensors
     const SlotInfo* slot = system_info_.get_slot_global(slot_index);
     if (slot &&
         (slot->status == SlotStatus::AVAILABLE || slot->status == SlotStatus::FROM_BUFFER)) {
@@ -221,6 +229,14 @@ PathSegment AmsBackendHappyHare::get_slot_filament_segment(int slot_index) const
 PathSegment AmsBackendHappyHare::infer_error_segment() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return error_segment_;
+}
+
+bool AmsBackendHappyHare::slot_has_prep_sensor(int slot_index) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (slot_index < 0 || slot_index >= static_cast<int>(gate_sensors_.size())) {
+        return false;
+    }
+    return gate_sensors_[slot_index].has_pre_gate_sensor;
 }
 
 // ============================================================================
@@ -464,6 +480,54 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         }
     }
 
+    // Parse sensors dict: printer.mmu.sensors
+    // Keys matching "mmu_pre_gate_X" indicate pre-gate sensors per gate.
+    // Values: true (triggered/filament present), false (not triggered), null (error/unknown)
+    if (mmu_data.contains("sensors") && mmu_data["sensors"].is_object()) {
+        const auto& sensors = mmu_data["sensors"];
+        const std::string prefix = "mmu_pre_gate_";
+
+        for (auto it = sensors.begin(); it != sensors.end(); ++it) {
+            const std::string& key = it.key();
+            if (key.rfind(prefix, 0) != 0) {
+                continue; // Not a pre-gate sensor key
+            }
+
+            // Extract gate index from key suffix
+            std::string index_str = key.substr(prefix.size());
+            int gate_idx = -1;
+            try {
+                gate_idx = std::stoi(index_str);
+            } catch (...) {
+                continue; // Not a valid integer suffix
+            }
+
+            if (gate_idx < 0) {
+                continue;
+            }
+
+            // Resize gate_sensors_ if needed
+            if (gate_idx >= static_cast<int>(gate_sensors_.size())) {
+                gate_sensors_.resize(gate_idx + 1);
+            }
+
+            gate_sensors_[gate_idx].has_pre_gate_sensor = true;
+            gate_sensors_[gate_idx].pre_gate_triggered =
+                it.value().is_boolean() && it.value().get<bool>();
+
+            spdlog::trace("[AMS HappyHare] Pre-gate sensor {}: present=true, triggered={}",
+                          gate_idx, gate_sensors_[gate_idx].pre_gate_triggered);
+        }
+
+        // Update has_slot_sensors flag on units based on actual sensor data
+        bool any_sensor =
+            std::any_of(gate_sensors_.begin(), gate_sensors_.end(),
+                        [](const GateSensorState& g) { return g.has_pre_gate_sensor; });
+        for (auto& unit : system_info_.units) {
+            unit.has_slot_sensors = any_sensor;
+        }
+    }
+
     // Parse endless_spool_groups if available (multi-unit safe)
     if (mmu_data.contains("endless_spool_groups") && mmu_data["endless_spool_groups"].is_array()) {
         const auto& es_groups = mmu_data["endless_spool_groups"];
@@ -503,7 +567,10 @@ void AmsBackendHappyHare::initialize_gates(int gate_count) {
         unit.connected = true;
         unit.has_encoder = true;
         unit.has_toolhead_sensor = true;
-        unit.has_slot_sensors = true;
+        // has_slot_sensors starts false; updated when sensor data arrives in parse_mmu_state()
+        unit.has_slot_sensors =
+            std::any_of(gate_sensors_.begin(), gate_sensors_.end(),
+                        [](const GateSensorState& g) { return g.has_pre_gate_sensor; });
         unit.has_hub_sensor = true; // HH selector functions as hub equivalent
 
         for (int i = 0; i < unit_gates; ++i) {
@@ -522,6 +589,11 @@ void AmsBackendHappyHare::initialize_gates(int gate_count) {
     }
 
     system_info_.total_slots = gate_count;
+
+    // Ensure gate_sensors_ is large enough for all gates
+    if (static_cast<int>(gate_sensors_.size()) < gate_count) {
+        gate_sensors_.resize(gate_count);
+    }
 
     // Initialize tool-to-gate mapping (1:1 default)
     system_info_.tool_to_slot_map.clear();

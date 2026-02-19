@@ -77,6 +77,7 @@ class AmsBackendHappyHare : public AmsBackend {
     [[nodiscard]] PathSegment get_filament_segment() const override;
     [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
+    [[nodiscard]] bool slot_has_prep_sensor(int slot_index) const override;
 
     // Operations
     AmsError load_filament(int slot_index) override;
@@ -254,6 +255,13 @@ class AmsBackendHappyHare : public AmsBackend {
     // Path visualization state
     int filament_pos_{0};                          ///< Happy Hare filament_pos value
     PathSegment error_segment_{PathSegment::NONE}; ///< Inferred error location
+
+    // Per-gate sensor state (from printer.mmu.sensors dict)
+    struct GateSensorState {
+        bool has_pre_gate_sensor = false; ///< Pre-gate sensor configured for this gate
+        bool pre_gate_triggered = false; ///< Pre-gate sensor currently triggered (filament present)
+    };
+    std::vector<GateSensorState> gate_sensors_;
 
     // Error state tracking
     std::string reason_for_pause_; ///< Last reason_for_pause from MMU (descriptive error text)

@@ -319,6 +319,12 @@ PathSegment AmsBackendAfc::infer_error_segment() const {
     return error_segment_;
 }
 
+bool AmsBackendAfc::slot_has_prep_sensor(int slot_index) const {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    // AFC always has prep sensors on all lanes
+    return slot_index >= 0 && slot_index < system_info_.total_slots;
+}
+
 PathSegment AmsBackendAfc::compute_filament_segment_unlocked() const {
     // Must be called with mutex_ held!
     // Returns the furthest point filament has reached based on sensor states.

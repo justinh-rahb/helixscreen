@@ -227,6 +227,12 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
         ui_filament_path_canvas_set_faceted_toolhead(canvas, true);
     }
 
+    // Set per-slot prep sensor capability flags
+    for (int i = 0; i < slot_count; ++i) {
+        bool has_prep = backend->slot_has_prep_sensor(slot_offset + i);
+        ui_filament_path_canvas_set_slot_prep_sensor(canvas, i, has_prep);
+    }
+
     // Set per-slot filament states (using local indices for unit-scoped views)
     ui_filament_path_canvas_clear_slot_filaments(canvas);
     for (int i = 0; i < slot_count; ++i) {

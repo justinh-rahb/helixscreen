@@ -224,6 +224,19 @@ void ui_filament_path_canvas_set_slot_filament(lv_obj_t* obj, int slot_index, in
                                                uint32_t color);
 
 /**
+ * @brief Set per-slot prep sensor capability flag
+ *
+ * Controls whether a prep/pre-gate sensor dot is drawn for the given slot.
+ * HUB topology (AFC) callers set all slots true; LINEAR topology (Happy Hare)
+ * callers set per-slot based on actual pre-gate sensor presence.
+ *
+ * @param obj The filament_path_canvas widget
+ * @param slot Slot index (0-15)
+ * @param has_sensor true if this slot has a prep/pre-gate sensor
+ */
+void ui_filament_path_canvas_set_slot_prep_sensor(lv_obj_t* obj, int slot, bool has_sensor);
+
+/**
  * @brief Clear all per-slot filament states
  *
  * Resets all slots to show as idle (no filament installed).

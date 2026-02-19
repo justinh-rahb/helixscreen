@@ -122,6 +122,7 @@ class AmsBackendAfc : public AmsBackend {
     [[nodiscard]] PathSegment get_filament_segment() const override;
     [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
+    [[nodiscard]] bool slot_has_prep_sensor(int slot_index) const override;
 
     // Operations
     AmsError load_filament(int slot_index) override;
