@@ -411,10 +411,29 @@ Configure HelixScreen:
 }
 ```
 
-### End-to-End Self-Update Testing on Pi
+### End-to-End Self-Update Testing on Device
 
 Use `scripts/serve-local-update.sh` to drive the complete download → install → restart
-cycle without publishing a real release. See the script's `--help` for setup instructions.
+cycle without publishing a real release. See the script's `--help` for full setup.
+
+**Quick setup (once per device):**
+
+```bash
+export HELIX_TEST_PRINTER=helixscreen.local   # device hostname or IP
+export HELIX_TEST_USERNAME=pi                  # SSH username
+
+# Configures dev channel, copies install.sh to /tmp/, enables debug logging
+./scripts/serve-local-update.sh --configure-remote
+```
+
+**Two testing paths:**
+
+| Path | Command | When to use |
+|------|---------|-------------|
+| Via update checker | Trigger from Settings → About → Check for Updates | Tests the full self-update flow |
+| Direct local install | `ssh USER@PRINTER 'sh /tmp/install.sh --local /tmp/helixscreen-update.tar.gz'` | Tests install.sh in isolation, bypasses update checker |
+
+`--configure-remote` copies `install.sh` to `/tmp/` on the device automatically, enabling the direct path without an extra transfer step.
 
 #### The Two-Install Rule for `update_checker.cpp` Changes
 
@@ -436,7 +455,7 @@ it does the new binary take over.
 # Serve the build (--no-build reuses the last tarball for fast iteration)
 ./scripts/serve-local-update.sh --no-build
 
-# On Pi: trigger update from Settings → About → Check for Updates
+# On device: trigger update from Settings → About → Check for Updates
 # → install completes, helix-screen restarts (1st install done, new binary running)
 
 # Trigger update again from the UI  ← this is the one that exercises your change
@@ -446,7 +465,7 @@ it does the new binary take over.
 binary version, so the freshly restarted binary immediately sees a pending update and
 lets you trigger the second install right away.
 
-#### Monitoring Logs on Pi
+#### Monitoring Logs on Device
 
 The service writes all output — launcher, watchdog, and app — to the systemd journal.
 Use `-u helixscreen` (unit name) rather than `-t` (syslog identifier) to capture

@@ -29,11 +29,11 @@
 # QUICK START
 # -----------
 #   # 1. Set your device's address (once, add to ~/.zshrc or ~/.bashrc):
-#   export HELIX_TEST_PI_USER=pi
-#   export HELIX_TEST_PI_HOST=helixscreen.local   # or an IP address
+#   export HELIX_TEST_USERNAME=pi
+#   export HELIX_TEST_PRINTER=helixscreen.local   # or an IP address
 #
 #   # 2. First time only — configure the device to use dev channel:
-#   ./scripts/serve-local-update.sh --configure-pi
+#   ./scripts/serve-local-update.sh --configure-remote
 #
 #   # 3. Every subsequent test iteration:
 #   ./scripts/serve-local-update.sh [--platform PLATFORM]
@@ -41,34 +41,44 @@
 #   helix-screen will check the manifest, see a newer version, download
 #   the tarball, run install.sh, and restart itself.
 #
+#   To test the installer directly on the device (bypassing the update checker):
+#   ssh USERNAME@PRINTER 'sh /tmp/install.sh --local /tmp/helixscreen-update.tar.gz'
+#   (install.sh is copied to /tmp/ automatically by --configure-remote)
+#
 # ENVIRONMENT VARIABLES
 # ---------------------
-#   HELIX_TEST_PI_HOST   Device hostname or IP  (default: helixscreen.local)
-#   HELIX_TEST_PI_USER   Device SSH username    (default: pi)
+#   HELIX_TEST_PRINTER   Device hostname or IP  (default: helixscreen.local)
+#   HELIX_TEST_USERNAME  Device SSH username    (default: pi)
+#
+#   Legacy names still accepted for backward compatibility:
+#   HELIX_TEST_PI_HOST → HELIX_TEST_PRINTER
+#   HELIX_TEST_PI_USER → HELIX_TEST_USERNAME
 #
 # OPTIONS
 # -------
-#   --platform PLATFORM  Target platform to build and serve (default: pi).
-#                        See platform list above.
-#   --configure-pi   SSH into the device, write dev channel + dev_url into
-#                    ~/helixscreen/config/helixconfig.json, enable HELIX_DEBUG=1
-#                    in helixscreen.env for debug logging, and restart the
-#                    helixscreen service. Run once per device (or after a
-#                    factory reset). Requires passwordless sudo + SSH key access.
-#                    Note: uses Pi paths (~/helixscreen/). For other platforms
-#                    configure helixconfig.json manually.
-#   --no-bump        Serve the exact version from VERSION.txt instead of
-#                    99.0.0. Useful if you manually set a higher version.
-#   --no-build       Skip compile + package. Patches install.sh from the repo
-#                    into the existing dist/ tarball so script-only changes
-#                    (install.sh, no binary changes) can be tested immediately.
-#   --port PORT      HTTP port to listen on (default: 8765).
+#   --platform PLATFORM   Target platform to build and serve (default: pi).
+#                         See platform list above.
+#   --configure-remote    SSH into the device, write dev channel + dev_url into
+#                         helixconfig.json, enable HELIX_DEBUG=1 in
+#                         helixscreen.env for debug logging, copy install.sh to
+#                         /tmp/ for local install testing, and restart the
+#                         helixscreen service. Run once per device (or after a
+#                         factory reset). Requires SSH key access.
+#                         Note: uses Pi paths (~/helixscreen/). For other
+#                         platforms configure helixconfig.json manually.
+#   --no-bump             Serve the exact version from VERSION.txt instead of
+#                         99.0.0. Useful if you manually set a higher version.
+#   --no-build            Skip compile + package. Patches install.sh from the
+#                         repo into the existing dist/ tarball so script-only
+#                         changes (install.sh, no binary changes) can be tested
+#                         immediately.
+#   --port PORT           HTTP port to listen on (default: 8765).
 #
 # DEPENDENCIES
 # ------------
 #   - Docker (for *-docker cross-compilation targets)
 #   - python3 (for the HTTP server and device helixconfig.json patch)
-#   - ssh + ssh-agent or ~/.ssh/config with key for $HELIX_TEST_PI_USER@$HELIX_TEST_PI_HOST
+#   - ssh + scp with key for $HELIX_TEST_USERNAME@$HELIX_TEST_PRINTER
 #   - rsync (used by package.sh)
 #
 # NOTES
@@ -78,7 +88,7 @@
 #   - After install the device binary still reports VERSION.txt's version
 #     (< 99.0.0), so the next run will again offer an update — intentional
 #     for iteration.
-#   - To reset the device back to the stable channel, re-run --configure-pi
+#   - To reset the device back to the stable channel, re-run --configure-remote
 #     after removing the dev_url key, or delete helixconfig.json on the device.
 
 set -euo pipefail
@@ -87,22 +97,23 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # ── Defaults (overridable via env) ────────────────────────────────────────────
-PI_HOST="${HELIX_TEST_PI_HOST:-helixscreen.local}"
-PI_USER="${HELIX_TEST_PI_USER:-pi}"
+# Accept both new names and legacy PI_* names for backward compatibility
+PRINTER="${HELIX_TEST_PRINTER:-${HELIX_TEST_PI_HOST:-helixscreen.local}}"
+USERNAME="${HELIX_TEST_USERNAME:-${HELIX_TEST_PI_USER:-pi}}"
 PORT=8765
 BUILD=1
 BUMP=1
-CONFIGURE_PI=0
+CONFIGURE_REMOTE=0
 PLATFORM=pi
 
 # ── Args ──────────────────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --configure-pi) CONFIGURE_PI=1; shift ;;
-        --no-build)     BUILD=0; shift ;;
-        --no-bump)      BUMP=0; shift ;;
-        --platform)     PLATFORM=$2; shift 2 ;;
-        --port)         PORT=$2; shift 2 ;;
+        --configure-remote) CONFIGURE_REMOTE=1; shift ;;
+        --no-build)         BUILD=0; shift ;;
+        --no-bump)          BUMP=0; shift ;;
+        --platform)         PLATFORM=$2; shift 2 ;;
+        --port)             PORT=$2; shift 2 ;;
         --help|-h)
             sed -n '2,/^set -/p' "$0" | grep '^#' | sed 's/^# \?//'
             exit 0
@@ -115,7 +126,7 @@ done
 BASE_VERSION="$(tr -d '[:space:]' < "$PROJECT_DIR/VERSION.txt")"  # e.g. 0.10.4
 
 # Use a fixed high test version so the manifest is always newer than any real
-# install, regardless of which branch or version is currently on the Pi.
+# install, regardless of which branch or version is currently on the device.
 if [[ $BUMP -eq 1 ]]; then
     TEST_VERSION="99.0.0"
 else
@@ -143,7 +154,7 @@ echo "  Base version : $BASE_VERSION  (VERSION.txt — unchanged)"
 echo "  Test version : $TEST_VERSION  $([ $BUMP -eq 1 ] && echo "(fixed high — always newer than installed)" || echo "(no bump)")"
 echo "  Tarball      : $TARBALL_NAME"
 echo "  Serving at   : $BASE_URL"
-echo "  Device       : ${PI_USER}@${PI_HOST}"
+echo "  Device       : ${USERNAME}@${PRINTER}"
 echo ""
 
 # ── Git pull ──────────────────────────────────────────────────────────────────
@@ -211,17 +222,17 @@ cat > "$MANIFEST_PATH" <<EOF
 EOF
 echo "[serve-local-update] Manifest → $MANIFEST_PATH"
 
-# ── Configure Pi ──────────────────────────────────────────────────────────────
-if [[ $CONFIGURE_PI -eq 1 ]]; then
-    echo "[serve-local-update] Configuring ${PI_USER}@${PI_HOST} ..."
-    ssh "${PI_USER}@${PI_HOST}" "python3 -c \"
+# ── Configure remote device ────────────────────────────────────────────────────
+if [[ $CONFIGURE_REMOTE -eq 1 ]]; then
+    echo "[serve-local-update] Configuring ${USERNAME}@${PRINTER} ..."
+    ssh "${USERNAME}@${PRINTER}" "python3 -c \"
 import json, os, re
 
 # Write dev channel + dev_url into helixconfig.json (read by Config::get_instance())
 path = os.path.expanduser('~/helixscreen/config/helixconfig.json')
 if not os.path.exists(path):
     print('  ERROR: helixconfig.json not found at', path)
-    print('  Run the HelixScreen setup wizard first, then re-run --configure-pi.')
+    print('  Run the HelixScreen setup wizard first, then re-run --configure-remote.')
     raise SystemExit(1)
 with open(path) as f:
     data = json.load(f)
@@ -265,10 +276,15 @@ open(env_path, 'w').write(content)
 print('  HELIX_DEBUG=1  (debug logging enabled in', env_path + ')')
 \""
     echo ""
-    echo "[serve-local-update] Restarting helix-screen on ${PI_USER}@${PI_HOST} ..."
-    ssh "${PI_USER}@${PI_HOST}" "sudo systemctl restart helixscreen"
+    echo "[serve-local-update] Copying install.sh to /tmp/ on ${USERNAME}@${PRINTER} ..."
+    scp "$PROJECT_DIR/scripts/install.sh" "${USERNAME}@${PRINTER}:/tmp/install.sh"
+    echo "  To test the installer directly on the device (bypasses update checker):"
+    echo "    ssh ${USERNAME}@${PRINTER} 'sh /tmp/install.sh --local /tmp/helixscreen-update.tar.gz'"
+    echo ""
+    echo "[serve-local-update] Restarting helix-screen on ${USERNAME}@${PRINTER} ..."
+    ssh "${USERNAME}@${PRINTER}" "sudo systemctl restart helixscreen"
     echo "[serve-local-update] helix-screen restarted."
-    echo "  To revert: remove update/dev_url from ~/helixscreen/config/helixconfig.json on the Pi."
+    echo "  To revert: remove update/dev_url from ~/helixscreen/config/helixconfig.json on the device."
     echo ""
 fi
 
@@ -279,7 +295,7 @@ echo "  ────────────────────────
 echo "  Manifest : ${BASE_URL}/manifest.json"
 echo "  Tarball  : ${BASE_URL}/${TARBALL_NAME}"
 echo ""
-echo "  Device expects (set via --configure-pi if not already done):"
+echo "  Device expects (set via --configure-remote if not already done):"
 echo "    update/channel  = 2"
 echo "    update/dev_url  = \"${BASE_URL}/\""
 echo ""
