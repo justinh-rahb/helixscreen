@@ -468,6 +468,20 @@ std::string DebugBundleCollector::fetch_log_tail(const std::string& base_url,
                              resp->body.size());
                 return {};
             }
+        } else if (status == 416) {
+            // Range not satisfiable (file smaller than requested range) — retry without Range
+            spdlog::debug("[DebugBundle] 416 for {}, retrying without Range header", endpoint);
+            auto retry_req = std::make_shared<HttpRequest>();
+            retry_req->method = HTTP_GET;
+            retry_req->url = base_url + endpoint;
+            retry_req->timeout = 15;
+            resp = requests::request(retry_req);
+            if (!resp)
+                return {};
+            status = static_cast<int>(resp->status_code);
+            if (status < 200 || status >= 300)
+                return {};
+            // Small file — no size concern, fall through to line parsing
         } else if (status != 206) {
             spdlog::debug("[DebugBundle] HTTP {} fetching {}", status, endpoint);
             return {};
