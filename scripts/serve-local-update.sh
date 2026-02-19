@@ -174,6 +174,14 @@ if [[ "$_SCRIPT_REV_BEFORE" != "$_SCRIPT_REV_AFTER" ]]; then
 fi
 echo ""
 
+# ── Bundle install.sh from modules ───────────────────────────────────────────
+# install.sh is auto-generated from scripts/lib/installer/*.sh by bundle-installer.sh.
+# Always regenerate before build or patch so the tarball contains the latest installer,
+# even if only module sources were edited (not the bundled install.sh).
+echo "[serve-local-update] Bundling install.sh from modules..."
+"$SCRIPT_DIR/bundle-installer.sh" -o "$PROJECT_DIR/scripts/install.sh"
+echo ""
+
 # ── Build ─────────────────────────────────────────────────────────────────────
 if [[ $BUILD -eq 1 ]]; then
     echo "[serve-local-update] Compiling ${PLATFORM} binary (docker)..."
