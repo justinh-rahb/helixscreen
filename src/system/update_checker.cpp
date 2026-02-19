@@ -1350,6 +1350,14 @@ void UpdateChecker::check_for_updates(Callback callback) {
         cached_r2_base_url_.pop_back();
     }
 
+    const char* channel_name = (cached_channel_ == UpdateChannel::Beta)  ? "beta"
+                               : (cached_channel_ == UpdateChannel::Dev) ? "dev"
+                                                                          : "stable";
+    spdlog::debug("[UpdateChecker] check_for_updates: channel={} dev_url='{}' r2_base_url='{}'",
+                  channel_name,
+                  cached_dev_url_.empty() ? "(none)" : cached_dev_url_,
+                  cached_r2_base_url_);
+
     // Update subjects on LVGL thread (check_for_updates is public, could be called from any thread)
     if (subjects_initialized_) {
         helix::ui::queue_update([this]() {
