@@ -731,6 +731,14 @@ class AmsState {
      */
     void stop_spoolman_polling();
 
+    /**
+     * @brief Bump the slots version counter to trigger UI refresh
+     *
+     * Call after modifying slot data (weights, endless spool config, etc.)
+     * to notify observers and redraw the AMS panel.
+     */
+    void bump_slots_version();
+
   private:
     friend class AmsStateTestAccess;
 
@@ -744,11 +752,6 @@ class AmsState {
      * @param data Event data
      */
     void on_backend_event(int backend_index, const std::string& event, const std::string& data);
-
-    /**
-     * @brief Bump the slots version counter
-     */
-    void bump_slots_version();
 
     /**
      * @brief Probe for ValgACE via REST endpoint

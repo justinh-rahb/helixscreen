@@ -385,9 +385,11 @@
     <str name="icon_alert" value="󰀦"/>
     <str name="icon_alert_circle" value="󰀨"/>
     <str name="icon_alert_octagon" value="󰀩"/>
+    <str name="icon_alpha_a_circle" value="󰯬"/>
     <str name="icon_animation" value="󰗘"/>
     <str name="icon_animation_play" value="󰤺"/>
     <str name="icon_arrow_down" value="󰁅"/>
+    <str name="icon_arrow_down_bold" value="󰜮"/>
     <str name="icon_arrow_expand_down" value="󰞖"/>
     <str name="icon_arrow_expand_up" value="󰞙"/>
     <str name="icon_arrow_left" value="󰁍"/>
@@ -410,10 +412,13 @@
     <str name="icon_bed" value="󰋣"/>
     <str name="icon_bell" value="󰂚"/>
     <str name="icon_block_helper" value="󰂭"/>
+    <str name="icon_book" value="󰗚"/>
+    <str name="icon_bug" value="󰃤"/>
     <str name="icon_camera_timer" value="󰄉"/>
     <str name="icon_cancel" value="󰜺"/>
     <str name="icon_chart_line" value="󰄪"/>
     <str name="icon_check" value="󰄬"/>
+    <str name="icon_check_bold" value="󰸞"/>
     <str name="icon_check_circle" value="󰗡"/>
     <str name="icon_chevron_down" value="󰅀"/>
     <str name="icon_chevron_left" value="󰅁"/>
@@ -428,32 +433,45 @@
     <str name="icon_console" value="󰆍"/>
     <str name="icon_cooldown" value="󰜗"/>
     <str name="icon_cube" value="󰆧"/>
+    <str name="icon_cube_outline" value="󰆧"/>
     <str name="icon_cursor_move" value="󰆾"/>
     <str name="icon_dashboard" value="󰕮"/>
+    <str name="icon_database" value="󰆼"/>
     <str name="icon_delete" value="󰆴"/>
     <str name="icon_dots_vertical" value="󰇙"/>
     <str name="icon_download" value="󰇚"/>
+    <str name="icon_electric_switch" value="󰺟"/>
     <str name="icon_engine" value="󰇺"/>
     <str name="icon_engine_off" value="󰩆"/>
     <str name="icon_ethernet" value="󰈀"/>
     <str name="icon_expand_all" value="󰁌"/>
+    <str name="icon_eye" value="󰈈"/>
+    <str name="icon_eye_off" value="󰈉"/>
     <str name="icon_fan" value="󰈐"/>
     <str name="icon_fan_off" value="󰠝"/>
     <str name="icon_filament" value="󰹛"/>
+    <str name="icon_filament_alert" value="󱇀"/>
     <str name="icon_fine_tune" value="󰘮"/>
     <str name="icon_fire" value="󰈸"/>
+    <str name="icon_flash" value="󰉁"/>
     <str name="icon_folder" value="󰉋"/>
+    <str name="icon_folder_arrow_up" value="󱧰"/>
     <str name="icon_folder_open" value="󰝰"/>
     <str name="icon_folder_upload" value="󰉙"/>
     <str name="icon_grid_large" value="󰝘"/>
+    <str name="icon_grid_off" value="󰋂"/>
     <str name="icon_grid_view" value="󰕰"/>
     <str name="icon_heat_wave" value="󱩅"/>
     <str name="icon_heater" value="󱢸"/>
+    <str name="icon_help" value="󰘥"/>
     <str name="icon_help_circle" value="󰋗"/>
     <str name="icon_home" value="󰋜"/>
     <str name="icon_home_import" value="󰾜"/>
     <str name="icon_hourglass" value="󰔟"/>
+    <str name="icon_image_area" value="󰋫"/>
     <str name="icon_image_broken_variant" value="󰋮"/>
+    <str name="icon_inbox_outline" value="󱉴"/>
+    <str name="icon_infinity" value="󰛤"/>
     <str name="icon_info" value="󰋼"/>
     <str name="icon_info_circle" value="󰋼"/>
     <str name="icon_info_outline" value="󰋽"/>
@@ -476,18 +494,22 @@
     <str name="icon_lightbulb_on_90" value="󱩖"/>
     <str name="icon_lightbulb_outline" value="󰌶"/>
     <str name="icon_limit" value="󰹏"/>
+    <str name="icon_link" value="󰌹"/>
     <str name="icon_list" value="󰉹"/>
     <str name="icon_lock" value="󰌾"/>
+    <str name="icon_message" value="󰍩"/>
     <str name="icon_minus" value="󰍴"/>
     <str name="icon_move" value="󰁌"/>
     <str name="icon_network" value="󰈀"/>
     <str name="icon_notifications" value="󰂚"/>
+    <str name="icon_palette" value="󰏘"/>
     <str name="icon_pause" value="󰏤"/>
     <str name="icon_pencil" value="󰏫"/>
     <str name="icon_play" value="󰐊"/>
     <str name="icon_play_circle" value="󰐌"/>
     <str name="icon_plus" value="󰐕"/>
     <str name="icon_power" value="󰐥"/>
+    <str name="icon_power_cycle" value="󰤁"/>
     <str name="icon_power_plug" value="󰚥"/>
     <str name="icon_print" value="󰐪"/>
     <str name="icon_printer_3d" value="󰐫"/>
@@ -499,6 +521,7 @@
     <str name="icon_radiator" value="󰐸"/>
     <str name="icon_redo" value="󰑎"/>
     <str name="icon_refresh" value="󰑐"/>
+    <str name="icon_restart" value="󰜉"/>
     <str name="icon_resume" value="󰐌"/>
     <str name="icon_robot" value="󰚩"/>
     <str name="icon_rotate_3d" value="󰻇"/>
@@ -509,14 +532,18 @@
     <str name="icon_script_text" value="󰯂"/>
     <str name="icon_sd" value="󰑹"/>
     <str name="icon_send" value="󰒊"/>
+    <str name="icon_sensor" value="󰶑"/>
     <str name="icon_settings" value="󰒓"/>
     <str name="icon_sine_wave" value="󰥛"/>
+    <str name="icon_sleep" value="󰒲"/>
     <str name="icon_source_branch" value="󰘬"/>
     <str name="icon_speed" value="󰓅"/>
     <str name="icon_speed_down" value="󰾆"/>
     <str name="icon_speed_up" value="󰾅"/>
     <str name="icon_spoolman" value="󰈯"/>
     <str name="icon_stop" value="󰓛"/>
+    <str name="icon_swap_vertical" value="󰓢"/>
+    <str name="icon_sync" value="󰓦"/>
     <str name="icon_sysinfo" value="󰋼"/>
     <str name="icon_target" value="󰓾"/>
     <str name="icon_thermometer" value="󰔏"/>
@@ -525,6 +552,7 @@
     <str name="icon_tortoise" value="󰴻"/>
     <str name="icon_toy_brick_outline" value="󱊍"/>
     <str name="icon_train_flatbed" value="󱬵"/>
+    <str name="icon_translate" value="󰗊"/>
     <str name="icon_trash_can_outline" value="󰩺"/>
     <str name="icon_tray_arrow_up" value="󰄝"/>
     <str name="icon_triangle_exclamation" value="󰀦"/>
@@ -533,12 +561,17 @@
     <str name="icon_tune_vertical_variant" value="󱕃"/>
     <str name="icon_undo" value="󰕌"/>
     <str name="icon_update" value="󰚰"/>
+    <str name="icon_usb" value="󰕓"/>
     <str name="icon_vibrate" value="󰕦"/>
     <str name="icon_video" value="󰕧"/>
     <str name="icon_view_dashboard" value="󰕮"/>
     <str name="icon_view_grid" value="󰕰"/>
     <str name="icon_view_list" value="󰕲"/>
+    <str name="icon_volume_high" value="󰕾"/>
+    <str name="icon_volume_low" value="󰖀"/>
+    <str name="icon_volume_off" value="󰖁"/>
     <str name="icon_water" value="󰖌"/>
+    <str name="icon_waveform" value="󱑽"/>
     <str name="icon_weight" value="󰖡"/>
     <str name="icon_wifi" value="󰖩"/>
     <str name="icon_wifi_alert" value="󱚵"/>
@@ -556,7 +589,6 @@
     <str name="icon_wifi_strength_4_lock" value="󰤪"/>
     <str name="icon_wrench" value="󱌣"/>
     <str name="icon_xmark" value="󰅖"/>
-    <str name="icon_xmark_circle" value="󰅙"/>
     <str name="icon_z_closer" value="󰜮"/>
     <str name="icon_z_farther" value="󰜷"/>
     <!-- END GENERATED ICON CONSTS -->

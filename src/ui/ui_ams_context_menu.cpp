@@ -7,6 +7,7 @@
 #include "ui_toast_manager.h"
 
 #include "ams_backend.h"
+#include "ams_state.h"
 #include "ams_types.h"
 #include "filament_database.h"
 
@@ -377,10 +378,23 @@ void AmsContextMenu::handle_tool_changed() {
                  tool_number >= 0 ? tool_number : -1);
 
     if (tool_number >= 0) {
-        // Set this slot as the mapping for the selected tool
+        // Warn if another tool already maps to this slot
+        auto mapping = backend_->get_tool_mapping();
+        for (size_t i = 0; i < mapping.size(); ++i) {
+            if (static_cast<int>(i) != tool_number && mapping[i] == get_item_index()) {
+                spdlog::warn("[AmsContextMenu] Tool {} will share slot {} with tool {}",
+                             tool_number, get_item_index(), i);
+                std::string msg =
+                    "T" + std::to_string(tool_number) + " shares slot with T" + std::to_string(i);
+                ToastManager::instance().show(ToastSeverity::WARNING, msg.c_str());
+                break;
+            }
+        }
+
         auto result = backend_->set_tool_mapping(tool_number, get_item_index());
         if (!result.success()) {
             spdlog::warn("[AmsContextMenu] Failed to set tool mapping: {}", result.user_msg);
+            ToastManager::instance().show(ToastSeverity::ERROR, result.user_msg.c_str());
         }
     }
     // Note: "None" selection doesn't clear mapping - user needs to map another slot to that tool
@@ -438,7 +452,13 @@ void AmsContextMenu::handle_backup_changed() {
     auto result = backend_->set_endless_spool_backup(get_item_index(), backup_slot);
     if (!result.success()) {
         spdlog::warn("[AmsContextMenu] Failed to set endless spool backup: {}", result.user_msg);
+    } else {
+        // Bump slots version to trigger endless spool arrow redraw
+        AmsState::instance().bump_slots_version();
     }
+
+    // Close the context menu after selection
+    hide();
 }
 
 // ============================================================================
@@ -461,23 +481,22 @@ void AmsContextMenu::configure_dropdowns() {
 
     bool show_any_dropdown = false;
 
-    // Configure tool mapping dropdown
-    if (backend_) {
-        auto tool_caps = backend_->get_tool_mapping_capabilities();
-        if (tool_caps.supported) {
-            populate_tool_dropdown();
-            if (tool_row) {
-                lv_obj_remove_flag(tool_row, LV_OBJ_FLAG_HIDDEN);
-            }
-            // Disable dropdown if not editable
-            if (tool_dropdown_ && !tool_caps.editable) {
-                lv_obj_add_state(tool_dropdown_, LV_STATE_DISABLED);
-            }
-            show_any_dropdown = true;
-            spdlog::debug("[AmsContextMenu] Tool mapping enabled (editable={})",
-                          tool_caps.editable);
-        }
-    }
+    // Tool mapping dropdown - hidden until we have a good UX for remapping
+    // (currently 1:1 lane-to-tool mapping is the only conflict-free option)
+    // if (backend_) {
+    //     auto tool_caps = backend_->get_tool_mapping_capabilities();
+    //     if (tool_caps.supported) {
+    //         populate_tool_dropdown();
+    //         if (tool_row) {
+    //             lv_obj_remove_flag(tool_row, LV_OBJ_FLAG_HIDDEN);
+    //         }
+    //         if (tool_dropdown_ && !tool_caps.editable) {
+    //             lv_obj_add_state(tool_dropdown_, LV_STATE_DISABLED);
+    //         }
+    //         show_any_dropdown = true;
+    //     }
+    // }
+    (void)tool_row;
 
     // Configure endless spool dropdown
     if (backend_) {

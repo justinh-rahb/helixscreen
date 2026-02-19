@@ -141,6 +141,7 @@ static const IconMapping ICON_MAP[] = {
     {"image_area",           "\xF3\xB0\x8B\xAB"},  // F02EB image-area (photo/picture)
     {"image_broken_variant", "\xF3\xB0\x8B\xAE"}, // F02EE image-broken-variant (fallback)
     {"inbox_outline",      "\xF3\xB1\x89\xB4"},  // F1274 inbox-outline
+    {"infinity",           "\xF3\xB0\x9B\xA4"},  // F06E4 infinity (endless spool)
     {"info",               "\xF3\xB0\x8B\xBC"},  // F02FC information
     {"info_circle",        "\xF3\xB0\x8B\xBC"},  // F02FC information (alias for FontAwesome compat)
     {"info_outline",       "\xF3\xB0\x8B\xBD"},  // F02FD information-outline
