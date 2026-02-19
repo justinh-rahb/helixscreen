@@ -1037,27 +1037,27 @@ void AmsPanel::update_step_progress(AmsAction action) {
     // NOTE: Operation type is now set by start_operation() before backend calls.
     // We only fall back to heuristic detection for operations started externally
     // (e.g., gcode T commands, Mainsail/Fluidd UI).
-    if (action == AmsAction::HEATING && prev_ams_action_ == AmsAction::IDLE &&
-        target_load_slot_ < 0) {
-        // External operation - try to detect type from backend state
+    bool is_external = (target_load_slot_ < 0);
+    bool filament_loaded = false;
+    if (is_external) {
         AmsBackend* backend = AmsState::instance().get_backend();
         if (backend) {
             AmsSystemInfo info = backend->get_system_info();
-            // If something is currently loaded, this will be a swap (cut first)
-            // Otherwise it's a fresh load
-            if (info.current_slot >= 0) {
-                recreate_step_progress_for_operation(StepOperationType::LOAD_SWAP);
-            } else {
-                recreate_step_progress_for_operation(StepOperationType::LOAD_FRESH);
-            }
-        } else {
-            recreate_step_progress_for_operation(StepOperationType::LOAD_FRESH);
+            filament_loaded = (info.current_slot >= 0);
         }
-    } else if (action == AmsAction::UNLOADING && prev_ams_action_ != AmsAction::CUTTING) {
-        // Explicit unload (not part of a swap) - show unload steps
-        // For swap operations, UNLOADING follows CUTTING, so don't recreate
-        if (current_operation_type_ != StepOperationType::LOAD_SWAP) {
-            recreate_step_progress_for_operation(StepOperationType::UNLOAD);
+    }
+
+    auto detection = detect_step_operation(action, prev_ams_action_, current_operation_type_,
+                                           is_external, filament_loaded);
+    if (detection.should_recreate) {
+        if (detection.op_type == StepOperationType::LOAD_SWAP &&
+            current_operation_type_ == StepOperationType::UNLOAD) {
+            spdlog::debug("[{}] Upgrading UNLOAD → LOAD_SWAP (loading detected after unload)",
+                          get_name());
+        }
+        recreate_step_progress_for_operation(detection.op_type);
+        if (detection.jump_to_step >= 0 && step_progress_) {
+            ui_step_progress_set_current(step_progress_, detection.jump_to_step);
         }
     }
 

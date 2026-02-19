@@ -13,6 +13,7 @@
 #include "ui_panel_base.h"
 
 #include "ams_state.h"
+#include "ams_step_operation.h"
 #include "ams_types.h" // For SlotInfo
 
 #include <memory>
@@ -153,13 +154,6 @@ class AmsPanel : public PanelBase {
     AmsAction prev_ams_action_ = AmsAction::IDLE; ///< Previous action for transition detection
 
     // === Step Progress Operation Type ===
-
-    /// Operation types for dynamic step progress
-    enum class StepOperationType {
-        LOAD_FRESH, ///< Loading into empty toolhead (4 steps)
-        LOAD_SWAP,  ///< Loading while another filament is loaded (5 steps, includes cut/retract)
-        UNLOAD      ///< Explicit unload operation (4 steps)
-    };
 
     StepOperationType current_operation_type_ =
         StepOperationType::LOAD_FRESH; ///< Current operation
