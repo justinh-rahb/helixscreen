@@ -2317,9 +2317,12 @@ deploy_platform_hooks() {
         return 0
     fi
 
-    $SUDO mkdir -p "${install_dir}/platform"
-    $SUDO cp "$hooks_src" "${install_dir}/platform/hooks.sh"
-    $SUDO chmod +x "${install_dir}/platform/hooks.sh"
+    # Try without sudo first: during self-update INSTALL_DIR is pi-owned so no root
+    # is needed.  Fall back to sudo for fresh installs where the directory may be
+    # root-owned or not yet created.
+    mkdir -p "${install_dir}/platform" 2>/dev/null || $SUDO mkdir -p "${install_dir}/platform"
+    cp "$hooks_src" "${install_dir}/platform/hooks.sh" 2>/dev/null || $SUDO cp "$hooks_src" "${install_dir}/platform/hooks.sh"
+    chmod +x "${install_dir}/platform/hooks.sh" 2>/dev/null || $SUDO chmod +x "${install_dir}/platform/hooks.sh"
     log_info "Deployed platform hooks: $platform"
 }
 
