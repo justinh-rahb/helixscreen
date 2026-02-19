@@ -137,6 +137,7 @@ class LedControlOverlay : public OverlayBase {
     lv_subject_t wled_visible_{};
     lv_subject_t macro_visible_{};
     lv_subject_t strip_selector_visible_{};
+    lv_subject_t color_visible_{};
 
     // Observers
     ObserverGuard wled_brightness_observer_;

@@ -58,6 +58,33 @@ void PrinterLedState::update_from_status(const nlohmann::json& status) {
 
     const auto& led = status[tracked_led_name_];
 
+    // Handle output_pin format: {"value": 0.0-1.0} (no color_data)
+    // Only enter this path for actual output_pin objects, not for native LEDs with missing data
+    if (!led.contains("color_data") && tracked_led_name_.rfind("output_pin ", 0) == 0) {
+        if (led.contains("value") && led["value"].is_number()) {
+            double val = led["value"].get<double>();
+            int brightness = std::clamp(static_cast<int>(val * 100.0 + 0.5), 0, 100);
+            int intensity = std::clamp(static_cast<int>(val * 255.0 + 0.5), 0, 255);
+
+            lv_subject_set_int(&led_r_, intensity);
+            lv_subject_set_int(&led_g_, intensity);
+            lv_subject_set_int(&led_b_, intensity);
+            lv_subject_set_int(&led_w_, 0);
+            lv_subject_set_int(&led_brightness_, brightness);
+
+            bool is_on = (val > 0.0);
+            int new_state = is_on ? 1 : 0;
+            int old_state = lv_subject_get_int(&led_state_);
+            if (new_state != old_state) {
+                lv_subject_set_int(&led_state_, new_state);
+                spdlog::debug(
+                    "[PrinterLedState] Output pin {} state: {} (value={:.2f} brightness={}%)",
+                    tracked_led_name_, is_on ? "ON" : "OFF", val, brightness);
+            }
+        }
+        return;
+    }
+
     if (!led.contains("color_data") || !led["color_data"].is_array() || led["color_data"].empty()) {
         return;
     }

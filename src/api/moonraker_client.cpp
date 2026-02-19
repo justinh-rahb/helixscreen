@@ -15,10 +15,12 @@
 #include "moonraker_client.h"
 
 #include "ui_error_reporting.h"
+#include "ui_update_queue.h"
 
 #include "abort_manager.h"
 #include "app_globals.h"
 #include "helix_version.h"
+#include "led/led_controller.h"
 #include "printer_state.h"
 
 #include <algorithm> // For std::sort in MCU query handling
@@ -1272,8 +1274,20 @@ void MoonrakerClient::continue_discovery(std::function<void()> on_complete,
                                 config_response["result"]["status"].contains("configfile") &&
                                 config_response["result"]["status"]["configfile"].contains(
                                     "config")) {
-                                hardware_.parse_config_keys(
-                                    config_response["result"]["status"]["configfile"]["config"]);
+                                const auto& cfg =
+                                    config_response["result"]["status"]["configfile"]["config"];
+                                hardware_.parse_config_keys(cfg);
+
+                                // Update LED controller with configfile data (effect targets +
+                                // output_pin PWM)
+                                nlohmann::json cfg_copy = cfg;
+                                helix::ui::queue_update([cfg_copy]() {
+                                    auto& led_ctrl = helix::led::LedController::instance();
+                                    if (led_ctrl.is_initialized()) {
+                                        led_ctrl.update_effect_targets(cfg_copy);
+                                        led_ctrl.update_output_pin_config(cfg_copy);
+                                    }
+                                });
                             }
                         },
                         [](const MoonrakerError& err) {

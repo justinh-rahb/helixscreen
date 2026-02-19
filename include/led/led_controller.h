@@ -261,6 +261,64 @@ class MacroBackend {
     std::unordered_map<std::string, bool> macro_states_; // Optimistic state tracking
 };
 
+class OutputPinBackend {
+  public:
+    OutputPinBackend() = default;
+
+    void set_api(MoonrakerAPI* api) {
+        api_ = api;
+    }
+
+    [[nodiscard]] LedBackendType type() const {
+        return LedBackendType::OUTPUT_PIN;
+    }
+    [[nodiscard]] bool is_available() const {
+        return !pins_.empty();
+    }
+    [[nodiscard]] const std::vector<LedStripInfo>& pins() const {
+        return pins_;
+    }
+
+    void add_pin(const LedStripInfo& pin);
+    void clear();
+
+    // Control methods
+    void set_value(const std::string& pin_id, double value,
+                   NativeBackend::SuccessCallback on_success = nullptr,
+                   NativeBackend::ErrorCallback on_error = nullptr);
+    void turn_on(const std::string& pin_id, NativeBackend::SuccessCallback on_success = nullptr,
+                 NativeBackend::ErrorCallback on_error = nullptr);
+    void turn_off(const std::string& pin_id, NativeBackend::SuccessCallback on_success = nullptr,
+                  NativeBackend::ErrorCallback on_error = nullptr);
+    void set_brightness(const std::string& pin_id, int brightness_pct,
+                        NativeBackend::SuccessCallback on_success = nullptr,
+                        NativeBackend::ErrorCallback on_error = nullptr);
+
+    /// Update pin values from Moonraker status JSON
+    void update_from_status(const nlohmann::json& status);
+
+    [[nodiscard]] double get_value(const std::string& pin_id) const;
+    [[nodiscard]] bool is_on(const std::string& pin_id) const;
+    [[nodiscard]] int brightness_pct(const std::string& pin_id) const;
+    [[nodiscard]] bool is_pwm(const std::string& pin_id) const;
+
+    void set_pin_pwm(const std::string& pin_id, bool is_pwm);
+
+    using ValueChangeCallback = std::function<void(const std::string& pin_id, double value)>;
+    void set_value_change_callback(ValueChangeCallback cb) {
+        value_change_cb_ = std::move(cb);
+    }
+    void clear_value_change_callback() {
+        value_change_cb_ = nullptr;
+    }
+
+  private:
+    MoonrakerAPI* api_ = nullptr;
+    std::vector<LedStripInfo> pins_;
+    std::unordered_map<std::string, double> pin_values_;
+    ValueChangeCallback value_change_cb_;
+};
+
 class LedController {
   public:
     static LedController& instance();
@@ -285,6 +343,9 @@ class LedController {
     MacroBackend& macro() {
         return macro_;
     }
+    OutputPinBackend& output_pin() {
+        return output_pin_;
+    }
 
     const NativeBackend& native() const {
         return native_;
@@ -298,6 +359,9 @@ class LedController {
     const MacroBackend& macro() const {
         return macro_;
     }
+    const OutputPinBackend& output_pin() const {
+        return output_pin_;
+    }
 
     // Discovery
     void discover_from_hardware(const helix::PrinterDiscovery& hardware);
@@ -305,6 +369,9 @@ class LedController {
 
     // Update effect target LEDs from configfile config section
     void update_effect_targets(const nlohmann::json& configfile_config);
+
+    // Update output_pin PWM config from configfile config section
+    void update_output_pin_config(const nlohmann::json& configfile_config);
 
     // Queries
     [[nodiscard]] bool has_any_backend() const;
@@ -394,6 +461,7 @@ class LedController {
     LedEffectBackend effects_;
     WledBackend wled_;
     MacroBackend macro_;
+    OutputPinBackend output_pin_;
 
     // Config state
     std::vector<std::string> selected_strips_;

@@ -345,6 +345,7 @@ void PrinterState::update_from_status(const json& state) {
     if (led_ctrl.is_initialized()) {
         led_ctrl.native().update_from_status(state);
         led_ctrl.effects().update_from_status(state);
+        led_ctrl.output_pin().update_from_status(state);
     }
 
     // Update exclude_object state (for mid-print object exclusion)
