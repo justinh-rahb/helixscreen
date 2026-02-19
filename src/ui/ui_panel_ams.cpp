@@ -1023,29 +1023,10 @@ void AmsPanel::start_operation(StepOperationType op_type, int target_slot) {
 
     AmsBackend* backend = AmsState::instance().get_backend();
 
-    if (op_type == StepOperationType::LOAD_SWAP && backend) {
-        // SWAP: Clear highlight on current slot (no pulse), pulse only target
-        int current = backend->get_system_info().current_slot;
-        if (current >= 0 && current < MAX_VISIBLE_SLOTS && slot_widgets_[current] &&
-            current != target_slot) {
-            // Forcibly clear highlight - don't pulse it
-            ui_ams_slot_clear_highlight(slot_widgets_[current]);
-        }
-        // Pulse the target slot
-        if (target_slot >= 0 && target_slot < MAX_VISIBLE_SLOTS && slot_widgets_[target_slot]) {
-            ui_ams_slot_set_pulsing(slot_widgets_[target_slot], true);
-        }
-    } else if (op_type == StepOperationType::UNLOAD) {
-        // UNLOAD only: Pulse the slot being unloaded
-        if (target_slot >= 0 && target_slot < MAX_VISIBLE_SLOTS && slot_widgets_[target_slot]) {
-            ui_ams_slot_set_pulsing(slot_widgets_[target_slot], true);
-        }
-    } else {
-        // LOAD_FRESH: Pulse the target slot
-        if (target_slot >= 0 && target_slot < MAX_VISIBLE_SLOTS && slot_widgets_[target_slot]) {
-            ui_ams_slot_set_pulsing(slot_widgets_[target_slot], true);
-        }
-    }
+    // NOTE: Slot pulse animation is now subject-driven (in ui_ams_slot.cpp).
+    // Each slot auto-pulses when ams_action indicates an active operation and
+    // current_slot matches its index. No explicit pulse calls needed here.
+    LV_UNUSED(backend);
 }
 
 void AmsPanel::update_step_progress(AmsAction action) {
@@ -1096,10 +1077,9 @@ void AmsPanel::update_step_progress(AmsAction action) {
         lv_obj_add_flag(step_progress_container_, LV_OBJ_FLAG_HIDDEN);
 
         // Stop pulse animation and reset target when operation completes
-        if (target_load_slot_ >= 0) {
-            set_slot_continuous_pulse(-1, false); // Stop all pulses
-            target_load_slot_ = -1;
-        }
+        // NOTE: Pulse animation stops automatically via subject-driven logic
+        // in ui_ams_slot.cpp when action transitions to IDLE.
+        target_load_slot_ = -1;
         return;
     }
 
@@ -1266,25 +1246,8 @@ void AmsPanel::update_action_display(AmsAction action) {
     // Update step progress stepper
     update_step_progress(action);
 
-    // NOTE: Slot border pulsing is now handled by start_operation() for UI-initiated operations.
-    // For externally-triggered operations (gcode, other UI), we start pulsing here only if
-    // target_load_slot_ was not set by start_operation().
-    if (target_load_slot_ < 0) {
-        bool is_operation_active =
-            (action == AmsAction::LOADING || action == AmsAction::UNLOADING ||
-             action == AmsAction::HEATING || action == AmsAction::CUTTING ||
-             action == AmsAction::FORMING_TIP || action == AmsAction::PURGING);
-        if (is_operation_active) {
-            AmsBackend* backend = AmsState::instance().get_backend();
-            if (backend) {
-                AmsSystemInfo info = backend->get_system_info();
-                if (info.current_slot >= 0) {
-                    set_slot_continuous_pulse(info.current_slot, true);
-                    target_load_slot_ = info.current_slot; // Track so we don't restart
-                }
-            }
-        }
-    }
+    // NOTE: Slot border pulsing is now fully subject-driven in ui_ams_slot.cpp.
+    // Each slot auto-pulses based on ams_action + current_slot subjects.
 
     // Handle error state - show error modal (only if not already visible)
     if (action == AmsAction::ERROR) {
@@ -1348,25 +1311,6 @@ void AmsPanel::update_current_slot_highlight(int slot_index) {
 
     // Update the "Currently Loaded" card in the right column
     update_current_loaded_display(slot_index);
-}
-
-void AmsPanel::set_slot_continuous_pulse(int slot_index, bool enable) {
-    // Stop all existing pulses first
-    for (int i = 0; i < MAX_VISIBLE_SLOTS; ++i) {
-        if (slot_widgets_[i]) {
-            ui_ams_slot_set_pulsing(slot_widgets_[i], false);
-        }
-    }
-
-    // Start pulse on target slot if enabled
-    if (enable && slot_index >= 0 && slot_index < MAX_VISIBLE_SLOTS && slot_widgets_[slot_index]) {
-        if (!SettingsManager::instance().get_animations_enabled()) {
-            // No animation - slot's static highlight will show
-            return;
-        }
-        ui_ams_slot_set_pulsing(slot_widgets_[slot_index], true);
-        spdlog::debug("[AmsPanel] Started continuous pulse animation on slot {}", slot_index);
-    }
 }
 
 void AmsPanel::update_current_loaded_display(int slot_index) {

@@ -237,18 +237,6 @@ class AmsPanel : public PanelBase {
     void update_current_slot_highlight(int slot_index);
     void update_current_loaded_display(int slot_index);
 
-    /**
-     * @brief Start or stop continuous border pulse animation on a slot
-     *
-     * During operations (loading/unloading), the active slot's border should
-     * pulse continuously to indicate activity. When operations complete,
-     * the pulse stops and border returns to static highlight.
-     *
-     * @param slot_index Slot to pulse (-1 to stop all pulses)
-     * @param enable True to start pulsing, false to stop
-     */
-    void set_slot_continuous_pulse(int slot_index, bool enable);
-
     // === Event Callbacks (static trampolines) ===
 
     static void on_slot_clicked(lv_event_t* e);

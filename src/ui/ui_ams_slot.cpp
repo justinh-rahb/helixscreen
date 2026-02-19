@@ -59,6 +59,7 @@ struct AmsSlotData {
     ObserverGuard status_observer;
     ObserverGuard current_slot_observer;
     ObserverGuard filament_loaded_observer;
+    ObserverGuard action_observer;
 
     // Skeuomorphic spool visualization layers (flat style)
     lv_obj_t* spool_container = nullptr; // Container for all spool elements
@@ -146,7 +147,7 @@ static void unregister_slot_data(lv_obj_t* obj) {
             data->status_observer.release();
             data->current_slot_observer.release();
             data->filament_loaded_observer.release();
-            // Subject buffers are struct members, freed when unique_ptr destructs
+            data->action_observer.release();
         }
         s_slot_registry.erase(it);
     }
@@ -355,6 +356,46 @@ static void apply_current_slot_highlight(AmsSlotData* data, int current_slot) {
 
     spdlog::trace("[AmsSlot] Slot {} active={} (current_slot={}, loaded={})", data->slot_index,
                   is_active, current_slot, filament_loaded);
+}
+
+// Forward declaration (defined below in Animation section)
+void ui_ams_slot_set_pulsing(lv_obj_t* obj, bool pulsing);
+
+/**
+ * @brief Evaluate whether this slot should be pulsing based on ams_action and current_slot.
+ *
+ * Called by both the action and current_slot observers. Automatically starts/stops
+ * the pulse animation so any panel using ams_slot widgets gets consistent feedback
+ * during filament operations.
+ */
+static void evaluate_pulse_state(AmsSlotData* data) {
+    if (!data || !data->container) {
+        return;
+    }
+
+    lv_subject_t* action_subject = AmsState::instance().get_ams_action_subject();
+    lv_subject_t* slot_subject = AmsState::instance().get_current_slot_subject();
+    if (!action_subject || !slot_subject) {
+        return;
+    }
+
+    auto action = static_cast<AmsAction>(lv_subject_get_int(action_subject));
+    int current_slot = lv_subject_get_int(slot_subject);
+
+    bool is_active_operation = (action == AmsAction::HEATING || action == AmsAction::LOADING ||
+                                action == AmsAction::UNLOADING || action == AmsAction::CUTTING ||
+                                action == AmsAction::FORMING_TIP || action == AmsAction::PURGING);
+
+    bool should_pulse = is_active_operation && (current_slot == data->slot_index);
+
+    if (should_pulse && !data->is_pulsing) {
+        if (!SettingsManager::instance().get_animations_enabled()) {
+            return; // Static highlight will handle it
+        }
+        ui_ams_slot_set_pulsing(data->container, true);
+    } else if (!should_pulse && data->is_pulsing) {
+        ui_ams_slot_set_pulsing(data->container, false);
+    }
 }
 
 /**
@@ -663,8 +704,10 @@ static void setup_slot_observers(AmsSlotData* data) {
         data->current_slot_observer = observe_int_sync<lv_obj_t>(
             current_slot_subject, obj, [](lv_obj_t* o, int current_slot) {
                 auto* d = get_slot_data(o);
-                if (d)
+                if (d) {
+                    evaluate_pulse_state(d);
                     apply_current_slot_highlight(d, current_slot);
+                }
             });
     }
     if (filament_loaded_subject) {
@@ -678,6 +721,17 @@ static void setup_slot_observers(AmsSlotData* data) {
                 if (slot_subject) {
                     apply_current_slot_highlight(d, lv_subject_get_int(slot_subject));
                 }
+            });
+    }
+
+    // Action observer: auto-pulse this slot during active filament operations
+    lv_subject_t* action_subject = state.get_ams_action_subject();
+    if (action_subject) {
+        data->action_observer =
+            observe_int_sync<lv_obj_t>(action_subject, obj, [](lv_obj_t* o, int /*action*/) {
+                auto* d = get_slot_data(o);
+                if (d)
+                    evaluate_pulse_state(d);
             });
     }
 
