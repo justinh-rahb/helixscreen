@@ -17,7 +17,8 @@ LVGL_PATCHED_FILES := \
 	src/core/lv_observer.c \
 	src/widgets/slider/lv_slider.c \
 	src/stdlib/clib/lv_string_clib.c \
-	src/stdlib/builtin/lv_string_builtin.c
+	src/stdlib/builtin/lv_string_builtin.c \
+	src/draw/sw/blend/lv_draw_sw_blend.c
 
 # Files modified by libhv patches
 LIBHV_PATCHED_FILES := \
@@ -172,6 +173,17 @@ $(PATCHES_STAMP): $(PATCH_FILES) $(LVGL_HEAD) $(LIBHV_HEAD)
 		fi \
 	else \
 		echo "$(GREEN)✓ LVGL strdup NULL guard patch already applied$(RESET)"; \
+	fi
+	$(Q)if git -C $(LVGL_DIR) diff --quiet src/draw/sw/blend/lv_draw_sw_blend.c 2>/dev/null; then \
+		echo "$(YELLOW)→ Applying LVGL blend NULL guard patch...$(RESET)"; \
+		if git -C $(LVGL_DIR) apply --check ../../patches/lvgl_blend_null_guard.patch 2>/dev/null; then \
+			git -C $(LVGL_DIR) apply ../../patches/lvgl_blend_null_guard.patch && \
+			echo "$(GREEN)✓ Blend NULL guard patch applied$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠ Cannot apply patch (already applied or conflicts)$(RESET)"; \
+		fi \
+	else \
+		echo "$(GREEN)✓ LVGL blend NULL guard patch already applied$(RESET)"; \
 	fi
 	$(ECHO) "$(CYAN)Checking libhv patches...$(RESET)"
 	$(Q)if git -C $(LIBHV_DIR) diff --quiet http/client/requests.h 2>/dev/null; then \
