@@ -1673,7 +1673,7 @@ void MoonrakerAPI::get_spoolman_spools(SpoolListCallback on_success, ErrorCallba
 
 void MoonrakerAPI::get_spoolman_spool(int spool_id, SpoolCallback on_success,
                                       ErrorCallback on_error) {
-    spdlog::debug("[Moonraker API] get_spoolman_spool({})", spool_id);
+    spdlog::trace("[Moonraker API] get_spoolman_spool({})", spool_id);
 
     // Use Moonraker's Spoolman proxy to GET /v1/spool/{id}
     json params;
@@ -1685,7 +1685,7 @@ void MoonrakerAPI::get_spoolman_spool(int spool_id, SpoolCallback on_success,
         [on_success, spool_id](json response) {
             if (response.contains("result") && response["result"].is_object()) {
                 SpoolInfo spool = parse_spool_info(response["result"]);
-                spdlog::debug("[Moonraker API] Got spool {}: {} {}", spool_id, spool.vendor,
+                spdlog::trace("[Moonraker API] Got spool {}: {} {}", spool_id, spool.vendor,
                               spool.material);
                 if (on_success) {
                     on_success(spool);

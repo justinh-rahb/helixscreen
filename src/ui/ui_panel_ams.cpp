@@ -790,13 +790,13 @@ void AmsPanel::update_endless_arrows_from_backend() {
     }
 
     if (!has_any_backup) {
-        spdlog::info("[{}] No endless spool backups configured - hiding arrows", get_name());
+        spdlog::trace("[{}] No endless spool backups configured - hiding arrows", get_name());
         ui_endless_spool_arrows_clear(endless_arrows_);
         lv_obj_add_flag(endless_arrows_, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
-    spdlog::info("[{}] Endless spool has {} configs with backups", get_name(), configs.size());
+    spdlog::trace("[{}] Endless spool has {} configs with backups", get_name(), configs.size());
 
     // Build backup slots array
     int backup_slots[16] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
@@ -1522,7 +1522,7 @@ void AmsPanel::on_slots_version_changed(lv_observer_t* observer, lv_subject_t* /
     if (!self->subjects_initialized_ || !self->panel_) {
         return; // Not yet ready
     }
-    spdlog::debug("[AmsPanel] Gates version changed - refreshing slots");
+    spdlog::trace("[AmsPanel] Gates version changed - refreshing slots");
     self->refresh_slots();
 }
 

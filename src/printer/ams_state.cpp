@@ -1173,6 +1173,15 @@ void AmsState::refresh_spoolman_weights() {
                             return;
                         }
 
+                        // Skip update if weights haven't changed (avoids UI refresh cascade)
+                        if (slot.remaining_weight_g == d->remaining_weight_g &&
+                            slot.total_weight_g == d->total_weight_g) {
+                            spdlog::trace(
+                                "[AmsState] Slot {} weights unchanged ({:.0f}g / {:.0f}g)",
+                                d->slot_index, d->remaining_weight_g, d->total_weight_g);
+                            return;
+                        }
+
                         // Update weights and set back.
                         // CRITICAL: persist=false prevents an infinite feedback loop.
                         // With persist=true, set_slot_info sends G-code to firmware
@@ -1188,7 +1197,7 @@ void AmsState::refresh_spoolman_weights() {
                         primary->set_slot_info(d->slot_index, slot, /*persist=*/false);
                         state.bump_slots_version();
 
-                        spdlog::trace("[AmsState] Updated slot {} weights: {:.0f}g / {:.0f}g",
+                        spdlog::debug("[AmsState] Updated slot {} weights: {:.0f}g / {:.0f}g",
                                       d->slot_index, d->remaining_weight_g, d->total_weight_g);
                     });
                 },
@@ -1200,7 +1209,7 @@ void AmsState::refresh_spoolman_weights() {
     }
 
     if (linked_count > 0) {
-        spdlog::debug("[AmsState] Refreshing Spoolman weights for {} linked slots", linked_count);
+        spdlog::trace("[AmsState] Refreshing Spoolman weights for {} linked slots", linked_count);
     }
 }
 
