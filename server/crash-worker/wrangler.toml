@@ -25,11 +25,10 @@ binding = "DEBUG_BUNDLES"
 bucket_name = "helix-debug-bundles"
 jurisdiction = "eu"
 
-# Symbol files for server-side backtrace resolution (shared with telemetry worker)
+# Symbol files for server-side backtrace resolution
 [[r2_buckets]]
-binding = "TELEMETRY_BUCKET"
-bucket_name = "helixscreen-telemetry"
-jurisdiction = "eu"
+binding = "RELEASES_BUCKET"
+bucket_name = "helixscreen-releases"
 
 # Rate limiting: 5 crash reports per IP per 60 seconds
 # Prevents crash loops from flooding GitHub with duplicate issues
