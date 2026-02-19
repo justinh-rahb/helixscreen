@@ -170,7 +170,20 @@ std::string KlipperConfigParser::get(const std::string& section, const std::stri
     auto key_it = sec_it->second.find(key);
     if (key_it == sec_it->second.end())
         return default_val;
-    return get_multiline_value(key_it->second);
+    std::string val = get_multiline_value(key_it->second);
+
+    // Strip inline comments: Klipper treats " #" (space + hash) as comment start.
+    // Bare "#" without preceding space is NOT a comment (e.g. color "#FF0000").
+    auto comment_pos = val.find(" #");
+    if (comment_pos != std::string::npos) {
+        val = val.substr(0, comment_pos);
+        // Trim trailing whitespace left behind
+        while (!val.empty() && (val.back() == ' ' || val.back() == '\t')) {
+            val.pop_back();
+        }
+    }
+
+    return val;
 }
 
 bool KlipperConfigParser::get_bool(const std::string& section, const std::string& key,

@@ -2380,6 +2380,12 @@ void AmsBackendAfc::load_afc_configs() {
             configs_loading_.store(false, std::memory_order_relaxed);
             configs_loaded_.store(true, std::memory_order_release);
             spdlog::info("[AMS AFC] Config files loaded");
+
+            // Detect tip method from AFC config.
+            // TODO: Replace with direct Moonraker status query once AFC exposes
+            // tool_cut/form_tip in get_status() (upstream AFC enhancement pending).
+            update_tip_method_from_config();
+
             emit_event(EVENT_STATE_CHANGED);
         }
     };
@@ -2412,6 +2418,44 @@ bool AmsBackendAfc::get_macro_var_bool(const std::string& key, bool default_val)
         return default_val;
     }
     return macro_vars_config_->parser().get_bool("gcode_macro AFC_MacroVars", key, default_val);
+}
+
+void AmsBackendAfc::update_tip_method_from_config() {
+    if (!afc_config_ || !afc_config_->is_loaded()) {
+        return;
+    }
+
+    const auto& parser = afc_config_->parser();
+
+    // Check toolhead cutting (pin-based cutter at nozzle) from [AFC] section
+    bool tool_cut = parser.get_bool("AFC", "tool_cut", false);
+
+    // Check hub cutting (servo-based cutter on hub) from any [AFC_hub *] section
+    bool hub_cut = false;
+    for (const auto& section : parser.get_sections_matching("AFC_hub")) {
+        if (parser.get_bool(section, "cut", false)) {
+            hub_cut = true;
+            break;
+        }
+    }
+
+    // Check tip forming from [AFC] section
+    bool form_tip = parser.get_bool("AFC", "form_tip", false);
+
+    TipMethod method = TipMethod::NONE;
+    if (tool_cut || hub_cut) {
+        method = TipMethod::CUT;
+    } else if (form_tip) {
+        method = TipMethod::TIP_FORM;
+    }
+
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
+        system_info_.tip_method = method;
+    }
+
+    spdlog::info("[AMS AFC] Tip method from config: {} (tool_cut={}, hub_cut={}, form_tip={})",
+                 tip_method_to_string(method), tool_cut, hub_cut, form_tip);
 }
 
 // ============================================================================

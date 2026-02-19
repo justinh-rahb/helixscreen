@@ -593,6 +593,11 @@ class AmsBackendAfc : public AmsBackend {
     /// Load AFC config files from printer
     void load_afc_configs();
 
+    /// Detect tip method (cut vs tip-form) from loaded AFC config.
+    /// Temporary: will be replaced by direct Moonraker status query when AFC
+    /// exposes tool_cut/form_tip in get_status().
+    void update_tip_method_from_config();
+
     /// Helper to get macro variable as float
     float get_macro_var_float(const std::string& key, float default_val) const;
     /// Helper to get macro variable as bool
