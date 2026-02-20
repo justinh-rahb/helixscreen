@@ -1094,10 +1094,17 @@ const char* SettingsManager::get_z_movement_style_options() {
 
 std::optional<SlotInfo> SettingsManager::get_external_spool_info() const {
     Config* config = Config::get_instance();
-    // Check if the external_spool key exists by looking for a required field
-    auto color = config->get<int>("/filament/external_spool/color_rgb", -1);
-    if (color == -1) {
-        return std::nullopt;
+
+    // Primary check: explicit assigned boolean (new format)
+    bool assigned = config->get<bool>("/filament/external_spool/assigned", false);
+
+    // Backward compat: old configs have color_rgb but no assigned key
+    if (!assigned) {
+        auto color = config->get<int>("/filament/external_spool/color_rgb", -1);
+        if (color == -1) {
+            return std::nullopt;
+        }
+        // Old format detected — treat as assigned (will be migrated on next set)
     }
 
     SlotInfo info;
@@ -1121,6 +1128,7 @@ std::optional<SlotInfo> SettingsManager::get_external_spool_info() const {
 
 void SettingsManager::set_external_spool_info(const SlotInfo& info) {
     Config* config = Config::get_instance();
+    config->set<bool>("/filament/external_spool/assigned", true);
     config->set<int>("/filament/external_spool/color_rgb", static_cast<int>(info.color_rgb));
     config->set<std::string>("/filament/external_spool/material", info.material);
     config->set<std::string>("/filament/external_spool/brand", info.brand);

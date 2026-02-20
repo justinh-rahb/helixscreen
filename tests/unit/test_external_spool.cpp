@@ -145,6 +145,39 @@ TEST_CASE("external spool slot_index is always -2", "[external_spool][settings]"
     CHECK(result->global_index == -2);
 }
 
+TEST_CASE("get_external_spool_info with assigned=true returns spool even with black color",
+          "[external_spool][settings]") {
+    TempConfigFixture fixture;
+    auto& settings = SettingsManager::instance();
+
+    SlotInfo info;
+    info.color_rgb = 0x000000; // Black — previously could fail with -1 sentinel
+    info.material = "PLA";
+
+    settings.set_external_spool_info(info);
+
+    auto result = settings.get_external_spool_info();
+    REQUIRE(result.has_value());
+    CHECK(result->color_rgb == 0x000000);
+    CHECK(result->material == "PLA");
+}
+
+TEST_CASE("backward compat: old config without assigned key but with color_rgb",
+          "[external_spool][settings]") {
+    TempConfigFixture fixture;
+
+    // Manually write old-format config (no "assigned" key)
+    Config* config = Config::get_instance();
+    config->set<int>("/filament/external_spool/color_rgb", 0xFF0000);
+    config->set<std::string>("/filament/external_spool/material", "PETG");
+    config->save();
+
+    auto result = SettingsManager::instance().get_external_spool_info();
+    REQUIRE(result.has_value());
+    CHECK(result->color_rgb == 0xFF0000);
+    CHECK(result->material == "PETG");
+}
+
 // ============================================================================
 // Step 2: AmsState external spool subject and get/set
 // ============================================================================
