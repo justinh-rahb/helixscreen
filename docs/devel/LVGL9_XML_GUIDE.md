@@ -1,8 +1,8 @@
 # LVGL 9 XML UI System - Complete Guide
 
-Comprehensive guide to LVGL 9.4's declarative XML UI system with reactive data binding, based on practical experience building the HelixScreen UI.
+Comprehensive guide to the declarative XML UI system with reactive data binding, based on practical experience building the HelixScreen UI. The XML engine lives in `lib/helix-xml/` (extracted from LVGL 9.4, MIT licensed) and works with LVGL 9.5.
 
-**Last Updated:** 2026-02-12
+**Last Updated:** 2026-02-18
 
 ---
 

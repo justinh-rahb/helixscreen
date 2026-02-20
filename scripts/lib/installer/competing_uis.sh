@@ -96,7 +96,7 @@ stop_competing_uis() {
     for ui in $COMPETING_UIS; do
         # Check systemd services
         if [ "$INIT_SYSTEM" = "systemd" ]; then
-            if $SUDO systemctl is-active --quiet "$ui" 2>/dev/null; then
+            if systemctl is-active --quiet "$ui" 2>/dev/null; then
                 log_info "Stopping $ui (systemd service)..."
                 $SUDO systemctl stop "$ui" 2>/dev/null || true
                 $SUDO systemctl disable "$ui" 2>/dev/null || true

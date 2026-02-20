@@ -276,10 +276,29 @@ class GCodeViewerState {
     int fps_actual_render_count_{0};
     float fps_render_time_avg_ms_{0.0f};
 
+    /**
+     * @brief Generation counter for async callback staleness detection.
+     *
+     * Incremented each time a new file load begins. Async callbacks capture
+     * the generation at dispatch time and compare on arrival — if they don't
+     * match, the callback is from an earlier (stale) load and is skipped.
+     * This prevents a completed-but-superseded load from deleting widgets
+     * that belong to the current load.
+     */
+    uint32_t load_generation() const {
+        return load_generation_.load();
+    }
+
+    /// Bump generation counter — call at the start of each new file load
+    uint32_t bump_generation() {
+        return load_generation_.fetch_add(1) + 1;
+    }
+
   private:
     std::thread build_thread_;
     std::atomic<bool> building_{false};
     std::atomic<bool> cancel_flag_{false};
+    std::atomic<uint32_t> load_generation_{0};
 };
 
 // Type alias for compatibility with existing code
@@ -896,6 +915,9 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
     st->viewer_state = GcodeViewerState::Loading;
     st->first_render = true; // Reset for new file
 
+    // Bump generation so any in-flight async callbacks from a prior load are rejected
+    const uint32_t gen = st->bump_generation();
+
     // Clear any existing data sources (mutually exclusive: streaming XOR full-file)
     st->streaming_controller_.reset();
     st->gcode_file.reset();
@@ -962,7 +984,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
         // Launch async index building with completion callback
         // The callback runs on the background thread, so we use lv_async_call to marshal to UI
         std::string path_copy = file_path;
-        st->streaming_controller_->open_file_async(path_copy, [obj, path_copy](bool success) {
+        st->streaming_controller_->open_file_async(path_copy, [obj, path_copy, gen](bool success) {
             // Marshal completion to UI thread
             struct StreamingResult {
                 bool success;
@@ -973,9 +995,17 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
             result->path = path_copy;
 
             helix::ui::queue_update<
-                StreamingResult>(obj, std::move(result), [](lv_obj_t* obj, StreamingResult* r) {
+                StreamingResult>(obj, std::move(result), [gen](lv_obj_t* obj, StreamingResult* r) {
                 gcode_viewer_state_t* st = get_state(obj);
                 if (!st) {
+                    return;
+                }
+
+                // Reject stale callbacks from superseded loads
+                if (st->load_generation() != gen) {
+                    spdlog::debug("[GCode Viewer] Stale streaming callback (gen {} vs current {}), "
+                                  "skipping",
+                                  gen, st->load_generation());
                     return;
                 }
 
@@ -1019,15 +1049,12 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                     st->layer_renderer_2d_->set_canvas_size(width, height);
                     st->layer_renderer_2d_->auto_fit();
 
-                    // Apply any stored content offset (may have been set before streaming started)
+                    // Apply any stored content offset
                     if (st->content_offset_y_percent_ != 0.0f) {
                         st->layer_renderer_2d_->set_content_offset_y(st->content_offset_y_percent_);
                         spdlog::debug("[GCode Viewer] Applied stored content offset: {}%",
                                       st->content_offset_y_percent_ * 100);
                     }
-
-                    // Note: Ghost mode is disabled in streaming mode (requires all layers)
-                    // The renderer handles this automatically in set_streaming_controller()
 
                     st->viewer_state = GcodeViewerState::Loaded;
                     st->first_render = false;
@@ -1094,7 +1121,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
 
     // Launch worker thread via RAII-managed start_build()
     // Automatically cancels any existing build and joins the thread
-    st->start_build([st, obj, path = std::string(file_path)]() {
+    st->start_build([st, obj, path = std::string(file_path), gen]() {
         auto result = std::make_unique<AsyncBuildResult>();
 
         try {
@@ -1230,10 +1257,20 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
         }
 
         // PHASE 3: Marshal result back to UI thread (SAFE)
+        // Capture generation so the callback can detect if a newer load superseded us
         helix::ui::queue_update<AsyncBuildResult>(
-            obj, std::move(result), [](lv_obj_t* obj, AsyncBuildResult* r) {
+            obj, std::move(result), [gen](lv_obj_t* obj, AsyncBuildResult* r) {
                 gcode_viewer_state_t* st = get_state(obj);
                 if (!st) {
+                    return;
+                }
+
+                // Reject stale callbacks from superseded builds — a newer
+                // load_file_async() has already set up its own loading UI
+                if (st->load_generation() != gen) {
+                    spdlog::debug("[GCode Viewer] Stale async callback (gen {} vs current {}), "
+                                  "skipping",
+                                  gen, st->load_generation());
                     return;
                 }
 

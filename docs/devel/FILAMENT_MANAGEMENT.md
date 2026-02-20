@@ -301,17 +301,128 @@ Happy Hare's `filament_pos` (0-8) maps to `PathSegment` via `path_segment_from_h
 
 ## AFC (Armored Turtle / Box Turtle)
 
-AFC-Klipper-Add-On is a hub-based multi-filament system. Multiple lanes feed through a hub/merger to a single toolhead.
+AFC-Klipper-Add-On supports multiple hardware types (Box Turtle, OpenAMS) with different topologies. A single AFC installation can mix hardware types — e.g., a Box Turtle feeding 4 toolheads alongside two OpenAMS units each feeding 1 toolhead.
+
+### Hardware Types and Klipper Objects
+
+AFC hardware types register as different Klipper object prefixes:
+
+| Hardware | Klipper Object Prefix | Lane Object | Hub Object | Topology |
+|----------|----------------------|-------------|------------|----------|
+| Box Turtle | `AFC_BoxTurtle {name}` | `AFC_stepper lane{N}` | `AFC_hub {name}` or none | HUB (standard) or PARALLEL (toolchanger) |
+| OpenAMS | `AFC_OpenAMS {name}` | `AFC_lane lane{N}` | `AFC_hub Hub_{N}` | HUB (always) |
+| Toolchanger | `AFC_Toolchanger {name}` | — | — | Container only |
+
+**Critical: OpenAMS uses `AFC_lane`, not `AFC_stepper`.** Both have the same JSON schema and are parsed through the same `parse_afc_stepper()` function. We subscribe to both object types.
+
+### Unit Object Structure (Real Production Data)
+
+Each unit-type object provides lane/extruder/hub/buffer membership. This data comes from Klipper, not from individual lane queries.
+
+**Box Turtle in toolchanger mode** (`AFC_BoxTurtle Turtle_1`):
+```json
+{
+    "lanes": ["lane0", "lane1", "lane2", "lane3"],
+    "extruders": ["extruder", "extruder1", "extruder2", "extruder3"],
+    "hubs": [],
+    "buffers": ["TN", "TN1", "TN2", "TN3"]
+}
+```
+- 4 extruders → PARALLEL topology (each lane feeds its own toolhead)
+- No hubs (lanes use `hub: "direct_load"` — direct connection to extruder)
+- TurtleNeck buffers per lane
+
+**OpenAMS** (`AFC_OpenAMS AMS_1`):
+```json
+{
+    "lanes": ["lane4", "lane5", "lane6", "lane7"],
+    "extruders": ["extruder4"],
+    "hubs": ["Hub_1", "Hub_2", "Hub_3", "Hub_4"],
+    "buffers": []
+}
+```
+- 1 extruder → HUB topology (all 4 lanes converge to 1 toolhead)
+- Per-lane hubs: each lane has its own hub (Hub_1 for lane4, Hub_2 for lane5, etc.)
+- Hub names do NOT match unit names (Hub_1 ≠ AMS_1)
+- No buffers (no TurtleNeck needed)
+
+### Topology Determination
+
+AFC topology is inferred from the extruder count per unit:
+- **1 extruder** → `PathTopology::HUB` (all lanes merge to one toolhead)
+- **N extruders (N == lane count)** → `PathTopology::PARALLEL` (1:1 lane-to-tool mapping)
+
+This is stored per-unit in `unit_topologies_[]` and queried via `get_unit_topology(unit_index)`.
+
+### The `map` Field Problem
+
+AFC assigns each lane a virtual tool number via the `map` field (e.g., `"T4"`). **For HUB units, AFC gives each lane a unique map value even though all lanes physically feed the same extruder.**
+
+Real production data from a 6-toolhead mixed system:
+
+| Lane | Unit | Hub | Extruder | map | Physical Tool |
+|------|------|-----|----------|-----|---------------|
+| lane0 | Turtle_1 | direct_load | extruder | T0 | T0 |
+| lane1 | Turtle_1 | direct_load | extruder1 | T1 | T1 |
+| lane2 | Turtle_1 | direct_load | extruder2 | T2 | T2 |
+| lane3 | Turtle_1 | direct_load | extruder3 | T3 | T3 |
+| lane4 | AMS_1 | Hub_1 | extruder4 | T4 | T4 |
+| lane5 | AMS_1 | Hub_2 | extruder4 | T5 | **T4** (same physical nozzle) |
+| lane6 | AMS_1 | Hub_3 | extruder4 | T6 | **T4** (same physical nozzle) |
+| lane7 | AMS_1 | Hub_4 | extruder4 | T7 | **T4** (same physical nozzle) |
+| lane8 | AMS_2 | Hub_5 | extruder5 | T8 | T5 |
+| lane9 | AMS_2 | Hub_6 | extruder5 | T9 | **T5** (same physical nozzle) |
+| lane10 | AMS_2 | Hub_7 | extruder5 | T10 | **T5** (same physical nozzle) |
+| lane11 | AMS_2 | Hub_8 | extruder5 | T11 | **T5** (same physical nozzle) |
+
+**The `map` field represents virtual tool numbers for AFC's internal routing, not physical toolheads.** The UI must use topology to determine physical tool count for drawing nozzles:
+- PARALLEL: `tool_count = max_tool - min_tool + 1` (each map value = different nozzle)
+- HUB: `tool_count = 1` (all map values = same nozzle)
+
+### Hub Sensor Propagation
+
+Standard Box Turtle: hub name matches unit name (e.g., hub "Turtle_1" for unit "Turtle_1"), so `hub_name == unit.name` works.
+
+OpenAMS: hub names are per-lane (Hub_1, Hub_2, ..., Hub_8) and do NOT match the unit name (AMS_1, AMS_2). Hub sensor state must be propagated by looking up which unit owns the hub via the `unit_infos_` hub membership lists.
+
+The code uses a two-strategy approach:
+1. Check `unit_infos_[].hubs` to find the parent unit (handles OpenAMS)
+2. Fallback: direct `hub_name == unit.name` match (handles standard Box Turtle)
+
+If ANY hub in a unit is triggered, `unit.hub_sensor_triggered = true`.
+
+### AFC Lane Status Values
+
+Status values observed in production and their mapping to `SlotStatus`:
+
+| AFC Status | `tool_loaded` | Meaning | SlotStatus |
+|------------|---------------|---------|------------|
+| `"Tooled"` | any | Actively loaded in toolhead (OpenAMS) | LOADED |
+| `"Loaded"` | true | Filament loaded to toolhead | LOADED |
+| `"Loaded"` | false | Filament loaded to hub (not toolhead) | AVAILABLE |
+| `"Ready"` | false | Filament present, sensors triggered | AVAILABLE |
+| `"None"` | false | No filament, no sensors | EMPTY |
+| `"Error"` | any | Lane error | AVAILABLE + SlotError |
+| `""` (empty) | false | No data yet | EMPTY |
+
+**Critical**: AFC's `"Loaded"` status means hub-loaded, NOT toolhead-loaded. The `tool_loaded` boolean is the authoritative indicator of toolhead presence. Only `tool_loaded: true` or `status: "Tooled"` maps to `SlotStatus::LOADED`. The `"Loaded"` status string alone (with `tool_loaded: false`) maps to `AVAILABLE`.
+
+### Other AFC Lane Fields
+
+Fields present in production `AFC_lane` data but not in `AFC_stepper`:
+- `buffer: null` and `buffer_status: null` (OpenAMS has no buffers)
+- `dist_hub: 60` (OpenAMS, short distance) vs `1940-2230` (Box Turtle, long bowden)
+- `td1_td`, `td1_color`, `td1_scan_time` — TD1 filament tag detection sensor data (not currently used by HelixScreen)
 
 ### Detection
 
-Klipper object `AFC` in `printer.objects.list` sets `AmsType::AFC`. Lane names come from `AFC_stepper lane*` objects, hub names from `AFC_hub *` objects.
+Klipper object `AFC` in `printer.objects.list` sets `AmsType::AFC`. Lane names come from `AFC_stepper lane*` and `AFC_lane lane*` objects, hub names from `AFC_hub *` objects. Unit-type objects (`AFC_BoxTurtle`, `AFC_OpenAMS`) provide the lane/extruder/hub/buffer membership that determines per-unit topology.
 
 ### Data Sources
 
 AFC state comes from multiple Klipper objects:
 
-**Per-lane state** (`AFC_stepper lane{N}`):
+**Per-lane state** (`AFC_stepper lane{N}` or `AFC_lane lane{N}`):
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -319,7 +430,7 @@ AFC state comes from multiple Klipper objects:
 | `load` | bool | Load sensor triggered |
 | `loaded_to_hub` | bool | Filament reached hub |
 | `tool_loaded` | bool | Filament loaded to toolhead |
-| `status` | string | "Loaded", "None", "Ready" |
+| `status` | string | "Loaded", "Tooled", "Ready", "None", "Error" |
 | `color` | string | Filament color hex (`#RRGGBB`) |
 | `material` | string | Material type from Spoolman |
 | `spool_id` | int | Spoolman spool ID |
@@ -598,9 +709,10 @@ The `AmsContextMenu` (`ui_ams_context_menu.h`) provides per-slot operations:
 
 | Action | Description | Availability |
 |--------|-------------|------------|
-| **Load** | Load filament from this slot | When slot has filament (status != EMPTY) |
+| **Load** | Load filament from this slot | When slot has filament and not at toolhead |
 | **Unload** | Unload filament from extruder | When filament is loaded to extruder |
-| **Edit** | Edit slot properties (color, material, brand) | Always |
+| **Eject** | Eject filament from hub back to spool (AFC only) | When hub-loaded but not at toolhead, and backend supports lane eject |
+| **Spool Info** | View/edit slot properties (color, material, brand) | When slot has filament |
 | **Spoolman** | Assign a Spoolman spool to this slot | Always |
 
 The context menu also includes inline dropdowns for:
@@ -646,7 +758,7 @@ Mock mode is activated when `RuntimeConfig::should_mock_ams()` returns true (typ
 | Variable | Values | Default | Description |
 |----------|--------|---------|-------------|
 | `HELIX_AMS_GATES` | 1-16 | 4 | Number of simulated slots |
-| `HELIX_MOCK_AMS_TYPE` | `afc`, `box_turtle`, `boxturtle`, `toolchanger`, `tool_changer`, `tc` | Happy Hare | AMS type to simulate |
+| `HELIX_MOCK_AMS_TYPE` | `afc`, `box_turtle`, `boxturtle`, `toolchanger`, `tool_changer`, `tc`, `mixed` | Happy Hare | AMS type to simulate |
 | `HELIX_MOCK_AMS_REALISTIC` | `1`, `true` | Disabled | Multi-phase operations (HEATING -> LOADING -> CHECKING) |
 | `HELIX_MOCK_DRYER` | `1`, `true` | Disabled | Simulate integrated dryer |
 | `HELIX_MOCK_DRYER_SPEED` | Integer | 60 | Dryer speed multiplier (60 = 1 real sec = 1 sim min) |
@@ -668,6 +780,21 @@ When AFC mock mode is enabled:
 - Editable endless spool with pre-configured backup mapping
 - Supports auto-heat on load
 
+### Mock Mixed Topology Mode
+
+```bash
+HELIX_MOCK_AMS_TYPE=mixed ./build/bin/helix-screen --test
+```
+
+Simulates a real-world 6-toolhead toolchanger with mixed AFC hardware (based on production data):
+
+- **Unit 0**: Box Turtle "Turtle_1" — 4 lanes, PARALLEL, lanes 0-3 → T0-T3, TurtleNeck buffers, no hub sensor
+- **Unit 1**: OpenAMS "AMS_1" — 4 lanes, HUB, lanes 4-7 all → T4, per-lane hubs (Hub_1-Hub_4), no buffers
+- **Unit 2**: OpenAMS "AMS_2" — 4 lanes, HUB, lanes 8-11 all → T5, per-lane hubs (Hub_5-Hub_8), no buffers
+- Total: 12 slots, 6 physical toolheads
+- Per-unit topology via `get_unit_topology()`
+- 23 regression tests in `tests/unit/test_ams_mock_mixed_topology.cpp` validate this setup
+
 ### Mock Tool Changer Mode
 
 ```bash
@@ -687,7 +814,7 @@ HELIX_MOCK_AMS_REALISTIC=1 ./build/bin/helix-screen --test
 
 Enables multi-phase operation simulation with realistic timing:
 
-- **Load**: HEATING -> LOADING (segment animation) -> CHECKING -> IDLE
+- **Load**: HEATING -> LOADING (segment animation) -> IDLE
 - **Unload**: HEATING -> CUTTING -> UNLOADING (animation) -> IDLE
 - Timing respects `--sim-speed` flag with +/-20-30% variance
 
@@ -860,7 +987,9 @@ See `docs/devel/plans/2026-02-15-spool-wizard-status.md` for visual test plan.
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | "No multi-filament system detected" | `AFC` object not in Klipper | Verify AFC-Klipper-Add-On is installed |
-| Lane count wrong | Discovery mismatch | Check that `AFC_stepper lane*` objects appear in `printer.objects.list` |
+| Lane count wrong | Discovery mismatch | Check for both `AFC_stepper lane*` and `AFC_lane lane*` objects in `printer.objects.list` (OpenAMS uses `AFC_lane`) |
+| Too many nozzles drawn | HUB unit map values treated as separate tools | Verify topology detection — HUB units always have tool_count=1 regardless of `map` field values |
+| Hub sensors not updating | Hub name doesn't match unit name | OpenAMS uses per-lane hubs (Hub_1..Hub_N) — check hub-to-unit ownership in `unit_infos_` |
 | No filament colors/materials | AFC version too old or no Spoolman | `lane_data` database requires v1.0.32+; assign spools in Spoolman |
 | Device actions missing | Backend not returning sections | Verify AFC backend is connected (not mock) |
 | Bowden length slider shows wrong range | Default 450mm being used | Hub data may not be received yet; wait for state sync |

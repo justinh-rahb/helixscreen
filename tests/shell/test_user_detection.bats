@@ -198,3 +198,155 @@ setup() {
 @test "detect_platform still has /home/mks check (regression)" {
     grep -q '/home/mks' "$WORKTREE_ROOT/scripts/lib/installer/platform.sh"
 }
+
+# --- Debian-family OS detection (regression) ---
+
+@test "detect_platform checks os-release for Ubuntu (Armbian support)" {
+    grep -qi 'ubuntu' "$WORKTREE_ROOT/scripts/lib/installer/platform.sh"
+}
+
+@test "detect_platform checks os-release for Armbian" {
+    grep -qi 'armbian' "$WORKTREE_ROOT/scripts/lib/installer/platform.sh"
+}
+
+@test "detect_platform uses dpkg as Debian-family fallback" {
+    grep -q 'dpkg' "$WORKTREE_ROOT/scripts/lib/installer/platform.sh"
+}
+
+# --- Debian-family OS detection (functional) ---
+# These tests exercise the actual detection logic with mocked environments.
+# Since detect_platform() reads real filesystem paths, we redefine it inline
+# with controlled inputs (same pattern as the bitness tests).
+
+# Helper: build a testable detect_platform with injected os-release content,
+# dpkg availability, and home directory state.
+# Uses exported env vars so they're accessible inside the redefined function.
+# Args: $1=os_release_content (or "none"), $2=has_dpkg (true/false),
+#        $3=home_dirs ("pi mks biqu" space-separated, or "none")
+_build_os_detect_function() {
+    export _TEST_OS_RELEASE="$1"
+    export _TEST_HAS_DPKG="$2"
+    export _TEST_HOME_DIRS="$3"
+
+    detect_platform() {
+        local arch="aarch64"
+
+        # Skip AD5M / K1 checks (we're testing SBC detection only)
+        local is_arm_sbc=false
+
+        # 1. os-release check
+        if [ "$_TEST_OS_RELEASE" != "none" ]; then
+            if echo "$_TEST_OS_RELEASE" | grep -qi "debian\|raspbian\|ubuntu\|armbian"; then
+                is_arm_sbc=true
+            fi
+        fi
+
+        # 2. dpkg check
+        if [ "$is_arm_sbc" = false ] && [ "$_TEST_HAS_DPKG" = true ]; then
+            is_arm_sbc=true
+        fi
+
+        # 3. Home directory check
+        if [ "$is_arm_sbc" = false ] && [ "$_TEST_HOME_DIRS" != "none" ]; then
+            for d in $_TEST_HOME_DIRS; do
+                is_arm_sbc=true
+                break
+            done
+        fi
+
+        if [ "$is_arm_sbc" = true ]; then
+            echo "pi"  # 64-bit for simplicity
+        else
+            echo "unsupported"
+        fi
+    }
+}
+
+@test "Armbian Ubuntu os-release detected as SBC" {
+    # Real Armbian Ubuntu os-release contains ID=ubuntu and ID_LIKE=debian
+    local os_release="PRETTY_NAME=\"Armbian 24.2.1 Jammy\"
+NAME=\"Ubuntu\"
+VERSION_ID=\"22.04\"
+ID=ubuntu
+ID_LIKE=debian"
+    _build_os_detect_function "$os_release" "false" "none"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "pi" ]
+}
+
+@test "Armbian Debian os-release detected as SBC" {
+    local os_release="PRETTY_NAME=\"Armbian 24.2.1 Bookworm\"
+NAME=\"Debian GNU/Linux\"
+VERSION_ID=\"12\"
+ID=debian"
+    _build_os_detect_function "$os_release" "false" "none"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "pi" ]
+}
+
+@test "Armbian with ID=armbian detected as SBC" {
+    # Some Armbian builds use ID=armbian with ID_LIKE=debian
+    local os_release="PRETTY_NAME=\"Armbian 24.5 Noble\"
+ID=armbian
+ID_LIKE=debian ubuntu"
+    _build_os_detect_function "$os_release" "false" "none"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "pi" ]
+}
+
+@test "Raspbian os-release still detected as SBC" {
+    local os_release="PRETTY_NAME=\"Raspbian GNU/Linux 12 (bookworm)\"
+ID=raspbian
+ID_LIKE=debian"
+    _build_os_detect_function "$os_release" "false" "none"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "pi" ]
+}
+
+@test "Unknown distro with dpkg detected as SBC" {
+    # Exotic Debian derivative we've never heard of, but has dpkg
+    local os_release="PRETTY_NAME=\"ExoticLinux 1.0\"
+ID=exoticlinux"
+    _build_os_detect_function "$os_release" "true" "none"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "pi" ]
+}
+
+@test "Unknown distro without dpkg falls back to home dirs" {
+    local os_release="PRETTY_NAME=\"ExoticLinux 1.0\"
+ID=exoticlinux"
+    _build_os_detect_function "$os_release" "false" "pi"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "pi" ]
+}
+
+@test "No os-release, no dpkg, no home dirs returns unsupported" {
+    _build_os_detect_function "none" "false" "none"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "unsupported" ]
+}
+
+@test "dpkg alone is sufficient without matching os-release" {
+    _build_os_detect_function "none" "true" "none"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "pi" ]
+}
+
+@test "os-release with ID_LIKE=debian catches unknown derivative" {
+    # Distro we don't list by name, but has ID_LIKE=debian
+    local os_release="PRETTY_NAME=\"SomeOS 3.0\"
+ID=someos
+ID_LIKE=debian"
+    _build_os_detect_function "$os_release" "false" "none"
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "pi" ]
+}

@@ -405,7 +405,7 @@ void MoonrakerAPI::download_thumbnail(const std::string& thumbnail_path,
     }
 
     // Build URL: http://host:port/server/files/gcodes/{thumbnail_path}
-    // Thumbnail paths from metadata are relative to gcodes root
+    // Thumbnail paths must be relative to the gcodes root (caller prepends subdir)
     // URL-encode the path to handle spaces and special characters
     // Leave /.-_ unescaped as they're valid in URL paths
     std::string encoded_path = HUrl::escape(thumbnail_path, "/.-_");

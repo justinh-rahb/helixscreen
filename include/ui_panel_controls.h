@@ -344,6 +344,8 @@ class ControlsPanel : public PanelBase {
     //
 
     void handle_home_all();
+    void handle_home_x();
+    void handle_home_y();
     void handle_home_xy();
     void handle_home_z();
     void handle_qgl();
@@ -436,6 +438,8 @@ class ControlsPanel : public PanelBase {
     //
 
     static void on_home_all(lv_event_t* e);
+    static void on_home_x(lv_event_t* e);
+    static void on_home_y(lv_event_t* e);
     static void on_home_xy(lv_event_t* e);
     static void on_home_z(lv_event_t* e);
     static void on_qgl(lv_event_t* e);

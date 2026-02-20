@@ -20,7 +20,7 @@
 [Unit]
 Description=HelixScreen 3D Printer Touch UI
 Documentation=https://github.com/prestonbrown/helixscreen
-After=multi-user.target network.target
+After=network.target
 
 # Wait for display hardware to be ready
 After=systemd-udev-settle.service

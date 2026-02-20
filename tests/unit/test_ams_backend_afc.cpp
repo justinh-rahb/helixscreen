@@ -998,6 +998,88 @@ TEST_CASE("AFC persistence: sends multiple commands for full slot info",
 }
 
 // ============================================================================
+// set_slot_info() persist=false Tests
+// ============================================================================
+//
+// When persist=false, set_slot_info() should update in-memory slot state but
+// NOT send any G-code commands to firmware. This is critical for preventing an
+// infinite feedback loop when Spoolman weight polling updates slot data:
+//
+//   set_slot_info(persist=true) → G-code to firmware → firmware status_update
+//   via WebSocket → sync_from_backend → refresh_spoolman_weights →
+//   set_slot_info again → ∞
+//
+// With persist=false, the cycle breaks because no G-code is sent, so firmware
+// doesn't emit a status_update, and the loop terminates.
+// ============================================================================
+
+TEST_CASE("AFC persist=false: updates local state without G-code",
+          "[ams][afc][persistence][persist_flag]") {
+    AmsBackendAfcTestHelper helper;
+
+    helper.set_afc_version("1.0.20");
+    helper.initialize_test_lanes_with_slots(4);
+
+    SlotInfo info;
+    info.color_rgb = 0xFF0000;
+    info.material = "PLA";
+    info.remaining_weight_g = 850;
+    info.spoolman_id = 42;
+
+    // persist=false should NOT send any G-code
+    helper.set_slot_info(0, info, /*persist=*/false);
+
+    REQUIRE(helper.captured_gcodes.empty());
+
+    // But local state SHOULD be updated
+    SlotInfo stored = helper.get_slot_info(0);
+    REQUIRE(stored.color_rgb == 0xFF0000);
+    REQUIRE(stored.material == "PLA");
+    REQUIRE(stored.remaining_weight_g == Catch::Approx(850.0f));
+    REQUIRE(stored.spoolman_id == 42);
+}
+
+TEST_CASE("AFC persist=true: sends G-code (default behavior unchanged)",
+          "[ams][afc][persistence][persist_flag]") {
+    AmsBackendAfcTestHelper helper;
+
+    helper.set_afc_version("1.0.20");
+    helper.initialize_test_lanes_with_slots(4);
+
+    SlotInfo info;
+    info.color_rgb = 0x00FF00;
+    info.material = "ABS";
+    info.remaining_weight_g = 500;
+    info.spoolman_id = 7;
+
+    // Default persist=true should send G-code
+    helper.set_slot_info(0, info);
+
+    REQUIRE(helper.has_gcode("SET_COLOR LANE=lane1 COLOR=00FF00"));
+    REQUIRE(helper.has_gcode("SET_MATERIAL LANE=lane1 MATERIAL=ABS"));
+    REQUIRE(helper.has_gcode("SET_WEIGHT LANE=lane1 WEIGHT=500"));
+    REQUIRE(helper.has_gcode("SET_SPOOL_ID LANE=lane1 SPOOL_ID=7"));
+}
+
+TEST_CASE("AFC persist=false: version warning not emitted",
+          "[ams][afc][persistence][persist_flag]") {
+    AmsBackendAfcTestHelper helper;
+
+    // Old version + persist=false should NOT log the upgrade warning
+    helper.set_afc_version("1.0.19");
+    helper.initialize_test_lanes_with_slots(4);
+
+    SlotInfo info;
+    info.color_rgb = 0xFF0000;
+    info.material = "PLA";
+
+    // Should succeed without errors and without persistence
+    auto result = helper.set_slot_info(0, info, /*persist=*/false);
+    REQUIRE(result.success());
+    REQUIRE(helper.captured_gcodes.empty());
+}
+
+// ============================================================================
 // reset_tool_mappings() Tests
 // ============================================================================
 
@@ -1044,11 +1126,11 @@ TEST_CASE("AFC reset_endless_spool clears all slots", "[ams][afc][endless_spool]
     // Should have sent 4 SET_RUNOUT commands (one per slot)
     REQUIRE(helper.captured_gcodes.size() == 4);
 
-    // Each should be setting RUNOUT_LANE= (empty) to disable
-    REQUIRE(helper.has_gcode("SET_RUNOUT LANE=lane1 RUNOUT_LANE="));
-    REQUIRE(helper.has_gcode("SET_RUNOUT LANE=lane2 RUNOUT_LANE="));
-    REQUIRE(helper.has_gcode("SET_RUNOUT LANE=lane3 RUNOUT_LANE="));
-    REQUIRE(helper.has_gcode("SET_RUNOUT LANE=lane4 RUNOUT_LANE="));
+    // Each should be setting RUNOUT=NONE to disable
+    REQUIRE(helper.has_gcode("SET_RUNOUT LANE=lane1 RUNOUT=NONE"));
+    REQUIRE(helper.has_gcode("SET_RUNOUT LANE=lane2 RUNOUT=NONE"));
+    REQUIRE(helper.has_gcode("SET_RUNOUT LANE=lane3 RUNOUT=NONE"));
+    REQUIRE(helper.has_gcode("SET_RUNOUT LANE=lane4 RUNOUT=NONE"));
 }
 
 TEST_CASE("AFC reset_endless_spool with zero slots is no-op", "[ams][afc][endless_spool][reset]") {
@@ -1863,7 +1945,8 @@ TEST_CASE("AFC backend handles AFC_lane status updates", "[ams][afc][mixed]") {
     REQUIRE(slot->material == "PLA");
     REQUIRE(slot->mapped_tool == 4);
     REQUIRE(slot->color_rgb == 0x000000);
-    REQUIRE(slot->status == SlotStatus::LOADED);
+    // AFC "Loaded" means hub-loaded, tool_loaded=false → AVAILABLE, not LOADED
+    REQUIRE(slot->status == SlotStatus::AVAILABLE);
 }
 
 TEST_CASE("AFC backend handles mix of AFC_stepper and AFC_lane in same update",
@@ -2068,7 +2151,8 @@ TEST_CASE("AFC backend with only AFC_stepper lanes works correctly (no AFC_lane)
     REQUIRE(slot0->material == "PLA");
     REQUIRE(slot0->color_rgb == 0xFF0000);
     REQUIRE(slot0->mapped_tool == 0);
-    REQUIRE(slot0->status == SlotStatus::LOADED);
+    // AFC "Loaded" with no tool_loaded → AVAILABLE (hub-loaded only)
+    REQUIRE(slot0->status == SlotStatus::AVAILABLE);
 
     auto* slot1 = info.get_slot_global(1);
     REQUIRE(slot1 != nullptr);
@@ -2202,4 +2286,131 @@ TEST_CASE("AFC supports_lane_eject returns true", "[ams][afc][capability]") {
 TEST_CASE("AFC supports_lane_reset returns true", "[ams][afc][capability]") {
     AmsBackendAfcTestHelper helper;
     REQUIRE(helper.supports_lane_reset());
+}
+
+// ============================================================================
+// Slot status mapping: AFC "Loaded" vs tool_loaded
+// ============================================================================
+
+TEST_CASE("AFC hub-loaded lane is AVAILABLE, not LOADED", "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_lanes_from_discovery();
+
+    // Exact production state: loaded_to_hub=true, tool_loaded=false, status="Loaded"
+    helper.feed_afc_stepper("lane1", {{"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"tool_loaded", false},
+                                      {"material", "ASA"},
+                                      {"color", "#000000"},
+                                      {"map", "T0"},
+                                      {"status", "Loaded"},
+                                      {"weight", 570}});
+
+    auto info = helper.get_system_info();
+    auto* slot = info.get_slot_global(0);
+    REQUIRE(slot != nullptr);
+    // Hub-loaded filament should be AVAILABLE (ready to load to toolhead)
+    REQUIRE(slot->status == SlotStatus::AVAILABLE);
+    // Should NOT be the "current" loaded slot
+    REQUIRE(info.current_slot == -1);
+    REQUIRE_FALSE(info.filament_loaded);
+}
+
+TEST_CASE("AFC tool_loaded=true lane is LOADED", "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_lanes_from_discovery();
+
+    // Filament actually at the toolhead
+    helper.feed_afc_stepper("lane1", {{"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"tool_loaded", true},
+                                      {"material", "ASA"},
+                                      {"color", "#000000"},
+                                      {"map", "T0"},
+                                      {"status", "Loaded"},
+                                      {"weight", 570}});
+
+    auto info = helper.get_system_info();
+    auto* slot = info.get_slot_global(0);
+    REQUIRE(slot != nullptr);
+    REQUIRE(slot->status == SlotStatus::LOADED);
+}
+
+TEST_CASE("AFC 'Tooled' status maps to LOADED even without tool_loaded flag",
+          "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_lanes_from_discovery();
+
+    // OpenAMS uses "Tooled" status string
+    helper.feed_afc_stepper("lane1", {{"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"tool_loaded", false},
+                                      {"material", "PLA"},
+                                      {"color", "#FF0000"},
+                                      {"map", "T0"},
+                                      {"status", "Tooled"}});
+
+    auto info = helper.get_system_info();
+    auto* slot = info.get_slot_global(0);
+    REQUIRE(slot != nullptr);
+    // "Tooled" is an explicit toolhead-loaded indicator
+    REQUIRE(slot->status == SlotStatus::LOADED);
+}
+
+TEST_CASE("AFC context menu shows Eject for hub-loaded slot", "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_lanes_from_discovery();
+
+    // Two lanes loaded to hub, none to toolhead
+    helper.feed_afc_stepper("lane1", {{"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"tool_loaded", false},
+                                      {"material", "ASA"},
+                                      {"map", "T0"},
+                                      {"status", "Loaded"}});
+
+    auto slot = helper.get_slot_info(0);
+    // Slot should be present (has filament)
+    REQUIRE(slot.is_present());
+    // But NOT loaded to extruder
+    REQUIRE(slot.status == SlotStatus::AVAILABLE);
+    REQUIRE(slot.status != SlotStatus::LOADED);
+}
+
+TEST_CASE("AFC slot transitions from LOADED to AVAILABLE on unload", "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_lanes_from_discovery();
+
+    // First: loaded to toolhead
+    helper.feed_afc_stepper("lane1", {{"tool_loaded", true},
+                                      {"status", "Loaded"},
+                                      {"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"map", "T0"},
+                                      {"material", "ASA"}});
+
+    auto info = helper.get_system_info();
+    REQUIRE(info.get_slot_global(0)->status == SlotStatus::LOADED);
+
+    // Then: unloaded from toolhead, still at hub
+    helper.feed_afc_stepper("lane1", {{"tool_loaded", false},
+                                      {"status", "Loaded"},
+                                      {"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"map", "T0"},
+                                      {"material", "ASA"}});
+
+    info = helper.get_system_info();
+    REQUIRE(info.get_slot_global(0)->status == SlotStatus::AVAILABLE);
 }

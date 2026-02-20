@@ -216,6 +216,17 @@ The web frontend you use (Mainsail, Fluidd, etc.) doesn't matter - HelixScreen t
 
 Features include visual slot configuration with tool badges, endless spool arrows, tap-to-edit popup, Spoolman integration, and material compatibility validation.
 
+### Can I customize the home screen widgets?
+
+**Yes!** The Home Panel displays configurable widgets — quick-access buttons for features like temperature, LED control, network status, AMS, and more.
+
+To customize:
+1. Go to **Settings** → **Home Widgets** (in the Appearance section)
+2. Toggle widgets on or off
+3. Long-press the drag handle to reorder
+
+Up to 10 widgets can be shown. Some widgets (like AMS, humidity sensor, or probe) only appear if the relevant hardware is detected. See the [Home Panel guide](guide/home-panel.md#home-widgets) for the full widget list.
+
 ### Can I customize the colors or layout?
 
 **Yes!** HelixScreen includes a built-in theme editor with 14 preset themes:

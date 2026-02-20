@@ -281,7 +281,7 @@ class UpdateChecker {
 
     // Rate limiting
     std::chrono::steady_clock::time_point last_check_time_{};
-    static constexpr auto MIN_CHECK_INTERVAL = std::chrono::hours{1};
+    static constexpr auto MIN_CHECK_INTERVAL = std::chrono::minutes{10};
 
     // Threading
     std::thread worker_thread_;

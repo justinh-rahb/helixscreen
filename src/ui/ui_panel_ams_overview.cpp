@@ -148,21 +148,37 @@ void AmsOverviewPanel::init_subjects() {
         // Overview panel reuses existing AMS subjects (slots_version, etc.)
         AmsState::instance().init_subjects(true);
 
-        // Observe slots_version to auto-refresh when slot data changes
+        // Observe slots_version to auto-refresh when slot data changes.
+        // In detail mode, per-slot observers handle visual updates (color, pulse,
+        // highlight) automatically — we only need to react to structural changes
+        // (slot count changed) or refresh the overview cards.
         slots_version_observer_ = ObserverGuard(
             AmsState::instance().get_slots_version_subject(),
             [](lv_observer_t* observer, lv_subject_t* /*subject*/) {
                 auto* self = static_cast<AmsOverviewPanel*>(lv_observer_get_user_data(observer));
                 if (self && self->panel_) {
                     if (self->detail_unit_index_ >= 0) {
-                        // In detail mode — refresh the detail slot view
-                        self->show_unit_detail(self->detail_unit_index_);
+                        // In detail mode — only rebuild slots if count changed.
+                        // Per-slot observers drive all visual state (color, pulse, etc.)
+                        self->refresh_detail_if_needed();
                     } else {
                         self->refresh_units();
                     }
                 }
             },
             this);
+
+        // Observe external spool color changes to reactively update bypass display.
+        // NOTE: set_external_spool_info() calls lv_subject_set_int() directly (not via
+        // ui_queue_update) which is safe because all current callers are on the LVGL thread.
+        // If callers from background threads are added, those must use ui_queue_update().
+        using helix::ui::observe_int_sync;
+        external_spool_observer_ = observe_int_sync<AmsOverviewPanel>(
+            AmsState::instance().get_external_spool_color_subject(), this,
+            [](AmsOverviewPanel* self, int /*color_int*/) {
+                // Delegate to existing refresh helper which reads full spool info
+                self->refresh_bypass_display();
+            });
     });
 }
 
@@ -470,79 +486,74 @@ void AmsOverviewPanel::refresh_system_path(const AmsSystemInfo& info, int curren
 
     // Set bypass path state (bypass is drawn inside the canvas, no card needed)
     bool bypass_active = info.supports_bypass && (current_slot == -2);
-    ui_system_path_canvas_set_bypass(system_path_, info.supports_bypass, bypass_active, 0x888888);
+    uint32_t bypass_color = 0x888888; // Default gray when no external spool assigned
+    auto ext_spool = AmsState::instance().get_external_spool_info();
+    if (ext_spool) {
+        bypass_color = ext_spool->color_rgb;
+    }
+    ui_system_path_canvas_set_bypass(system_path_, info.supports_bypass, bypass_active,
+                                     bypass_color);
 
-    // Set per-unit hub sensor states and per-unit topology/tool routing
+    // Set whether an external spool is assigned (controls filled vs hollow spool box)
+    ui_system_path_canvas_set_bypass_has_spool(system_path_, ext_spool.has_value());
+
+    // Register bypass click callback (safe to call repeatedly — just updates the stored cb)
+    ui_system_path_canvas_set_bypass_callback(system_path_, on_bypass_spool_clicked, this);
+
+    // Compute physical tool layout (handles HUB units with unique per-lane mapped_tools)
     auto* backend = AmsState::instance().get_backend();
-    int total_tools = 0;
-    int active_tool = -1;
+    auto tool_layout = ams_draw::compute_system_tool_layout(info, backend);
 
+    // Set per-unit hub sensor states, topology, and tool routing
     for (int i = 0; i < unit_count && i < static_cast<int>(info.units.size()); ++i) {
         const auto& unit = info.units[i];
         ui_system_path_canvas_set_unit_hub_sensor(system_path_, i, unit.has_hub_sensor,
                                                   unit.hub_sensor_triggered);
 
-        // Per-unit topology
         PathTopology topo = unit.topology;
         if (backend) {
             topo = backend->get_unit_topology(i);
         }
         ui_system_path_canvas_set_unit_topology(system_path_, i, static_cast<int>(topo));
 
-        // Per-unit tool routing: derive tool count and first tool from slot mapped_tool data
-        int first_tool = -1;
-        int max_tool = -1;
-        for (const auto& slot : unit.slots) {
-            if (slot.mapped_tool >= 0) {
-                if (first_tool < 0 || slot.mapped_tool < first_tool) {
-                    first_tool = slot.mapped_tool;
-                }
-                if (slot.mapped_tool > max_tool) {
-                    max_tool = slot.mapped_tool;
-                }
-            }
-        }
-
-        int unit_tool_count = 0;
-        if (topo != PathTopology::PARALLEL) {
-            // HUB/LINEAR: all slots in this unit converge to a single toolhead
-            unit_tool_count = 1;
-            if (first_tool < 0) {
-                first_tool = total_tools; // Assign next available tool index
-            }
-        } else if (first_tool >= 0) {
-            // PARALLEL: each slot maps to a different tool (tool_count = distinct tools)
-            unit_tool_count = max_tool - first_tool + 1;
-        } else if (!unit.slots.empty()) {
-            // PARALLEL fallback: no mapped_tool data, use slot count
-            first_tool = total_tools;
-            unit_tool_count = static_cast<int>(unit.slots.size());
-        }
-
-        ui_system_path_canvas_set_unit_tools(system_path_, i, unit_tool_count,
-                                             first_tool >= 0 ? first_tool : total_tools);
-
-        // Track active tool from current slot
-        if (current_slot >= 0 && i == active_unit) {
-            const SlotInfo* active_slot = info.get_slot_global(current_slot);
-            if (active_slot && active_slot->mapped_tool >= 0) {
-                active_tool = active_slot->mapped_tool;
-            }
-        }
-
-        // Accumulate total tool count
-        // For PARALLEL with mapped_tool data: use max tool index (tools may overlap/share)
-        // For HUB or no mapped_tool: add unit_tool_count sequentially
-        if (topo == PathTopology::PARALLEL && max_tool >= 0) {
-            total_tools = std::max(total_tools, max_tool + 1);
-        } else {
-            total_tools = std::max(total_tools, first_tool + unit_tool_count);
+        if (i < static_cast<int>(tool_layout.units.size())) {
+            const auto& utl = tool_layout.units[i];
+            ui_system_path_canvas_set_unit_tools(system_path_, i, utl.tool_count,
+                                                 utl.first_physical_tool);
         }
     }
 
-    ui_system_path_canvas_set_total_tools(system_path_, total_tools);
+    // Translate active slot's virtual tool number to physical nozzle index
+    int active_tool = -1;
+    if (current_slot >= 0) {
+        const SlotInfo* active_slot = info.get_slot_global(current_slot);
+        if (active_slot && active_slot->mapped_tool >= 0) {
+            auto it = tool_layout.virtual_to_physical.find(active_slot->mapped_tool);
+            if (it != tool_layout.virtual_to_physical.end()) {
+                active_tool = it->second;
+            }
+        }
+    }
+
+    ui_system_path_canvas_set_total_tools(system_path_, tool_layout.total_physical_tools);
     ui_system_path_canvas_set_active_tool(system_path_, active_tool);
     ui_system_path_canvas_set_current_tool(system_path_, info.current_tool);
+
+    // Set virtual tool labels for badge display.
+    // For HUB units with an active slot, override the static hub_tool_label with the
+    // actual virtual tool number (e.g., show "T6" when AMS_1 slot 3 is loaded, not "T4").
+    if (!tool_layout.physical_to_virtual_label.empty()) {
+        auto labels = tool_layout.physical_to_virtual_label; // mutable copy
+        if (active_tool >= 0 && active_tool < static_cast<int>(labels.size()) &&
+            current_slot >= 0) {
+            const SlotInfo* active_slot_info = info.get_slot_global(current_slot);
+            if (active_slot_info && active_slot_info->mapped_tool >= 0) {
+                labels[active_tool] = active_slot_info->mapped_tool;
+            }
+        }
+        ui_system_path_canvas_set_tool_virtual_numbers(system_path_, labels.data(),
+                                                       static_cast<int>(labels.size()));
+    }
 
     // Set toolhead sensor state
     {
@@ -608,10 +619,17 @@ void AmsOverviewPanel::on_detail_slot_clicked(lv_event_t* e) {
         return;
     }
 
+    // Capture click point from the input device while event is still active
+    lv_point_t click_pt = {0, 0};
+    lv_indev_t* indev = lv_indev_active();
+    if (indev) {
+        lv_indev_get_point(indev, &click_pt);
+    }
+
     // Use current_target (widget callback was registered on) not target (originally clicked child)
     lv_obj_t* slot = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
     auto global_index = static_cast<int>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(slot)));
-    self->handle_detail_slot_tap(global_index);
+    self->handle_detail_slot_tap(global_index, click_pt);
 
     LVGL_SAFE_EVENT_CB_END();
 }
@@ -619,6 +637,45 @@ void AmsOverviewPanel::on_detail_slot_clicked(lv_event_t* e) {
 // ============================================================================
 // Detail View (inline unit zoom)
 // ============================================================================
+
+void AmsOverviewPanel::refresh_detail_if_needed() {
+    if (detail_unit_index_ < 0 || !panel_)
+        return;
+
+    auto* backend = AmsState::instance().get_backend();
+    if (!backend)
+        return;
+
+    AmsSystemInfo info = backend->get_system_info();
+    if (detail_unit_index_ >= static_cast<int>(info.units.size()))
+        return;
+
+    const AmsUnit& unit = info.units[detail_unit_index_];
+    int new_slot_count = static_cast<int>(unit.slots.size());
+
+    if (new_slot_count != detail_slot_count_) {
+        // Structural change — rebuild slots (no animation restart)
+        spdlog::debug("[{}] Detail slot count changed {} -> {}, rebuilding", get_name(),
+                      detail_slot_count_, new_slot_count);
+        create_detail_slots(unit);
+        update_detail_header(unit, info);
+    }
+
+    // Always update path canvas — segment/action changes need to propagate
+    // even when slot count hasn't changed (e.g., load/unload animations)
+    setup_detail_path_canvas(unit, info);
+
+    // Update loaded swatch color (also done in refresh_system_path for overview mode)
+    if (panel_) {
+        lv_obj_t* swatch = lv_obj_find_by_name(panel_, "loaded_swatch");
+        if (swatch) {
+            lv_color_t color = lv_color_hex(static_cast<uint32_t>(
+                lv_subject_get_int(AmsState::instance().get_current_color_subject())));
+            lv_obj_set_style_bg_color(swatch, color, 0);
+            lv_obj_set_style_border_color(swatch, color, 0);
+        }
+    }
+}
 
 void AmsOverviewPanel::show_unit_detail(int unit_index) {
     if (!panel_ || !detail_container_ || !cards_row_)
@@ -855,6 +912,7 @@ void AmsOverviewPanel::clear_panel_reference() {
 
     // Clear observer guards before clearing widget pointers
     slots_version_observer_.reset();
+    external_spool_observer_.reset();
 
     // Clear global instance pointer
     g_overview_panel_instance.store(nullptr);
@@ -993,7 +1051,7 @@ AmsOverviewPanel& get_global_ams_overview_panel() {
 // Slot Context Menu (detail view)
 // ============================================================================
 
-void AmsOverviewPanel::handle_detail_slot_tap(int global_slot_index) {
+void AmsOverviewPanel::handle_detail_slot_tap(int global_slot_index, lv_point_t click_pt) {
     spdlog::info("[{}] Detail slot {} tapped", get_name(), global_slot_index);
 
     // Find the local widget for positioning the menu
@@ -1018,10 +1076,11 @@ void AmsOverviewPanel::handle_detail_slot_tap(int global_slot_index) {
     if (!slot_widget)
         return;
 
-    show_detail_context_menu(global_slot_index, slot_widget);
+    show_detail_context_menu(global_slot_index, slot_widget, click_pt);
 }
 
-void AmsOverviewPanel::show_detail_context_menu(int slot_index, lv_obj_t* near_widget) {
+void AmsOverviewPanel::show_detail_context_menu(int slot_index, lv_obj_t* near_widget,
+                                                lv_point_t click_pt) {
     if (!parent_screen_ || !near_widget)
         return;
 
@@ -1046,11 +1105,30 @@ void AmsOverviewPanel::show_detail_context_menu(int slot_index, lv_obj_t* near_w
                         NOTIFY_WARNING("AMS is busy: {}", ams_action_to_string(info.action));
                         return;
                     }
-                }
-                {
-                    AmsError load_err = backend->load_filament(slot);
-                    if (load_err.result != AmsResult::SUCCESS) {
-                        NOTIFY_ERROR("Load failed: {}", load_err.user_msg);
+
+                    AmsError error;
+                    // If filament is already loaded from a DIFFERENT slot, use tool change
+                    // (unload-then-load) so the segment animation plays properly
+                    if (info.current_slot >= 0 && info.current_slot != slot) {
+                        const SlotInfo* slot_info = info.get_slot_global(slot);
+                        if (slot_info && slot_info->mapped_tool >= 0) {
+                            spdlog::info("[AmsOverview] Swapping slot {} -> {} via tool "
+                                         "change T{}",
+                                         info.current_slot, slot, slot_info->mapped_tool);
+                            error = backend->change_tool(slot_info->mapped_tool);
+                        } else {
+                            // Fallback: unload first
+                            spdlog::info("[AmsOverview] Unloading slot {} before loading {}",
+                                         info.current_slot, slot);
+                            error = backend->unload_filament();
+                        }
+                    } else {
+                        spdlog::info("[AmsOverview] Fresh load to slot {} (current_slot={})", slot,
+                                     info.current_slot);
+                        error = backend->load_filament(slot);
+                    }
+                    if (error.result != AmsResult::SUCCESS) {
+                        NOTIFY_ERROR("Load failed: {}", error.user_msg);
                     }
                 }
                 break;
@@ -1095,7 +1173,118 @@ void AmsOverviewPanel::show_detail_context_menu(int slot_index, lv_obj_t* near_w
         is_loaded = (slot_info.status == SlotStatus::LOADED);
     }
 
-    context_menu_->show_near_widget(parent_screen_, slot_index, near_widget, is_loaded);
+    context_menu_->set_click_point(click_pt);
+    context_menu_->show_near_widget(parent_screen_, slot_index, near_widget, is_loaded, backend);
+}
+
+// ============================================================================
+// Bypass Spool Interaction
+// ============================================================================
+
+void AmsOverviewPanel::on_bypass_spool_clicked(void* user_data) {
+    auto* self = static_cast<AmsOverviewPanel*>(user_data);
+    if (self) {
+        self->handle_bypass_click();
+    }
+}
+
+void AmsOverviewPanel::handle_bypass_click() {
+    if (!parent_screen_ || !system_path_) {
+        return;
+    }
+
+    // Capture click point from input device for menu positioning
+    lv_point_t click_pt = {0, 0};
+    lv_indev_t* indev = lv_indev_active();
+    if (indev) {
+        lv_indev_get_point(indev, &click_pt);
+    }
+
+    // Create context menu on first use
+    if (!context_menu_) {
+        context_menu_ = std::make_unique<helix::ui::AmsContextMenu>();
+    }
+
+    // Set callback to handle menu actions for external spool
+    context_menu_->set_action_callback(
+        [this](helix::ui::AmsContextMenu::MenuAction action, int /*slot*/) {
+            switch (action) {
+            case helix::ui::AmsContextMenu::MenuAction::EDIT:
+            case helix::ui::AmsContextMenu::MenuAction::SPOOLMAN:
+                show_edit_modal(-2);
+                break;
+
+            case helix::ui::AmsContextMenu::MenuAction::CLEAR_SPOOL:
+                AmsState::instance().clear_external_spool_info();
+                // bypass display update handled reactively by external_spool_observer_
+                NOTIFY_INFO("External spool cleared");
+                break;
+
+            case helix::ui::AmsContextMenu::MenuAction::CANCELLED:
+            default:
+                break;
+            }
+        });
+
+    // Position menu at click point, show for external spool
+    context_menu_->set_click_point(click_pt);
+    context_menu_->show_for_external_spool(parent_screen_, system_path_);
+}
+
+void AmsOverviewPanel::refresh_bypass_display() {
+    if (!system_path_) {
+        return;
+    }
+
+    auto ext_spool = AmsState::instance().get_external_spool_info();
+    ui_system_path_canvas_set_bypass_has_spool(system_path_, ext_spool.has_value());
+
+    if (ext_spool) {
+        // Preserve current bypass active state, update color from spool
+        auto* backend = AmsState::instance().get_backend();
+        if (backend) {
+            AmsSystemInfo info = backend->get_system_info();
+            int current_slot = lv_subject_get_int(AmsState::instance().get_current_slot_subject());
+            bool bypass_active = info.supports_bypass && (current_slot == -2);
+            ui_system_path_canvas_set_bypass(system_path_, info.supports_bypass, bypass_active,
+                                             ext_spool->color_rgb);
+        }
+    }
+
+    ui_system_path_canvas_refresh(system_path_);
+}
+
+void AmsOverviewPanel::show_edit_modal(int slot_index) {
+    if (!parent_screen_) {
+        spdlog::warn("[{}] Cannot show edit modal - no parent screen", get_name());
+        return;
+    }
+
+    // Create modal on first use (lazy initialization)
+    if (!edit_modal_) {
+        edit_modal_ = std::make_unique<helix::ui::AmsEditModal>();
+    }
+
+    // External spool (bypass/direct) - not managed by backend
+    if (slot_index == -2) {
+        auto ext = AmsState::instance().get_external_spool_info();
+        SlotInfo initial_info = ext.value_or(SlotInfo{});
+        initial_info.slot_index = -2;
+        initial_info.global_index = -2;
+
+        edit_modal_->set_completion_callback([](const helix::ui::AmsEditModal::EditResult& result) {
+            if (result.saved) {
+                AmsState::instance().set_external_spool_info(result.slot_info);
+                // bypass display update handled reactively by external_spool_observer_
+                NOTIFY_INFO("External spool updated");
+            }
+        });
+        edit_modal_->show_for_slot(parent_screen_, -2, initial_info, api_);
+        return;
+    }
+
+    spdlog::warn("[{}] show_edit_modal called with unsupported slot_index={}", get_name(),
+                 slot_index);
 }
 
 // ============================================================================

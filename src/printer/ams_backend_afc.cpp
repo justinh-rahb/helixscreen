@@ -4,7 +4,9 @@
 #include "ams_backend_afc.h"
 
 #include "ui_error_reporting.h"
+#include "ui_modal.h"
 #include "ui_notification.h"
+#include "ui_update_queue.h"
 
 #include "action_prompt_manager.h"
 #include "afc_defaults.h"
@@ -267,8 +269,17 @@ PathTopology AmsBackendAfc::get_topology() const {
 
 PathTopology AmsBackendAfc::get_unit_topology(int unit_index) const {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
-    if (unit_index >= 0 && unit_index < static_cast<int>(unit_infos_.size())) {
-        return unit_infos_[unit_index].topology;
+    // unit_infos_ is in AFC JSON order, system_info_.units is alphabetically sorted.
+    // Must match by name, not by index.
+    if (unit_index >= 0 && unit_index < static_cast<int>(system_info_.units.size())) {
+        const auto& unit_name = system_info_.units[unit_index].name;
+        for (const auto& ui : unit_infos_) {
+            std::string display_name = ui.type + " " + ui.name;
+            if (display_name == unit_name) {
+                return ui.topology;
+            }
+        }
+        return system_info_.units[unit_index].topology;
     }
     return get_topology(); // Fallback to system-wide topology
 }
@@ -317,6 +328,12 @@ PathSegment AmsBackendAfc::get_slot_filament_segment(int slot_index) const {
 PathSegment AmsBackendAfc::infer_error_segment() const {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     return error_segment_;
+}
+
+bool AmsBackendAfc::slot_has_prep_sensor(int slot_index) const {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    // AFC always has prep sensors on all lanes
+    return slot_index >= 0 && slot_index < system_info_.total_slots;
 }
 
 PathSegment AmsBackendAfc::compute_filament_segment_unlocked() const {
@@ -586,16 +603,24 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data) {
                     emit_event(EVENT_ERROR, msg_text);
                 }
 
-                // Determine if an AFC action:prompt is currently active
-                // If so, suppress the toast (user already sees the modal) but
-                // still add to notification history
+                // Suppress toasts when:
+                // 1. AFC action:prompt modal is already showing (user sees it)
+                // 2. Filament operation is active (load/unload generates noise)
                 bool afc_prompt_active = helix::ActionPromptManager::is_showing() &&
                                          helix::ActionPromptManager::current_prompt_name().find(
                                              "AFC") != std::string::npos;
+                // Only suppress during states that actively move filament.
+                // Heating, tip forming, cutting, purging are stationary —
+                // a sensor change there indicates a real problem.
+                bool operation_active = system_info_.action == AmsAction::LOADING ||
+                                        system_info_.action == AmsAction::UNLOADING ||
+                                        system_info_.action == AmsAction::SELECTING;
+                bool suppress_toast = afc_prompt_active || operation_active;
 
-                if (afc_prompt_active) {
-                    // Notification history only (no toast) - user already has the modal
-                    spdlog::debug("[AMS AFC] Toast suppressed (AFC prompt active): {}", msg_text);
+                if (suppress_toast) {
+                    // Notification history only (no toast) - operation in progress
+                    spdlog::debug("[AMS AFC] Toast suppressed (prompt={}, op={}): {}",
+                                  afc_prompt_active, operation_active, msg_text);
                     ui_notification_info_with_action("AFC", msg_text.c_str(), "afc_message");
                 } else {
                     // Show toast based on message type
@@ -924,9 +949,11 @@ void AmsBackendAfc::parse_afc_stepper(const std::string& lane_name, const nlohma
         status_str = data["status"].get<std::string>();
     }
 
-    if (tool_loaded || status_str == "Loaded") {
+    // AFC "Loaded" status means hub-loaded, not toolhead-loaded.
+    // Only tool_loaded == true means filament is at the extruder.
+    if (tool_loaded || status_str == "Tooled") {
         slot->status = SlotStatus::LOADED;
-    } else if (status_str == "Ready" || sensors.prep || sensors.load) {
+    } else if (status_str == "Loaded" || status_str == "Ready" || sensors.prep || sensors.load) {
         slot->status = SlotStatus::AVAILABLE;
     } else if (status_str == "None" || status_str.empty()) {
         slot->status = SlotStatus::EMPTY;
@@ -937,20 +964,8 @@ void AmsBackendAfc::parse_afc_stepper(const std::string& lane_name, const nlohma
     // Populate or clear per-slot error based on lane status
     if (status_str == "Error") {
         SlotError err;
-        // Use system message text if available, otherwise default
-        if (!last_seen_message_.empty()) {
-            err.message = last_seen_message_;
-        } else {
-            err.message = "Lane error";
-        }
-        // Map severity from system message type
-        if (last_message_type_ == "error") {
-            err.severity = SlotError::ERROR;
-        } else if (last_message_type_ == "warning") {
-            err.severity = SlotError::WARNING;
-        } else {
-            err.severity = SlotError::ERROR; // Default to ERROR for lane errors
-        }
+        err.message = last_seen_message_.empty() ? "Lane error" : last_seen_message_;
+        err.severity = (last_message_type_ == "warning") ? SlotError::WARNING : SlotError::ERROR;
         slot->error = err;
         spdlog::debug("[AMS AFC] Lane {} (slot {}): error state - {}", lane_name, slot_index,
                       err.message);
@@ -1030,23 +1045,30 @@ void AmsBackendAfc::parse_afc_hub(const std::string& hub_name, const nlohmann::j
         //    where hub names differ from unit names).
         // 2. Fallback: match hub name directly against unit.name (works when
         //    hub names match unit names, e.g., standard Box Turtle "Turtle_1").
+        // unit_infos_ is in AFC JSON order, system_info_.units is alphabetically sorted.
+        // Must find the matching system_info_ unit by name, not by paired index.
         bool found = false;
-        for (size_t ui = 0; ui < unit_infos_.size() && ui < system_info_.units.size(); ++ui) {
-            const auto& uinfo = unit_infos_[ui];
+        for (const auto& uinfo : unit_infos_) {
             bool owns_hub =
                 std::find(uinfo.hubs.begin(), uinfo.hubs.end(), hub_name) != uinfo.hubs.end();
             if (owns_hub) {
-                system_info_.units[ui].has_hub_sensor = true;
-                // Any hub triggered in this unit means filament is at/past hub
-                bool any_triggered = false;
-                for (const auto& h : uinfo.hubs) {
-                    auto it = hub_sensors_.find(h);
-                    if (it != hub_sensors_.end() && it->second) {
-                        any_triggered = true;
+                // Find the corresponding system_info_ unit by name
+                std::string display_name = uinfo.type + " " + uinfo.name;
+                for (auto& sys_unit : system_info_.units) {
+                    if (sys_unit.name == display_name) {
+                        sys_unit.has_hub_sensor = true;
+                        bool any_triggered = false;
+                        for (const auto& h : uinfo.hubs) {
+                            auto it = hub_sensors_.find(h);
+                            if (it != hub_sensors_.end() && it->second) {
+                                any_triggered = true;
+                                break;
+                            }
+                        }
+                        sys_unit.hub_sensor_triggered = any_triggered;
                         break;
                     }
                 }
-                system_info_.units[ui].hub_sensor_triggered = any_triggered;
                 found = true;
                 break;
             }
@@ -1244,9 +1266,27 @@ void AmsBackendAfc::reorganize_units_from_unit_info() {
         if (lanes_initialized_) {
             reorganize_units_from_map();
 
-            // Set per-unit topology on AmsUnit structs from unit_infos_
-            for (size_t i = 0; i < unit_infos_.size() && i < system_info_.units.size(); ++i) {
-                system_info_.units[i].topology = unit_infos_[i].topology;
+            // Set per-unit topology on AmsUnit structs from unit_infos_.
+            // unit_infos_ is in AFC JSON order, system_info_.units is alphabetically sorted.
+            // Must match by name, not by index.
+            for (const auto& ui : unit_infos_) {
+                std::string display_name = ui.type + " " + ui.name;
+                for (auto& sys_unit : system_info_.units) {
+                    if (sys_unit.name == display_name) {
+                        sys_unit.topology = ui.topology;
+                        // For HUB units, derive physical tool label from extruder name
+                        if (ui.topology == PathTopology::HUB && ui.extruders.size() == 1) {
+                            const auto& ext_name = ui.extruders[0];
+                            size_t pos = ext_name.find_last_not_of("0123456789");
+                            if (pos != std::string::npos && pos + 1 < ext_name.size()) {
+                                sys_unit.hub_tool_label = std::stoi(ext_name.substr(pos + 1));
+                            } else if (ext_name == "extruder") {
+                                sys_unit.hub_tool_label = 0;
+                            }
+                        }
+                        break;
+                    }
+                }
             }
 
             spdlog::debug("[AMS AFC] Reorganized {} units from unit-level objects",
@@ -1289,6 +1329,25 @@ void AmsBackendAfc::detect_afc_version() {
                     }
                     spdlog::info("[AMS AFC] Detected AFC version: {} (lane_data DB: {})",
                                  afc_version_, has_lane_data_db_ ? "yes" : "no");
+
+                    // Warn if AFC version is older than minimum supported
+                    if (!version_at_least("1.0.35")) {
+                        auto* msg = new (std::nothrow)
+                            std::string(fmt::format("AFC version {} may have compatibility issues. "
+                                                    "Please upgrade to v1.0.35 or later.",
+                                                    afc_version_));
+                        if (msg) {
+                            spdlog::warn("[AMS AFC] {}", *msg);
+                            helix::ui::async_call(
+                                [](void* data) {
+                                    auto* m = static_cast<std::string*>(data);
+                                    helix::ui::modal_show_alert("AFC Version Warning", m->c_str(),
+                                                                ModalSeverity::Warning, "OK");
+                                    delete m;
+                                },
+                                msg);
+                        }
+                    }
                 }
             }
 
@@ -1755,8 +1814,14 @@ AmsError AmsBackendAfc::execute_gcode(const std::string& gcode) {
     api_->execute_gcode(
         gcode, []() { spdlog::debug("[AMS AFC] G-code executed successfully"); },
         [gcode](const MoonrakerError& err) {
-            spdlog::error("[AMS AFC] G-code failed: {} - {}", gcode, err.message);
-        });
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[AMS AFC] G-code response timed out (may still be running): {}",
+                             gcode);
+            } else {
+                spdlog::error("[AMS AFC] G-code failed: {} - {}", gcode, err.message);
+            }
+        },
+        MoonrakerAPI::AMS_OPERATION_TIMEOUT_MS);
 
     return AmsErrorHelper::success();
 }
@@ -1779,12 +1844,19 @@ AmsError AmsBackendAfc::execute_gcode_notify(const std::string& gcode,
             }
         },
         [gcode, error_prefix](const MoonrakerError& err) {
-            if (!error_prefix.empty()) {
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[AMS AFC] G-code response timed out (may still be running): {}",
+                             gcode);
+                if (!error_prefix.empty()) {
+                    NOTIFY_WARNING("{} — response timed out", error_prefix);
+                }
+            } else if (!error_prefix.empty()) {
                 NOTIFY_ERROR("{}: {}", error_prefix, err.message);
             } else {
                 spdlog::error("[AMS AFC] G-code failed: {} - {}", gcode, err.message);
             }
-        });
+        },
+        MoonrakerAPI::AMS_OPERATION_TIMEOUT_MS);
 
     return AmsErrorHelper::success();
 }
@@ -1816,9 +1888,9 @@ AmsError AmsBackendAfc::load_filament(int slot_index) {
         }
     }
 
-    // Send AFC_LOAD LANE={name} command
+    // Send CHANGE_TOOL LANE={name} command
     std::ostringstream cmd;
-    cmd << "AFC_LOAD LANE=" << lane_name;
+    cmd << "CHANGE_TOOL LANE=" << lane_name;
 
     spdlog::info("[AMS AFC] Loading from lane {} (slot {})", lane_name, slot_index);
     return execute_gcode(cmd.str());
@@ -1840,7 +1912,7 @@ AmsError AmsBackendAfc::unload_filament() {
     }
 
     spdlog::info("[AMS AFC] Unloading filament");
-    return execute_gcode("AFC_UNLOAD");
+    return execute_gcode("TOOL_UNLOAD");
 }
 
 AmsError AmsBackendAfc::select_slot(int slot_index) {
@@ -1864,13 +1936,10 @@ AmsError AmsBackendAfc::select_slot(int slot_index) {
         }
     }
 
-    // AFC may not have a direct "select without load" command
-    // Some AFC configurations use AFC_SELECT, others may require different approach
-    std::ostringstream cmd;
-    cmd << "AFC_SELECT LANE=" << lane_name;
-
-    spdlog::info("[AMS AFC] Selecting lane {} (slot {})", lane_name, slot_index);
-    return execute_gcode(cmd.str());
+    // AFC does not have a "select without load" command — only CHANGE_TOOL loads filament
+    spdlog::debug("[AMS AFC] Select-only requested for lane {} (slot {}), not supported", lane_name,
+                  slot_index);
+    return AmsErrorHelper::not_supported("AFC does not support select without load");
 }
 
 AmsError AmsBackendAfc::change_tool(int tool_number) {
@@ -1928,9 +1997,9 @@ AmsError AmsBackendAfc::reset() {
         }
     }
 
-    spdlog::info("[AMS AFC] Homing AFC system");
-    return execute_gcode_notify("AFC_HOME", lv_tr("AFC homing complete"),
-                                lv_tr("AFC homing failed"));
+    spdlog::info("[AMS AFC] Resetting AFC system");
+    return execute_gcode_notify("AFC_RESET", lv_tr("AFC reset complete"),
+                                lv_tr("AFC reset failed"));
 }
 
 AmsError AmsBackendAfc::reset_lane(int slot_index) {
@@ -1994,17 +2063,17 @@ AmsError AmsBackendAfc::cancel() {
         }
     }
 
-    // AFC may use AFC_ABORT or AFC_CANCEL to stop current operation
+    // AFC uses RESET_FAILURE to cancel/recover from error state
     spdlog::info("[AMS AFC] Cancelling current operation");
-    return execute_gcode_notify("AFC_ABORT", lv_tr("AFC operation aborted"),
-                                lv_tr("AFC abort failed"));
+    return execute_gcode_notify("RESET_FAILURE", lv_tr("AFC failure reset complete"),
+                                lv_tr("AFC failure reset failed"));
 }
 
 // ============================================================================
 // Configuration Operations
 // ============================================================================
 
-AmsError AmsBackendAfc::set_slot_info(int slot_index, const SlotInfo& info) {
+AmsError AmsBackendAfc::set_slot_info(int slot_index, const SlotInfo& info, bool persist) {
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
 
@@ -2048,8 +2117,15 @@ AmsError AmsBackendAfc::set_slot_info(int slot_index, const SlotInfo& info) {
                          info.color_name);
         }
 
-        // Persist via G-code commands if AFC version supports it (v1.0.20+)
-        if (version_at_least("1.0.20")) {
+        // Persist via G-code commands if AFC version supports it (v1.0.20+).
+        // Skip persistence when persist=false — this is used by Spoolman weight
+        // polling (refresh_spoolman_weights) to update in-memory state without
+        // sending G-code back to AFC firmware. Without this guard, each weight
+        // update would fire SET_COLOR/SET_MATERIAL/SET_WEIGHT/SET_SPOOL_ID G-codes,
+        // which trigger AFC status_update WebSocket events, which call
+        // sync_from_backend → refresh_spoolman_weights → set_slot_info again,
+        // creating an infinite feedback loop that saturates the CPU.
+        if (persist && version_at_least("1.0.20")) {
             std::string lane_name = get_lane_name(slot_index);
             if (!lane_name.empty()) {
                 // Color (only if changed and valid - not 0 or default grey)
@@ -2083,7 +2159,7 @@ AmsError AmsBackendAfc::set_slot_info(int slot_index, const SlotInfo& info) {
                     execute_gcode(fmt::format("SET_SPOOL_ID LANE={} SPOOL_ID=", lane_name));
                 }
             }
-        } else if (afc_version_ != "unknown" && !afc_version_.empty()) {
+        } else if (persist && afc_version_ != "unknown" && !afc_version_.empty()) {
             spdlog::info("[AMS AFC] Version {} - slot changes stored locally only (upgrade to "
                          "1.0.20+ for persistence)",
                          afc_version_);
@@ -2146,7 +2222,7 @@ AmsError AmsBackendAfc::set_tool_mapping(int tool_number, int slot_index) {
     // This varies by AFC version/configuration
     if (!lane_name.empty()) {
         std::ostringstream cmd;
-        cmd << "AFC_MAP TOOL=" << tool_number << " LANE=" << lane_name;
+        cmd << "SET_MAP LANE=" << lane_name << " MAP=T" << tool_number;
         spdlog::info("[AMS AFC] Mapping T{} to lane {} (slot {})", tool_number, lane_name,
                      slot_index);
         return execute_gcode(cmd.str());
@@ -2174,13 +2250,17 @@ AmsError AmsBackendAfc::enable_bypass() {
         }
     }
 
-    // AFC enables bypass via filament sensor control
-    // SET_FILAMENT_SENSOR SENSOR=bypass ENABLE=1
-    spdlog::info("[AMS AFC] Enabling bypass mode");
-    return execute_gcode("SET_FILAMENT_SENSOR SENSOR=bypass ENABLE=1");
+    // AFC enables bypass via filament sensor control.
+    // Sensor name depends on hardware vs virtual bypass:
+    //   Hardware: "filament_switch_sensor bypass"
+    //   Virtual:  "filament_switch_sensor virtual_bypass"
+    const char* sensor = system_info_.has_hardware_bypass_sensor ? "bypass" : "virtual_bypass";
+    spdlog::info("[AMS AFC] Enabling bypass mode (sensor={})", sensor);
+    return execute_gcode(fmt::format("SET_FILAMENT_SENSOR SENSOR={} ENABLE=1", sensor));
 }
 
 AmsError AmsBackendAfc::disable_bypass() {
+    const char* sensor = nullptr;
     {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
 
@@ -2192,11 +2272,12 @@ AmsError AmsBackendAfc::disable_bypass() {
             return AmsError(AmsResult::WRONG_STATE, "Bypass not active",
                             "Bypass mode is not currently active", "");
         }
+
+        sensor = system_info_.has_hardware_bypass_sensor ? "bypass" : "virtual_bypass";
     }
 
-    // Disable bypass sensor
-    spdlog::info("[AMS AFC] Disabling bypass mode");
-    return execute_gcode("SET_FILAMENT_SENSOR SENSOR=bypass ENABLE=0");
+    spdlog::info("[AMS AFC] Disabling bypass mode (sensor={})", sensor);
+    return execute_gcode(fmt::format("SET_FILAMENT_SENSOR SENSOR={} ENABLE=0", sensor));
 }
 
 bool AmsBackendAfc::is_bypass_active() const {
@@ -2285,15 +2366,14 @@ AmsError AmsBackendAfc::set_endless_spool_backup(int slot_index, int backup_slot
     }
 
     // Build and send G-code command
-    // SET_RUNOUT LANE={lane_name} RUNOUT_LANE={backup_lane_name}
-    // If backup_slot == -1, send empty RUNOUT_LANE= to disable
+    // AFC uses: SET_RUNOUT LANE=<name> RUNOUT=<name|NONE>
     std::string gcode;
     if (backup_slot >= 0) {
-        gcode = fmt::format("SET_RUNOUT LANE={} RUNOUT_LANE={}", lane_name, backup_lane_name);
+        gcode = fmt::format("SET_RUNOUT LANE={} RUNOUT={}", lane_name, backup_lane_name);
         spdlog::info("[AMS AFC] Setting endless spool backup: {} -> {}", lane_name,
                      backup_lane_name);
     } else {
-        gcode = fmt::format("SET_RUNOUT LANE={} RUNOUT_LANE=", lane_name);
+        gcode = fmt::format("SET_RUNOUT LANE={} RUNOUT=NONE", lane_name);
         spdlog::info("[AMS AFC] Disabling endless spool backup for {}", lane_name);
     }
 
@@ -2373,6 +2453,12 @@ void AmsBackendAfc::load_afc_configs() {
             configs_loading_.store(false, std::memory_order_relaxed);
             configs_loaded_.store(true, std::memory_order_release);
             spdlog::info("[AMS AFC] Config files loaded");
+
+            // Detect tip method from AFC config.
+            // TODO: Replace with direct Moonraker status query once AFC exposes
+            // tool_cut/form_tip in get_status() (upstream AFC enhancement pending).
+            update_tip_method_from_config();
+
             emit_event(EVENT_STATE_CHANGED);
         }
     };
@@ -2405,6 +2491,44 @@ bool AmsBackendAfc::get_macro_var_bool(const std::string& key, bool default_val)
         return default_val;
     }
     return macro_vars_config_->parser().get_bool("gcode_macro AFC_MacroVars", key, default_val);
+}
+
+void AmsBackendAfc::update_tip_method_from_config() {
+    if (!afc_config_ || !afc_config_->is_loaded()) {
+        return;
+    }
+
+    const auto& parser = afc_config_->parser();
+
+    // Check toolhead cutting (pin-based cutter at nozzle) from [AFC] section
+    bool tool_cut = parser.get_bool("AFC", "tool_cut", false);
+
+    // Check hub cutting (servo-based cutter on hub) from any [AFC_hub *] section
+    bool hub_cut = false;
+    for (const auto& section : parser.get_sections_matching("AFC_hub")) {
+        if (parser.get_bool(section, "cut", false)) {
+            hub_cut = true;
+            break;
+        }
+    }
+
+    // Check tip forming from [AFC] section
+    bool form_tip = parser.get_bool("AFC", "form_tip", false);
+
+    TipMethod method = TipMethod::NONE;
+    if (tool_cut || hub_cut) {
+        method = TipMethod::CUT;
+    } else if (form_tip) {
+        method = TipMethod::TIP_FORM;
+    }
+
+    {
+        std::lock_guard<std::recursive_mutex> lock(mutex_);
+        system_info_.tip_method = method;
+    }
+
+    spdlog::info("[AMS AFC] Tip method from config: {} (tool_cut={}, hub_cut={}, form_tip={})",
+                 tip_method_to_string(method), tool_cut, hub_cut, form_tip);
 }
 
 // ============================================================================
@@ -2620,14 +2744,13 @@ AmsError AmsBackendAfc::execute_device_action(const std::string& action_id, cons
                                 "Invalid value",
                                 fmt::format("Enter a length between 100 and {:.0f}mm", max_len));
             }
-            // AFC uses SET_BOWDEN_LENGTH UNIT={unit_name} LENGTH={mm}
-            // For simplicity, we'll use the first unit
-            if (!system_info_.units.empty()) {
-                std::string unit_name = system_info_.units[0].name;
-                return execute_gcode("SET_BOWDEN_LENGTH UNIT=" + unit_name +
+            // AFC uses SET_BOWDEN_LENGTH HUB={hub_name} LENGTH={mm}
+            if (!hub_names_.empty()) {
+                std::string hub_name = hub_names_[0];
+                return execute_gcode("SET_BOWDEN_LENGTH HUB=" + hub_name +
                                      " LENGTH=" + std::to_string(static_cast<int>(length)));
             }
-            return AmsErrorHelper::not_supported("No AFC units configured");
+            return AmsErrorHelper::not_supported("No AFC hubs configured");
         } catch (const std::bad_any_cast&) {
             return AmsError(AmsResult::WRONG_STATE, "Invalid bowden length type",
                             "Invalid value type", "Provide a numeric value");
@@ -2651,8 +2774,24 @@ AmsError AmsBackendAfc::execute_device_action(const std::string& action_id, cons
             // Extract tool index from action_id (e.g., "bowden_T0" -> 0)
             int tool_idx = std::stoi(action_id.substr(8));
             if (tool_idx >= 0 && tool_idx < static_cast<int>(extruders_.size())) {
-                // Use extruder name for the command
-                return execute_gcode("SET_BOWDEN_LENGTH EXTRUDER=" + extruders_[tool_idx].name +
+                // Find the hub for this extruder by matching unit membership
+                std::string hub_name;
+                const std::string& ext_name = extruders_[tool_idx].name;
+                for (const auto& unit : unit_infos_) {
+                    auto it = std::find(unit.extruders.begin(), unit.extruders.end(), ext_name);
+                    if (it != unit.extruders.end() && !unit.hubs.empty()) {
+                        hub_name = unit.hubs[0];
+                        break;
+                    }
+                }
+                // Fall back to first known hub
+                if (hub_name.empty() && !hub_names_.empty()) {
+                    hub_name = hub_names_[0];
+                }
+                if (hub_name.empty()) {
+                    return AmsErrorHelper::not_supported("No AFC hub found for extruder");
+                }
+                return execute_gcode("SET_BOWDEN_LENGTH HUB=" + hub_name +
                                      " LENGTH=" + std::to_string(static_cast<int>(length)));
             }
             return AmsErrorHelper::not_supported("Invalid extruder index: " +
@@ -2672,10 +2811,18 @@ AmsError AmsBackendAfc::execute_device_action(const std::string& action_id, cons
                 return AmsError(AmsResult::WRONG_STATE, "Speed multiplier must be 0.5-2.0x",
                                 "Invalid value", "Enter a multiplier between 0.5 and 2.0");
             }
-            // AFC uses SET_LONG_MOVE_SPEED with FWD and REV parameters
-            // We'll set just the one being changed
-            std::string param = (action_id == "speed_fwd") ? "FWD" : "REV";
-            return execute_gcode("SET_LONG_MOVE_SPEED " + param + "=" + std::to_string(multiplier));
+            // AFC SET_LONG_MOVE_SPEED is per-lane; apply to all lanes
+            std::string param = (action_id == "speed_fwd") ? "FWD_SPEED" : "RWD_FACTOR";
+            if (lane_names_.empty()) {
+                return AmsErrorHelper::not_supported("No AFC lanes configured");
+            }
+            for (const auto& lane : lane_names_) {
+                AmsError err = execute_gcode("SET_LONG_MOVE_SPEED LANE=" + lane + " " + param +
+                                             "=" + std::to_string(multiplier));
+                if (!err)
+                    return err; // Return first error
+            }
+            return AmsErrorHelper::success();
         } catch (const std::bad_any_cast&) {
             return AmsError(AmsResult::WRONG_STATE, "Invalid speed multiplier type",
                             "Invalid value type", "Provide a numeric value");
@@ -2689,7 +2836,16 @@ AmsError AmsBackendAfc::execute_device_action(const std::string& action_id, cons
     } else if (action_id == "brush") {
         return execute_gcode("AFC_BRUSH");
     } else if (action_id == "reset_motor") {
-        return execute_gcode("AFC_RESET_MOTOR_TIME");
+        // AFC_RESET_MOTOR_TIME is per-lane; reset all lanes
+        if (lane_names_.empty()) {
+            return AmsErrorHelper::not_supported("No AFC lanes configured");
+        }
+        for (const auto& lane : lane_names_) {
+            AmsError err = execute_gcode("AFC_RESET_MOTOR_TIME LANE=" + lane);
+            if (!err)
+                return err;
+        }
+        return AmsErrorHelper::success();
     } else if (action_id == "led_toggle") {
         std::lock_guard<std::recursive_mutex> lock(mutex_);
         return execute_gcode(afc_led_state_ ? "TURN_OFF_AFC_LED" : "TURN_ON_AFC_LED");

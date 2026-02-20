@@ -85,8 +85,8 @@ static const lv_font_t* get_button_icon_font() {
 static bool is_mdi_icon_font(const lv_font_t* font) {
     if (!font)
         return false;
-    return font == &mdi_icons_16 || font == &mdi_icons_24 || font == &mdi_icons_32 ||
-           font == &mdi_icons_48 || font == &mdi_icons_64;
+    return font == &mdi_icons_14 || font == &mdi_icons_16 || font == &mdi_icons_24 ||
+           font == &mdi_icons_32 || font == &mdi_icons_48 || font == &mdi_icons_64;
 }
 
 /**
@@ -727,5 +727,30 @@ void ui_button_set_text(lv_obj_t* btn, const char* text) {
     lv_label_set_text(data->label, text);
     // Label invalidation only redraws the label area — force the whole button
     // to repaint so the background behind the label is consistent
+    lv_obj_invalidate(btn);
+}
+
+void ui_button_set_icon(lv_obj_t* btn, const char* icon_name) {
+    if (!btn || !icon_name) {
+        return;
+    }
+    auto* data = static_cast<UiButtonData*>(lv_obj_get_user_data(btn));
+    if (!data || data->magic != UiButtonData::MAGIC || !data->icon) {
+        return;
+    }
+
+    const char* codepoint = ui_icon::lookup_codepoint(icon_name);
+    if (!codepoint) {
+        const char* stripped = ui_icon::strip_legacy_prefix(icon_name);
+        if (stripped != icon_name) {
+            codepoint = ui_icon::lookup_codepoint(stripped);
+        }
+    }
+    if (!codepoint) {
+        spdlog::warn("[ui_button] Icon '{}' not found", icon_name);
+        return;
+    }
+
+    lv_label_set_text(data->icon, codepoint);
     lv_obj_invalidate(btn);
 }

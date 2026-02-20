@@ -636,6 +636,10 @@ struct AmsUnit {
     // Per-unit topology (for mixed-topology setups like Box Turtle + OpenAMS)
     PathTopology topology = PathTopology::HUB; ///< Filament path topology for this unit
 
+    /// Physical tool label for HUB units (e.g., 4 for extruder4/T4, 5 for extruder5/T5).
+    /// -1 means "use min(mapped_tool) from lanes" (the default/PARALLEL behavior).
+    int hub_tool_label = -1;
+
     /**
      * @brief Check if any slot in this unit has an error
      * @return true if at least one slot has error.has_value()
@@ -683,6 +687,7 @@ struct AmsSystemInfo {
     // Current state
     int current_tool = -1;              ///< Active tool (-1=none, -2=bypass for HH)
     int current_slot = -1;              ///< Active slot (-1=none, -2=bypass for HH)
+    int pending_target_slot = -1;       ///< Target slot during tool change (-1=none)
     bool filament_loaded = false;       ///< Filament at extruder
     AmsAction action = AmsAction::IDLE; ///< Current operation
     std::string operation_detail;       ///< Detailed operation string

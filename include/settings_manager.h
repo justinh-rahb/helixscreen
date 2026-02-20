@@ -3,11 +3,13 @@
 
 #pragma once
 
+#include "ams_types.h"
 #include "lvgl/lvgl.h"
 #include "subject_managed_panel.h"
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace helix {
@@ -404,6 +406,27 @@ class SettingsManager {
     lv_subject_t* subject_z_movement_style() {
         return &z_movement_style_subject_;
     }
+
+    // =========================================================================
+    // FILAMENT SETTINGS
+    // =========================================================================
+
+    /**
+     * @brief Get external spool info (bypass/direct spool)
+     * @return SlotInfo with external spool data, or nullopt if not set
+     */
+    std::optional<SlotInfo> get_external_spool_info() const;
+
+    /**
+     * @brief Set external spool info (bypass/direct spool)
+     * @param info SlotInfo with filament data (slot_index forced to -2)
+     */
+    void set_external_spool_info(const SlotInfo& info);
+
+    /**
+     * @brief Clear external spool info (back to unassigned)
+     */
+    void clear_external_spool_info();
 
     // =========================================================================
     // INPUT SETTINGS (require restart)

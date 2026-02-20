@@ -40,6 +40,15 @@ class DebugBundleCollector {
     static std::string collect_klipper_log_tail(int num_lines = 500);
     static std::string collect_moonraker_log_tail(int num_lines = 200);
 
+    /// Collect Moonraker state via REST (server info, printer state, config)
+    static nlohmann::json collect_moonraker_info();
+
+    /// Sanitize a string value for PII patterns (emails, credentials, webhooks, tokens, MACs)
+    static std::string sanitize_value(const std::string& value);
+
+    /// Recursively strip sensitive keys from JSON (public for integration testing)
+    static nlohmann::json sanitize_json(const nlohmann::json& input, int depth = 0);
+
     /// Gzip compression using zlib
     static std::vector<uint8_t> gzip_compress(const std::string& data);
 
@@ -47,8 +56,16 @@ class DebugBundleCollector {
     static constexpr const char* WORKER_URL = "https://crash.helixscreen.org/v1/debug-bundle";
     static constexpr const char* INGEST_API_KEY = "hx-tel-v1-a7f3c9e2d1b84056";
 
-    /// Recursively strip sensitive keys from JSON
-    static nlohmann::json sanitize_json(const nlohmann::json& input);
+    /// Blocking HTTP GET to a Moonraker endpoint, returns parsed JSON or error object
+    static nlohmann::json moonraker_get(const std::string& base_url, const std::string& endpoint,
+                                        int timeout_sec = 10);
+
+    /// Get the Moonraker HTTP base URL (from MoonrakerAPI if connected)
+    static std::string get_moonraker_url();
+
+    /// Fetch the tail of a log file from Moonraker using HTTP Range requests
+    static std::string fetch_log_tail(const std::string& base_url, const std::string& endpoint,
+                                      int num_lines, int tail_bytes = 524288);
 
     /// Check if a key name matches a sensitive pattern
     static bool is_sensitive_key(const std::string& key);

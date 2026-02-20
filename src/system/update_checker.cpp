@@ -418,6 +418,21 @@ int extract_tar_member(const std::string& tarball_path, const std::string& extra
     return ret;
 }
 
+/// Log-and-flush macros for install diagnostics. Ensures every message reaches
+/// journalctl immediately — spdlog buffers by default and a systemd cgroup kill
+/// during self-update can lose all buffered output.
+// NOLINTBEGIN(cppcoreguidelines-macro-usage)
+#define FLOG(level, ...)                                                                           \
+    do {                                                                                           \
+        spdlog::level(__VA_ARGS__);                                                                \
+        spdlog::default_logger()->flush();                                                         \
+    } while (false)
+#define flog_info(...) FLOG(info, __VA_ARGS__)
+#define flog_warn(...) FLOG(warn, __VA_ARGS__)
+#define flog_error(...) FLOG(error, __VA_ARGS__)
+#define flog_debug(...) FLOG(debug, __VA_ARGS__)
+// NOLINTEND(cppcoreguidelines-macro-usage)
+
 } // anonymous namespace
 
 // ============================================================================
@@ -963,7 +978,10 @@ bool UpdateChecker::validate_elf_architecture(const std::string& tarball_path) {
 }
 
 void UpdateChecker::do_install(const std::string& tarball_path) {
+    flog_info("[UpdateChecker] do_install() ENTER: tarball={}", tarball_path);
+
     if (download_cancelled_.load()) {
+        flog_info("[UpdateChecker] do_install() cancelled, aborting");
         std::remove(tarball_path.c_str());
         report_download_status(DownloadStatus::Idle, 0, "");
         return;
@@ -978,24 +996,29 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
     std::string extracted_dir = tarball_path + ".installer";
     bool extracted_from_tarball = false;
 
-    mkdir(extracted_dir.c_str(), 0750);
+    flog_debug("[UpdateChecker] Creating extracted_dir: {}", extracted_dir);
+    int mkdir_ret = mkdir(extracted_dir.c_str(), 0750);
+    flog_debug("[UpdateChecker] mkdir returned {} (errno={})", mkdir_ret,
+               mkdir_ret < 0 ? strerror(errno) : "ok");
 
     const std::string rm_bin = resolve_tool("rm");
 
+    flog_debug("[UpdateChecker] Extracting installer from tarball...");
     install_script = extract_installer_from_tarball(tarball_path, extracted_dir);
     if (!install_script.empty()) {
         extracted_from_tarball = true;
-        spdlog::info("[UpdateChecker] Using installer extracted from update tarball");
+        flog_info("[UpdateChecker] Using installer extracted from tarball: {}", install_script);
     } else {
         // Fall back to local install.sh (best effort for older tarballs without it)
-        spdlog::warn(
+        flog_warn(
             "[UpdateChecker] Could not extract install.sh from tarball, falling back to local");
         safe_exec({rm_bin, "-rf", extracted_dir});
         install_script = find_local_installer();
+        flog_info("[UpdateChecker] Local installer search result: '{}'", install_script);
     }
 
     if (install_script.empty()) {
-        spdlog::error("[UpdateChecker] Cannot find install.sh");
+        flog_error("[UpdateChecker] Cannot find install.sh");
         report_download_status(DownloadStatus::Error, 0, "Error: Installer not found",
                                "Cannot locate install.sh script");
         return;
@@ -1005,27 +1028,22 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
     // process is killed mid-install (e.g. stop_service kills the cgroup).
     std::string install_log = tarball_path + ".install.log";
 
-    spdlog::info("[UpdateChecker] Running: {} --local {} --update", install_script, tarball_path);
-    spdlog::debug("[UpdateChecker] install_script exists/executable: access={}",
-                  access(install_script.c_str(), X_OK));
-    spdlog::debug("[UpdateChecker] tarball_path exists/readable:     access={}",
-                  access(tarball_path.c_str(), R_OK));
-    spdlog::debug("[UpdateChecker] extracted_dir: {}", extracted_dir);
-    spdlog::debug("[UpdateChecker] install log:   {}", install_log);
+    flog_info("[UpdateChecker] Running: {} --local {} --update", install_script, tarball_path);
+    flog_info("[UpdateChecker] install_script access(X_OK)={} tarball access(R_OK)={}",
+              access(install_script.c_str(), X_OK), access(tarball_path.c_str(), R_OK));
+    flog_info("[UpdateChecker] install_log={}", install_log);
     {
-        // Log current process context
         char cwd_buf[PATH_MAX] = {};
         const char* cwd = getcwd(cwd_buf, sizeof(cwd_buf));
-        spdlog::debug("[UpdateChecker] cwd={} uid={} euid={}", cwd ? cwd : "(error)", getuid(),
-                      geteuid());
+        flog_info("[UpdateChecker] cwd={} uid={} euid={} pid={}", cwd ? cwd : "(error)", getuid(),
+                  geteuid(), getpid());
     }
     {
-        // Log tarball file size
         struct stat st{};
         if (stat(tarball_path.c_str(), &st) == 0) {
-            spdlog::debug("[UpdateChecker] tarball size: {} bytes", st.st_size);
+            flog_info("[UpdateChecker] tarball size: {} bytes", st.st_size);
         } else {
-            spdlog::error("[UpdateChecker] stat({}) failed: {}", tarball_path, strerror(errno));
+            flog_error("[UpdateChecker] stat({}) failed: {}", tarball_path, strerror(errno));
         }
     }
 
@@ -1036,13 +1054,15 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
     {
         int log_fd = open(install_log.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
         if (log_fd < 0) {
-            spdlog::warn("[UpdateChecker] Could not open install log {}: {}", install_log,
-                         strerror(errno));
+            flog_error("[UpdateChecker] Could not open install log {}: {}", install_log,
+                       strerror(errno));
+        } else {
+            flog_info("[UpdateChecker] Install log fd={}", log_fd);
         }
 
         pid_t pid = fork();
         if (pid < 0) {
-            spdlog::error("[UpdateChecker] fork() for install failed: {}", strerror(errno));
+            flog_error("[UpdateChecker] fork() for install failed: {}", strerror(errno));
             if (log_fd >= 0)
                 close(log_fd);
         } else if (pid == 0) {
@@ -1066,6 +1086,7 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
             _exit(127);
         } else {
             // Parent: close our copy of the log fd and wait with timeout
+            flog_info("[UpdateChecker] Forked install.sh as pid={}, waiting...", pid);
             if (log_fd >= 0)
                 close(log_fd);
 
@@ -1076,32 +1097,56 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
             for (int elapsed = 0; elapsed < timeout_seconds; ++elapsed) {
                 pid_t result = waitpid(pid, &status, WNOHANG);
                 if (result < 0) {
-                    spdlog::error("[UpdateChecker] waitpid(install) failed: {}", strerror(errno));
+                    flog_error("[UpdateChecker] waitpid(install) failed: {} (errno={})",
+                               strerror(errno), errno);
                     break;
                 }
                 if (result > 0) {
                     exited = true;
+                    flog_info("[UpdateChecker] install.sh (pid={}) exited after ~{}s", pid,
+                              elapsed);
                     break;
+                }
+                // Log progress every 10 seconds so we can see the wait is active
+                if (elapsed > 0 && elapsed % 10 == 0) {
+                    flog_info("[UpdateChecker] Still waiting for install.sh pid={} ({}s/{}s)", pid,
+                              elapsed, timeout_seconds);
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
 
             if (exited) {
-                ret = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-                spdlog::info("[UpdateChecker] install.sh exited with code {}", ret);
+                bool normal_exit = WIFEXITED(status);
+                bool signaled = WIFSIGNALED(status);
+                ret = normal_exit ? WEXITSTATUS(status) : -1;
+                int sig = signaled ? WTERMSIG(status) : 0;
+                flog_info(
+                    "[UpdateChecker] install.sh exit: code={} normal={} signaled={} signal={}", ret,
+                    normal_exit, signaled, sig);
             } else {
-                spdlog::error("[UpdateChecker] install.sh timed out after {}s, killing",
-                              timeout_seconds);
+                flog_error("[UpdateChecker] install.sh timed out after {}s, killing",
+                           timeout_seconds);
                 kill(pid, SIGKILL);
                 waitpid(pid, nullptr, 0); // reap zombie
             }
         }
 
         // Read back the install log and emit every line through spdlog
+        {
+            struct stat log_stat{};
+            if (stat(install_log.c_str(), &log_stat) == 0) {
+                flog_info("[UpdateChecker] Install log exists: {} bytes", log_stat.st_size);
+            } else {
+                flog_error("[UpdateChecker] Install log MISSING {}: {}", install_log,
+                           strerror(errno));
+            }
+        }
+
         FILE* lf = fopen(install_log.c_str(), "r");
         if (lf) {
             char line[512];
-            spdlog::info("[UpdateChecker] ---- install.sh output ----");
+            int line_count = 0;
+            flog_info("[UpdateChecker] ---- install.sh output ----");
             while (fgets(line, sizeof(line), lf)) {
                 // Strip trailing newline
                 size_t len = strlen(line);
@@ -1109,23 +1154,27 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
                     line[--len] = '\0';
                 }
                 spdlog::info("[install.sh] {}", line);
+                line_count++;
             }
-            spdlog::info("[UpdateChecker] ---- end install.sh output ----");
+            flog_info("[UpdateChecker] ---- end install.sh output ({} lines) ----", line_count);
             fclose(lf);
         } else {
-            spdlog::warn("[UpdateChecker] Could not read install log {}", install_log);
+            flog_error("[UpdateChecker] Could not read install log {}: {}", install_log,
+                       strerror(errno));
         }
         std::remove(install_log.c_str());
     }
 
     // Clean up tarball and extracted installer regardless of result
+    flog_info("[UpdateChecker] Cleaning up: tarball={} extracted={} (from_tarball={})",
+              tarball_path, extracted_dir, extracted_from_tarball);
     std::remove(tarball_path.c_str());
     if (extracted_from_tarball) {
         safe_exec({rm_bin, "-rf", extracted_dir});
     }
 
     if (ret != 0) {
-        spdlog::error("[UpdateChecker] Install script failed with code {}", ret);
+        flog_error("[UpdateChecker] Install script failed with code {}", ret);
         report_download_status(DownloadStatus::Error, 0, "Error: Installation failed",
                                "install.sh returned error code " + std::to_string(ret));
         return;
@@ -1140,8 +1189,32 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
     }
 
     report_download_status(DownloadStatus::Complete, 100,
-                           "v" + version + " installed! Restart to apply.");
+                           "v" + version + " installed! Restarting...");
+
+    // Trigger self-restart: _exit(0) causes the watchdog to restart helix-screen
+    // with the newly installed binary ("Normal exit (code 0) — restart silently").
+    // install.sh skips systemctl restart under NoNewPrivileges, so we own the restart.
+    //
+    // _exit() not exit(): calling exit() from a background thread races with
+    // destructors on other threads (LVGL loop, WebSocket threads) and causes
+    // SIGSEGV (code 139). The watchdog treats that as a crash, shows the recovery
+    // dialog, and Config::init() recreates helixconfig.json from defaults — wiping
+    // dev_url and channel settings. _exit() terminates immediately at the OS level
+    // with no C++ cleanup, so exit code 0 reaches the watchdog cleanly.
+    std::thread([] {
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        spdlog::info("[UpdateChecker] Restarting to apply update");
+        spdlog::default_logger()->flush();
+        ::_exit(0);
+    }).detach();
 }
+
+// Done with flush-on-write macros — only needed in do_install()
+#undef flog_info
+#undef flog_warn
+#undef flog_error
+#undef flog_debug
+#undef FLOG
 
 // ============================================================================
 // Static helpers
@@ -1227,11 +1300,14 @@ void UpdateChecker::check_for_updates(Callback callback) {
         return;
     }
 
-    // Rate limiting: return cached result if checked recently
+    // Rate limiting: return cached result if checked recently.
+    // Skipped for dev channel (local server) — no risk of hammering remote APIs.
     auto now = std::chrono::steady_clock::now();
     auto time_since_last = now - last_check_time_;
+    bool dev_channel = (get_channel() == UpdateChannel::Dev);
 
-    if (last_check_time_.time_since_epoch().count() > 0 && time_since_last < MIN_CHECK_INTERVAL) {
+    if (!dev_channel && last_check_time_.time_since_epoch().count() > 0 &&
+        time_since_last < MIN_CHECK_INTERVAL) {
         auto minutes_remaining =
             std::chrono::duration_cast<std::chrono::minutes>(MIN_CHECK_INTERVAL - time_since_last)
                 .count();
@@ -1290,6 +1366,13 @@ void UpdateChecker::check_for_updates(Callback callback) {
     if (!cached_r2_base_url_.empty() && cached_r2_base_url_.back() == '/') {
         cached_r2_base_url_.pop_back();
     }
+
+    const char* channel_name = (cached_channel_ == UpdateChannel::Beta)  ? "beta"
+                               : (cached_channel_ == UpdateChannel::Dev) ? "dev"
+                                                                         : "stable";
+    spdlog::debug("[UpdateChecker] check_for_updates: channel={} dev_url='{}' r2_base_url='{}'",
+                  channel_name, cached_dev_url_.empty() ? "(none)" : cached_dev_url_,
+                  cached_r2_base_url_);
 
     // Update subjects on LVGL thread (check_for_updates is public, could be called from any thread)
     if (subjects_initialized_) {

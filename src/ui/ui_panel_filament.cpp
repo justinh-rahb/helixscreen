@@ -758,8 +758,13 @@ void FilamentPanel::handle_purge_button() {
         [this](const MoonrakerError& error) {
             helix::ui::async_call(
                 [](void* ud) { static_cast<FilamentPanel*>(ud)->operation_guard_.end(); }, this);
-            NOTIFY_ERROR("Purge failed: {}", error.user_message());
-        });
+            if (error.type == MoonrakerErrorType::TIMEOUT) {
+                NOTIFY_WARNING("Purge may still be running — response timed out");
+            } else {
+                NOTIFY_ERROR("Purge failed: {}", error.user_message());
+            }
+        },
+        MoonrakerAPI::EXTRUSION_TIMEOUT_MS);
 }
 
 // ============================================================================

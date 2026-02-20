@@ -67,12 +67,12 @@ TEST_CASE("Responsive token discovery includes _tiny suffix", "[theme][breakpoin
 }
 
 TEST_CASE("Tokens without _tiny variant still have _small available", "[theme][breakpoints]") {
-    // space_md has _small/_medium/_large but no _tiny — verify _small exists for fallback
+    // space_2xl has _small/_medium/_large but no _tiny — verify _small exists for fallback
     auto small_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_small");
-    REQUIRE(small_tokens.count("space_md") > 0);
+    REQUIRE(small_tokens.count("space_2xl") > 0);
 
     auto tiny_tokens = theme_manager_parse_all_xml_for_suffix("ui_xml", "px", "_tiny");
-    REQUIRE(tiny_tokens.count("space_md") == 0);
+    REQUIRE(tiny_tokens.count("space_2xl") == 0);
 }
 
 TEST_CASE("Validation does not require _tiny for complete sets", "[theme][breakpoints]") {

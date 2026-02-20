@@ -9,6 +9,7 @@
 #include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <sstream>
 
 using namespace helix;
@@ -35,6 +36,9 @@ AmsBackendHappyHare::AmsBackendHappyHare(MoonrakerAPI* api, MoonrakerClient* cli
     system_info_.supports_bypass = true;
     // Happy Hare bypass is always positional (selector moves to bypass position), never a sensor
     system_info_.has_hardware_bypass_sensor = false;
+    // Default to TIP_FORM — Happy Hare's default macro is _MMU_FORM_TIP.
+    // Overridden by query_tip_method_from_config() once configfile response arrives.
+    system_info_.tip_method = TipMethod::TIP_FORM;
 
     spdlog::debug("[AMS HappyHare] Backend created");
 }
@@ -93,6 +97,11 @@ AmsError AmsBackendHappyHare::start() {
     if (should_emit) {
         emit_event(EVENT_STATE_CHANGED);
     }
+
+    // Query configfile to determine tip method (cutter vs tip-forming).
+    // Happy Hare determines this from form_tip_macro: if it contains "cut",
+    // it's a cutter system; otherwise it's tip-forming or none.
+    query_tip_method_from_config();
 
     return AmsErrorHelper::success();
 }
@@ -207,8 +216,15 @@ PathSegment AmsBackendHappyHare::get_slot_filament_segment(int slot_index) const
         return path_segment_from_happy_hare_pos(filament_pos_);
     }
 
-    // For non-active slots in Happy Hare (linear topology), check slot status
-    // Slots with available filament are assumed to have filament ready at the selector
+    // For non-active slots, check pre-gate sensor first for better visualization
+    if (slot_index >= 0 && slot_index < static_cast<int>(gate_sensors_.size())) {
+        const auto& gs = gate_sensors_[slot_index];
+        if (gs.has_pre_gate_sensor && gs.pre_gate_triggered) {
+            return PathSegment::PREP; // Filament detected at pre-gate sensor
+        }
+    }
+
+    // Fall back to gate_status for slots without pre-gate sensors
     const SlotInfo* slot = system_info_.get_slot_global(slot_index);
     if (slot &&
         (slot->status == SlotStatus::AVAILABLE || slot->status == SlotStatus::FROM_BUFFER)) {
@@ -221,6 +237,14 @@ PathSegment AmsBackendHappyHare::get_slot_filament_segment(int slot_index) const
 PathSegment AmsBackendHappyHare::infer_error_segment() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return error_segment_;
+}
+
+bool AmsBackendHappyHare::slot_has_prep_sensor(int slot_index) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (slot_index < 0 || slot_index >= static_cast<int>(gate_sensors_.size())) {
+        return false;
+    }
+    return gate_sensors_[slot_index].has_pre_gate_sensor;
 }
 
 // ============================================================================
@@ -464,6 +488,54 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         }
     }
 
+    // Parse sensors dict: printer.mmu.sensors
+    // Keys matching "mmu_pre_gate_X" indicate pre-gate sensors per gate.
+    // Values: true (triggered/filament present), false (not triggered), null (error/unknown)
+    if (mmu_data.contains("sensors") && mmu_data["sensors"].is_object()) {
+        const auto& sensors = mmu_data["sensors"];
+        const std::string prefix = "mmu_pre_gate_";
+
+        for (auto it = sensors.begin(); it != sensors.end(); ++it) {
+            const std::string& key = it.key();
+            if (key.rfind(prefix, 0) != 0) {
+                continue; // Not a pre-gate sensor key
+            }
+
+            // Extract gate index from key suffix
+            std::string index_str = key.substr(prefix.size());
+            int gate_idx = -1;
+            try {
+                gate_idx = std::stoi(index_str);
+            } catch (...) {
+                continue; // Not a valid integer suffix
+            }
+
+            if (gate_idx < 0) {
+                continue;
+            }
+
+            // Resize gate_sensors_ if needed
+            if (gate_idx >= static_cast<int>(gate_sensors_.size())) {
+                gate_sensors_.resize(gate_idx + 1);
+            }
+
+            gate_sensors_[gate_idx].has_pre_gate_sensor = true;
+            gate_sensors_[gate_idx].pre_gate_triggered =
+                it.value().is_boolean() && it.value().get<bool>();
+
+            spdlog::trace("[AMS HappyHare] Pre-gate sensor {}: present=true, triggered={}",
+                          gate_idx, gate_sensors_[gate_idx].pre_gate_triggered);
+        }
+
+        // Update has_slot_sensors flag on units based on actual sensor data
+        bool any_sensor =
+            std::any_of(gate_sensors_.begin(), gate_sensors_.end(),
+                        [](const GateSensorState& g) { return g.has_pre_gate_sensor; });
+        for (auto& unit : system_info_.units) {
+            unit.has_slot_sensors = any_sensor;
+        }
+    }
+
     // Parse endless_spool_groups if available (multi-unit safe)
     if (mmu_data.contains("endless_spool_groups") && mmu_data["endless_spool_groups"].is_array()) {
         const auto& es_groups = mmu_data["endless_spool_groups"];
@@ -503,7 +575,10 @@ void AmsBackendHappyHare::initialize_gates(int gate_count) {
         unit.connected = true;
         unit.has_encoder = true;
         unit.has_toolhead_sensor = true;
-        unit.has_slot_sensors = true;
+        // has_slot_sensors starts false; updated when sensor data arrives in parse_mmu_state()
+        unit.has_slot_sensors =
+            std::any_of(gate_sensors_.begin(), gate_sensors_.end(),
+                        [](const GateSensorState& g) { return g.has_pre_gate_sensor; });
         unit.has_hub_sensor = true; // HH selector functions as hub equivalent
 
         for (int i = 0; i < unit_gates; ++i) {
@@ -523,6 +598,11 @@ void AmsBackendHappyHare::initialize_gates(int gate_count) {
 
     system_info_.total_slots = gate_count;
 
+    // Ensure gate_sensors_ is large enough for all gates
+    if (static_cast<int>(gate_sensors_.size()) < gate_count) {
+        gate_sensors_.resize(gate_count);
+    }
+
     // Initialize tool-to-gate mapping (1:1 default)
     system_info_.tool_to_slot_map.clear();
     system_info_.tool_to_slot_map.reserve(gate_count);
@@ -531,6 +611,72 @@ void AmsBackendHappyHare::initialize_gates(int gate_count) {
     }
 
     gates_initialized_ = true;
+}
+
+void AmsBackendHappyHare::query_tip_method_from_config() {
+    if (!client_) {
+        return;
+    }
+
+    // Query configfile.settings.mmu to read form_tip_macro.
+    // Happy Hare uses the same logic internally: if the macro name contains "cut",
+    // it's a cutter system (e.g., _MMU_CUT_TIP). Otherwise it's tip-forming.
+    nlohmann::json params = {{"objects", nlohmann::json::object({{"configfile", {"settings"}}})}};
+
+    client_->send_jsonrpc(
+        "printer.objects.query", params,
+        [this](nlohmann::json response) {
+            try {
+                const auto& settings = response["result"]["status"]["configfile"]["settings"];
+
+                if (!settings.contains("mmu") || !settings["mmu"].is_object()) {
+                    spdlog::debug("[AMS HappyHare] No mmu section in configfile settings");
+                    return;
+                }
+
+                const auto& mmu_cfg = settings["mmu"];
+                TipMethod method = TipMethod::NONE;
+
+                if (mmu_cfg.contains("form_tip_macro") && mmu_cfg["form_tip_macro"].is_string()) {
+                    std::string macro = mmu_cfg["form_tip_macro"].get<std::string>();
+
+                    // Convert to lowercase for comparison (same as Happy Hare)
+                    std::string lower_macro = macro;
+                    for (auto& c : lower_macro) {
+                        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    }
+
+                    if (lower_macro.find("cut") != std::string::npos) {
+                        method = TipMethod::CUT;
+                    } else {
+                        method = TipMethod::TIP_FORM;
+                    }
+
+                    spdlog::info("[AMS HappyHare] Tip method from config: {} (form_tip_macro={})",
+                                 tip_method_to_string(method), macro);
+                } else {
+                    // No form_tip_macro configured — default to tip-forming
+                    // (Happy Hare default macro is _MMU_FORM_TIP, not a cutter)
+                    method = TipMethod::TIP_FORM;
+                    spdlog::info(
+                        "[AMS HappyHare] No form_tip_macro in config, defaulting to TIP_FORM");
+                }
+
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    system_info_.tip_method = method;
+                }
+
+                emit_event(EVENT_STATE_CHANGED);
+            } catch (const nlohmann::json::exception& e) {
+                spdlog::warn("[AMS HappyHare] Failed to parse configfile for tip method: {}",
+                             e.what());
+            }
+        },
+        [](const MoonrakerError& err) {
+            spdlog::warn("[AMS HappyHare] Failed to query configfile for tip method: {}",
+                         err.message);
+        });
 }
 
 // ============================================================================
@@ -568,8 +714,14 @@ AmsError AmsBackendHappyHare::execute_gcode(const std::string& gcode) {
     api_->execute_gcode(
         gcode, []() { spdlog::debug("[AMS HappyHare] G-code executed successfully"); },
         [gcode](const MoonrakerError& err) {
-            spdlog::error("[AMS HappyHare] G-code failed: {} - {}", gcode, err.message);
-        });
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[AMS HappyHare] G-code response timed out (may still be running): {}",
+                             gcode);
+            } else {
+                spdlog::error("[AMS HappyHare] G-code failed: {} - {}", gcode, err.message);
+            }
+        },
+        MoonrakerAPI::AMS_OPERATION_TIMEOUT_MS);
 
     return AmsErrorHelper::success();
 }
@@ -764,7 +916,7 @@ AmsError AmsBackendHappyHare::cancel() {
 // Configuration Operations
 // ============================================================================
 
-AmsError AmsBackendHappyHare::set_slot_info(int slot_index, const SlotInfo& info) {
+AmsError AmsBackendHappyHare::set_slot_info(int slot_index, const SlotInfo& info, bool persist) {
     int old_spoolman_id = 0;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -810,37 +962,45 @@ AmsError AmsBackendHappyHare::set_slot_info(int slot_index, const SlotInfo& info
         }
     }
 
-    // Persist via MMU_GATE_MAP command (Happy Hare stores in mmu_vars.cfg automatically)
-    bool has_changes = false;
-    std::string cmd = fmt::format("MMU_GATE_MAP GATE={}", slot_index);
+    // Persist via MMU_GATE_MAP command (Happy Hare stores in mmu_vars.cfg automatically).
+    // Skip persistence when persist=false — used by Spoolman weight polling to update
+    // in-memory state without sending G-code back to firmware. Without this guard,
+    // weight updates would trigger MMU_GATE_MAP → firmware status_update WebSocket
+    // event → sync_from_backend → refresh_spoolman_weights → set_slot_info again,
+    // creating an infinite feedback loop.
+    if (persist) {
+        bool has_changes = false;
+        std::string cmd = fmt::format("MMU_GATE_MAP GATE={}", slot_index);
 
-    // Color (hex format, no # prefix)
-    if (info.color_rgb != 0 && info.color_rgb != AMS_DEFAULT_SLOT_COLOR) {
-        cmd += fmt::format(" COLOR={:06X}", info.color_rgb & 0xFFFFFF);
-        has_changes = true;
-    }
+        // Color (hex format, no # prefix)
+        if (info.color_rgb != 0 && info.color_rgb != AMS_DEFAULT_SLOT_COLOR) {
+            cmd += fmt::format(" COLOR={:06X}", info.color_rgb & 0xFFFFFF);
+            has_changes = true;
+        }
 
-    // Material (validate to prevent command injection)
-    if (!info.material.empty() && MoonrakerAPI::is_safe_gcode_param(info.material)) {
-        cmd += fmt::format(" MATERIAL={}", info.material);
-        has_changes = true;
-    } else if (!info.material.empty()) {
-        spdlog::warn("[AMS HappyHare] Skipping MATERIAL - unsafe characters in: {}", info.material);
-    }
+        // Material (validate to prevent command injection)
+        if (!info.material.empty() && MoonrakerAPI::is_safe_gcode_param(info.material)) {
+            cmd += fmt::format(" MATERIAL={}", info.material);
+            has_changes = true;
+        } else if (!info.material.empty()) {
+            spdlog::warn("[AMS HappyHare] Skipping MATERIAL - unsafe characters in: {}",
+                         info.material);
+        }
 
-    // Spoolman ID (-1 to clear)
-    if (info.spoolman_id > 0) {
-        cmd += fmt::format(" SPOOLID={}", info.spoolman_id);
-        has_changes = true;
-    } else if (info.spoolman_id == 0 && old_spoolman_id > 0) {
-        cmd += " SPOOLID=-1"; // Clear existing link
-        has_changes = true;
-    }
+        // Spoolman ID (-1 to clear)
+        if (info.spoolman_id > 0) {
+            cmd += fmt::format(" SPOOLID={}", info.spoolman_id);
+            has_changes = true;
+        } else if (info.spoolman_id == 0 && old_spoolman_id > 0) {
+            cmd += " SPOOLID=-1"; // Clear existing link
+            has_changes = true;
+        }
 
-    // Only send command if there are actual changes to persist
-    if (has_changes) {
-        execute_gcode(cmd);
-        spdlog::debug("[AMS HappyHare] Sent: {}", cmd);
+        // Only send command if there are actual changes to persist
+        if (has_changes) {
+            execute_gcode(cmd);
+            spdlog::debug("[AMS HappyHare] Sent: {}", cmd);
+        }
     }
 
     // Emit OUTSIDE the lock to avoid deadlock with callbacks

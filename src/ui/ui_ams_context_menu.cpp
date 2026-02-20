@@ -7,6 +7,7 @@
 #include "ui_toast_manager.h"
 
 #include "ams_backend.h"
+#include "ams_state.h"
 #include "ams_types.h"
 #include "filament_database.h"
 
@@ -123,6 +124,7 @@ bool AmsContextMenu::show_near_widget(lv_obj_t* parent, int slot_index, lv_obj_t
     // Store AMS-specific state BEFORE base class calls on_created
     backend_ = backend;
     pending_is_loaded_ = is_loaded;
+    external_spool_mode_ = false;
 
     // Get total slots from backend
     if (backend_) {
@@ -144,12 +146,88 @@ bool AmsContextMenu::show_near_widget(lv_obj_t* parent, int slot_index, lv_obj_t
     return result;
 }
 
+bool AmsContextMenu::show_for_external_spool(lv_obj_t* parent, lv_obj_t* anchor_widget) {
+    // Register callbacks once (idempotent)
+    register_callbacks();
+
+    // Configure for external spool mode (no backend operations)
+    backend_ = nullptr;
+    pending_is_loaded_ = false;
+    total_slots_ = 0;
+    external_spool_mode_ = true;
+
+    // Set as active instance for static callbacks
+    s_active_instance_ = this;
+
+    // Base class handles: XML creation, on_created callback, positioning
+    bool result = ContextMenu::show_near_widget(parent, -2, anchor_widget);
+    if (!result) {
+        s_active_instance_ = nullptr;
+        external_spool_mode_ = false;
+    }
+
+    spdlog::debug("[AmsContextMenu] Shown for external spool");
+    return result;
+}
+
 // ============================================================================
 // ContextMenu override
 // ============================================================================
 
 void AmsContextMenu::on_created(lv_obj_t* menu_obj) {
     int slot_index = get_item_index();
+
+    // External spool mode: hide backend-related buttons, show only EDIT/CLEAR
+    if (external_spool_mode_) {
+        // Hide Load, Unload, Reset buttons (not applicable to external spool)
+        lv_obj_t* btn_load = lv_obj_find_by_name(menu_obj, "btn_load");
+        if (btn_load)
+            lv_obj_add_flag(btn_load, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_t* btn_unload = lv_obj_find_by_name(menu_obj, "btn_unload");
+        if (btn_unload)
+            lv_obj_add_flag(btn_unload, LV_OBJ_FLAG_HIDDEN);
+        // btn_reset_lane is already hidden by default in XML
+
+        // Disable subject-driven states so hidden buttons stay hidden
+        lv_subject_set_int(&slot_is_loaded_subject_, 0);
+        lv_subject_set_int(&slot_can_load_subject_, 0);
+
+        // Set header to "External Spool"
+        lv_obj_t* slot_header = lv_obj_find_by_name(menu_obj, "slot_header");
+        if (slot_header) {
+            lv_label_set_text(slot_header, lv_tr("External Spool"));
+        }
+
+        // Check if external spool has an assignment (for Clear Spool mode)
+        clear_spool_mode_ = false;
+        auto ext_info = AmsState::instance().get_external_spool_info();
+        bool has_assignment =
+            ext_info.has_value() && (ext_info->spoolman_id > 0 || !ext_info->material.empty());
+
+        lv_obj_t* btn_edit = lv_obj_find_by_name(menu_obj, "btn_edit");
+        if (has_assignment && btn_edit) {
+            // Show "Clear Spool" as the edit button action
+            clear_spool_mode_ = true;
+            ui_button_set_text(btn_edit, lv_tr("Clear Spool"));
+            ui_button_set_icon(btn_edit, "close");
+        } else if (!has_assignment && btn_edit) {
+            // No spool assigned — keep "Spool Info" label for editing
+            ui_button_set_text(btn_edit, lv_tr("Spool Info"));
+        }
+
+        // Show "Select Spool" if Spoolman is available
+        lv_obj_t* btn_spoolman = lv_obj_find_by_name(menu_obj, "btn_spoolman");
+        if (btn_spoolman) {
+            auto* spoolman_subj = lv_xml_get_subject(nullptr, "printer_has_spoolman");
+            bool has_spoolman = spoolman_subj && lv_subject_get_int(spoolman_subj) == 1;
+            if (has_spoolman) {
+                lv_obj_clear_flag(btn_spoolman, LV_OBJ_FLAG_HIDDEN);
+            }
+        }
+
+        // No dropdowns for external spool
+        return;
+    }
 
     // Check if system is busy (operation in progress)
     bool system_busy = false;
@@ -211,6 +289,32 @@ void AmsContextMenu::on_created(lv_obj_t* menu_obj) {
         }
     }
 
+    // Handle Spool Info / Clear Spool button based on slot state
+    clear_spool_mode_ = false;
+    if (!slot_has_filament) {
+        // Slot is empty — check if it still has an assigned spool
+        bool has_assignment = false;
+        if (backend_) {
+            SlotInfo slot_info = backend_->get_slot_info(slot_index);
+            has_assignment = (slot_info.spoolman_id > 0 || !slot_info.material.empty());
+        }
+
+        lv_obj_t* btn_edit = lv_obj_find_by_name(menu_obj, "btn_edit");
+        if (has_assignment) {
+            // Show "Clear Spool" instead of disabled "Spool Info"
+            clear_spool_mode_ = true;
+            if (btn_edit) {
+                ui_button_set_text(btn_edit, lv_tr("Clear Spool"));
+                ui_button_set_icon(btn_edit, "close");
+            }
+        } else {
+            // Truly empty — disable the button
+            if (btn_edit) {
+                lv_obj_add_state(btn_edit, LV_STATE_DISABLED);
+            }
+        }
+    }
+
     // Update the slot header text (1-based for user display)
     lv_obj_t* slot_header = lv_obj_find_by_name(menu_obj, "slot_header");
     if (slot_header) {
@@ -267,8 +371,18 @@ void AmsContextMenu::handle_reset_lane() {
 }
 
 void AmsContextMenu::handle_edit() {
-    spdlog::info("[AmsContextMenu] Edit requested for slot {}", get_item_index());
-    dispatch_ams_action(MenuAction::EDIT);
+    if (clear_spool_mode_) {
+        spdlog::info("[AmsContextMenu] Clear spool requested for slot {}", get_item_index());
+        dispatch_ams_action(MenuAction::CLEAR_SPOOL);
+    } else {
+        spdlog::info("[AmsContextMenu] Edit requested for slot {}", get_item_index());
+        dispatch_ams_action(MenuAction::EDIT);
+    }
+}
+
+void AmsContextMenu::handle_spoolman() {
+    spdlog::info("[AmsContextMenu] Spoolman select requested for slot {}", get_item_index());
+    dispatch_ams_action(MenuAction::SPOOLMAN);
 }
 
 // ============================================================================
@@ -285,6 +399,7 @@ void AmsContextMenu::register_callbacks() {
     lv_xml_register_event_cb(nullptr, "ams_context_unload_cb", on_unload_cb);
     lv_xml_register_event_cb(nullptr, "ams_context_reset_lane_cb", on_reset_lane_cb);
     lv_xml_register_event_cb(nullptr, "ams_context_edit_cb", on_edit_cb);
+    lv_xml_register_event_cb(nullptr, "ams_context_spoolman_cb", on_spoolman_cb);
     lv_xml_register_event_cb(nullptr, "ams_context_tool_changed_cb", on_tool_changed_cb);
     lv_xml_register_event_cb(nullptr, "ams_context_backup_changed_cb", on_backup_changed_cb);
 
@@ -338,6 +453,13 @@ void AmsContextMenu::on_edit_cb(lv_event_t* /*e*/) {
     }
 }
 
+void AmsContextMenu::on_spoolman_cb(lv_event_t* /*e*/) {
+    auto* self = get_active_instance();
+    if (self) {
+        self->handle_spoolman();
+    }
+}
+
 void AmsContextMenu::on_tool_changed_cb(lv_event_t* /*e*/) {
     auto* self = get_active_instance();
     if (self) {
@@ -369,10 +491,23 @@ void AmsContextMenu::handle_tool_changed() {
                  tool_number >= 0 ? tool_number : -1);
 
     if (tool_number >= 0) {
-        // Set this slot as the mapping for the selected tool
+        // Warn if another tool already maps to this slot
+        auto mapping = backend_->get_tool_mapping();
+        for (size_t i = 0; i < mapping.size(); ++i) {
+            if (static_cast<int>(i) != tool_number && mapping[i] == get_item_index()) {
+                spdlog::warn("[AmsContextMenu] Tool {} will share slot {} with tool {}",
+                             tool_number, get_item_index(), i);
+                std::string msg =
+                    "T" + std::to_string(tool_number) + " shares slot with T" + std::to_string(i);
+                ToastManager::instance().show(ToastSeverity::WARNING, msg.c_str());
+                break;
+            }
+        }
+
         auto result = backend_->set_tool_mapping(tool_number, get_item_index());
         if (!result.success()) {
             spdlog::warn("[AmsContextMenu] Failed to set tool mapping: {}", result.user_msg);
+            ToastManager::instance().show(ToastSeverity::ERROR, result.user_msg.c_str());
         }
     }
     // Note: "None" selection doesn't clear mapping - user needs to map another slot to that tool
@@ -430,7 +565,13 @@ void AmsContextMenu::handle_backup_changed() {
     auto result = backend_->set_endless_spool_backup(get_item_index(), backup_slot);
     if (!result.success()) {
         spdlog::warn("[AmsContextMenu] Failed to set endless spool backup: {}", result.user_msg);
+    } else {
+        // Bump slots version to trigger endless spool arrow redraw
+        AmsState::instance().bump_slots_version();
     }
+
+    // Close the context menu after selection
+    hide();
 }
 
 // ============================================================================
@@ -453,23 +594,22 @@ void AmsContextMenu::configure_dropdowns() {
 
     bool show_any_dropdown = false;
 
-    // Configure tool mapping dropdown
-    if (backend_) {
-        auto tool_caps = backend_->get_tool_mapping_capabilities();
-        if (tool_caps.supported) {
-            populate_tool_dropdown();
-            if (tool_row) {
-                lv_obj_remove_flag(tool_row, LV_OBJ_FLAG_HIDDEN);
-            }
-            // Disable dropdown if not editable
-            if (tool_dropdown_ && !tool_caps.editable) {
-                lv_obj_add_state(tool_dropdown_, LV_STATE_DISABLED);
-            }
-            show_any_dropdown = true;
-            spdlog::debug("[AmsContextMenu] Tool mapping enabled (editable={})",
-                          tool_caps.editable);
-        }
-    }
+    // Tool mapping dropdown - hidden until we have a good UX for remapping
+    // (currently 1:1 lane-to-tool mapping is the only conflict-free option)
+    // if (backend_) {
+    //     auto tool_caps = backend_->get_tool_mapping_capabilities();
+    //     if (tool_caps.supported) {
+    //         populate_tool_dropdown();
+    //         if (tool_row) {
+    //             lv_obj_remove_flag(tool_row, LV_OBJ_FLAG_HIDDEN);
+    //         }
+    //         if (tool_dropdown_ && !tool_caps.editable) {
+    //             lv_obj_add_state(tool_dropdown_, LV_STATE_DISABLED);
+    //         }
+    //         show_any_dropdown = true;
+    //     }
+    // }
+    (void)tool_row;
 
     // Configure endless spool dropdown
     if (backend_) {

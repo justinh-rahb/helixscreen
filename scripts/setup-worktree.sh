@@ -79,15 +79,28 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ -z "$BRANCH" ]]; then
-    echo -e "${RED}Error: branch-name is required${RESET}"
-    usage
-    exit 1
-fi
-
 # Get the main tree root (where this script lives)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MAIN_TREE="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Auto-detect: if run from inside an existing worktree with no args, set up in-place
+if [[ -z "$BRANCH" ]]; then
+    # Check if we're inside a git worktree (not the main tree)
+    CURRENT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    GIT_COMMON="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+    if [[ -n "$CURRENT_ROOT" && -n "$GIT_COMMON" ]] && \
+       [[ "$(cd "$CURRENT_ROOT" && pwd)" != "$(cd "$GIT_COMMON/.." && pwd)" ]]; then
+        # We're in a worktree — infer branch and path
+        BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+        WORKTREE_PATH="$CURRENT_ROOT"
+        SETUP_ONLY=true
+        echo -e "${YELLOW}Auto-detected worktree: $WORKTREE_PATH (branch: $BRANCH)${RESET}"
+    else
+        echo -e "${RED}Error: branch-name is required (or run from inside a worktree)${RESET}"
+        usage
+        exit 1
+    fi
+fi
 
 # Default worktree path: .worktrees/<branch-basename>
 if [[ -z "$WORKTREE_PATH" ]]; then

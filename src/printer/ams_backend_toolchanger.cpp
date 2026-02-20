@@ -472,8 +472,15 @@ AmsError AmsBackendToolChanger::execute_gcode(const std::string& gcode) {
     api_->execute_gcode(
         gcode, []() { spdlog::debug("[AMS ToolChanger] G-code executed successfully"); },
         [gcode](const MoonrakerError& err) {
-            spdlog::error("[AMS ToolChanger] G-code failed: {} - {}", gcode, err.message);
-        });
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn(
+                    "[AMS ToolChanger] G-code response timed out (may still be running): {}",
+                    gcode);
+            } else {
+                spdlog::error("[AMS ToolChanger] G-code failed: {} - {}", gcode, err.message);
+            }
+        },
+        MoonrakerAPI::AMS_OPERATION_TIMEOUT_MS);
 
     return AmsErrorHelper::success();
 }
@@ -508,7 +515,6 @@ AmsError AmsBackendToolChanger::select_slot(int slot_index) {
 }
 
 AmsError AmsBackendToolChanger::change_tool(int tool_number) {
-    std::string tool_name;
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -521,13 +527,6 @@ AmsError AmsBackendToolChanger::change_tool(int tool_number) {
         if (!slot_valid) {
             return slot_valid;
         }
-
-        // Get tool name for the command
-        if (tool_number >= 0 && tool_number < static_cast<int>(tool_names_.size())) {
-            tool_name = tool_names_[tool_number];
-        } else {
-            tool_name = "T" + std::to_string(tool_number);
-        }
     }
 
     // Set action immediately to prevent race window where a second click
@@ -538,9 +537,13 @@ AmsError AmsBackendToolChanger::change_tool(int tool_number) {
     }
     emit_event(EVENT_STATE_CHANGED);
 
-    // Send T{n} gcode — standard tool select, works with any toolchanger implementation
-    spdlog::info("[AMS ToolChanger] Mounting tool {} ({})", tool_number, tool_name);
-    return execute_gcode(tool_name);
+    // Use SELECT_TOOL T={n} to select by tool number via the toolchanger's
+    // internal lookup, bypassing any ASSIGN_TOOL T-command remapping.
+    // This ensures we mount the physical tool the user tapped, not whatever
+    // the slicer's T{n} command was remapped to.
+    std::string cmd = "SELECT_TOOL T=" + std::to_string(tool_number);
+    spdlog::info("[AMS ToolChanger] Mounting tool {}: {}", tool_number, cmd);
+    return execute_gcode(cmd);
 }
 
 // ============================================================================
@@ -569,7 +572,8 @@ AmsError AmsBackendToolChanger::cancel() {
 // Configuration Operations
 // ============================================================================
 
-AmsError AmsBackendToolChanger::set_slot_info(int slot_index, const SlotInfo& info) {
+AmsError AmsBackendToolChanger::set_slot_info(int slot_index, const SlotInfo& info,
+                                              bool /*persist*/) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     AmsError slot_valid = validate_slot_index(slot_index);

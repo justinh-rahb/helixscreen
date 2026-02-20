@@ -80,6 +80,30 @@ struct ThumbnailInfo {
 };
 
 /**
+ * @brief Resolve a Moonraker thumbnail relative_path to be relative to the gcodes root.
+ *
+ * Moonraker's metadata returns thumbnail relative_path values that are relative to the
+ * gcode file's PARENT directory, not the gcodes root. For files at root this is the same
+ * thing, but for files in subdirectories the gcode_dir must be prepended.
+ *
+ * @param thumb_relative_path  The thumbnail's relative_path from Moonraker metadata
+ * @param gcode_dir            The directory containing the gcode file (empty for root)
+ * @return Path relative to gcodes root, suitable for download URL construction
+ *
+ * Examples:
+ *   resolve_thumbnail_path(".thumbs/file-300x300.png", "")       -> ".thumbs/file-300x300.png"
+ *   resolve_thumbnail_path(".thumbs/file-300x300.png", "prints") ->
+ * "prints/.thumbs/file-300x300.png"
+ */
+[[nodiscard]] inline std::string resolve_thumbnail_path(const std::string& thumb_relative_path,
+                                                        const std::string& gcode_dir) {
+    if (thumb_relative_path.empty() || gcode_dir.empty()) {
+        return thumb_relative_path;
+    }
+    return gcode_dir + "/" + thumb_relative_path;
+}
+
+/**
  * @brief File metadata structure (detailed file info)
  */
 struct FileMetadata {

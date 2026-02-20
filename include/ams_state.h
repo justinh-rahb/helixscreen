@@ -273,6 +273,20 @@ class AmsState {
     }
 
     /**
+     * @brief Get pending target slot subject (for tool change animations)
+     * @return Subject holding target slot index (-1 if no swap in progress)
+     */
+    lv_subject_t* get_pending_target_slot_subject() {
+        return &pending_target_slot_;
+    }
+
+    /**
+     * @brief Set pending target slot directly from UI (for early pulse during preheat)
+     * @param slot Target slot index, or -1 to clear
+     */
+    void set_pending_target_slot(int slot);
+
+    /**
      * @brief Get current tool subject
      * @return Subject holding current tool index (-1 if none)
      */
@@ -306,6 +320,14 @@ class AmsState {
      */
     lv_subject_t* get_bypass_active_subject() {
         return &bypass_active_;
+    }
+
+    /**
+     * @brief Get external spool color subject
+     * @return Subject holding 0xRRGGBB color or 0 if no external spool assigned
+     */
+    lv_subject_t* get_external_spool_color_subject() {
+        return &external_spool_color_;
     }
 
     /**
@@ -682,6 +704,23 @@ class AmsState {
     void set_action_detail(const std::string& detail);
 
     /**
+     * @brief Get external spool info from persistent storage
+     * @return SlotInfo or nullopt if not set
+     */
+    std::optional<SlotInfo> get_external_spool_info() const;
+
+    /**
+     * @brief Set external spool info and update color subject
+     * @param info SlotInfo with filament data
+     */
+    void set_external_spool_info(const SlotInfo& info);
+
+    /**
+     * @brief Clear external spool info
+     */
+    void clear_external_spool_info();
+
+    /**
      * @brief Set the current AMS action state directly
      *
      * Used by UI to indicate operation in progress (e.g., during UI-managed preheat
@@ -690,6 +729,16 @@ class AmsState {
      * @param action The action state to set
      */
     void set_action(AmsAction action);
+
+    /**
+     * @brief Check if a filament operation (load/unload) is currently active
+     *
+     * Used by FilamentSensorManager to suppress spurious sensor toasts while
+     * filament is being intentionally moved through sensors.
+     *
+     * @return true if AMS is actively loading, unloading, or performing related ops
+     */
+    bool is_filament_operation_active();
 
     // ========================================================================
     // Spoolman Weight Polling
@@ -721,6 +770,14 @@ class AmsState {
      */
     void stop_spoolman_polling();
 
+    /**
+     * @brief Bump the slots version counter to trigger UI refresh
+     *
+     * Call after modifying slot data (weights, endless spool config, etc.)
+     * to notify observers and redraw the AMS panel.
+     */
+    void bump_slots_version();
+
   private:
     friend class AmsStateTestAccess;
 
@@ -734,11 +791,6 @@ class AmsState {
      * @param data Event data
      */
     void on_backend_event(int backend_index, const std::string& event, const std::string& data);
-
-    /**
-     * @brief Bump the slots version counter
-     */
-    void bump_slots_version();
 
     /**
      * @brief Probe for ValgACE via REST endpoint
@@ -795,9 +847,11 @@ class AmsState {
     lv_subject_t ams_type_;
     lv_subject_t ams_action_;
     lv_subject_t current_slot_;
+    lv_subject_t pending_target_slot_;
     lv_subject_t ams_current_tool_;
     lv_subject_t filament_loaded_;
     lv_subject_t bypass_active_;
+    lv_subject_t external_spool_color_;
     lv_subject_t supports_bypass_;
     lv_subject_t ams_slot_count_;
     lv_subject_t slots_version_;

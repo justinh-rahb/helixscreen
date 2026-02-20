@@ -227,6 +227,12 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
         ui_filament_path_canvas_set_faceted_toolhead(canvas, true);
     }
 
+    // Set per-slot prep sensor capability flags
+    for (int i = 0; i < slot_count; ++i) {
+        bool has_prep = backend->slot_has_prep_sensor(slot_offset + i);
+        ui_filament_path_canvas_set_slot_prep_sensor(canvas, i, has_prep);
+    }
+
     // Set per-slot filament states (using local indices for unit-scoped views)
     ui_filament_path_canvas_clear_slot_filaments(canvas);
     for (int i = 0; i < slot_count; ++i) {
@@ -252,6 +258,13 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
         }
     }
     ui_filament_path_canvas_set_buffer_fault_state(canvas, buffer_fault);
+
+    // Set external spool color and assignment state
+    auto ext_spool = AmsState::instance().get_external_spool_info();
+    ui_filament_path_canvas_set_bypass_has_spool(canvas, ext_spool.has_value());
+    if (ext_spool.has_value()) {
+        ui_filament_path_canvas_set_bypass_color(canvas, ext_spool->color_rgb);
+    }
 
     ui_filament_path_canvas_refresh(canvas);
 

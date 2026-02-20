@@ -1365,12 +1365,18 @@ void MoonrakerAPI::start_bed_mesh_calibrate(BedMeshProgressCallback on_progress,
             spdlog::debug("[MoonrakerAPI] BED_MESH_CALIBRATE command accepted");
         },
         [collector, on_error](const MoonrakerError& err) {
-            spdlog::error("[MoonrakerAPI] BED_MESH_CALIBRATE failed: {}", err.message);
-            collector->mark_completed(); // Stop listening
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[MoonrakerAPI] BED_MESH_CALIBRATE response timed out "
+                             "(calibration may still be running)");
+            } else {
+                spdlog::error("[MoonrakerAPI] BED_MESH_CALIBRATE failed: {}", err.message);
+            }
+            collector->mark_completed();
             if (on_error) {
                 on_error(err);
             }
-        });
+        },
+        CALIBRATION_TIMEOUT_MS);
 }
 
 void MoonrakerAPI::calculate_screws_tilt(ScrewTiltCallback on_success, ErrorCallback on_error) {
@@ -1390,14 +1396,20 @@ void MoonrakerAPI::calculate_screws_tilt(ScrewTiltCallback on_success, ErrorCall
             spdlog::debug("[Moonraker API] SCREWS_TILT_CALCULATE command accepted");
         },
         [collector, on_error](const MoonrakerError& err) {
-            // Failed to send command - mark collector completed to prevent double-callback
-            spdlog::error("[Moonraker API] Failed to send SCREWS_TILT_CALCULATE: {}", err.message);
-            collector->mark_completed(); // Prevent collector from calling on_error again
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[Moonraker API] SCREWS_TILT_CALCULATE response timed out "
+                             "(probing may still be running)");
+            } else {
+                spdlog::error("[Moonraker API] Failed to send SCREWS_TILT_CALCULATE: {}",
+                              err.message);
+            }
+            collector->mark_completed();
             collector->unregister();
             if (on_error) {
                 on_error(err);
             }
-        });
+        },
+        CALIBRATION_TIMEOUT_MS);
 }
 
 void MoonrakerAPI::run_qgl(SuccessCallback /*on_success*/, ErrorCallback on_error) {
@@ -1431,21 +1443,25 @@ void MoonrakerAPI::start_resonance_test(char axis, AdvancedProgressCallback on_p
 
     // Send the G-code command
     // SHAPER_CALIBRATE sweeps 5-100 Hz (~95s) then calculates best shapers (~30-60s)
-    static constexpr uint32_t SHAPER_CALIBRATE_TIMEOUT_MS = 5 * 60 * 1000;
     std::string cmd = "SHAPER_CALIBRATE AXIS=";
     cmd += axis;
 
     execute_gcode(
         cmd, []() { spdlog::debug("[Moonraker API] SHAPER_CALIBRATE command accepted"); },
         [collector, on_error](const MoonrakerError& err) {
-            spdlog::error("[Moonraker API] Failed to send SHAPER_CALIBRATE: {}", err.message);
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[Moonraker API] SHAPER_CALIBRATE response timed out "
+                             "(calibration may still be running)");
+            } else {
+                spdlog::error("[Moonraker API] Failed to send SHAPER_CALIBRATE: {}", err.message);
+            }
             collector->mark_completed();
             collector->unregister();
             if (on_error) {
                 on_error(err);
             }
         },
-        SHAPER_CALIBRATE_TIMEOUT_MS);
+        SHAPER_TIMEOUT_MS);
 }
 
 void MoonrakerAPI::start_klippain_shaper_calibration(const std::string& /*axis*/,
@@ -1485,13 +1501,18 @@ void MoonrakerAPI::measure_axes_noise(NoiseCheckCallback on_complete, ErrorCallb
         "MEASURE_AXES_NOISE",
         []() { spdlog::debug("[Moonraker API] MEASURE_AXES_NOISE command accepted"); },
         [collector, on_error](const MoonrakerError& err) {
-            spdlog::error("[Moonraker API] Failed to send MEASURE_AXES_NOISE: {}", err.message);
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[Moonraker API] MEASURE_AXES_NOISE response timed out");
+            } else {
+                spdlog::error("[Moonraker API] Failed to send MEASURE_AXES_NOISE: {}", err.message);
+            }
             collector->mark_completed();
             collector->unregister();
             if (on_error) {
                 on_error(err);
             }
-        });
+        },
+        SHAPER_TIMEOUT_MS);
 }
 
 void MoonrakerAPI::get_input_shaper_config(InputShaperConfigCallback on_success,
@@ -1673,7 +1694,7 @@ void MoonrakerAPI::get_spoolman_spools(SpoolListCallback on_success, ErrorCallba
 
 void MoonrakerAPI::get_spoolman_spool(int spool_id, SpoolCallback on_success,
                                       ErrorCallback on_error) {
-    spdlog::debug("[Moonraker API] get_spoolman_spool({})", spool_id);
+    spdlog::trace("[Moonraker API] get_spoolman_spool({})", spool_id);
 
     // Use Moonraker's Spoolman proxy to GET /v1/spool/{id}
     json params;
@@ -1685,7 +1706,7 @@ void MoonrakerAPI::get_spoolman_spool(int spool_id, SpoolCallback on_success,
         [on_success, spool_id](json response) {
             if (response.contains("result") && response["result"].is_object()) {
                 SpoolInfo spool = parse_spool_info(response["result"]);
-                spdlog::debug("[Moonraker API] Got spool {}: {} {}", spool_id, spool.vendor,
+                spdlog::trace("[Moonraker API] Got spool {}: {} {}", spool_id, spool.vendor,
                               spool.material);
                 if (on_success) {
                     on_success(spool);
@@ -2454,14 +2475,16 @@ void MoonrakerAPI::start_pid_calibrate(const std::string& heater, int target_tem
     char cmd[64];
     snprintf(cmd, sizeof(cmd), "PID_CALIBRATE HEATER=%s TARGET=%d", heater.c_str(), target_temp);
 
-    // PID calibration takes 3-10 minutes — use 15 min timeout
-    static constexpr uint32_t PID_TIMEOUT_MS = 15 * 60 * 1000;
-
     // silent=true: PID errors are handled by the collector and UI panel, not global toast
     execute_gcode(
         cmd, nullptr,
         [collector, on_error](const MoonrakerError& err) {
-            spdlog::error("[MoonrakerAPI] Failed to send PID_CALIBRATE: {}", err.message);
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[MoonrakerAPI] PID_CALIBRATE response timed out "
+                             "(calibration may still be running)");
+            } else {
+                spdlog::error("[MoonrakerAPI] Failed to send PID_CALIBRATE: {}", err.message);
+            }
             collector->mark_completed();
             collector->unregister();
             if (on_error)

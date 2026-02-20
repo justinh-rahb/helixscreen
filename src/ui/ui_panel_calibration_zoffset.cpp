@@ -481,14 +481,20 @@ void ZOffsetCalibrationPanel::begin_probe_sequence() {
                     this);
             },
             [this](const MoonrakerError& err) {
-                spdlog::error("[ZOffsetCal] Failed to move to position: {}", err.message);
-                helix::ui::async_call(
-                    [](void* ud) {
-                        static_cast<ZOffsetCalibrationPanel*>(ud)->on_calibration_result(
-                            false, "Failed to move to calibration position");
-                    },
-                    this);
-            });
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    spdlog::warn("[ZOffsetCal] Move to position timed out (may still be running)");
+                    NOTIFY_WARNING("Calibration move may still be running — response timed out");
+                } else {
+                    spdlog::error("[ZOffsetCal] Failed to move to position: {}", err.message);
+                    helix::ui::async_call(
+                        [](void* ud) {
+                            static_cast<ZOffsetCalibrationPanel*>(ud)->on_calibration_result(
+                                false, "Failed to move to calibration position");
+                        },
+                        this);
+                }
+            },
+            MoonrakerAPI::PROBING_TIMEOUT_MS);
     } else {
         // Probe calibrate or endstop strategy
         std::string gcode;
@@ -521,14 +527,21 @@ void ZOffsetCalibrationPanel::begin_probe_sequence() {
                 // State transition to ADJUSTING happens via manual_probe_active observer
             },
             [this](const MoonrakerError& err) {
-                spdlog::error("[ZOffsetCal] Failed to start calibration: {}", err.message);
-                helix::ui::async_call(
-                    [](void* ud) {
-                        static_cast<ZOffsetCalibrationPanel*>(ud)->on_calibration_result(
-                            false, "Failed to start calibration");
-                    },
-                    this);
-            });
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    spdlog::warn(
+                        "[ZOffsetCal] Calibration response timed out (may still be running)");
+                    NOTIFY_WARNING("Calibration may still be running — response timed out");
+                } else {
+                    spdlog::error("[ZOffsetCal] Failed to start calibration: {}", err.message);
+                    helix::ui::async_call(
+                        [](void* ud) {
+                            static_cast<ZOffsetCalibrationPanel*>(ud)->on_calibration_result(
+                                false, "Failed to start Z offset calibration");
+                        },
+                        this);
+                }
+            },
+            MoonrakerAPI::PROBING_TIMEOUT_MS);
     }
 }
 

@@ -44,10 +44,10 @@ class MoonrakerAPI;
  * }
  *
  * G-code Commands:
- * - AFC_LOAD LANE={name}   - Load filament from specified lane
- * - AFC_UNLOAD             - Unload current filament
- * - AFC_CUT LANE={name}    - Cut filament (if cutter supported)
- * - AFC_HOME               - Home the AFC system
+ * - CHANGE_TOOL LANE={name} - Load/change filament from specified lane
+ * - TOOL_UNLOAD             - Unload current filament
+ * - SET_MAP LANE={name} MAP=T{n} - Map lane to tool number
+ * - AFC_RESET               - Reset/re-prep all lanes
  * - T{n}                   - Tool change (unload + load)
  */
 /**
@@ -122,6 +122,7 @@ class AmsBackendAfc : public AmsBackend {
     [[nodiscard]] PathSegment get_filament_segment() const override;
     [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
+    [[nodiscard]] bool slot_has_prep_sensor(int slot_index) const override;
 
     // Operations
     AmsError load_filament(int slot_index) override;
@@ -143,7 +144,7 @@ class AmsBackendAfc : public AmsBackend {
     AmsError cancel() override;
 
     // Configuration
-    AmsError set_slot_info(int slot_index, const SlotInfo& info) override;
+    AmsError set_slot_info(int slot_index, const SlotInfo& info, bool persist = true) override;
     AmsError set_tool_mapping(int tool_number, int slot_index) override;
 
     // Bypass mode
@@ -592,6 +593,11 @@ class AmsBackendAfc : public AmsBackend {
 
     /// Load AFC config files from printer
     void load_afc_configs();
+
+    /// Detect tip method (cut vs tip-form) from loaded AFC config.
+    /// Temporary: will be replaced by direct Moonraker status query when AFC
+    /// exposes tool_cut/form_tip in get_status().
+    void update_tip_method_from_config();
 
     /// Helper to get macro variable as float
     float get_macro_var_float(const std::string& key, float default_val) const;

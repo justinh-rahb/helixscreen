@@ -21,7 +21,7 @@ Fast, beautiful, and built for every Klipper printer — from a Creality K1 to a
 
 ---
 
-> **Beta Release — v0.10.0**
+> **Beta Release — v0.10.10**
 >
 > Core features are complete and stabilizing. We're looking for testers across different printer setups.
 >

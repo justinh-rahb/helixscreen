@@ -150,14 +150,20 @@ TEST_CASE_METHOD(LVGLTestFixture, "ObserverGuard RAII removes observer on destru
         auto guard = helix::ui::observe_int_sync<TestReceiver>(
             &subject, &receiver, [](TestReceiver* r, int /*value*/) { r->counter->fetch_add(1); });
 
-        REQUIRE(guard);                      // Guard should be valid
+        REQUIRE(guard); // Guard should be valid
+
+        // observe_int_sync defers callbacks via queue_update(), so we must
+        // drain the update queue to process the initial subscription callback
+        process_lvgl(10);
         REQUIRE(callback_count.load() == 1); // Initial callback on subscription
 
-        // Value changes should trigger callback
+        // Value changes should trigger callback (drain queue after each)
         lv_subject_set_int(&subject, 42);
+        process_lvgl(10);
         REQUIRE(callback_count.load() == 2);
 
         lv_subject_set_int(&subject, 100);
+        process_lvgl(10);
         REQUIRE(callback_count.load() == 3);
 
         // Guard goes out of scope here - observer should be removed
@@ -167,9 +173,11 @@ TEST_CASE_METHOD(LVGLTestFixture, "ObserverGuard RAII removes observer on destru
     // Reset counter to verify no more callbacks
     callback_count.store(0);
     lv_subject_set_int(&subject, 200);
+    process_lvgl(10);
     REQUIRE(callback_count.load() == 0); // No callback - observer was removed
 
     lv_subject_set_int(&subject, 300);
+    process_lvgl(10);
     REQUIRE(callback_count.load() == 0); // Still no callback
 
     lv_subject_deinit(&subject);
@@ -197,6 +205,9 @@ TEST_CASE_METHOD(LVGLTestFixture, "ObserverGuard move semantics transfer ownersh
             &subject, &receiver, [](TestReceiver* r, int /*value*/) { r->counter->fetch_add(1); });
 
         REQUIRE(inner_guard);
+
+        // observe_int_sync defers callbacks via queue_update(), drain the queue
+        process_lvgl(10);
         REQUIRE(callback_count.load() == 1);
 
         // Move to outer scope
@@ -211,6 +222,7 @@ TEST_CASE_METHOD(LVGLTestFixture, "ObserverGuard move semantics transfer ownersh
     // Observer should still be active via outer_guard
     callback_count.store(0);
     lv_subject_set_int(&subject, 42);
+    process_lvgl(10);
     REQUIRE(callback_count.load() == 1); // Callback still works
 
     // Explicitly reset to remove observer
@@ -219,6 +231,7 @@ TEST_CASE_METHOD(LVGLTestFixture, "ObserverGuard move semantics transfer ownersh
 
     callback_count.store(0);
     lv_subject_set_int(&subject, 100);
+    process_lvgl(10);
     REQUIRE(callback_count.load() == 0); // No callback after reset
 
     lv_subject_deinit(&subject);

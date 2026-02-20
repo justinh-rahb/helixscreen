@@ -12,6 +12,16 @@ _HELIX_SERVICE_SOURCED=1
 
 # SERVICE_NAME is defined in common.sh
 
+# Returns true if this process is running under the NoNewPrivileges systemd constraint.
+# When helix-screen self-updates, it spawns install.sh as a child process.  The
+# helixscreen.service unit has NoNewPrivileges=true, so ALL sudo calls in install.sh
+# will fail.  Callers use this to skip operations that require root (service file
+# copy, daemon-reload, systemctl start) and instead let update_checker.cpp restart
+# the process via exit(0), which the watchdog treats as "restart silently".
+_has_no_new_privs() {
+    [ -r /proc/self/status ] && grep -q '^NoNewPrivs:[[:space:]]*1' /proc/self/status 2>/dev/null
+}
+
 # Install service (dispatcher)
 # Calls install_service_systemd or install_service_sysv based on INIT_SYSTEM
 install_service() {
@@ -37,6 +47,20 @@ install_service_systemd() {
         exit 1
     fi
 
+    # Under NoNewPrivileges (self-update spawned by helix-screen), sudo is blocked and
+    # /etc/systemd/system/ is read-only in the service's mount namespace.  The service
+    # is already installed and correct — skip reinstall.  The process restart is handled
+    # by update_checker.cpp calling exit(0) after install.sh succeeds.
+    if _has_no_new_privs; then
+        if [ -f "$service_dest" ]; then
+            log_info "Skipping service reinstall (NoNewPrivileges; already installed)"
+            CLEANUP_SERVICE=true
+            return 0
+        fi
+        log_error "Service not installed and NoNewPrivileges prevents installation"
+        exit 1
+    fi
+
     $SUDO cp "$service_src" "$service_dest"
 
     # Template placeholders (match SysV pattern in install_service_sysv)
@@ -58,8 +82,40 @@ install_service_systemd() {
         exit 1
     fi
 
+    # Install update watcher (restarts helixscreen after Moonraker web-type update)
+    # Workaround for mainsail-crew/mainsail#2444: type: web lacks managed_services
+    install_update_watcher_systemd
+
     CLEANUP_SERVICE=true
     log_success "Installed systemd service"
+}
+
+# Install systemd path unit that restarts helixscreen after Moonraker extracts an update
+install_update_watcher_systemd() {
+    local path_src="${INSTALL_DIR}/config/helixscreen-update.path"
+    local svc_src="${INSTALL_DIR}/config/helixscreen-update.service"
+    local path_dest="/etc/systemd/system/helixscreen-update.path"
+    local svc_dest="/etc/systemd/system/helixscreen-update.service"
+
+    if [ ! -f "$path_src" ] || [ ! -f "$svc_src" ]; then
+        log_info "Update watcher units not found, skipping"
+        return 0
+    fi
+
+    local install_dir="${INSTALL_DIR:-/opt/helixscreen}"
+
+    $SUDO cp "$path_src" "$path_dest"
+    $SUDO cp "$svc_src" "$svc_dest"
+
+    # Template the install directory path
+    $SUDO sed -i "s|@@INSTALL_DIR@@|${install_dir}|g" "$path_dest" 2>/dev/null || \
+    $SUDO sed -i '' "s|@@INSTALL_DIR@@|${install_dir}|g" "$path_dest" 2>/dev/null || true
+
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl enable helixscreen-update.path 2>/dev/null || true
+    $SUDO systemctl start helixscreen-update.path 2>/dev/null || true
+
+    log_info "Installed update watcher (helixscreen-update.path)"
 }
 
 # Install SysV init script
@@ -101,6 +157,14 @@ start_service() {
 start_service_systemd() {
     log_info "Enabling and starting HelixScreen (systemd)..."
 
+    # Under NoNewPrivileges, systemctl is blocked.  The restart is handled by
+    # update_checker.cpp: it calls exit(0) after we return, which the watchdog
+    # treats as "normal exit — restart silently".
+    if _has_no_new_privs; then
+        log_info "Skipping service start (NoNewPrivileges; restart via watchdog)"
+        return 0
+    fi
+
     if ! $SUDO systemctl enable "$SERVICE_NAME"; then
         log_error "Failed to enable ${SERVICE_NAME} service."
         exit 1
@@ -116,7 +180,7 @@ start_service_systemd() {
     local i
     for i in 1 2 3 4 5; do
         sleep 1
-        if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
+        if systemctl is-active --quiet "$SERVICE_NAME"; then
             log_success "HelixScreen is running!"
             return
         fi
@@ -166,9 +230,12 @@ deploy_platform_hooks() {
         return 0
     fi
 
-    $SUDO mkdir -p "${install_dir}/platform"
-    $SUDO cp "$hooks_src" "${install_dir}/platform/hooks.sh"
-    $SUDO chmod +x "${install_dir}/platform/hooks.sh"
+    # Try without sudo first: during self-update INSTALL_DIR is pi-owned so no root
+    # is needed.  Fall back to sudo for fresh installs where the directory may be
+    # root-owned or not yet created.
+    mkdir -p "${install_dir}/platform" 2>/dev/null || $SUDO mkdir -p "${install_dir}/platform"
+    cp "$hooks_src" "${install_dir}/platform/hooks.sh" 2>/dev/null || $SUDO cp "$hooks_src" "${install_dir}/platform/hooks.sh"
+    chmod +x "${install_dir}/platform/hooks.sh" 2>/dev/null || $SUDO chmod +x "${install_dir}/platform/hooks.sh"
     log_info "Deployed platform hooks: $platform"
 }
 
@@ -187,7 +254,7 @@ fix_install_ownership() {
 # Stop service for update
 stop_service() {
     if [ "$INIT_SYSTEM" = "systemd" ]; then
-        if $SUDO systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
             log_info "Stopping existing HelixScreen service (systemd)..."
             $SUDO systemctl stop "$SERVICE_NAME" || true
         fi

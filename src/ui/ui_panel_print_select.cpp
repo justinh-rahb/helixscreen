@@ -954,7 +954,8 @@ void PrintSelectPanel::process_metadata_result(size_t i, const std::string& file
     // This reduces download size while ensuring adequate resolution
     helix::ThumbnailTarget target = helix::ThumbnailProcessor::get_target_for_display();
     const ThumbnailInfo* best_thumb = metadata.get_best_thumbnail(target.width, target.height);
-    std::string thumb_path = best_thumb ? best_thumb->relative_path : "";
+    std::string thumb_path =
+        resolve_thumbnail_path(best_thumb ? best_thumb->relative_path : "", current_path_);
 
     // Include predicted pre-print overhead (heating, homing, bed mesh, etc.)
     // in the total time estimate so users see realistic wall-clock time
@@ -1339,6 +1340,13 @@ void PrintSelectPanel::on_activate() {
         get_name(), first_activation_, file_list_.size(), is_usb_active, (api_ != nullptr),
         files_changed_while_detail_open_);
 
+    // ALWAYS resume polling while panel is visible (must be before early returns)
+    if (file_poll_timer_) {
+        lv_timer_resume(file_poll_timer_);
+        lv_timer_reset(file_poll_timer_); // Reset so first poll is a full interval from now
+        spdlog::trace("[{}] File list polling resumed", get_name());
+    }
+
     // Skip refresh when returning from detail view if no files changed
     // This preserves scroll position by avoiding unnecessary repopulate
     if (!first_activation_ && !file_list_.empty() && !files_changed_while_detail_open_) {
@@ -1375,13 +1383,6 @@ void PrintSelectPanel::on_activate() {
         if (usb_source_) {
             usb_source_->refresh_files();
         }
-    }
-
-    // Resume file list polling while panel is visible
-    if (file_poll_timer_) {
-        lv_timer_resume(file_poll_timer_);
-        lv_timer_reset(file_poll_timer_); // Reset so first poll is a full interval from now
-        spdlog::trace("[{}] File list polling resumed", get_name());
     }
 }
 

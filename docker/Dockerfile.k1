@@ -48,6 +48,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libtool \
     flex \
     bison \
+    ccache \
     && rm -rf /var/lib/apt/lists/*
 
 # Download Bootlin's mips32el musl toolchain (stable-2024.02-1)

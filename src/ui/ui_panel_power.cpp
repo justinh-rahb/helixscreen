@@ -5,12 +5,15 @@
 
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
+#include "ui_led_chip_factory.h"
 #include "ui_nav_manager.h"
 #include "ui_panel_common.h"
 #include "ui_subject_registry.h"
+#include "ui_update_queue.h"
 #include "ui_utils.h"
 
 #include "app_globals.h"
+#include "config.h"
 #include "device_display_name.h"
 #include "moonraker_api.h"
 #include "printer_state.h"
@@ -18,6 +21,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -27,6 +31,7 @@ using namespace helix;
 PowerPanel::PowerPanel(PrinterState& printer_state, MoonrakerAPI* api)
     : PanelBase(printer_state, api) {
     std::snprintf(status_buf_, sizeof(status_buf_), "Loading devices...");
+    load_selected_devices();
 }
 
 PowerPanel::~PowerPanel() {
@@ -86,6 +91,7 @@ void PowerPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
         device_list_container_ = lv_obj_find_by_name(overlay_content, "device_list");
         empty_state_container_ = lv_obj_find_by_name(overlay_content, "empty_state");
         status_label_ = lv_obj_find_by_name(overlay_content, "status_message");
+        chip_container_ = lv_obj_find_by_name(overlay_content, "power_chip_container");
     }
 
     if (!device_list_container_) {
@@ -134,6 +140,9 @@ void PowerPanel::clear_device_list() {
 void PowerPanel::populate_device_list(const std::vector<PowerDevice>& devices) {
     clear_device_list();
 
+    // Notify about discovered devices (for selection config)
+    on_devices_discovered(devices);
+
     bool has_devices = !devices.empty();
 
     // Toggle visibility: show device list OR empty state
@@ -161,6 +170,9 @@ void PowerPanel::populate_device_list(const std::vector<PowerDevice>& devices) {
     for (const auto& device : devices) {
         create_device_row(device);
     }
+
+    // Populate chip selector for home button
+    populate_device_chips();
 
     // Clear status message on success
     status_buf_[0] = '\0';
@@ -275,8 +287,9 @@ void PowerPanel::on_power_device_toggle(lv_event_t* e) {
     if (!toggle) {
         spdlog::warn("[PowerPanel] No target in toggle event");
     } else {
-        // Navigate from toggle to parent row to get DeviceRow index
-        lv_obj_t* row = lv_obj_get_parent(toggle);
+        // Navigate from toggle → right container → power_device_row root (has user_data)
+        lv_obj_t* right_container = lv_obj_get_parent(toggle);
+        lv_obj_t* row = right_container ? lv_obj_get_parent(right_container) : nullptr;
         if (!row) {
             spdlog::warn("[PowerPanel] Toggle has no parent row");
         } else {
@@ -302,6 +315,139 @@ void PowerPanel::on_power_device_toggle(lv_event_t* e) {
     }
 
     LVGL_SAFE_EVENT_CB_END();
+}
+
+void PowerPanel::load_selected_devices() {
+    Config* config = Config::get_instance();
+    if (!config) {
+        spdlog::warn("[{}] No config available for loading selected devices", get_name());
+        return;
+    }
+
+    auto devices = config->get<std::vector<std::string>>("/printer/power/selected_devices",
+                                                         std::vector<std::string>{});
+    if (devices.empty()) {
+        // No config exists yet - will auto-select all on first discovery
+        config_loaded_ = false;
+        spdlog::debug("[{}] No selected_devices config found (will auto-select on discovery)",
+                      get_name());
+        return;
+    }
+
+    selected_devices_ = devices;
+    config_loaded_ = true;
+    spdlog::debug("[{}] Loaded {} selected devices from config", get_name(),
+                  selected_devices_.size());
+}
+
+void PowerPanel::set_selected_devices(const std::vector<std::string>& devices) {
+    selected_devices_ = devices;
+
+    Config* config = Config::get_instance();
+    if (config) {
+        config->set("/printer/power/selected_devices", devices);
+        config->save();
+        spdlog::debug("[{}] Saved {} selected devices to config", get_name(), devices.size());
+    }
+}
+
+void PowerPanel::on_devices_discovered(const std::vector<PowerDevice>& devices) {
+    // Update discovered device list
+    discovered_devices_.clear();
+    for (const auto& d : devices) {
+        discovered_devices_.push_back(d.device);
+    }
+
+    if (!config_loaded_) {
+        // First time: auto-select all devices
+        selected_devices_ = discovered_devices_;
+        set_selected_devices(selected_devices_); // Persist
+        spdlog::info("[{}] Auto-selected all {} discovered devices", get_name(),
+                     selected_devices_.size());
+    } else {
+        // Prune stale devices that no longer exist
+        std::set<std::string> discovered_set(discovered_devices_.begin(),
+                                             discovered_devices_.end());
+        std::vector<std::string> pruned;
+        for (const auto& d : selected_devices_) {
+            if (discovered_set.count(d) > 0) {
+                pruned.push_back(d);
+            }
+        }
+        if (pruned.size() != selected_devices_.size()) {
+            spdlog::info("[{}] Pruned {} stale devices from selection", get_name(),
+                         selected_devices_.size() - pruned.size());
+            set_selected_devices(pruned); // Save pruned list
+        }
+    }
+}
+
+void PowerPanel::populate_device_chips() {
+    if (!chip_container_)
+        return;
+
+    // Defer to avoid re-entrancy from chip click handler
+    helix::ui::queue_update([this]() { populate_device_chips_impl(); });
+}
+
+void PowerPanel::populate_device_chips_impl() {
+    if (!chip_container_)
+        return;
+
+    lv_obj_clean(chip_container_);
+
+    std::set<std::string> selected_set(selected_devices_.begin(), selected_devices_.end());
+
+    for (const auto& device : discovered_devices_) {
+        bool is_selected = selected_set.count(device) > 0;
+        std::string display_name = helix::get_display_name(device, helix::DeviceType::POWER_DEVICE);
+
+        helix::ui::create_led_chip(chip_container_, device, display_name, is_selected,
+                                   [this](const std::string& name) { handle_chip_clicked(name); });
+    }
+
+    spdlog::debug("[{}] Populated {} device chips ({} selected)", get_name(),
+                  discovered_devices_.size(), selected_devices_.size());
+}
+
+void PowerPanel::handle_chip_clicked(const std::string& device_name) {
+    // Toggle selection
+    auto it = std::find(selected_devices_.begin(), selected_devices_.end(), device_name);
+    if (it != selected_devices_.end()) {
+        selected_devices_.erase(it);
+    } else {
+        selected_devices_.push_back(device_name);
+    }
+
+    // Save immediately
+    set_selected_devices(selected_devices_);
+
+    // Rebuild chips to update visual state
+    populate_device_chips();
+}
+
+lv_obj_t* PowerPanel::get_or_create_overlay(lv_obj_t* parent_screen) {
+    if (cached_overlay_)
+        return cached_overlay_;
+
+    if (!parent_screen)
+        return nullptr;
+
+    if (!are_subjects_initialized()) {
+        init_subjects();
+    }
+
+    auto* obj =
+        static_cast<lv_obj_t*>(lv_xml_create(parent_screen, get_xml_component_name(), nullptr));
+    if (!obj) {
+        spdlog::error("[{}] Failed to create overlay from XML", get_name());
+        return nullptr;
+    }
+
+    setup(obj, parent_screen);
+    NavigationManager::instance().register_overlay_instance(obj, this);
+    cached_overlay_ = obj;
+    return cached_overlay_;
 }
 
 // Global instance accessor

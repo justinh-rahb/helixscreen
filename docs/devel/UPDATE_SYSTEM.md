@@ -411,6 +411,83 @@ Configure HelixScreen:
 }
 ```
 
+### End-to-End Self-Update Testing on Device
+
+Use `scripts/serve-local-update.sh` to drive the complete download → install → restart
+cycle without publishing a real release. See the script's `--help` for full setup.
+
+**Quick setup (once per device):**
+
+```bash
+export HELIX_TEST_PRINTER=helixscreen.local   # device hostname or IP
+export HELIX_TEST_USERNAME=pi                  # SSH username
+
+# Configures dev channel, copies install.sh to /tmp/, enables debug logging
+./scripts/serve-local-update.sh --configure-remote
+```
+
+**Two testing paths:**
+
+| Path | Command | When to use |
+|------|---------|-------------|
+| Via update checker | Trigger from Settings → About → Check for Updates | Tests the full self-update flow |
+| Direct local install | `ssh USER@PRINTER 'sh /tmp/install.sh --local /tmp/helixscreen-update.tar.gz'` | Tests install.sh in isolation, bypasses update checker |
+
+`--configure-remote` copies `install.sh` to `/tmp/` on the device automatically, enabling the direct path without an extra transfer step.
+
+#### The Two-Install Rule for `update_checker.cpp` Changes
+
+When you change `update_checker.cpp` (or any code that participates in the install flow),
+**two consecutive installs are required** before you can observe the effect of your change:
+
+| Install | Which binary runs the update? | What you see |
+|---------|-------------------------------|-------------|
+| First | The **old** binary — still in memory | Old update-checker behaviour. Your fix is on disk but not in the running process. |
+| Second | The **new** binary — restarted after first install | Your change is now live. |
+
+This is an inherent property of self-updating executables: the running process cannot
+replace its own instructions mid-flight. Linux keeps the old inode in memory even after
+`install.sh` swaps the file on disk. Only after the process exits and the watchdog restarts
+it does the new binary take over.
+
+**Practical workflow:**
+```bash
+# Serve the build (--no-build reuses the last tarball for fast iteration)
+./scripts/serve-local-update.sh --no-build
+
+# On device: trigger update from Settings → About → Check for Updates
+# → install completes, helix-screen restarts (1st install done, new binary running)
+
+# Trigger update again from the UI  ← this is the one that exercises your change
+```
+
+`serve-local-update.sh` always serves version `99.0.0`, which is higher than any real
+binary version, so the freshly restarted binary immediately sees a pending update and
+lets you trigger the second install right away.
+
+#### Monitoring Logs on Device
+
+The service writes all output — launcher, watchdog, and app — to the systemd journal.
+Use `-u helixscreen` (unit name) rather than `-t` (syslog identifier) to capture
+everything, including install.sh lines forwarded through update_checker:
+
+```bash
+# Follow live, surviving service restarts
+journalctl -u helixscreen -f
+
+# Start from the last 50 lines (useful after the service has already been running)
+journalctl -u helixscreen -f -n 50
+
+# Dump the entire current boot session (offline analysis)
+journalctl -u helixscreen -b
+```
+
+> **Note:** `journalctl -t helix -f` filters by syslog identifier, not unit name, and
+> may show no output if the identifier doesn't match exactly. Stick with `-u helixscreen`.
+
+`journalctl -f` continues across service restarts automatically — you don't need to
+rerun it after the watchdog brings the new binary up.
+
 ### Unit Tests
 
 - `tests/unit/test_update_checker.cpp` — Version comparison, JSON parsing, status enums, lifecycle, subjects, dismissed versions, auto-check timer

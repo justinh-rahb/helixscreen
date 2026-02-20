@@ -234,6 +234,8 @@ void ControlsPanel::init_subjects() {
     // Register V2 controls panel event callbacks (XML event_cb references)
     // Quick Actions: Home buttons
     lv_xml_register_event_cb(nullptr, "on_controls_home_all", on_home_all);
+    lv_xml_register_event_cb(nullptr, "on_controls_home_x", on_home_x);
+    lv_xml_register_event_cb(nullptr, "on_controls_home_y", on_home_y);
     lv_xml_register_event_cb(nullptr, "on_controls_home_xy", on_home_xy);
     lv_xml_register_event_cb(nullptr, "on_controls_home_z", on_home_z);
 
@@ -1058,7 +1060,69 @@ void ControlsPanel::handle_home_all() {
                 helix::ui::async_call(
                     [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
                     this);
-                NOTIFY_ERROR("Homing failed: {}", err.user_message());
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    NOTIFY_WARNING("Homing may still be running — response timed out");
+                } else {
+                    NOTIFY_ERROR("Homing failed: {}", err.user_message());
+                }
+            });
+    }
+}
+
+void ControlsPanel::handle_home_x() {
+    spdlog::debug("[{}] Home X clicked", get_name());
+    if (operation_guard_.is_active()) {
+        NOTIFY_WARNING("Operation already in progress");
+        return;
+    }
+    if (api_) {
+        operation_guard_.begin(300000, [] { NOTIFY_WARNING("Homing timed out"); });
+        NOTIFY_INFO("Homing X...");
+        api_->home_axes(
+            "X",
+            [this]() {
+                helix::ui::async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+            },
+            [this](const MoonrakerError& err) {
+                helix::ui::async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    NOTIFY_WARNING("Homing may still be running — response timed out");
+                } else {
+                    NOTIFY_ERROR("Homing failed: {}", err.user_message());
+                }
+            });
+    }
+}
+
+void ControlsPanel::handle_home_y() {
+    spdlog::debug("[{}] Home Y clicked", get_name());
+    if (operation_guard_.is_active()) {
+        NOTIFY_WARNING("Operation already in progress");
+        return;
+    }
+    if (api_) {
+        operation_guard_.begin(300000, [] { NOTIFY_WARNING("Homing timed out"); });
+        NOTIFY_INFO("Homing Y...");
+        api_->home_axes(
+            "Y",
+            [this]() {
+                helix::ui::async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+            },
+            [this](const MoonrakerError& err) {
+                helix::ui::async_call(
+                    [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
+                    this);
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    NOTIFY_WARNING("Homing may still be running — response timed out");
+                } else {
+                    NOTIFY_ERROR("Homing failed: {}", err.user_message());
+                }
             });
     }
 }
@@ -1083,7 +1147,11 @@ void ControlsPanel::handle_home_xy() {
                 helix::ui::async_call(
                     [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
                     this);
-                NOTIFY_ERROR("Homing failed: {}", err.user_message());
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    NOTIFY_WARNING("Homing may still be running — response timed out");
+                } else {
+                    NOTIFY_ERROR("Homing failed: {}", err.user_message());
+                }
             });
     }
 }
@@ -1108,7 +1176,11 @@ void ControlsPanel::handle_home_z() {
                 helix::ui::async_call(
                     [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
                     this);
-                NOTIFY_ERROR("Homing failed: {}", err.user_message());
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    NOTIFY_WARNING("Homing may still be running — response timed out");
+                } else {
+                    NOTIFY_ERROR("Homing failed: {}", err.user_message());
+                }
             });
     }
 }
@@ -1134,8 +1206,13 @@ void ControlsPanel::handle_qgl() {
                 helix::ui::async_call(
                     [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
                     this);
-                NOTIFY_ERROR("QGL failed: {}", err.user_message());
-            });
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    NOTIFY_WARNING("QGL may still be running — response timed out");
+                } else {
+                    NOTIFY_ERROR("QGL failed: {}", err.user_message());
+                }
+            },
+            MoonrakerAPI::LEVELING_TIMEOUT_MS);
     }
 }
 
@@ -1160,8 +1237,13 @@ void ControlsPanel::handle_z_tilt() {
                 helix::ui::async_call(
                     [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },
                     this);
-                NOTIFY_ERROR("Z-Tilt failed: {}", err.user_message());
-            });
+                if (err.type == MoonrakerErrorType::TIMEOUT) {
+                    NOTIFY_WARNING("Z-Tilt may still be running — response timed out");
+                } else {
+                    NOTIFY_ERROR("Z-Tilt failed: {}", err.user_message());
+                }
+            },
+            MoonrakerAPI::LEVELING_TIMEOUT_MS);
     }
 }
 
@@ -1459,6 +1541,8 @@ PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, calibration_motors)
 // ============================================================================
 
 PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, home_all)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, home_x)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, home_y)
 PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, home_xy)
 PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, home_z)
 PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, qgl)

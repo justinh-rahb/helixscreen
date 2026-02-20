@@ -77,6 +77,7 @@ class AmsBackendHappyHare : public AmsBackend {
     [[nodiscard]] PathSegment get_filament_segment() const override;
     [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
+    [[nodiscard]] bool slot_has_prep_sensor(int slot_index) const override;
 
     // Operations
     AmsError load_filament(int slot_index) override;
@@ -98,7 +99,7 @@ class AmsBackendHappyHare : public AmsBackend {
     AmsError cancel() override;
 
     // Configuration
-    AmsError set_slot_info(int slot_index, const SlotInfo& info) override;
+    AmsError set_slot_info(int slot_index, const SlotInfo& info, bool persist = true) override;
     AmsError set_tool_mapping(int tool_number, int slot_index) override;
 
     // Bypass mode
@@ -236,6 +237,16 @@ class AmsBackendHappyHare : public AmsBackend {
      */
     AmsError validate_slot_index(int gate_index) const;
 
+    /**
+     * @brief Query configfile.settings.mmu to determine tip method
+     *
+     * Reads form_tip_macro from Happy Hare config via Moonraker.
+     * If macro name contains "cut", sets TipMethod::CUT (e.g., _MMU_CUT_TIP).
+     * Otherwise sets TipMethod::TIP_FORM (e.g., _MMU_FORM_TIP).
+     * Called once during start().
+     */
+    void query_tip_method_from_config();
+
     // Dependencies
     MoonrakerAPI* api_;              ///< For sending G-code commands
     helix::MoonrakerClient* client_; ///< For subscribing to updates
@@ -254,6 +265,13 @@ class AmsBackendHappyHare : public AmsBackend {
     // Path visualization state
     int filament_pos_{0};                          ///< Happy Hare filament_pos value
     PathSegment error_segment_{PathSegment::NONE}; ///< Inferred error location
+
+    // Per-gate sensor state (from printer.mmu.sensors dict)
+    struct GateSensorState {
+        bool has_pre_gate_sensor = false; ///< Pre-gate sensor configured for this gate
+        bool pre_gate_triggered = false; ///< Pre-gate sensor currently triggered (filament present)
+    };
+    std::vector<GateSensorState> gate_sensors_;
 
     // Error state tracking
     std::string reason_for_pause_; ///< Last reason_for_pause from MMU (descriptive error text)

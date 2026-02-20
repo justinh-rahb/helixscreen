@@ -1,11 +1,13 @@
 # LVGL XML Licensing and Future Situation
 
-**Date:** 2026-02-05
-**Status:** Critical information for project planning
+**Date:** 2026-02-05 | **Updated:** 2026-02-18
+**Status:** RESOLVED — XML extracted into `lib/helix-xml/`, LVGL upgraded to v9.5.0
 
 ## Summary
 
 LVGL removed XML support from the core library on January 27, 2026. The XML functionality is now part of **LVGL Pro**, a paid subscription product. HelixScreen relies heavily on XML for its entire UI system.
+
+**Resolution (2026-02-18):** We extracted the MIT-licensed XML engine into `lib/helix-xml/` as a standalone library and upgraded LVGL to v9.5.0. See `docs/devel/plans/2026-02-18-helix-xml-plan.md` for full details.
 
 ## Timeline
 
@@ -95,17 +97,18 @@ LVGL then developed their own tooling (LVGL Pro) and is now monetizing it.
 
 ## Patches We Maintain
 
-Note: We maintain several patches against LVGL in `patches/`:
-- `lvgl_sdl_window.patch` - Window title, positioning, quit handling
+After the v9.5 upgrade, remaining LVGL patches in `patches/`:
+- `lvgl_sdl_window.patch` - Window title, positioning, quit handling (regenerated for v9.5)
 - `lvgl_theme_breakpoints.patch` - Theme breakpoints
-- `lvgl_image_parser_contain.patch` - Image contain/cover
-- `lvgl_translate_percent.patch` - Translate percentages
 - `lvgl_fbdev_stride_bpp.patch` - Framebuffer fixes
-- `lvgl_xml_const_silent.patch` - XML const lookup
 - `lvgl_observer_debug.patch` - Observer debugging
 - `lvgl_slider_scroll_chain.patch` - Slider scroll fix
+- `lvgl_strdup_null_guard.patch` - Null guard for strdup
 
-If we upgrade LVGL, these patches may need regeneration (as we just discovered with the SDL window patch).
+XML patches were baked permanently into `lib/helix-xml/` and removed from `patches/`:
+- ~~`lvgl_xml_const_silent.patch`~~ - XML const lookup (baked in)
+- ~~`lvgl_image_parser_contain.patch`~~ - Image contain/cover (baked in)
+- ~~`lvgl_translate_percent.patch`~~ - Translate percentages (baked in)
 
 ## What We're Missing (274 commits)
 
@@ -228,13 +231,20 @@ Memory leak and crash fixes. **lodepng leak** (`964b0220a`) fixes memory not bei
 
 - `6da0773e2` **feat(calendar): add 2026 to header** (#9630) - lol
 
-## Recommendation
+## Resolution
 
-**Short term:** Upgrade to `a15dcbeb5` to get 2.5 months of bug fixes and features while keeping XML.
+**Chosen approach: Option 5 — Extract XML + Upgrade LVGL** (2026-02-18)
 
-**Long term:** Monitor LVGL Pro pricing and evaluate whether:
-- The subscription cost is acceptable
-- We want to fork and maintain XML ourselves
-- A gradual migration to pure C++ makes sense
+We extracted the MIT-licensed XML engine into `lib/helix-xml/` and upgraded LVGL to v9.5.0. This gives us:
+- Full ownership of the XML engine with MIT license
+- All 274 commits of LVGL improvements (blur, drop shadow, flex fixes, memory leak fixes, etc.)
+- No dependency on LVGL Pro or its subscription model
+- Collaboration path with lui-xml (Kevin/coevin) for future improvements
 
-This is a significant architectural decision that shouldn't be rushed.
+**Branch:** `feature/helix-xml` | **Plan:** `docs/devel/plans/2026-02-18-helix-xml-plan.md`
+
+### Previous Recommendation (obsolete)
+
+~~**Short term:** Upgrade to `a15dcbeb5` to get 2.5 months of bug fixes and features while keeping XML.~~
+
+~~**Long term:** Monitor LVGL Pro pricing and evaluate whether the subscription cost is acceptable, we want to fork and maintain XML ourselves, or a gradual migration to pure C++ makes sense.~~

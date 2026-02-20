@@ -9,6 +9,7 @@
 #include "ui_panel_calibration_pid.h"
 #include "ui_panel_console.h"
 #include "ui_panel_macros.h"
+#include "ui_panel_power.h"
 #include "ui_panel_spoolman.h"
 #include "ui_toast_manager.h"
 
@@ -73,6 +74,7 @@ void AdvancedPanel::init_subjects() {
     lv_xml_register_event_cb(nullptr, "on_phase_tracking_changed", on_phase_tracking_changed);
     lv_xml_register_event_cb(nullptr, "on_pid_tuning_clicked", on_pid_tuning_clicked);
     lv_xml_register_event_cb(nullptr, "on_timelapse_setup_clicked", on_timelapse_setup_clicked);
+    lv_xml_register_event_cb(nullptr, "on_power_row_clicked", on_power_row_clicked);
 
     // Note: Input shaping uses on_input_shaper_row_clicked registered by InputShaperPanel
     // Note: Restart row doesn't exist - restart buttons have their own callbacks in
@@ -140,6 +142,18 @@ void AdvancedPanel::handle_history_clicked() {
         "Print History", get_name());
 }
 
+void AdvancedPanel::handle_power_clicked() {
+    spdlog::debug("[{}] Power clicked - opening panel", get_name());
+
+    auto& panel = get_global_power_panel();
+    lv_obj_t* overlay = panel.get_or_create_overlay(parent_screen_);
+    if (overlay) {
+        NavigationManager::instance().push_overlay(overlay);
+    } else {
+        spdlog::error("[{}] Failed to open Power panel", get_name());
+    }
+}
+
 void AdvancedPanel::handle_configure_print_start_clicked() {
     spdlog::debug("[{}] Configure PRINT_START clicked", get_name());
 
@@ -195,6 +209,10 @@ void AdvancedPanel::on_console_clicked(lv_event_t* /*e*/) {
 
 void AdvancedPanel::on_history_clicked(lv_event_t* /*e*/) {
     get_global_advanced_panel().handle_history_clicked();
+}
+
+void AdvancedPanel::on_power_row_clicked(lv_event_t* /*e*/) {
+    get_global_advanced_panel().handle_power_clicked();
 }
 
 void AdvancedPanel::on_configure_print_start_clicked(lv_event_t* /*e*/) {

@@ -149,6 +149,7 @@ class PrinterDiscovery {
                 if (upper_pin.find("LIGHT") != std::string::npos ||
                     upper_pin.find("LED") != std::string::npos ||
                     upper_pin.find("LAMP") != std::string::npos) {
+                    leds_.push_back(name);
                     has_led_ = true;
                 }
                 // Speaker/buzzer detection for M300 support

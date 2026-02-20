@@ -118,6 +118,16 @@ void ui_system_path_canvas_set_status_text(lv_obj_t* obj, const char* text);
 void ui_system_path_canvas_set_bypass(lv_obj_t* obj, bool has_bypass, bool bypass_active,
                                       uint32_t bypass_color);
 
+/// Set whether an external spool is assigned to bypass
+void ui_system_path_canvas_set_bypass_has_spool(lv_obj_t* obj, bool has_spool);
+
+/// Callback type for bypass spool clicks
+typedef void (*system_path_bypass_cb_t)(void* user_data);
+
+/// Set callback for when the bypass spool box is clicked
+void ui_system_path_canvas_set_bypass_callback(lv_obj_t* obj, system_path_bypass_cb_t cb,
+                                               void* user_data);
+
 /**
  * @brief Set per-unit hub sensor state
  *
@@ -195,6 +205,19 @@ void ui_system_path_canvas_set_active_tool(lv_obj_t* obj, int tool_index);
  * @param tool_index Virtual tool index, or -1 for none
  */
 void ui_system_path_canvas_set_current_tool(lv_obj_t* obj, int tool_index);
+
+/**
+ * @brief Set virtual tool numbers for badge labels
+ *
+ * Maps physical nozzle positions to AFC virtual tool numbers for display.
+ * When set, tool badges show the virtual number (e.g., "T4") instead of
+ * the physical position index (e.g., "T1").
+ *
+ * @param obj The system_path_canvas widget
+ * @param numbers Array of virtual tool numbers (one per physical tool)
+ * @param count Number of entries in the array
+ */
+void ui_system_path_canvas_set_tool_virtual_numbers(lv_obj_t* obj, const int* numbers, int count);
 
 /**
  * @brief Force redraw of the path visualization

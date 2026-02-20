@@ -139,6 +139,7 @@ MDI_ICONS+=",0xF04B2"    # sleep (moon/zzz)
 MDI_ICONS+=",0xF04C5"    # speedometer
 MDI_ICONS+=",0xF04DB"    # stop
 MDI_ICONS+=",0xF04E2"    # swap-vertical
+MDI_ICONS+=",0xF06E4"    # infinity (endless spool)
 MDI_ICONS+=",0xF04E6"    # sync (auto-detect)
 MDI_ICONS+=",0xF050F"    # thermometer
 MDI_ICONS+=",0xF054C"    # undo (counter-clockwise arrow - for loosen)
@@ -181,6 +182,7 @@ MDI_ICONS+=",0xF02C2"    # grid-off (no mesh empty state)
 MDI_ICONS+=",0xF0770"    # folder-open
 MDI_ICONS+=",0xF0792"    # arrow-collapse-down (flow-down)
 MDI_ICONS+=",0xF0CE1"    # arrow-up-circle (load/activate)
+MDI_ICONS+=",0xF0901"    # power-cycle
 MDI_ICONS+=",0xF0907"    # rabbit (Happy Hare logo)
 MDI_ICONS+=",0xF0796"    # arrow-expand-down (bed drops - CoreXY Z closer)
 MDI_ICONS+=",0xF0795"    # arrow-collapse-up (flow-up)
@@ -281,7 +283,7 @@ MDI_ICONS+=",0xF0632"    # apple-keyboard-caps (caps lock indicator)
 MDI_ICONS+=",0xF0636"    # apple-keyboard-shift (shift key outline)
 
 # Sizes to generate - matching text font sizes for consistent UI
-SIZES="16 24 32 48 64"
+SIZES="14 16 24 32 48 64"
 
 echo "Generating Material Design Icons fonts for LVGL..."
 echo "  Font: $FONT"

@@ -5,6 +5,108 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.10] - 2026-02-19
+
+### Added
+- Output pin LED backend for brightness-only chamber lights and enclosure LEDs — auto-detects `[output_pin]` devices with PWM slider or on/off toggle
+- Individual X and Y homing buttons in controls quick actions
+- Clear Spool context menu action for assigned-but-empty AMS slots
+- AFC version warning when firmware is below v1.0.35
+- Configurable Allwinner backlight ENABLE/DISABLE ioctls for broader SBC compatibility
+- Udev and polkit rules for non-root backlight and Wi-Fi access on Pi
+
+### Fixed
+- Self-update under systemd NoNewPrivileges — installer now correctly skips privileged operations during in-place updates
+- Installer preserves settings.json, helixscreen.env, and config across updates
+- Render thread crash from NULL draw buffer race condition
+- AFC unit topology now uses name-based matching instead of fragile index ordering
+- Toolchanger uses SELECT_TOOL instead of ASSIGN_TOOL to avoid remapping
+- Thumbnail paths resolved correctly for files in subdirectories
+- File browser poll timer resumes after returning to print selection panel
+- Timeouts added to long-running G-code calls to prevent UI hangs
+- Systemd service dependency cycle from multi-user.target removed
+- Self-restart uses `_exit(0)` instead of `exit(0)` to avoid background thread races
+- Mock sensor dots restored for AMS prep sensors
+
+### Changed
+- Update check cooldown reduced from 60 minutes to 10 minutes
+- SDL display hints cleaned up for better cross-platform performance
+
+## [0.10.9] - 2026-02-19
+
+### Added
+- AMS sensor error states with visual indicators for hub, extruder, and lane sensor faults
+- Happy Hare pre-gate sensor support for filament detection at each gate
+- External tool change step progress detection — swaps and loads initiated from gcode or other UIs now show correct progress steps
+
+### Fixed
+- AFC gcode commands corrected to match actual AFC-Klipper-Add-On API: `CHANGE_TOOL`, `TOOL_UNLOAD`, `SET_MAP`, `RESET_FAILURE`, and `SET_BOWDEN_LENGTH` now use correct command names and parameters
+- AFC per-lane commands (`SET_LONG_MOVE_SPEED`, `AFC_RESET_MOTOR_TIME`) now apply to all lanes instead of only the first
+- AFC bowden length per-extruder now maps through unit membership to find the correct hub
+- AMS mini status widget fills available height in multi-unit stacked layouts
+- AMS tool badge labels use pre-formatted buffers with auto-sized badge width
+- AMS backend skipped for tool changes when backend doesn't manage the tool
+- AMS nozzle count corrected for mixed topology with unique per-lane tool mappings
+- Happy Hare tip method detection reads from configfile on startup
+- Mock mixed topology corrected to match real hardware (Box Turtle=HUB, AMS_2=PARALLEL)
+- Worktree setup script auto-detects worktree when run without arguments
+
+## [0.10.8] - 2026-02-19
+
+### Added
+- Debug bundle now collects Moonraker state, config, and Klipper/Moonraker logs via REST API
+- PII sanitization in debug bundles for emails, API tokens, webhook URLs, and MAC addresses
+
+### Fixed
+- Crash from running animations when navigating away from a panel (#128)
+- Crash from NULL font pointer during AMS bar layout rebuild
+- Crash from stale async callbacks in gcode viewer
+- Systemd update watcher stuck in infinite restart loop due to PathExists check
+- Debug bundle log fetching handles HTTP 416 Range Not Satisfiable responses
+
+## [0.10.7] - 2026-02-18
+
+### Fixed
+- AMS context menu UX: hidden tool dropdown, auto-close on backup select, conflict toast, and infinity icon for unlimited backup
+- AMS Load/Unload/Eject buttons now work correctly from context menu
+- AMS filament sensor toasts suppressed during active load/unload operations
+- AFC `SET_RUNOUT` parameter corrected from `RUNOUT_LANE` to `RUNOUT`
+- AFC 'Loaded' hub status correctly mapped to available instead of loaded
+- AFC tip method detection from config with inline comment stripping
+- Spoolman polling log noise suppressed unless spool weights actually changed
+- Touch calibration wizard disabled ABS mismatch override for HDMI devices
+- Power device probe no longer shows error toast on printers without power component
+- Moonraker update manager switched from `type: zip` to `type: web` with systemd restart watcher
+
+### Changed
+- Removed dead AmsSlotEditPopup code replaced by context menu
+
+## [0.10.6] - 2026-02-18
+
+### Fixed
+- Infinite CPU loop when saving Spoolman spool assignments on AFC and Happy Hare systems — Spoolman weight polling now updates slot state without sending G-code back to firmware, breaking a feedback cycle that saturated the CPU
+
+## [0.10.5] - 2026-02-18
+
+### Added
+- **Android port**: Initial Android build system with CMake/Gradle, APK asset extraction, SDL fullscreen, and CI release pipeline
+- **Power panel**: Moonraker power device control with home panel toggle and advanced menu integration
+- Widget-safe async callback utilities for LVGL event handling
+
+### Fixed
+- AMS crash on quit from unjoinable scenario/dryer threads
+- AMS right column capped at 200px max width for proper flex layout
+- AMS tool count, hub sensor, and status corrected for mixed-topology AFC
+- AMS current slot label improved for multi-unit and tool changer displays
+- AMS 'Tooled' status handled correctly with production data regression tests
+- Gcode viewer SEGV from unsafe async callback
+- History totals computed from job list instead of hardcoded mock values
+- Update check errors now visible in settings UI
+- Installer uses printf for ANSI escapes instead of echo for POSIX compliance
+
+### Changed
+- Test output cleaned up: ~637 spurious warning/error lines silenced
+
 ## [0.10.4] - 2026-02-18
 
 Slicer-preferred progress, Klipper M117 display messages, interactive AMS toolheads, and a batch of AMS rendering and stability fixes.
@@ -711,6 +813,12 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.10.10]: https://github.com/prestonbrown/helixscreen/compare/v0.10.9...v0.10.10
+[0.10.9]: https://github.com/prestonbrown/helixscreen/compare/v0.10.8...v0.10.9
+[0.10.8]: https://github.com/prestonbrown/helixscreen/compare/v0.10.7...v0.10.8
+[0.10.7]: https://github.com/prestonbrown/helixscreen/compare/v0.10.6...v0.10.7
+[0.10.6]: https://github.com/prestonbrown/helixscreen/compare/v0.10.5...v0.10.6
+[0.10.5]: https://github.com/prestonbrown/helixscreen/compare/v0.10.4...v0.10.5
 [0.10.4]: https://github.com/prestonbrown/helixscreen/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/prestonbrown/helixscreen/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/prestonbrown/helixscreen/compare/v0.10.1...v0.10.2

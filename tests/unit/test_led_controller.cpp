@@ -695,3 +695,123 @@ TEST_CASE("LedController: light_toggle and light_is_on", "[led][controller]") {
 
     ctrl.deinit();
 }
+
+// ============================================================================
+// OutputPinBackend tests
+// ============================================================================
+
+TEST_CASE("OutputPinBackend: enum value and is_pwm field", "[led][output_pin]") {
+    helix::led::LedStripInfo info;
+    info.backend = helix::led::LedBackendType::OUTPUT_PIN;
+    REQUIRE(info.backend == helix::led::LedBackendType::OUTPUT_PIN);
+    REQUIRE(info.is_pwm == false);
+    info.is_pwm = true;
+    REQUIRE(info.is_pwm == true);
+}
+
+TEST_CASE("OutputPinBackend: strip management", "[led][output_pin]") {
+    helix::led::OutputPinBackend backend;
+    REQUIRE_FALSE(backend.is_available());
+    REQUIRE(backend.pins().empty());
+
+    helix::led::LedStripInfo pin;
+    pin.name = "Enclosure LEDs";
+    pin.id = "output_pin Enclosure_LEDs";
+    pin.backend = helix::led::LedBackendType::OUTPUT_PIN;
+    pin.supports_color = false;
+    pin.supports_white = false;
+    pin.is_pwm = true;
+
+    backend.add_pin(pin);
+    REQUIRE(backend.is_available());
+    REQUIRE(backend.pins().size() == 1);
+    REQUIRE(backend.pins()[0].name == "Enclosure LEDs");
+
+    backend.clear();
+    REQUIRE_FALSE(backend.is_available());
+}
+
+TEST_CASE("OutputPinBackend: cached value from status", "[led][output_pin]") {
+    helix::led::OutputPinBackend backend;
+    helix::led::LedStripInfo pin;
+    pin.id = "output_pin test_led";
+    pin.backend = helix::led::LedBackendType::OUTPUT_PIN;
+    backend.add_pin(pin);
+
+    REQUIRE(backend.get_value("output_pin test_led") == Catch::Approx(0.0));
+
+    nlohmann::json status = {{"output_pin test_led", {{"value", 0.75}}}};
+    backend.update_from_status(status);
+
+    REQUIRE(backend.get_value("output_pin test_led") == Catch::Approx(0.75));
+}
+
+TEST_CASE("OutputPinBackend: is_on", "[led][output_pin]") {
+    helix::led::OutputPinBackend backend;
+    helix::led::LedStripInfo pin;
+    pin.id = "output_pin test_led";
+    backend.add_pin(pin);
+
+    REQUIRE_FALSE(backend.is_on("output_pin test_led"));
+
+    nlohmann::json status = {{"output_pin test_led", {{"value", 0.5}}}};
+    backend.update_from_status(status);
+    REQUIRE(backend.is_on("output_pin test_led"));
+
+    status = {{"output_pin test_led", {{"value", 0.0}}}};
+    backend.update_from_status(status);
+    REQUIRE_FALSE(backend.is_on("output_pin test_led"));
+}
+
+TEST_CASE("OutputPinBackend: brightness_pct", "[led][output_pin]") {
+    helix::led::OutputPinBackend backend;
+    helix::led::LedStripInfo pin;
+    pin.id = "output_pin test_led";
+    backend.add_pin(pin);
+
+    nlohmann::json status = {{"output_pin test_led", {{"value", 0.75}}}};
+    backend.update_from_status(status);
+    REQUIRE(backend.brightness_pct("output_pin test_led") == 75);
+}
+
+TEST_CASE("OutputPinBackend: is_pwm check", "[led][output_pin]") {
+    helix::led::OutputPinBackend backend;
+    helix::led::LedStripInfo pin;
+    pin.id = "output_pin test_led";
+    pin.is_pwm = true;
+    backend.add_pin(pin);
+
+    REQUIRE(backend.is_pwm("output_pin test_led"));
+
+    backend.set_pin_pwm("output_pin test_led", false);
+    REQUIRE_FALSE(backend.is_pwm("output_pin test_led"));
+}
+
+TEST_CASE("OutputPinBackend: value change callback", "[led][output_pin]") {
+    helix::led::OutputPinBackend backend;
+    helix::led::LedStripInfo pin;
+    pin.id = "output_pin test_led";
+    backend.add_pin(pin);
+
+    std::string cb_pin;
+    double cb_value = -1.0;
+    backend.set_value_change_callback([&](const std::string& id, double val) {
+        cb_pin = id;
+        cb_value = val;
+    });
+
+    nlohmann::json status = {{"output_pin test_led", {{"value", 0.42}}}};
+    backend.update_from_status(status);
+
+    REQUIRE(cb_pin == "output_pin test_led");
+    REQUIRE(cb_value == Catch::Approx(0.42));
+}
+
+TEST_CASE("OutputPinBackend: no API safety", "[led][output_pin]") {
+    helix::led::OutputPinBackend backend;
+    // Should not crash when API is null
+    backend.set_value("output_pin test", 0.5);
+    backend.turn_on("output_pin test");
+    backend.turn_off("output_pin test");
+    backend.set_brightness("output_pin test", 50);
+}

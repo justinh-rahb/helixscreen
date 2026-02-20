@@ -306,7 +306,8 @@ class FilamentPanel : public PanelBase {
     void update_material_temp_display();
     void update_left_card_temps();
     void update_status_icon_for_state();
-    static constexpr uint32_t OPERATION_TIMEOUT_MS = 30000;
+    static constexpr uint32_t OPERATION_TIMEOUT_MS =
+        120000; // 2 min — purge/extrude at slow feedrate
 
     // Filament sensor warning helpers
     void show_load_warning();

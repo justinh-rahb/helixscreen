@@ -64,7 +64,7 @@ path: ~/mainsail
 CONF
 }
 
-# Helper: create a moonraker.conf with existing helixscreen zip section
+# Helper: create a moonraker.conf with existing helixscreen web section
 create_moonraker_conf_with_helix() {
     local conf="$1"
     create_moonraker_conf "$conf"
@@ -73,11 +73,13 @@ create_moonraker_conf_with_helix() {
 # HelixScreen Update Manager
 # Added by HelixScreen installer - enables one-click updates from Mainsail/Fluidd
 [update_manager helixscreen]
-type: zip
+type: web
 channel: stable
 repo: prestonbrown/helixscreen
 path: /opt/helixscreen
-managed_services: helixscreen
+persistent_files:
+    config/helixconfig.json
+    config/.disabled_services
 CONF
 }
 
@@ -131,7 +133,7 @@ setup_moonraker_home() {
     [ -f "${conf}.bak.helixscreen" ]
 }
 
-@test "add_update_manager_section: appended section has type: zip" {
+@test "add_update_manager_section: appended section has type: web" {
     local conf
     conf=$(setup_moonraker_home)
     create_moonraker_conf "$conf"
@@ -139,7 +141,7 @@ setup_moonraker_home() {
     add_update_manager_section "$conf"
 
     # Extract the helixscreen section and check type
-    awk '/^\[update_manager helixscreen\]/{found=1} found' "$conf" | grep -q "type: zip"
+    awk '/^\[update_manager helixscreen\]/{found=1} found' "$conf" | grep -q "type: web"
 }
 
 @test "add_update_manager_section: preserves existing content" {
@@ -156,26 +158,26 @@ setup_moonraker_home() {
 }
 
 # =============================================================================
-# migrate_git_repo_to_zip
+# migrate_to_web_type
 # =============================================================================
 
-@test "migrate_git_repo_to_zip: removes old section and adds zip section" {
+@test "migrate_to_web_type: removes old section and adds web section" {
     local conf
     conf=$(setup_moonraker_home)
     create_moonraker_conf_with_git_repo "$conf"
     # Override MOONRAKER_CONF_PATHS so find_moonraker_conf finds our test file
     MOONRAKER_CONF_PATHS="$conf"
 
-    migrate_git_repo_to_zip "$conf"
+    migrate_to_web_type "$conf"
 
     # Old git_repo type should be gone
     ! awk '/^\[update_manager helixscreen\]/{found=1; next} found && /^\[/{exit} found && /^type:/{print; exit}' "$conf" | grep -q 'git_repo'
-    # New zip section should exist
+    # New web section should exist
     grep -q '^\[update_manager helixscreen\]' "$conf"
-    awk '/^\[update_manager helixscreen\]/{found=1; next} found && /^\[/{exit} found && /^type:/{print; exit}' "$conf" | grep -q 'zip'
+    awk '/^\[update_manager helixscreen\]/{found=1; next} found && /^\[/{exit} found && /^type:/{print; exit}' "$conf" | grep -q 'web'
 }
 
-@test "migrate_git_repo_to_zip: cleans up old -repo directory" {
+@test "migrate_to_web_type: cleans up old -repo directory" {
     local conf
     conf=$(setup_moonraker_home)
     create_moonraker_conf_with_git_repo "$conf"
@@ -184,12 +186,12 @@ setup_moonraker_home() {
     # Create old repo directory
     mkdir -p "${INSTALL_DIR}-repo/.git"
 
-    migrate_git_repo_to_zip "$conf"
+    migrate_to_web_type "$conf"
 
     [ ! -d "${INSTALL_DIR}-repo" ]
 }
 
-@test "migrate_git_repo_to_zip: no old repo dir does not error" {
+@test "migrate_to_web_type: no old repo dir does not error" {
     local conf
     conf=$(setup_moonraker_home)
     create_moonraker_conf_with_git_repo "$conf"
@@ -200,7 +202,7 @@ setup_moonraker_home() {
 
     # Don't use `run` here — sh -c inside remove_update_manager_section
     # causes fd issues with bats run subshell on macOS
-    migrate_git_repo_to_zip "$conf"
+    migrate_to_web_type "$conf"
 }
 
 # =============================================================================
@@ -297,8 +299,8 @@ BINEOF
 
     configure_moonraker_updates "pi"
 
-    # Should now have zip type, not git_repo
-    awk '/^\[update_manager helixscreen\]/{found=1; next} found && /^\[/{exit} found && /^type:/{print; exit}' "$conf" | grep -q 'zip'
+    # Should now have web type, not git_repo
+    awk '/^\[update_manager helixscreen\]/{found=1; next} found && /^\[/{exit} found && /^type:/{print; exit}' "$conf" | grep -q 'web'
 }
 
 # =============================================================================

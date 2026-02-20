@@ -2,7 +2,7 @@
 
 ## Quick Start
 
-**HelixScreen**: LVGL 9.4 touchscreen UI for Klipper 3D printers. Pattern: XML → Subjects → C++.
+**HelixScreen**: LVGL 9.5 touchscreen UI for Klipper 3D printers. XML engine in `lib/helix-xml/`. Pattern: XML → Subjects → C++.
 
 ```bash
 make -j                              # Build ONLY the program binary (NOT tests)
@@ -56,6 +56,7 @@ Most commonly needed:
 | **No auto-mock** | `if(!start()) return Mock()` | Check `RuntimeConfig::should_mock_*()` |
 | **JSON include** | `#include <nlohmann/json.hpp>` | `#include "hv/json.hpp"` (libhv's bundled version) |
 | **Build system** | `cmake`, `ninja` | `make -j` (pure Makefile) |
+| **Bug commits** | `fix: thing` (no reference) | `fix(scope): thing (prestonbrown/helixscreen#123)` |
 
 **ALWAYS:** Search the SAME FILE you're editing for similar patterns before implementing.
 
@@ -159,6 +160,8 @@ void MyState::init_subjects() {
 
 **NEVER debug without flags!** Use `-vv` minimum.
 Trust debug output. Impossible values = bug is UPSTREAM. Ask "what ELSE?" not "did first fix work?"
+
+**Debug bundles**: `./scripts/debug-bundle.sh <SHARE_CODE> --save` to download. Save to `/tmp/` for investigation (not in repo).
 
 ---
 

@@ -131,8 +131,21 @@ std::string get_prerendered_printer_path(const std::string& printer_name, int sc
         return "A:" + path;
     }
 
-    spdlog::trace("[Prerendered] Printer {} fallback to PNG (no {}px)", printer_name, size);
-    return "A:assets/images/printers/" + printer_name + ".png";
+    // Fall back to original PNG, but verify it exists
+    std::string png_path = "assets/images/printers/" + printer_name + ".png";
+    if (prerendered_exists(png_path)) {
+        spdlog::trace("[Prerendered] Printer {} fallback to PNG (no {}px)", printer_name, size);
+        return "A:" + png_path;
+    }
+
+    // Neither prerendered nor PNG exists — fall back to generic
+    spdlog::debug("[Prerendered] Printer {} has no image, using generic fallback", printer_name);
+    std::string generic_bin =
+        "assets/images/printers/prerendered/generic-corexy-" + std::to_string(size) + ".bin";
+    if (prerendered_exists(generic_bin)) {
+        return "A:" + generic_bin;
+    }
+    return "A:assets/images/printers/generic-corexy.png";
 }
 
 std::string get_prerendered_placeholder_path(const std::string& placeholder_name) {

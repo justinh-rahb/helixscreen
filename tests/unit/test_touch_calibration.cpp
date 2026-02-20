@@ -707,6 +707,62 @@ TEST_CASE("TouchCalibration: has_abs_display_mismatch", "[touch-calibration][abs
         // Just past 5% on X axis
         REQUIRE(has_abs_display_mismatch(841, 480, 800, 480) == true);
     }
+
+    SECTION("generic HID range 4096x4096 — no mismatch (BTT HDMI5 scenario)") {
+        // BTT HDMI5 reports 4096x4096, display is 800x480.
+        // This is a generic HID range, NOT a real panel resolution.
+        // LVGL's evdev driver maps it linearly — no calibration needed.
+        REQUIRE(has_abs_display_mismatch(4096, 4096, 800, 480) == false);
+    }
+
+    SECTION("generic HID range 4095x4095 — no mismatch") {
+        // 12-bit range (2^12 - 1), common USB HID touchscreens
+        REQUIRE(has_abs_display_mismatch(4095, 4095, 800, 480) == false);
+    }
+
+    SECTION("generic HID range 32767x32767 — no mismatch") {
+        // 15-bit range, another common USB HID format
+        REQUIRE(has_abs_display_mismatch(32767, 32767, 1024, 600) == false);
+    }
+
+    SECTION("generic HID range 65535x65535 — no mismatch") {
+        // 16-bit range
+        REQUIRE(has_abs_display_mismatch(65535, 65535, 480, 272) == false);
+    }
+
+    SECTION("mixed generic/non-generic still triggers mismatch") {
+        // One axis is generic HID, the other is a real resolution
+        // Both must be generic to skip
+        REQUIRE(has_abs_display_mismatch(4096, 480, 800, 480) == true);
+        REQUIRE(has_abs_display_mismatch(800, 4096, 800, 480) == true);
+    }
+
+    SECTION("Goodix on Nebula Pad: 800x480 ABS on 480x272 display") {
+        // Real panel resolution that doesn't match display — should trigger
+        REQUIRE(has_abs_display_mismatch(800, 480, 480, 272) == true);
+    }
+}
+
+TEST_CASE("TouchCalibration: is_generic_hid_abs_range", "[touch-calibration][abs-mismatch]") {
+    SECTION("known generic HID ranges") {
+        REQUIRE(is_generic_hid_abs_range(255) == true);
+        REQUIRE(is_generic_hid_abs_range(1023) == true);
+        REQUIRE(is_generic_hid_abs_range(4095) == true);
+        REQUIRE(is_generic_hid_abs_range(4096) == true);
+        REQUIRE(is_generic_hid_abs_range(8191) == true);
+        REQUIRE(is_generic_hid_abs_range(16383) == true);
+        REQUIRE(is_generic_hid_abs_range(32767) == true);
+        REQUIRE(is_generic_hid_abs_range(65535) == true);
+    }
+
+    SECTION("real panel resolutions are NOT generic") {
+        REQUIRE(is_generic_hid_abs_range(800) == false);
+        REQUIRE(is_generic_hid_abs_range(480) == false);
+        REQUIRE(is_generic_hid_abs_range(1024) == false);
+        REQUIRE(is_generic_hid_abs_range(600) == false);
+        REQUIRE(is_generic_hid_abs_range(272) == false);
+        REQUIRE(is_generic_hid_abs_range(1280) == false);
+    }
 }
 
 TEST_CASE("TouchCalibration: scoring factors for common touchscreen types",

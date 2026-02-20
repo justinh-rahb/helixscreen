@@ -28,7 +28,7 @@ import type { CrashReport, ResolvedBacktrace } from "./symbol-resolver";
 interface Env {
   // R2 buckets
   DEBUG_BUNDLES: R2Bucket;
-  TELEMETRY_BUCKET: R2Bucket;
+  RELEASES_BUCKET: R2Bucket;
 
   // Rate limiters
   CRASH_LIMITER: RateLimit;
@@ -188,9 +188,9 @@ async function createGitHubIssue(env: Env, report: CrashReport): Promise<IssueRe
 
   // Resolve backtrace symbols from R2 (best-effort, never throws)
   let resolved: ResolvedBacktrace | null = null;
-  if (env.TELEMETRY_BUCKET) {
+  if (env.RELEASES_BUCKET) {
     try {
-      resolved = await resolveBacktrace(env.TELEMETRY_BUCKET, report);
+      resolved = await resolveBacktrace(env.RELEASES_BUCKET, report);
     } catch (err) {
       console.error("Symbol resolution failed:", (err as Error).message);
     }

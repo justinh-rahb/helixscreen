@@ -8,12 +8,12 @@
 #include "ui_ams_dryer_card.h"
 #include "ui_ams_edit_modal.h"
 #include "ui_ams_loading_error_modal.h"
-#include "ui_ams_slot_edit_popup.h"
 #include "ui_color_picker.h"
 #include "ui_observer_guard.h"
 #include "ui_panel_base.h"
 
 #include "ams_state.h"
+#include "ams_step_operation.h"
 #include "ams_types.h" // For SlotInfo
 
 #include <memory>
@@ -126,7 +126,6 @@ class AmsPanel : public PanelBase {
     // === Extracted UI Modules ===
 
     std::unique_ptr<helix::ui::AmsContextMenu> context_menu_;      ///< Slot context menu
-    std::unique_ptr<helix::ui::AmsSlotEditPopup> slot_edit_popup_; ///< Slot edit popup
     std::unique_ptr<helix::ui::AmsEditModal> edit_modal_;          ///< Edit filament modal
     std::unique_ptr<helix::ui::AmsDryerCard> dryer_card_;          ///< Dryer card and modal
     std::unique_ptr<helix::ui::AmsLoadingErrorModal> error_modal_; ///< Loading error modal
@@ -139,16 +138,15 @@ class AmsPanel : public PanelBase {
     ObserverGuard slot_count_observer_;
     ObserverGuard path_segment_observer_;
     ObserverGuard path_topology_observer_;
-    ObserverGuard extruder_temp_observer_; ///< For preheat completion detection
-    ObserverGuard backend_count_observer_; ///< For backend selector visibility
+    ObserverGuard extruder_temp_observer_;  ///< For preheat completion detection
+    ObserverGuard backend_count_observer_;  ///< For backend selector visibility
+    ObserverGuard external_spool_observer_; ///< Reactive updates when external spool color changes
 
     // === Dynamic Slot State ===
 
-    int scoped_unit_index_ = -1;     ///< Unit scope: -1 = all units, >=0 = specific unit
-    int current_slot_count_ = 0;     ///< Number of slots currently created
-    lv_obj_t* slot_grid_ = nullptr;  ///< Container for dynamically created slots
-    int last_highlighted_slot_ = -1; ///< Previously highlighted slot (for pulse animation)
-
+    int scoped_unit_index_ = -1;    ///< Unit scope: -1 = all units, >=0 = specific unit
+    int current_slot_count_ = 0;    ///< Number of slots currently created
+    lv_obj_t* slot_grid_ = nullptr; ///< Container for dynamically created slots
     // === Preheat State for Filament Loading ===
 
     int pending_load_slot_ = -1;                  ///< Slot awaiting preheat completion (-1 = none)
@@ -157,13 +155,6 @@ class AmsPanel : public PanelBase {
     AmsAction prev_ams_action_ = AmsAction::IDLE; ///< Previous action for transition detection
 
     // === Step Progress Operation Type ===
-
-    /// Operation types for dynamic step progress
-    enum class StepOperationType {
-        LOAD_FRESH, ///< Loading into empty toolhead (4 steps)
-        LOAD_SWAP,  ///< Loading while another filament is loaded (5 steps, includes cut/retract)
-        UNLOAD      ///< Explicit unload operation (4 steps)
-    };
 
     StepOperationType current_operation_type_ =
         StepOperationType::LOAD_FRESH; ///< Current operation
@@ -239,18 +230,6 @@ class AmsPanel : public PanelBase {
     void update_current_slot_highlight(int slot_index);
     void update_current_loaded_display(int slot_index);
 
-    /**
-     * @brief Start or stop continuous border pulse animation on a slot
-     *
-     * During operations (loading/unloading), the active slot's border should
-     * pulse continuously to indicate activity. When operations complete,
-     * the pulse stops and border returns to static highlight.
-     *
-     * @param slot_index Slot to pulse (-1 to stop all pulses)
-     * @param enable True to start pulsing, false to stop
-     */
-    void set_slot_continuous_pulse(int slot_index, bool enable);
-
     // === Event Callbacks (static trampolines) ===
 
     static void on_slot_clicked(lv_event_t* e);
@@ -264,9 +243,17 @@ class AmsPanel : public PanelBase {
     static void on_current_slot_changed(lv_observer_t* observer, lv_subject_t* subject);
     static void on_path_state_changed(lv_observer_t* observer, lv_subject_t* subject);
 
-    // === Path Canvas Callback ===
+    // === Path Canvas Callbacks ===
 
     static void on_path_slot_clicked(int slot_index, void* user_data);
+    static void on_bypass_spool_clicked(void* user_data);
+
+    /**
+     * @brief Handle click on bypass spool box in path canvas
+     *
+     * Opens the edit modal for the external spool (slot_index -2).
+     */
+    void handle_bypass_spool_click();
 
     // === Spoolman Integration ===
 
@@ -326,7 +313,6 @@ class AmsPanel : public PanelBase {
     // === UI Module Helpers (internal, show modals with callbacks) ===
 
     void show_context_menu(int slot_index, lv_obj_t* near_widget, lv_point_t click_pt);
-    void show_slot_edit_popup(int slot_index, lv_obj_t* near_widget);
     void show_edit_modal(int slot_index);
     void show_loading_error_modal();
 

@@ -17,6 +17,7 @@
 #include "ui_settings_about.h"
 #include "ui_settings_display.h"
 #include "ui_settings_hardware_health.h"
+#include "ui_settings_home_widgets.h"
 #include "ui_settings_led.h"
 #include "ui_settings_machine_limits.h"
 #include "ui_settings_macro_buttons.h"
@@ -441,6 +442,8 @@ void SettingsPanel::init_subjects() {
 
     // Register XML event callbacks for action rows
     lv_xml_register_event_cb(nullptr, "on_display_settings_clicked", on_display_settings_clicked);
+    lv_xml_register_event_cb(nullptr, "on_home_widgets_clicked",
+                             SettingsPanel::on_home_widgets_clicked);
     // Note: on_printer_image_clicked moved to PrinterManagerOverlay
     lv_xml_register_event_cb(nullptr, "on_filament_sensors_clicked", on_filament_sensors_clicked);
 
@@ -930,6 +933,13 @@ void SettingsPanel::handle_display_settings_clicked() {
     overlay.show(parent_screen_);
 }
 
+void SettingsPanel::handle_home_widgets_clicked() {
+    spdlog::debug("[{}] Home Widgets clicked - delegating to HomeWidgetsOverlay", get_name());
+
+    auto& overlay = helix::settings::get_home_widgets_overlay();
+    overlay.show(parent_screen_);
+}
+
 void SettingsPanel::handle_filament_sensors_clicked() {
     spdlog::debug("[{}] Sensors clicked - delegating to SensorSettingsOverlay", get_name());
 
@@ -1313,6 +1323,12 @@ void SettingsPanel::on_display_settings_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void SettingsPanel::on_home_widgets_clicked(lv_event_t* /*e*/) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_home_widgets_clicked");
+    get_global_settings_panel().handle_home_widgets_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
 void SettingsPanel::on_filament_sensors_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_filament_sensors_clicked");
     get_global_settings_panel().handle_filament_sensors_clicked();
@@ -1471,6 +1487,8 @@ void register_settings_panel_callbacks() {
     // Action row callbacks used in settings_panel.xml
     lv_xml_register_event_cb(nullptr, "on_display_settings_clicked",
                              SettingsPanel::on_display_settings_clicked);
+    lv_xml_register_event_cb(nullptr, "on_home_widgets_clicked",
+                             SettingsPanel::on_home_widgets_clicked);
     lv_xml_register_event_cb(nullptr, "on_filament_sensors_clicked",
                              SettingsPanel::on_filament_sensors_clicked);
     lv_xml_register_event_cb(nullptr, "on_macro_buttons_clicked",

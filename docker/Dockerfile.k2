@@ -55,6 +55,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libtool \
     flex \
     bison \
+    ccache \
     && rm -rf /var/lib/apt/lists/*
 
 # Download Bootlin's armv7-eabihf musl toolchain (stable-2024.02-1)

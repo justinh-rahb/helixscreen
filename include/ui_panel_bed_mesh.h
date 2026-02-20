@@ -167,7 +167,10 @@ class BedMeshPanel : public OverlayBase {
 
     // Operation timeout guard (no subject needed — modals prevent interaction)
     OperationTimeoutGuard operation_guard_;
-    static constexpr uint32_t OPERATION_TIMEOUT_MS = 15000;
+    static constexpr uint32_t OPERATION_TIMEOUT_MS = 15000; // quick ops (delete, rename)
+    static constexpr uint32_t SLOW_OPERATION_TIMEOUT_MS =
+        120000; // load, save_config (Klipper restart)
+    static constexpr uint32_t CALIBRATION_TIMEOUT_MS = 300000; // 5 min for BED_MESH_CALIBRATE
 
     // Destruction flag for async callback safety [L012]
     // Shared with WebSocket callbacks to detect when panel is destroyed

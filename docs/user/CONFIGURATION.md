@@ -20,6 +20,7 @@ Complete reference for HelixScreen configuration options.
 - [Moonraker Settings](#moonraker-settings)
 - [G-code Viewer Settings](#g-code-viewer-settings)
 - [AMS Settings](#ams-settings)
+- [Home Widget Settings](#home-widget-settings)
 - [Cache Settings](#cache-settings)
 - [Streaming Settings](#streaming-settings)
 - [Safety Settings](#safety-settings)
@@ -65,7 +66,7 @@ The configuration file is JSON format with several top-level sections:
   "dark_mode": false,
   "brightness": 50,
   "sounds_enabled": true,
-  "completion_alert": true,
+  "completion_alert": 2,
   "wizard_completed": false,
   "wifi_expected": false,
   "language": "en",
@@ -74,6 +75,7 @@ The configuration file is JSON format with several top-level sections:
   "log_path": "",
   "log_level": "warn",
 
+  "home_widgets": [ ... ],
   "theme": { ... },
   "display": { ... },
   "input": { ... },
@@ -112,9 +114,15 @@ The configuration file is JSON format with several top-level sections:
 **Description:** Enable UI sound effects (button clicks, navigation sounds).
 
 ### `completion_alert`
-**Type:** boolean
-**Default:** `true`
-**Description:** Play an alert sound when a print completes. Useful for getting notified when away from the printer.
+**Type:** integer
+**Default:** `2`
+**Values:** `0` (Off), `1` (Notification), `2` (Alert)
+**Description:** How HelixScreen notifies you when a print completes or is cancelled (while you're on a different screen):
+- `0` — **Off**: No notification (sound still plays if sounds are enabled)
+- `1` — **Notification**: Brief toast message at the top of the screen
+- `2` — **Alert**: Full-screen modal with print stats (duration, layers, filament used) and confetti for successful prints
+
+Errors always show the full alert regardless of this setting. To change this in the UI, go to **Settings > Print Complete Alert** and select from the dropdown.
 
 ### `wizard_completed`
 **Type:** boolean
@@ -772,6 +780,63 @@ Located in the `ams` section:
 
 ---
 
+## Home Widget Settings
+
+Located at the top level as `home_widgets`:
+
+```json
+{
+  "home_widgets": [
+    {"id": "power", "enabled": true},
+    {"id": "network", "enabled": true},
+    {"id": "firmware_restart", "enabled": true},
+    {"id": "ams", "enabled": true},
+    {"id": "temperature", "enabled": true},
+    {"id": "led", "enabled": true},
+    {"id": "humidity", "enabled": true},
+    {"id": "width_sensor", "enabled": true},
+    {"id": "probe", "enabled": true},
+    {"id": "filament_sensor", "enabled": true},
+    {"id": "notifications", "enabled": true}
+  ]
+}
+```
+
+### `home_widgets`
+**Type:** array of objects
+**Default:** All widgets enabled in the order shown above
+**Description:** Controls which widgets appear on the Home Panel and in what order. Each object has:
+
+- `id` — Widget identifier (see table below)
+- `enabled` — Whether the widget is shown (`true`/`false`)
+
+**Available widget IDs:**
+
+| ID | Widget | Hardware-Gated |
+|----|--------|---------------|
+| `power` | Moonraker power device controls | Yes (requires power devices) |
+| `network` | WiFi/Ethernet status | No |
+| `firmware_restart` | Klipper firmware restart | No |
+| `ams` | Multi-material spool status | Yes (requires AMS/MMU) |
+| `temperature` | Nozzle temperature with heating animation | No |
+| `led` | LED quick toggle | No |
+| `humidity` | Enclosure humidity sensor | Yes (requires sensor) |
+| `width_sensor` | Filament width sensor | Yes (requires sensor) |
+| `probe` | Z probe status and offset | Yes (requires probe) |
+| `filament_sensor` | Filament runout detection | Yes (requires sensor) |
+| `notifications` | Pending alerts with severity badge | No |
+
+**Notes:**
+- Maximum 10 widgets can be enabled simultaneously
+- The array order determines display order on the Home Panel
+- Hardware-gated widgets are hidden on the Home Panel if their hardware isn't detected, even when enabled
+- New widgets added in future versions are automatically appended with `enabled: true`
+- Unknown widget IDs (from older versions) are silently ignored
+
+This is best configured via **Settings > Home Widgets** rather than editing the JSON directly.
+
+---
+
 ## Cache Settings
 
 Located in the `cache` section:
@@ -1156,7 +1221,7 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
   "dark_mode": true,
   "brightness": 70,
   "sounds_enabled": true,
-  "completion_alert": true,
+  "completion_alert": 2,
   "wizard_completed": true,
   "wifi_expected": true,
   "language": "en",
@@ -1291,6 +1356,20 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
     "layers_per_frame": 0,
     "adaptive_layer_target_ms": 16
   },
+
+  "home_widgets": [
+    {"id": "temperature", "enabled": true},
+    {"id": "network", "enabled": true},
+    {"id": "led", "enabled": true},
+    {"id": "ams", "enabled": true},
+    {"id": "notifications", "enabled": true},
+    {"id": "power", "enabled": true},
+    {"id": "firmware_restart", "enabled": false},
+    {"id": "humidity", "enabled": false},
+    {"id": "width_sensor", "enabled": false},
+    {"id": "probe", "enabled": false},
+    {"id": "filament_sensor", "enabled": false}
+  ],
 
   "ams": {
     "spool_style": "3d"

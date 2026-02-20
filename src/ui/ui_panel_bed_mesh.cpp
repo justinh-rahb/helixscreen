@@ -774,7 +774,7 @@ void BedMeshPanel::load_profile(int index) {
 
     MoonrakerAPI* api = get_moonraker_api();
     if (api) {
-        operation_guard_.begin(OPERATION_TIMEOUT_MS, [this] {
+        operation_guard_.begin(SLOW_OPERATION_TIMEOUT_MS, [this] {
             hide_all_modals();
             pending_operation_ = PendingOperation::None;
             NOTIFY_WARNING("Bed mesh operation timed out");
@@ -1091,10 +1091,17 @@ void BedMeshPanel::execute_calibration(const std::string& profile_name) {
             // Modal will close when mesh update notification arrives
         },
         [this](const MoonrakerError& err) {
-            spdlog::error("[{}] Failed to start calibration: {}", get_name(), err.message);
-            NOTIFY_ERROR("Failed to start calibration");
-            lv_subject_set_int(&bed_mesh_calibrating_, 0);
-        });
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn("[{}] Calibration response timed out (may still be running)",
+                             get_name());
+                NOTIFY_WARNING("Calibration may still be running — response timed out");
+            } else {
+                spdlog::error("[{}] Failed to start calibration: {}", get_name(), err.message);
+                NOTIFY_ERROR("Failed to start calibration");
+                lv_subject_set_int(&bed_mesh_calibrating_, 0);
+            }
+        },
+        CALIBRATION_TIMEOUT_MS);
 }
 
 void BedMeshPanel::execute_save_config() {
@@ -1104,7 +1111,7 @@ void BedMeshPanel::execute_save_config() {
 
     spdlog::info("[{}] Saving config (will restart Klipper)", get_name());
 
-    operation_guard_.begin(OPERATION_TIMEOUT_MS, [this] {
+    operation_guard_.begin(SLOW_OPERATION_TIMEOUT_MS, [this] {
         hide_all_modals();
         pending_operation_ = PendingOperation::None;
         NOTIFY_WARNING("Bed mesh operation timed out");

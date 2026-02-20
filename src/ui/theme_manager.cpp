@@ -1464,8 +1464,8 @@ static void apply_button_text_contrast(lv_obj_t* btn) {
 static bool is_icon_font(const lv_font_t* font) {
     if (!font)
         return false;
-    return font == &mdi_icons_16 || font == &mdi_icons_24 || font == &mdi_icons_32 ||
-           font == &mdi_icons_48 || font == &mdi_icons_64;
+    return font == &mdi_icons_14 || font == &mdi_icons_16 || font == &mdi_icons_24 ||
+           font == &mdi_icons_32 || font == &mdi_icons_48 || font == &mdi_icons_64;
 }
 
 /**

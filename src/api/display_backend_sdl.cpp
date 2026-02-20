@@ -26,6 +26,11 @@ bool DisplayBackendSDL::is_available() const {
 lv_display_t* DisplayBackendSDL::create_display(int width, int height) {
     spdlog::debug("[SDL Backend] Creating SDL display: {}x{}", width, height);
 
+    // Enable VSync to prevent tearing
+    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+
+    // Prevent compositor bypass on X11 (no-op on other platforms)
+    SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
     // LVGL's SDL driver handles SDL_Init and window creation internally
     display_ = lv_sdl_window_create(width, height);
 

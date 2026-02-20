@@ -57,6 +57,7 @@ class AmsBackendMock : public AmsBackend {
     [[nodiscard]] PathSegment get_filament_segment() const override;
     [[nodiscard]] PathSegment get_slot_filament_segment(int slot_index) const override;
     [[nodiscard]] PathSegment infer_error_segment() const override;
+    [[nodiscard]] bool slot_has_prep_sensor(int slot_index) const override;
 
     // Operations
     AmsError load_filament(int slot_index) override;
@@ -68,9 +69,13 @@ class AmsBackendMock : public AmsBackend {
     AmsError recover() override;
     AmsError reset() override;
     AmsError cancel() override;
+    AmsError reset_lane(int slot_index) override;
+    [[nodiscard]] bool supports_lane_reset() const override {
+        return true;
+    }
 
     // Configuration
-    AmsError set_slot_info(int slot_index, const SlotInfo& info) override;
+    AmsError set_slot_info(int slot_index, const SlotInfo& info, bool persist = true) override;
     AmsError set_tool_mapping(int tool_number, int slot_index) override;
 
     // Bypass mode
@@ -445,7 +450,7 @@ class AmsBackendMock : public AmsBackend {
     EventCallback event_callback_;     ///< Registered event handler
 
     AmsSystemInfo system_info_;     ///< Simulated system state
-    int operation_delay_ms_ = 1000; ///< Simulated operation delay
+    int operation_delay_ms_ = 5000; ///< Simulated operation delay
     bool realistic_mode_ = false;   ///< Enable multi-phase operations (HEATING→LOADING→CHECKING)
 
     // Path visualization state

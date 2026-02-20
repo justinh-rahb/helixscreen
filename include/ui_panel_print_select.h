@@ -473,7 +473,7 @@ class PrintSelectPanel : public PanelBase {
 
     // Periodic polling timer for file list (fallback when WebSocket notifications are missed)
     lv_timer_t* file_poll_timer_ = nullptr;
-    static constexpr uint32_t FILE_POLL_INTERVAL_MS = 15000; ///< 15s polling fallback
+    static constexpr uint32_t FILE_POLL_INTERVAL_MS = 5000; ///< 5s polling fallback
 
     // Virtualized view modules (extracted for maintainability)
     std::unique_ptr<helix::ui::PrintSelectCardView> card_view_;

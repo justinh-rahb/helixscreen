@@ -7,7 +7,7 @@
 
 namespace helix::led {
 
-enum class LedBackendType { NATIVE, LED_EFFECT, WLED, MACRO };
+enum class LedBackendType { NATIVE, LED_EFFECT, WLED, MACRO, OUTPUT_PIN };
 
 struct LedStripInfo {
     std::string name; // Display name
@@ -15,6 +15,7 @@ struct LedStripInfo {
     LedBackendType backend;
     bool supports_color; // RGB/RGBW capable
     bool supports_white; // Has W channel (RGBW)
+    bool is_pwm = false; // PWM capable (output_pin with pwm:true)
 };
 
 struct LedEffectInfo {

@@ -72,6 +72,21 @@
  */
 class MoonrakerAPI {
   public:
+    // ========== G-code execute_gcode timeout constants ==========
+    // Default is 30s (in MoonrakerClient). These are for long-running commands.
+    static constexpr uint32_t HOMING_TIMEOUT_MS = 300000; // 5 min — G28 on large printers
+    static constexpr uint32_t CALIBRATION_TIMEOUT_MS =
+        300000; // 5 min — BED_MESH_CALIBRATE, SCREWS_TILT_CALCULATE
+    static constexpr uint32_t LEVELING_TIMEOUT_MS = 600000; // 10 min — QGL, Z_TILT_ADJUST
+    static constexpr uint32_t SHAPER_TIMEOUT_MS =
+        300000; // 5 min — SHAPER_CALIBRATE, MEASURE_AXES_NOISE
+    static constexpr uint32_t PID_TIMEOUT_MS = 900000;           // 15 min — PID_CALIBRATE
+    static constexpr uint32_t AMS_OPERATION_TIMEOUT_MS = 300000; // 5 min — MMU/AFC/tool change ops
+    static constexpr uint32_t PROBING_TIMEOUT_MS =
+        180000; // 3 min — PROBE_CALIBRATE, Z_ENDSTOP_CALIBRATE
+    static constexpr uint32_t EXTRUSION_TIMEOUT_MS =
+        120000; // 2 min — filament purge/load at slow feedrate
+
     using SuccessCallback = std::function<void()>;
     using ErrorCallback = std::function<void(const MoonrakerError&)>;
     using FileListCallback = std::function<void(const std::vector<FileInfo>&)>;

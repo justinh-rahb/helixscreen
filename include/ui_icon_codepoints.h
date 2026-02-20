@@ -141,6 +141,7 @@ static const IconMapping ICON_MAP[] = {
     {"image_area",           "\xF3\xB0\x8B\xAB"},  // F02EB image-area (photo/picture)
     {"image_broken_variant", "\xF3\xB0\x8B\xAE"}, // F02EE image-broken-variant (fallback)
     {"inbox_outline",      "\xF3\xB1\x89\xB4"},  // F1274 inbox-outline
+    {"infinity",           "\xF3\xB0\x9B\xA4"},  // F06E4 infinity (endless spool)
     {"info",               "\xF3\xB0\x8B\xBC"},  // F02FC information
     {"info_circle",        "\xF3\xB0\x8B\xBC"},  // F02FC information (alias for FontAwesome compat)
     {"info_outline",       "\xF3\xB0\x8B\xBD"},  // F02FD information-outline
@@ -185,6 +186,7 @@ static const IconMapping ICON_MAP[] = {
     {"play_circle",        "\xF3\xB0\x90\x8C"},  // F040C play-circle
     {"plus",               "\xF3\xB0\x90\x95"},  // F0415 plus
     {"power",              "\xF3\xB0\x90\xA5"},  // F0425 power
+    {"power_cycle",        "\xF3\xB0\xA4\x81"},  // F0901 power-cycle
     {"power_plug",         "\xF3\xB0\x9A\xA5"},  // F06A5 power-plug
     {"print",              "\xF3\xB0\x90\xAA"},  // F042A printer
     {"printer_3d",         "\xF3\xB0\x90\xAB"},  // F042B printer-3d

@@ -111,7 +111,7 @@ class AmsBackendValgACE : public AmsBackend {
     // Configuration
     // ========================================================================
 
-    AmsError set_slot_info(int slot_index, const SlotInfo& info) override;
+    AmsError set_slot_info(int slot_index, const SlotInfo& info, bool persist = true) override;
     AmsError set_tool_mapping(int tool_number, int slot_index) override;
 
     // ValgACE has fixed 1:1 mapping (tools ARE slots), not configurable

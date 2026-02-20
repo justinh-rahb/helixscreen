@@ -1119,6 +1119,25 @@ class PrinterState {
     }
 
     /**
+     * @brief Set power device count
+     *
+     * Delegates to PrinterCapabilitiesState (thread-safe).
+     *
+     * @param count Number of discovered power devices
+     */
+    void set_power_device_count(int count);
+
+    /**
+     * @brief Get power device count subject for XML binding
+     *
+     * Integer subject holding the number of discovered power devices.
+     * 0 = no power devices, used to hide/show power panel UI elements.
+     */
+    lv_subject_t* get_power_device_count_subject() {
+        return capabilities_state_.get_power_device_count_subject();
+    }
+
+    /**
      * @brief Set Spoolman availability status
      *
      * Called after checking Moonraker's server.info components and verifying

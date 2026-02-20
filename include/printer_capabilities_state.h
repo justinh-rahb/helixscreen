@@ -14,7 +14,7 @@ namespace helix {
  *
  * Tracks hardware capabilities (probe, heater bed, LED, accelerometer, etc.)
  * and feature availability (spoolman, timelapse, firmware retraction, etc.)
- * Provides 17 subjects for reactive UI updates based on printer capabilities.
+ * Provides 18+ subjects for reactive UI updates based on printer capabilities.
  * Extracted from PrinterState as part of god class decomposition.
  *
  * @note Capability values are set from hardware discovery on connect, with
@@ -122,8 +122,17 @@ class PrinterCapabilitiesState {
         return stepper_z_endstop_microns_;
     }
 
+    /**
+     * @brief Set power device count (async update from Moonraker query)
+     *
+     * Thread-safe: Uses helix::ui::queue_update() for main-thread execution.
+     *
+     * @param count Number of discovered power devices
+     */
+    void set_power_device_count(int count);
+
     // ========================================================================
-    // Subject accessors (17 subjects)
+    // Subject accessors
     // ========================================================================
 
     /// 1 if printer has quad_gantry_level
@@ -216,6 +225,11 @@ class PrinterCapabilitiesState {
         return const_cast<lv_subject_t*>(&printer_has_extra_fans_);
     }
 
+    /// Number of configured power devices (0 = none)
+    lv_subject_t* get_power_device_count_subject() const {
+        return const_cast<lv_subject_t*>(&power_device_count_);
+    }
+
     // ========================================================================
     // Convenience methods
     // ========================================================================
@@ -257,6 +271,7 @@ class PrinterCapabilitiesState {
     lv_subject_t printer_has_screws_tilt_{};         // screws_tilt_adjust
     lv_subject_t printer_has_webcam_{};              // enabled webcam configured
     lv_subject_t printer_has_extra_fans_{};          // extra controllable fans beyond part cooling
+    lv_subject_t power_device_count_{};              // number of power devices (0 = none)
 };
 
 } // namespace helix

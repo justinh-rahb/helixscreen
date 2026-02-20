@@ -17,26 +17,42 @@ The top area displays:
 
 ---
 
-## Temperature Displays
+## Home Widgets
 
-Real-time temperature readouts show:
+Below the status area, the Home Panel displays a row of **configurable widgets** — quick-access buttons for the features you use most. You choose which widgets appear, and in what order.
 
-- **Nozzle**: Current / Target temperature
-- **Bed**: Current / Target temperature
-- **Chamber**: Current temperature (if equipped)
+### Available Widgets
 
-**Tap any temperature** to jump directly to its control panel.
+| Widget | What It Does |
+|--------|-------------|
+| **Power** | Toggle Moonraker power devices. Only appears if you have power devices configured. |
+| **Network** | Shows WiFi signal strength or Ethernet status at a glance. |
+| **Firmware Restart** | Restart Klipper firmware with one tap. Always shown when Klipper is in SHUTDOWN state, even if disabled. |
+| **AMS Status** | Mini view of your multi-material spool slots. Only appears if an AMS/MMU system is detected. |
+| **Temperature** | Nozzle temperature readout with animated heating icon. Tap to open the Temperature panel. |
+| **LED Light** | Quick toggle for your LEDs. Long-press for the full LED Control Overlay (see [LED Controls](#led-controls) below). |
+| **Humidity** | Enclosure humidity sensor reading. Only appears if a humidity sensor is detected. |
+| **Width Sensor** | Filament width sensor reading. Only appears if a width sensor is detected. |
+| **Probe** | Z probe status and offset. Only appears if a probe is configured. |
+| **Filament Sensor** | Filament runout detection status. Only appears if a filament sensor is detected. |
+| **Notifications** | Pending alerts with severity badge. Tap to open notification history. |
 
----
+Up to **10 widgets** can be enabled at once. They automatically arrange into 1 or 2 rows depending on how many are active.
 
-## AMS / Filament Status
+### Hardware-Gated Widgets
 
-If you have a multi-material system (Happy Hare, AFC-Klipper, Bambu AMS):
+Some widgets only appear when the relevant hardware is detected by Klipper. If a sensor, probe, or AMS system isn't present, that widget is automatically hidden on the Home Panel — even if enabled in settings. In the widget configuration screen, these show "(not detected)" and their toggle is disabled.
 
-- Visual display of loaded filament slots
-- Current active slot highlighted
-- Color indicators from Spoolman (if integrated)
-- Tap to access the Filament panel
+### Customizing Widgets
+
+To change which widgets appear and their order:
+
+1. Go to **Settings** → **Home Widgets** (in the Appearance section)
+2. **Toggle** widgets on or off with the switch on each row
+3. **Reorder** by long-pressing the drag handle (arrows icon) on a row and dragging it to a new position
+4. Changes take effect immediately when you leave the overlay
+
+To reset to defaults, disable all widgets and re-enable the ones you want, or edit the config file directly (see [Configuration Reference](../CONFIGURATION.md#home-widget-settings)).
 
 ---
 
@@ -50,14 +66,9 @@ On printers with a toolchanger, the Home Panel displays an active tool badge:
 
 ---
 
-## Quick Actions
+## Emergency Stop
 
-Buttons for common operations:
-
-- **LED Button** (lightbulb icon):
-  - **Tap** to toggle your LEDs on/off
-  - **Long-press** to open the **LED Control Overlay** with full color, brightness, effects, and preset controls (see [LED Controls](#led-controls) below)
-- **Emergency Stop**: Halt all motion immediately (confirmation required unless disabled in Safety Settings)
+The **Emergency Stop** button halts all motion immediately (confirmation required unless disabled in Safety Settings).
 
 ---
 

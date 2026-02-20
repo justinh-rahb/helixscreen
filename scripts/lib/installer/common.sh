@@ -47,6 +47,7 @@ file_sudo() {
 CLEANUP_TMP=false
 CLEANUP_SERVICE=false
 BACKUP_CONFIG=""
+BACKUP_ENV=""
 ORIGINAL_INSTALL_EXISTS=false
 
 # Colors (if terminal supports it)
@@ -90,13 +91,7 @@ error_handler() {
     log_error "=========================================="
     echo ""
 
-    # Cleanup temporary files
-    if [ "$CLEANUP_TMP" = true ] && [ -d "$TMP_DIR" ]; then
-        log_info "Cleaning up temporary files..."
-        rm -rf "$TMP_DIR"
-    fi
-
-    # If we backed up config and install failed, try to restore state
+    # Restore backups BEFORE cleaning TMP_DIR — backup files live in TMP_DIR
     if [ -n "$BACKUP_CONFIG" ] && [ -f "$BACKUP_CONFIG" ]; then
         log_info "Restoring backed up configuration..."
         if $(file_sudo "${INSTALL_DIR}") mkdir -p "${INSTALL_DIR}/config" 2>/dev/null; then
@@ -108,6 +103,18 @@ error_handler() {
         else
             log_warn "Could not create config directory. Backup saved at: $BACKUP_CONFIG"
         fi
+    fi
+    if [ -n "$BACKUP_ENV" ] && [ -f "$BACKUP_ENV" ]; then
+        if $(file_sudo "${INSTALL_DIR}/config") cp "$BACKUP_ENV" "${INSTALL_DIR}/config/helixscreen.env" 2>/dev/null; then
+            log_success "helixscreen.env restored"
+        else
+            log_warn "Could not restore helixscreen.env. Backup saved at: $BACKUP_ENV"
+        fi
+    fi
+
+    # Cleanup temporary files after restores are done
+    if [ "$CLEANUP_TMP" = true ] && [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR"
     fi
 
     echo ""

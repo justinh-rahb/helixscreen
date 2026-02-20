@@ -66,18 +66,33 @@ detect_platform() {
         fi
     fi
 
-    # Check for Raspberry Pi (aarch64 or armv7l)
+    # Check for Debian-family SBC (Raspberry Pi, MKS, BTT, Armbian, etc.)
     # Returns "pi" for 64-bit, "pi32" for 32-bit
     if [ "$arch" = "aarch64" ] || [ "$arch" = "armv7l" ]; then
-        local is_pi=false
-        if [ -f /etc/os-release ] && grep -q "Raspbian\|Debian" /etc/os-release; then
-            is_pi=true
+        local is_arm_sbc=false
+
+        # 1. os-release: check for Debian-family indicators
+        #    ID_LIKE=debian appears in all derivatives (Ubuntu, Armbian, Raspbian, etc.)
+        #    so grepping for "debian" alone catches most cases.
+        if [ -f /etc/os-release ] && \
+           grep -qi "debian\|raspbian\|ubuntu\|armbian" /etc/os-release 2>/dev/null; then
+            is_arm_sbc=true
         fi
-        # Also check for MainsailOS / BTT Pi / MKS
-        if [ -d /home/pi ] || [ -d /home/mks ] || [ -d /home/biqu ]; then
-            is_pi=true
+
+        # 2. Package manager: dpkg is the definitive Debian-family indicator.
+        #    Catches any derivative not listed above.
+        if [ "$is_arm_sbc" = false ] && command -v dpkg >/dev/null 2>&1; then
+            is_arm_sbc=true
         fi
-        if [ "$is_pi" = true ]; then
+
+        # 3. Well-known SBC user home directories (MainsailOS, BTT Pi, MKS)
+        if [ "$is_arm_sbc" = false ]; then
+            if [ -d /home/pi ] || [ -d /home/mks ] || [ -d /home/biqu ]; then
+                is_arm_sbc=true
+            fi
+        fi
+
+        if [ "$is_arm_sbc" = true ]; then
             # Detect actual userspace bitness, not just kernel arch.
             # Many Pi systems run 64-bit kernel with 32-bit userspace,
             # which makes uname -m report aarch64 even though only

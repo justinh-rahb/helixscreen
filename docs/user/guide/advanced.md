@@ -41,10 +41,32 @@ Execute custom Klipper macros:
 
 ## Power Device Control
 
-Control Moonraker power devices:
+Control Moonraker power devices from the full power panel or the home panel quick-toggle button.
 
-1. Navigate to **Advanced > Power**
-2. Toggle devices on/off with switches
+### Home Panel Quick Toggle
+
+A **power-cycle button** appears on the home panel when power devices are configured:
+
+- **Tap** to toggle your selected power devices on or off
+- **Long-press** to open the full power panel overlay
+- The button shows a **danger (red) variant** when devices are on, and **muted** when off
+
+### Full Power Panel
+
+1. Navigate to **Advanced > Power Devices** (hidden when no power devices are detected)
+2. Toggle individual devices on/off with switches
+
+**Main Power Button section:**
+
+At the top of the power panel, a **"Main Power Button"** section lets you choose which devices the home panel quick-toggle controls:
+
+- Selection chips appear for each discovered power device
+- Tap chips to include or exclude devices from the home button
+- Your selection is saved automatically
+
+### Auto-Discovery
+
+HelixScreen automatically discovers power devices from Moonraker when it connects to your printer. On first discovery, all devices are selected for the home panel button by default. The **Power Devices** row in the Advanced panel is hidden when no power devices are available.
 
 **Notes:**
 

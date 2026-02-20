@@ -1,7 +1,8 @@
-# LVGL 9.5 Slot Component Designs
+# Slot Component Designs
 
-**Purpose**: Pre-design slot-based components to reduce XML verbosity when LVGL 9.5 releases.
-**Target**: LVGL 9.5.1 (expected ~March 2026, after Feb 18 release + stability patch)
+**Purpose**: Slot-based components to reduce XML verbosity using LVGL's slot support (available in `lib/helix-xml/`).
+**Status**: Ready to implement — slot support included in helix-xml extraction (commit `f38718108`)
+**Plan**: `docs/devel/plans/2026-02-18-helix-xml-plan.md` (Phase 3)
 **Estimated Savings**: ~170+ lines across 4 component patterns
 
 ---

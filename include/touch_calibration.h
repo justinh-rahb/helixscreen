@@ -184,12 +184,51 @@ inline bool device_needs_calibration(const std::string& name, const std::string&
 }
 
 /**
+ * @brief Check if an ABS range value looks like a generic HID resolution-independent range
+ *
+ * USB HID touchscreens report generic ranges (4096, 32767, 65535, etc.) that LVGL's
+ * evdev driver maps linearly to screen coordinates. These work correctly without
+ * calibration regardless of display resolution.
+ *
+ * In contrast, platform touchscreens (Goodix, FocalTech) report ABS ranges that
+ * correspond to an actual panel resolution (e.g., 800x480), which can mismatch
+ * the display if wired to a different-resolution panel.
+ *
+ * @param value ABS maximum value to check
+ * @return true if value looks like a generic HID range (not a real panel resolution)
+ */
+inline bool is_generic_hid_abs_range(int value) {
+    // Common generic HID touchscreen ranges (resolution-independent)
+    // These are typically powers-of-2 minus 1, or round powers-of-2
+    static const int generic_ranges[] = {
+        255,   // 8-bit
+        1023,  // 10-bit
+        4095,  // 12-bit (very common: BTT HDMI5, many USB HID panels)
+        4096,  // 12-bit (alternate)
+        8191,  // 13-bit
+        16383, // 14-bit
+        32767, // 15-bit (common USB HID)
+        65535, // 16-bit
+    };
+
+    for (int range : generic_ranges) {
+        if (value == range) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * @brief Check if touch ABS range doesn't match display resolution
  *
  * For capacitive screens that report coordinates for a different resolution
  * than the actual display (e.g., Goodix on SV06 Ace: ABS 800x480, display 480x272).
  * When there's a mismatch, the calibration wizard should be shown even for
  * capacitive touchscreens that are normally "factory calibrated".
+ *
+ * Skips generic HID ranges (4096, 32767, etc.) which are resolution-independent
+ * and correctly mapped by LVGL's evdev linear interpolation.
  *
  * @param abs_max_x Maximum ABS_X value from EVIOCGABS
  * @param abs_max_y Maximum ABS_Y value from EVIOCGABS
@@ -201,6 +240,12 @@ inline bool has_abs_display_mismatch(int abs_max_x, int abs_max_y, int display_w
                                      int display_height) {
     // Can't determine mismatch with invalid ranges
     if (abs_max_x <= 0 || abs_max_y <= 0 || display_width <= 0 || display_height <= 0) {
+        return false;
+    }
+
+    // Generic HID ranges (4096, 32767, etc.) are resolution-independent —
+    // LVGL's evdev driver maps them linearly to screen coords. No mismatch.
+    if (is_generic_hid_abs_range(abs_max_x) && is_generic_hid_abs_range(abs_max_y)) {
         return false;
     }
 

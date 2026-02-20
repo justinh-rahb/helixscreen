@@ -182,12 +182,190 @@ TEST_CASE("DebugBundleCollector: collect_printer_info() returns valid JSON", "[d
 // Klipper/Moonraker stubs [debug-bundle]
 // ============================================================================
 
-TEST_CASE("DebugBundleCollector: klipper log tail stub returns empty", "[debug-bundle]") {
+TEST_CASE("DebugBundleCollector: klipper log tail returns empty when not connected",
+          "[debug-bundle]") {
     std::string log = helix::DebugBundleCollector::collect_klipper_log_tail();
     REQUIRE(log.empty());
 }
 
-TEST_CASE("DebugBundleCollector: moonraker log tail stub returns empty", "[debug-bundle]") {
+TEST_CASE("DebugBundleCollector: moonraker log tail returns empty when not connected",
+          "[debug-bundle]") {
     std::string log = helix::DebugBundleCollector::collect_moonraker_log_tail();
     REQUIRE(log.empty());
+}
+
+// ============================================================================
+// sanitize_value() tests [debug-bundle][sanitize]
+// ============================================================================
+
+TEST_CASE("DebugBundleCollector: sanitize_value redacts email addresses",
+          "[debug-bundle][sanitize]") {
+    auto result = helix::DebugBundleCollector::sanitize_value("notify user@example.com on error");
+    REQUIRE(result.find("user@example.com") == std::string::npos);
+    REQUIRE(result.find("[REDACTED_EMAIL]") != std::string::npos);
+}
+
+TEST_CASE("DebugBundleCollector: sanitize_value redacts URLs with credentials",
+          "[debug-bundle][sanitize]") {
+    auto result =
+        helix::DebugBundleCollector::sanitize_value("http://admin:s3cret@192.168.1.100:8080/api");
+    REQUIRE(result.find("admin") == std::string::npos);
+    REQUIRE(result.find("s3cret") == std::string::npos);
+    REQUIRE(result.find("[REDACTED_CREDENTIALS]") != std::string::npos);
+}
+
+TEST_CASE("DebugBundleCollector: sanitize_value redacts Discord webhooks",
+          "[debug-bundle][sanitize]") {
+    auto result = helix::DebugBundleCollector::sanitize_value(
+        "https://discord.com/api/webhooks/123456/abcdef-token");
+    REQUIRE(result == "[REDACTED_WEBHOOK]");
+}
+
+TEST_CASE("DebugBundleCollector: sanitize_value redacts Telegram bot tokens",
+          "[debug-bundle][sanitize]") {
+    auto result = helix::DebugBundleCollector::sanitize_value(
+        "https://api.telegram.org/bot123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11/sendMessage");
+    REQUIRE(result == "[REDACTED_WEBHOOK]");
+}
+
+TEST_CASE("DebugBundleCollector: sanitize_value redacts long hex tokens",
+          "[debug-bundle][sanitize]") {
+    std::string long_hex = "ghp_" + std::string(36, 'a'); // 40 chars total
+    auto result = helix::DebugBundleCollector::sanitize_value(long_hex);
+    REQUIRE(result == "[REDACTED_TOKEN]");
+}
+
+TEST_CASE("DebugBundleCollector: sanitize_value preserves normal strings",
+          "[debug-bundle][sanitize]") {
+    REQUIRE(helix::DebugBundleCollector::sanitize_value("hello world") == "hello world");
+    REQUIRE(helix::DebugBundleCollector::sanitize_value("/tmp/printer_data") ==
+            "/tmp/printer_data");
+    REQUIRE(helix::DebugBundleCollector::sanitize_value("192.168.1.100") == "192.168.1.100");
+}
+
+TEST_CASE("DebugBundleCollector: sanitize_value redacts MAC addresses",
+          "[debug-bundle][sanitize]") {
+    auto result = helix::DebugBundleCollector::sanitize_value("aa:bb:cc:dd:ee:ff");
+    REQUIRE(result.find("aa:bb:cc:dd:ee:ff") == std::string::npos);
+    REQUIRE(result.find("[REDACTED_MAC]") != std::string::npos);
+}
+
+TEST_CASE("DebugBundleCollector: sanitize_value redacts Pushover and ntfy webhooks",
+          "[debug-bundle][sanitize]") {
+    auto pushover =
+        helix::DebugBundleCollector::sanitize_value("https://api.pushover.net/1/messages.json");
+    REQUIRE(pushover == "[REDACTED_WEBHOOK]");
+
+    auto ntfy = helix::DebugBundleCollector::sanitize_value("https://ntfy.sh/my-printer-alerts");
+    REQUIRE(ntfy == "[REDACTED_WEBHOOK]");
+
+    auto ifttt = helix::DebugBundleCollector::sanitize_value(
+        "https://maker.ifttt.com/trigger/print_done/with/key/abc123");
+    REQUIRE(ifttt == "[REDACTED_WEBHOOK]");
+}
+
+// ============================================================================
+// collect_moonraker_info() tests [debug-bundle][moonraker]
+// ============================================================================
+
+TEST_CASE("DebugBundleCollector: collect_moonraker_info returns object with expected keys",
+          "[debug-bundle][moonraker]") {
+    // When not connected, should return an object with error sub-keys (not crash)
+    json mr = helix::DebugBundleCollector::collect_moonraker_info();
+    REQUIRE(mr.is_object());
+
+    // Should always have these keys, even if errored
+    REQUIRE(mr.contains("server_info"));
+    REQUIRE(mr.contains("printer_info"));
+    REQUIRE(mr.contains("system_info"));
+    REQUIRE(mr.contains("printer_state"));
+    REQUIRE(mr.contains("config"));
+}
+
+TEST_CASE("DebugBundleCollector: collect includes moonraker section", "[debug-bundle][moonraker]") {
+    json bundle = helix::DebugBundleCollector::collect();
+    REQUIRE(bundle.contains("moonraker"));
+    REQUIRE(bundle["moonraker"].is_object());
+}
+
+// ============================================================================
+// Realistic Moonraker config sanitization [debug-bundle][sanitize]
+// ============================================================================
+
+TEST_CASE("DebugBundleCollector: sanitize_json handles realistic moonraker config",
+          "[debug-bundle][sanitize]") {
+    // Simulate a realistic /server/config response with various PII
+    json config = R"({
+        "result": {
+            "config": {
+                "server": {
+                    "host": "0.0.0.0",
+                    "port": 7125,
+                    "klippy_uds_address": "/home/pi/printer_data/comms/klippy.sock"
+                },
+                "authorization": {
+                    "trusted_clients": ["192.168.1.0/24", "10.0.0.0/8"],
+                    "cors_domains": ["http://my-printer.local"]
+                },
+                "notifier my_telegram": {
+                    "url": "https://api.telegram.org/bot123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11/sendMessage",
+                    "events": ["error", "complete"],
+                    "body": "Printer notification for user@example.com"
+                },
+                "notifier my_discord": {
+                    "url": "https://discord.com/api/webhooks/1234567890/ABCdefGHIjklMNOpqrSTUvwxYZ",
+                    "events": ["error"]
+                },
+                "update_manager client mainsail": {
+                    "type": "web",
+                    "repo": "mainsail-crew/mainsail"
+                },
+                "power my_plug": {
+                    "type": "tplink_smartplug",
+                    "address": "192.168.1.50",
+                    "password": "my_plug_password"
+                },
+                "webcam my_camera": {
+                    "stream_url": "http://admin:camera_pass@192.168.1.60:8080/stream",
+                    "snapshot_url": "/webcam/?action=snapshot"
+                },
+                "spoolman": {
+                    "server": "http://192.168.1.100:7912"
+                }
+            }
+        }
+    })"_json;
+
+    json sanitized = helix::DebugBundleCollector::sanitize_json(config);
+
+    // Telegram URL should be fully redacted
+    std::string telegram_url =
+        sanitized["result"]["config"]["notifier my_telegram"]["url"].get<std::string>();
+    REQUIRE(telegram_url == "[REDACTED_WEBHOOK]");
+
+    // Discord webhook should be fully redacted
+    std::string discord_url =
+        sanitized["result"]["config"]["notifier my_discord"]["url"].get<std::string>();
+    REQUIRE(discord_url == "[REDACTED_WEBHOOK]");
+
+    // Email in body should be redacted
+    std::string body =
+        sanitized["result"]["config"]["notifier my_telegram"]["body"].get<std::string>();
+    REQUIRE(body.find("user@example.com") == std::string::npos);
+    REQUIRE(body.find("[REDACTED_EMAIL]") != std::string::npos);
+
+    // Password key should be redacted
+    std::string pw = sanitized["result"]["config"]["power my_plug"]["password"].get<std::string>();
+    REQUIRE(pw == "[REDACTED]");
+
+    // Camera URL with credentials should be redacted
+    std::string cam_url =
+        sanitized["result"]["config"]["webcam my_camera"]["stream_url"].get<std::string>();
+    REQUIRE(cam_url.find("admin") == std::string::npos);
+    REQUIRE(cam_url.find("camera_pass") == std::string::npos);
+
+    // Safe values should be preserved
+    REQUIRE(sanitized["result"]["config"]["server"]["port"] == 7125);
+    REQUIRE(sanitized["result"]["config"]["update_manager client mainsail"]["repo"] ==
+            "mainsail-crew/mainsail");
 }

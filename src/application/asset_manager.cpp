@@ -28,6 +28,7 @@ void AssetManager::register_fonts() {
     lv_xml_register_font(nullptr, "mdi_icons_32", &mdi_icons_32);
     lv_xml_register_font(nullptr, "mdi_icons_24", &mdi_icons_24);
     lv_xml_register_font(nullptr, "mdi_icons_16", &mdi_icons_16);
+    lv_xml_register_font(nullptr, "mdi_icons_14", &mdi_icons_14);
 
     // Montserrat text fonts - used by semantic text components:
     // - text_heading uses font_heading (20/26/28 for small/medium/large breakpoints)
@@ -47,6 +48,7 @@ void AssetManager::register_fonts() {
     // Noto Sans fonts - same sizes as Montserrat, with extended Unicode support
     // (includes ©®™€£¥°±•… and other symbols)
     lv_xml_register_font(nullptr, "noto_sans_10", &noto_sans_10);
+    lv_xml_register_font(nullptr, "noto_sans_11", &noto_sans_11);
     lv_xml_register_font(nullptr, "noto_sans_12", &noto_sans_12);
     lv_xml_register_font(nullptr, "noto_sans_14", &noto_sans_14);
     lv_xml_register_font(nullptr, "noto_sans_16", &noto_sans_16);
@@ -58,6 +60,7 @@ void AssetManager::register_fonts() {
 
     // Noto Sans Light fonts (for text_small)
     lv_xml_register_font(nullptr, "noto_sans_light_10", &noto_sans_light_10);
+    lv_xml_register_font(nullptr, "noto_sans_light_11", &noto_sans_light_11);
     lv_xml_register_font(nullptr, "noto_sans_light_12", &noto_sans_light_12);
     lv_xml_register_font(nullptr, "noto_sans_light_14", &noto_sans_light_14);
     lv_xml_register_font(nullptr, "noto_sans_light_16", &noto_sans_light_16);

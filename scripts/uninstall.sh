@@ -69,6 +69,7 @@ file_sudo() {
 CLEANUP_TMP=false
 CLEANUP_SERVICE=false
 BACKUP_CONFIG=""
+BACKUP_ENV=""
 ORIGINAL_INSTALL_EXISTS=false
 
 # Colors (if terminal supports it)
@@ -112,13 +113,7 @@ error_handler() {
     log_error "=========================================="
     echo ""
 
-    # Cleanup temporary files
-    if [ "$CLEANUP_TMP" = true ] && [ -d "$TMP_DIR" ]; then
-        log_info "Cleaning up temporary files..."
-        rm -rf "$TMP_DIR"
-    fi
-
-    # If we backed up config and install failed, try to restore state
+    # Restore backups BEFORE cleaning TMP_DIR — backup files live in TMP_DIR
     if [ -n "$BACKUP_CONFIG" ] && [ -f "$BACKUP_CONFIG" ]; then
         log_info "Restoring backed up configuration..."
         if $(file_sudo "${INSTALL_DIR}") mkdir -p "${INSTALL_DIR}/config" 2>/dev/null; then
@@ -130,6 +125,18 @@ error_handler() {
         else
             log_warn "Could not create config directory. Backup saved at: $BACKUP_CONFIG"
         fi
+    fi
+    if [ -n "$BACKUP_ENV" ] && [ -f "$BACKUP_ENV" ]; then
+        if $(file_sudo "${INSTALL_DIR}/config") cp "$BACKUP_ENV" "${INSTALL_DIR}/config/helixscreen.env" 2>/dev/null; then
+            log_success "helixscreen.env restored"
+        else
+            log_warn "Could not restore helixscreen.env. Backup saved at: $BACKUP_ENV"
+        fi
+    fi
+
+    # Cleanup temporary files after restores are done
+    if [ "$CLEANUP_TMP" = true ] && [ -d "$TMP_DIR" ]; then
+        rm -rf "$TMP_DIR"
     fi
 
     echo ""
@@ -256,18 +263,33 @@ detect_platform() {
         fi
     fi
 
-    # Check for Raspberry Pi (aarch64 or armv7l)
+    # Check for Debian-family SBC (Raspberry Pi, MKS, BTT, Armbian, etc.)
     # Returns "pi" for 64-bit, "pi32" for 32-bit
     if [ "$arch" = "aarch64" ] || [ "$arch" = "armv7l" ]; then
-        local is_pi=false
-        if [ -f /etc/os-release ] && grep -q "Raspbian\|Debian" /etc/os-release; then
-            is_pi=true
+        local is_arm_sbc=false
+
+        # 1. os-release: check for Debian-family indicators
+        #    ID_LIKE=debian appears in all derivatives (Ubuntu, Armbian, Raspbian, etc.)
+        #    so grepping for "debian" alone catches most cases.
+        if [ -f /etc/os-release ] && \
+           grep -qi "debian\|raspbian\|ubuntu\|armbian" /etc/os-release 2>/dev/null; then
+            is_arm_sbc=true
         fi
-        # Also check for MainsailOS / BTT Pi / MKS
-        if [ -d /home/pi ] || [ -d /home/mks ] || [ -d /home/biqu ]; then
-            is_pi=true
+
+        # 2. Package manager: dpkg is the definitive Debian-family indicator.
+        #    Catches any derivative not listed above.
+        if [ "$is_arm_sbc" = false ] && command -v dpkg >/dev/null 2>&1; then
+            is_arm_sbc=true
         fi
-        if [ "$is_pi" = true ]; then
+
+        # 3. Well-known SBC user home directories (MainsailOS, BTT Pi, MKS)
+        if [ "$is_arm_sbc" = false ]; then
+            if [ -d /home/pi ] || [ -d /home/mks ] || [ -d /home/biqu ]; then
+                is_arm_sbc=true
+            fi
+        fi
+
+        if [ "$is_arm_sbc" = true ]; then
             # Detect actual userspace bitness, not just kernel arch.
             # Many Pi systems run 64-bit kernel with 32-bit userspace,
             # which makes uname -m report aarch64 even though only
@@ -651,6 +673,74 @@ check_permissions() {
             SUDO="sudo"
         else
             SUDO=""
+        fi
+    fi
+}
+
+# Install system permission rules for non-root operation
+# - udev rule: backlight brightness write access for video group
+# - polkit rule: NetworkManager access for service user
+# Only installed on platforms that run as non-root (Pi, generic Linux)
+install_permission_rules() {
+    local platform=$1
+    local helix_user="${KLIPPER_USER:-root}"
+
+    # Skip for platforms that run as root (AD5M, K1) or if user is root
+    if [ "$platform" = "ad5m" ] || [ "$platform" = "k1" ] || [ "$helix_user" = "root" ]; then
+        log_info "Skipping permission rules (running as root)"
+        return 0
+    fi
+
+    # Under NoNewPrivileges (self-update), sudo is blocked.  The rules were
+    # already installed during the initial install — skip silently.
+    if _has_no_new_privs; then
+        log_info "Skipping permission rules (NoNewPrivileges; already installed)"
+        return 0
+    fi
+
+    # --- Backlight udev rule ---
+    local udev_src="${INSTALL_DIR}/config/99-helixscreen-backlight.rules"
+    local udev_dest="/etc/udev/rules.d/99-helixscreen-backlight.rules"
+
+    if [ -f "$udev_src" ] && [ -d /etc/udev/rules.d ]; then
+        $SUDO cp "$udev_src" "$udev_dest"
+        # Trigger udev to apply immediately for any existing backlight devices
+        $SUDO udevadm trigger --subsystem-match=backlight 2>/dev/null || true
+        log_info "Installed backlight udev rule"
+    fi
+
+    # --- NetworkManager polkit rule ---
+    local pkla_src="${INSTALL_DIR}/config/helixscreen-network.pkla"
+
+    if [ -f "$pkla_src" ] && command -v nmcli >/dev/null 2>&1; then
+        # polkit JavaScript rules for newer polkit (Debian 12+, polkit >= 0.106)
+        local rules_dir="/etc/polkit-1/rules.d"
+        # polkit local authority (.pkla) for older polkit (Debian 11 and similar)
+        local pkla_dir="/etc/polkit-1/localauthority/50-local.d"
+
+        if [ -d "$rules_dir" ]; then
+            # JavaScript rules format (newer polkit, Debian 12+)
+            local rules_dest="${rules_dir}/50-helixscreen-network.rules"
+            $SUDO tee "$rules_dest" > /dev/null << POLKIT_EOF
+// Installed by HelixScreen — allow service user to manage NetworkManager
+polkit.addRule(function(action, subject) {
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 &&
+        subject.user === "${helix_user}") {
+        return polkit.Result.YES;
+    }
+});
+POLKIT_EOF
+            log_info "Installed NetworkManager polkit rule (.rules)"
+        elif [ -d "$pkla_dir" ]; then
+            # .pkla format (pklocalauthority, Debian 11 and older)
+            local pkla_dest="${pkla_dir}/helixscreen-network.pkla"
+            $SUDO cp "$pkla_src" "$pkla_dest"
+            # Template the user
+            $SUDO sed -i "s|@@HELIX_USER@@|${helix_user}|g" "$pkla_dest" 2>/dev/null || \
+            $SUDO sed -i '' "s|@@HELIX_USER@@|${helix_user}|g" "$pkla_dest" 2>/dev/null || true
+            log_info "Installed NetworkManager polkit rule (.pkla)"
+        else
+            log_warn "polkit rules directory not found — Wi-Fi may not work as non-root"
         fi
     fi
 }
@@ -1436,14 +1526,17 @@ generate_update_manager_config() {
 
 # HelixScreen Update Manager
 # Added by HelixScreen installer - enables one-click updates from Mainsail/Fluidd
+# NOTE: type: web is used instead of type: zip as a workaround for
+# mainsail-crew/mainsail#2444 (zip type always shows UP-TO-DATE).
+# A systemd path unit handles service restart after Moonraker extracts the update.
 [update_manager helixscreen]
-type: zip
+type: web
 channel: stable
 repo: prestonbrown/helixscreen
 path: ${INSTALL_DIR}
-managed_services: helixscreen
 persistent_files:
     config/helixconfig.json
+    config/helixscreen.env
     config/.disabled_services
 EOF
 }
@@ -1479,31 +1572,43 @@ has_old_git_repo_section() {
     return 1
 }
 
-# Migrate old git_repo section to zip
+# Check if moonraker.conf has old zip-style helixscreen section
 # Args: $1 = moonraker.conf path
-migrate_git_repo_to_zip() {
+# Returns: 0 if old zip section found, 1 if not
+has_old_zip_section() {
+    local conf="$1"
+    if grep -q '^\[update_manager helixscreen\]' "$conf" 2>/dev/null; then
+        awk '/^\[update_manager helixscreen\]/{found=1; next} found && /^\[/{exit} found && /^type:/{print; exit}' "$conf" | grep -q 'zip'
+        return $?
+    fi
+    return 1
+}
+
+# Migrate old section (git_repo or zip) to type: web
+# Args: $1 = moonraker.conf path
+migrate_to_web_type() {
     local conf="$1"
 
-    log_info "Migrating update_manager from git_repo to zip..."
+    log_info "Migrating update_manager to type: web..."
 
     # Remove old section
     remove_update_manager_section "$conf" 2>/dev/null || true
 
-    # Add new zip section
+    # Add new web section
     add_update_manager_section "$conf"
 
-    # Clean up old sparse clone directory if it exists
+    # Clean up old sparse clone directory if it exists (from git_repo era)
     local old_repo_dir="${INSTALL_DIR}-repo"
     if [ -d "$old_repo_dir" ]; then
         log_info "Removing old updater repo at $old_repo_dir..."
         $SUDO rm -rf "$old_repo_dir"
     fi
 
-    log_success "Migrated to type: zip update manager"
+    log_success "Migrated to type: web update manager"
 }
 
 # Write release_info.json if not already present
-# Moonraker type:zip needs this file to detect installed version
+# Moonraker type:web needs this file to detect installed version
 write_release_info() {
     local release_info="${INSTALL_DIR}/release_info.json"
 
@@ -1608,9 +1713,10 @@ configure_moonraker_updates() {
         return 0
     fi
 
-    # Migrate old git_repo config to zip
-    if has_old_git_repo_section "$conf"; then
-        migrate_git_repo_to_zip "$conf"
+    # Migrate old git_repo or zip config to type: web
+    # (type: zip shows perpetual UP-TO-DATE in Mainsail — see mainsail-crew/mainsail#2444)
+    if has_old_git_repo_section "$conf" || has_old_zip_section "$conf"; then
+        migrate_to_web_type "$conf"
         ensure_moonraker_asvc "$conf"
         restart_moonraker
         return 0
@@ -1716,6 +1822,15 @@ uninstall() {
         $SUDO systemctl stop "$SERVICE_NAME" 2>/dev/null || true
         $SUDO systemctl disable "$SERVICE_NAME" 2>/dev/null || true
         $SUDO rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
+        # Remove update watcher units (mainsail#2444 workaround)
+        $SUDO systemctl stop helixscreen-update.path 2>/dev/null || true
+        $SUDO systemctl disable helixscreen-update.path 2>/dev/null || true
+        $SUDO rm -f /etc/systemd/system/helixscreen-update.path
+        $SUDO rm -f /etc/systemd/system/helixscreen-update.service
+        # Remove permission rules (udev, polkit)
+        $SUDO rm -f /etc/udev/rules.d/99-helixscreen-backlight.rules
+        $SUDO rm -f /etc/polkit-1/localauthority/50-local.d/helixscreen-network.pkla
+        $SUDO rm -f /etc/polkit-1/rules.d/50-helixscreen-network.rules
         $SUDO systemctl daemon-reload
     else
         # Stop and remove SysV init scripts (check all possible locations)
@@ -1791,14 +1906,14 @@ uninstall() {
     for cache_dir in /root/.cache/helix /tmp/helix_thumbs /.cache/helix /data/helixscreen/cache /usr/data/helixscreen/cache; do
         if [ -d "$cache_dir" ] 2>/dev/null; then
             log_info "Removing cache: $cache_dir"
-            $(file_sudo "$cache_dir") rm -rf "$cache_dir"
+            $SUDO rm -rf "$cache_dir"
         fi
     done
     # Clean up /var/tmp helix files
     for tmp_pattern in /var/tmp/helix_*; do
         if [ -e "$tmp_pattern" ] 2>/dev/null; then
             log_info "Removing cache: $tmp_pattern"
-            $(file_sudo "$tmp_pattern") rm -rf "$tmp_pattern"
+            $SUDO rm -rf "$tmp_pattern"
         fi
     done
 
@@ -1901,8 +2016,17 @@ clean_old_installation() {
         log_info "Removing systemd service..."
         $SUDO systemctl disable "$SERVICE_NAME" 2>/dev/null || true
         $SUDO rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
-        $SUDO systemctl daemon-reload 2>/dev/null || true
     fi
+    # Remove update watcher units
+    $SUDO systemctl stop helixscreen-update.path 2>/dev/null || true
+    $SUDO systemctl disable helixscreen-update.path 2>/dev/null || true
+    $SUDO rm -f /etc/systemd/system/helixscreen-update.path
+    $SUDO rm -f /etc/systemd/system/helixscreen-update.service
+    # Remove permission rules (udev, polkit)
+    $SUDO rm -f /etc/udev/rules.d/99-helixscreen-backlight.rules
+    $SUDO rm -f /etc/polkit-1/localauthority/50-local.d/helixscreen-network.pkla
+    $SUDO rm -f /etc/polkit-1/rules.d/50-helixscreen-network.rules
+    $SUDO systemctl daemon-reload 2>/dev/null || true
 
     log_success "Old installation cleaned"
     echo ""

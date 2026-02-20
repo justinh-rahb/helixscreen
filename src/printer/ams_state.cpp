@@ -24,6 +24,7 @@
 #include "printer_discovery.h"
 #include "printer_state.h"
 #include "runtime_config.h"
+#include "settings_manager.h"
 #include "state/subject_macros.h"
 #include "static_subject_registry.h"
 #include "tool_state.h"
@@ -170,6 +171,7 @@ void AmsState::init_subjects(bool register_xml) {
     INIT_SUBJECT_INT(ams_type, static_cast<int>(AmsType::NONE), subjects_, register_xml);
     INIT_SUBJECT_INT(ams_action, static_cast<int>(AmsAction::IDLE), subjects_, register_xml);
     INIT_SUBJECT_INT(current_slot, -1, subjects_, register_xml);
+    INIT_SUBJECT_INT(pending_target_slot, -1, subjects_, register_xml);
     INIT_SUBJECT_INT(ams_current_tool, -1, subjects_, register_xml);
     // These subjects need ams_ prefix for XML but member vars don't have it
     lv_subject_init_int(&filament_loaded_, 0);
@@ -181,6 +183,16 @@ void AmsState::init_subjects(bool register_xml) {
     subjects_.register_subject(&bypass_active_);
     if (register_xml)
         lv_xml_register_subject(nullptr, "ams_bypass_active", &bypass_active_);
+
+    // External spool color subject (loaded from persistent settings)
+    {
+        auto ext_spool = helix::SettingsManager::instance().get_external_spool_info();
+        int initial_color = ext_spool.has_value() ? static_cast<int>(ext_spool->color_rgb) : 0;
+        lv_subject_init_int(&external_spool_color_, initial_color);
+        subjects_.register_subject(&external_spool_color_);
+        if (register_xml)
+            lv_xml_register_subject(nullptr, "ams_external_spool_color", &external_spool_color_);
+    }
 
     lv_subject_init_int(&supports_bypass_, 0);
     subjects_.register_subject(&supports_bypass_);
@@ -663,6 +675,7 @@ void AmsState::sync_from_backend() {
         lv_subject_copy_string(&ams_system_name_, ams_type_to_string(info.type));
     }
     lv_subject_set_int(&current_slot_, info.current_slot);
+    lv_subject_set_int(&pending_target_slot_, info.pending_target_slot);
     lv_subject_set_int(&ams_current_tool_, info.current_tool);
 
     // Update formatted tool text (e.g., "T0", "T1", or "---" when no tool active)
@@ -677,6 +690,11 @@ void AmsState::sync_from_backend() {
     lv_subject_set_int(&filament_loaded_, info.filament_loaded ? 1 : 0);
     lv_subject_set_int(&bypass_active_, info.current_slot == -2 ? 1 : 0);
     lv_subject_set_int(&supports_bypass_, info.supports_bypass ? 1 : 0);
+
+    // Update external spool color from persistent settings
+    auto ext_spool = helix::SettingsManager::instance().get_external_spool_info();
+    lv_subject_set_int(&external_spool_color_,
+                       ext_spool.has_value() ? static_cast<int>(ext_spool->color_rgb) : 0);
     lv_subject_set_int(&ams_slot_count_, info.total_slots);
 
     // Update action detail string
@@ -897,6 +915,26 @@ void AmsState::set_action(AmsAction action) {
     spdlog::debug("[AMS State] Action set: {}", ams_action_to_string(action));
 }
 
+void AmsState::set_pending_target_slot(int slot) {
+    helix::ui::queue_update([this, slot]() { lv_subject_set_int(&pending_target_slot_, slot); });
+}
+
+bool AmsState::is_filament_operation_active() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    auto action = static_cast<AmsAction>(lv_subject_get_int(&ams_action_));
+    // Only suppress during states that actively move filament past sensors.
+    // Heating, tip forming, cutting, and purging are stationary — a sensor
+    // change in those states would indicate a real problem.
+    switch (action) {
+    case AmsAction::LOADING:
+    case AmsAction::UNLOADING:
+    case AmsAction::SELECTING:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void AmsState::sync_current_loaded_from_backend() {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
 
@@ -970,22 +1008,21 @@ void AmsState::sync_current_loaded_from_backend() {
                          slot_index);
             } else {
                 const char* unit_name = nullptr;
-                int local_slot = slot_index + 1; // 1-based default
+                int display_slot = slot_index + 1; // 1-based global slot number
                 for (const auto& unit : sys.units) {
                     if (slot_index >= unit.first_slot_global_index &&
                         slot_index < unit.first_slot_global_index + unit.slot_count) {
                         unit_name = unit.name.c_str();
-                        local_slot = slot_index - unit.first_slot_global_index + 1;
                         break;
                     }
                 }
                 if (unit_name && sys.units.size() > 1) {
-                    // Multi-unit: break across two lines for readability
+                    // Multi-unit: show unit name + global slot number
                     snprintf(current_slot_text_buf_, sizeof(current_slot_text_buf_),
-                             "Current: %s\nSlot %d", unit_name, local_slot);
+                             "Current: %s\nSlot %d", unit_name, display_slot);
                 } else {
                     snprintf(current_slot_text_buf_, sizeof(current_slot_text_buf_),
-                             "Current: Slot %d", local_slot);
+                             "Current: Slot %d", display_slot);
                 }
             }
             lv_subject_copy_string(&current_slot_text_, current_slot_text_buf_);
@@ -1157,13 +1194,31 @@ void AmsState::refresh_spoolman_weights() {
                             return;
                         }
 
-                        // Update weights and set back
+                        // Skip update if weights haven't changed (avoids UI refresh cascade)
+                        if (slot.remaining_weight_g == d->remaining_weight_g &&
+                            slot.total_weight_g == d->total_weight_g) {
+                            spdlog::trace(
+                                "[AmsState] Slot {} weights unchanged ({:.0f}g / {:.0f}g)",
+                                d->slot_index, d->remaining_weight_g, d->total_weight_g);
+                            return;
+                        }
+
+                        // Update weights and set back.
+                        // CRITICAL: persist=false prevents an infinite feedback loop.
+                        // With persist=true, set_slot_info sends G-code to firmware
+                        // (e.g., SET_WEIGHT for AFC, MMU_GATE_MAP for Happy Hare).
+                        // Firmware then emits a status_update WebSocket event, which
+                        // triggers sync_from_backend → refresh_spoolman_weights →
+                        // set_slot_info again, ad infinitum. With 4 AFC lanes this
+                        // fires 16+ G-code commands per cycle and saturates the CPU.
+                        // Since these weights come FROM Spoolman (an external source),
+                        // there's no need to write them back to firmware.
                         slot.remaining_weight_g = d->remaining_weight_g;
                         slot.total_weight_g = d->total_weight_g;
-                        primary->set_slot_info(d->slot_index, slot);
+                        primary->set_slot_info(d->slot_index, slot, /*persist=*/false);
                         state.bump_slots_version();
 
-                        spdlog::trace("[AmsState] Updated slot {} weights: {:.0f}g / {:.0f}g",
+                        spdlog::debug("[AmsState] Updated slot {} weights: {:.0f}g / {:.0f}g",
                                       d->slot_index, d->remaining_weight_g, d->total_weight_g);
                     });
                 },
@@ -1175,7 +1230,7 @@ void AmsState::refresh_spoolman_weights() {
     }
 
     if (linked_count > 0) {
-        spdlog::debug("[AmsState] Refreshing Spoolman weights for {} linked slots", linked_count);
+        spdlog::trace("[AmsState] Refreshing Spoolman weights for {} linked slots", linked_count);
     }
 }
 
@@ -1214,4 +1269,24 @@ void AmsState::stop_spoolman_polling() {
         lv_timer_delete(spoolman_poll_timer_);
         spoolman_poll_timer_ = nullptr;
     }
+}
+
+// ============================================================================
+// External Spool (delegates to SettingsManager for persistence)
+// ============================================================================
+
+std::optional<SlotInfo> AmsState::get_external_spool_info() const {
+    return helix::SettingsManager::instance().get_external_spool_info();
+}
+
+void AmsState::set_external_spool_info(const SlotInfo& info) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    helix::SettingsManager::instance().set_external_spool_info(info);
+    lv_subject_set_int(&external_spool_color_, static_cast<int>(info.color_rgb));
+}
+
+void AmsState::clear_external_spool_info() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    helix::SettingsManager::instance().clear_external_spool_info();
+    lv_subject_set_int(&external_spool_color_, 0);
 }

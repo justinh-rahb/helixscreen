@@ -3,6 +3,7 @@
 
 #include "backlight_backend.h"
 
+#include "config.h"
 #include "runtime_config.h"
 #include "spdlog/spdlog.h"
 
@@ -246,8 +247,14 @@ class BacklightBackendAllwinner : public BacklightBackend {
     static constexpr int MAX_BRIGHTNESS = 255;
 
     BacklightBackendAllwinner() {
+        // Some Allwinner platforms (e.g. Elegoo CC1) invert PWM polarity when
+        // BACKLIGHT_ENABLE/DISABLE ioctls are used. Config opt-out skips those
+        // ioctls entirely and uses SET_BRIGHTNESS only.
+        auto* config = helix::Config::get_instance();
+        use_enable_ioctl_ = config->get<bool>("/display/backlight_enable_ioctl", true);
+
         probe_device();
-        if (available_) {
+        if (available_ && use_enable_ioctl_) {
             // Reset backlight driver state by cycling through DISABLE.
             // On AD5M, the Allwinner DISP2 driver can get into an "inverted" state
             // where higher brightness values = dimmer screen. Cycling through
@@ -321,28 +328,36 @@ class BacklightBackendAllwinner : public BacklightBackend {
                              strerror(err));
             }
 
-            // Also disable backlight via dedicated ioctl (may control enable GPIO)
-            args[1] = 0;
-            ret = ioctl(fd.get(), DISP_LCD_BACKLIGHT_DISABLE, args);
-            if (ret < 0) {
-                int err = errno;
-                spdlog::warn("[Backlight-Allwinner] ioctl BACKLIGHT_DISABLE failed: {}",
-                             strerror(err));
+            if (use_enable_ioctl_) {
+                // Also disable backlight via dedicated ioctl (may control enable GPIO).
+                // Skipped when backlight_enable_ioctl is false — some platforms invert
+                // PWM polarity when BACKLIGHT_DISABLE is called.
+                args[1] = 0;
+                ret = ioctl(fd.get(), DISP_LCD_BACKLIGHT_DISABLE, args);
+                if (ret < 0) {
+                    int err = errno;
+                    spdlog::warn("[Backlight-Allwinner] ioctl BACKLIGHT_DISABLE failed: {}",
+                                 strerror(err));
+                }
             }
-            spdlog::debug("[Backlight-Allwinner] Backlight disabled (PWM=0 + DISABLE)");
+            spdlog::debug("[Backlight-Allwinner] Backlight disabled (PWM=0{})",
+                          use_enable_ioctl_ ? " + DISABLE" : "");
         } else {
-            // Enable backlight first (required on AD5M before SET_BRIGHTNESS works)
-            int ret = ioctl(fd.get(), DISP_LCD_BACKLIGHT_ENABLE, args);
-            if (ret < 0) {
-                int err = errno;
-                spdlog::warn("[Backlight-Allwinner] ioctl BACKLIGHT_ENABLE failed: {}",
-                             strerror(err));
-                // Continue anyway - some devices may not need explicit enable
+            if (use_enable_ioctl_) {
+                // Enable backlight first (required on AD5M before SET_BRIGHTNESS works).
+                // Skipped when backlight_enable_ioctl is false to avoid polarity issues.
+                int ret = ioctl(fd.get(), DISP_LCD_BACKLIGHT_ENABLE, args);
+                if (ret < 0) {
+                    int err = errno;
+                    spdlog::warn("[Backlight-Allwinner] ioctl BACKLIGHT_ENABLE failed: {}",
+                                 strerror(err));
+                    // Continue anyway - some devices may not need explicit enable
+                }
             }
 
             // Set brightness level
             args[1] = static_cast<unsigned long>(brightness);
-            ret = ioctl(fd.get(), DISP_LCD_SET_BRIGHTNESS, args);
+            int ret = ioctl(fd.get(), DISP_LCD_SET_BRIGHTNESS, args);
             if (ret < 0) {
                 int err = errno;
                 spdlog::warn("[Backlight-Allwinner] ioctl SET_BRIGHTNESS failed: {}",
@@ -421,11 +436,13 @@ class BacklightBackendAllwinner : public BacklightBackend {
         }
 
         available_ = true;
-        spdlog::info("[Backlight-Allwinner] Found {} (current brightness: {})", DISP_DEVICE,
-                     (ret > 0) ? ret : static_cast<int>(args[1]));
+        int raw = (ret > 0) ? ret : static_cast<int>(args[1]);
+        spdlog::info("[Backlight-Allwinner] Found {} (raw brightness: {}{})", DISP_DEVICE, raw,
+                     use_enable_ioctl_ ? "" : ", enable ioctl disabled");
     }
 
     bool available_ = false;
+    bool use_enable_ioctl_ = true;
 };
 #endif // __linux__
 

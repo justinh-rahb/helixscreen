@@ -33,26 +33,32 @@
          runtime by ui_theme.cpp - do NOT define them here or responsive overrides
          will be silently ignored due to LVGL's lv_xml_register_const() behavior. -->
     <!-- space_xxs: Tiny spacing (keypad rows, compact icon gaps) -->
+    <px name="space_xxs_tiny" value="1"/>
     <px name="space_xxs_small" value="2"/>
     <px name="space_xxs_medium" value="3"/>
     <px name="space_xxs_large" value="4"/>
     <!-- space_xs: Extra small (button icon+text, dense info) -->
+    <px name="space_xs_tiny" value="2"/>
     <px name="space_xs_small" value="4"/>
     <px name="space_xs_medium" value="5"/>
     <px name="space_xs_large" value="6"/>
     <!-- space_sm: Small (tight layouts, minor separations) -->
+    <px name="space_sm_tiny" value="4"/>
     <px name="space_sm_small" value="6"/>
     <px name="space_sm_medium" value="7"/>
     <px name="space_sm_large" value="8"/>
     <!-- space_md: Medium (standard flex gaps, compact padding) -->
+    <px name="space_md_tiny" value="6"/>
     <px name="space_md_small" value="8"/>
     <px name="space_md_medium" value="10"/>
     <px name="space_md_large" value="12"/>
     <!-- space_lg: Large (container padding, major sections) -->
+    <px name="space_lg_tiny" value="8"/>
     <px name="space_lg_small" value="12"/>
     <px name="space_lg_medium" value="16"/>
     <px name="space_lg_large" value="20"/>
     <!-- space_xl: Extra large (emphasis cards, major separations) -->
+    <px name="space_xl_tiny" value="8"/>
     <px name="space_xl_small" value="16"/>
     <px name="space_xl_medium" value="20"/>
     <px name="space_xl_large" value="24"/>
@@ -80,6 +86,7 @@
     <!-- Responsive Badge Sizes (badge_size)                                   -->
     <!-- ===================================================================== -->
     <!-- Small round badge for tool numbers, counts, etc. overlaid on icons -->
+    <px name="badge_size_tiny" value="10"/>
     <px name="badge_size_small" value="16"/>
     <px name="badge_size_medium" value="18"/>
     <px name="badge_size_large" value="20"/>
@@ -113,12 +120,8 @@
     <px name="spinner_arc_md_small" value="2"/>
     <px name="spinner_arc_md_medium" value="3"/>
     <px name="spinner_arc_md_large" value="3"/>
-    <px name="spinner_arc_sm_small" value="2"/>
-    <px name="spinner_arc_sm_medium" value="2"/>
-    <px name="spinner_arc_sm_large" value="2"/>
-    <px name="spinner_arc_xs_small" value="2"/>
-    <px name="spinner_arc_xs_medium" value="2"/>
-    <px name="spinner_arc_xs_large" value="2"/>
+    <px name="spinner_arc_sm" value="2"/>
+    <px name="spinner_arc_xs" value="2"/>
 
     <!-- Fan card tokens (fan_*) live in fan_tokens.xml -->
 
@@ -179,22 +182,25 @@
     <px name="button_padding" value="12"/>
 
     <!-- Icon buttons, back buttons -->
-    <px name="button_height_sm_small" value="36"/>
+    <px name="button_height_sm_tiny" value="22"/>
+    <px name="button_height_sm_small" value="40"/>
     <px name="button_height_sm_medium" value="40"/>
-    <px name="button_height_sm_large" value="48"/>
-    <px name="button_height_sm" value="40"/>
+    <px name="button_height_sm_large" value="40"/>
 
     <!-- button_height is responsive: _small/_medium/_large registered as button_height based on screen size -->
+    <px name="button_height_tiny" value="26"/>
     <px name="button_height_small" value="48"/>
     <px name="button_height_medium" value="52"/>
     <px name="button_height_large" value="72"/>
 
+    <px name="button_height_lg_tiny" value="32"/>
     <px name="button_height_lg_small" value="64"/>
     <px name="button_height_lg_medium" value="70"/>
     <px name="button_height_lg_large" value="96"/>
 
     <!-- Other component dimensions -->
     <!-- header_height is responsive: _small/_medium/_large registered as header_height based on screen height -->
+    <px name="header_height_tiny" value="28"/>
     <px name="header_height_small" value="48"/>
     <px name="header_height_medium" value="56"/>
     <px name="header_height_large" value="60"/>
@@ -203,14 +209,17 @@
     <!-- Responsive Panel Heights (print status, file detail, history)         -->
     <!-- ===================================================================== -->
     <!-- temp_card_height: Temperature card height in print status panel -->
+    <px name="temp_card_height_tiny" value="48"/>
     <px name="temp_card_height_small" value="64"/>
     <px name="temp_card_height_medium" value="72"/>
     <px name="temp_card_height_large" value="80"/>
     <!-- detail_metadata_clip_height: Clip container for print file detail overlay -->
+    <px name="detail_metadata_clip_height_tiny" value="72"/>
     <px name="detail_metadata_clip_height_small" value="92"/>
     <px name="detail_metadata_clip_height_medium" value="112"/>
     <px name="detail_metadata_clip_height_large" value="112"/>
     <!-- detail_metadata_overlay_height: Inner overlay for print file detail -->
+    <px name="detail_metadata_overlay_height_tiny" value="80"/>
     <px name="detail_metadata_overlay_height_small" value="100"/>
     <px name="detail_metadata_overlay_height_medium" value="120"/>
     <px name="detail_metadata_overlay_height_large" value="120"/>
@@ -238,21 +247,25 @@
          runtime by ui_theme_register_responsive_fonts() - do NOT define them
          here or responsive overrides will be silently ignored. -->
     <!-- font_heading variants (section headings, large text) -->
+    <string name="font_heading_tiny" value="noto_sans_14"/>
     <string name="font_heading_small" value="noto_sans_20"/>
     <string name="font_heading_medium" value="noto_sans_26"/>
     <string name="font_heading_large" value="noto_sans_28"/>
     <!-- NO BASE font_heading - registered at runtime -->
     <!-- font_body variants (standard body text) -->
+    <string name="font_body_tiny" value="noto_sans_11"/>
     <string name="font_body_small" value="noto_sans_14"/>
     <string name="font_body_medium" value="noto_sans_18"/>
     <string name="font_body_large" value="noto_sans_20"/>
     <!-- NO BASE font_body - registered at runtime -->
     <!-- font_small variants (hints, helpers, chart labels) - uses Light weight -->
+    <string name="font_small_tiny" value="noto_sans_light_11"/>
     <string name="font_small_small" value="noto_sans_light_12"/>
     <string name="font_small_medium" value="noto_sans_light_16"/>
     <string name="font_small_large" value="noto_sans_light_18"/>
     <!-- NO BASE font_small - registered at runtime -->
     <!-- font_xs variants (compact metadata, card overlays, badges) - uses Light weight -->
+    <string name="font_xs_tiny" value="noto_sans_light_10"/>
     <string name="font_xs_small" value="noto_sans_light_10"/>
     <string name="font_xs_medium" value="noto_sans_light_12"/>
     <string name="font_xs_large" value="noto_sans_light_14"/>
@@ -261,26 +274,31 @@
     <!-- Icon Typography - Responsive Material Design Icon Fonts               -->
     <!-- ===================================================================== -->
     <!-- icon_font_xs: Extra-small icons (compact badges, minimal UI elements) -->
+    <string name="icon_font_xs_tiny" value="mdi_icons_14"/>
     <string name="icon_font_xs_small" value="mdi_icons_16"/>
     <string name="icon_font_xs_medium" value="mdi_icons_16"/>
     <string name="icon_font_xs_large" value="mdi_icons_16"/>
     <!-- NO BASE icon_font_xs - registered at runtime -->
     <!-- icon_font_sm: Small inline icons (metadata, hints, small indicators) -->
+    <string name="icon_font_sm_tiny" value="mdi_icons_14"/>
     <string name="icon_font_sm_small" value="mdi_icons_24"/>
     <string name="icon_font_sm_medium" value="mdi_icons_24"/>
     <string name="icon_font_sm_large" value="mdi_icons_24"/>
     <!-- NO BASE icon_font_sm - registered at runtime -->
     <!-- icon_font_md: Standard UI icons (buttons, status, notifications) -->
+    <string name="icon_font_md_tiny" value="mdi_icons_24"/>
     <string name="icon_font_md_small" value="mdi_icons_32"/>
     <string name="icon_font_md_medium" value="mdi_icons_32"/>
     <string name="icon_font_md_large" value="mdi_icons_32"/>
     <!-- NO BASE icon_font_md - registered at runtime -->
     <!-- icon_font_lg: Large icons (cards, status panels, emphasis) -->
+    <string name="icon_font_lg_tiny" value="mdi_icons_24"/>
     <string name="icon_font_lg_small" value="mdi_icons_48"/>
     <string name="icon_font_lg_medium" value="mdi_icons_48"/>
     <string name="icon_font_lg_large" value="mdi_icons_48"/>
     <!-- NO BASE icon_font_lg - registered at runtime -->
     <!-- icon_font_xl: Navigation/hero icons (nav bar, large displays) -->
+    <string name="icon_font_xl_tiny" value="mdi_icons_32"/>
     <string name="icon_font_xl_small" value="mdi_icons_64"/>
     <string name="icon_font_xl_medium" value="mdi_icons_64"/>
     <string name="icon_font_xl_large" value="mdi_icons_64"/>
@@ -385,9 +403,11 @@
     <str name="icon_alert" value="󰀦"/>
     <str name="icon_alert_circle" value="󰀨"/>
     <str name="icon_alert_octagon" value="󰀩"/>
+    <str name="icon_alpha_a_circle" value="󰯬"/>
     <str name="icon_animation" value="󰗘"/>
     <str name="icon_animation_play" value="󰤺"/>
     <str name="icon_arrow_down" value="󰁅"/>
+    <str name="icon_arrow_down_bold" value="󰜮"/>
     <str name="icon_arrow_expand_down" value="󰞖"/>
     <str name="icon_arrow_expand_up" value="󰞙"/>
     <str name="icon_arrow_left" value="󰁍"/>
@@ -410,10 +430,13 @@
     <str name="icon_bed" value="󰋣"/>
     <str name="icon_bell" value="󰂚"/>
     <str name="icon_block_helper" value="󰂭"/>
+    <str name="icon_book" value="󰗚"/>
+    <str name="icon_bug" value="󰃤"/>
     <str name="icon_camera_timer" value="󰄉"/>
     <str name="icon_cancel" value="󰜺"/>
     <str name="icon_chart_line" value="󰄪"/>
     <str name="icon_check" value="󰄬"/>
+    <str name="icon_check_bold" value="󰸞"/>
     <str name="icon_check_circle" value="󰗡"/>
     <str name="icon_chevron_down" value="󰅀"/>
     <str name="icon_chevron_left" value="󰅁"/>
@@ -428,32 +451,45 @@
     <str name="icon_console" value="󰆍"/>
     <str name="icon_cooldown" value="󰜗"/>
     <str name="icon_cube" value="󰆧"/>
+    <str name="icon_cube_outline" value="󰆧"/>
     <str name="icon_cursor_move" value="󰆾"/>
     <str name="icon_dashboard" value="󰕮"/>
+    <str name="icon_database" value="󰆼"/>
     <str name="icon_delete" value="󰆴"/>
     <str name="icon_dots_vertical" value="󰇙"/>
     <str name="icon_download" value="󰇚"/>
+    <str name="icon_electric_switch" value="󰺟"/>
     <str name="icon_engine" value="󰇺"/>
     <str name="icon_engine_off" value="󰩆"/>
     <str name="icon_ethernet" value="󰈀"/>
     <str name="icon_expand_all" value="󰁌"/>
+    <str name="icon_eye" value="󰈈"/>
+    <str name="icon_eye_off" value="󰈉"/>
     <str name="icon_fan" value="󰈐"/>
     <str name="icon_fan_off" value="󰠝"/>
     <str name="icon_filament" value="󰹛"/>
+    <str name="icon_filament_alert" value="󱇀"/>
     <str name="icon_fine_tune" value="󰘮"/>
     <str name="icon_fire" value="󰈸"/>
+    <str name="icon_flash" value="󰉁"/>
     <str name="icon_folder" value="󰉋"/>
+    <str name="icon_folder_arrow_up" value="󱧰"/>
     <str name="icon_folder_open" value="󰝰"/>
     <str name="icon_folder_upload" value="󰉙"/>
     <str name="icon_grid_large" value="󰝘"/>
+    <str name="icon_grid_off" value="󰋂"/>
     <str name="icon_grid_view" value="󰕰"/>
     <str name="icon_heat_wave" value="󱩅"/>
     <str name="icon_heater" value="󱢸"/>
+    <str name="icon_help" value="󰘥"/>
     <str name="icon_help_circle" value="󰋗"/>
     <str name="icon_home" value="󰋜"/>
     <str name="icon_home_import" value="󰾜"/>
     <str name="icon_hourglass" value="󰔟"/>
+    <str name="icon_image_area" value="󰋫"/>
     <str name="icon_image_broken_variant" value="󰋮"/>
+    <str name="icon_inbox_outline" value="󱉴"/>
+    <str name="icon_infinity" value="󰛤"/>
     <str name="icon_info" value="󰋼"/>
     <str name="icon_info_circle" value="󰋼"/>
     <str name="icon_info_outline" value="󰋽"/>
@@ -476,18 +512,22 @@
     <str name="icon_lightbulb_on_90" value="󱩖"/>
     <str name="icon_lightbulb_outline" value="󰌶"/>
     <str name="icon_limit" value="󰹏"/>
+    <str name="icon_link" value="󰌹"/>
     <str name="icon_list" value="󰉹"/>
     <str name="icon_lock" value="󰌾"/>
+    <str name="icon_message" value="󰍩"/>
     <str name="icon_minus" value="󰍴"/>
     <str name="icon_move" value="󰁌"/>
     <str name="icon_network" value="󰈀"/>
     <str name="icon_notifications" value="󰂚"/>
+    <str name="icon_palette" value="󰏘"/>
     <str name="icon_pause" value="󰏤"/>
     <str name="icon_pencil" value="󰏫"/>
     <str name="icon_play" value="󰐊"/>
     <str name="icon_play_circle" value="󰐌"/>
     <str name="icon_plus" value="󰐕"/>
     <str name="icon_power" value="󰐥"/>
+    <str name="icon_power_cycle" value="󰤁"/>
     <str name="icon_power_plug" value="󰚥"/>
     <str name="icon_print" value="󰐪"/>
     <str name="icon_printer_3d" value="󰐫"/>
@@ -499,6 +539,7 @@
     <str name="icon_radiator" value="󰐸"/>
     <str name="icon_redo" value="󰑎"/>
     <str name="icon_refresh" value="󰑐"/>
+    <str name="icon_restart" value="󰜉"/>
     <str name="icon_resume" value="󰐌"/>
     <str name="icon_robot" value="󰚩"/>
     <str name="icon_rotate_3d" value="󰻇"/>
@@ -509,14 +550,18 @@
     <str name="icon_script_text" value="󰯂"/>
     <str name="icon_sd" value="󰑹"/>
     <str name="icon_send" value="󰒊"/>
+    <str name="icon_sensor" value="󰶑"/>
     <str name="icon_settings" value="󰒓"/>
     <str name="icon_sine_wave" value="󰥛"/>
+    <str name="icon_sleep" value="󰒲"/>
     <str name="icon_source_branch" value="󰘬"/>
     <str name="icon_speed" value="󰓅"/>
     <str name="icon_speed_down" value="󰾆"/>
     <str name="icon_speed_up" value="󰾅"/>
     <str name="icon_spoolman" value="󰈯"/>
     <str name="icon_stop" value="󰓛"/>
+    <str name="icon_swap_vertical" value="󰓢"/>
+    <str name="icon_sync" value="󰓦"/>
     <str name="icon_sysinfo" value="󰋼"/>
     <str name="icon_target" value="󰓾"/>
     <str name="icon_thermometer" value="󰔏"/>
@@ -525,6 +570,7 @@
     <str name="icon_tortoise" value="󰴻"/>
     <str name="icon_toy_brick_outline" value="󱊍"/>
     <str name="icon_train_flatbed" value="󱬵"/>
+    <str name="icon_translate" value="󰗊"/>
     <str name="icon_trash_can_outline" value="󰩺"/>
     <str name="icon_tray_arrow_up" value="󰄝"/>
     <str name="icon_triangle_exclamation" value="󰀦"/>
@@ -533,12 +579,17 @@
     <str name="icon_tune_vertical_variant" value="󱕃"/>
     <str name="icon_undo" value="󰕌"/>
     <str name="icon_update" value="󰚰"/>
+    <str name="icon_usb" value="󰕓"/>
     <str name="icon_vibrate" value="󰕦"/>
     <str name="icon_video" value="󰕧"/>
     <str name="icon_view_dashboard" value="󰕮"/>
     <str name="icon_view_grid" value="󰕰"/>
     <str name="icon_view_list" value="󰕲"/>
+    <str name="icon_volume_high" value="󰕾"/>
+    <str name="icon_volume_low" value="󰖀"/>
+    <str name="icon_volume_off" value="󰖁"/>
     <str name="icon_water" value="󰖌"/>
+    <str name="icon_waveform" value="󱑽"/>
     <str name="icon_weight" value="󰖡"/>
     <str name="icon_wifi" value="󰖩"/>
     <str name="icon_wifi_alert" value="󱚵"/>
@@ -556,7 +607,6 @@
     <str name="icon_wifi_strength_4_lock" value="󰤪"/>
     <str name="icon_wrench" value="󱌣"/>
     <str name="icon_xmark" value="󰅖"/>
-    <str name="icon_xmark_circle" value="󰅙"/>
     <str name="icon_z_closer" value="󰜮"/>
     <str name="icon_z_farther" value="󰜷"/>
     <!-- END GENERATED ICON CONSTS -->

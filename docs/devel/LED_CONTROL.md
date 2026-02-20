@@ -1,17 +1,18 @@
 # LED Control System
 
-HelixScreen's LED control system provides unified management of printer LED strips across four backends: native Klipper LEDs, `led_effect` plugin effects, WLED network strips, and custom macros. It includes hardware discovery, automatic state-based lighting, a user-facing control overlay, and a settings overlay for configuration.
+HelixScreen's LED control system provides unified management of printer LED strips across five backends: native Klipper LEDs, `led_effect` plugin effects, WLED network strips, custom macros, and `output_pin` brightness-only devices. It includes hardware discovery, automatic state-based lighting, a user-facing control overlay, and a settings overlay for configuration.
 
 ## Architecture Overview
 
 ```
 Hardware Discovery (PrinterDiscovery)
     ↓
-LedController (singleton, 4 backends)
-    ├── NativeBackend     — neopixel, dotstar, led strips via Klipper G-code
-    ├── LedEffectBackend  — led_effect plugin animations
-    ├── WledBackend       — WLED network strips via Moonraker HTTP bridge
-    └── MacroBackend      — user-configured macro devices
+LedController (singleton, 5 backends)
+    ├── NativeBackend      — neopixel, dotstar, led strips via Klipper G-code
+    ├── LedEffectBackend   — led_effect plugin animations
+    ├── WledBackend        — WLED network strips via Moonraker HTTP bridge
+    ├── MacroBackend       — user-configured macro devices
+    └── OutputPinBackend   — output_pin brightness-only (PWM) or on/off devices
     ↓
 LedAutoState (singleton)           PrinterLedState (domain class)
     │ observes printer state            │ tracks one LED for home panel
@@ -29,7 +30,7 @@ LedControlOverlay (UI)             LedSettingsOverlay (UI)
 | File | Purpose |
 |------|---------|
 | `include/led/led_backend.h` | Data types: `LedStripInfo`, `LedEffectInfo`, `LedMacroInfo`, `WledPresetInfo`, enums |
-| `include/led/led_controller.h` | `LedController` singleton — orchestrates all 4 backends |
+| `include/led/led_controller.h` | `LedController` singleton — orchestrates all 5 backends |
 | `src/led/led_controller.cpp` | Discovery, config persistence, toggle_all, startup preference |
 | `include/led/led_auto_state.h` | `LedAutoState` singleton — automatic state-to-LED mapping |
 | `src/led/led_auto_state.cpp` | Observer-based state tracking, action application, config I/O |
@@ -66,7 +67,7 @@ LedControlOverlay (UI)             LedSettingsOverlay (UI)
 
 | File | Coverage |
 |------|----------|
-| `tests/unit/test_led_controller.cpp` | Controller init/deinit, singleton lifecycle |
+| `tests/unit/test_led_controller.cpp` | Controller init/deinit, singleton lifecycle, output_pin backend |
 | `tests/unit/test_led_config.cpp` | Config persistence: selected strips, color presets, macros |
 | `tests/unit/test_led_discovery.cpp` | Hardware discovery from PrinterDiscovery |
 | `tests/unit/test_led_auto_state.cpp` | State mapping, evaluate, config round-trip |
@@ -77,7 +78,7 @@ LedControlOverlay (UI)             LedSettingsOverlay (UI)
 | `tests/unit/test_printer_led_char.cpp` | PrinterLedState subject updates |
 | `tests/unit/test_settings_led_char.cpp` | Settings overlay characterization |
 
-## Four Backends
+## Five Backends
 
 ### NativeBackend
 
@@ -120,6 +121,17 @@ Executes user-configured Klipper macros for LED control. Three device types:
 
 - **Discovery**: Macros with "led" or "light" in the name are auto-discovered as candidates
 - **Configuration**: User-configured only — macro devices are created/edited/deleted in LED Settings
+
+### OutputPinBackend
+
+Controls Klipper `[output_pin]` devices used for chamber lights, enclosure LEDs, and other single-channel lighting. These are brightness-only (no color) — either PWM (0-100% brightness slider) or digital on/off.
+
+- **Discovery**: Auto-detected from `printer.objects.list` — `output_pin *` objects with "light", "led", or "lamp" in the name
+- **PWM detection**: Checks Klipper config object for `pwm: true` — determines slider vs toggle UI
+- **Control**: `SET_PIN PIN=<name> VALUE=<0.0-1.0>` via `MoonrakerAPI`
+- **State tracking**: Subscribes to `output_pin <name>` Moonraker status objects; reported `value` (0.0-1.0) maps to brightness percentage
+- **Value change callback**: Notifies UI when pin value changes from external sources (macros, other UIs)
+- **Strip info flags**: `supports_color = false`, `supports_white = false`, `is_pwm` determines brightness slider vs on/off toggle
 
 ## Auto-State Lighting (LedAutoState)
 
@@ -216,10 +228,11 @@ Opened via long-press on the home panel lightbulb button. Displays sections for 
 
 **Sections** (top to bottom):
 1. Strip selector — chips for switching between strips
-2. Native color — preset swatches, brightness slider, custom color picker
-3. Effects — effect cards with activate/stop-all
-4. WLED — toggle, brightness slider, preset buttons
-5. Macros — on/off, toggle, and preset action buttons
+2. Native color — preset swatches, brightness slider, custom color picker (hidden for non-color strips like output_pin)
+3. Output pin — brightness slider (PWM) or on/off toggle (non-PWM), shown when an output_pin strip is selected
+4. Effects — effect cards with activate/stop-all
+5. WLED — toggle, brightness slider, preset buttons
+6. Macros — on/off, toggle, and preset action buttons
 
 ### LED Settings Overlay
 
@@ -236,7 +249,7 @@ Opened from Settings panel. Configures which strips HelixScreen controls and how
 - **Discovery**: Runs on main thread during printer connection
 - **WLED discovery**: Async via Moonraker HTTP — results marshaled to main thread via `ui_async_call()`
 - **LED commands**: Sent via `MoonrakerAPI` (through WebSocket, runs on libhv thread)
-- **Status updates**: `NativeBackend::update_from_status()` and `WledBackend::update_strip_state()` called from Moonraker subscription handler (background thread), color change callbacks dispatched to main thread
+- **Status updates**: `NativeBackend::update_from_status()`, `OutputPinBackend::update_from_status()`, and `WledBackend::update_strip_state()` called from Moonraker subscription handler (background thread), change callbacks dispatched to main thread
 - **UI updates**: All subject updates and widget manipulation on main thread only
 
 ## Extending the System

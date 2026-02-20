@@ -57,12 +57,21 @@ void InputShaperCalibrator::ensure_homed_then(std::function<void()> then, ErrorC
             then();
         },
         [this, on_error](const MoonrakerError& err) {
-            state_ = State::IDLE;
-            spdlog::error("[InputShaperCalibrator] Homing failed: {}", err.message);
-            if (on_error) {
-                on_error("Homing failed: " + err.message);
+            if (err.type == MoonrakerErrorType::TIMEOUT) {
+                spdlog::warn(
+                    "[InputShaperCalibrator] G28 response timed out (may still be running)");
+                if (on_error) {
+                    on_error("Homing timed out — printer may still be homing");
+                }
+            } else {
+                spdlog::error("[InputShaperCalibrator] Homing failed: {}", err.message);
+                if (on_error) {
+                    on_error("Homing failed: " + err.message);
+                }
             }
-        });
+            state_ = State::IDLE;
+        },
+        MoonrakerAPI::HOMING_TIMEOUT_MS);
 }
 
 // ============================================================================

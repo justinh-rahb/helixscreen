@@ -224,6 +224,19 @@ void ui_filament_path_canvas_set_slot_filament(lv_obj_t* obj, int slot_index, in
                                                uint32_t color);
 
 /**
+ * @brief Set per-slot prep sensor capability flag
+ *
+ * Controls whether a prep/pre-gate sensor dot is drawn for the given slot.
+ * HUB topology (AFC) callers set all slots true; LINEAR topology (Happy Hare)
+ * callers set per-slot based on actual pre-gate sensor presence.
+ *
+ * @param obj The filament_path_canvas widget
+ * @param slot Slot index (0-15)
+ * @param has_sensor true if this slot has a prep/pre-gate sensor
+ */
+void ui_filament_path_canvas_set_slot_prep_sensor(lv_obj_t* obj, int slot, bool has_sensor);
+
+/**
  * @brief Clear all per-slot filament states
  *
  * Resets all slots to show as idle (no filament installed).
@@ -303,6 +316,20 @@ void ui_filament_path_canvas_set_heat_active(lv_obj_t* obj, bool active);
  * @param state Buffer fault state (0=healthy, 1=warning, 2=fault)
  */
 void ui_filament_path_canvas_set_buffer_fault_state(lv_obj_t* obj, int state);
+
+/**
+ * @brief Set bypass entry filament color
+ * @param obj The filament_path_canvas widget
+ * @param color RGB color (0xRRGGBB) for bypass filament
+ */
+void ui_filament_path_canvas_set_bypass_color(lv_obj_t* obj, uint32_t color);
+
+/**
+ * @brief Set whether an external spool is assigned to bypass
+ * @param obj The filament_path_canvas widget
+ * @param has_spool true if spool assigned (shows filled box), false (shows empty indicator)
+ */
+void ui_filament_path_canvas_set_bypass_has_spool(lv_obj_t* obj, bool has_spool);
 
 #ifdef __cplusplus
 }

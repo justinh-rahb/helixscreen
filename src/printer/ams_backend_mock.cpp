@@ -44,7 +44,7 @@ constexpr int CUTTING_BASE_MS = 2000;            // 2 seconds for filament cut
 constexpr int PURGING_BASE_MS = 3000;            // 3 seconds for purge after load
 constexpr int CHECKING_BASE_MS = 1500;           // 1.5 seconds for recovery check
 constexpr int SELECTING_BASE_MS = 1000;          // 1 second for slot/tool selection
-constexpr int SEGMENT_ANIMATION_BASE_MS = 10000; // 10 seconds for full segment animation
+constexpr int SEGMENT_ANIMATION_BASE_MS = 15000; // 15 seconds for full segment animation
 
 // Variance factors (±percentage) for natural timing variation
 constexpr float HEATING_VARIANCE = 0.3f;    // ±30%
@@ -501,6 +501,7 @@ AmsError AmsBackendMock::change_tool(int tool_number) {
         system_info_.action = AmsAction::UNLOADING; // Start with unload
         system_info_.operation_detail = "Tool change to T" + std::to_string(tool_number);
         target_slot = system_info_.tool_to_slot_map[tool_number]; // Capture while locked
+        system_info_.pending_target_slot = target_slot;
         spdlog::info("[AmsBackendMock] Tool change to T{}", tool_number);
     }
 
@@ -592,7 +593,33 @@ AmsError AmsBackendMock::cancel() {
     return AmsErrorHelper::success();
 }
 
-AmsError AmsBackendMock::set_slot_info(int slot_index, const SlotInfo& info) {
+AmsError AmsBackendMock::reset_lane(int slot_index) {
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+
+        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+        }
+
+        auto* slot = system_info_.get_slot_global(slot_index);
+        if (!slot) {
+            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+        }
+
+        // Clear error state and return slot to normal
+        slot->error = std::nullopt;
+        if (slot->status == SlotStatus::BLOCKED) {
+            slot->status = SlotStatus::AVAILABLE;
+        }
+
+        spdlog::info("[AmsBackendMock] Reset lane {} - cleared error state", slot_index);
+    }
+
+    emit_event(EVENT_STATE_CHANGED);
+    return AmsErrorHelper::success();
+}
+
+AmsError AmsBackendMock::set_slot_info(int slot_index, const SlotInfo& info, bool /*persist*/) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
@@ -1484,16 +1511,20 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
         // System-wide topology: HUB for backward compat
         topology_ = PathTopology::HUB;
 
-        // Per-unit topologies
+        // Per-unit topologies (matches real user hardware: Box Turtle + 2x OpenAMS)
+        // Turtle_1: 4 lanes → 4 extruders (extruder, extruder1-3) → PARALLEL
+        // AMS_1: 4 lanes → 1 extruder (extruder4) → HUB
+        // AMS_2: 4 lanes → 1 extruder (extruder5) → HUB
         unit_topologies_.clear();
-        unit_topologies_.push_back(PathTopology::PARALLEL); // Unit 0: Box Turtle
-        unit_topologies_.push_back(PathTopology::HUB);      // Unit 1: OpenAMS
-        unit_topologies_.push_back(PathTopology::HUB);      // Unit 2: OpenAMS
+        unit_topologies_.push_back(PathTopology::PARALLEL); // Unit 0: Box Turtle (4 extruders)
+        unit_topologies_.push_back(PathTopology::HUB);      // Unit 1: OpenAMS (1 extruder)
+        unit_topologies_.push_back(PathTopology::HUB);      // Unit 2: OpenAMS (1 extruder)
 
         system_info_.units.clear();
 
         // ================================================================
         // Unit 0: "Turtle_1" (Box Turtle) — 4 lanes, PARALLEL, buffers
+        // Real AFC: 4 extruders (extruder, extruder1-3) → PARALLEL
         // ================================================================
         {
             AmsUnit unit;
@@ -1506,7 +1537,7 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
             unit.has_encoder = false;
             unit.has_toolhead_sensor = true;
             unit.has_slot_sensors = true;
-            unit.has_hub_sensor = false; // No hub hardware — direct_load per lane
+            unit.has_hub_sensor = false; // PARALLEL: no shared hub
             unit.topology = PathTopology::PARALLEL;
 
             // Buffer health (TurtleNeck buffers)
@@ -1554,7 +1585,11 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
         }
 
         // ================================================================
-        // Unit 1: "AMS_1" (OpenAMS) — 4 lanes, HUB, all share T4
+        // Unit 1: "AMS_1" (OpenAMS) — 4 lanes, HUB, unique virtual tools
+        //
+        // Real AFC behavior: each lane gets its own virtual tool number
+        // (T4-T7), but all lanes share a single physical extruder
+        // (extruder4). The HUB topology tells the UI to draw 1 nozzle.
         // ================================================================
         {
             AmsUnit unit;
@@ -1570,6 +1605,7 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
             unit.has_hub_sensor = true;
             unit.hub_sensor_triggered = false;
             unit.topology = PathTopology::HUB;
+            unit.hub_tool_label = 4; // extruder4 → T4
             // No buffer_health — OpenAMS has no buffers
 
             const struct {
@@ -1592,7 +1628,7 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
                 slot.color_rgb = ams1_slots[i].color;
                 slot.color_name = ams1_slots[i].name;
                 slot.status = ams1_slots[i].status;
-                slot.mapped_tool = 4; // All lanes share T4
+                slot.mapped_tool = 4 + i; // Real AFC: unique virtual tool per lane
                 slot.spoolman_id = 310 + i;
                 slot.total_weight_g = 1000.0f;
                 slot.remaining_weight_g = 1000.0f - i * 150.0f;
@@ -1609,7 +1645,10 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
         }
 
         // ================================================================
-        // Unit 2: "AMS_2" (OpenAMS) — 4 lanes, HUB, all share T5
+        // Unit 2: "AMS_2" (OpenAMS) — 4 lanes, HUB, unique virtual tools
+        //
+        // Real AFC: 1 extruder (extruder5) → HUB. Per-lane hubs merge
+        // to a single physical toolhead. Lanes get T8-T11 virtual tools.
         // ================================================================
         {
             AmsUnit unit;
@@ -1625,6 +1664,7 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
             unit.has_hub_sensor = true;
             unit.hub_sensor_triggered = false;
             unit.topology = PathTopology::HUB;
+            unit.hub_tool_label = 5; // extruder5 → T5
             // No buffer_health — OpenAMS has no buffers
 
             const struct {
@@ -1647,7 +1687,7 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
                 slot.color_rgb = ams2_slots[i].color;
                 slot.color_name = ams2_slots[i].name;
                 slot.status = ams2_slots[i].status;
-                slot.mapped_tool = 5; // All lanes share T5
+                slot.mapped_tool = 8 + i; // Real AFC: unique virtual tool per lane
                 slot.spoolman_id = 320 + i;
                 slot.total_weight_g = 1000.0f;
                 slot.remaining_weight_g = 1000.0f - i * 100.0f;
@@ -1663,10 +1703,10 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
             system_info_.units.push_back(unit);
         }
 
-        // Tool-to-slot mapping: 6 tools
-        // T0->slot0, T1->slot1, T2->slot2, T3->slot3 (BT, 1:1)
-        // T4->slot4 (first slot of OpenAMS 1), T5->slot8 (first slot of OpenAMS 2)
-        system_info_.tool_to_slot_map = {0, 1, 2, 3, 4, 8};
+        // Tool-to-slot mapping: 12 virtual tools (AFC assigns 1:1 virtual→lane)
+        // T0->slot0, T1->slot1, ..., T11->slot11
+        // The UI uses compute_system_tool_layout() to derive 6 physical nozzles
+        system_info_.tool_to_slot_map = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 
         // Start with slot 0 loaded
         system_info_.current_slot = 0;
@@ -1732,6 +1772,12 @@ PathTopology AmsBackendMock::get_unit_topology(int unit_index) const {
         return unit_topologies_[unit_index];
     }
     return topology_; // Fallback to system-wide topology
+}
+
+bool AmsBackendMock::slot_has_prep_sensor(int slot_index) const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    // Mock always has prep sensors on all valid slots (matches AFC behavior)
+    return slot_index >= 0 && slot_index < system_info_.total_slots;
 }
 
 int AmsBackendMock::get_effective_delay_ms(int base_ms, float variance) const {
@@ -1803,6 +1849,8 @@ void AmsBackendMock::run_unload_segment_animation(InterruptibleSleep interruptib
             std::lock_guard<std::mutex> lock(mutex_);
             filament_segment_ = seg;
         }
+        spdlog::debug("[AmsBackendMock] Unload step: segment={}, delay={}ms", static_cast<int>(seg),
+                      segment_delay);
         emit_event(EVENT_STATE_CHANGED);
         if (!interruptible_sleep(segment_delay))
             return;
@@ -1823,6 +1871,7 @@ void AmsBackendMock::finalize_load_state(int slot_index) {
     }
     system_info_.action = AmsAction::IDLE;
     system_info_.operation_detail.clear();
+    system_info_.pending_target_slot = -1;
 }
 
 void AmsBackendMock::finalize_unload_state() {
@@ -1929,6 +1978,11 @@ void AmsBackendMock::execute_tool_change_operation(int target_slot,
             return;
         if (shutdown_requested_ || cancel_requested_)
             return;
+    } else {
+        // Non-realistic: finalize_unload_state set action to IDLE, but we need LOADING
+        // for the load phase so that UI elements (slot pulse, step progress) stay active
+        set_action(AmsAction::LOADING, "Loading slot " + std::to_string(target_slot));
+        emit_event(EVENT_STATE_CHANGED);
     }
 
     // Phase 3: Load new filament

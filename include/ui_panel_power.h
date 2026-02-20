@@ -10,6 +10,7 @@
 #include "subject_managed_panel.h"
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -36,7 +37,33 @@ class PowerPanel : public PanelBase {
         return "power_panel";
     }
 
+    /// Get devices selected for home panel quick-toggle
+    const std::vector<std::string>& get_selected_devices() const {
+        return selected_devices_;
+    }
+
+    /// Set devices selected for home panel quick-toggle (saves to config)
+    void set_selected_devices(const std::vector<std::string>& devices);
+
+    /// Load selected devices from config file
+    void load_selected_devices();
+
+    /// Called when new devices are discovered to auto-select if no config exists
+    void on_devices_discovered(const std::vector<PowerDevice>& devices);
+
+    /**
+     * @brief Get or create the overlay widget (singleton overlay creation)
+     *
+     * Ensures only one overlay lv_obj_t* exists for this panel, shared by
+     * all callers (HomePanel long-press, AdvancedPanel row click, etc.).
+     *
+     * @param parent_screen Screen to create overlay on (used only on first call)
+     * @return The overlay lv_obj_t*, or nullptr on failure
+     */
+    lv_obj_t* get_or_create_overlay(lv_obj_t* parent_screen);
+
   private:
+    lv_obj_t* cached_overlay_ = nullptr; // Single shared overlay widget
     // Subject manager for automatic cleanup
     SubjectManager subjects_;
 
@@ -57,6 +84,19 @@ class PowerPanel : public PanelBase {
         bool locked = false;
     };
     std::vector<DeviceRow> device_rows_;
+
+    // Selected devices for home panel quick-toggle
+    std::vector<std::string> selected_devices_;
+    std::vector<std::string> discovered_devices_; // All discovered device names
+    bool config_loaded_ = false;
+
+    // Chip selector widgets
+    lv_obj_t* chip_container_ = nullptr;
+
+    // Chip selector helpers
+    void populate_device_chips();
+    void populate_device_chips_impl();
+    void handle_chip_clicked(const std::string& device_name);
 
     // Setup helpers
     void fetch_devices();

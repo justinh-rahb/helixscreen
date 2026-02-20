@@ -11,6 +11,9 @@
     },
     "touch_device": "/dev/input/event1"
   },
+  "display": {
+    "backlight_enable_ioctl": false
+  },
   "printer": {
     "moonraker_host": "127.0.0.1",
     "moonraker_port": 7125,

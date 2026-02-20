@@ -47,6 +47,7 @@ void PrinterCapabilitiesState::init_subjects(bool register_xml) {
     INIT_SUBJECT_INT(printer_has_screws_tilt, 0, subjects_, register_xml);
     INIT_SUBJECT_INT(printer_has_webcam, 0, subjects_, register_xml);
     INIT_SUBJECT_INT(printer_has_extra_fans, 0, subjects_, register_xml);
+    INIT_SUBJECT_INT(power_device_count, 0, subjects_, register_xml);
 
     subjects_initialized_ = true;
     spdlog::trace("[PrinterCapabilitiesState] Subjects initialized successfully");
@@ -154,6 +155,14 @@ void PrinterCapabilitiesState::set_bed_moves(bool bed_moves) {
         lv_subject_set_int(&printer_bed_moves_, new_value);
         spdlog::info("[PrinterCapabilitiesState] Bed moves on Z: {}", bed_moves);
     }
+}
+
+void PrinterCapabilitiesState::set_power_device_count(int count) {
+    // Thread-safe: Use ui_queue_update to update LVGL subject from any thread
+    helix::ui::queue_update([this, count]() {
+        lv_subject_set_int(&power_device_count_, count);
+        spdlog::debug("[PrinterCapabilitiesState] Power device count set: {}", count);
+    });
 }
 
 } // namespace helix

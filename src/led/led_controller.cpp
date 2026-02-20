@@ -63,6 +63,7 @@ void LedController::init(MoonrakerAPI* api, MoonrakerClient* client) {
     wled_.set_api(api);
     wled_.set_client(client);
     macro_.set_api(api);
+    output_pin_.set_api(api);
 
     initialized_ = true;
     load_config();
@@ -74,12 +75,14 @@ void LedController::deinit() {
     effects_.clear();
     wled_.clear();
     macro_.clear();
+    output_pin_.clear();
 
     native_.set_api(nullptr);
     effects_.set_api(nullptr);
     wled_.set_api(nullptr);
     wled_.set_client(nullptr);
     macro_.set_api(nullptr);
+    output_pin_.set_api(nullptr);
 
     api_ = nullptr;
     client_ = nullptr;
@@ -100,7 +103,7 @@ void LedController::deinit() {
 
 bool LedController::has_any_backend() const {
     return native_.is_available() || effects_.is_available() || wled_.is_available() ||
-           macro_.is_available();
+           macro_.is_available() || output_pin_.is_available();
 }
 
 std::vector<LedBackendType> LedController::available_backends() const {
@@ -117,6 +120,9 @@ std::vector<LedBackendType> LedController::available_backends() const {
     if (macro_.is_available()) {
         result.push_back(LedBackendType::MACRO);
     }
+    if (output_pin_.is_available()) {
+        result.push_back(LedBackendType::OUTPUT_PIN);
+    }
     return result;
 }
 
@@ -126,9 +132,41 @@ void LedController::discover_from_hardware(const helix::PrinterDiscovery& hardwa
     effects_.clear();
     wled_.clear();
     macro_.clear();
+    output_pin_.clear();
 
     // Populate native backend from discovered LEDs
     for (const auto& led_id : hardware.leds()) {
+        // Check if this is an output_pin (not a native LED strip)
+        if (led_id.rfind("output_pin ", 0) == 0) {
+            LedStripInfo pin;
+            // Format display name from "output_pin Enclosure_LEDs" -> "Enclosure LEDs"
+            std::string raw_name = led_id.substr(11);
+            std::string display = raw_name;
+            for (auto& ch : display) {
+                if (ch == '_')
+                    ch = ' ';
+            }
+            // Title case
+            bool cap_next = true;
+            for (auto& ch : display) {
+                if (ch == ' ') {
+                    cap_next = true;
+                } else if (cap_next) {
+                    ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+                    cap_next = false;
+                }
+            }
+            pin.name = display;
+            pin.id = led_id;
+            pin.backend = LedBackendType::OUTPUT_PIN;
+            pin.supports_color = false;
+            pin.supports_white = false;
+            pin.is_pwm = true; // Default to PWM; configfile will override if needed
+            output_pin_.add_pin(pin);
+            spdlog::info("[LedController] Discovered output_pin LED: {} -> {}", led_id, display);
+            continue;
+        }
+
         LedStripInfo strip;
         strip.id = led_id;
         strip.backend = LedBackendType::NATIVE;
@@ -440,6 +478,31 @@ void LedController::update_effect_targets(const nlohmann::json& configfile_confi
     }
 
     spdlog::info("[LedController] Updated effect targets for {} effect(s)", updated);
+}
+
+void LedController::update_output_pin_config(const nlohmann::json& configfile_config) {
+    if (!configfile_config.is_object()) {
+        return;
+    }
+
+    for (const auto& pin : output_pin_.pins()) {
+        if (configfile_config.contains(pin.id)) {
+            const auto& pin_cfg = configfile_config[pin.id];
+            if (pin_cfg.contains("pwm")) {
+                const auto& pwm_val = pin_cfg["pwm"];
+                bool is_pwm = false;
+                if (pwm_val.is_boolean()) {
+                    is_pwm = pwm_val.get<bool>();
+                } else if (pwm_val.is_string()) {
+                    std::string s = pwm_val.get<std::string>();
+                    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+                    is_pwm = (s == "true" || s == "1" || s == "yes");
+                }
+                output_pin_.set_pin_pwm(pin.id, is_pwm);
+                spdlog::debug("[LedController] Output pin {} PWM: {}", pin.id, is_pwm);
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -1210,6 +1273,112 @@ bool MacroBackend::has_known_state(const std::string& macro_name) const {
 }
 
 // ============================================================================
+// OutputPinBackend
+// ============================================================================
+
+void OutputPinBackend::add_pin(const LedStripInfo& pin) {
+    pins_.push_back(pin);
+}
+
+void OutputPinBackend::clear() {
+    pins_.clear();
+    pin_values_.clear();
+}
+
+void OutputPinBackend::set_value(const std::string& pin_id, double value,
+                                 NativeBackend::SuccessCallback on_success,
+                                 NativeBackend::ErrorCallback on_error) {
+    if (!api_) {
+        spdlog::warn("[OutputPinBackend] set_value called with no API (pin={})", pin_id);
+        return;
+    }
+
+    value = std::clamp(value, 0.0, 1.0);
+
+    // Extract pin name from "output_pin <name>" format
+    std::string pin_name = pin_id;
+    if (pin_name.rfind("output_pin ", 0) == 0) {
+        pin_name = pin_name.substr(11);
+    }
+
+    // Use spdlog's bundled fmt for locale-independent float formatting
+    std::string gcode = fmt::format("SET_PIN PIN={} VALUE={:.4f}", pin_name, value);
+    api_->execute_gcode(gcode, on_success, [on_error](const MoonrakerError& err) {
+        if (on_error) {
+            on_error(err.message);
+        }
+    });
+}
+
+void OutputPinBackend::turn_on(const std::string& pin_id, NativeBackend::SuccessCallback on_success,
+                               NativeBackend::ErrorCallback on_error) {
+    set_value(pin_id, 1.0, on_success, on_error);
+}
+
+void OutputPinBackend::turn_off(const std::string& pin_id,
+                                NativeBackend::SuccessCallback on_success,
+                                NativeBackend::ErrorCallback on_error) {
+    set_value(pin_id, 0.0, on_success, on_error);
+}
+
+void OutputPinBackend::set_brightness(const std::string& pin_id, int brightness_pct,
+                                      NativeBackend::SuccessCallback on_success,
+                                      NativeBackend::ErrorCallback on_error) {
+    double value = std::clamp(brightness_pct, 0, 100) / 100.0;
+    // Non-PWM pins only accept 0 or 1 — clamp to avoid Klipper errors
+    if (!is_pwm(pin_id)) {
+        value = (value > 0.0) ? 1.0 : 0.0;
+    }
+    set_value(pin_id, value, on_success, on_error);
+}
+
+// Called from UI thread (via UpdateQueue dispatch in printer_state.cpp)
+void OutputPinBackend::update_from_status(const nlohmann::json& status) {
+    for (const auto& pin : pins_) {
+        if (!status.contains(pin.id))
+            continue;
+        const auto& pin_status = status[pin.id];
+        if (pin_status.contains("value") && pin_status["value"].is_number()) {
+            double value = pin_status["value"].get<double>();
+            pin_values_[pin.id] = value;
+            if (value_change_cb_) {
+                value_change_cb_(pin.id, value);
+            }
+        }
+    }
+}
+
+double OutputPinBackend::get_value(const std::string& pin_id) const {
+    auto it = pin_values_.find(pin_id);
+    return (it != pin_values_.end()) ? it->second : 0.0;
+}
+
+bool OutputPinBackend::is_on(const std::string& pin_id) const {
+    return get_value(pin_id) > 0.0;
+}
+
+int OutputPinBackend::brightness_pct(const std::string& pin_id) const {
+    return std::clamp(static_cast<int>(get_value(pin_id) * 100.0 + 0.5), 0, 100);
+}
+
+bool OutputPinBackend::is_pwm(const std::string& pin_id) const {
+    for (const auto& p : pins_) {
+        if (p.id == pin_id)
+            return p.is_pwm;
+    }
+    return false;
+}
+
+void OutputPinBackend::set_pin_pwm(const std::string& pin_id, bool is_pwm) {
+    for (auto& p : pins_) {
+        if (p.id == pin_id) {
+            p.is_pwm = is_pwm;
+            return;
+        }
+    }
+}
+
+// ============================================================================
 // LedController config persistence
 // ============================================================================
 
@@ -1540,6 +1709,14 @@ void LedController::toggle_all(bool on) {
             break;
         }
 
+        case LedBackendType::OUTPUT_PIN:
+            if (on) {
+                output_pin_.turn_on(strip_id);
+            } else {
+                output_pin_.turn_off(strip_id);
+            }
+            break;
+
         case LedBackendType::LED_EFFECT:
             // Effects are controlled separately via activate/stop
             break;
@@ -1568,6 +1745,12 @@ LedBackendType LedController::backend_for_strip(const std::string& strip_id) con
         if (macro.display_name == raw_name) {
             return LedBackendType::MACRO;
         }
+    }
+
+    // Check output_pin strips
+    for (const auto& p : output_pin_.pins()) {
+        if (p.id == strip_id)
+            return LedBackendType::OUTPUT_PIN;
     }
 
     // Default to native (for backward compat with old configs)
@@ -1600,6 +1783,10 @@ std::vector<LedStripInfo> LedController::all_selectable_strips() const {
         result.push_back(info);
     }
 
+    // Output pin strips
+    for (const auto& p : output_pin_.pins())
+        result.push_back(p);
+
     return result;
 }
 
@@ -1624,6 +1811,11 @@ std::string LedController::first_available_strip() const {
         if (macro.type != MacroLedType::PRESET) {
             return "macro:" + macro.display_name;
         }
+    }
+
+    // Fall back to first output_pin
+    if (!output_pin_.pins().empty()) {
+        return output_pin_.pins()[0].id;
     }
 
     return "";

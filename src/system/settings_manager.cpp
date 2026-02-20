@@ -168,8 +168,8 @@ void SettingsManager::init_subjects() {
     int volume = std::clamp(config->get<int>("/sounds/volume", 80), 0, 100);
     UI_MANAGED_SUBJECT_INT(volume_subject_, volume, "settings_volume", subjects_);
 
-    // Completion alert mode (default: NOTIFICATION=1, handles old bool migration)
-    int completion_mode = config->get<int>("/completion_alert", 1);
+    // Completion alert mode (default: ALERT=2, handles old bool migration)
+    int completion_mode = config->get<int>("/completion_alert", 2);
     completion_mode = std::max(0, std::min(2, completion_mode));
     UI_MANAGED_SUBJECT_INT(completion_alert_subject_, completion_mode, "settings_completion_alert",
                            subjects_);
@@ -1086,4 +1086,71 @@ void SettingsManager::set_z_movement_style(ZMovementStyle style) {
 
 const char* SettingsManager::get_z_movement_style_options() {
     return Z_MOVEMENT_STYLE_OPTIONS_TEXT;
+}
+
+// ============================================================================
+// Filament Settings
+// ============================================================================
+
+std::optional<SlotInfo> SettingsManager::get_external_spool_info() const {
+    Config* config = Config::get_instance();
+
+    // Primary check: explicit assigned boolean (new format)
+    bool assigned = config->get<bool>("/filament/external_spool/assigned", false);
+
+    // Backward compat: old configs have color_rgb but no assigned key
+    if (!assigned) {
+        auto color = config->get<int>("/filament/external_spool/color_rgb", -1);
+        if (color == -1) {
+            return std::nullopt;
+        }
+        // Old format detected — treat as assigned (will be migrated on next set)
+    }
+
+    SlotInfo info;
+    info.slot_index = -2; // External spool sentinel
+    info.global_index = -2;
+    info.color_rgb = static_cast<uint32_t>(config->get<int>(
+        "/filament/external_spool/color_rgb", static_cast<int>(AMS_DEFAULT_SLOT_COLOR)));
+    info.material = config->get<std::string>("/filament/external_spool/material", "");
+    info.brand = config->get<std::string>("/filament/external_spool/brand", "");
+    info.nozzle_temp_min = config->get<int>("/filament/external_spool/nozzle_temp_min", 0);
+    info.nozzle_temp_max = config->get<int>("/filament/external_spool/nozzle_temp_max", 0);
+    info.bed_temp = config->get<int>("/filament/external_spool/bed_temp", 0);
+    info.spoolman_id = config->get<int>("/filament/external_spool/spoolman_id", 0);
+    info.spool_name = config->get<std::string>("/filament/external_spool/spool_name", "");
+    info.remaining_weight_g =
+        config->get<float>("/filament/external_spool/remaining_weight_g", -1.0f);
+    info.total_weight_g = config->get<float>("/filament/external_spool/total_weight_g", -1.0f);
+    info.status = SlotStatus::AVAILABLE;
+    return info;
+}
+
+void SettingsManager::set_external_spool_info(const SlotInfo& info) {
+    Config* config = Config::get_instance();
+    config->set<bool>("/filament/external_spool/assigned", true);
+    config->set<int>("/filament/external_spool/color_rgb", static_cast<int>(info.color_rgb));
+    config->set<std::string>("/filament/external_spool/material", info.material);
+    config->set<std::string>("/filament/external_spool/brand", info.brand);
+    config->set<int>("/filament/external_spool/nozzle_temp_min", info.nozzle_temp_min);
+    config->set<int>("/filament/external_spool/nozzle_temp_max", info.nozzle_temp_max);
+    config->set<int>("/filament/external_spool/bed_temp", info.bed_temp);
+    config->set<int>("/filament/external_spool/spoolman_id", info.spoolman_id);
+    config->set<std::string>("/filament/external_spool/spool_name", info.spool_name);
+    config->set<float>("/filament/external_spool/remaining_weight_g", info.remaining_weight_g);
+    config->set<float>("/filament/external_spool/total_weight_g", info.total_weight_g);
+    config->save();
+}
+
+void SettingsManager::clear_external_spool_info() {
+    Config* config = Config::get_instance();
+    try {
+        auto& filament = config->get_json("/filament");
+        if (filament.is_object() && filament.contains("external_spool")) {
+            filament.erase("external_spool");
+        }
+    } catch (...) {
+        // /filament doesn't exist or isn't an object, nothing to clear
+    }
+    config->save();
 }

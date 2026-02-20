@@ -3,6 +3,8 @@
 
 #include "moonraker_client_mock.h"
 
+#include "ui_update_queue.h"
+
 #include "../tests/mocks/mock_printer_state.h"
 #include "app_globals.h"
 #include "gcode_parser.h"
@@ -579,6 +581,16 @@ void MoonrakerClientMock::discover_printer(
             get_printer_state().set_webcam_available(true);
             spdlog::debug("[MoonrakerClientMock] Webcam available: true (mock always has webcam)");
 
+            // Set power device count during discovery (matches real Moonraker behavior)
+            // Real client queries machine.device_power.devices during discovery
+            if (std::getenv("MOCK_EMPTY_POWER")) {
+                get_printer_state().set_power_device_count(0);
+                spdlog::debug("[MoonrakerClientMock] Power devices: 0 (MOCK_EMPTY_POWER set)");
+            } else {
+                get_printer_state().set_power_device_count(4);
+                spdlog::debug("[MoonrakerClientMock] Power devices: 4 (mock default)");
+            }
+
             // Log discovered hardware
             spdlog::debug("[MoonrakerClientMock] Discovered: {} heaters, {} sensors, {} fans, {} "
                           "LEDs",
@@ -623,7 +635,8 @@ void MoonrakerClientMock::populate_hardware() {
         fans_ = {"heater_fan hotend_fan",
                  "fan", // Part cooling fan
                  "fan_generic nevermore", "controller_fan controller_fan"};
-        leds_ = {"neopixel chamber_light", "neopixel status_led", "led caselight"};
+        leds_ = {"neopixel chamber_light", "neopixel status_led", "led caselight",
+                 "output_pin Enclosure_LEDs"};
         break;
 
     case PrinterType::VORON_TRIDENT:
@@ -699,6 +712,8 @@ void MoonrakerClientMock::populate_hardware() {
         std::lock_guard<std::mutex> lock(led_mutex_);
         led_states_.clear();
         for (const auto& led : leds_) {
+            if (led.rfind("output_pin ", 0) == 0)
+                continue; // output_pin uses {value:} not color_data
             led_states_[led] = LedColor{0.0, 0.0, 0.0, 0.0};
         }
     }
@@ -1297,12 +1312,7 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
     }
     // M112 - Emergency stop
     else if (gcode.find("M112") != std::string::npos) {
-        print_phase_.store(MockPrintPhase::ERROR);
-        print_state_.store(5); // error
-        extruder_target_.store(0.0);
-        bed_target_.store(0.0);
-        spdlog::warn("[MoonrakerClientMock] Emergency stop (M112)!");
-        dispatch_print_state_notification("error");
+        emergency_stop_internal();
     }
 
     // ========================================================================
@@ -2364,6 +2374,36 @@ bool MoonrakerClientMock::cancel_print_internal() {
     return true;
 }
 
+void MoonrakerClientMock::emergency_stop_internal() {
+    spdlog::warn("[MoonrakerClientMock] Emergency stop executed!");
+
+    // Zero all heater targets
+    extruder_target_.store(0.0);
+    bed_target_.store(0.0);
+
+    // Turn off all fans
+    fan_speed_.store(0);
+    {
+        std::lock_guard<std::mutex> lock(fan_mutex_);
+        for (auto& [name, speed] : fan_speeds_) {
+            speed = 0.0;
+        }
+    }
+
+    // Reset PRINT_START simulation phase
+    simulated_print_start_phase_.store(static_cast<uint8_t>(SimulatedPrintStartPhase::NONE));
+
+    // Set print state to error (matches real Klipper M112 behavior)
+    print_phase_.store(MockPrintPhase::ERROR);
+    print_state_.store(5); // error
+    dispatch_print_state_notification("error");
+
+    // Set klippy state to SHUTDOWN (must defer to main thread)
+    helix::ui::async_call(
+        [](void*) { get_printer_state().set_klippy_state_sync(helix::KlippyState::SHUTDOWN); },
+        nullptr);
+}
+
 bool MoonrakerClientMock::toggle_filament_runout() {
     // Find primary runout sensor from filament_sensors_ list
     std::string runout_sensor;
@@ -2617,6 +2657,12 @@ void MoonrakerClientMock::dispatch_initial_state() {
         std::lock_guard<std::mutex> lock(led_mutex_);
         for (const auto& [name, color] : led_states_) {
             led_json[name] = {{"color_data", json::array({{color.r, color.g, color.b, color.w}})}};
+        }
+    }
+    // Add output_pin status (uses {value:} format, not color_data)
+    for (const auto& led : leds_) {
+        if (led.rfind("output_pin ", 0) == 0) {
+            led_json[led] = {{"value", 0.75}}; // Mock: enclosure at 75% brightness
         }
     }
 

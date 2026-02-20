@@ -44,7 +44,7 @@ void MoonrakerAPI::home_axes(const std::string& axes, SuccessCallback on_success
     spdlog::info("[Moonraker API] Homing axes: {} (G-code: {})", axes.empty() ? "all" : axes,
                  gcode);
 
-    execute_gcode(gcode, on_success, on_error);
+    execute_gcode(gcode, on_success, on_error, HOMING_TIMEOUT_MS);
 }
 
 void MoonrakerAPI::move_axis(char axis, double distance, double feedrate,

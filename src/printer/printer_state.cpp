@@ -345,6 +345,7 @@ void PrinterState::update_from_status(const json& state) {
     if (led_ctrl.is_initialized()) {
         led_ctrl.native().update_from_status(state);
         led_ctrl.effects().update_from_status(state);
+        led_ctrl.output_pin().update_from_status(state);
     }
 
     // Update exclude_object state (for mid-print object exclusion)
@@ -533,6 +534,11 @@ void PrinterState::set_os_version(const std::string& version) {
 
 void PrinterState::set_os_version_internal(const std::string& version) {
     versions_state_.set_os_version_internal(version);
+}
+
+void PrinterState::set_power_device_count(int count) {
+    // Delegate to capabilities_state_ component (handles thread-safety)
+    capabilities_state_.set_power_device_count(count);
 }
 
 void PrinterState::set_spoolman_available(bool available) {

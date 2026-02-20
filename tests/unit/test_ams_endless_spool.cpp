@@ -309,10 +309,10 @@ TEST_CASE("AFC backend endless spool - full implementation", "[ams][endless_spoo
         auto result = helper.set_endless_spool_backup(0, 2);
 
         REQUIRE(result);
-        // AFC command: SET_RUNOUT LANE=lane1 RUNOUT_LANE=lane3
+        // AFC command: SET_RUNOUT LANE=lane1 RUNOUT=lane3
         CHECK(helper.has_gcode_containing("SET_RUNOUT"));
         CHECK(helper.has_gcode_containing("LANE=lane1"));
-        CHECK(helper.has_gcode_containing("RUNOUT_LANE=lane3"));
+        CHECK(helper.has_gcode_containing("RUNOUT=lane3"));
     }
 
     SECTION("set_endless_spool_backup with -1 disables backup") {

@@ -15,10 +15,12 @@
 #include "moonraker_client.h"
 
 #include "ui_error_reporting.h"
+#include "ui_update_queue.h"
 
 #include "abort_manager.h"
 #include "app_globals.h"
 #include "helix_version.h"
+#include "led/led_controller.h"
 #include "printer_state.h"
 
 #include <algorithm> // For std::sort in MCU query handling
@@ -1202,6 +1204,27 @@ void MoonrakerClient::continue_discovery(std::function<void()> on_complete,
                         get_printer_state().set_webcam_available(false);
                     });
 
+                // Fire-and-forget power device detection (silent — not all printers
+                // have the power component, and "Method not found" is expected)
+                send_jsonrpc(
+                    "machine.device_power.devices", json::object(),
+                    [](json response) {
+                        int device_count = 0;
+                        if (response.contains("result") && response["result"].contains("devices")) {
+                            device_count = static_cast<int>(response["result"]["devices"].size());
+                        }
+                        spdlog::info("[Moonraker Client] Power device detection: {} devices",
+                                     device_count);
+                        get_printer_state().set_power_device_count(device_count);
+                    },
+                    [](const MoonrakerError& err) {
+                        spdlog::debug("[Moonraker Client] Power device detection failed: {}",
+                                      err.message);
+                        get_printer_state().set_power_device_count(0);
+                    },
+                    0,     // default timeout
+                    true); // silent — suppress error toast
+
                 // Step 3: Get printer information
                 send_jsonrpc("printer.info", {}, [this, on_complete](json printer_response) {
                     if (printer_response.contains("result")) {
@@ -1251,8 +1274,20 @@ void MoonrakerClient::continue_discovery(std::function<void()> on_complete,
                                 config_response["result"]["status"].contains("configfile") &&
                                 config_response["result"]["status"]["configfile"].contains(
                                     "config")) {
-                                hardware_.parse_config_keys(
-                                    config_response["result"]["status"]["configfile"]["config"]);
+                                const auto& cfg =
+                                    config_response["result"]["status"]["configfile"]["config"];
+                                hardware_.parse_config_keys(cfg);
+
+                                // Update LED controller with configfile data (effect targets +
+                                // output_pin PWM)
+                                nlohmann::json cfg_copy = cfg;
+                                helix::ui::queue_update([cfg_copy]() {
+                                    auto& led_ctrl = helix::led::LedController::instance();
+                                    if (led_ctrl.is_initialized()) {
+                                        led_ctrl.update_effect_targets(cfg_copy);
+                                        led_ctrl.update_output_pin_config(cfg_copy);
+                                    }
+                                });
                             }
                         },
                         [](const MoonrakerError& err) {

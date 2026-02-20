@@ -7,7 +7,6 @@
 #include "ui_ams_device_operations_overlay.h"
 #include "ui_ams_dryer_card.h"
 #include "ui_ams_slot.h"
-#include "ui_ams_slot_edit_popup.h"
 #include "ui_ams_slot_layout.h"
 #include "ui_endless_spool_arrows.h"
 #include "ui_error_reporting.h"
@@ -125,7 +124,6 @@ static void ensure_ams_widgets_registered() {
     lv_xml_register_component_from_file("A:ui_xml/components/ams_loaded_card.xml");
     lv_xml_register_component_from_file("A:ui_xml/ams_panel.xml");
     lv_xml_register_component_from_file("A:ui_xml/ams_context_menu.xml");
-    lv_xml_register_component_from_file("A:ui_xml/ams_slot_edit_popup.xml");
     lv_xml_register_component_from_file("A:ui_xml/spoolman_spool_item.xml");
     lv_xml_register_component_from_file("A:ui_xml/ams_edit_modal.xml");
     lv_xml_register_component_from_file("A:ui_xml/ams_loading_error_modal.xml");
@@ -287,6 +285,23 @@ void AmsPanel::init_subjects() {
         AmsState::instance().get_backend_count_subject(), this,
         [](AmsPanel* self, int /*count*/) { self->rebuild_backend_selector(); });
 
+    // Observe external spool color changes to reactively update bypass in path canvas.
+    // NOTE: set_external_spool_info() calls lv_subject_set_int() directly (not via
+    // ui_queue_update) which is safe because all current callers are on the LVGL thread.
+    // If callers from background threads are added, those must use ui_queue_update().
+    external_spool_observer_ = observe_int_sync<AmsPanel>(
+        AmsState::instance().get_external_spool_color_subject(), this,
+        [](AmsPanel* self, int color_int) {
+            if (!self->path_canvas_)
+                return;
+            bool has_spool = color_int != 0;
+            ui_filament_path_canvas_set_bypass_has_spool(self->path_canvas_, has_spool);
+            if (has_spool) {
+                ui_filament_path_canvas_set_bypass_color(self->path_canvas_,
+                                                         static_cast<uint32_t>(color_int));
+            }
+        });
+
     // UI module subjects are now encapsulated in their respective classes:
     // - helix::ui::AmsEditModal
     // - helix::ui::AmsColorPicker
@@ -439,7 +454,6 @@ void AmsPanel::clear_panel_reference() {
     // Reset extracted UI modules (they handle their own RAII cleanup)
     dryer_card_.reset();
     context_menu_.reset();
-    slot_edit_popup_.reset();
     edit_modal_.reset();
     error_modal_.reset();
 
@@ -453,6 +467,7 @@ void AmsPanel::clear_panel_reference() {
     path_segment_observer_.reset();
     path_topology_observer_.reset();
     backend_count_observer_.reset();
+    external_spool_observer_.reset();
     // extruder_temp_observer_ intentionally NOT reset - needed for preheat completion
 
     // Don't cancel preheat or clear pending load state when panel closes.
@@ -727,6 +742,9 @@ void AmsPanel::setup_path_canvas() {
     // Set slot click callback (panel-specific)
     ui_filament_path_canvas_set_slot_callback(path_canvas_, on_path_slot_clicked, this);
 
+    // Set bypass spool click callback (opens edit modal for external spool)
+    ui_filament_path_canvas_set_bypass_callback(path_canvas_, on_bypass_spool_clicked, this);
+
     // Configure from backend using shared helper
     ams_detail_setup_path_canvas(path_canvas_, slot_grid_, scoped_unit_index_, false);
 
@@ -790,13 +808,13 @@ void AmsPanel::update_endless_arrows_from_backend() {
     }
 
     if (!has_any_backup) {
-        spdlog::info("[{}] No endless spool backups configured - hiding arrows", get_name());
+        spdlog::trace("[{}] No endless spool backups configured - hiding arrows", get_name());
         ui_endless_spool_arrows_clear(endless_arrows_);
         lv_obj_add_flag(endless_arrows_, LV_OBJ_FLAG_HIDDEN);
         return;
     }
 
-    spdlog::info("[{}] Endless spool has {} configs with backups", get_name(), configs.size());
+    spdlog::trace("[{}] Endless spool has {} configs with backups", get_name(), configs.size());
 
     // Build backup slots array
     int backup_slots[16] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
@@ -1012,6 +1030,9 @@ void AmsPanel::start_operation(StepOperationType op_type, int target_slot) {
     // Store target for pulse animation
     target_load_slot_ = target_slot;
 
+    // Set pending target slot early so the target slot pulses during preheat
+    AmsState::instance().set_pending_target_slot(target_slot);
+
     // Set ams_action to HEATING immediately - this triggers XML binding to hide buttons
     // (Important for UI-managed preheat where backend hasn't started yet)
     AmsState::instance().set_action(AmsAction::HEATING);
@@ -1026,29 +1047,10 @@ void AmsPanel::start_operation(StepOperationType op_type, int target_slot) {
 
     AmsBackend* backend = AmsState::instance().get_backend();
 
-    if (op_type == StepOperationType::LOAD_SWAP && backend) {
-        // SWAP: Clear highlight on current slot (no pulse), pulse only target
-        int current = backend->get_system_info().current_slot;
-        if (current >= 0 && current < MAX_VISIBLE_SLOTS && slot_widgets_[current] &&
-            current != target_slot) {
-            // Forcibly clear highlight - don't pulse it
-            ui_ams_slot_clear_highlight(slot_widgets_[current]);
-        }
-        // Pulse the target slot
-        if (target_slot >= 0 && target_slot < MAX_VISIBLE_SLOTS && slot_widgets_[target_slot]) {
-            ui_ams_slot_set_pulsing(slot_widgets_[target_slot], true);
-        }
-    } else if (op_type == StepOperationType::UNLOAD) {
-        // UNLOAD only: Pulse the slot being unloaded
-        if (target_slot >= 0 && target_slot < MAX_VISIBLE_SLOTS && slot_widgets_[target_slot]) {
-            ui_ams_slot_set_pulsing(slot_widgets_[target_slot], true);
-        }
-    } else {
-        // LOAD_FRESH: Pulse the target slot
-        if (target_slot >= 0 && target_slot < MAX_VISIBLE_SLOTS && slot_widgets_[target_slot]) {
-            ui_ams_slot_set_pulsing(slot_widgets_[target_slot], true);
-        }
-    }
+    // NOTE: Slot pulse animation is now subject-driven (in ui_ams_slot.cpp).
+    // Each slot auto-pulses when ams_action indicates an active operation and
+    // current_slot matches its index. No explicit pulse calls needed here.
+    LV_UNUSED(backend);
 }
 
 void AmsPanel::update_step_progress(AmsAction action) {
@@ -1059,27 +1061,27 @@ void AmsPanel::update_step_progress(AmsAction action) {
     // NOTE: Operation type is now set by start_operation() before backend calls.
     // We only fall back to heuristic detection for operations started externally
     // (e.g., gcode T commands, Mainsail/Fluidd UI).
-    if (action == AmsAction::HEATING && prev_ams_action_ == AmsAction::IDLE &&
-        target_load_slot_ < 0) {
-        // External operation - try to detect type from backend state
+    bool is_external = (target_load_slot_ < 0);
+    bool filament_loaded = false;
+    if (is_external) {
         AmsBackend* backend = AmsState::instance().get_backend();
         if (backend) {
             AmsSystemInfo info = backend->get_system_info();
-            // If something is currently loaded, this will be a swap (cut first)
-            // Otherwise it's a fresh load
-            if (info.current_slot >= 0) {
-                recreate_step_progress_for_operation(StepOperationType::LOAD_SWAP);
-            } else {
-                recreate_step_progress_for_operation(StepOperationType::LOAD_FRESH);
-            }
-        } else {
-            recreate_step_progress_for_operation(StepOperationType::LOAD_FRESH);
+            filament_loaded = (info.current_slot >= 0);
         }
-    } else if (action == AmsAction::UNLOADING && prev_ams_action_ != AmsAction::CUTTING) {
-        // Explicit unload (not part of a swap) - show unload steps
-        // For swap operations, UNLOADING follows CUTTING, so don't recreate
-        if (current_operation_type_ != StepOperationType::LOAD_SWAP) {
-            recreate_step_progress_for_operation(StepOperationType::UNLOAD);
+    }
+
+    auto detection = detect_step_operation(action, prev_ams_action_, current_operation_type_,
+                                           is_external, filament_loaded);
+    if (detection.should_recreate) {
+        if (detection.op_type == StepOperationType::LOAD_SWAP &&
+            current_operation_type_ == StepOperationType::UNLOAD) {
+            spdlog::debug("[{}] Upgrading UNLOAD → LOAD_SWAP (loading detected after unload)",
+                          get_name());
+        }
+        recreate_step_progress_for_operation(detection.op_type);
+        if (detection.jump_to_step >= 0 && step_progress_) {
+            ui_step_progress_set_current(step_progress_, detection.jump_to_step);
         }
     }
 
@@ -1099,10 +1101,9 @@ void AmsPanel::update_step_progress(AmsAction action) {
         lv_obj_add_flag(step_progress_container_, LV_OBJ_FLAG_HIDDEN);
 
         // Stop pulse animation and reset target when operation completes
-        if (target_load_slot_ >= 0) {
-            set_slot_continuous_pulse(-1, false); // Stop all pulses
-            target_load_slot_ = -1;
-        }
+        // NOTE: Pulse animation stops automatically via subject-driven logic
+        // in ui_ams_slot.cpp when action transitions to IDLE.
+        target_load_slot_ = -1;
         return;
     }
 
@@ -1269,25 +1270,8 @@ void AmsPanel::update_action_display(AmsAction action) {
     // Update step progress stepper
     update_step_progress(action);
 
-    // NOTE: Slot border pulsing is now handled by start_operation() for UI-initiated operations.
-    // For externally-triggered operations (gcode, other UI), we start pulsing here only if
-    // target_load_slot_ was not set by start_operation().
-    if (target_load_slot_ < 0) {
-        bool is_operation_active =
-            (action == AmsAction::LOADING || action == AmsAction::UNLOADING ||
-             action == AmsAction::HEATING || action == AmsAction::CUTTING ||
-             action == AmsAction::FORMING_TIP || action == AmsAction::PURGING);
-        if (is_operation_active) {
-            AmsBackend* backend = AmsState::instance().get_backend();
-            if (backend) {
-                AmsSystemInfo info = backend->get_system_info();
-                if (info.current_slot >= 0) {
-                    set_slot_continuous_pulse(info.current_slot, true);
-                    target_load_slot_ = info.current_slot; // Track so we don't restart
-                }
-            }
-        }
-    }
+    // NOTE: Slot border pulsing is now fully subject-driven in ui_ams_slot.cpp.
+    // Each slot auto-pulses based on ams_action + current_slot subjects.
 
     // Handle error state - show error modal (only if not already visible)
     if (action == AmsAction::ERROR) {
@@ -1298,78 +1282,10 @@ void AmsPanel::update_action_display(AmsAction action) {
 }
 
 void AmsPanel::update_current_slot_highlight(int slot_index) {
-    // Check if this is an actual slot change (for pulse animation)
-    bool slot_changed = (slot_index != last_highlighted_slot_);
-
-    // Remove highlight from all slots (set border opacity to 0)
-    for (int i = 0; i < MAX_VISIBLE_SLOTS; ++i) {
-        if (slot_widgets_[i]) {
-            // Cancel any running animation on this slot
-            if (slot_changed) {
-                lv_anim_delete(slot_widgets_[i], nullptr);
-            }
-            lv_obj_remove_state(slot_widgets_[i], LV_STATE_CHECKED);
-            lv_obj_set_style_border_opa(slot_widgets_[i], LV_OPA_0, 0);
-        }
-    }
-
-    // Add highlight to current slot (show border)
-    if (slot_index >= 0 && slot_index < MAX_VISIBLE_SLOTS && slot_widgets_[slot_index]) {
-        lv_obj_add_state(slot_widgets_[slot_index], LV_STATE_CHECKED);
-
-        // Pulse animation when slot changes (bright -> normal opacity)
-        if (slot_changed && SettingsManager::instance().get_animations_enabled()) {
-            // Start with bright border
-            lv_obj_set_style_border_opa(slot_widgets_[slot_index], LV_OPA_COVER, 0);
-
-            // Animate from bright (255) to normal (100% = 255, so we go to ~60%)
-            constexpr int32_t PULSE_START_OPA = 255;
-            constexpr int32_t PULSE_END_OPA = 153; // ~60% opacity for subtle sustained highlight
-            constexpr uint32_t PULSE_DURATION_MS = 400;
-
-            lv_anim_t pulse_anim;
-            lv_anim_init(&pulse_anim);
-            lv_anim_set_var(&pulse_anim, slot_widgets_[slot_index]);
-            lv_anim_set_values(&pulse_anim, PULSE_START_OPA, PULSE_END_OPA);
-            lv_anim_set_duration(&pulse_anim, PULSE_DURATION_MS);
-            lv_anim_set_path_cb(&pulse_anim, lv_anim_path_ease_out);
-            lv_anim_set_exec_cb(&pulse_anim, [](void* obj, int32_t value) {
-                lv_obj_set_style_border_opa(static_cast<lv_obj_t*>(obj),
-                                            static_cast<lv_opa_t>(value), 0);
-            });
-            lv_anim_start(&pulse_anim);
-
-            spdlog::debug("[AmsPanel] Started pulse animation on slot {}", slot_index);
-        } else {
-            // No animation - just set final opacity
-            lv_obj_set_style_border_opa(slot_widgets_[slot_index], LV_OPA_100, 0);
-        }
-    }
-
-    // Track for next call
-    last_highlighted_slot_ = slot_index;
-
-    // Update the "Currently Loaded" card in the right column
+    // NOTE: Visual highlight (border + glow) on spool_container is fully handled
+    // by slot-level observers in ui_ams_slot.cpp (apply_current_slot_highlight).
+    // This method just updates the "Currently Loaded" info card in the right column.
     update_current_loaded_display(slot_index);
-}
-
-void AmsPanel::set_slot_continuous_pulse(int slot_index, bool enable) {
-    // Stop all existing pulses first
-    for (int i = 0; i < MAX_VISIBLE_SLOTS; ++i) {
-        if (slot_widgets_[i]) {
-            ui_ams_slot_set_pulsing(slot_widgets_[i], false);
-        }
-    }
-
-    // Start pulse on target slot if enabled
-    if (enable && slot_index >= 0 && slot_index < MAX_VISIBLE_SLOTS && slot_widgets_[slot_index]) {
-        if (!SettingsManager::instance().get_animations_enabled()) {
-            // No animation - slot's static highlight will show
-            return;
-        }
-        ui_ams_slot_set_pulsing(slot_widgets_[slot_index], true);
-        spdlog::debug("[AmsPanel] Started continuous pulse animation on slot {}", slot_index);
-    }
 }
 
 void AmsPanel::update_current_loaded_display(int slot_index) {
@@ -1406,6 +1322,59 @@ void AmsPanel::update_current_loaded_display(int slot_index) {
 // ============================================================================
 // Event Callbacks
 // ============================================================================
+
+void AmsPanel::on_bypass_spool_clicked(void* user_data) {
+    auto* self = static_cast<AmsPanel*>(user_data);
+    if (self) {
+        self->handle_bypass_spool_click();
+    }
+}
+
+void AmsPanel::handle_bypass_spool_click() {
+    if (!parent_screen_ || !path_canvas_) {
+        return;
+    }
+
+    // Capture click point from input device for menu positioning
+    lv_point_t click_pt = {0, 0};
+    lv_indev_t* indev = lv_indev_active();
+    if (indev) {
+        lv_indev_get_point(indev, &click_pt);
+    }
+
+    // Create context menu on first use
+    if (!context_menu_) {
+        context_menu_ = std::make_unique<helix::ui::AmsContextMenu>();
+    }
+
+    // Set callback to handle menu actions for external spool
+    context_menu_->set_action_callback(
+        [this](helix::ui::AmsContextMenu::MenuAction action, int /*slot*/) {
+            switch (action) {
+            case helix::ui::AmsContextMenu::MenuAction::EDIT:
+                show_edit_modal(-2);
+                break;
+
+            case helix::ui::AmsContextMenu::MenuAction::SPOOLMAN:
+                show_edit_modal(-2);
+                break;
+
+            case helix::ui::AmsContextMenu::MenuAction::CLEAR_SPOOL:
+                AmsState::instance().clear_external_spool_info();
+                // bypass display update handled reactively by external_spool_observer_
+                NOTIFY_INFO("External spool cleared");
+                break;
+
+            case helix::ui::AmsContextMenu::MenuAction::CANCELLED:
+            default:
+                break;
+            }
+        });
+
+    // Position menu at click point, show for external spool
+    context_menu_->set_click_point(click_pt);
+    context_menu_->show_for_external_spool(parent_screen_, path_canvas_);
+}
 
 void AmsPanel::on_path_slot_clicked(int slot_index, void* user_data) {
     auto* self = static_cast<AmsPanel*>(user_data);
@@ -1522,7 +1491,7 @@ void AmsPanel::on_slots_version_changed(lv_observer_t* observer, lv_subject_t* /
     if (!self->subjects_initialized_ || !self->panel_) {
         return; // Not yet ready
     }
-    spdlog::debug("[AmsPanel] Gates version changed - refreshing slots");
+    spdlog::trace("[AmsPanel] Gates version changed - refreshing slots");
     self->refresh_slots();
 }
 
@@ -1750,6 +1719,34 @@ void AmsPanel::show_context_menu(int slot_index, lv_obj_t* near_widget, lv_point
                 show_edit_modal(slot);
                 break;
 
+            case helix::ui::AmsContextMenu::MenuAction::CLEAR_SPOOL:
+                if (!backend) {
+                    NOTIFY_WARNING("AMS not available");
+                    return;
+                }
+                {
+                    // Clear spool assignment: reset material/color/spool data, keep slot status
+                    SlotInfo cleared = backend->get_slot_info(slot);
+                    cleared.material.clear();
+                    cleared.color_rgb = AMS_DEFAULT_SLOT_COLOR;
+                    cleared.color_name.clear();
+                    cleared.multi_color_hexes.clear();
+                    cleared.brand.clear();
+                    cleared.spool_name.clear();
+                    cleared.spoolman_id = 0;
+                    cleared.remaining_weight_g = -1;
+                    cleared.total_weight_g = -1;
+                    auto error = backend->set_slot_info(slot, cleared);
+                    if (error.success()) {
+                        AmsState::instance().sync_from_backend();
+                        refresh_slots();
+                        NOTIFY_INFO("Slot {} spool cleared", slot + 1);
+                    } else {
+                        NOTIFY_ERROR("Clear failed: {}", error.user_msg);
+                    }
+                }
+                break;
+
             case helix::ui::AmsContextMenu::MenuAction::CANCELLED:
             default:
                 break;
@@ -1766,56 +1763,7 @@ void AmsPanel::show_context_menu(int slot_index, lv_obj_t* near_widget, lv_point
 
     // Position menu near the click point, then show
     context_menu_->set_click_point(click_pt);
-    context_menu_->show_near_widget(parent_screen_, slot_index, near_widget, is_loaded);
-}
-
-// ============================================================================
-// Slot Edit Popup Management (delegates to helix::ui::AmsSlotEditPopup)
-// ============================================================================
-
-void AmsPanel::show_slot_edit_popup(int slot_index, lv_obj_t* near_widget) {
-    if (!parent_screen_ || !near_widget) {
-        return;
-    }
-
-    // Create popup on first use
-    if (!slot_edit_popup_) {
-        slot_edit_popup_ = std::make_unique<helix::ui::AmsSlotEditPopup>();
-    }
-
-    AmsBackend* backend = AmsState::instance().get_backend();
-
-    // Set callbacks for load/unload actions
-    slot_edit_popup_->set_load_callback([this](int slot) {
-        AmsBackend* backend = AmsState::instance().get_backend();
-        if (!backend) {
-            NOTIFY_WARNING("AMS not available");
-            return;
-        }
-        // Check if backend is busy
-        AmsSystemInfo info = backend->get_system_info();
-        if (info.action != AmsAction::IDLE && info.action != AmsAction::ERROR) {
-            NOTIFY_WARNING("AMS is busy: {}", ams_action_to_string(info.action));
-            return;
-        }
-        // Use preheat-aware load
-        this->handle_load_with_preheat(slot);
-    });
-
-    slot_edit_popup_->set_unload_callback([]() {
-        AmsBackend* backend = AmsState::instance().get_backend();
-        if (!backend) {
-            NOTIFY_WARNING("AMS not available");
-            return;
-        }
-        AmsError error = backend->unload_filament();
-        if (error.result != AmsResult::SUCCESS) {
-            NOTIFY_ERROR("Unload failed: {}", error.user_msg);
-        }
-    });
-
-    // Show the popup near the slot widget
-    slot_edit_popup_->show_for_slot(parent_screen_, slot_index, near_widget, backend);
+    context_menu_->show_near_widget(parent_screen_, slot_index, near_widget, is_loaded, backend);
 }
 
 // ============================================================================
@@ -1828,15 +1776,33 @@ void AmsPanel::show_edit_modal(int slot_index) {
         return;
     }
 
+    // Create modal on first use (lazy initialization)
+    if (!edit_modal_) {
+        edit_modal_ = std::make_unique<helix::ui::AmsEditModal>();
+    }
+
+    // External spool (bypass/direct) — not managed by backend
+    if (slot_index == -2) {
+        auto ext = AmsState::instance().get_external_spool_info();
+        SlotInfo initial_info = ext.value_or(SlotInfo{});
+        initial_info.slot_index = -2;
+        initial_info.global_index = -2;
+
+        edit_modal_->set_completion_callback([](const helix::ui::AmsEditModal::EditResult& result) {
+            if (result.saved) {
+                AmsState::instance().set_external_spool_info(result.slot_info);
+                // bypass display update handled reactively by external_spool_observer_
+                NOTIFY_INFO("External spool updated");
+            }
+        });
+        edit_modal_->show_for_slot(parent_screen_, -2, initial_info, api_);
+        return;
+    }
+
     AmsBackend* backend = AmsState::instance().get_backend();
     if (!backend) {
         NOTIFY_WARNING("AMS not available");
         return;
-    }
-
-    // Create modal on first use (lazy initialization)
-    if (!edit_modal_) {
-        edit_modal_ = std::make_unique<helix::ui::AmsEditModal>();
     }
 
     // Get current slot info
@@ -1909,6 +1875,21 @@ void AmsPanel::show_loading_error_modal() {
 // ============================================================================
 
 int AmsPanel::get_load_temp_for_slot(int slot_index) {
+    // External spool (bypass/direct) — get info from AmsState, not backend
+    if (slot_index == -2) {
+        auto info = AmsState::instance().get_external_spool_info();
+        if (info.has_value()) {
+            if (info->nozzle_temp_min > 0)
+                return info->nozzle_temp_min;
+            if (!info->material.empty()) {
+                auto mat = filament::find_material(info->material);
+                if (mat.has_value())
+                    return mat->nozzle_min;
+            }
+        }
+        return AppConstants::Ams::DEFAULT_LOAD_PREHEAT_TEMP;
+    }
+
     AmsBackend* backend = AmsState::instance().get_backend();
     if (!backend) {
         return AppConstants::Ams::DEFAULT_LOAD_PREHEAT_TEMP;
@@ -1959,11 +1940,28 @@ void AmsPanel::handle_load_with_preheat(int slot_index) {
         start_operation(StepOperationType::LOAD_FRESH, slot_index);
     }
 
+    // Helper: initiate load or tool change depending on current state
+    auto do_load_or_swap = [&]() {
+        if (info.current_slot >= 0 && info.current_slot != slot_index) {
+            const SlotInfo* slot_info = info.get_slot_global(slot_index);
+            if (slot_info && slot_info->mapped_tool >= 0) {
+                spdlog::info("[AmsPanel] Preheat path: swapping via tool change T{}",
+                             slot_info->mapped_tool);
+                backend->change_tool(slot_info->mapped_tool);
+            } else {
+                spdlog::info("[AmsPanel] Preheat path: unload first, then load {}", slot_index);
+                backend->unload_filament();
+            }
+        } else {
+            backend->load_filament(slot_index);
+        }
+    };
+
     // If backend handles heating automatically, just call load directly
     // Backend will also handle cooling after load completes
     if (backend->supports_auto_heat_on_load()) {
         ui_initiated_heat_ = false; // Backend manages temp
-        backend->load_filament(slot_index);
+        do_load_or_swap();
         return;
     }
 
@@ -1979,7 +1977,7 @@ void AmsPanel::handle_load_with_preheat(int slot_index) {
     if (current >= (target - TEMP_THRESHOLD)) {
         // Already hot enough - load immediately, no UI-initiated heat
         ui_initiated_heat_ = false;
-        backend->load_filament(slot_index);
+        do_load_or_swap();
         return;
     }
 
@@ -2025,8 +2023,21 @@ void AmsPanel::check_pending_load() {
 
         AmsBackend* backend = AmsState::instance().get_backend();
         if (backend) {
-            spdlog::info("[AmsPanel] Preheat complete, loading slot {}", slot);
-            backend->load_filament(slot);
+            AmsSystemInfo preheat_info = backend->get_system_info();
+            if (preheat_info.current_slot >= 0 && preheat_info.current_slot != slot) {
+                const SlotInfo* slot_info = preheat_info.get_slot_global(slot);
+                if (slot_info && slot_info->mapped_tool >= 0) {
+                    spdlog::info("[AmsPanel] Preheat complete, swapping via tool change T{}",
+                                 slot_info->mapped_tool);
+                    backend->change_tool(slot_info->mapped_tool);
+                } else {
+                    spdlog::info("[AmsPanel] Preheat complete, unloading first then load {}", slot);
+                    backend->unload_filament();
+                }
+            } else {
+                spdlog::info("[AmsPanel] Preheat complete, loading slot {}", slot);
+                backend->load_filament(slot);
+            }
         }
     }
 }

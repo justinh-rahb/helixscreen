@@ -3121,6 +3121,66 @@
       ]
     },
     {
+      "id": "infimech_tx",
+      "name": "Infimech TX",
+      "manufacturer": "Infimech",
+      "image": "infimech-tx.png",
+      "heuristics": [
+        {
+          "type": "kinematics_match",
+          "field": "kinematics",
+          "pattern": "corexy",
+          "confidence": 40,
+          "reason": "CoreXY kinematics"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "infimech",
+          "confidence": 95,
+          "reason": "Hostname contains 'infimech'"
+        },
+        {
+          "type": "hostname_match",
+          "field": "hostname",
+          "pattern": "mks",
+          "confidence": 50,
+          "reason": "Hostname contains 'mks' (MKS board common in Infimech)"
+        },
+        {
+          "type": "stepper_count",
+          "field": "z_count",
+          "pattern": "z_count_2",
+          "confidence": 30,
+          "reason": "Dual Z steppers"
+        },
+        {
+          "type": "build_volume_range",
+          "field": "bed_mesh",
+          "min_x": 210,
+          "max_x": 235,
+          "min_y": 210,
+          "max_y": 235,
+          "confidence": 40,
+          "reason": "Build volume ~225mm (Infimech TX size)"
+        },
+        {
+          "type": "fan_match",
+          "field": "fans",
+          "pattern": "fan3",
+          "confidence": 20,
+          "reason": "Filter fan present (fan3)"
+        },
+        {
+          "type": "object_exists",
+          "field": "printer_objects",
+          "pattern": "adxl345",
+          "confidence": 20,
+          "reason": "Built-in ADXL345 accelerometer"
+        }
+      ]
+    },
+    {
       "id": "kamp_user",
       "name": "KAMP (Adaptive Meshing)",
       "manufacturer": "Generic",

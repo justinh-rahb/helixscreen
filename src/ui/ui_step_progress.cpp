@@ -21,6 +21,8 @@ typedef struct {
     StepState* states;    // Current state for each step
     int step_count;
     bool horizontal;
+    int32_t circle_size;     // Responsive circle diameter
+    int32_t connector_width; // Responsive connector line thickness
 } step_progress_data_t;
 
 // Theme-aware color variables (loaded from component scope or defaults)
@@ -212,6 +214,27 @@ lv_obj_t* ui_step_progress_create(lv_obj_t* parent, const ui_step_t* steps, int 
     // Initialize theme-aware colors from component scope
     init_step_progress_colors(scope_name);
 
+    // Read responsive sizing tokens (with fallbacks)
+    int32_t circle_size = theme_manager_get_spacing("step_indicator");
+    if (circle_size <= 0)
+        circle_size = 20; // fallback
+    int32_t connector_thickness = theme_manager_get_spacing("step_connector");
+    if (connector_thickness <= 0)
+        connector_thickness = 2; // fallback
+    int32_t label_gap = theme_manager_get_spacing("step_label_gap");
+    if (label_gap <= 0)
+        label_gap = 8; // fallback
+    int32_t row_gap = theme_manager_get_spacing("step_row_gap");
+    if (row_gap <= 0)
+        row_gap = 12; // fallback
+
+    int32_t circle_radius = circle_size / 2;
+    int32_t border_width = 2;
+
+    spdlog::debug("[StepProgress] Responsive sizes: circle={}px, connector={}px, label_gap={}px, "
+                  "row_gap={}px",
+                  circle_size, connector_thickness, label_gap, row_gap);
+
     // Allocate widget data using RAII
     auto data_ptr = lvgl_make_unique<step_progress_data_t>();
     if (!data_ptr) {
@@ -222,6 +245,8 @@ lv_obj_t* ui_step_progress_create(lv_obj_t* parent, const ui_step_t* steps, int 
     step_progress_data_t* data = data_ptr.get();
     data->step_count = step_count;
     data->horizontal = horizontal;
+    data->circle_size = circle_size;
+    data->connector_width = connector_thickness;
 
     // Allocate arrays using RAII
     auto label_buffers_ptr = lvgl_make_unique_array<char*>(static_cast<size_t>(step_count));
@@ -262,7 +287,7 @@ lv_obj_t* ui_step_progress_create(lv_obj_t* parent, const ui_step_t* steps, int 
     if (horizontal) {
         lv_obj_set_style_pad_column(container, 0, 0); // No gap - connectors fill space
     } else {
-        lv_obj_set_style_pad_row(container, 12, 0); // 12px spacing between vertical steps (compact)
+        lv_obj_set_style_pad_row(container, row_gap, 0);
     }
 
     // Transfer ownership to LVGL widget
@@ -275,8 +300,6 @@ lv_obj_t* ui_step_progress_create(lv_obj_t* parent, const ui_step_t* steps, int 
     for (int i = 0; i < step_count; i++) {
         // Create step item container
         lv_obj_t* step_item = lv_obj_create(container);
-        // Set explicit minimum width to bootstrap layout calculation
-        // Horizontal: minimum width for label text, Vertical: use full parent width
         if (horizontal) {
             lv_obj_set_width(step_item, LV_SIZE_CONTENT); // Auto-size to content
             lv_obj_set_flex_grow(step_item, 1);           // Distribute space evenly across steps
@@ -287,205 +310,166 @@ lv_obj_t* ui_step_progress_create(lv_obj_t* parent, const ui_step_t* steps, int 
         lv_obj_set_style_bg_opa(step_item, LV_OPA_0, 0);
         lv_obj_set_style_border_width(step_item, 0, 0);
         lv_obj_set_style_pad_all(step_item, 0, 0);
-        lv_obj_set_style_pad_gap(step_item, 0, 0); // No gap
-        // Horizontal: column layout (circle + connector + label stacked), Vertical: row layout
+        lv_obj_set_style_pad_gap(step_item, 0, 0);
+        // Horizontal: column layout (circle + label stacked), Vertical: row layout
         lv_obj_set_flex_flow(step_item, horizontal ? LV_FLEX_FLOW_COLUMN : LV_FLEX_FLOW_ROW);
-        // Center labels beneath circles in horizontal mode, vertically center in vertical mode
         lv_obj_set_flex_align(step_item, LV_FLEX_ALIGN_START,
                               LV_FLEX_ALIGN_CENTER, // Center cross-axis for both orientations
                               LV_FLEX_ALIGN_START);
 
-        // Create indicator column (circle + connector line)
+        // Create indicator column (just wraps the circle)
         lv_obj_t* indicator_column = lv_obj_create(step_item);
-        if (horizontal) {
-            lv_obj_set_size(indicator_column, 24, LV_SIZE_CONTENT); // Horizontal: just the circle
-        } else {
-            // Vertical: circle only (connectors are positioned separately)
-            lv_obj_set_size(indicator_column, 18, 18); // step_indicator_size (compact)
-        }
+        lv_obj_set_size(indicator_column, circle_size, horizontal ? LV_SIZE_CONTENT : circle_size);
         lv_obj_set_style_bg_opa(indicator_column, LV_OPA_0, 0);
         lv_obj_set_style_border_width(indicator_column, 0, 0);
         lv_obj_set_style_pad_all(indicator_column, 0, 0);
-        lv_obj_set_style_pad_gap(indicator_column, 0, 0); // No gap between circle and connector
+        lv_obj_set_style_pad_gap(indicator_column, 0, 0);
         lv_obj_set_flex_flow(indicator_column, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(indicator_column, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER,
                               LV_FLEX_ALIGN_START);
 
         // Create circle indicator
         lv_obj_t* circle = lv_obj_create(indicator_column);
-        lv_obj_set_size(circle, 18, 18); // step_indicator_size (compact)
+        lv_obj_set_size(circle, circle_size, circle_size);
         lv_obj_set_style_radius(circle, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_border_width(circle, 2, 0);
+        lv_obj_set_style_border_width(circle, border_width, 0);
         lv_obj_set_style_pad_all(circle, 0, 0);
-        lv_obj_set_style_margin_all(circle, 0, 0); // No margin around circle
+        lv_obj_set_style_margin_all(circle, 0, 0);
 
         // Create step number label (shown for PENDING/ACTIVE states)
         lv_obj_t* step_number = lv_label_create(circle);
-        char num_buf[16]; // Increased buffer size to handle larger step numbers
-        snprintf(num_buf, sizeof(num_buf), "%d", i + 1); // 1-indexed step numbers
+        char num_buf[16];
+        snprintf(num_buf, sizeof(num_buf), "%d", i + 1);
         lv_label_set_text(step_number, num_buf);
         lv_obj_align(step_number, LV_ALIGN_CENTER, 0, 0);
         lv_obj_set_style_text_font(step_number, theme_manager_get_font("font_body"), 0);
-        lv_obj_set_style_text_color(step_number, color_number_active,
-                                    0); // Theme-aware, will be updated by apply_step_styling()
+        lv_obj_set_style_text_color(step_number, color_number_active, 0);
 
         // Create checkmark label (shown for COMPLETED state)
-        // Use MDI check icon (F012C) instead of LV_SYMBOL_OK which isn't in our fonts
         lv_obj_t* checkmark = lv_label_create(circle);
         lv_label_set_text(checkmark, "\xF3\xB0\x84\xAC"); // MDI check icon (F012C)
         lv_obj_align(checkmark, LV_ALIGN_CENTER, 0, 0);
-        lv_obj_set_style_text_font(checkmark, &mdi_icons_16, 0); // Use MDI icon font
-        lv_obj_set_style_text_color(checkmark, color_number_active,
-                                    0);                 // Theme-aware checkmark color
-        lv_obj_add_flag(checkmark, LV_OBJ_FLAG_HIDDEN); // Hidden by default
-
-        // Vertical connectors will be created dynamically after layout
+        lv_obj_set_style_text_font(checkmark, &mdi_icons_16, 0);
+        lv_obj_set_style_text_color(checkmark, color_number_active, 0);
+        lv_obj_add_flag(checkmark, LV_OBJ_FLAG_HIDDEN);
 
         // Create step label
         lv_obj_t* label = lv_label_create(step_item);
         lv_label_set_text(label, data->label_buffers[i]);
-        lv_obj_set_style_text_color(label, color_label_inactive,
-                                    0); // Theme-aware, will be updated by apply_step_styling()
+        lv_obj_set_style_text_color(label, color_label_inactive, 0);
         if (horizontal) {
-            // Horizontal: label below circle, centered
-            lv_obj_set_width(label, LV_SIZE_CONTENT);          // Auto-size to text
-            lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP); // Enable wrapping if needed
-            lv_obj_set_style_pad_top(label, 8, 0);             // Space between circle and label
+            lv_obj_set_width(label, LV_SIZE_CONTENT);
+            lv_label_set_long_mode(label, LV_LABEL_LONG_WRAP);
+            lv_obj_set_style_pad_top(label, label_gap, 0);
             lv_obj_set_style_text_align(label, LV_TEXT_ALIGN_CENTER, 0);
-            lv_obj_set_style_max_width(label, 120, 0); // Max width for wrapping long labels
+            lv_obj_set_style_max_width(label, 120, 0);
         } else {
-            // Vertical: label to right of circle
-            lv_obj_set_style_pad_left(label, 8, 0); // step_spacing (compact)
+            lv_obj_set_style_pad_left(label, label_gap, 0);
             lv_obj_set_style_pad_top(label, 0, 0);
             lv_obj_set_flex_grow(label, 1);
         }
 
         // Apply initial styling based on state
         apply_step_styling(step_item, steps[i].state);
-
-        // Horizontal connectors will be created dynamically after layout
     }
 
-    // For vertical layout, create connector lines AFTER layout is calculated
-    // This allows us to measure actual positions and draw lines that properly connect circles
-    if (!horizontal) {
-        lv_obj_update_layout(container); // Force layout calculation
+    // Create connector lines AFTER layout is calculated
+    // Connectors are positioned to span from one circle edge to the next — no overlap
+    lv_obj_update_layout(container);
 
-        spdlog::debug("[Step Progress] Creating vertical connectors for {} steps", step_count);
+    if (!horizontal) {
+        spdlog::debug("[StepProgress] Creating vertical connectors for {} steps", step_count);
 
         for (int i = 0; i < step_count - 1; i++) {
             lv_obj_t* current_step = lv_obj_get_child(container, i);
             lv_obj_t* next_step = lv_obj_get_child(container, i + 1);
 
             if (current_step && next_step) {
-                // Get positions after layout
                 lv_coord_t current_y = lv_obj_get_y(current_step);
                 lv_coord_t next_y = lv_obj_get_y(next_step);
 
-                // Calculate connector position and height
-                // Circle is 18px with 2px border - connector should overlap slightly to eliminate
-                // gaps
-                lv_coord_t connector_y =
-                    current_y + 16; // Start 2px before bottom edge of 18px circle
-                lv_coord_t connector_height =
-                    (next_y - connector_y) + 2; // Extend 2px into next circle
+                // Connector starts at bottom edge of current circle, ends at top edge of next
+                lv_coord_t connector_y = current_y + circle_size;
+                lv_coord_t connector_height = next_y - connector_y;
 
-                spdlog::debug("[Step Progress] Connector {}: current_y={}, next_y={}, "
-                              "connector_y={}, height={}",
-                              i, current_y, next_y, connector_y, connector_height);
+                // Center the connector line on the circle's center X
+                lv_coord_t connector_x = circle_radius - (connector_thickness / 2);
 
-                // Create connector line - MUST add IGNORE_LAYOUT first before sizing
                 lv_obj_t* connector = lv_obj_create(container);
-                lv_obj_add_flag(connector, LV_OBJ_FLAG_IGNORE_LAYOUT); // Exempt from flex FIRST
+                lv_obj_add_flag(connector, LV_OBJ_FLAG_IGNORE_LAYOUT);
                 lv_obj_remove_flag(connector, LV_OBJ_FLAG_CLICKABLE);
-                lv_obj_set_size(connector, 2, connector_height); // 2px wide line
-                lv_obj_set_pos(connector, 8, connector_y);       // x=8 (center of 18px indicator)
+                lv_obj_set_size(connector, connector_thickness, connector_height);
+                lv_obj_set_pos(connector, connector_x, connector_y);
                 lv_obj_set_style_bg_opa(connector, LV_OPA_COVER, 0);
                 lv_obj_set_style_border_width(connector, 0, 0);
                 lv_obj_set_style_pad_all(connector, 0, 0);
                 lv_obj_set_style_radius(connector, 0, 0);
-                // Connector color: green only for COMPLETED steps, gray for all others
                 lv_color_t connector_color =
                     (steps[i].state == StepState::Completed) ? color_completed : color_pending;
                 lv_obj_set_style_bg_color(connector, connector_color, 0);
 
-                spdlog::debug("[Step Progress] Connector {} at ({}, {}) h={}", i, 8, connector_y,
+                spdlog::debug("[StepProgress] Vertical connector {}: y={}..{}, x={}, h={}", i,
+                              connector_y, connector_y + connector_height, connector_x,
                               connector_height);
             }
         }
     } else {
-        // For horizontal layout, create connector lines AFTER layout is calculated
-        lv_obj_update_layout(container);
+        spdlog::debug("[StepProgress] Creating horizontal connectors for {} steps", step_count);
 
         for (int i = 0; i < step_count - 1; i++) {
             lv_obj_t* current_step = lv_obj_get_child(container, i);
             lv_obj_t* next_step = lv_obj_get_child(container, i + 1);
 
             if (current_step && next_step) {
-                // Get indicator_column widgets (first child of each step_item, contains circle)
                 lv_obj_t* current_indicator = lv_obj_get_child(current_step, 0);
                 lv_obj_t* next_indicator = lv_obj_get_child(next_step, 0);
 
                 if (!current_indicator || !next_indicator) {
-                    spdlog::warn(
-                        "[Step Progress] Missing indicator widget for horizontal connector {}", i);
+                    spdlog::warn("[StepProgress] Missing indicator for horizontal connector {}", i);
                     continue;
                 }
 
-                // Get circle widgets (first child of indicator_column)
                 lv_obj_t* current_circle = lv_obj_get_child(current_indicator, 0);
                 lv_obj_t* next_circle = lv_obj_get_child(next_indicator, 0);
 
                 if (!current_circle || !next_circle) {
-                    spdlog::warn(
-                        "[Step Progress] Missing circle widget for horizontal connector {}", i);
+                    spdlog::warn("[StepProgress] Missing circle for horizontal connector {}", i);
                     continue;
                 }
 
-                // Get actual X positions of circles and container
+                // Compute absolute X positions of circles within the container
                 lv_coord_t current_circle_x = lv_obj_get_x(current_step) +
                                               lv_obj_get_x(current_indicator) +
                                               lv_obj_get_x(current_circle);
                 lv_coord_t next_circle_x = lv_obj_get_x(next_step) + lv_obj_get_x(next_indicator) +
                                            lv_obj_get_x(next_circle);
 
-                // Calculate circle center X positions (circle is 24px wide)
-                lv_coord_t current_circle_center_x = current_circle_x + 12;
-                lv_coord_t next_circle_center_x = next_circle_x + 12;
+                // Connector spans from right edge of current circle to left edge of next
+                lv_coord_t conn_x = current_circle_x + circle_size;
+                lv_coord_t conn_end_x = next_circle_x;
+                lv_coord_t conn_width = conn_end_x - conn_x;
 
-                // Position connector to touch circle edges accounting for 2px border
-                // Circles are 24px diameter (12px radius) with 2px border drawn inside
-                // Visual edge is at radius + border_half = 12 + 1 = 13px from center
-                lv_coord_t connector_x =
-                    current_circle_center_x + 13; // Right edge including border
-                lv_coord_t connector_end_x =
-                    next_circle_center_x - 13; // Left edge including border
-                lv_coord_t connector_width = connector_end_x - connector_x;
-                lv_coord_t connector_y =
-                    lv_obj_get_y(current_circle) + 11; // Vertically centered with 24px circle
+                // Vertically centered on circle
+                lv_coord_t conn_y = lv_obj_get_y(current_step) + lv_obj_get_y(current_indicator) +
+                                    lv_obj_get_y(current_circle) + circle_radius -
+                                    (connector_thickness / 2);
 
                 lv_obj_t* connector = lv_obj_create(container);
-                lv_obj_remove_flag(connector,
-                                   LV_OBJ_FLAG_FLEX_IN_NEW_TRACK); // Remove from flex layout
-                lv_obj_set_size(connector, connector_width, 1);
-                lv_obj_set_pos(connector, connector_x, connector_y);
+                lv_obj_add_flag(connector, LV_OBJ_FLAG_IGNORE_LAYOUT);
+                lv_obj_remove_flag(connector, LV_OBJ_FLAG_CLICKABLE);
+                lv_obj_set_size(connector, conn_width, connector_thickness);
+                lv_obj_set_pos(connector, conn_x, conn_y);
                 lv_obj_set_style_bg_opa(connector, LV_OPA_COVER, 0);
                 lv_obj_set_style_border_width(connector, 0, 0);
                 lv_obj_set_style_pad_all(connector, 0, 0);
                 lv_obj_set_style_radius(connector, 0, 0);
-                lv_obj_add_flag(connector, LV_OBJ_FLAG_IGNORE_LAYOUT); // Don't let flex move this
 
-                // Connector color: green only for COMPLETED steps, gray for all others
                 lv_color_t connector_color =
                     (steps[i].state == StepState::Completed) ? color_completed : color_pending;
                 lv_obj_set_style_bg_color(connector, connector_color, 0);
 
-                spdlog::debug(
-                    "[Step Progress] Horizontal connector {}: circle_centers=({}, {}), connector "
-                    "pos=({}, {}) size=({}, {})",
-                    i, current_circle_center_x, next_circle_center_x, lv_obj_get_x(connector),
-                    lv_obj_get_y(connector), lv_obj_get_width(connector),
-                    lv_obj_get_height(connector));
+                spdlog::debug("[StepProgress] Horizontal connector {}: x={}..{}, y={}, w={}", i,
+                              conn_x, conn_x + conn_width, conn_y, conn_width);
             }
         }
     }

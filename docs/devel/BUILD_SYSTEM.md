@@ -1188,10 +1188,12 @@ make compile_commands_full
 
 The project uses git submodules for external dependencies:
 
-- `lvgl` - LVGL 9.4 graphics library (with automatic patches)
+- `lvgl` - LVGL 9.5 graphics library (with automatic patches)
 - `libhv` - HTTP/WebSocket client library (auto-built)
 - `spdlog` - Logging library
 - `wpa_supplicant` - WiFi control (Linux only, auto-built)
+
+Additionally, `lib/helix-xml/` contains the extracted XML engine (originally from LVGL 9.4, MIT licensed). This is **not** a submodule — it lives directly in the repository with XML patches baked in permanently.
 
 **Automatic handling**: Submodule dependencies are built automatically when missing. Patches are applied automatically before builds. Never commit changes directly to submodules - always create patches instead.
 
