@@ -595,10 +595,17 @@ void AmsOverviewPanel::on_detail_slot_clicked(lv_event_t* e) {
         return;
     }
 
+    // Capture click point from the input device while event is still active
+    lv_point_t click_pt = {0, 0};
+    lv_indev_t* indev = lv_indev_active();
+    if (indev) {
+        lv_indev_get_point(indev, &click_pt);
+    }
+
     // Use current_target (widget callback was registered on) not target (originally clicked child)
     lv_obj_t* slot = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
     auto global_index = static_cast<int>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(slot)));
-    self->handle_detail_slot_tap(global_index);
+    self->handle_detail_slot_tap(global_index, click_pt);
 
     LVGL_SAFE_EVENT_CB_END();
 }
@@ -1008,7 +1015,7 @@ AmsOverviewPanel& get_global_ams_overview_panel() {
 // Slot Context Menu (detail view)
 // ============================================================================
 
-void AmsOverviewPanel::handle_detail_slot_tap(int global_slot_index) {
+void AmsOverviewPanel::handle_detail_slot_tap(int global_slot_index, lv_point_t click_pt) {
     spdlog::info("[{}] Detail slot {} tapped", get_name(), global_slot_index);
 
     // Find the local widget for positioning the menu
@@ -1033,10 +1040,11 @@ void AmsOverviewPanel::handle_detail_slot_tap(int global_slot_index) {
     if (!slot_widget)
         return;
 
-    show_detail_context_menu(global_slot_index, slot_widget);
+    show_detail_context_menu(global_slot_index, slot_widget, click_pt);
 }
 
-void AmsOverviewPanel::show_detail_context_menu(int slot_index, lv_obj_t* near_widget) {
+void AmsOverviewPanel::show_detail_context_menu(int slot_index, lv_obj_t* near_widget,
+                                                lv_point_t click_pt) {
     if (!parent_screen_ || !near_widget)
         return;
 
@@ -1129,6 +1137,7 @@ void AmsOverviewPanel::show_detail_context_menu(int slot_index, lv_obj_t* near_w
         is_loaded = (slot_info.status == SlotStatus::LOADED);
     }
 
+    context_menu_->set_click_point(click_pt);
     context_menu_->show_near_widget(parent_screen_, slot_index, near_widget, is_loaded, backend);
 }
 

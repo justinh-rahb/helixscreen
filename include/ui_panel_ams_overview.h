@@ -120,8 +120,8 @@ class AmsOverviewPanel : public PanelBase {
     // === Slot Interaction ===
     std::unique_ptr<helix::ui::AmsContextMenu> context_menu_; ///< Slot context menu (lazy init)
 
-    void handle_detail_slot_tap(int global_slot_index);
-    void show_detail_context_menu(int slot_index, lv_obj_t* near_widget);
+    void handle_detail_slot_tap(int global_slot_index, lv_point_t click_pt);
+    void show_detail_context_menu(int slot_index, lv_obj_t* near_widget, lv_point_t click_pt);
 
     // === Event Handling ===
     static void on_unit_card_clicked(lv_event_t* e);
