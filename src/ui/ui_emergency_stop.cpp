@@ -498,5 +498,26 @@ void EmergencyStopOverlay::advanced_firmware_restart_clicked(lv_event_t* e) {
 void EmergencyStopOverlay::home_firmware_restart_clicked(lv_event_t* e) {
     LV_UNUSED(e);
     spdlog::info("[Home] Firmware Restart clicked from Home panel");
-    EmergencyStopOverlay::instance().firmware_restart();
+
+    // If Klipper is already in SHUTDOWN, restart immediately (no confirmation needed).
+    // Otherwise, confirm because restarting interrupts a running printer.
+    lv_subject_t* klippy = lv_xml_get_subject(nullptr, "klippy_state");
+    bool in_shutdown = klippy && lv_subject_get_int(klippy) == 2;
+
+    if (in_shutdown) {
+        EmergencyStopOverlay::instance().firmware_restart();
+    } else {
+        helix::ui::modal_show_confirmation(
+            lv_tr("Restart Firmware?"),
+            lv_tr("This will restart Klipper firmware. Any active operations will be interrupted."),
+            ModalSeverity::Warning, lv_tr("Restart"),
+            [](lv_event_t*) {
+                lv_obj_t* top = Modal::get_top();
+                if (top) {
+                    Modal::hide(top);
+                }
+                EmergencyStopOverlay::instance().firmware_restart();
+            },
+            nullptr, nullptr);
+    }
 }

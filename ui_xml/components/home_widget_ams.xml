@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2025-2026 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<component>
+  <view name="home_widget_ams" extends="lv_obj"
+        height="#button_height_lg" flex_grow="1" style_pad_all="0" scrollable="false">
+    <!-- Hardware gate (ams_slot_count) checked in C++ populate_widgets() -->
+    <ams_mini_status/>
+  </view>
+</component>

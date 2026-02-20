@@ -25,6 +25,8 @@
 #include "ethernet_manager.h"
 #include "filament_sensor_manager.h"
 #include "format_utils.h"
+#include "home_widget_config.h"
+#include "home_widget_registry.h"
 #include "injection_point_manager.h"
 #include "led/led_controller.h"
 #include "led/ui_led_control_overlay.h"
@@ -123,7 +125,10 @@ HomePanel::~HomePanel() {
     // This prevents crashes during lv_deinit() when widgets try to unsubscribe
     deinit_subjects();
 
-    // ObserverGuard handles observer cleanup automatically
+    // Gate observers watch external subjects (capabilities, klippy_state) that may
+    // already be freed. Clear unconditionally — deinit_subjects() may have been
+    // skipped if subjects_initialized_ was already false from a prior call.
+    widget_gate_observers_.clear();
 
     // Clean up timers and animations - must be deleted explicitly before LVGL shutdown
     // Check lv_is_initialized() to avoid crash during static destruction
@@ -231,10 +236,203 @@ void HomePanel::deinit_subjects() {
     if (!subjects_initialized_) {
         return;
     }
+    // Release gate observers BEFORE subjects are freed — they observe external
+    // subjects (capabilities, klippy_state) that may be destroyed during shutdown.
+    widget_gate_observers_.clear();
+
     // SubjectManager handles all lv_subject_deinit() calls via RAII
     subjects_.deinit_all();
     subjects_initialized_ = false;
     spdlog::debug("[{}] Subjects deinitialized", get_name());
+}
+
+static helix::HomeWidgetConfig& get_widget_config() {
+    static helix::HomeWidgetConfig config(*Config::get_instance());
+    // Always reload to pick up changes from settings overlay
+    config.load();
+    return config;
+}
+
+void HomePanel::setup_widget_gate_observers() {
+    using helix::ui::observe_int_sync;
+    widget_gate_observers_.clear();
+
+    // Collect unique gate subject names from the widget registry
+    std::vector<const char*> gate_names;
+    for (const auto& def : helix::get_all_widget_defs()) {
+        if (def.hardware_gate_subject) {
+            // Avoid duplicates
+            bool found = false;
+            for (const auto* existing : gate_names) {
+                if (std::strcmp(existing, def.hardware_gate_subject) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                gate_names.push_back(def.hardware_gate_subject);
+            }
+        }
+    }
+
+    // Also observe klippy_state for firmware_restart conditional injection
+    gate_names.push_back("klippy_state");
+
+    for (const auto* name : gate_names) {
+        lv_subject_t* subject = lv_xml_get_subject(nullptr, name);
+        if (!subject) {
+            spdlog::trace("[{}] Gate subject '{}' not registered yet", get_name(), name);
+            continue;
+        }
+
+        widget_gate_observers_.push_back(observe_int_sync<HomePanel>(
+            subject, this, [](HomePanel* self, int /*value*/) { self->populate_widgets(); }));
+
+        spdlog::trace("[{}] Observing gate subject '{}'", get_name(), name);
+    }
+
+    spdlog::debug("[{}] Set up {} widget gate observers", get_name(),
+                  widget_gate_observers_.size());
+}
+
+void HomePanel::populate_widgets() {
+    lv_obj_t* container = lv_obj_find_by_name(panel_, "widget_container");
+    if (!container) {
+        spdlog::error("[{}] widget_container not found", get_name());
+        return;
+    }
+
+    // Clear existing children (for repopulation)
+    lv_obj_clean(container);
+
+    auto& widget_config = get_widget_config();
+
+    // Collect enabled + hardware-available widget component names
+    std::vector<std::string> enabled_widgets;
+    for (const auto& entry : widget_config.entries()) {
+        if (!entry.enabled) {
+            continue;
+        }
+
+        // Check hardware gate — skip widgets whose hardware isn't present.
+        // Gates are defined in HomeWidgetDef::hardware_gate_subject and checked
+        // here instead of XML bind_flag_if_eq to avoid orphaned dividers.
+        const auto* def = helix::find_widget_def(entry.id);
+        if (def && def->hardware_gate_subject) {
+            lv_subject_t* gate = lv_xml_get_subject(nullptr, def->hardware_gate_subject);
+            if (gate && lv_subject_get_int(gate) == 0) {
+                continue;
+            }
+        }
+
+        enabled_widgets.push_back("home_widget_" + entry.id);
+    }
+
+    // If firmware_restart is NOT already in the list (user disabled it),
+    // conditionally inject it as the LAST widget when Klipper is in SHUTDOWN.
+    // This ensures the restart button is always reachable during a shutdown.
+    bool has_firmware_restart = std::find(enabled_widgets.begin(), enabled_widgets.end(),
+                                          "home_widget_firmware_restart") != enabled_widgets.end();
+    if (!has_firmware_restart) {
+        lv_subject_t* klippy = lv_xml_get_subject(nullptr, "klippy_state");
+        if (klippy && lv_subject_get_int(klippy) == 2) {
+            enabled_widgets.push_back("home_widget_firmware_restart");
+            spdlog::debug("[{}] Injected firmware_restart (Klipper SHUTDOWN)", get_name());
+        }
+    }
+
+    if (enabled_widgets.empty()) {
+        cache_widget_references();
+        return;
+    }
+
+    // Smart row layout:
+    //   1-4 widgets  → 1 row
+    //   5-8 widgets  → 2 rows, first row has 4
+    //   9-10 widgets → 2 rows, first row has 5
+    size_t total = enabled_widgets.size();
+    size_t first_row_count;
+    if (total <= 4) {
+        first_row_count = total; // Single row
+    } else if (total <= 8) {
+        first_row_count = 4; // 2 rows: 4 + remainder
+    } else {
+        first_row_count = 5; // 2 rows: 5 + remainder
+    }
+
+    auto create_row = [&](size_t start, size_t count) {
+        lv_obj_t* row = lv_obj_create(container);
+        lv_obj_set_width(row, LV_PCT(100));
+        lv_obj_set_flex_grow(row, 1);
+        lv_obj_set_style_pad_all(row, 0, 0);
+        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+        bool first = true;
+        for (size_t i = start; i < start + count && i < enabled_widgets.size(); ++i) {
+            // Add divider between widgets (not before first)
+            if (!first) {
+                const char* div_attrs[] = {"height", "80%", nullptr, nullptr};
+                lv_xml_create(row, "divider_vertical", div_attrs);
+            }
+
+            auto* widget =
+                static_cast<lv_obj_t*>(lv_xml_create(row, enabled_widgets[i].c_str(), nullptr));
+            if (widget) {
+                first = false;
+                spdlog::debug("[{}] Created widget: {}", get_name(), enabled_widgets[i]);
+            } else {
+                spdlog::warn("[{}] Failed to create widget: {}", get_name(), enabled_widgets[i]);
+            }
+        }
+    };
+
+    // Create first row
+    create_row(0, first_row_count);
+
+    // Create second row if needed
+    if (total > first_row_count) {
+        create_row(first_row_count, total - first_row_count);
+    }
+
+    // Re-cache widget references after dynamic creation
+    cache_widget_references();
+}
+
+void HomePanel::cache_widget_references() {
+    // Find light icon for dynamic brightness/color updates
+    light_icon_ = lv_obj_find_by_name(panel_, "light_icon");
+    if (light_icon_) {
+        spdlog::debug("[{}] Found light_icon for dynamic brightness/color", get_name());
+        update_light_icon();
+    }
+
+    // Find power icon for visual feedback
+    power_icon_ = lv_obj_find_by_name(panel_, "power_icon");
+
+    // Cache tip label for fade animation
+    tip_label_ = lv_obj_find_by_name(panel_, "status_text_label");
+    if (!tip_label_) {
+        spdlog::warn("[{}] Could not find status_text_label for tip animation", get_name());
+    }
+
+    // Look up print card widgets for dynamic updates during printing
+    print_card_thumb_ = lv_obj_find_by_name(panel_, "print_card_thumb");
+    print_card_active_thumb_ = lv_obj_find_by_name(panel_, "print_card_active_thumb");
+    print_card_label_ = lv_obj_find_by_name(panel_, "print_card_label");
+
+    // Attach heating icon animator
+    lv_obj_t* temp_icon = lv_obj_find_by_name(panel_, "nozzle_icon_glyph");
+    if (temp_icon) {
+        temp_icon_animator_.attach(temp_icon);
+        cached_extruder_temp_ =
+            lv_subject_get_int(printer_state_.get_active_extruder_temp_subject());
+        cached_extruder_target_ =
+            lv_subject_get_int(printer_state_.get_active_extruder_target_subject());
+        temp_icon_animator_.update(cached_extruder_temp_, cached_extruder_target_);
+        spdlog::debug("[{}] Heating icon animator attached", get_name());
+    }
 }
 
 void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
@@ -248,40 +446,13 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 
     spdlog::debug("[{}] Setting up...", get_name());
 
-    // Widget visibility (light button/divider) is handled by XML bindings to printer_has_led
-    // subject Printer image opacity is handled by XML styles bound to printer_connection_state
-    // subject No C++ widget manipulation needed - everything is declarative
+    // Dynamically populate status card widgets from HomeWidgetConfig
+    populate_widgets();
 
-    // Attach heating icon animator (gradient color + pulse while heating)
-    lv_obj_t* temp_icon = lv_obj_find_by_name(panel_, "nozzle_icon_glyph");
-    if (temp_icon) {
-        temp_icon_animator_.attach(temp_icon);
-        // Initialize with cached values (observers may have already fired)
-        cached_extruder_temp_ =
-            lv_subject_get_int(printer_state_.get_active_extruder_temp_subject());
-        cached_extruder_target_ =
-            lv_subject_get_int(printer_state_.get_active_extruder_target_subject());
-        temp_icon_animator_.update(cached_extruder_temp_, cached_extruder_target_);
-        spdlog::debug("[{}] Heating icon animator attached", get_name());
-    }
-
-    // Find light icon for dynamic brightness/color updates
-    light_icon_ = lv_obj_find_by_name(panel_, "light_icon");
-    if (light_icon_) {
-        spdlog::debug("[{}] Found light_icon for dynamic brightness/color", get_name());
-        update_light_icon(); // Initialize with current state
-    }
-
-    // Find power icon for visual feedback
-    power_icon_ = lv_obj_find_by_name(panel_, "power_icon");
-
-    // AMS mini status is now created declaratively via XML <ams_mini_status/>
-
-    // Cache tip label for fade animation
-    tip_label_ = lv_obj_find_by_name(panel_, "status_text_label");
-    if (!tip_label_) {
-        spdlog::warn("[{}] Could not find status_text_label for tip animation", get_name());
-    }
+    // Observe hardware gate subjects so widgets appear/disappear when
+    // capabilities change (e.g. power devices discovered after startup).
+    // Also observe klippy_state for firmware_restart conditional injection.
+    setup_widget_gate_observers();
 
     // Start tip rotation timer (60 seconds = 60000ms)
     if (!tip_rotation_timer_) {
@@ -321,10 +492,7 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
         update_ams_indicator(slot_count);
     }
 
-    // Look up print card widgets for dynamic updates during printing
-    print_card_thumb_ = lv_obj_find_by_name(panel_, "print_card_thumb");
-    print_card_active_thumb_ = lv_obj_find_by_name(panel_, "print_card_active_thumb");
-    print_card_label_ = lv_obj_find_by_name(panel_, "print_card_label");
+    // Print card widgets are already cached by cache_widget_references() via populate_widgets()
     if (print_card_thumb_ && print_card_active_thumb_ && print_card_label_) {
         spdlog::debug("[{}] Found print card widgets for dynamic updates", get_name());
 

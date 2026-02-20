@@ -62,6 +62,13 @@ class HomePanel : public PanelBase {
     }
 
     /**
+     * @brief Rebuild the widget list from current HomeWidgetConfig
+     *
+     * Called from HomeWidgetsOverlay when widget toggles change.
+     */
+    void populate_widgets();
+
+    /**
      * @brief Update status text and temperature display
      * @param status_text New status/tip text (nullptr to keep current)
      * @param temp Temperature in degrees Celsius
@@ -145,6 +152,8 @@ class HomePanel : public PanelBase {
     lv_obj_t* nozzle_temp_panel_ = nullptr;
     lv_obj_t* led_control_panel_ = nullptr;
 
+    void setup_widget_gate_observers();
+    void cache_widget_references();
     void update_tip_of_day();
     void start_tip_fade_transition(const helix::PrintingTip& new_tip);
     void apply_pending_tip();         // Called when fade-out completes
@@ -195,6 +204,9 @@ class HomePanel : public PanelBase {
     ObserverGuard ams_slot_count_observer_;
     ObserverGuard ams_bypass_observer_;
     ObserverGuard filament_sensor_count_observer_;
+
+    // Observers for widget hardware gate subjects — triggers populate_widgets() on change
+    std::vector<ObserverGuard> widget_gate_observers_;
 
     // Computed subject: show filament status when sensors exist AND (no AMS OR bypass active)
     lv_subject_t show_filament_status_;

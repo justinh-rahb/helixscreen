@@ -69,6 +69,7 @@ class Config {
     friend class ChangeHostConfigFixture;
     friend class HardwareValidatorConfigFixture;
     friend class MmuDetectionFixture;
+    friend class HomeWidgetConfigFixture;
 
   public:
     /**
