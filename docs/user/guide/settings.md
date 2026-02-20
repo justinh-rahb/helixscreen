@@ -6,7 +6,7 @@ Access via the **Gear icon** in the navigation bar. Settings are organized into 
 
 | Section | What's Inside |
 |---------|---------------|
-| [Appearance](settings/appearance.md) | Language, animations, 3D preview, display settings (theme, brightness, sleep, time format) |
+| [Appearance](settings/appearance.md) | Language, animations, 3D preview, home widgets, display settings (theme, brightness, sleep, time format) |
 | [Printer](settings/printer.md) | Filament sensors, AMS, Spoolman, LED settings, retraction, macro buttons |
 | [Notifications](settings/notifications.md) | Sound settings (volume, themes, UI sounds), print completion alerts |
 | [Motion](settings/motion.md) | Z movement style, machine limits, E-Stop confirmation, cancel escalation |

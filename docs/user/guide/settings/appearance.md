@@ -57,4 +57,17 @@ Override with the `--layout` command-line flag if auto-detection picks the wrong
 
 ---
 
+## Home Widgets
+
+Tap **Home Widgets** to configure which widgets appear on your Home Panel dashboard and in what order.
+
+- **Toggle** individual widgets on or off (maximum 10 enabled)
+- **Reorder** by long-pressing the drag handle on any row and dragging it up or down
+- Widgets tied to specific hardware (AMS, humidity sensor, probe, etc.) show "(not detected)" and are disabled if that hardware isn't present
+- Changes apply immediately when you close the overlay
+
+See [Home Panel — Home Widgets](../home-panel.md#home-widgets) for details on each widget.
+
+---
+
 [Back to Settings](../settings.md) | [Next: Printer Settings](printer.md)

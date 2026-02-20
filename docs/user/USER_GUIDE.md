@@ -26,7 +26,7 @@ Navigation basics, touch gestures, connection status, first-time setup wizard, W
 ![Setup Wizard](../images/user/wizard-wifi.png)
 
 ### [Home Panel](guide/home-panel.md)
-Your printer dashboard — status area, temperatures, AMS/filament status, active tool badge for toolchanger printers, quick actions (LED control, power toggle, emergency stop), and the Printer Manager with custom images. Long-press the lightbulb button for full LED controls with color, brightness, effects, and WLED presets. Tap the power button to toggle selected devices; long-press for the full power panel.
+Your printer dashboard — status area, configurable home widgets (temperature, network, LED, AMS, power, notifications, and more), active tool badge for toolchanger printers, emergency stop, and the Printer Manager with custom images. Customize which widgets appear and their order via **Settings > Home Widgets**. Long-press the lightbulb widget for full LED controls with color, brightness, effects, and WLED presets.
 
 ### [Printing](guide/printing.md)
 The full printing workflow — file selection, preview, pre-print options, monitoring active prints, tune overlay, Z-offset baby steps, pressure advance, exclude object, and post-print summary.

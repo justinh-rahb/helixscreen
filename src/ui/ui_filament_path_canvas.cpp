@@ -4,6 +4,7 @@
 #include "ui_filament_path_canvas.h"
 
 #include "ui_fonts.h"
+#include "ui_spool_drawing.h"
 #include "ui_update_queue.h"
 #include "ui_widget_memory.h"
 
@@ -562,12 +563,13 @@ static void draw_glow_line(lv_layer_t* layer, int32_t x1, int32_t y1, int32_t x2
     lv_draw_line(layer, &line_dsc);
 }
 
-// Draw glow along a quadratic bezier curve.
+// Draw glow along a cubic bezier curve.
 // Uses butt caps on interior segment joints to prevent opacity compounding
 // where semi-transparent segments overlap. Round caps only on the very first
 // and last endpoints for clean termination.
-static void draw_glow_curve(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t cx, int32_t cy,
-                            int32_t x1, int32_t y1, lv_color_t filament_color, int32_t tube_width) {
+static void draw_glow_curve(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t cx1, int32_t cy1,
+                            int32_t cx2, int32_t cy2, int32_t x1, int32_t y1,
+                            lv_color_t filament_color, int32_t tube_width) {
     lv_color_t glow_color = get_glow_color(filament_color);
     int32_t glow_width = tube_width + GLOW_WIDTH_EXTRA;
 
@@ -576,8 +578,12 @@ static void draw_glow_curve(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t c
     for (int i = 1; i <= CURVE_SEGMENTS; i++) {
         float t = (float)i / CURVE_SEGMENTS;
         float inv = 1.0f - t;
-        int32_t bx = (int32_t)(inv * inv * x0 + 2 * inv * t * cx + t * t * x1);
-        int32_t by = (int32_t)(inv * inv * y0 + 2 * inv * t * cy + t * t * y1);
+        float b0 = inv * inv * inv;
+        float b1 = 3.0f * inv * inv * t;
+        float b2 = 3.0f * inv * t * t;
+        float b3 = t * t * t;
+        int32_t bx = (int32_t)(b0 * x0 + b1 * cx1 + b2 * cx2 + b3 * x1);
+        int32_t by = (int32_t)(b0 * y0 + b1 * cy1 + b2 * cy2 + b3 * y1);
 
         lv_draw_line_dsc_t line_dsc;
         lv_draw_line_dsc_init(&line_dsc);
@@ -636,9 +642,9 @@ static void draw_flow_dots_line(lv_layer_t* layer, int32_t x1, int32_t y1, int32
 }
 
 // Draw flow dots along a quadratic bezier curve
-static void draw_flow_dots_curve(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t cx, int32_t cy,
-                                 int32_t x1, int32_t y1, lv_color_t color, int32_t flow_offset,
-                                 bool reverse) {
+static void draw_flow_dots_curve(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t cx1,
+                                 int32_t cy1, int32_t cx2, int32_t cy2, int32_t x1, int32_t y1,
+                                 lv_color_t color, int32_t flow_offset, bool reverse) {
     // Approximate curve length and place dots along it
     lv_color_t dot_color = ph_lighten(color, 70);
     lv_draw_arc_dsc_t arc_dsc;
@@ -662,8 +668,12 @@ static void draw_flow_dots_curve(lv_layer_t* layer, int32_t x0, int32_t y0, int3
     for (int i = 1; i <= SAMPLES; i++) {
         float t = (float)i / SAMPLES;
         float inv = 1.0f - t;
-        sx[i] = (int32_t)(inv * inv * x0 + 2 * inv * t * cx + t * t * x1);
-        sy[i] = (int32_t)(inv * inv * y0 + 2 * inv * t * cy + t * t * y1);
+        float b0 = inv * inv * inv;
+        float b1 = 3.0f * inv * inv * t;
+        float b2 = 3.0f * inv * t * t;
+        float b3 = t * t * t;
+        sx[i] = (int32_t)(b0 * x0 + b1 * cx1 + b2 * cx2 + b3 * x1);
+        sy[i] = (int32_t)(b0 * y0 + b1 * cy1 + b2 * cy2 + b3 * y1);
         float seg_dx = (float)(sx[i] - sx[i - 1]);
         float seg_dy = (float)(sy[i] - sy[i - 1]);
         cumulative_len[i] = cumulative_len[i - 1] + sqrtf(seg_dx * seg_dx + seg_dy * seg_dy);
@@ -739,83 +749,6 @@ static void draw_sensor_dot(lv_layer_t* layer, int32_t cx, int32_t cy, lv_color_
         arc_dsc.width = 2;
         arc_dsc.color = color;
         lv_draw_arc(layer, &arc_dsc);
-    }
-}
-
-// Draw a small spool box at the bypass entry point.
-// With spool: filled rounded rect in filament color with 3D effect.
-// Without spool: hollow dashed outline with "+" indicator.
-static void draw_bypass_spool_box(lv_layer_t* layer, int32_t cx, int32_t cy, lv_color_t color,
-                                  bool has_spool, int32_t sensor_r) {
-    int32_t box_w = sensor_r * 3;
-    int32_t box_h = sensor_r * 4;
-    int32_t radius = LV_MAX(2, sensor_r / 2);
-
-    lv_area_t box_area = {cx - box_w / 2, cy - box_h / 2, cx + box_w / 2, cy + box_h / 2};
-
-    if (has_spool) {
-        // Shadow (darker, slightly offset)
-        lv_draw_rect_dsc_t shadow_dsc;
-        lv_draw_rect_dsc_init(&shadow_dsc);
-        shadow_dsc.radius = radius;
-        shadow_dsc.bg_color = ph_darken(color, 40);
-        shadow_dsc.bg_opa = LV_OPA_COVER;
-        lv_area_t shadow_area = box_area;
-        shadow_area.x1 += 1;
-        shadow_area.y1 += 1;
-        shadow_area.x2 += 1;
-        shadow_area.y2 += 1;
-        lv_draw_rect(layer, &shadow_dsc, &shadow_area);
-
-        // Main body in filament color
-        lv_draw_rect_dsc_t body_dsc;
-        lv_draw_rect_dsc_init(&body_dsc);
-        body_dsc.radius = radius;
-        body_dsc.bg_color = color;
-        body_dsc.bg_opa = LV_OPA_COVER;
-        lv_draw_rect(layer, &body_dsc, &box_area);
-
-        // Highlight border (top + left edges)
-        lv_draw_rect_dsc_t hl_dsc;
-        lv_draw_rect_dsc_init(&hl_dsc);
-        hl_dsc.radius = radius;
-        hl_dsc.bg_opa = LV_OPA_TRANSP;
-        hl_dsc.border_color = ph_lighten(color, 40);
-        hl_dsc.border_opa = LV_OPA_50;
-        hl_dsc.border_width = 1;
-        hl_dsc.border_side =
-            static_cast<lv_border_side_t>(LV_BORDER_SIDE_TOP | LV_BORDER_SIDE_LEFT);
-        lv_draw_rect(layer, &hl_dsc, &box_area);
-    } else {
-        // Empty box: hollow outline
-        lv_draw_rect_dsc_t outline_dsc;
-        lv_draw_rect_dsc_init(&outline_dsc);
-        outline_dsc.radius = radius;
-        outline_dsc.bg_opa = LV_OPA_TRANSP;
-        outline_dsc.border_color = color;
-        outline_dsc.border_opa = LV_OPA_40;
-        outline_dsc.border_width = 1;
-        lv_draw_rect(layer, &outline_dsc, &box_area);
-
-        // Draw "+" indicator in center
-        int32_t plus_size = LV_MAX(3, sensor_r);
-        lv_draw_line_dsc_t line_dsc;
-        lv_draw_line_dsc_init(&line_dsc);
-        line_dsc.color = color;
-        line_dsc.opa = LV_OPA_40;
-        line_dsc.width = 1;
-        // Horizontal bar
-        line_dsc.p1.x = cx - plus_size / 2;
-        line_dsc.p1.y = cy;
-        line_dsc.p2.x = cx + plus_size / 2;
-        line_dsc.p2.y = cy;
-        lv_draw_line(layer, &line_dsc);
-        // Vertical bar
-        line_dsc.p1.x = cx;
-        line_dsc.p1.y = cy - plus_size / 2;
-        line_dsc.p2.x = cx;
-        line_dsc.p2.y = cy + plus_size / 2;
-        lv_draw_line(layer, &line_dsc);
     }
 }
 
@@ -967,28 +900,34 @@ static void draw_hollow_line(lv_layer_t* layer, int32_t x1, int32_t y1, int32_t 
 // Quadratic bezier evaluated as N line segments for smooth tube routing.
 // Uses a control point to create natural-looking bends like actual tube routing.
 
-// Helper: evaluate quadratic bezier point at parameter t
+// Helper: evaluate cubic bezier point at parameter t
+// P(t) = (1-t)^3*P0 + 3*(1-t)^2*t*C1 + 3*(1-t)*t^2*C2 + t^3*P1
 struct BezierPt {
     int32_t x, y;
 };
 
-static BezierPt bezier_eval(int32_t x0, int32_t y0, int32_t cx, int32_t cy, int32_t x1, int32_t y1,
-                            float t) {
+static BezierPt bezier_eval(int32_t x0, int32_t y0, int32_t cx1, int32_t cy1, int32_t cx2,
+                            int32_t cy2, int32_t x1, int32_t y1, float t) {
     float inv = 1.0f - t;
-    return {(int32_t)(inv * inv * x0 + 2 * inv * t * cx + t * t * x1),
-            (int32_t)(inv * inv * y0 + 2 * inv * t * cy + t * t * y1)};
+    float b0 = inv * inv * inv;
+    float b1 = 3.0f * inv * inv * t;
+    float b2 = 3.0f * inv * t * t;
+    float b3 = t * t * t;
+    return {(int32_t)(b0 * x0 + b1 * cx1 + b2 * cx2 + b3 * x1),
+            (int32_t)(b0 * y0 + b1 * cy1 + b2 * cy2 + b3 * y1)};
 }
 
-// Draw a solid tube along a quadratic bezier curve (p0 → ctrl → p1)
+// Draw a solid tube along a cubic bezier curve (p0 → cp1 → cp2 → p1)
 // Renders each layer (shadow, body, highlight) as a complete pass to avoid
 // visible joints between bezier segments.
-static void draw_curved_tube(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t cx, int32_t cy,
-                             int32_t x1, int32_t y1, lv_color_t color, int32_t width) {
+static void draw_curved_tube(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t cx1, int32_t cy1,
+                             int32_t cx2, int32_t cy2, int32_t x1, int32_t y1, lv_color_t color,
+                             int32_t width) {
     // Pre-compute all bezier points
     BezierPt pts[CURVE_SEGMENTS + 1];
     pts[0] = {x0, y0};
     for (int i = 1; i <= CURVE_SEGMENTS; i++) {
-        pts[i] = bezier_eval(x0, y0, cx, cy, x1, y1, (float)i / CURVE_SEGMENTS);
+        pts[i] = bezier_eval(x0, y0, cx1, cy1, cx2, cy2, x1, y1, (float)i / CURVE_SEGMENTS);
     }
 
     // Pass 1: Shadow (wider, darker) — round caps OK, opaque overdraw is invisible
@@ -1034,15 +973,15 @@ static void draw_curved_tube(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t 
     }
 }
 
-// Draw a hollow tube along a quadratic bezier curve (p0 → ctrl → p1)
+// Draw a hollow tube along a cubic bezier curve (p0 → cp1 → cp2 → p1)
 // Same layer-by-layer approach for smooth joints.
-static void draw_curved_hollow_tube(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t cx,
-                                    int32_t cy, int32_t x1, int32_t y1, lv_color_t wall_color,
-                                    lv_color_t bg_color, int32_t width) {
+static void draw_curved_hollow_tube(lv_layer_t* layer, int32_t x0, int32_t y0, int32_t cx1,
+                                    int32_t cy1, int32_t cx2, int32_t cy2, int32_t x1, int32_t y1,
+                                    lv_color_t wall_color, lv_color_t bg_color, int32_t width) {
     BezierPt pts[CURVE_SEGMENTS + 1];
     pts[0] = {x0, y0};
     for (int i = 1; i <= CURVE_SEGMENTS; i++) {
-        pts[i] = bezier_eval(x0, y0, cx, cy, x1, y1, (float)i / CURVE_SEGMENTS);
+        pts[i] = bezier_eval(x0, y0, cx1, cy1, cx2, cy2, x1, y1, (float)i / CURVE_SEGMENTS);
     }
 
     // All passes use round caps — opaque overdraw at joints is invisible
@@ -1484,20 +1423,22 @@ static void filament_path_draw_cb(lv_event_t* e) {
                 hub_dot_x = center_x;
 
             // Draw curved tube from prep to hub sensor dot
-            // Control point: below slot at ~70% of the vertical drop — creates a
-            // smooth single-direction bend (no S-curve overshoot)
+            // S-curve: CP1 below start (departs downward), CP2 above end (arrives from top)
             int32_t start_y = prep_y + sensor_r;
             int32_t end_y = hub_top - sensor_r;
-            int32_t ctrl_x = slot_x;
-            int32_t ctrl_y = start_y + (end_y - start_y) * 7 / 10;
+            int32_t drop = end_y - start_y;
+            int32_t cp1_x = slot_x;
+            int32_t cp1_y = start_y + drop * 2 / 5;
+            int32_t cp2_x = hub_dot_x;
+            int32_t cp2_y = end_y - drop * 2 / 5;
             if (merge_is_idle) {
-                draw_curved_hollow_tube(layer, slot_x, prep_y + sensor_r, ctrl_x, ctrl_y, hub_dot_x,
-                                        hub_top - sensor_r, idle_color, bg_color, line_active);
+                draw_curved_hollow_tube(layer, slot_x, start_y, cp1_x, cp1_y, cp2_x, cp2_y,
+                                        hub_dot_x, end_y, idle_color, bg_color, line_active);
             } else {
-                draw_glow_curve(layer, slot_x, prep_y + sensor_r, ctrl_x, ctrl_y, hub_dot_x,
-                                hub_top - sensor_r, merge_line_color, lane_width);
-                draw_curved_tube(layer, slot_x, prep_y + sensor_r, ctrl_x, ctrl_y, hub_dot_x,
-                                 hub_top - sensor_r, merge_line_color, lane_width);
+                draw_glow_curve(layer, slot_x, start_y, cp1_x, cp1_y, cp2_x, cp2_y, hub_dot_x,
+                                end_y, merge_line_color, lane_width);
+                draw_curved_tube(layer, slot_x, start_y, cp1_x, cp1_y, cp2_x, cp2_y, hub_dot_x,
+                                 end_y, merge_line_color, lane_width);
             }
 
             // Draw hub sensor dot - colored with filament color if loaded to hub
@@ -1523,17 +1464,20 @@ static void filament_path_draw_cb(lv_event_t* e) {
                                    lane_width);
             }
         } else {
-            // Other non-hub topologies: converge to center merge point (curved)
+            // Other non-hub topologies: converge to center merge point (S-curve)
             int32_t start_y_other = prep_y + sensor_r;
-            int32_t ctrl_x = slot_x;
-            int32_t ctrl_y = start_y_other + (merge_y - start_y_other) * 7 / 10;
+            int32_t drop_other = merge_y - start_y_other;
+            int32_t cp1_x = slot_x;
+            int32_t cp1_y = start_y_other + drop_other * 2 / 5;
+            int32_t cp2_x = center_x;
+            int32_t cp2_y = merge_y - drop_other * 2 / 5;
             if (merge_is_idle) {
-                draw_curved_hollow_tube(layer, slot_x, prep_y + sensor_r, ctrl_x, ctrl_y, center_x,
-                                        merge_y, idle_color, bg_color, line_active);
+                draw_curved_hollow_tube(layer, slot_x, start_y_other, cp1_x, cp1_y, cp2_x, cp2_y,
+                                        center_x, merge_y, idle_color, bg_color, line_active);
             } else {
-                draw_glow_curve(layer, slot_x, prep_y + sensor_r, ctrl_x, ctrl_y, center_x, merge_y,
-                                merge_line_color, lane_width);
-                draw_curved_tube(layer, slot_x, prep_y + sensor_r, ctrl_x, ctrl_y, center_x,
+                draw_glow_curve(layer, slot_x, start_y_other, cp1_x, cp1_y, cp2_x, cp2_y, center_x,
+                                merge_y, merge_line_color, lane_width);
+                draw_curved_tube(layer, slot_x, start_y_other, cp1_x, cp1_y, cp2_x, cp2_y, center_x,
                                  merge_y, merge_line_color, lane_width);
             }
         }
@@ -1559,8 +1503,8 @@ static void filament_path_draw_cb(lv_event_t* e) {
         // Draw spool box instead of sensor dot at bypass entry
         lv_color_t spool_box_color =
             data->bypass_has_spool ? lv_color_hex(data->bypass_color) : idle_color;
-        draw_bypass_spool_box(layer, bypass_x, bypass_entry_y, spool_box_color,
-                              data->bypass_has_spool, sensor_r);
+        ui_draw_spool_box(layer, bypass_x, bypass_entry_y, spool_box_color, data->bypass_has_spool,
+                          sensor_r);
 
         // Draw vertical line from bypass entry down to merge level
         if (data->bypass_active) {
@@ -1793,11 +1737,15 @@ static void filament_path_draw_cb(lv_event_t* e) {
                                 data->active_slot * hub_dot_spacing;
             if (data->slot_count == 1)
                 hub_dot_x = center_x;
-            int32_t ctrl_x = slot_x;
-            int32_t ctrl_y =
-                (prep_y + sensor_r) + (hub_top - sensor_r - (prep_y + sensor_r)) * 7 / 10;
-            draw_flow_dots_curve(layer, slot_x, prep_y + sensor_r, ctrl_x, ctrl_y, hub_dot_x,
-                                 hub_top - sensor_r, flow_color, data->flow_offset, reverse);
+            int32_t fd_start_y = prep_y + sensor_r;
+            int32_t fd_end_y = hub_top - sensor_r;
+            int32_t fd_drop = fd_end_y - fd_start_y;
+            int32_t fd_cp1_x = slot_x;
+            int32_t fd_cp1_y = fd_start_y + fd_drop * 2 / 5;
+            int32_t fd_cp2_x = hub_dot_x;
+            int32_t fd_cp2_y = fd_end_y - fd_drop * 2 / 5;
+            draw_flow_dots_curve(layer, slot_x, fd_start_y, fd_cp1_x, fd_cp1_y, fd_cp2_x, fd_cp2_y,
+                                 hub_dot_x, fd_end_y, flow_color, data->flow_offset, reverse);
         } else if (data->topology == 0) {
             int32_t hub_top = hub_y - hub_h / 2;
             draw_flow_dots_line(layer, slot_x, prep_y + sensor_r, slot_x, hub_top, flow_color,
@@ -1878,10 +1826,15 @@ static void filament_path_draw_cb(lv_event_t* e) {
         int32_t slot_x = x_off + get_slot_x(data, data->active_slot, x_off);
         int32_t hub_top = hub_y - hub_h / 2;
 
-        // Helper to evaluate quadratic bezier at parameter t
-        auto bezier_eval = [](float t, int32_t p0, int32_t p1, int32_t p2) -> int32_t {
+        // Helper to evaluate cubic bezier (1D) at parameter t
+        auto bezier_eval_1d = [](float t, int32_t p0, int32_t c1, int32_t c2,
+                                 int32_t p1) -> int32_t {
             float inv = 1.0f - t;
-            return (int32_t)(inv * inv * p0 + 2 * inv * t * p1 + t * t * p2);
+            float b0 = inv * inv * inv;
+            float b1 = 3.0f * inv * inv * t;
+            float b2 = 3.0f * inv * t * t;
+            float b3 = t * t * t;
+            return (int32_t)(b0 * p0 + b1 * c1 + b2 * c2 + b3 * p1);
         };
 
         // Determine if the current transition crosses the curved lane-to-hub segment
@@ -1908,12 +1861,12 @@ static void filament_path_draw_cb(lv_event_t* e) {
             if (data->slot_count == 1)
                 hub_dot_x = center_x;
 
-            // Bezier: start=(slot_x, prep_y+sensor_r), ctrl=(slot_x, ctrl_y), end=(hub_dot_x,
-            // hub_top-sensor_r)
+            // Cubic bezier: start=(slot_x, prep_y+sensor_r), end=(hub_dot_x, hub_top-sensor_r)
             int32_t bz_x0 = slot_x, bz_y0 = prep_y + sensor_r;
-            int32_t bz_cx = slot_x;
-            int32_t bz_cy = bz_y0 + (hub_top - sensor_r - bz_y0) * 7 / 10;
             int32_t bz_x1 = hub_dot_x, bz_y1 = hub_top - sensor_r;
+            int32_t bz_drop = bz_y1 - bz_y0;
+            int32_t bz_cx1 = slot_x, bz_cy1 = bz_y0 + bz_drop * 2 / 5;
+            int32_t bz_cx2 = hub_dot_x, bz_cy2 = bz_y1 - bz_drop * 2 / 5;
 
             // Map segment pair to curve parameter range (curve spans PREP→HUB = two segments)
             float t;
@@ -1927,8 +1880,8 @@ static void filament_path_draw_cb(lv_event_t* e) {
                                : 0.5f + (1.0f - progress_factor) * 0.5f;
             }
 
-            tip_x = bezier_eval(t, bz_x0, bz_cx, bz_x1);
-            tip_y = bezier_eval(t, bz_y0, bz_cy, bz_y1);
+            tip_x = bezier_eval_1d(t, bz_x0, bz_cx1, bz_cx2, bz_x1);
+            tip_y = bezier_eval_1d(t, bz_y0, bz_cy1, bz_cy2, bz_y1);
         } else {
             // Straight segments — use Y mapping and simple X interpolation
             auto get_segment_y = [&](PathSegment seg) -> int32_t {
