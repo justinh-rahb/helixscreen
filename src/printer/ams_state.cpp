@@ -24,6 +24,7 @@
 #include "printer_discovery.h"
 #include "printer_state.h"
 #include "runtime_config.h"
+#include "settings_manager.h"
 #include "state/subject_macros.h"
 #include "static_subject_registry.h"
 #include "tool_state.h"
@@ -182,6 +183,16 @@ void AmsState::init_subjects(bool register_xml) {
     subjects_.register_subject(&bypass_active_);
     if (register_xml)
         lv_xml_register_subject(nullptr, "ams_bypass_active", &bypass_active_);
+
+    // External spool color subject (loaded from persistent settings)
+    {
+        auto ext_spool = helix::SettingsManager::instance().get_external_spool_info();
+        int initial_color = ext_spool.has_value() ? static_cast<int>(ext_spool->color_rgb) : 0;
+        lv_subject_init_int(&external_spool_color_, initial_color);
+        subjects_.register_subject(&external_spool_color_);
+        if (register_xml)
+            lv_xml_register_subject(nullptr, "ams_external_spool_color", &external_spool_color_);
+    }
 
     lv_subject_init_int(&supports_bypass_, 0);
     subjects_.register_subject(&supports_bypass_);
@@ -679,6 +690,11 @@ void AmsState::sync_from_backend() {
     lv_subject_set_int(&filament_loaded_, info.filament_loaded ? 1 : 0);
     lv_subject_set_int(&bypass_active_, info.current_slot == -2 ? 1 : 0);
     lv_subject_set_int(&supports_bypass_, info.supports_bypass ? 1 : 0);
+
+    // Update external spool color from persistent settings
+    auto ext_spool = helix::SettingsManager::instance().get_external_spool_info();
+    lv_subject_set_int(&external_spool_color_,
+                       ext_spool.has_value() ? static_cast<int>(ext_spool->color_rgb) : 0);
     lv_subject_set_int(&ams_slot_count_, info.total_slots);
 
     // Update action detail string
@@ -1254,4 +1270,22 @@ void AmsState::stop_spoolman_polling() {
         lv_timer_delete(spoolman_poll_timer_);
         spoolman_poll_timer_ = nullptr;
     }
+}
+
+// ============================================================================
+// External Spool (delegates to SettingsManager for persistence)
+// ============================================================================
+
+std::optional<SlotInfo> AmsState::get_external_spool_info() const {
+    return helix::SettingsManager::instance().get_external_spool_info();
+}
+
+void AmsState::set_external_spool_info(const SlotInfo& info) {
+    helix::SettingsManager::instance().set_external_spool_info(info);
+    lv_subject_set_int(&external_spool_color_, static_cast<int>(info.color_rgb));
+}
+
+void AmsState::clear_external_spool_info() {
+    helix::SettingsManager::instance().clear_external_spool_info();
+    lv_subject_set_int(&external_spool_color_, 0);
 }

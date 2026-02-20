@@ -323,6 +323,14 @@ class AmsState {
     }
 
     /**
+     * @brief Get external spool color subject
+     * @return Subject holding 0xRRGGBB color or 0 if no external spool assigned
+     */
+    lv_subject_t* get_external_spool_color_subject() {
+        return &external_spool_color_;
+    }
+
+    /**
      * @brief Get supports bypass subject
      * @return Subject holding 1 if backend supports bypass, 0 otherwise
      */
@@ -696,6 +704,23 @@ class AmsState {
     void set_action_detail(const std::string& detail);
 
     /**
+     * @brief Get external spool info from persistent storage
+     * @return SlotInfo or nullopt if not set
+     */
+    std::optional<SlotInfo> get_external_spool_info() const;
+
+    /**
+     * @brief Set external spool info and update color subject
+     * @param info SlotInfo with filament data
+     */
+    void set_external_spool_info(const SlotInfo& info);
+
+    /**
+     * @brief Clear external spool info
+     */
+    void clear_external_spool_info();
+
+    /**
      * @brief Set the current AMS action state directly
      *
      * Used by UI to indicate operation in progress (e.g., during UI-managed preheat
@@ -826,6 +851,7 @@ class AmsState {
     lv_subject_t ams_current_tool_;
     lv_subject_t filament_loaded_;
     lv_subject_t bypass_active_;
+    lv_subject_t external_spool_color_;
     lv_subject_t supports_bypass_;
     lv_subject_t ams_slot_count_;
     lv_subject_t slots_version_;
