@@ -694,27 +694,30 @@ static void system_path_draw_cb(lv_event_t* e) {
                     int32_t mini_hub_y = merge_y + (tools_y - merge_y) / 3;
                     int32_t end_y_mh = mini_hub_y - mini_hub_h / 2;
 
-                    // Hub sensor dot — close to AMS card for more routing room below
+                    // Hub sensor dot and short vertical beneath it
+                    // Use a shorter merge point for HUB units to leave more room
+                    // between hub routes and parallel routes below
+                    int32_t hub_merge_y = entry_y + (merge_y - entry_y) * 2 / 3;
                     bool has_sensor = data->unit_has_hub_sensor[i];
                     lv_color_t line_color = is_active ? active_color_lv : idle_color;
                     int32_t line_w = is_active ? line_active : line_idle;
-                    int32_t sensor_dot_y = entry_y + (merge_y - entry_y) / 3;
+                    int32_t sensor_dot_y = entry_y + (hub_merge_y - entry_y) / 3;
 
                     if (has_sensor) {
                         draw_vertical_line(layer, unit_x, entry_y, sensor_dot_y - sensor_r,
                                            line_color, line_w);
-                        draw_vertical_line(layer, unit_x, sensor_dot_y + sensor_r, merge_y,
+                        draw_vertical_line(layer, unit_x, sensor_dot_y + sensor_r, hub_merge_y,
                                            line_color, line_w);
                         bool filled = data->unit_hub_triggered[i];
                         lv_color_t dot_color =
                             filled ? (is_active ? active_color_lv : idle_color) : idle_color;
                         draw_sensor_dot(layer, unit_x, sensor_dot_y, dot_color, filled, sensor_r);
                     } else {
-                        draw_vertical_line(layer, unit_x, entry_y, merge_y, line_color, line_w);
+                        draw_vertical_line(layer, unit_x, entry_y, hub_merge_y, line_color, line_w);
                     }
 
                     int32_t dist = unit_x > tool_x ? (unit_x - tool_x) : (tool_x - unit_x);
-                    all_routes[total_routes++] = {i,      first_tool, unit_x, merge_y,
+                    all_routes[total_routes++] = {i,      first_tool, unit_x, hub_merge_y,
                                                   tool_x, end_y_mh,   dist,   true};
 
                     // Save hub info for deferred drawing
@@ -730,11 +733,27 @@ static void system_path_draw_cb(lv_event_t* e) {
         }
 
         // ================================================================
-        // PASS 2: Sort all routes by distance (furthest first = highest Y)
+        // PASS 2: Sort routes. PARALLEL by end_x ascending (leftmost
+        // tool first → bottom horizontal). HUB after parallel, by
+        // distance descending.
         // ================================================================
         for (int a = 0; a < total_routes - 1; ++a) {
             for (int b = a + 1; b < total_routes; ++b) {
-                if (all_routes[b].dist > all_routes[a].dist) {
+                bool swap = false;
+                if (all_routes[a].is_hub && !all_routes[b].is_hub) {
+                    swap = true; // parallel before hub
+                } else if (all_routes[a].is_hub == all_routes[b].is_hub) {
+                    if (!all_routes[a].is_hub) {
+                        // PARALLEL: sort by end_x ascending
+                        if (all_routes[b].end_x < all_routes[a].end_x)
+                            swap = true;
+                    } else {
+                        // HUB: sort by distance descending
+                        if (all_routes[b].dist > all_routes[a].dist)
+                            swap = true;
+                    }
+                }
+                if (swap) {
                     GlobalRoute tmp = all_routes[a];
                     all_routes[a] = all_routes[b];
                     all_routes[b] = tmp;
@@ -743,12 +762,48 @@ static void system_path_draw_cb(lv_event_t* e) {
         }
 
         // ================================================================
-        // PASS 3: Draw all routed paths
-        // Each route's horizontal Y is placed proportionally within its own
-        // vertical range. Furthest routes (r=0) get horizontal at 25% down,
-        // closest routes at 75% down. This keeps long-reach lines above
-        // short-reach lines, avoiding crossings.
+        // PASS 3: Draw all routed paths with computed coordinates.
+        //
+        // PARALLEL geometry (cable harness nesting):
+        //   Routes sorted by end_x ascending (T0 leftmost first).
+        //   Horizontal levels are fixed-spaced pixel positions centered
+        //   in the midzone between entry_y and tools_y.
+        //   T0 (first, leftmost end_x) → LOWEST horizontal (highest Y)
+        //   T3 (last, rightmost end_x) → HIGHEST horizontal (lowest Y)
+        //   This guarantees no crossings: since end_x increases left→right
+        //   and horiz_y increases top→bottom in the same order, no end
+        //   vertical segment can pass through another route's horizontal.
+        //
+        // HUB geometry:
+        //   20%-40% of own vertical range for clean hub-top arrival.
         // ================================================================
+
+        int parallel_count = 0;
+        int hub_count = 0;
+        for (int r = 0; r < total_routes; ++r) {
+            if (all_routes[r].start_x == all_routes[r].end_x)
+                continue;
+            if (all_routes[r].is_hub)
+                hub_count++;
+            else
+                parallel_count++;
+        }
+
+        // PARALLEL: compute absolute Y positions for each horizontal level
+        // Fixed spacing between levels (tube width * 3 gives clear visual gap)
+        int32_t par_step = LV_MAX(10, line_idle * 3 + 4);
+        // Total height of the stacked group
+        int32_t par_group_h = (parallel_count > 1) ? par_step * (parallel_count - 1) : 0;
+        // Center the group at 55% between entry_y and tools_y (slightly below middle)
+        int32_t par_center_y = entry_y + (tools_y - entry_y) * 55 / 100;
+        // Top of group (highest horizontal = smallest Y = last parallel route)
+        int32_t par_top_y = par_center_y - par_group_h / 2;
+        // Bottom of group (lowest horizontal = largest Y = first parallel route)
+        int32_t par_bot_y = par_top_y + par_group_h;
+
+        int parallel_idx = 0;
+        int hub_idx = 0;
+
         for (int r = 0; r < total_routes; ++r) {
             auto& route = all_routes[r];
             bool is_active = (route.unit_idx == data->active_unit);
@@ -757,22 +812,30 @@ static void system_path_draw_cb(lv_event_t* e) {
             lv_color_t route_color = tool_active ? active_color_lv : idle_color;
             int32_t route_w = tool_active ? line_active : line_idle;
 
-            // For routes that don't need horizontal shift, draw vertical
             if (route.start_x == route.end_x) {
                 draw_tube_line(layer, route.start_x, route.start_y, route.end_x, route.end_y,
                                is_active ? active_color_lv : idle_color,
                                is_active ? line_active : line_idle);
-            } else {
-                // Place horizontal Y within this route's own vertical range
-                // f goes from 0.25 (furthest, r=0) to 0.75 (closest, r=last)
-                float f = 0.25f;
-                if (total_routes > 1) {
-                    f = 0.25f + 0.50f * (float)r / (float)(total_routes - 1);
+            } else if (route.is_hub) {
+                // HUB: 20%-40% of own range for clean hub-top arrival
+                float f = 0.20f;
+                if (hub_count > 1) {
+                    f = 0.20f + 0.20f * (float)hub_idx / (float)(hub_count - 1);
                 }
+                hub_idx++;
+
                 int32_t route_drop = route.end_y - route.start_y;
                 int32_t horiz_y = route.start_y + (int32_t)(route_drop * f);
+                horiz_y = LV_CLAMP(horiz_y, route.start_y + arc_r + 2, route.end_y - arc_r - 2);
 
-                // Ensure room for arcs at both ends
+                draw_routed_tube(layer, route.start_x, route.start_y, route.end_x, route.end_y,
+                                 horiz_y, arc_r, route_color, route_w);
+            } else {
+                // PARALLEL: idx 0 (leftmost end_x) at par_bot_y (lowest),
+                // idx N-1 (rightmost end_x) at par_top_y (highest)
+                int32_t horiz_y = par_bot_y - parallel_idx * par_step;
+                parallel_idx++;
+
                 horiz_y = LV_CLAMP(horiz_y, route.start_y + arc_r + 2, route.end_y - arc_r - 2);
 
                 draw_routed_tube(layer, route.start_x, route.start_y, route.end_x, route.end_y,
