@@ -120,17 +120,18 @@ bool SlotRegistry::matches_layout(
     if (static_cast<int>(unit_slot_map.size()) != static_cast<int>(units_.size()))
         return false;
 
-    // Both iterate in sorted order (units_ was built from std::map, so already sorted)
-    auto map_it = unit_slot_map.begin();
-    for (int u = 0; u < static_cast<int>(units_.size()); ++u, ++map_it) {
+    // Look up each unit by name rather than assuming positional alignment,
+    // since units_ may not be sorted if initialized via initialize()/initialize_units()
+    for (int u = 0; u < static_cast<int>(units_.size()); ++u) {
         const auto& reg_unit = units_[u];
-        if (reg_unit.name != map_it->first)
+        auto it = unit_slot_map.find(reg_unit.name);
+        if (it == unit_slot_map.end())
             return false;
-        if (reg_unit.slot_count != static_cast<int>(map_it->second.size()))
+        if (reg_unit.slot_count != static_cast<int>(it->second.size()))
             return false;
 
         for (int s = 0; s < reg_unit.slot_count; ++s) {
-            if (slots_[reg_unit.first_slot + s].backend_name != map_it->second[s])
+            if (slots_[reg_unit.first_slot + s].backend_name != it->second[s])
                 return false;
         }
     }
