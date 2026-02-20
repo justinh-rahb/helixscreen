@@ -57,7 +57,7 @@ static AmsSystemInfo make_multi_unit_info(const std::vector<int>& slots_per_unit
 /**
  * @brief Test helper for AFC multi-unit parsing
  *
- * Exposes parse_afc_state and initialize_lanes for testing multi-unit
+ * Exposes parse_afc_state and initialize_slots for testing multi-unit
  * initialization paths that currently create only 1 unit.
  */
 class AmsBackendAfcMultiUnitHelper : public AmsBackendAfc {
@@ -74,9 +74,9 @@ class AmsBackendAfcMultiUnitHelper : public AmsBackendAfc {
         handle_status_update(notification);
     }
 
-    /// Expose initialize_lanes for testing
-    void test_initialize_lanes(const std::vector<std::string>& names) {
-        initialize_lanes(names);
+    /// Expose initialize_slots for testing
+    void test_initialize_slots(const std::vector<std::string>& names) {
+        initialize_slots(names);
     }
 
     /// Access system_info for assertions (const)
@@ -89,14 +89,19 @@ class AmsBackendAfcMultiUnitHelper : public AmsBackendAfc {
         return system_info_;
     }
 
-    /// Access lane_names for assertions
-    const std::vector<std::string>& get_lane_names() const {
-        return lane_names_;
+    /// Get slot count from registry
+    int get_slot_count() const {
+        return slots_.slot_count();
+    }
+
+    /// Get slot name from registry
+    std::string get_slot_name(int index) const {
+        return slots_.name_of(index);
     }
 
     /// Check if lanes have been initialized
     bool are_lanes_initialized() const {
-        return lanes_initialized_;
+        return slots_.is_initialized();
     }
 
     /// Set discovered lanes (delegates to base)
@@ -134,9 +139,9 @@ class AmsBackendHHMultiUnitHelper : public AmsBackendHappyHare {
         handle_status_update(notification);
     }
 
-    /// Access system_info for assertions
-    const AmsSystemInfo& get_system_info_ref() const {
-        return system_info_;
+    /// Get system info snapshot for assertions (builds from registry when initialized)
+    AmsSystemInfo get_system_info_snapshot() const {
+        return get_system_info();
     }
 
     /// Override execute_gcode to prevent real API calls
@@ -399,7 +404,7 @@ TEST_CASE("AmsSystemInfo total_slots matches sum across units", "[ams][multi-uni
 // ============================================================================
 //
 // NOTE: These tests define the EXPECTED behavior for multi-unit AFC support.
-// The AFC backend's initialize_lanes() currently always creates 1 unit.
+// The AFC backend's initialize_slots() currently always creates 1 unit.
 // Tests for multi-unit will FAIL initially - this is TDD.
 // ============================================================================
 
@@ -408,7 +413,7 @@ TEST_CASE("AFC single-unit backward compatibility", "[ams][multi-unit][afc]") {
     AmsBackendAfcMultiUnitHelper helper;
 
     std::vector<std::string> lanes = {"lane1", "lane2", "lane3", "lane4"};
-    helper.test_initialize_lanes(lanes);
+    helper.test_initialize_slots(lanes);
 
     const auto& info = helper.get_system_info_ref();
 
@@ -608,7 +613,7 @@ TEST_CASE("Happy Hare single-unit backward compatibility", "[ams][multi-unit][ha
     // Standard single-unit Happy Hare with integer num_gates
     AmsBackendHHMultiUnitHelper helper;
 
-    // Feed initial MMU state with gate arrays (triggers initialize_gates)
+    // Feed initial MMU state with gate arrays (triggers initialize_slots)
     nlohmann::json mmu_data;
     mmu_data["gate_status"] = {1, 1, 0, -1};
     mmu_data["gate_color_rgb"] = {0xFF0000, 0x00FF00, 0x0000FF, 0xFFFF00};
@@ -619,7 +624,7 @@ TEST_CASE("Happy Hare single-unit backward compatibility", "[ams][multi-unit][ha
     mmu_data["action"] = "Idle";
     helper.test_parse_mmu_state(mmu_data);
 
-    const auto& info = helper.get_system_info_ref();
+    auto info = helper.get_system_info_snapshot();
 
     SECTION("creates exactly one unit") {
         REQUIRE(info.units.size() == 1);
@@ -670,7 +675,7 @@ TEST_CASE("Happy Hare multi-unit: num_units with comma-separated num_gates",
     mmu_data["action"] = "Idle";
     helper.test_parse_mmu_state(mmu_data);
 
-    const auto& info = helper.get_system_info_ref();
+    auto info = helper.get_system_info_snapshot();
 
     SECTION("creates two units") {
         REQUIRE(info.units.size() == 2);
@@ -739,7 +744,7 @@ TEST_CASE("Happy Hare multi-unit: uneven gate division", "[ams][multi-unit][happ
     mmu_data["action"] = "Idle";
     helper.test_parse_mmu_state(mmu_data);
 
-    const auto& info = helper.get_system_info_ref();
+    auto info = helper.get_system_info_snapshot();
 
     REQUIRE(info.units.size() == 3);
     REQUIRE(info.units[0].slot_count == 3);
@@ -768,7 +773,7 @@ TEST_CASE("Happy Hare multi-unit: integer num_gates creates single unit",
     mmu_data["action"] = "Idle";
     helper.test_parse_mmu_state(mmu_data);
 
-    const auto& info = helper.get_system_info_ref();
+    auto info = helper.get_system_info_snapshot();
 
     REQUIRE(info.units.size() == 1);
     REQUIRE(info.units[0].slot_count == 4);
@@ -795,7 +800,7 @@ TEST_CASE("Happy Hare multi-unit: three units", "[ams][multi-unit][happy-hare]")
     mmu_data["action"] = "Idle";
     helper.test_parse_mmu_state(mmu_data);
 
-    const auto& info = helper.get_system_info_ref();
+    auto info = helper.get_system_info_snapshot();
 
     REQUIRE(info.units.size() == 3);
     REQUIRE(info.total_slots == 12);

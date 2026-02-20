@@ -53,58 +53,41 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
 
     void set_current_lane(const std::string& lane_name) {
         current_lane_name_ = lane_name;
-        // Update lane_name_to_index if not present
-        if (!lane_name.empty() && lane_name_to_index_.count(lane_name) == 0) {
-            int idx = static_cast<int>(lane_names_.size());
-            lane_names_.push_back(lane_name);
-            lane_name_to_index_[lane_name] = idx;
-        }
     }
 
     void initialize_test_lanes(int count) {
-        lane_names_.clear();
-        lane_name_to_index_.clear();
+        std::vector<std::string> names;
         for (int i = 0; i < count; ++i) {
-            std::string name = "lane" + std::to_string(i + 1);
-            lane_names_.push_back(name);
-            lane_name_to_index_[name] = i;
+            names.push_back("lane" + std::to_string(i + 1));
         }
-        // Reset lane sensors
-        for (int i = 0; i < 16; ++i) {
-            lane_sensors_[i] = LaneSensors{};
-        }
+        initialize_slots(names);
     }
 
     // 0-based lane naming: lane0, lane1, ... lane{N-1} (matches real AFC hardware)
     void initialize_test_lanes_zero_based(int count) {
-        lane_names_.clear();
-        lane_name_to_index_.clear();
+        std::vector<std::string> names;
         for (int i = 0; i < count; ++i) {
-            std::string name = "lane" + std::to_string(i);
-            lane_names_.push_back(name);
-            lane_name_to_index_[name] = i;
+            names.push_back("lane" + std::to_string(i));
         }
-        for (int i = 0; i < 16; ++i) {
-            lane_sensors_[i] = LaneSensors{};
-        }
+        initialize_slots(names);
     }
 
     void set_lane_prep_sensor(int lane_index, bool state) {
-        if (lane_index >= 0 && lane_index < 16) {
-            lane_sensors_[lane_index].prep = state;
-        }
+        auto* entry = slots_.get_mut(lane_index);
+        if (entry)
+            entry->sensors.prep = state;
     }
 
     void set_lane_load_sensor(int lane_index, bool state) {
-        if (lane_index >= 0 && lane_index < 16) {
-            lane_sensors_[lane_index].load = state;
-        }
+        auto* entry = slots_.get_mut(lane_index);
+        if (entry)
+            entry->sensors.load = state;
     }
 
     void set_lane_loaded_to_hub(int lane_index, bool state) {
-        if (lane_index >= 0 && lane_index < 16) {
-            lane_sensors_[lane_index].loaded_to_hub = state;
-        }
+        auto* entry = slots_.get_mut(lane_index);
+        if (entry)
+            entry->sensors.loaded_to_hub = state;
     }
 
     void set_running(bool state) {
@@ -124,26 +107,29 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
     }
 
     // Discovery testing helpers
-    const std::vector<std::string>& get_lane_names() const {
-        return lane_names_;
+    int get_slot_count() const {
+        return slots_.slot_count();
+    }
+
+    std::string get_slot_name(int index) const {
+        return slots_.name_of(index);
     }
 
     const std::vector<std::string>& get_hub_names() const {
         return hub_names_;
     }
 
-    void initialize_lanes_from_discovery() {
+    void initialize_slots_from_discovery() {
         // Simulates what start() does when lanes are pre-set via set_discovered_lanes()
-        if (!lane_names_.empty() && !lanes_initialized_) {
-            initialize_lanes(lane_names_);
+        if (!discovered_lane_names_.empty() && !slots_.is_initialized()) {
+            initialize_slots(discovered_lane_names_);
         }
     }
 
     // Persistence testing helpers
     void initialize_test_lanes_with_slots(int count) {
-        lane_names_.clear();
-        lane_name_to_index_.clear();
         system_info_.units.clear();
+        std::vector<std::string> names;
 
         AmsUnit unit;
         unit.unit_index = 0;
@@ -153,8 +139,7 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
 
         for (int i = 0; i < count; ++i) {
             std::string name = "lane" + std::to_string(i + 1);
-            lane_names_.push_back(name);
-            lane_name_to_index_[name] = i;
+            names.push_back(name);
 
             SlotInfo slot;
             slot.slot_index = i;
@@ -167,36 +152,31 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
 
         system_info_.units.push_back(unit);
         system_info_.total_slots = count;
-        lanes_initialized_ = true;
+        slots_.initialize("Box Turtle 1", names);
     }
 
     SlotInfo* get_mutable_slot(int slot_index) {
-        return system_info_.get_slot_global(slot_index);
+        auto* entry = slots_.get_mut(slot_index);
+        return entry ? &entry->info : nullptr;
     }
 
     // Initialize endless spool configs for reset testing
     void initialize_endless_spool_configs(int count) {
-        endless_spool_configs_.clear();
         for (int i = 0; i < count; ++i) {
-            helix::printer::EndlessSpoolConfig config;
-            config.slot_index = i;
-            config.backup_slot = -1;
-            endless_spool_configs_.push_back(config);
+            slots_.set_backup(i, -1);
         }
     }
 
     // Set a specific endless spool backup for testing
     void set_endless_spool_config(int slot, int backup) {
-        if (slot >= 0 && slot < static_cast<int>(endless_spool_configs_.size())) {
-            endless_spool_configs_[slot].backup_slot = backup;
-        }
+        slots_.set_backup(slot, backup);
     }
 
     // Set up multi-unit configuration and trigger reorganize
     void
     setup_multi_unit(const std::unordered_map<std::string, std::vector<std::string>>& unit_map) {
         unit_lane_map_ = unit_map;
-        reorganize_units_from_map();
+        reorganize_slots();
     }
 
     // For persistence tests: capture G-code commands
@@ -265,14 +245,14 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
         return system_info_.tool_to_slot_map;
     }
 
-    const std::vector<helix::printer::EndlessSpoolConfig>& get_endless_spool_configs() const {
-        return endless_spool_configs_;
+    std::vector<helix::printer::EndlessSpoolConfig> get_endless_spool_configs() const {
+        return get_endless_spool_config();
     }
 
     // Get mapped_tool from a slot
     int get_slot_mapped_tool(int slot_index) const {
-        const auto* slot = system_info_.get_slot_global(slot_index);
-        return slot ? slot->mapped_tool : -1;
+        const auto* entry = slots_.get(slot_index);
+        return entry ? entry->info.mapped_tool : -1;
     }
 
     // Event tracking
@@ -300,9 +280,13 @@ class AmsBackendAfcTestHelper : public AmsBackendAfc {
         return "";
     }
 
-    // Phase 2: Access to extended parsing state
-    const LaneSensors& get_lane_sensors(int index) const {
-        return lane_sensors_[index];
+    // Access to extended parsing state (reads from registry)
+    helix::printer::SlotSensors get_lane_sensors(int index) const {
+        const auto* entry = slots_.get(index);
+        if (entry) {
+            return entry->sensors;
+        }
+        return {};
     }
     bool get_hub_sensor() const {
         // Returns true if any hub sensor is triggered (backward compat)
@@ -613,7 +597,7 @@ TEST_CASE("AFC segment: toolhead sensors take priority over hub", "[ams][afc][se
 
 TEST_CASE("AFC segment: no lanes initialized returns NONE", "[ams][afc][segment][edge]") {
     AmsBackendAfcTestHelper helper;
-    // Don't call initialize_test_lanes - lane_names_ is empty
+    // Don't call initialize_test_lanes - no lanes configured
 
     REQUIRE(helper.test_compute_filament_segment() == PathSegment::NONE);
 }
@@ -682,10 +666,11 @@ TEST_CASE("AFC set_discovered_lanes: sets lane names correctly", "[ams][afc][dis
 
     helper.set_discovered_lanes(lanes, hubs);
 
-    // After setting lanes, they should be accessible
-    REQUIRE(helper.get_lane_names().size() == 4);
-    REQUIRE(helper.get_lane_names()[0] == "lane1");
-    REQUIRE(helper.get_lane_names()[3] == "lane4");
+    // After setting lanes and initializing, they should be accessible via registry
+    helper.initialize_slots_from_discovery();
+    REQUIRE(helper.get_slot_count() == 4);
+    REQUIRE(helper.get_slot_name(0) == "lane1");
+    REQUIRE(helper.get_slot_name(3) == "lane4");
 }
 
 TEST_CASE("AFC set_discovered_lanes: sets hub names correctly", "[ams][afc][discovery]") {
@@ -714,8 +699,9 @@ TEST_CASE("AFC set_discovered_lanes: empty lanes doesn't overwrite existing",
     std::vector<std::string> new_hubs = {"NewHub"};
     helper.set_discovered_lanes(empty_lanes, new_hubs);
 
-    // Lanes should remain unchanged
-    REQUIRE(helper.get_lane_names().size() == 2);
+    // Lanes should remain unchanged (check via discovery init)
+    helper.initialize_slots_from_discovery();
+    REQUIRE(helper.get_slot_count() == 2);
     // But hubs should be updated
     REQUIRE(helper.get_hub_names().size() == 1);
     REQUIRE(helper.get_hub_names()[0] == "NewHub");
@@ -730,7 +716,7 @@ TEST_CASE("AFC segment: works with discovered lanes", "[ams][afc][discovery][seg
     helper.set_discovered_lanes(lanes, hubs);
 
     // Initialize the lanes (like start() would do)
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Now test that sensors work correctly
     helper.set_current_lane("lane2");
@@ -1598,7 +1584,7 @@ TEST_CASE("AFC device action reset_motor dispatches gcode", "[ams][afc][device_a
     auto result = helper.execute_device_action("reset_motor");
 
     REQUIRE(result.success());
-    REQUIRE(helper.has_gcode("AFC_RESET_MOTOR_TIME"));
+    REQUIRE(helper.has_gcode_starting_with("AFC_RESET_MOTOR_TIME"));
 }
 
 TEST_CASE("AFC device action led toggle on when off", "[ams][afc][device_actions][phase3]") {
@@ -1750,7 +1736,7 @@ TEST_CASE("AFC error message surfaces in EVENT_ERROR data", "[ams][afc][recovery
 TEST_CASE("AFC backend handles flat string units array", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(12);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Feed AFC state with flat string units (real hardware format)
     nlohmann::json afc_state;
@@ -1797,7 +1783,7 @@ TEST_CASE("AFC backend handles flat string units array", "[ams][afc][mixed]") {
 TEST_CASE("AFC backend flat string units: single word name still parses", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(4);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Edge case: unit string with no space should not crash
     nlohmann::json afc_state;
@@ -1815,7 +1801,7 @@ TEST_CASE("AFC backend flat string units: single word name still parses", "[ams]
 TEST_CASE("AFC backend unit-level object populates AfcUnitInfo", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(12);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // First, feed flat string units to populate unit_infos_
     nlohmann::json afc_state;
@@ -1870,7 +1856,7 @@ TEST_CASE("AFC backend unit-level object populates AfcUnitInfo", "[ams][afc][mix
 TEST_CASE("AFC backend unit object triggers lane reorganization", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(8);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Feed flat string units
     nlohmann::json afc_state;
@@ -1900,7 +1886,7 @@ TEST_CASE("AFC backend unit object triggers lane reorganization", "[ams][afc][mi
     auto info = helper.get_system_info();
     REQUIRE(info.units.size() == 2);
     // Units sorted alphabetically: AMS_1 before Turtle_1
-    // (reorganize_units_from_map sorts unit names)
+    // (reorganize_slots sorts unit names)
     REQUIRE(info.units[0].slot_count == 4);
     REQUIRE(info.units[1].slot_count == 4);
     REQUIRE(info.total_slots == 8);
@@ -1911,7 +1897,7 @@ TEST_CASE("AFC backend unit object triggers lane reorganization", "[ams][afc][mi
 TEST_CASE("AFC backend handles AFC_lane status updates", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(8);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Feed an AFC_lane update (same schema as AFC_stepper)
     nlohmann::json lane_data;
@@ -1953,7 +1939,7 @@ TEST_CASE("AFC backend handles mix of AFC_stepper and AFC_lane in same update",
           "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(8);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Feed both AFC_stepper and AFC_lane in same notification
     nlohmann::json stepper_data;
@@ -1993,7 +1979,7 @@ TEST_CASE("AFC backend handles mix of AFC_stepper and AFC_lane in same update",
 TEST_CASE("AFC backend handles multiple AFC_extruder objects", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(12);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Set extruder names from AFC state
     nlohmann::json afc_state;
@@ -2022,7 +2008,7 @@ TEST_CASE("AFC backend multi-extruder backward compat: single extruder still wor
           "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(4);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Do NOT set extruder_names_ (empty = backward compat)
     // Feed single AFC_extruder extruder (old format)
@@ -2057,7 +2043,7 @@ TEST_CASE("AFC backend stores extruder names from AFC state extruders array", "[
 TEST_CASE("AFC backend backward compat: object-format units still works", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes(4);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Old format: units as objects with name and lanes
     nlohmann::json afc_state;
@@ -2078,7 +2064,7 @@ TEST_CASE("AFC backend backward compat: object-format units still works", "[ams]
 TEST_CASE("AFC backend backward compat: mixed string and object units", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(8);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Mix of string and object units (shouldn't happen in practice, but be robust)
     nlohmann::json afc_state;
@@ -2295,7 +2281,7 @@ TEST_CASE("AFC supports_lane_reset returns true", "[ams][afc][capability]") {
 TEST_CASE("AFC hub-loaded lane is AVAILABLE, not LOADED", "[ams][afc][status]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes(4);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Exact production state: loaded_to_hub=true, tool_loaded=false, status="Loaded"
     helper.feed_afc_stepper("lane1", {{"prep", true},
@@ -2321,7 +2307,7 @@ TEST_CASE("AFC hub-loaded lane is AVAILABLE, not LOADED", "[ams][afc][status]") 
 TEST_CASE("AFC tool_loaded=true lane is LOADED", "[ams][afc][status]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes(4);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Filament actually at the toolhead
     helper.feed_afc_stepper("lane1", {{"prep", true},
@@ -2344,7 +2330,7 @@ TEST_CASE("AFC 'Tooled' status maps to LOADED even without tool_loaded flag",
           "[ams][afc][status]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes(4);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // OpenAMS uses "Tooled" status string
     helper.feed_afc_stepper("lane1", {{"prep", true},
@@ -2366,7 +2352,7 @@ TEST_CASE("AFC 'Tooled' status maps to LOADED even without tool_loaded flag",
 TEST_CASE("AFC context menu shows Eject for hub-loaded slot", "[ams][afc][status]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes(4);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // Two lanes loaded to hub, none to toolhead
     helper.feed_afc_stepper("lane1", {{"prep", true},
@@ -2388,7 +2374,7 @@ TEST_CASE("AFC context menu shows Eject for hub-loaded slot", "[ams][afc][status
 TEST_CASE("AFC slot transitions from LOADED to AVAILABLE on unload", "[ams][afc][status]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes(4);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     // First: loaded to toolhead
     helper.feed_afc_stepper("lane1", {{"tool_loaded", true},

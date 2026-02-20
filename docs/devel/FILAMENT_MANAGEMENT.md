@@ -50,6 +50,8 @@ HelixScreen uses a backend abstraction layer to support multiple multi-filament 
 | `include/ams_types.h` | Shared types: `AmsType`, `SlotInfo`, `AmsAction`, `PathTopology`, etc. |
 | `include/ams_error.h` | Error types with user-friendly messages |
 | `include/ams_state.h` | LVGL subject bridge (singleton) |
+| `include/slot_registry.h` | SlotRegistry: single source of truth for per-slot state |
+| `src/printer/slot_registry.cpp` | SlotRegistry implementation (name/index mapping, reorganize, tool map) |
 | `include/ams_backend_happy_hare.h` | Happy Hare MMU implementation |
 | `include/ams_backend_afc.h` | AFC (Armored Turtle / Box Turtle) implementation |
 | `include/ams_backend_valgace.h` | ValgACE (AnyCubic ACE Pro) implementation |
@@ -66,8 +68,49 @@ HelixScreen uses a backend abstraction layer to support multiple multi-filament 
 
 1. **Discovery**: `PrinterDiscovery::parse_objects()` scans Klipper's `printer.objects.list` for `mmu`, `AFC`, `toolchanger`, `AFC_stepper lane*`, `AFC_hub *`, `tool T*` objects.
 2. **Backend Creation**: `AmsState::init_backend_from_hardware()` calls `AmsBackend::create()` with the detected `AmsType` and Moonraker dependencies.
-3. **State Sync**: Backend emits events (`STATE_CHANGED`, `SLOT_CHANGED`, etc.) which `AmsState` translates to LVGL subject updates.
-4. **UI Binding**: XML widgets bind to subjects (`ams_type`, `ams_action`, `current_slot`, `slots_version`, etc.) for reactive updates.
+3. **Slot State**: Each backend stores per-slot state in its `SlotRegistry` instance (`slots_`), which provides indexed access, name lookup, and multi-unit reorganization. Moonraker status updates write to the registry under the backend's mutex.
+4. **State Sync**: Backend emits events (`STATE_CHANGED`, `SLOT_CHANGED`, etc.) which `AmsState` translates to LVGL subject updates.
+5. **UI Binding**: XML widgets bind to subjects (`ams_type`, `ams_action`, `current_slot`, `slots_version`, etc.) for reactive updates.
+
+### SlotRegistry (Per-Slot State)
+
+Each backend owns a `helix::printer::SlotRegistry` instance (`slots_`) that serves as the single source of truth for all per-slot indexed state. Before SlotRegistry, backends maintained parallel vectors (`lane_names_`, `lane_sensors_`, `gate_sensors_`, etc.) that had to be kept in sync manually -- a frequent source of index mismatch bugs.
+
+**What SlotRegistry manages:**
+- Slot names and bidirectional name-to-index lookup
+- Per-slot sensor states (prep, load, loaded_to_hub, tool_loaded)
+- Per-slot error and buffer health
+- Per-slot filament weight tracking
+- Tool-to-slot mapping
+- Multi-unit reorganization (preserving slot data when unit topology changes)
+
+**How backends use it:**
+
+```cpp
+// Initialize (once, during startup or first data arrival)
+slots_.initialize("AFC Box Turtle", lane_names);   // AFC
+slots_.initialize("Happy Hare MMU", gate_count);    // Happy Hare
+
+// Read state
+int idx = slots_.index_of("lane3");         // Name -> index
+std::string name = slots_.name_of(2);       // Index -> name
+const auto* entry = slots_.get(idx);        // Read-only access
+auto info = slots_.build_slot_info(idx);    // Build SlotInfo for API
+
+// Write state (under backend mutex)
+auto* entry = slots_.get_mut(idx);
+entry->sensors.prep = true;
+entry->info.color_rgb = 0xFF0000;
+
+// Multi-unit reorganization (AFC multi-unit topology changes)
+slots_.reorganize(unit_lane_map);           // Preserves slot data across layout changes
+```
+
+**Key design decisions:**
+- SlotRegistry does NOT hold a mutex -- the owning backend's mutex protects all access
+- `build_slot_info()` constructs a `SlotInfo` snapshot, avoiding shared mutable state
+- `reorganize()` uses `matches_layout()` to skip no-op rebuilds on repeated status updates
+- Slot names remain backend-specific ("lane1" for AFC, "Gate 0" for Happy Hare) -- SlotRegistry is agnostic
 
 ### Threading Model
 

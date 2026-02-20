@@ -59,7 +59,7 @@ AmsBackendMock::AmsBackendMock(int slot_count) {
     // Clamp slot count to reasonable range
     slot_count = std::clamp(slot_count, 1, 16);
 
-    // Initialize system info
+    // Initialize system info (non-slot metadata)
     system_info_.type = AmsType::HAPPY_HARE; // Mock as Happy Hare
     system_info_.type_name = "Happy Hare (Mock)";
     system_info_.version = "2.7.0-mock";
@@ -77,100 +77,96 @@ AmsBackendMock::AmsBackendMock(int slot_count) {
     system_info_.tip_method = caps.tip_method;
     system_info_.has_hardware_bypass_sensor = false; // Mock default: virtual toggle
 
-    // Create single unit with all slots
-    AmsUnit unit;
-    unit.unit_index = 0;
-    unit.name = "Mock MMU";
-    unit.slot_count = slot_count;
-    unit.first_slot_global_index = 0;
-    unit.connected = true;
-    unit.firmware_version = "mock-1.0";
-    unit.has_encoder = true;
-    unit.has_toolhead_sensor = true;
-    unit.has_slot_sensors = true;
-
-    // Initialize slots with sample filament data
+    // Initialize registry with single unit
+    std::vector<std::string> slot_names;
+    slot_names.reserve(slot_count);
     for (int i = 0; i < slot_count; ++i) {
-        SlotInfo slot;
-        slot.slot_index = i;
-        slot.global_index = i;
-        slot.status = SlotStatus::AVAILABLE;
-        slot.mapped_tool = i; // Direct 1:1 mapping
+        slot_names.push_back(std::to_string(i));
+    }
+    slots_.initialize("Mock MMU", slot_names);
+
+    // Populate slot data in registry
+    for (int i = 0; i < slot_count; ++i) {
+        auto* entry = slots_.get_mut(i);
+        if (!entry)
+            continue;
+
+        entry->info.slot_index = i;
+        entry->info.global_index = i;
+        entry->info.status = SlotStatus::AVAILABLE;
+        entry->info.mapped_tool = i; // Direct 1:1 mapping
 
         // Assign sample filament data (cycle through samples)
         const auto& sample = SAMPLE_FILAMENTS[i % NUM_SAMPLE_FILAMENTS];
-        slot.color_rgb = sample.color;
-        slot.color_name = sample.color_name;
-        slot.material = sample.material;
-        slot.brand = sample.brand;
+        entry->info.color_rgb = sample.color;
+        entry->info.color_name = sample.color_name;
+        entry->info.material = sample.material;
+        entry->info.brand = sample.brand;
 
         // Mock Spoolman data with dramatic fill level differences for demo
-        // Use IDs 1-N to match mock Spoolman spools (1-18 in moonraker_api_mock.cpp)
-        slot.spoolman_id = i + 1;
-        slot.spool_name = std::string(sample.color_name) + " " + sample.material;
-        slot.total_weight_g = 1000.0f;
-        // Vary fill levels dramatically: 100%, 75%, 40%, 10% for clear visual difference
+        entry->info.spoolman_id = i + 1;
+        entry->info.spool_name = std::string(sample.color_name) + " " + sample.material;
+        entry->info.total_weight_g = 1000.0f;
         static const float fill_levels[] = {1.0f, 0.75f, 0.40f, 0.10f, 0.90f, 0.50f, 0.25f, 0.05f};
-        slot.remaining_weight_g = slot.total_weight_g * fill_levels[i % 8];
+        entry->info.remaining_weight_g = entry->info.total_weight_g * fill_levels[i % 8];
 
         // Temperature recommendations from filament database
         auto mat_info = filament::find_material(sample.material);
         if (mat_info) {
-            slot.nozzle_temp_min = mat_info->nozzle_min;
-            slot.nozzle_temp_max = mat_info->nozzle_max;
-            slot.bed_temp = mat_info->bed_temp;
+            entry->info.nozzle_temp_min = mat_info->nozzle_min;
+            entry->info.nozzle_temp_max = mat_info->nozzle_max;
+            entry->info.bed_temp = mat_info->bed_temp;
         } else {
-            // Fallback to PLA defaults for unknown materials
             auto pla_info = filament::find_material("PLA");
             if (pla_info) {
-                slot.nozzle_temp_min = pla_info->nozzle_min;
-                slot.nozzle_temp_max = pla_info->nozzle_max;
-                slot.bed_temp = pla_info->bed_temp;
+                entry->info.nozzle_temp_min = pla_info->nozzle_min;
+                entry->info.nozzle_temp_max = pla_info->nozzle_max;
+                entry->info.bed_temp = pla_info->bed_temp;
             } else {
-                // Ultimate fallback (should never happen - PLA is in database)
-                slot.nozzle_temp_min = 190;
-                slot.nozzle_temp_max = 220;
-                slot.bed_temp = 60;
+                entry->info.nozzle_temp_min = 190;
+                entry->info.nozzle_temp_max = 220;
+                entry->info.bed_temp = 60;
             }
         }
-
-        unit.slots.push_back(slot);
     }
 
-    system_info_.units.push_back(unit);
-
-    // Initialize tool-to-slot mapping (1:1)
-    system_info_.tool_to_slot_map.resize(slot_count);
+    // Set tool mapping (1:1)
+    std::vector<int> tool_map(slot_count);
     for (int i = 0; i < slot_count; ++i) {
-        system_info_.tool_to_slot_map[i] = i;
+        tool_map[i] = i;
     }
+    slots_.set_tool_map(tool_map);
+
+    // Unit-level metadata stored in system_info_ for overlay
+    AmsUnit unit_meta;
+    unit_meta.unit_index = 0;
+    unit_meta.name = "Mock MMU";
+    unit_meta.slot_count = slot_count;
+    unit_meta.first_slot_global_index = 0;
+    unit_meta.connected = true;
+    unit_meta.firmware_version = "mock-1.0";
+    unit_meta.has_encoder = true;
+    unit_meta.has_toolhead_sensor = true;
+    unit_meta.has_slot_sensors = true;
+    system_info_.units.push_back(unit_meta);
 
     // Start with slot 0 loaded for realistic demo appearance
     if (slot_count > 0) {
-        auto* slot = system_info_.get_slot_global(0);
-        if (slot) {
-            slot->status = SlotStatus::LOADED;
+        auto* entry = slots_.get_mut(0);
+        if (entry) {
+            entry->info.status = SlotStatus::LOADED;
         }
         system_info_.current_slot = 0;
         system_info_.current_tool = 0;
         system_info_.filament_loaded = true;
-        filament_segment_ = PathSegment::NOZZLE; // Filament is fully loaded to nozzle
-    }
-
-    // Initialize endless spool configs for all slots (no backup by default)
-    endless_spool_configs_.reserve(slot_count);
-    for (int i = 0; i < slot_count; ++i) {
-        helix::printer::EndlessSpoolConfig config;
-        config.slot_index = i;
-        config.backup_slot = -1; // No backup
-        endless_spool_configs_.push_back(config);
+        filament_segment_ = PathSegment::NOZZLE;
     }
 
     // Make slot index 3 (4th slot) empty for realistic demo
     if (slot_count > 3) {
-        auto* slot = system_info_.get_slot_global(3);
-        if (slot) {
-            slot->status = SlotStatus::EMPTY;
+        auto* entry = slots_.get_mut(3);
+        if (entry) {
+            entry->info.status = SlotStatus::EMPTY;
         }
     }
 
@@ -300,7 +296,47 @@ void AmsBackendMock::set_event_callback(EventCallback callback) {
 
 AmsSystemInfo AmsBackendMock::get_system_info() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return system_info_;
+
+    if (!slots_.is_initialized()) {
+        return system_info_;
+    }
+
+    // Build slot data from registry, then overlay non-slot metadata
+    auto info = slots_.build_system_info();
+
+    // Copy system-level fields not managed by registry
+    info.type = system_info_.type;
+    info.type_name = system_info_.type_name;
+    info.version = system_info_.version;
+    info.action = system_info_.action;
+    info.operation_detail = system_info_.operation_detail;
+    info.current_slot = system_info_.current_slot;
+    info.current_tool = system_info_.current_tool;
+    info.pending_target_slot = system_info_.pending_target_slot;
+    info.filament_loaded = system_info_.filament_loaded;
+    info.supports_endless_spool = system_info_.supports_endless_spool;
+    info.supports_tool_mapping = system_info_.supports_tool_mapping;
+    info.supports_bypass = system_info_.supports_bypass;
+    info.has_hardware_bypass_sensor = system_info_.has_hardware_bypass_sensor;
+    info.tip_method = system_info_.tip_method;
+    info.supports_purge = system_info_.supports_purge;
+
+    // Copy unit-level metadata not managed by registry
+    for (size_t u = 0; u < info.units.size() && u < system_info_.units.size(); ++u) {
+        info.units[u].name = system_info_.units[u].name;
+        info.units[u].connected = system_info_.units[u].connected;
+        info.units[u].has_hub_sensor = system_info_.units[u].has_hub_sensor;
+        info.units[u].hub_sensor_triggered = system_info_.units[u].hub_sensor_triggered;
+        info.units[u].buffer_health = system_info_.units[u].buffer_health;
+        info.units[u].topology = system_info_.units[u].topology;
+        info.units[u].hub_tool_label = system_info_.units[u].hub_tool_label;
+        info.units[u].has_encoder = system_info_.units[u].has_encoder;
+        info.units[u].has_toolhead_sensor = system_info_.units[u].has_toolhead_sensor;
+        info.units[u].has_slot_sensors = system_info_.units[u].has_slot_sensors;
+        info.units[u].firmware_version = system_info_.units[u].firmware_version;
+    }
+
+    return info;
 }
 
 AmsType AmsBackendMock::get_type() const {
@@ -311,9 +347,9 @@ AmsType AmsBackendMock::get_type() const {
 SlotInfo AmsBackendMock::get_slot_info(int slot_index) const {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    const auto* slot = system_info_.get_slot_global(slot_index);
-    if (slot) {
-        return *slot;
+    const auto* entry = slots_.get(slot_index);
+    if (entry) {
+        return entry->info;
     }
 
     // Return empty slot info for invalid index
@@ -362,21 +398,23 @@ PathSegment AmsBackendMock::get_slot_filament_segment(int slot_index) const {
     }
 
     // For non-active slots, check if filament is installed at the slot
-    const SlotInfo* slot = system_info_.get_slot_global(slot_index);
-    if (!slot) {
+    const auto* entry = slots_.get(slot_index);
+    if (!entry) {
         return PathSegment::NONE;
     }
 
     // Tool changers: each tool has filament loaded all the way to the nozzle
     if (tool_changer_mode_) {
-        if (slot->status == SlotStatus::AVAILABLE || slot->status == SlotStatus::FROM_BUFFER) {
+        if (entry->info.status == SlotStatus::AVAILABLE ||
+            entry->info.status == SlotStatus::FROM_BUFFER) {
             return PathSegment::NOZZLE;
         }
         return PathSegment::NONE;
     }
 
     // Hub/linear: non-active slots have filament sitting at prep sensor
-    if (slot->status == SlotStatus::AVAILABLE || slot->status == SlotStatus::FROM_BUFFER) {
+    if (entry->info.status == SlotStatus::AVAILABLE ||
+        entry->info.status == SlotStatus::FROM_BUFFER) {
         return PathSegment::PREP;
     }
 
@@ -400,12 +438,12 @@ AmsError AmsBackendMock::load_filament(int slot_index) {
             return AmsErrorHelper::busy(ams_action_to_string(system_info_.action));
         }
 
-        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
-            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+        if (!slots_.is_valid_index(slot_index)) {
+            return AmsErrorHelper::invalid_slot(slot_index, slots_.slot_count() - 1);
         }
 
-        auto* slot = system_info_.get_slot_global(slot_index);
-        if (!slot || slot->status == SlotStatus::EMPTY) {
+        const auto* entry = slots_.get(slot_index);
+        if (!entry || entry->info.status == SlotStatus::EMPTY) {
             return AmsErrorHelper::slot_not_available(slot_index);
         }
 
@@ -464,8 +502,8 @@ AmsError AmsBackendMock::select_slot(int slot_index) {
             return AmsErrorHelper::busy(ams_action_to_string(system_info_.action));
         }
 
-        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
-            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+        if (!slots_.is_valid_index(slot_index)) {
+            return AmsErrorHelper::invalid_slot(slot_index, slots_.slot_count() - 1);
         }
 
         // Immediate selection (no filament movement)
@@ -490,8 +528,8 @@ AmsError AmsBackendMock::change_tool(int tool_number) {
             return AmsErrorHelper::busy(ams_action_to_string(system_info_.action));
         }
 
-        if (tool_number < 0 ||
-            tool_number >= static_cast<int>(system_info_.tool_to_slot_map.size())) {
+        int mapped_slot = slots_.slot_for_tool(tool_number);
+        if (mapped_slot < 0) {
             return AmsError(AmsResult::INVALID_TOOL,
                             "Tool " + std::to_string(tool_number) + " out of range",
                             "Invalid tool number", "Select a valid tool");
@@ -500,7 +538,7 @@ AmsError AmsBackendMock::change_tool(int tool_number) {
         // Start tool change (unload + load sequence)
         system_info_.action = AmsAction::UNLOADING; // Start with unload
         system_info_.operation_detail = "Tool change to T" + std::to_string(tool_number);
-        target_slot = system_info_.tool_to_slot_map[tool_number]; // Capture while locked
+        target_slot = mapped_slot; // Capture while locked
         system_info_.pending_target_slot = target_slot;
         spdlog::info("[AmsBackendMock] Tool change to T{}", tool_number);
     }
@@ -597,19 +635,19 @@ AmsError AmsBackendMock::reset_lane(int slot_index) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
-            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+        if (!slots_.is_valid_index(slot_index)) {
+            return AmsErrorHelper::invalid_slot(slot_index, slots_.slot_count() - 1);
         }
 
-        auto* slot = system_info_.get_slot_global(slot_index);
-        if (!slot) {
-            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+        auto* entry = slots_.get_mut(slot_index);
+        if (!entry) {
+            return AmsErrorHelper::invalid_slot(slot_index, slots_.slot_count() - 1);
         }
 
         // Clear error state and return slot to normal
-        slot->error = std::nullopt;
-        if (slot->status == SlotStatus::BLOCKED) {
-            slot->status = SlotStatus::AVAILABLE;
+        entry->info.error = std::nullopt;
+        if (entry->info.status == SlotStatus::BLOCKED) {
+            entry->info.status = SlotStatus::AVAILABLE;
         }
 
         spdlog::info("[AmsBackendMock] Reset lane {} - cleared error state", slot_index);
@@ -623,27 +661,27 @@ AmsError AmsBackendMock::set_slot_info(int slot_index, const SlotInfo& info, boo
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
-        if (slot_index < 0 || slot_index >= system_info_.total_slots) {
-            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+        if (!slots_.is_valid_index(slot_index)) {
+            return AmsErrorHelper::invalid_slot(slot_index, slots_.slot_count() - 1);
         }
 
-        auto* slot = system_info_.get_slot_global(slot_index);
-        if (!slot) {
-            return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+        auto* entry = slots_.get_mut(slot_index);
+        if (!entry) {
+            return AmsErrorHelper::invalid_slot(slot_index, slots_.slot_count() - 1);
         }
 
         // Update filament info
-        slot->color_name = info.color_name;
-        slot->color_rgb = info.color_rgb;
-        slot->material = info.material;
-        slot->brand = info.brand;
-        slot->spoolman_id = info.spoolman_id;
-        slot->spool_name = info.spool_name;
-        slot->remaining_weight_g = info.remaining_weight_g;
-        slot->total_weight_g = info.total_weight_g;
-        slot->nozzle_temp_min = info.nozzle_temp_min;
-        slot->nozzle_temp_max = info.nozzle_temp_max;
-        slot->bed_temp = info.bed_temp;
+        entry->info.color_name = info.color_name;
+        entry->info.color_rgb = info.color_rgb;
+        entry->info.material = info.material;
+        entry->info.brand = info.brand;
+        entry->info.spoolman_id = info.spoolman_id;
+        entry->info.spool_name = info.spool_name;
+        entry->info.remaining_weight_g = info.remaining_weight_g;
+        entry->info.total_weight_g = info.total_weight_g;
+        entry->info.nozzle_temp_min = info.nozzle_temp_min;
+        entry->info.nozzle_temp_max = info.nozzle_temp_max;
+        entry->info.bed_temp = info.bed_temp;
 
         spdlog::trace("[AmsBackendMock] Updated slot {} info", slot_index);
     }
@@ -656,25 +694,27 @@ AmsError AmsBackendMock::set_slot_info(int slot_index, const SlotInfo& info, boo
 AmsError AmsBackendMock::set_tool_mapping(int tool_number, int slot_index) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (tool_number < 0 || tool_number >= static_cast<int>(system_info_.tool_to_slot_map.size())) {
+    // Get current tool map from registry
+    auto current_info = slots_.build_system_info();
+    if (tool_number < 0 || tool_number >= static_cast<int>(current_info.tool_to_slot_map.size())) {
         return AmsError(AmsResult::INVALID_TOOL,
                         "Tool " + std::to_string(tool_number) + " out of range",
                         "Invalid tool number", "");
     }
 
-    if (slot_index < 0 || slot_index >= system_info_.total_slots) {
-        return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+    if (!slots_.is_valid_index(slot_index)) {
+        return AmsErrorHelper::invalid_slot(slot_index, slots_.slot_count() - 1);
     }
 
-    system_info_.tool_to_slot_map[tool_number] = slot_index;
+    // Update the tool map entry and re-apply
+    // Mock allows multiple tools to map to same slot (lenient behavior)
+    current_info.tool_to_slot_map[tool_number] = slot_index;
+    slots_.set_tool_map(current_info.tool_to_slot_map);
 
-    // Update slot's mapped_tool
-    for (auto& unit : system_info_.units) {
-        for (auto& slot : unit.slots) {
-            if (slot.global_index == slot_index) {
-                slot.mapped_tool = tool_number;
-            }
-        }
+    // Also update the target slot's mapped_tool
+    auto* entry = slots_.get_mut(slot_index);
+    if (entry) {
+        entry->info.mapped_tool = tool_number;
     }
 
     spdlog::info("[AmsBackendMock] Mapped T{} to slot {}", tool_number, slot_index);
@@ -808,9 +848,9 @@ void AmsBackendMock::set_operation_delay(int delay_ms) {
 void AmsBackendMock::force_slot_status(int slot_index, SlotStatus status) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    auto* slot = system_info_.get_slot_global(slot_index);
-    if (slot) {
-        slot->status = status;
+    auto* entry = slots_.get_mut(slot_index);
+    if (entry) {
+        entry->info.status = status;
         spdlog::debug("[AmsBackendMock] Forced slot {} status to {}", slot_index,
                       slot_status_to_string(status));
     }
@@ -819,11 +859,11 @@ void AmsBackendMock::force_slot_status(int slot_index, SlotStatus status) {
 void AmsBackendMock::set_slot_error(int slot_index, std::optional<SlotError> error) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    auto* slot = system_info_.get_slot_global(slot_index);
-    if (slot) {
-        slot->error = std::move(error);
+    auto* entry = slots_.get_mut(slot_index);
+    if (entry) {
+        entry->info.error = std::move(error);
         spdlog::debug("[AmsBackendMock] Slot {} error {}", slot_index,
-                      slot->error.has_value() ? slot->error->message : "cleared");
+                      entry->info.error.has_value() ? entry->info.error->message : "cleared");
     }
 }
 
@@ -840,28 +880,32 @@ void AmsBackendMock::set_unit_buffer_health(int unit_index, std::optional<Buffer
 void AmsBackendMock::inject_mock_errors() {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    for (auto& unit : system_info_.units) {
+    for (int u = 0; u < slots_.unit_count(); ++u) {
+        auto [first, end] = slots_.unit_slot_range(u);
+        int last_slot = end - 1;
+
         // Add a lane ERROR on the last slot of each unit
-        if (!unit.slots.empty()) {
-            auto& last_slot = unit.slots.back();
-            SlotError err;
-            err.message = fmt::format("Lane {} load failed", last_slot.slot_index + 1);
-            err.severity = SlotError::ERROR;
-            last_slot.error = err;
+        if (first < end) {
+            auto* entry = slots_.get_mut(last_slot);
+            if (entry) {
+                SlotError err;
+                err.message = fmt::format("Lane {} load failed", entry->info.slot_index + 1);
+                err.severity = SlotError::ERROR;
+                entry->info.error = err;
+            }
         }
 
         // Add buffer health approaching fault on unit 0 (AFC only — TurtleNeck buffer)
-        if (afc_mode_ && unit.unit_index == 0) {
+        if (afc_mode_ && u == 0 && u < static_cast<int>(system_info_.units.size())) {
             BufferHealth health;
             health.fault_detection_enabled = true;
             health.state = "Trailing";
             health.distance_to_fault = 12.5f;
-            unit.buffer_health = health;
+            system_info_.units[u].buffer_health = health;
         }
     }
 
-    spdlog::info("[AmsBackendMock] Injected mock error states on {} units",
-                 system_info_.units.size());
+    spdlog::info("[AmsBackendMock] Injected mock error states on {} units", slots_.unit_count());
 }
 
 void AmsBackendMock::set_has_hardware_bypass_sensor(bool has_sensor) {
@@ -1095,15 +1139,13 @@ void AmsBackendMock::set_tool_changer_mode(bool enabled) {
         // Rename unit to reflect tool changer nature
         if (!system_info_.units.empty()) {
             system_info_.units[0].name = "Mock Tool Changer";
-            // Slots retain their filament data - represents what's loaded in each toolhead
         }
 
         // Tool changers have no AMS-style device settings
         mock_device_sections_.clear();
         mock_device_actions_.clear();
 
-        spdlog::info("[AmsBackendMock] Tool changer mode enabled ({} tools)",
-                     system_info_.total_slots);
+        spdlog::info("[AmsBackendMock] Tool changer mode enabled ({} tools)", slots_.slot_count());
     } else {
         // Revert to filament system (Happy Hare)
         system_info_.type = AmsType::HAPPY_HARE;
@@ -1154,127 +1196,74 @@ void AmsBackendMock::set_afc_mode(bool enabled) {
         // HUB topology, single unit
         topology_ = PathTopology::HUB;
 
-        // Build single Box Turtle unit with 4 lanes
-        system_info_.units.clear();
-        AmsUnit unit;
-        unit.unit_index = 0;
-        unit.name = "Box Turtle (Mock)";
-        unit.slot_count = 4;
-        unit.first_slot_global_index = 0;
-        unit.connected = true;
-        unit.firmware_version = "1.0.32-mock";
-        unit.has_encoder = false;
-        unit.has_toolhead_sensor = true;
-        unit.has_slot_sensors = true;
+        // Reinitialize registry with single Box Turtle unit
+        slots_.clear();
+        slots_.initialize("Box Turtle (Mock)", {"0", "1", "2", "3"});
 
-        // Lane 1: ASA, loaded
-        {
-            SlotInfo slot;
-            slot.slot_index = 0;
-            slot.global_index = 0;
-            slot.material = "ASA";
-            slot.brand = "Bambu Lab";
-            slot.color_rgb = 0x000000;
-            slot.color_name = "Black";
-            slot.status = SlotStatus::LOADED;
-            slot.mapped_tool = 0;
-            slot.spoolman_id = 1;
-            slot.spool_name = "Black ASA";
-            slot.total_weight_g = 1000.0f;
-            slot.remaining_weight_g = 750.0f;
-            auto mat_info = filament::find_material("ASA");
+        // Populate slot data
+        struct SlotData {
+            const char* material;
+            const char* brand;
+            uint32_t color;
+            const char* color_name;
+            SlotStatus status;
+            int spoolman_id;
+            const char* spool_name;
+            float remaining;
+        };
+        const SlotData slot_data[] = {
+            {"ASA", "Bambu Lab", 0x000000, "Black", SlotStatus::LOADED, 1, "Black ASA", 750.0f},
+            {"PLA", "Polymaker", 0xFF0000, "Red", SlotStatus::AVAILABLE, 2, "Red PLA", 900.0f},
+            {"PETG", "eSUN", 0x00FF00, "Green", SlotStatus::AVAILABLE, 3, "Green PETG", 500.0f},
+            {"TPU", "eSUN", 0xFF6600, "Orange", SlotStatus::AVAILABLE, 0, "", 200.0f},
+        };
+
+        for (int i = 0; i < 4; ++i) {
+            auto* entry = slots_.get_mut(i);
+            if (!entry)
+                continue;
+            const auto& d = slot_data[i];
+            entry->info.slot_index = i;
+            entry->info.global_index = i;
+            entry->info.material = d.material;
+            entry->info.brand = d.brand;
+            entry->info.color_rgb = d.color;
+            entry->info.color_name = d.color_name;
+            entry->info.status = d.status;
+            entry->info.spoolman_id = d.spoolman_id;
+            entry->info.spool_name = d.spool_name;
+            entry->info.total_weight_g = 1000.0f;
+            entry->info.remaining_weight_g = d.remaining;
+            auto mat_info = filament::find_material(d.material);
             if (mat_info) {
-                slot.nozzle_temp_min = mat_info->nozzle_min;
-                slot.nozzle_temp_max = mat_info->nozzle_max;
-                slot.bed_temp = mat_info->bed_temp;
+                entry->info.nozzle_temp_min = mat_info->nozzle_min;
+                entry->info.nozzle_temp_max = mat_info->nozzle_max;
+                entry->info.bed_temp = mat_info->bed_temp;
             }
-            unit.slots.push_back(slot);
         }
-
-        // Lane 2: PLA, available
-        {
-            SlotInfo slot;
-            slot.slot_index = 1;
-            slot.global_index = 1;
-            slot.material = "PLA";
-            slot.brand = "Polymaker";
-            slot.color_rgb = 0xFF0000;
-            slot.color_name = "Red";
-            slot.status = SlotStatus::AVAILABLE;
-            slot.mapped_tool = 1;
-            slot.spoolman_id = 2;
-            slot.spool_name = "Red PLA";
-            slot.total_weight_g = 1000.0f;
-            slot.remaining_weight_g = 900.0f;
-            auto mat_info = filament::find_material("PLA");
-            if (mat_info) {
-                slot.nozzle_temp_min = mat_info->nozzle_min;
-                slot.nozzle_temp_max = mat_info->nozzle_max;
-                slot.bed_temp = mat_info->bed_temp;
-            }
-            unit.slots.push_back(slot);
-        }
-
-        // Lane 3: PETG, available
-        {
-            SlotInfo slot;
-            slot.slot_index = 2;
-            slot.global_index = 2;
-            slot.material = "PETG";
-            slot.brand = "eSUN";
-            slot.color_rgb = 0x00FF00;
-            slot.color_name = "Green";
-            slot.status = SlotStatus::AVAILABLE;
-            slot.mapped_tool = 2;
-            slot.spoolman_id = 3;
-            slot.spool_name = "Green PETG";
-            slot.total_weight_g = 1000.0f;
-            slot.remaining_weight_g = 500.0f;
-            auto mat_info = filament::find_material("PETG");
-            if (mat_info) {
-                slot.nozzle_temp_min = mat_info->nozzle_min;
-                slot.nozzle_temp_max = mat_info->nozzle_max;
-                slot.bed_temp = mat_info->bed_temp;
-            }
-            unit.slots.push_back(slot);
-        }
-
-        // Lane 4: error state (for testing error visualization)
-        {
-            SlotInfo slot;
-            slot.slot_index = 3;
-            slot.global_index = 3;
-            slot.material = "TPU";
-            slot.brand = "eSUN";
-            slot.color_rgb = 0xFF6600;
-            slot.color_name = "Orange";
-            slot.status = SlotStatus::AVAILABLE;
-            slot.mapped_tool = 3;
-            slot.total_weight_g = 1000.0f;
-            slot.remaining_weight_g = 200.0f;
-            unit.slots.push_back(slot);
-        }
-
-        system_info_.units.push_back(unit);
 
         // Tool-to-slot mapping: T0->lane1, T1->lane2, T2->lane3, T3->lane4
-        system_info_.tool_to_slot_map = {0, 1, 2, 3};
+        slots_.set_tool_map({0, 1, 2, 3});
+
+        // Unit-level metadata
+        system_info_.units.clear();
+        AmsUnit unit_meta;
+        unit_meta.unit_index = 0;
+        unit_meta.name = "Box Turtle (Mock)";
+        unit_meta.slot_count = 4;
+        unit_meta.first_slot_global_index = 0;
+        unit_meta.connected = true;
+        unit_meta.firmware_version = "1.0.32-mock";
+        unit_meta.has_encoder = false;
+        unit_meta.has_toolhead_sensor = true;
+        unit_meta.has_slot_sensors = true;
+        system_info_.units.push_back(unit_meta);
 
         // Start with lane 0 (ASA) loaded
         system_info_.current_slot = 0;
         system_info_.current_tool = 0;
         system_info_.filament_loaded = true;
         filament_segment_ = PathSegment::NOZZLE;
-
-        // Reinitialize endless spool configs for 4 slots
-        endless_spool_configs_.clear();
-        endless_spool_configs_.reserve(4);
-        for (int i = 0; i < 4; ++i) {
-            helix::printer::EndlessSpoolConfig config;
-            config.slot_index = i;
-            config.backup_slot = -1;
-            endless_spool_configs_.push_back(config);
-        }
 
         // AFC device sections and actions — use all defaults
         mock_device_sections_ = helix::printer::afc_default_sections();
@@ -1323,7 +1312,7 @@ void AmsBackendMock::set_multi_unit_mode(bool enabled) {
         // Disable conflicting modes
         tool_changer_mode_ = false;
 
-        // Configure as AFC with 2 Box Turtle units
+        // Configure as AFC with 2 units
         system_info_.type = AmsType::AFC;
         system_info_.type_name = "AFC (Mock Multi-Unit)";
         system_info_.version = "1.0.32-mock";
@@ -1333,133 +1322,126 @@ void AmsBackendMock::set_multi_unit_mode(bool enabled) {
         system_info_.has_hardware_bypass_sensor = false;
         system_info_.tip_method = TipMethod::CUT;
         system_info_.supports_purge = true;
+        system_info_.total_slots = 6;
         topology_ = PathTopology::HUB;
 
+        // Reinitialize registry with 2 units
+        slots_.clear();
+        slots_.initialize_units({
+            {"Box Turtle 1", {"0", "1", "2", "3"}},
+            {"Night Owl", {"0", "1"}},
+        });
+
+        // Unit 0 slot data
+        struct SlotData {
+            const char* material;
+            const char* brand;
+            uint32_t color;
+            const char* color_name;
+            SlotStatus status;
+            int spoolman_id;
+            float remaining;
+        };
+        const SlotData bt_slots[] = {
+            {"ASA", "Bambu Lab", 0x000000, "Black", SlotStatus::LOADED, 100, 1000.0f},
+            {"PLA", "Polymaker", 0xFF0000, "Red", SlotStatus::AVAILABLE, 101, 750.0f},
+            {"PETG", "eSUN", 0x00FF00, "Green", SlotStatus::AVAILABLE, 102, 500.0f},
+            {"PLA", "Overture", 0xFFFFFF, "White", SlotStatus::EMPTY, 103, 0.0f},
+        };
+        for (int i = 0; i < 4; ++i) {
+            auto* entry = slots_.get_mut(i);
+            if (!entry)
+                continue;
+            const auto& d = bt_slots[i];
+            entry->info.slot_index = i;
+            entry->info.global_index = i;
+            entry->info.material = d.material;
+            entry->info.brand = d.brand;
+            entry->info.color_rgb = d.color;
+            entry->info.color_name = d.color_name;
+            entry->info.status = d.status;
+            entry->info.mapped_tool = 0; // All slots share single toolhead
+            entry->info.spoolman_id = d.spoolman_id;
+            entry->info.total_weight_g = 1000.0f;
+            entry->info.remaining_weight_g = d.remaining;
+            auto mat_info = filament::find_material(d.material);
+            if (mat_info) {
+                entry->info.nozzle_temp_min = mat_info->nozzle_min;
+                entry->info.nozzle_temp_max = mat_info->nozzle_max;
+                entry->info.bed_temp = mat_info->bed_temp;
+            }
+        }
+
+        // Unit 1 slot data (Night Owl, 2 lanes)
+        const SlotData no_slots[] = {
+            {"PETG", "Prusa", 0x1E88E5, "Blue", SlotStatus::AVAILABLE, 200, 1000.0f},
+            {"ABS", "Bambu Lab", 0xFDD835, "Yellow", SlotStatus::AVAILABLE, 201, 800.0f},
+        };
+        for (int i = 0; i < 2; ++i) {
+            auto* entry = slots_.get_mut(4 + i);
+            if (!entry)
+                continue;
+            const auto& d = no_slots[i];
+            entry->info.slot_index = i;
+            entry->info.global_index = 4 + i;
+            entry->info.material = d.material;
+            entry->info.brand = d.brand;
+            entry->info.color_rgb = d.color;
+            entry->info.color_name = d.color_name;
+            entry->info.status = d.status;
+            entry->info.mapped_tool = 0; // All slots share single toolhead
+            entry->info.spoolman_id = d.spoolman_id;
+            entry->info.total_weight_g = 1000.0f;
+            entry->info.remaining_weight_g = d.remaining;
+            auto mat_info = filament::find_material(d.material);
+            if (mat_info) {
+                entry->info.nozzle_temp_min = mat_info->nozzle_min;
+                entry->info.nozzle_temp_max = mat_info->nozzle_max;
+                entry->info.bed_temp = mat_info->bed_temp;
+            }
+        }
+
+        // Single toolhead — T0 maps to currently loaded slot
+        slots_.set_tool_map({0});
+
+        // Unit-level metadata
         system_info_.units.clear();
-        system_info_.total_slots = 6; // 4 (Box Turtle) + 2 (Night Owl)
-
-        // Unit 0: "Box Turtle 1" - 4 slots
         {
-            AmsUnit unit;
-            unit.unit_index = 0;
-            unit.name = "Box Turtle 1";
-            unit.slot_count = 4;
-            unit.first_slot_global_index = 0;
-            unit.connected = true;
-            unit.firmware_version = "1.0.32-mock";
-            unit.has_encoder = false;
-            unit.has_toolhead_sensor = true;
-            unit.has_slot_sensors = true;
-            unit.has_hub_sensor = true;
-            unit.hub_sensor_triggered = true; // Active unit has filament at hub
-
-            const struct {
-                uint32_t color;
-                const char* name;
-                const char* material;
-                const char* brand;
-                SlotStatus status;
-            } slots[] = {
-                {0x000000, "Black", "ASA", "Bambu Lab", SlotStatus::LOADED},
-                {0xFF0000, "Red", "PLA", "Polymaker", SlotStatus::AVAILABLE},
-                {0x00FF00, "Green", "PETG", "eSUN", SlotStatus::AVAILABLE},
-                {0xFFFFFF, "White", "PLA", "Overture", SlotStatus::EMPTY},
-            };
-
-            for (int i = 0; i < 4; i++) {
-                SlotInfo slot;
-                slot.slot_index = i;
-                slot.global_index = i;
-                slot.material = slots[i].material;
-                slot.brand = slots[i].brand;
-                slot.color_rgb = slots[i].color;
-                slot.color_name = slots[i].name;
-                slot.status = slots[i].status;
-                slot.mapped_tool = 0; // All slots share single toolhead (virtual tools)
-                slot.spoolman_id = 100 + i;
-                slot.total_weight_g = 1000.0f;
-                slot.remaining_weight_g = (i == 3) ? 0.0f : (1000.0f - i * 250.0f);
-                auto mat_info = filament::find_material(slots[i].material);
-                if (mat_info) {
-                    slot.nozzle_temp_min = mat_info->nozzle_min;
-                    slot.nozzle_temp_max = mat_info->nozzle_max;
-                    slot.bed_temp = mat_info->bed_temp;
-                }
-                unit.slots.push_back(slot);
-            }
-
-            system_info_.units.push_back(unit);
+            AmsUnit u;
+            u.unit_index = 0;
+            u.name = "Box Turtle 1";
+            u.slot_count = 4;
+            u.first_slot_global_index = 0;
+            u.connected = true;
+            u.firmware_version = "1.0.32-mock";
+            u.has_encoder = false;
+            u.has_toolhead_sensor = true;
+            u.has_slot_sensors = true;
+            u.has_hub_sensor = true;
+            u.hub_sensor_triggered = true;
+            system_info_.units.push_back(u);
         }
-
-        // Unit 1: "Night Owl" - 2 slots (Night Owls are 2-lane units)
         {
-            AmsUnit unit;
-            unit.unit_index = 1;
-            unit.name = "Night Owl";
-            unit.slot_count = 2;
-            unit.first_slot_global_index = 4;
-            unit.connected = true;
-            unit.firmware_version = "2.1.0-mock";
-            unit.has_encoder = true;
-            unit.has_toolhead_sensor = true;
-            unit.has_slot_sensors = true;
-            unit.has_hub_sensor = true;
-            unit.hub_sensor_triggered = false; // Inactive unit, no filament at hub
-
-            const struct {
-                uint32_t color;
-                const char* name;
-                const char* material;
-                const char* brand;
-                SlotStatus status;
-            } slots[] = {
-                {0x1E88E5, "Blue", "PETG", "Prusa", SlotStatus::AVAILABLE},
-                {0xFDD835, "Yellow", "ABS", "Bambu Lab", SlotStatus::AVAILABLE},
-            };
-
-            for (int i = 0; i < 2; i++) {
-                SlotInfo slot;
-                slot.slot_index = i;
-                slot.global_index = 4 + i;
-                slot.material = slots[i].material;
-                slot.brand = slots[i].brand;
-                slot.color_rgb = slots[i].color;
-                slot.color_name = slots[i].name;
-                slot.status = slots[i].status;
-                slot.mapped_tool = 0; // All slots share single toolhead (virtual tools)
-                slot.spoolman_id = 200 + i;
-                slot.total_weight_g = 1000.0f;
-                slot.remaining_weight_g = 1000.0f - i * 200.0f;
-                auto mat_info = filament::find_material(slots[i].material);
-                if (mat_info) {
-                    slot.nozzle_temp_min = mat_info->nozzle_min;
-                    slot.nozzle_temp_max = mat_info->nozzle_max;
-                    slot.bed_temp = mat_info->bed_temp;
-                }
-                unit.slots.push_back(slot);
-            }
-            system_info_.units.push_back(unit);
+            AmsUnit u;
+            u.unit_index = 1;
+            u.name = "Night Owl";
+            u.slot_count = 2;
+            u.first_slot_global_index = 4;
+            u.connected = true;
+            u.firmware_version = "2.1.0-mock";
+            u.has_encoder = true;
+            u.has_toolhead_sensor = true;
+            u.has_slot_sensors = true;
+            u.has_hub_sensor = true;
+            u.hub_sensor_triggered = false;
+            system_info_.units.push_back(u);
         }
-
-        // Single toolhead — all units feed one nozzle via combiner
-        // T0 maps to the currently loaded slot
-        system_info_.tool_to_slot_map = {0};
 
         // Start with slot 0 loaded
         system_info_.current_slot = 0;
         system_info_.current_tool = 0;
         system_info_.filament_loaded = true;
         filament_segment_ = PathSegment::NOZZLE;
-
-        // Reinitialize endless spool configs for 6 slots
-        endless_spool_configs_.clear();
-        endless_spool_configs_.reserve(6);
-        for (int i = 0; i < 6; ++i) {
-            helix::printer::EndlessSpoolConfig config;
-            config.slot_index = i;
-            config.backup_slot = -1;
-            endless_spool_configs_.push_back(config);
-        }
 
         spdlog::info("[AmsBackendMock] Multi-unit mode: Box Turtle (4) + Night Owl (2) = 6 slots");
     } else {
@@ -1499,7 +1481,6 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
         system_info_.version = "1.0.32-mock";
         system_info_.total_slots = 12;
 
-        // Use shared AFC defaults for capabilities
         auto afc_caps = helix::printer::afc_default_capabilities();
         system_info_.supports_endless_spool = afc_caps.supports_endless_spool;
         system_info_.supports_tool_mapping = afc_caps.supports_tool_mapping;
@@ -1508,205 +1489,123 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
         system_info_.tip_method = afc_caps.tip_method;
         system_info_.has_hardware_bypass_sensor = false;
 
-        // System-wide topology: HUB for backward compat
         topology_ = PathTopology::HUB;
 
-        // Per-unit topologies (matches real user hardware: Box Turtle + 2x OpenAMS)
-        // Turtle_1: 4 lanes → 4 extruders (extruder, extruder1-3) → PARALLEL
-        // AMS_1: 4 lanes → 1 extruder (extruder4) → HUB
-        // AMS_2: 4 lanes → 1 extruder (extruder5) → HUB
+        // Per-unit topologies
         unit_topologies_.clear();
-        unit_topologies_.push_back(PathTopology::PARALLEL); // Unit 0: Box Turtle (4 extruders)
-        unit_topologies_.push_back(PathTopology::HUB);      // Unit 1: OpenAMS (1 extruder)
-        unit_topologies_.push_back(PathTopology::HUB);      // Unit 2: OpenAMS (1 extruder)
+        unit_topologies_.push_back(PathTopology::PARALLEL);
+        unit_topologies_.push_back(PathTopology::HUB);
+        unit_topologies_.push_back(PathTopology::HUB);
 
+        // Reinitialize registry with 3 units (4+4+4=12 slots)
+        slots_.clear();
+        slots_.initialize_units({
+            {"Turtle_1", {"0", "1", "2", "3"}},
+            {"AMS_1", {"0", "1", "2", "3"}},
+            {"AMS_2", {"0", "1", "2", "3"}},
+        });
+
+        // Helper to populate a slot
+        auto populate_slot = [this](int gi, int si, const char* material, uint32_t color,
+                                    const char* color_name, SlotStatus status, int /*tool*/,
+                                    int spoolman_id, float remaining) {
+            auto* entry = slots_.get_mut(gi);
+            if (!entry)
+                return;
+            entry->info.slot_index = si;
+            entry->info.global_index = gi;
+            entry->info.material = material;
+            entry->info.color_rgb = color;
+            entry->info.color_name = color_name;
+            entry->info.status = status;
+            entry->info.spoolman_id = spoolman_id;
+            entry->info.total_weight_g = 1000.0f;
+            entry->info.remaining_weight_g = remaining;
+            auto mat_info = filament::find_material(material);
+            if (mat_info) {
+                entry->info.nozzle_temp_min = mat_info->nozzle_min;
+                entry->info.nozzle_temp_max = mat_info->nozzle_max;
+                entry->info.bed_temp = mat_info->bed_temp;
+            }
+        };
+
+        // Unit 0: Turtle_1 (Box Turtle) — 4 lanes, PARALLEL, 1:1 tool mapping
+        populate_slot(0, 0, "ASA", 0x000000, "Black", SlotStatus::LOADED, 0, 300, 1000.0f);
+        populate_slot(1, 1, "PLA", 0xFF0000, "Red", SlotStatus::AVAILABLE, 1, 301, 800.0f);
+        populate_slot(2, 2, "PETG", 0x00FF00, "Green", SlotStatus::AVAILABLE, 2, 302, 600.0f);
+        populate_slot(3, 3, "PLA", 0xFFFFFF, "White", SlotStatus::AVAILABLE, 3, 303, 400.0f);
+
+        // Unit 1: AMS_1 (OpenAMS) — 4 lanes, HUB, T4-T7
+        populate_slot(4, 0, "PETG", 0x1E88E5, "Blue", SlotStatus::AVAILABLE, 4, 310, 1000.0f);
+        populate_slot(5, 1, "PLA", 0xFDD835, "Yellow", SlotStatus::AVAILABLE, 5, 311, 850.0f);
+        populate_slot(6, 2, "ABS", 0x8E24AA, "Purple", SlotStatus::AVAILABLE, 6, 312, 700.0f);
+        populate_slot(7, 3, "TPU", 0xFF6F00, "Orange", SlotStatus::AVAILABLE, 7, 313, 550.0f);
+
+        // Unit 2: AMS_2 (OpenAMS) — 4 lanes, HUB, T8-T11
+        populate_slot(8, 0, "PLA", 0xE53935, "Red", SlotStatus::AVAILABLE, 8, 320, 1000.0f);
+        populate_slot(9, 1, "ASA", 0x43A047, "Green", SlotStatus::AVAILABLE, 9, 321, 900.0f);
+        populate_slot(10, 2, "PETG", 0x90CAF9, "Sky Blue", SlotStatus::AVAILABLE, 10, 322, 800.0f);
+        populate_slot(11, 3, "PLA-CF", 0x424242, "Carbon", SlotStatus::AVAILABLE, 11, 323, 700.0f);
+
+        // Tool mapping: 12 virtual tools, 1:1 with slots
+        slots_.set_tool_map({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11});
+
+        // Unit-level metadata
         system_info_.units.clear();
-
-        // ================================================================
-        // Unit 0: "Turtle_1" (Box Turtle) — 4 lanes, PARALLEL, buffers
-        // Real AFC: 4 extruders (extruder, extruder1-3) → PARALLEL
-        // ================================================================
         {
-            AmsUnit unit;
-            unit.unit_index = 0;
-            unit.name = "Turtle_1";
-            unit.slot_count = 4;
-            unit.first_slot_global_index = 0;
-            unit.connected = true;
-            unit.firmware_version = "1.0.32-mock";
-            unit.has_encoder = false;
-            unit.has_toolhead_sensor = true;
-            unit.has_slot_sensors = true;
-            unit.has_hub_sensor = false; // PARALLEL: no shared hub
-            unit.topology = PathTopology::PARALLEL;
-
-            // Buffer health (TurtleNeck buffers)
+            AmsUnit u;
+            u.unit_index = 0;
+            u.name = "Turtle_1";
+            u.slot_count = 4;
+            u.first_slot_global_index = 0;
+            u.connected = true;
+            u.firmware_version = "1.0.32-mock";
+            u.has_encoder = false;
+            u.has_toolhead_sensor = true;
+            u.has_slot_sensors = true;
+            u.has_hub_sensor = false; // PARALLEL: no shared hub
+            u.topology = PathTopology::PARALLEL;
             BufferHealth health;
             health.fault_detection_enabled = true;
             health.state = "Trailing";
             health.distance_to_fault = 50.0f;
-            unit.buffer_health = health;
-
-            // 4 lanes, each with own extruder (T0-T3)
-            const struct {
-                uint32_t color;
-                const char* name;
-                const char* material;
-                SlotStatus status;
-            } bt_slots[] = {
-                {0x000000, "Black", "ASA", SlotStatus::LOADED},
-                {0xFF0000, "Red", "PLA", SlotStatus::AVAILABLE},
-                {0x00FF00, "Green", "PETG", SlotStatus::AVAILABLE},
-                {0xFFFFFF, "White", "PLA", SlotStatus::AVAILABLE},
-            };
-
-            for (int i = 0; i < 4; ++i) {
-                SlotInfo slot;
-                slot.slot_index = i;
-                slot.global_index = i;
-                slot.material = bt_slots[i].material;
-                slot.color_rgb = bt_slots[i].color;
-                slot.color_name = bt_slots[i].name;
-                slot.status = bt_slots[i].status;
-                slot.mapped_tool = i; // 1:1 lane->tool
-                slot.spoolman_id = 300 + i;
-                slot.total_weight_g = 1000.0f;
-                slot.remaining_weight_g = 1000.0f - i * 200.0f;
-                auto mat_info = filament::find_material(bt_slots[i].material);
-                if (mat_info) {
-                    slot.nozzle_temp_min = mat_info->nozzle_min;
-                    slot.nozzle_temp_max = mat_info->nozzle_max;
-                    slot.bed_temp = mat_info->bed_temp;
-                }
-                unit.slots.push_back(slot);
-            }
-
-            system_info_.units.push_back(unit);
+            u.buffer_health = health;
+            system_info_.units.push_back(u);
         }
-
-        // ================================================================
-        // Unit 1: "AMS_1" (OpenAMS) — 4 lanes, HUB, unique virtual tools
-        //
-        // Real AFC behavior: each lane gets its own virtual tool number
-        // (T4-T7), but all lanes share a single physical extruder
-        // (extruder4). The HUB topology tells the UI to draw 1 nozzle.
-        // ================================================================
         {
-            AmsUnit unit;
-            unit.unit_index = 1;
-            unit.name = "AMS_1";
-            unit.slot_count = 4;
-            unit.first_slot_global_index = 4;
-            unit.connected = true;
-            unit.firmware_version = "1.0.0-mock";
-            unit.has_encoder = false;
-            unit.has_toolhead_sensor = true;
-            unit.has_slot_sensors = true;
-            unit.has_hub_sensor = true;
-            unit.hub_sensor_triggered = false;
-            unit.topology = PathTopology::HUB;
-            unit.hub_tool_label = 4; // extruder4 → T4
-            // No buffer_health — OpenAMS has no buffers
-
-            const struct {
-                uint32_t color;
-                const char* name;
-                const char* material;
-                SlotStatus status;
-            } ams1_slots[] = {
-                {0x1E88E5, "Blue", "PETG", SlotStatus::AVAILABLE},
-                {0xFDD835, "Yellow", "PLA", SlotStatus::AVAILABLE},
-                {0x8E24AA, "Purple", "ABS", SlotStatus::AVAILABLE},
-                {0xFF6F00, "Orange", "TPU", SlotStatus::AVAILABLE},
-            };
-
-            for (int i = 0; i < 4; ++i) {
-                SlotInfo slot;
-                slot.slot_index = i;
-                slot.global_index = 4 + i;
-                slot.material = ams1_slots[i].material;
-                slot.color_rgb = ams1_slots[i].color;
-                slot.color_name = ams1_slots[i].name;
-                slot.status = ams1_slots[i].status;
-                slot.mapped_tool = 4 + i; // Real AFC: unique virtual tool per lane
-                slot.spoolman_id = 310 + i;
-                slot.total_weight_g = 1000.0f;
-                slot.remaining_weight_g = 1000.0f - i * 150.0f;
-                auto mat_info = filament::find_material(ams1_slots[i].material);
-                if (mat_info) {
-                    slot.nozzle_temp_min = mat_info->nozzle_min;
-                    slot.nozzle_temp_max = mat_info->nozzle_max;
-                    slot.bed_temp = mat_info->bed_temp;
-                }
-                unit.slots.push_back(slot);
-            }
-
-            system_info_.units.push_back(unit);
+            AmsUnit u;
+            u.unit_index = 1;
+            u.name = "AMS_1";
+            u.slot_count = 4;
+            u.first_slot_global_index = 4;
+            u.connected = true;
+            u.firmware_version = "1.0.0-mock";
+            u.has_encoder = false;
+            u.has_toolhead_sensor = true;
+            u.has_slot_sensors = true;
+            u.has_hub_sensor = true;
+            u.hub_sensor_triggered = false;
+            u.topology = PathTopology::HUB;
+            u.hub_tool_label = 4;
+            system_info_.units.push_back(u);
         }
-
-        // ================================================================
-        // Unit 2: "AMS_2" (OpenAMS) — 4 lanes, HUB, unique virtual tools
-        //
-        // Real AFC: 1 extruder (extruder5) → HUB. Per-lane hubs merge
-        // to a single physical toolhead. Lanes get T8-T11 virtual tools.
-        // ================================================================
         {
-            AmsUnit unit;
-            unit.unit_index = 2;
-            unit.name = "AMS_2";
-            unit.slot_count = 4;
-            unit.first_slot_global_index = 8;
-            unit.connected = true;
-            unit.firmware_version = "1.0.0-mock";
-            unit.has_encoder = false;
-            unit.has_toolhead_sensor = true;
-            unit.has_slot_sensors = true;
-            unit.has_hub_sensor = true;
-            unit.hub_sensor_triggered = false;
-            unit.topology = PathTopology::HUB;
-            unit.hub_tool_label = 5; // extruder5 → T5
-            // No buffer_health — OpenAMS has no buffers
-
-            const struct {
-                uint32_t color;
-                const char* name;
-                const char* material;
-                SlotStatus status;
-            } ams2_slots[] = {
-                {0xE53935, "Red", "PLA", SlotStatus::AVAILABLE},
-                {0x43A047, "Green", "ASA", SlotStatus::AVAILABLE},
-                {0x90CAF9, "Sky Blue", "PETG", SlotStatus::AVAILABLE},
-                {0x424242, "Carbon", "PLA-CF", SlotStatus::AVAILABLE},
-            };
-
-            for (int i = 0; i < 4; ++i) {
-                SlotInfo slot;
-                slot.slot_index = i;
-                slot.global_index = 8 + i;
-                slot.material = ams2_slots[i].material;
-                slot.color_rgb = ams2_slots[i].color;
-                slot.color_name = ams2_slots[i].name;
-                slot.status = ams2_slots[i].status;
-                slot.mapped_tool = 8 + i; // Real AFC: unique virtual tool per lane
-                slot.spoolman_id = 320 + i;
-                slot.total_weight_g = 1000.0f;
-                slot.remaining_weight_g = 1000.0f - i * 100.0f;
-                auto mat_info = filament::find_material(ams2_slots[i].material);
-                if (mat_info) {
-                    slot.nozzle_temp_min = mat_info->nozzle_min;
-                    slot.nozzle_temp_max = mat_info->nozzle_max;
-                    slot.bed_temp = mat_info->bed_temp;
-                }
-                unit.slots.push_back(slot);
-            }
-
-            system_info_.units.push_back(unit);
+            AmsUnit u;
+            u.unit_index = 2;
+            u.name = "AMS_2";
+            u.slot_count = 4;
+            u.first_slot_global_index = 8;
+            u.connected = true;
+            u.firmware_version = "1.0.0-mock";
+            u.has_encoder = false;
+            u.has_toolhead_sensor = true;
+            u.has_slot_sensors = true;
+            u.has_hub_sensor = true;
+            u.hub_sensor_triggered = false;
+            u.topology = PathTopology::HUB;
+            u.hub_tool_label = 5;
+            system_info_.units.push_back(u);
         }
-
-        // Tool-to-slot mapping: 12 virtual tools (AFC assigns 1:1 virtual→lane)
-        // T0->slot0, T1->slot1, ..., T11->slot11
-        // The UI uses compute_system_tool_layout() to derive 6 physical nozzles
-        system_info_.tool_to_slot_map = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 
         // Start with slot 0 loaded
         system_info_.current_slot = 0;
@@ -1714,21 +1613,9 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
         system_info_.filament_loaded = true;
         filament_segment_ = PathSegment::NOZZLE;
 
-        // Reinitialize endless spool configs for 12 slots
-        endless_spool_configs_.clear();
-        endless_spool_configs_.reserve(12);
-        for (int i = 0; i < 12; ++i) {
-            helix::printer::EndlessSpoolConfig config;
-            config.slot_index = i;
-            config.backup_slot = -1;
-            endless_spool_configs_.push_back(config);
-        }
-
         // AFC device sections and actions
         mock_device_sections_ = helix::printer::afc_default_sections();
         mock_device_actions_ = helix::printer::afc_default_actions();
-
-        // Disable save_restart in mock mode
         for (auto& action : mock_device_actions_) {
             if (action.id == "save_restart") {
                 action.enabled = false;
@@ -1753,7 +1640,6 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
             system_info_.units[0].name = "Mock MMU";
         }
 
-        // Restore Happy Hare device sections and actions
         mock_device_sections_ = helix::printer::hh_default_sections();
         mock_device_actions_ = helix::printer::hh_default_actions();
 
@@ -1777,7 +1663,7 @@ PathTopology AmsBackendMock::get_unit_topology(int unit_index) const {
 bool AmsBackendMock::slot_has_prep_sensor(int slot_index) const {
     std::lock_guard<std::mutex> lock(mutex_);
     // Mock always has prep sensors on all valid slots (matches AFC behavior)
-    return slot_index >= 0 && slot_index < system_info_.total_slots;
+    return slots_.is_valid_index(slot_index);
 }
 
 int AmsBackendMock::get_effective_delay_ms(int base_ms, float variance) const {
@@ -1864,9 +1750,9 @@ void AmsBackendMock::finalize_load_state(int slot_index) {
     if (slot_index >= 0) {
         system_info_.current_slot = slot_index;
         system_info_.current_tool = slot_index;
-        auto* slot = system_info_.get_slot_global(slot_index);
-        if (slot) {
-            slot->status = SlotStatus::LOADED;
+        auto* entry = slots_.get_mut(slot_index);
+        if (entry) {
+            entry->info.status = SlotStatus::LOADED;
         }
     }
     system_info_.action = AmsAction::IDLE;
@@ -1877,9 +1763,9 @@ void AmsBackendMock::finalize_load_state(int slot_index) {
 void AmsBackendMock::finalize_unload_state() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (system_info_.current_slot >= 0) {
-        auto* slot = system_info_.get_slot_global(system_info_.current_slot);
-        if (slot) {
-            slot->status = SlotStatus::AVAILABLE;
+        auto* entry = slots_.get_mut(system_info_.current_slot);
+        if (entry) {
+            entry->info.status = SlotStatus::AVAILABLE;
         }
     }
     system_info_.filament_loaded = false;
@@ -2129,44 +2015,45 @@ helix::printer::EndlessSpoolCapabilities AmsBackendMock::get_endless_spool_capab
 
 std::vector<helix::printer::EndlessSpoolConfig> AmsBackendMock::get_endless_spool_config() const {
     std::lock_guard<std::mutex> lock(mutex_);
-    return endless_spool_configs_;
+
+    std::vector<helix::printer::EndlessSpoolConfig> configs;
+    configs.reserve(slots_.slot_count());
+    for (int i = 0; i < slots_.slot_count(); ++i) {
+        helix::printer::EndlessSpoolConfig config;
+        config.slot_index = i;
+        config.backup_slot = slots_.backup_for_slot(i);
+        configs.push_back(config);
+    }
+    return configs;
 }
 
 AmsError AmsBackendMock::set_endless_spool_backup(int slot_index, int backup_slot) {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    // Check if endless spool is supported
     if (!endless_spool_supported_) {
         return AmsErrorHelper::not_supported("Endless spool");
     }
 
-    // Check if editable
     if (!endless_spool_editable_) {
         return AmsErrorHelper::not_supported("Endless spool configuration");
     }
 
-    // Validate slot_index
-    if (slot_index < 0 || slot_index >= system_info_.total_slots) {
-        return AmsErrorHelper::invalid_slot(slot_index, system_info_.total_slots - 1);
+    if (!slots_.is_valid_index(slot_index)) {
+        return AmsErrorHelper::invalid_slot(slot_index, slots_.slot_count() - 1);
     }
 
-    // Cannot set slot as its own backup
     if (backup_slot == slot_index) {
         return AmsError(AmsResult::INVALID_SLOT,
                         "Cannot set slot " + std::to_string(slot_index) + " as its own backup",
                         "Invalid backup configuration", "Select a different slot as backup");
     }
 
-    // Validate backup_slot (must be -1 or valid slot index)
-    if (backup_slot != -1 && (backup_slot < 0 || backup_slot >= system_info_.total_slots)) {
-        return AmsErrorHelper::invalid_slot(backup_slot, system_info_.total_slots - 1);
+    if (backup_slot != -1 && !slots_.is_valid_index(backup_slot)) {
+        return AmsErrorHelper::invalid_slot(backup_slot, slots_.slot_count() - 1);
     }
 
-    // Update the config
-    if (slot_index < static_cast<int>(endless_spool_configs_.size())) {
-        endless_spool_configs_[slot_index].backup_slot = backup_slot;
-        spdlog::info("[AmsBackendMock] Set slot {} backup to {}", slot_index, backup_slot);
-    }
+    slots_.set_backup(slot_index, backup_slot);
+    spdlog::info("[AmsBackendMock] Set slot {} backup to {}", slot_index, backup_slot);
 
     return AmsErrorHelper::success();
 }
@@ -2195,7 +2082,7 @@ std::vector<int> AmsBackendMock::get_tool_mapping() const {
         return {};
     }
 
-    return system_info_.tool_to_slot_map;
+    return slots_.build_system_info().tool_to_slot_map;
 }
 
 // ============================================================================

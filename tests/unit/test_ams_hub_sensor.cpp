@@ -18,9 +18,8 @@ class HubSensorTestHelper : public AmsBackendAfc {
 
     // Lane/hub setup
     void initialize_test_lanes_with_slots(int count) {
-        lane_names_.clear();
-        lane_name_to_index_.clear();
         system_info_.units.clear();
+        std::vector<std::string> names;
 
         AmsUnit unit;
         unit.unit_index = 0;
@@ -30,8 +29,7 @@ class HubSensorTestHelper : public AmsBackendAfc {
 
         for (int i = 0; i < count; ++i) {
             std::string name = "lane" + std::to_string(i + 1);
-            lane_names_.push_back(name);
-            lane_name_to_index_[name] = i;
+            names.push_back(name);
 
             SlotInfo slot;
             slot.slot_index = i;
@@ -44,7 +42,7 @@ class HubSensorTestHelper : public AmsBackendAfc {
 
         system_info_.units.push_back(unit);
         system_info_.total_slots = count;
-        lanes_initialized_ = true;
+        slots_.initialize("Turtle_1", names);
     }
 
     void set_discovered_hubs(const std::vector<std::string>& hubs) {
@@ -68,7 +66,7 @@ class HubSensorTestHelper : public AmsBackendAfc {
     void
     setup_multi_unit(const std::unordered_map<std::string, std::vector<std::string>>& unit_map) {
         unit_lane_map_ = unit_map;
-        reorganize_units_from_map();
+        reorganize_slots();
     }
 
     // Feed status updates
@@ -92,9 +90,9 @@ class HubSensorTestHelper : public AmsBackendAfc {
         return compute_filament_segment_unlocked();
     }
 
-    void initialize_lanes_from_discovery() {
-        if (!lane_names_.empty() && !lanes_initialized_) {
-            initialize_lanes(lane_names_);
+    void initialize_slots_from_discovery() {
+        if (!discovered_lane_names_.empty() && !slots_.is_initialized()) {
+            initialize_slots(discovered_lane_names_);
         }
     }
 
@@ -257,17 +255,17 @@ TEST_CASE("AFC multi-unit: no hub triggered returns NONE", "[ams][hub_sensor][af
 }
 
 // ============================================================================
-// AFC initialize_lanes sets has_hub_sensor
+// AFC initialize_slots sets has_hub_sensor
 // ============================================================================
 
-TEST_CASE("AFC initialize_lanes sets has_hub_sensor on unit", "[ams][hub_sensor][afc]") {
+TEST_CASE("AFC initialize_slots sets has_hub_sensor on unit", "[ams][hub_sensor][afc]") {
     HubSensorTestHelper helper;
 
-    // Use the real initialize_lanes flow via set_discovered_lanes + initialize
+    // Use the real initialize_slots flow via set_discovered_lanes + initialize
     std::vector<std::string> lanes = {"lane1", "lane2", "lane3", "lane4"};
     std::vector<std::string> hubs = {"Turtle_1"};
     helper.set_discovered_lanes(lanes, hubs);
-    helper.initialize_lanes_from_discovery();
+    helper.initialize_slots_from_discovery();
 
     auto info = helper.get_test_system_info();
     REQUIRE(info.units.size() == 1);

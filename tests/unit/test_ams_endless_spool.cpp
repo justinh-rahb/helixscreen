@@ -226,6 +226,7 @@ class AmsBackendAfcEndlessSpoolHelper : public AmsBackendAfc {
     void initialize_test_lanes(int count) {
         system_info_.units.clear();
         system_info_.total_slots = count;
+        std::vector<std::string> names;
 
         AmsUnit unit;
         unit.unit_index = 0;
@@ -234,6 +235,9 @@ class AmsBackendAfcEndlessSpoolHelper : public AmsBackendAfc {
         unit.first_slot_global_index = 0;
 
         for (int i = 0; i < count; ++i) {
+            std::string name = "lane" + std::to_string(i + 1);
+            names.push_back(name);
+
             SlotInfo slot;
             slot.slot_index = i;
             slot.global_index = i;
@@ -243,20 +247,7 @@ class AmsBackendAfcEndlessSpoolHelper : public AmsBackendAfc {
         }
 
         system_info_.units.push_back(unit);
-        lane_names_.clear();
-        lane_name_to_index_.clear();
-        endless_spool_configs_.clear();
-        for (int i = 0; i < count; ++i) {
-            std::string name = "lane" + std::to_string(i + 1);
-            lane_names_.push_back(name);
-            lane_name_to_index_[name] = i;
-
-            // Initialize endless spool config for each lane
-            helix::printer::EndlessSpoolConfig config;
-            config.slot_index = i;
-            config.backup_slot = -1;
-            endless_spool_configs_.push_back(config);
-        }
+        slots_.initialize("AFC Test Unit", names);
     }
 
     // G-code capture for verification
@@ -367,12 +358,29 @@ class AmsBackendHappyHareEndlessSpoolHelper : public AmsBackendHappyHare {
         }
 
         system_info_.units.push_back(unit);
+
+        // Initialize SlotRegistry to match
+        std::vector<std::string> slot_names;
+        for (int i = 0; i < count; ++i) {
+            slot_names.push_back(std::to_string(i));
+        }
+        slots_.initialize("MMU", slot_names);
+        for (int i = 0; i < count; ++i) {
+            auto* entry = slots_.get_mut(i);
+            if (entry) {
+                entry->info.status = SlotStatus::AVAILABLE;
+                entry->info.endless_spool_group = -1;
+            }
+        }
     }
 
     void set_endless_spool_groups(const std::vector<int>& groups) {
-        // Simulate data from printer.mmu.endless_spool_groups
-        for (size_t i = 0; i < groups.size() && i < system_info_.units[0].slots.size(); ++i) {
-            system_info_.units[0].slots[i].endless_spool_group = groups[i];
+        // Simulate data from printer.mmu.endless_spool_groups via registry
+        for (size_t i = 0; i < groups.size(); ++i) {
+            auto* entry = slots_.get_mut(static_cast<int>(i));
+            if (entry) {
+                entry->info.endless_spool_group = groups[i];
+            }
         }
     }
 };

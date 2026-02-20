@@ -180,9 +180,8 @@ class AfcErrorStateHelper : public AmsBackendAfc {
     AfcErrorStateHelper() : AmsBackendAfc(nullptr, nullptr) {}
 
     void initialize_test_lanes_with_slots(int count) {
-        lane_names_.clear();
-        lane_name_to_index_.clear();
         system_info_.units.clear();
+        std::vector<std::string> names;
 
         AmsUnit unit;
         unit.unit_index = 0;
@@ -192,8 +191,7 @@ class AfcErrorStateHelper : public AmsBackendAfc {
 
         for (int i = 0; i < count; ++i) {
             std::string name = "lane" + std::to_string(i + 1);
-            lane_names_.push_back(name);
-            lane_name_to_index_[name] = i;
+            names.push_back(name);
 
             SlotInfo slot;
             slot.slot_index = i;
@@ -206,12 +204,7 @@ class AfcErrorStateHelper : public AmsBackendAfc {
 
         system_info_.units.push_back(unit);
         system_info_.total_slots = count;
-        lanes_initialized_ = true;
-
-        // Initialize lane sensors
-        for (int i = 0; i < 16; ++i) {
-            lane_sensors_[i] = LaneSensors{};
-        }
+        slots_.initialize("Box Turtle 1", names);
     }
 
     void feed_status_update(const nlohmann::json& params_inner) {
@@ -243,11 +236,13 @@ class AfcErrorStateHelper : public AmsBackendAfc {
     }
 
     const SlotInfo* get_slot(int idx) const {
-        return system_info_.get_slot_global(idx);
+        const auto* entry = slots_.get(idx);
+        return entry ? &entry->info : nullptr;
     }
 
     SlotInfo* get_slot_mut(int idx) {
-        return system_info_.get_slot_global(idx);
+        auto* entry = slots_.get_mut(idx);
+        return entry ? &entry->info : nullptr;
     }
 
     AmsSystemInfo& get_system_info_mut() {
@@ -457,7 +452,20 @@ class HappyHareErrorStateHelper : public AmsBackendHappyHare {
 
         system_info_.units.push_back(unit);
         system_info_.total_slots = count;
-        gates_initialized_ = true;
+
+        // Initialize SlotRegistry to match
+        std::vector<std::string> slot_names;
+        for (int i = 0; i < count; ++i) {
+            slot_names.push_back(std::to_string(i));
+        }
+        slots_.initialize("MMU", slot_names);
+        for (int i = 0; i < count; ++i) {
+            auto* entry = slots_.get_mut(i);
+            if (entry) {
+                entry->info.status = SlotStatus::AVAILABLE;
+                entry->info.color_rgb = AMS_DEFAULT_SLOT_COLOR;
+            }
+        }
     }
 
     void feed_status_update(const nlohmann::json& params_inner) {
@@ -473,7 +481,8 @@ class HappyHareErrorStateHelper : public AmsBackendHappyHare {
     }
 
     const SlotInfo* get_slot(int idx) const {
-        return system_info_.get_slot_global(idx);
+        const auto* entry = slots_.get(idx);
+        return entry ? &entry->info : nullptr;
     }
 
     AmsAction get_action() const {

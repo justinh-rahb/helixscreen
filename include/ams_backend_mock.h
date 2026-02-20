@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ams_backend.h"
+#include "slot_registry.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -449,9 +450,10 @@ class AmsBackendMock : public AmsBackend {
     std::atomic<bool> running_{false}; ///< Backend running state
     EventCallback event_callback_;     ///< Registered event handler
 
-    AmsSystemInfo system_info_;     ///< Simulated system state
-    int operation_delay_ms_ = 5000; ///< Simulated operation delay
-    bool realistic_mode_ = false;   ///< Enable multi-phase operations (HEATING→LOADING→CHECKING)
+    helix::printer::SlotRegistry slots_; ///< Slot registry (single source of truth for slot data)
+    AmsSystemInfo system_info_;          ///< Non-slot system metadata
+    int operation_delay_ms_ = 5000;      ///< Simulated operation delay
+    bool realistic_mode_ = false; ///< Enable multi-phase operations (HEATING→LOADING→CHECKING)
 
     // Path visualization state
     PathTopology topology_ = PathTopology::HUB;        ///< Simulated topology (default hub for AFC)
@@ -486,8 +488,6 @@ class AmsBackendMock : public AmsBackend {
     // Endless spool simulation state
     bool endless_spool_supported_ = true; ///< Whether endless spool is supported
     bool endless_spool_editable_ = true;  ///< Whether config is editable (AFC) vs read-only (HH)
-    std::vector<helix::printer::EndlessSpoolConfig>
-        endless_spool_configs_; ///< Per-slot backup config
 
     // Device actions mock state
     std::vector<helix::printer::DeviceSection> mock_device_sections_;
