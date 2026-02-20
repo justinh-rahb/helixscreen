@@ -44,7 +44,7 @@ constexpr int CUTTING_BASE_MS = 2000;            // 2 seconds for filament cut
 constexpr int PURGING_BASE_MS = 3000;            // 3 seconds for purge after load
 constexpr int CHECKING_BASE_MS = 1500;           // 1.5 seconds for recovery check
 constexpr int SELECTING_BASE_MS = 1000;          // 1 second for slot/tool selection
-constexpr int SEGMENT_ANIMATION_BASE_MS = 10000; // 10 seconds for full segment animation
+constexpr int SEGMENT_ANIMATION_BASE_MS = 15000; // 15 seconds for full segment animation
 
 // Variance factors (±percentage) for natural timing variation
 constexpr float HEATING_VARIANCE = 0.3f;    // ±30%
@@ -501,6 +501,7 @@ AmsError AmsBackendMock::change_tool(int tool_number) {
         system_info_.action = AmsAction::UNLOADING; // Start with unload
         system_info_.operation_detail = "Tool change to T" + std::to_string(tool_number);
         target_slot = system_info_.tool_to_slot_map[tool_number]; // Capture while locked
+        system_info_.pending_target_slot = target_slot;
         spdlog::info("[AmsBackendMock] Tool change to T{}", tool_number);
     }
 
@@ -1848,6 +1849,8 @@ void AmsBackendMock::run_unload_segment_animation(InterruptibleSleep interruptib
             std::lock_guard<std::mutex> lock(mutex_);
             filament_segment_ = seg;
         }
+        spdlog::debug("[AmsBackendMock] Unload step: segment={}, delay={}ms", static_cast<int>(seg),
+                      segment_delay);
         emit_event(EVENT_STATE_CHANGED);
         if (!interruptible_sleep(segment_delay))
             return;
@@ -1868,6 +1871,7 @@ void AmsBackendMock::finalize_load_state(int slot_index) {
     }
     system_info_.action = AmsAction::IDLE;
     system_info_.operation_detail.clear();
+    system_info_.pending_target_slot = -1;
 }
 
 void AmsBackendMock::finalize_unload_state() {
@@ -1974,6 +1978,11 @@ void AmsBackendMock::execute_tool_change_operation(int target_slot,
             return;
         if (shutdown_requested_ || cancel_requested_)
             return;
+    } else {
+        // Non-realistic: finalize_unload_state set action to IDLE, but we need LOADING
+        // for the load phase so that UI elements (slot pulse, step progress) stay active
+        set_action(AmsAction::LOADING, "Loading slot " + std::to_string(target_slot));
+        emit_event(EVENT_STATE_CHANGED);
     }
 
     // Phase 3: Load new filament

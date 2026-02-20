@@ -450,7 +450,7 @@ class AmsBackendMock : public AmsBackend {
     EventCallback event_callback_;     ///< Registered event handler
 
     AmsSystemInfo system_info_;     ///< Simulated system state
-    int operation_delay_ms_ = 1000; ///< Simulated operation delay
+    int operation_delay_ms_ = 5000; ///< Simulated operation delay
     bool realistic_mode_ = false;   ///< Enable multi-phase operations (HEATING→LOADING→CHECKING)
 
     // Path visualization state
