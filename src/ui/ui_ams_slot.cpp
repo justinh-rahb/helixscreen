@@ -61,6 +61,7 @@ struct AmsSlotData {
     ObserverGuard current_slot_observer;
     ObserverGuard filament_loaded_observer;
     ObserverGuard action_observer;
+    ObserverGuard target_slot_observer;
 
     // Skeuomorphic spool visualization layers (flat style)
     lv_obj_t* spool_container = nullptr; // Container for all spool elements
@@ -127,6 +128,7 @@ static void unregister_slot_data(lv_obj_t* obj) {
             data->current_slot_observer.release();
             data->filament_loaded_observer.release();
             data->action_observer.release();
+            data->target_slot_observer.release();
         }
         s_slot_registry.erase(it);
     }
@@ -150,6 +152,7 @@ static void cleanup_all_slot_data() {
         data->current_slot_observer.release();
         data->filament_loaded_observer.release();
         data->action_observer.release();
+        data->target_slot_observer.release();
 
         delete data;
     }
@@ -379,18 +382,25 @@ static void evaluate_pulse_state(AmsSlotData* data) {
 
     lv_subject_t* action_subject = AmsState::instance().get_ams_action_subject();
     lv_subject_t* slot_subject = AmsState::instance().get_current_slot_subject();
+    lv_subject_t* target_subject = AmsState::instance().get_pending_target_slot_subject();
     if (!action_subject || !slot_subject) {
         return;
     }
 
     auto action = static_cast<AmsAction>(lv_subject_get_int(action_subject));
     int current_slot = lv_subject_get_int(slot_subject);
+    int target_slot = target_subject ? lv_subject_get_int(target_subject) : -1;
 
     bool is_active_operation = (action == AmsAction::HEATING || action == AmsAction::LOADING ||
                                 action == AmsAction::UNLOADING || action == AmsAction::CUTTING ||
-                                action == AmsAction::FORMING_TIP || action == AmsAction::PURGING);
+                                action == AmsAction::FORMING_TIP || action == AmsAction::PURGING ||
+                                action == AmsAction::SELECTING);
 
-    bool should_pulse = is_active_operation && (current_slot == data->slot_index);
+    // Pulse the current slot during operations, AND the target slot during swaps
+    // (so the user can see which slot filament is being loaded into)
+    bool is_current = (current_slot == data->slot_index);
+    bool is_target = (target_slot >= 0 && target_slot == data->slot_index);
+    bool should_pulse = is_active_operation && (is_current || is_target);
 
     if (should_pulse && !data->is_pulsing) {
         if (!SettingsManager::instance().get_animations_enabled()) {
@@ -698,6 +708,17 @@ static void setup_slot_observers(AmsSlotData* data) {
     if (action_subject) {
         data->action_observer =
             observe_int_sync<lv_obj_t>(action_subject, obj, [](lv_obj_t* o, int /*action*/) {
+                auto* d = get_slot_data(o);
+                if (d)
+                    evaluate_pulse_state(d);
+            });
+    }
+
+    // Target slot observer: re-evaluate pulse when swap target changes
+    lv_subject_t* target_subject = state.get_pending_target_slot_subject();
+    if (target_subject) {
+        data->target_slot_observer =
+            observe_int_sync<lv_obj_t>(target_subject, obj, [](lv_obj_t* o, int /*target*/) {
                 auto* d = get_slot_data(o);
                 if (d)
                     evaluate_pulse_state(d);

@@ -170,6 +170,7 @@ void AmsState::init_subjects(bool register_xml) {
     INIT_SUBJECT_INT(ams_type, static_cast<int>(AmsType::NONE), subjects_, register_xml);
     INIT_SUBJECT_INT(ams_action, static_cast<int>(AmsAction::IDLE), subjects_, register_xml);
     INIT_SUBJECT_INT(current_slot, -1, subjects_, register_xml);
+    INIT_SUBJECT_INT(pending_target_slot, -1, subjects_, register_xml);
     INIT_SUBJECT_INT(ams_current_tool, -1, subjects_, register_xml);
     // These subjects need ams_ prefix for XML but member vars don't have it
     lv_subject_init_int(&filament_loaded_, 0);
@@ -663,6 +664,7 @@ void AmsState::sync_from_backend() {
         lv_subject_copy_string(&ams_system_name_, ams_type_to_string(info.type));
     }
     lv_subject_set_int(&current_slot_, info.current_slot);
+    lv_subject_set_int(&pending_target_slot_, info.pending_target_slot);
     lv_subject_set_int(&ams_current_tool_, info.current_tool);
 
     // Update formatted tool text (e.g., "T0", "T1", or "---" when no tool active)
@@ -895,6 +897,10 @@ void AmsState::set_action(AmsAction action) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     lv_subject_set_int(&ams_action_, static_cast<int>(action));
     spdlog::debug("[AMS State] Action set: {}", ams_action_to_string(action));
+}
+
+void AmsState::set_pending_target_slot(int slot) {
+    helix::ui::queue_update([this, slot]() { lv_subject_set_int(&pending_target_slot_, slot); });
 }
 
 bool AmsState::is_filament_operation_active() {

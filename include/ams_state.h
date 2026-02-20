@@ -273,6 +273,20 @@ class AmsState {
     }
 
     /**
+     * @brief Get pending target slot subject (for tool change animations)
+     * @return Subject holding target slot index (-1 if no swap in progress)
+     */
+    lv_subject_t* get_pending_target_slot_subject() {
+        return &pending_target_slot_;
+    }
+
+    /**
+     * @brief Set pending target slot directly from UI (for early pulse during preheat)
+     * @param slot Target slot index, or -1 to clear
+     */
+    void set_pending_target_slot(int slot);
+
+    /**
      * @brief Get current tool subject
      * @return Subject holding current tool index (-1 if none)
      */
@@ -808,6 +822,7 @@ class AmsState {
     lv_subject_t ams_type_;
     lv_subject_t ams_action_;
     lv_subject_t current_slot_;
+    lv_subject_t pending_target_slot_;
     lv_subject_t ams_current_tool_;
     lv_subject_t filament_loaded_;
     lv_subject_t bypass_active_;
