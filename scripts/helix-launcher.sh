@@ -241,6 +241,18 @@ if [ -n "${LOG_FILE}" ]; then
     log "Log file: ${LOG_FILE}"
 fi
 
+# DPI override (env var only — CLI passthrough handles --dpi directly)
+if [ -n "${HELIX_DPI:-}" ]; then
+    EXTRA_FLAGS="${EXTRA_FLAGS} --dpi=${HELIX_DPI}"
+    log "DPI override: ${HELIX_DPI}"
+fi
+
+# Skip internal splash screen
+if [ "${HELIX_SKIP_SPLASH:-0}" = "1" ]; then
+    EXTRA_FLAGS="${EXTRA_FLAGS} --skip-splash"
+    log "Splash screen disabled (HELIX_SKIP_SPLASH=1)"
+fi
+
 # Run main application (via watchdog if available for crash recovery)
 # Note: PASSTHROUGH_ARGS is unquoted to allow word splitting (POSIX compatible)
 if [ "${USE_WATCHDOG}" = "1" ]; then
