@@ -323,7 +323,7 @@
       </lv_obj>
 
       <!-- Plugin injection point -->
-      <lv_obj name="home_widget_area"
+      <lv_obj name="panel_widget_area"
               width="100%" height="content" style_pad_all="0" flex_flow="column" style_pad_gap="#space_sm"/>
     </ui_card>
   </view>

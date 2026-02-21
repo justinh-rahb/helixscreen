@@ -9,6 +9,6 @@
   "ui": {
     "settings_page": false,
     "navbar_panel": false,
-    "injection_points": ["home_widget_area"]
+    "injection_points": ["panel_widget_area"]
   }
 }

@@ -120,16 +120,16 @@ extern "C" bool helix_plugin_init(PluginAPI* api, const char* plugin_dir) {
     };
 
     // Check if injection point is available and inject
-    if (api->has_injection_point("home_widget_area")) {
-        if (api->inject_widget("home_widget_area", "led_widget", callbacks)) {
-            api->log_info("Widget injected into home_widget_area");
+    if (api->has_injection_point("panel_widget_area")) {
+        if (api->inject_widget("panel_widget_area", "led_widget", callbacks)) {
+            api->log_info("Widget injected into panel_widget_area");
         } else {
-            api->log_warn("Failed to inject widget into home_widget_area");
+            api->log_warn("Failed to inject widget into panel_widget_area");
         }
     } else {
         // Injection point not yet registered - this is normal if home panel
         // hasn't loaded yet. The widget won't appear until home panel loads.
-        spdlog::debug("[LED Effects] home_widget_area not yet available");
+        spdlog::debug("[LED Effects] panel_widget_area not yet available");
     }
 
     // Subscribe to printer connection events

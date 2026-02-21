@@ -8,8 +8,8 @@
 #include "ui_panel_base.h"
 #include "ui_panel_print_status.h" // For RunoutGuidanceModal
 
-#include "home_widget.h"
 #include "led/led_controller.h"
+#include "panel_widget.h"
 #include "subject_managed_panel.h"
 #include "tips_manager.h"
 
@@ -60,9 +60,9 @@ class HomePanel : public PanelBase {
     }
 
     /**
-     * @brief Rebuild the widget list from current HomeWidgetConfig
+     * @brief Rebuild the widget list from current PanelWidgetConfig
      *
-     * Called from HomeWidgetsOverlay when widget toggles change.
+     * Called from PanelWidgetsOverlay when widget toggles change.
      */
     void populate_widgets();
 
@@ -204,8 +204,8 @@ class HomePanel : public PanelBase {
     ObserverGuard led_brightness_observer_;
     ObserverGuard ams_slot_count_observer_;
 
-    // Active HomeWidget instances (factory-created, lifecycle-managed)
-    std::vector<std::unique_ptr<helix::HomeWidget>> active_widgets_;
+    // Active PanelWidget instances (factory-created, lifecycle-managed)
+    std::vector<std::unique_ptr<helix::PanelWidget>> active_widgets_;
 
     // Observers for widget hardware gate subjects — triggers populate_widgets() on change
     std::vector<ObserverGuard> widget_gate_observers_;

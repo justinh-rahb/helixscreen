@@ -173,7 +173,7 @@
       <!-- Status Card - Column layout with status row on top, info row below -->
       <ui_card name="status_card" height="100%" flex_grow="2" flex_flow="column" style_pad_gap="#space_sm">
 
-        <!-- Widget Container: populated dynamically from HomeWidgetConfig -->
+        <!-- Widget Container: populated dynamically from PanelWidgetConfig -->
         <lv_obj name="widget_container"
                 width="100%" flex_grow="1" style_pad_all="0"
                 flex_flow="column" style_pad_gap="#space_sm"
@@ -182,7 +182,7 @@
 
         <!-- Plugin injection point: widgets from plugins appear here -->
         <!-- Plugins can inject status widgets, indicators, or custom controls -->
-        <lv_obj name="home_widget_area"
+        <lv_obj name="panel_widget_area"
                 width="100%" height="content" style_pad_all="0" flex_flow="column" style_pad_gap="#space_sm"/>
       </ui_card>
     </lv_obj>

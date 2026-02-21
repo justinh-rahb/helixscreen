@@ -27,19 +27,19 @@
 #include "ethernet_manager.h"
 #include "filament_sensor_manager.h"
 #include "format_utils.h"
-#include "home_widget_config.h"
-#include "home_widget_registry.h"
-#include "home_widgets/led_widget.h"
-#include "home_widgets/network_widget.h"
-#include "home_widgets/power_widget.h"
-#include "home_widgets/temp_stack_widget.h"
-#include "home_widgets/temperature_widget.h"
-#include "home_widgets/thermistor_widget.h"
 #include "injection_point_manager.h"
 #include "led/led_controller.h"
 #include "led/ui_led_control_overlay.h"
 #include "moonraker_api.h"
 #include "observer_factory.h"
+#include "panel_widget_config.h"
+#include "panel_widget_registry.h"
+#include "panel_widgets/led_widget.h"
+#include "panel_widgets/network_widget.h"
+#include "panel_widgets/power_widget.h"
+#include "panel_widgets/temp_stack_widget.h"
+#include "panel_widgets/temperature_widget.h"
+#include "panel_widgets/thermistor_widget.h"
 #include "prerendered_images.h"
 #include "printer_detector.h"
 #include "printer_image_manager.h"
@@ -137,7 +137,7 @@ HomePanel::~HomePanel() {
     // skipped if subjects_initialized_ was already false from a prior call.
     widget_gate_observers_.clear();
 
-    // Detach active HomeWidget instances
+    // Detach active PanelWidget instances
     for (auto& w : active_widgets_) {
         w->detach();
     }
@@ -262,8 +262,8 @@ void HomePanel::deinit_subjects() {
     spdlog::debug("[{}] Subjects deinitialized", get_name());
 }
 
-static helix::HomeWidgetConfig& get_widget_config() {
-    static helix::HomeWidgetConfig config(*Config::get_instance());
+static helix::PanelWidgetConfig& get_widget_config() {
+    static helix::PanelWidgetConfig config(*Config::get_instance());
     // Always reload to pick up changes from settings overlay
     config.load();
     return config;
@@ -318,7 +318,7 @@ void HomePanel::populate_widgets() {
         return;
     }
 
-    // Detach active HomeWidget instances before clearing
+    // Detach active PanelWidget instances before clearing
     for (auto& w : active_widgets_) {
         w->detach();
     }
@@ -337,7 +337,7 @@ void HomePanel::populate_widgets() {
         }
 
         // Check hardware gate — skip widgets whose hardware isn't present.
-        // Gates are defined in HomeWidgetDef::hardware_gate_subject and checked
+        // Gates are defined in PanelWidgetDef::hardware_gate_subject and checked
         // here instead of XML bind_flag_if_eq to avoid orphaned dividers.
         const auto* def = helix::find_widget_def(entry.id);
         if (def && def->hardware_gate_subject) {
@@ -347,18 +347,18 @@ void HomePanel::populate_widgets() {
             }
         }
 
-        enabled_widgets.push_back("home_widget_" + entry.id);
+        enabled_widgets.push_back("panel_widget_" + entry.id);
     }
 
     // If firmware_restart is NOT already in the list (user disabled it),
     // conditionally inject it as the LAST widget when Klipper is in SHUTDOWN.
     // This ensures the restart button is always reachable during a shutdown.
     bool has_firmware_restart = std::find(enabled_widgets.begin(), enabled_widgets.end(),
-                                          "home_widget_firmware_restart") != enabled_widgets.end();
+                                          "panel_widget_firmware_restart") != enabled_widgets.end();
     if (!has_firmware_restart) {
         lv_subject_t* klippy = lv_xml_get_subject(nullptr, "klippy_state");
         if (klippy && lv_subject_get_int(klippy) == 2) {
-            enabled_widgets.push_back("home_widget_firmware_restart");
+            enabled_widgets.push_back("panel_widget_firmware_restart");
             spdlog::debug("[{}] Injected firmware_restart (Klipper SHUTDOWN)", get_name());
         }
     }
@@ -405,9 +405,9 @@ void HomePanel::populate_widgets() {
                 first = false;
                 spdlog::debug("[{}] Created widget: {}", get_name(), enabled_widgets[i]);
 
-                // If this widget def has a factory, create and attach the HomeWidget instance
+                // If this widget def has a factory, create and attach the PanelWidget instance
                 const std::string widget_id =
-                    enabled_widgets[i].substr(12); // strip "home_widget_" prefix
+                    enabled_widgets[i].substr(13); // strip "panel_widget_" prefix
                 const auto* def = helix::find_widget_def(widget_id);
                 if (def && def->factory) {
                     auto hw = def->factory();
@@ -480,7 +480,7 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 
     spdlog::debug("[{}] Setting up...", get_name());
 
-    // Dynamically populate status card widgets from HomeWidgetConfig
+    // Dynamically populate status card widgets from PanelWidgetConfig
     populate_widgets();
 
     // Observe hardware gate subjects so widgets appear/disappear when
@@ -540,11 +540,11 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     }
 
     // Register plugin injection point for home panel widgets
-    lv_obj_t* widget_area = lv_obj_find_by_name(panel_, "home_widget_area");
+    lv_obj_t* widget_area = lv_obj_find_by_name(panel_, "panel_widget_area");
     if (widget_area) {
-        helix::plugin::InjectionPointManager::instance().register_point("home_widget_area",
+        helix::plugin::InjectionPointManager::instance().register_point("panel_widget_area",
                                                                         widget_area);
-        spdlog::debug("[{}] Registered injection point: home_widget_area", get_name());
+        spdlog::debug("[{}] Registered injection point: panel_widget_area", get_name());
     }
 
     spdlog::debug("[{}] Setup complete!", get_name());

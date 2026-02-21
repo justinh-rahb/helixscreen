@@ -2,7 +2,7 @@
 <!-- Copyright 2025 HelixScreen -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <!-- LED Widget - Plugin widget for LED control -->
-<!-- Injected into home_widget_area by LED Effects plugin -->
+<!-- Injected into panel_widget_area by LED Effects plugin -->
 <component>
   <api>
     <consts/>

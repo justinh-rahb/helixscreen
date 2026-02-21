@@ -64,7 +64,7 @@ api->on_event(events::PRINT_STARTED, [](const EventData& e) {
 
 ### Widget Injection
 ```cpp
-api->inject_widget("home_widget_area", "led_widget", callbacks);
+api->inject_widget("panel_widget_area", "led_widget", callbacks);
 ```
 
 ### Gcode Execution
