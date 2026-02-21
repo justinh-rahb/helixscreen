@@ -2,8 +2,8 @@
 
 > **Document Purpose**: Reference guide for refactoring work and progress tracking
 > **Created**: 2026-01-08
-> **Last Updated**: 2026-01-17
-> **Version**: 1.4 (PrinterState decomposition complete, Quick Wins 100%)
+> **Last Updated**: 2026-02-21
+> **Version**: 1.5 (SettingsManager domain split complete, Panel base class helpers added)
 
 ## Table of Contents
 
@@ -1631,41 +1631,58 @@ Both hardcoded `tolerance = 2°C` for heating state logic. Both produced identic
 
 ### 2.8 SettingsManager Domain Split
 
-**Status**: [x] Not Started  [ ] In Progress  [ ] Complete
+**Status**: [ ] Not Started  [ ] In Progress  [x] Complete
 
 #### Problem Statement
 `SettingsManager` (854-line header, 1,156-line implementation) manages 27 LVGL subjects across 6 unrelated domains: display, audio, safety, print behavior, hardware, and network/system. The settings panel has 7+ nearly identical dropdown callback handlers.
 
-#### Proposed Solution
-Split into domain-specific managers:
-1. `DisplaySettingsManager` — brightness, dim, sleep, theme, backlight
-2. `AudioSettingsManager` — sounds, volume, completion alerts
-3. `PrintSettingsManager` — animations, gcode rendering, bed mesh, Z movement
-4. `SafetySettingsManager` — E-stop confirmation, cancel escalation
-5. `SystemSettingsManager` — language, time format, telemetry, update channel, LED
+#### Solution Implemented
+Split into 5 domain-specific managers + thin residual facade:
 
-Create a generic dropdown handler factory to eliminate repetitive callback boilerplate.
+| Manager | Subjects | Files |
+|---------|----------|-------|
+| `DisplaySettingsManager` | 13 (dark_mode, theme, brightness, dim, sleep, animations, render modes, time_format) | `display_settings_manager.{h,cpp}` |
+| `AudioSettingsManager` | 4 (sounds_enabled, ui_sounds, volume, completion_alert) | `audio_settings_manager.{h,cpp}` |
+| `SafetySettingsManager` | 3 (estop_confirm, cancel_escalation, timeout) | `safety_settings_manager.{h,cpp}` |
+| `SystemSettingsManager` | 3 (language, update_channel, telemetry) | `system_settings_manager.{h,cpp}` |
+| `InputSettingsManager` | 2 (scroll_throw, scroll_limit) + restart_pending | `input_settings_manager.{h,cpp}` |
+| **SettingsManager (residual)** | 2 (led_enabled, z_movement_style) + external_spool_info | Thin facade with forwarding wrappers |
 
-#### Effort Estimate
-Medium (3-5 days)
+Also created `settings_callback_helpers.h` with dropdown/toggle callback factories.
+
+**Tests:** 40 test cases, 252 assertions across 5 domain test suites.
+**Backward compat:** All `SettingsManager::instance().method()` calls still work via `@deprecated` inline forwarding wrappers. Consumers can migrate incrementally.
+
+#### Effort Actual
+~3 hours (2026-02-21)
 
 ---
 
 ### 2.9 Panel/Overlay Base Class Broader Adoption
 
-**Status**: [x] Not Started  [ ] In Progress  [ ] Complete
+**Status**: [ ] Not Started  [x] In Progress  [ ] Complete
 
 #### Problem Statement
 60+ panels/overlays share identical structural patterns: `register_callbacks()` → list of `lv_xml_register_event_cb()` calls, `init_subjects()` → guarded macro calls, `create()` → XML load + widget lookup. Base class helpers like `create_overlay_from_xml()` exist but are used by only 1-2 overlays.
 
-#### Proposed Solution
-- Audit existing base class facilities and document what's available
-- Create a standard `create_from_xml()` helper that handles the common XML load + error check + widget lookup pattern
-- Migrate overlays to use the helper (starting with the simplest ones)
-- Consider a declarative callback registration pattern (array of name/function pairs)
+#### Solution (Phase 1 Complete)
+Created `ui_callback_helpers.h` with two helpers:
+- **`register_xml_callbacks()`** — batch registration via `std::initializer_list<XmlCallbackEntry>`, replaces repetitive one-per-line calls with compact table format
+- **`find_required_widget()`** — wraps `lv_obj_find_by_name()` + error logging into single call
+
+Migrated 4 high-boilerplate files: bed mesh (26 callbacks), controls (24), spool wizard (25), settings (68 across two locations). Total: 143 individual registrations consolidated.
+
+`create_overlay_from_xml()` migration deferred — existing non-users intentionally differ in behavior (skip `ui_overlay_panel_setup_standard()` or defer `parent_screen_` assignment).
+
+**Tests:** 6 test cases, 9 assertions.
+
+#### Remaining Work
+- Migrate more panels to `register_xml_callbacks()` (many smaller panels with 5-15 callbacks)
+- Adopt `find_required_widget()` in panels with repetitive widget lookup + error checking
+- Investigate whether `create_overlay_from_xml()` can be made flexible enough for broader adoption
 
 #### Effort Estimate
-Low-medium (2-3 days)
+Low (1-2 days remaining)
 
 ---
 
@@ -1801,12 +1818,13 @@ Low (1 day)
 | Phase 2: Foundation | 4 | 4 | 100% |
 | Phase 3: Architecture | 5 | 4 | 80% |
 | Phase 4: Polish | 7 | 2 | 29% |
-| **Total** | **21** | **15** | **71%** |
+| Phase 5: New Findings | 5 | 3.5 | 70% |
+| **Total** | **26** | **18.5** | **71%** |
 
-> **Note (2026-02-20)**: Added 3 new Tier 2 items from codebase analysis (2.8-2.10).
-> Completed 2 new items: AMS backend base class extraction (2.6, -361 lines) and
-> temperature formatting consolidation (2.7, -61 lines). MoonrakerAPI domain split
-> still in progress.
+> **Note (2026-02-21)**: Completed SettingsManager domain split (2.8) — 5 domain managers
+> extracted, 40 tests, 252 assertions. Panel base class helpers (2.9) Phase 1 done — batch
+> callback registration + 4 panels migrated. AMS base class (2.6) and temperature
+> consolidation (2.7) also completed on 2026-02-20.
 
 ### Metrics Dashboard
 | Metric | Current | Target | Progress |
@@ -1816,6 +1834,9 @@ Low (1 day)
 | PrintStatusPanel lines | 1,959 | <1000 | 50% (over target but acceptable) |
 | AMS backend duplication | 0 (base class) | 0 | 100% |
 | Temperature format duplication | 0 (consolidated) | 0 | 100% |
+| SettingsManager subjects | 2 residual (was 27) | <5 | 100% |
+| Settings domain managers | 5 extracted | - | 100% |
+| Callback registration boilerplate | 143 consolidated (4 panels) | - | ~30% |
 | Panels using SubjectManagedPanel | 100% | 100% | 100% |
 | Observer boilerplate instances | ~90 | <20 | 30% |
 | Extracted components | 13 domain + 8 overlays + 1 AMS base | - | Done |
@@ -1829,7 +1850,7 @@ Low (1 day)
 
 ## Recommended Next Priorities
 
-Based on current codebase state and remaining work (updated 2026-02-20):
+Based on current codebase state and remaining work (updated 2026-02-21):
 
 ### High Value / Moderate Effort
 
@@ -1838,15 +1859,15 @@ Based on current codebase state and remaining work (updated 2026-02-20):
    - Would improve API discoverability and testing
    - Partially started: proxy methods added, full sub-API split remaining
 
-2. **SettingsManager domain split** (Section 2.8) — NEW
-   - 27 subjects across 6 unrelated domains
-   - 7+ identical dropdown callback handlers
-   - Would reduce coupling across 30+ UI panels
-
-3. **Observer factory broader adoption** (Section 1.2)
+2. **Observer factory broader adoption** (Section 1.2)
    - 10 panels still use legacy observer pattern
    - Migration would reduce ~1,000 lines of boilerplate
    - Optional but improves consistency
+
+3. **Panel/Overlay base class broader adoption** (Section 2.9) — Phase 1 done
+   - Helpers created, 4 panels migrated
+   - Many more panels with 5-15 callbacks could benefit
+   - Low-hanging fruit for continued boilerplate reduction
 
 ### Medium Value / Higher Effort
 
@@ -1855,9 +1876,10 @@ Based on current codebase state and remaining work (updated 2026-02-20):
    - Mixes connection, protocol, subscriptions, discovery caching
    - Moderate complexity but high maintainability impact
 
-5. **Panel/Overlay base class broader adoption** (Section 2.9) — NEW
-   - 60+ panels share identical structural patterns
-   - Base class helpers exist but are underutilized
+5. **SettingsManager consumer migration** (follow-up to 2.8)
+   - Domain managers done, but consumers still use forwarding wrappers
+   - Migrate 30+ files to use domain managers directly
+   - Remove deprecated forwarding wrappers from SettingsManager
 
 ### Lower Priority (Nice to Have)
 
@@ -1865,7 +1887,7 @@ Based on current codebase state and remaining work (updated 2026-02-20):
    - Three incompatible error patterns exist
    - Would standardize error handling across codebase
 
-7. **ui_utils.cpp split** (Section 2.10) — NEW
+7. **ui_utils.cpp split** (Section 2.10)
    - 520-line dumping ground mixing unrelated concerns
    - Low effort, low urgency
 
