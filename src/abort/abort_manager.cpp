@@ -6,6 +6,7 @@
 #include "ui_utils.h"
 
 #include "moonraker_api.h"
+#include "observer_factory.h"
 #include "printer_state.h"
 #include "safety_settings_manager.h"
 #include "static_panel_registry.h"
@@ -282,8 +283,11 @@ void AbortManager::send_cancel_print() {
     // Register observer on print_state_enum to detect when Klipper reports print ended
     // This allows early completion before the timeout when the CANCEL_PRINT macro finishes
     if (printer_state_) {
-        cancel_state_observer_ = ObserverGuard(printer_state_->get_print_state_enum_subject(),
-                                               cancel_state_observer_cb, this);
+        cancel_state_observer_ = helix::ui::observe_int_immediate<AbortManager>(
+            printer_state_->get_print_state_enum_subject(), this,
+            [](AbortManager* self, int value) {
+                self->on_print_state_during_cancel(static_cast<PrintJobState>(value));
+            });
         spdlog::debug("[AbortManager] Registered print_state_enum observer for cancel detection");
     }
 
@@ -426,8 +430,10 @@ void AbortManager::wait_for_reconnect() {
 
     // Register observer on klippy_state subject to detect when klippy becomes ready
     if (printer_state_) {
-        klippy_observer_ = ObserverGuard(printer_state_->get_klippy_state_subject(),
-                                         klippy_state_observer_cb, this);
+        klippy_observer_ = helix::ui::observe_int_immediate<AbortManager>(
+            printer_state_->get_klippy_state_subject(), this, [](AbortManager* self, int value) {
+                self->on_klippy_state_changed(static_cast<KlippyState>(value));
+            });
         spdlog::debug("[AbortManager] Registered klippy_state observer for reconnect detection");
     }
 }
@@ -659,16 +665,6 @@ void AbortManager::on_print_state_during_cancel(PrintJobState state) {
     }
 }
 
-void AbortManager::cancel_state_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
-    auto* self = static_cast<AbortManager*>(lv_observer_get_user_data(observer));
-    if (!self) {
-        return;
-    }
-
-    auto print_state = static_cast<PrintJobState>(lv_subject_get_int(subject));
-    self->on_print_state_during_cancel(print_state);
-}
-
 // ============================================================================
 // Helper Methods
 // ============================================================================
@@ -760,16 +756,6 @@ void AbortManager::update_visibility() {
         lv_obj_add_flag(backdrop_, LV_OBJ_FLAG_HIDDEN);
     }
     spdlog::debug("[AbortManager] Visibility updated: {}", visible ? "visible" : "hidden");
-}
-
-void AbortManager::klippy_state_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
-    auto* self = static_cast<AbortManager*>(lv_observer_get_user_data(observer));
-    if (!self) {
-        return;
-    }
-
-    auto klippy_state = static_cast<KlippyState>(lv_subject_get_int(subject));
-    self->on_klippy_state_changed(klippy_state);
 }
 
 // ============================================================================

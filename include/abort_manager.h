@@ -370,12 +370,6 @@ class AbortManager {
      */
     void on_print_state_during_cancel(PrintJobState state);
 
-    // Static observer callback for klippy state
-    static void klippy_state_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
-
-    // Static observer callback for print state during cancel
-    static void cancel_state_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
-
     // Static timer callbacks
     static void heater_interrupt_timer_cb(lv_timer_t* timer);
     static void probe_timer_cb(lv_timer_t* timer);

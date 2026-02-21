@@ -7,6 +7,7 @@
 #include "ui_utils.h"
 
 #include "app_globals.h"
+#include "observer_factory.h"
 #include "thumbnail_cache.h"
 #include "thumbnail_processor.h"
 
@@ -39,8 +40,11 @@ ActivePrintMediaManager& get_active_print_media_manager() {
 ActivePrintMediaManager::ActivePrintMediaManager(PrinterState& printer_state)
     : printer_state_(printer_state) {
     // Observe print_filename_ subject to react to filename changes
-    print_filename_observer_ =
-        ObserverGuard(printer_state_.get_print_filename_subject(), on_print_filename_changed, this);
+    print_filename_observer_ = helix::ui::observe_string<ActivePrintMediaManager>(
+        printer_state_.get_print_filename_subject(), this,
+        [](ActivePrintMediaManager* self, const char* filename) {
+            self->process_filename(filename);
+        });
 
     spdlog::debug("[ActivePrintMediaManager] Observer attached to print_filename subject");
 }
@@ -80,18 +84,6 @@ void ActivePrintMediaManager::set_thumbnail_path(const std::string& path) {
     // Set the thumbnail path directly (bypasses Moonraker API lookup)
     printer_state_.set_print_thumbnail_path(path);
     spdlog::debug("[ActivePrintMediaManager] Thumbnail path set directly: {}", path);
-}
-
-void ActivePrintMediaManager::on_print_filename_changed(lv_observer_t* observer,
-                                                        lv_subject_t* subject) {
-    auto* self = static_cast<ActivePrintMediaManager*>(lv_observer_get_user_data(observer));
-    if (!self) {
-        spdlog::warn("[ActivePrintMediaManager] Observer callback with null self!");
-        return;
-    }
-
-    const char* filename = lv_subject_get_string(subject);
-    self->process_filename(filename);
 }
 
 void ActivePrintMediaManager::process_filename(const char* raw_filename) {

@@ -10,6 +10,7 @@
 #include "ams_state.h"
 #include "filament_database.h"
 #include "lvgl/src/others/translation/lv_translation.h"
+#include "observer_factory.h"
 
 #include <spdlog/spdlog.h>
 
@@ -98,17 +99,14 @@ bool AmsDryerCard::setup(lv_obj_t* panel) {
     progress_fill_ = lv_obj_find_by_name(dryer_card_, "progress_fill");
     if (progress_fill_) {
         // Set up observer to update width when progress changes
-        progress_observer_ = ObserverGuard(
-            AmsState::instance().get_dryer_progress_pct_subject(),
-            [](lv_observer_t* observer, lv_subject_t* subject) {
-                auto* self = static_cast<AmsDryerCard*>(lv_observer_get_user_data(observer));
-                if (self && self->progress_fill_) {
-                    int progress = lv_subject_get_int(subject);
+        progress_observer_ = helix::ui::observe_int_sync<AmsDryerCard>(
+            AmsState::instance().get_dryer_progress_pct_subject(), this,
+            [](AmsDryerCard* self, int progress) {
+                if (self->progress_fill_) {
                     lv_obj_set_width(self->progress_fill_,
                                      lv_pct(std::max(0, std::min(100, progress))));
                 }
-            },
-            this);
+            });
 
         spdlog::debug("[AmsDryerCard] Progress bar observer set up");
     }

@@ -36,6 +36,7 @@
 #include "lvgl/src/xml/lv_xml.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h" // For ConnectionState enum
+#include "observer_factory.h"
 #include "preprint_predictor.h"
 #include "print_history_manager.h"
 #include "print_start_analyzer.h"
@@ -584,15 +585,12 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 
     // Register observer on connection state to refresh files when printer connects
     // This handles the race condition where panel activates before WebSocket connection
-    // ObserverGuard handles cleanup automatically in destructor
+    using helix::ui::observe_int_sync;
     lv_subject_t* connection_subject = printer_state_.get_printer_connection_state_subject();
     if (connection_subject) {
-        connection_observer_ = ObserverGuard(
-            connection_subject,
-            [](lv_observer_t* observer, lv_subject_t* subject) {
-                auto* self = static_cast<PrintSelectPanel*>(lv_observer_get_user_data(observer));
-                int32_t state = lv_subject_get_int(subject);
-                if (state == static_cast<int>(ConnectionState::CONNECTED) && self) {
+        connection_observer_ = observe_int_sync<PrintSelectPanel>(
+            connection_subject, this, [](PrintSelectPanel* self, int state) {
+                if (state == static_cast<int>(ConnectionState::CONNECTED)) {
                     // Refresh files if empty (and on Printer source, not USB)
                     bool is_printer_source =
                         !self->usb_source_ || !self->usb_source_->is_usb_active();
@@ -615,8 +613,7 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
                     // Note: Plugin detection now happens automatically in discovery flow
                     // (application.cpp). Install prompt is triggered by helix_plugin_observer_.
                 }
-            },
-            this);
+            });
         spdlog::trace("[{}] Registered observer on connection state for auto-refresh", get_name());
     }
 
@@ -624,15 +621,9 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     // Prevents starting a new print while one is already in progress
     lv_subject_t* print_state_subject = printer_state_.get_print_state_subject();
     if (print_state_subject) {
-        print_state_observer_ = ObserverGuard(
-            print_state_subject,
-            [](lv_observer_t* observer, lv_subject_t* /*subject*/) {
-                auto* self = static_cast<PrintSelectPanel*>(lv_observer_get_user_data(observer));
-                if (self) {
-                    self->update_print_button_state();
-                }
-            },
-            this);
+        print_state_observer_ = observe_int_sync<PrintSelectPanel>(
+            print_state_subject, this,
+            [](PrintSelectPanel* self, int) { self->update_print_button_state(); });
         spdlog::trace("[{}] Registered observer on print job state for print button", get_name());
     }
 
@@ -640,15 +631,9 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     // (before Moonraker reports state change, which can take seconds)
     lv_subject_t* print_in_progress_subject = printer_state_.get_print_in_progress_subject();
     if (print_in_progress_subject) {
-        print_in_progress_observer_ = ObserverGuard(
-            print_in_progress_subject,
-            [](lv_observer_t* observer, lv_subject_t* /*subject*/) {
-                auto* self = static_cast<PrintSelectPanel*>(lv_observer_get_user_data(observer));
-                if (self) {
-                    self->update_print_button_state();
-                }
-            },
-            this);
+        print_in_progress_observer_ = observe_int_sync<PrintSelectPanel>(
+            print_in_progress_subject, this,
+            [](PrintSelectPanel* self, int) { self->update_print_button_state(); });
         spdlog::trace("[{}] Registered observer on print_in_progress for print button", get_name());
     }
 
@@ -657,14 +642,8 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     // Only show modal when explicitly 0 (after discovery confirms plugin is missing)
     lv_subject_t* plugin_subject = printer_state_.get_helix_plugin_installed_subject();
     if (plugin_subject) {
-        helix_plugin_observer_ = ObserverGuard(
-            plugin_subject,
-            [](lv_observer_t* observer, lv_subject_t* subject) {
-                auto* self = static_cast<PrintSelectPanel*>(lv_observer_get_user_data(observer));
-                if (!self)
-                    return;
-
-                int plugin_state = lv_subject_get_int(subject);
+        helix_plugin_observer_ = observe_int_sync<PrintSelectPanel>(
+            plugin_subject, this, [](PrintSelectPanel* self, int plugin_state) {
                 // Only show modal when state is explicitly 0 (checked and not installed)
                 // Skip if -1 (unknown/pre-discovery) or 1 (installed)
                 if (plugin_state == 0 && self->plugin_installer_.should_prompt_install()) {
@@ -673,8 +652,7 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
                     self->plugin_install_modal_.set_installer(&self->plugin_installer_);
                     self->plugin_install_modal_.show(lv_screen_active());
                 }
-            },
-            this);
+            });
         spdlog::trace("[{}] Registered observer on helix_plugin_installed for install prompt",
                       get_name());
     }

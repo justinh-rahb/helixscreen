@@ -134,26 +134,17 @@ void ExcludeObjectsListOverlay::on_activate() {
         return;
 
     // Observe excluded objects changes - repopulate on change
-    excluded_observer_ = ObserverGuard(
-        printer_state_->get_excluded_objects_version_subject(),
-        [](lv_observer_t* obs, lv_subject_t*) {
-            auto* self = static_cast<ExcludeObjectsListOverlay*>(lv_observer_get_user_data(obs));
-            if (self && self->is_visible()) {
-                self->populate_list();
-            }
-        },
-        this);
+    auto repopulate_handler = [](ExcludeObjectsListOverlay* self, int) {
+        if (self->is_visible()) {
+            self->populate_list();
+        }
+    };
+    excluded_observer_ = helix::ui::observe_int_sync<ExcludeObjectsListOverlay>(
+        printer_state_->get_excluded_objects_version_subject(), this, repopulate_handler);
 
     // Observe defined objects changes - repopulate on change
-    defined_observer_ = ObserverGuard(
-        printer_state_->get_defined_objects_version_subject(),
-        [](lv_observer_t* obs, lv_subject_t*) {
-            auto* self = static_cast<ExcludeObjectsListOverlay*>(lv_observer_get_user_data(obs));
-            if (self && self->is_visible()) {
-                self->populate_list();
-            }
-        },
-        this);
+    defined_observer_ = helix::ui::observe_int_sync<ExcludeObjectsListOverlay>(
+        printer_state_->get_defined_objects_version_subject(), this, repopulate_handler);
 
     // Repopulate to get fresh data
     populate_list();

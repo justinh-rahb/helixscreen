@@ -10,6 +10,7 @@
 
 #include "lvgl/src/others/translation/lv_translation.h"
 #include "moonraker_api.h"
+#include "observer_factory.h"
 #include "printer_state.h"
 
 #include <spdlog/spdlog.h>
@@ -53,8 +54,9 @@ void PrintExcludeObjectManager::init() {
     }
 
     // Subscribe to excluded objects changes from PrinterState
-    excluded_objects_observer_ = ObserverGuard(
-        printer_state_.get_excluded_objects_version_subject(), excluded_objects_observer_cb, this);
+    excluded_objects_observer_ = helix::ui::observe_int_sync<PrintExcludeObjectManager>(
+        printer_state_.get_excluded_objects_version_subject(), this,
+        [](PrintExcludeObjectManager* self, int) { self->on_excluded_objects_changed(); });
 
     // Register long-press callback on gcode viewer
     if (gcode_viewer_) {
@@ -323,14 +325,7 @@ void PrintExcludeObjectManager::exclude_undo_timer_cb(lv_timer_t* timer) {
 // Observer Callback
 // ============================================================================
 
-void PrintExcludeObjectManager::excluded_objects_observer_cb(lv_observer_t* observer,
-                                                             lv_subject_t* subject) {
-    (void)subject;
-    auto* self = static_cast<PrintExcludeObjectManager*>(lv_observer_get_user_data(observer));
-    if (self) {
-        self->on_excluded_objects_changed();
-    }
-}
+// excluded_objects_observer_cb migrated to lambda in init()
 
 void PrintExcludeObjectManager::on_excluded_objects_changed() {
     // Sync excluded objects from PrinterState (Klipper/Moonraker)

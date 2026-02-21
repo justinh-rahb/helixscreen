@@ -144,8 +144,13 @@ void AmsPanel::init_subjects() {
     // Using observer factory for action and slot_count; others use traditional callbacks
     using helix::ui::observe_int_sync;
 
-    slots_version_observer_ = ObserverGuard(AmsState::instance().get_slots_version_subject(),
-                                            on_slots_version_changed, this);
+    slots_version_observer_ = observe_int_sync<AmsPanel>(
+        AmsState::instance().get_slots_version_subject(), this, [](AmsPanel* self, int) {
+            if (!self->subjects_initialized_ || !self->panel_)
+                return;
+            spdlog::trace("[AmsPanel] Gates version changed - refreshing slots");
+            self->refresh_slots();
+        });
 
     // Simplified action observer - only handles panel-specific concerns
     // (path canvas heat glow and error modal). Step progress is handled by sidebar_.
@@ -169,8 +174,34 @@ void AmsPanel::init_subjects() {
             }
         });
 
-    current_slot_observer_ = ObserverGuard(AmsState::instance().get_current_slot_subject(),
-                                           on_current_slot_changed, this);
+    current_slot_observer_ = observe_int_sync<AmsPanel>(
+        AmsState::instance().get_current_slot_subject(), this, [](AmsPanel* self, int slot) {
+            if (!self->subjects_initialized_ || !self->panel_)
+                return;
+            spdlog::debug("[AmsPanel] Current slot changed: {}", slot);
+            self->update_current_slot_highlight(slot);
+            self->update_path_canvas_from_backend();
+
+            // Auto-set active Spoolman spool when slot becomes active
+            if (slot >= 0 && self->api_) {
+                auto* backend = AmsState::instance().get_backend();
+                if (backend) {
+                    SlotInfo slot_info = backend->get_slot_info(slot);
+                    if (slot_info.spoolman_id > 0) {
+                        spdlog::info(
+                            "[AmsPanel] Slot {} has Spoolman ID {}, setting as active spool", slot,
+                            slot_info.spoolman_id);
+                        self->api_->set_active_spool(
+                            slot_info.spoolman_id,
+                            []() { spdlog::debug("[AmsPanel] Active spool set successfully"); },
+                            [](const MoonrakerError& err) {
+                                spdlog::warn("[AmsPanel] Failed to set active spool: {}",
+                                             err.message);
+                            });
+                    }
+                }
+            }
+        });
 
     // Slot count observer for dynamic slot creation (non-scoped mode only)
     slot_count_observer_ = observe_int_sync<AmsPanel>(
@@ -186,10 +217,16 @@ void AmsPanel::init_subjects() {
         });
 
     // Path state observers for filament path visualization
-    path_segment_observer_ = ObserverGuard(AmsState::instance().get_path_filament_segment_subject(),
-                                           on_path_state_changed, this);
-    path_topology_observer_ = ObserverGuard(AmsState::instance().get_path_topology_subject(),
-                                            on_path_state_changed, this);
+    auto path_handler = [](AmsPanel* self, int) {
+        if (!self->subjects_initialized_ || !self->panel_)
+            return;
+        spdlog::debug("[AmsPanel] Path state changed - updating path canvas");
+        self->update_path_canvas_from_backend();
+    };
+    path_segment_observer_ = observe_int_sync<AmsPanel>(
+        AmsState::instance().get_path_filament_segment_subject(), this, path_handler);
+    path_topology_observer_ = observe_int_sync<AmsPanel>(
+        AmsState::instance().get_path_topology_subject(), this, path_handler);
 
     // Backend count observer for multi-backend selector
     backend_count_observer_ = observe_int_sync<AmsPanel>(
@@ -1025,65 +1062,8 @@ void AmsPanel::on_slot_clicked(lv_event_t* e) {
 // Observer Callbacks
 // ============================================================================
 
-void AmsPanel::on_slots_version_changed(lv_observer_t* observer, lv_subject_t* /*subject*/) {
-    auto* self = static_cast<AmsPanel*>(lv_observer_get_user_data(observer));
-    if (!self) {
-        return;
-    }
-    if (!self->subjects_initialized_ || !self->panel_) {
-        return; // Not yet ready
-    }
-    spdlog::trace("[AmsPanel] Gates version changed - refreshing slots");
-    self->refresh_slots();
-}
-
-// on_action_changed migrated to lambda in init_subjects()
-
-void AmsPanel::on_current_slot_changed(lv_observer_t* observer, lv_subject_t* subject) {
-    auto* self = static_cast<AmsPanel*>(lv_observer_get_user_data(observer));
-    if (!self) {
-        return;
-    }
-    if (!self->subjects_initialized_ || !self->panel_) {
-        return; // Not yet ready
-    }
-    int slot = lv_subject_get_int(subject);
-    spdlog::debug("[AmsPanel] Current slot changed: {}", slot);
-    self->update_current_slot_highlight(slot);
-
-    // Also update path canvas when current slot changes
-    self->update_path_canvas_from_backend();
-
-    // Auto-set active Spoolman spool when slot becomes active
-    if (slot >= 0 && self->api_) {
-        auto* backend = AmsState::instance().get_backend();
-        if (backend) {
-            SlotInfo slot_info = backend->get_slot_info(slot);
-            if (slot_info.spoolman_id > 0) {
-                spdlog::info("[AmsPanel] Slot {} has Spoolman ID {}, setting as active spool", slot,
-                             slot_info.spoolman_id);
-                self->api_->set_active_spool(
-                    slot_info.spoolman_id,
-                    []() { spdlog::debug("[AmsPanel] Active spool set successfully"); },
-                    [](const MoonrakerError& err) {
-                        spdlog::warn("[AmsPanel] Failed to set active spool: {}", err.message);
-                    });
-            }
-        }
-    }
-}
-
-void AmsPanel::on_path_state_changed(lv_observer_t* observer, lv_subject_t* /*subject*/) {
-    auto* self = static_cast<AmsPanel*>(lv_observer_get_user_data(observer));
-    if (!self) {
-        return;
-    }
-    if (!self->subjects_initialized_ || !self->panel_) {
-        return; // Not yet ready
-    }
-    spdlog::debug("[AmsPanel] Path state changed - updating path canvas");
-    self->update_path_canvas_from_backend();
-}
+// on_slots_version_changed, on_action_changed, on_current_slot_changed, on_path_state_changed
+// all migrated to lambdas in init_subjects()
 
 // ============================================================================
 // Action Handlers

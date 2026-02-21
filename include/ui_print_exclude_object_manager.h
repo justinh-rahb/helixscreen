@@ -247,10 +247,7 @@ class PrintExcludeObjectManager {
      */
     static void on_object_long_pressed(lv_obj_t* viewer, const char* object_name, void* user_data);
 
-    /**
-     * @brief Static callback for excluded objects observer
-     */
-    static void excluded_objects_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
+    // excluded_objects_observer_cb migrated to lambda in init()
 
     /**
      * @brief Timer callback when undo window expires

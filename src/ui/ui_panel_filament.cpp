@@ -262,37 +262,28 @@ void FilamentPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
                                             self->update_multi_filament_card_visibility();
                                         });
 
-    // Subscribe to AMS type to expand temp graph when no AMS present [L020] [L029]
-    ams_type_observer_ = ObserverGuard(
-        AmsState::instance().get_ams_type_subject(),
-        [](lv_observer_t* observer, [[maybe_unused]] lv_subject_t* subject) {
-            auto* self = static_cast<FilamentPanel*>(lv_observer_get_user_data(observer));
-            if (!self || !self->temp_group_ || !self->temp_graph_card_)
+    // Subscribe to AMS type to expand temp graph when no AMS present
+    ams_type_observer_ = observe_int_sync<FilamentPanel>(
+        AmsState::instance().get_ams_type_subject(), this, [](FilamentPanel* self, int ams_type) {
+            if (!self->temp_group_ || !self->temp_graph_card_)
                 return;
 
-            helix::ui::async_call(
-                [](void* ctx) {
-                    auto* panel = static_cast<FilamentPanel*>(ctx);
-                    bool has_ams =
-                        (lv_subject_get_int(AmsState::instance().get_ams_type_subject()) != 0);
+            bool has_ams = (ams_type != 0);
 
-                    if (has_ams) {
-                        // AMS visible: standard 120px graph
-                        lv_obj_set_height(panel->temp_graph_card_, 120);
-                        lv_obj_set_flex_grow(panel->temp_group_, 0);
-                        lv_obj_set_flex_grow(panel->temp_graph_card_, 0);
-                    } else {
-                        // AMS hidden: expand graph to fill available space
-                        lv_obj_set_flex_grow(panel->temp_group_, 1);
-                        lv_obj_set_flex_grow(panel->temp_graph_card_, 1);
-                    }
+            if (has_ams) {
+                // AMS visible: standard 120px graph
+                lv_obj_set_height(self->temp_graph_card_, 120);
+                lv_obj_set_flex_grow(self->temp_group_, 0);
+                lv_obj_set_flex_grow(self->temp_graph_card_, 0);
+            } else {
+                // AMS hidden: expand graph to fill available space
+                lv_obj_set_flex_grow(self->temp_group_, 1);
+                lv_obj_set_flex_grow(self->temp_graph_card_, 1);
+            }
 
-                    // Update multi-filament card visibility (AMS state changed)
-                    panel->update_multi_filament_card_visibility();
-                },
-                self);
-        },
-        this);
+            // Update multi-filament card visibility (AMS state changed)
+            self->update_multi_filament_card_visibility();
+        });
 
     // Initialize visual state
     update_preset_buttons_visual();

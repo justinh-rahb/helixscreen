@@ -79,7 +79,6 @@ class ActivePrintMediaManager {
     void set_thumbnail_path(const std::string& path);
 
   private:
-    static void on_print_filename_changed(lv_observer_t* observer, lv_subject_t* subject);
     void process_filename(const char* raw_filename);
     void load_thumbnail_for_file(const std::string& filename);
     void clear_print_info();

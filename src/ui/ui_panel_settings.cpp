@@ -49,6 +49,7 @@
 #include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "moonraker_manager.h"
+#include "observer_factory.h"
 #include "platform_info.h"
 #include "printer_hardware.h"
 #include "printer_state.h"
@@ -573,21 +574,17 @@ void SettingsPanel::setup_toggle_handlers() {
         led_light_switch_ = lv_obj_find_by_name(led_light_row, "toggle");
         if (led_light_switch_) {
             // Sync toggle with actual printer LED state via observer
-            // Applying [L020]: Use ObserverGuard for cleanup
-            led_state_observer_ = ObserverGuard(
-                printer_state_.get_led_state_subject(),
-                [](lv_observer_t* obs, lv_subject_t* subj) {
-                    auto* self = static_cast<SettingsPanel*>(lv_observer_get_user_data(obs));
-                    if (self && self->led_light_switch_) {
-                        bool on = lv_subject_get_int(subj) != 0;
+            led_state_observer_ = helix::ui::observe_int_sync<SettingsPanel>(
+                printer_state_.get_led_state_subject(), this, [](SettingsPanel* self, int value) {
+                    if (self->led_light_switch_) {
+                        bool on = value != 0;
                         if (on) {
                             lv_obj_add_state(self->led_light_switch_, LV_STATE_CHECKED);
                         } else {
                             lv_obj_remove_state(self->led_light_switch_, LV_STATE_CHECKED);
                         }
                     }
-                },
-                this);
+                });
             spdlog::trace("[{}]   ✓ LED light toggle (observing printer state)", get_name());
         }
     }

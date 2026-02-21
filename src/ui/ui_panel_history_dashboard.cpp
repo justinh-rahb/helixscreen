@@ -15,6 +15,7 @@
 #include "lvgl/src/others/translation/lv_translation.h"
 #include "moonraker_api.h"
 #include "moonraker_client.h"
+#include "observer_factory.h"
 #include "printer_state.h"
 #include "static_panel_registry.h"
 #include "theme_manager.h"
@@ -245,20 +246,14 @@ lv_obj_t* HistoryDashboardPanel::create(lv_obj_t* parent) {
 
     // Register connection state observer to auto-refresh when connected
     // This handles the case where the panel is opened before connection is established
-    // ObserverGuard handles cleanup automatically in destructor
     lv_subject_t* conn_subject = get_printer_state().get_printer_connection_state_subject();
-    connection_observer_ = ObserverGuard(
-        conn_subject,
-        [](lv_observer_t* observer, lv_subject_t* subject) {
-            auto* self = static_cast<HistoryDashboardPanel*>(lv_observer_get_user_data(observer));
-            int32_t state = lv_subject_get_int(subject);
-
+    connection_observer_ = helix::ui::observe_int_sync<HistoryDashboardPanel>(
+        conn_subject, this, [](HistoryDashboardPanel* self, int state) {
             if (state == static_cast<int>(ConnectionState::CONNECTED) && self->is_active_) {
                 spdlog::debug("[{}] Connection established - refreshing data", self->get_name());
                 self->refresh_data();
             }
-        },
-        this);
+        });
 
     // Initially hidden
     lv_obj_add_flag(overlay_root_, LV_OBJ_FLAG_HIDDEN);

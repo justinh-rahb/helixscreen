@@ -98,21 +98,21 @@ void AmsOverviewPanel::init_subjects() {
         // In detail mode, per-slot observers handle visual updates (color, pulse,
         // highlight) automatically — we only need to react to structural changes
         // (slot count changed) or refresh the overview cards.
-        slots_version_observer_ = ObserverGuard(
-            AmsState::instance().get_slots_version_subject(),
-            [](lv_observer_t* observer, lv_subject_t* /*subject*/) {
-                auto* self = static_cast<AmsOverviewPanel*>(lv_observer_get_user_data(observer));
-                if (self && self->panel_) {
-                    if (self->detail_unit_index_ >= 0) {
-                        // In detail mode — only rebuild slots if count changed.
-                        // Per-slot observers drive all visual state (color, pulse, etc.)
-                        self->refresh_detail_if_needed();
-                    } else {
-                        self->refresh_units();
-                    }
-                }
-            },
-            this);
+        using helix::ui::observe_int_sync;
+        slots_version_observer_ =
+            observe_int_sync<AmsOverviewPanel>(AmsState::instance().get_slots_version_subject(),
+                                               this, [](AmsOverviewPanel* self, int) {
+                                                   if (!self->panel_)
+                                                       return;
+                                                   if (self->detail_unit_index_ >= 0) {
+                                                       // In detail mode — only rebuild slots if
+                                                       // count changed. Per-slot observers drive
+                                                       // all visual state (color, pulse, etc.)
+                                                       self->refresh_detail_if_needed();
+                                                   } else {
+                                                       self->refresh_units();
+                                                   }
+                                               });
 
         // Observe external spool color changes to reactively update bypass display.
         // NOTE: set_external_spool_info() calls lv_subject_set_int() directly (not via

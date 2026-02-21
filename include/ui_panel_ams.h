@@ -194,11 +194,7 @@ class AmsPanel : public PanelBase {
     static void on_slot_clicked(lv_event_t* e);
 
     // === Observer Callbacks ===
-    // on_action_changed migrated to lambda observer factory
-
-    static void on_slots_version_changed(lv_observer_t* observer, lv_subject_t* subject);
-    static void on_current_slot_changed(lv_observer_t* observer, lv_subject_t* subject);
-    static void on_path_state_changed(lv_observer_t* observer, lv_subject_t* subject);
+    // All observer callbacks migrated to lambda observer factory in init_subjects()
 
     // === Path Canvas Callbacks ===
 
