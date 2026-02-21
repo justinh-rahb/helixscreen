@@ -458,15 +458,9 @@ class ControlsPanel : public PanelBase {
 
     static void on_zoffset_tune(lv_event_t* e);
 
-    //
-    // === Observer Callbacks (static - only for complex cases not using factory) ===
-    //
-
-    static void on_secondary_fan_speed_changed(lv_observer_t* obs, lv_subject_t* subject);
     void subscribe_to_secondary_fan_speeds();
     void update_secondary_fan_speed(const std::string& object_name, int speed_pct);
 
-    static void on_secondary_temp_changed(lv_observer_t* obs, lv_subject_t* subject);
     void subscribe_to_secondary_temp_subjects();
     void update_secondary_temp(const std::string& klipper_name, int centidegrees);
 };

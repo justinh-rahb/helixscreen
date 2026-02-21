@@ -11,6 +11,7 @@
 #include "active_print_media_manager.h"
 #include "app_globals.h"
 #include "memory_utils.h"
+#include "observer_factory.h"
 #include "operation_registry.h"
 
 #include <spdlog/fmt/fmt.h>
@@ -68,21 +69,13 @@ void PrintPreparationManager::set_dependencies(MoonrakerAPI* api, PrinterState* 
     // Set up observer to trigger PRINT_START analysis when connected
     // This avoids making requests before the WebSocket connection is established
     if (printer_state_) {
-        connection_observer_ = ObserverGuard(printer_state_->get_printer_connection_state_subject(),
-                                             on_connection_state_changed, this);
-    }
-}
-
-void PrintPreparationManager::on_connection_state_changed(lv_observer_t* observer,
-                                                          lv_subject_t* subject) {
-    auto* self = static_cast<PrintPreparationManager*>(lv_observer_get_user_data(observer));
-    if (!self) {
-        return;
-    }
-
-    int state = lv_subject_get_int(subject);
-    if (state == static_cast<int>(ConnectionState::CONNECTED)) {
-        self->analyze_print_start_macro();
+        connection_observer_ = helix::ui::observe_int_sync<PrintPreparationManager>(
+            printer_state_->get_printer_connection_state_subject(), this,
+            [](PrintPreparationManager* self, int state) {
+                if (state == static_cast<int>(ConnectionState::CONNECTED)) {
+                    self->analyze_print_start_macro();
+                }
+            });
     }
 }
 

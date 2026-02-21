@@ -1579,31 +1579,16 @@ void ControlsPanel::on_fan_slider_changed(lv_event_t* e) {
 
 PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, save_z_offset)
 
-// ============================================================================
-// OBSERVER CALLBACKS (Static - only for complex cases not using factory)
-// ============================================================================
-
-void ControlsPanel::on_secondary_fan_speed_changed(lv_observer_t* obs, lv_subject_t* subject) {
-    auto* self = static_cast<ControlsPanel*>(lv_observer_get_user_data(obs));
-    if (self) {
-        int speed_pct = lv_subject_get_int(subject);
-        // Find which fan this subject belongs to and update its label
-        for (const auto& row : self->secondary_fan_rows_) {
-            auto* fan_subject = self->printer_state_.get_fan_speed_subject(row.object_name);
-            if (fan_subject == subject) {
-                self->update_secondary_fan_speed(row.object_name, speed_pct);
-                break;
-            }
-        }
-    }
-}
-
 void ControlsPanel::subscribe_to_secondary_fan_speeds() {
+    using helix::ui::observe_int_sync;
     secondary_fan_observers_.reserve(secondary_fan_rows_.size());
 
     for (const auto& row : secondary_fan_rows_) {
         if (auto* subject = printer_state_.get_fan_speed_subject(row.object_name)) {
-            secondary_fan_observers_.emplace_back(subject, on_secondary_fan_speed_changed, this);
+            secondary_fan_observers_.push_back(observe_int_sync<ControlsPanel>(
+                subject, this, [name = row.object_name](ControlsPanel* self, int speed_pct) {
+                    self->update_secondary_fan_speed(name, speed_pct);
+                }));
             spdlog::trace("[{}] Subscribed to speed subject for secondary fan '{}'", get_name(),
                           row.object_name);
         }
@@ -1762,28 +1747,17 @@ void ControlsPanel::handle_secondary_temps_clicked() {
     overlay.show(parent_screen_);
 }
 
-void ControlsPanel::on_secondary_temp_changed(lv_observer_t* obs, lv_subject_t* subject) {
-    auto* self = static_cast<ControlsPanel*>(lv_observer_get_user_data(obs));
-    if (self) {
-        int centidegrees = lv_subject_get_int(subject);
-        auto& tsm = helix::sensors::TemperatureSensorManager::instance();
-        for (const auto& row : self->secondary_temp_rows_) {
-            auto* temp_subject = tsm.get_temp_subject(row.klipper_name);
-            if (temp_subject == subject) {
-                self->update_secondary_temp(row.klipper_name, centidegrees);
-                break;
-            }
-        }
-    }
-}
-
 void ControlsPanel::subscribe_to_secondary_temp_subjects() {
+    using helix::ui::observe_int_sync;
     secondary_temp_observers_.reserve(secondary_temp_rows_.size());
 
     auto& tsm = helix::sensors::TemperatureSensorManager::instance();
     for (const auto& row : secondary_temp_rows_) {
         if (auto* subject = tsm.get_temp_subject(row.klipper_name)) {
-            secondary_temp_observers_.emplace_back(subject, on_secondary_temp_changed, this);
+            secondary_temp_observers_.push_back(observe_int_sync<ControlsPanel>(
+                subject, this, [name = row.klipper_name](ControlsPanel* self, int centidegrees) {
+                    self->update_secondary_temp(name, centidegrees);
+                }));
             spdlog::trace("[{}] Subscribed to temp subject for sensor '{}'", get_name(),
                           row.klipper_name);
         }

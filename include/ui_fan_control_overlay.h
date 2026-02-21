@@ -126,11 +126,6 @@ class FanControlOverlay : public OverlayBase {
     // on_fans_version_changed migrated to lambda observer factory
 
     /**
-     * @brief Observer callback for per-fan speed changes
-     */
-    static void on_fan_speed_changed(lv_observer_t* obs, lv_subject_t* subject);
-
-    /**
      * @brief Subscribe to all per-fan speed subjects
      */
     void subscribe_to_fan_speeds();

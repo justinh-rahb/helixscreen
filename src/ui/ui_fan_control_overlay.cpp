@@ -283,18 +283,9 @@ void FanControlOverlay::send_fan_speed(const std::string& object_name, int speed
         });
 }
 
-// ============================================================================
-// OBSERVER CALLBACK
-// ============================================================================
-
-void FanControlOverlay::on_fan_speed_changed(lv_observer_t* obs, lv_subject_t* /* subject */) {
-    auto* self = static_cast<FanControlOverlay*>(lv_observer_get_user_data(obs));
-    if (self && self->is_visible()) {
-        self->update_fan_speeds();
-    }
-}
-
 void FanControlOverlay::subscribe_to_fan_speeds() {
+    using helix::ui::observe_int_sync;
+
     // Bind AnimatedValue for each FanDial - provides smooth animation when speed changes
     for (auto& afd : animated_fan_dials_) {
         if (auto* subject = printer_state_.get_fan_speed_subject(afd.object_name)) {
@@ -309,11 +300,16 @@ void FanControlOverlay::subscribe_to_fan_speeds() {
         }
     }
 
-    // Subscribe to auto fan subjects using traditional observers (immediate update, no animation)
+    // Subscribe to auto fan subjects using observer factory (deferred, no animation)
     fan_speed_observers_.reserve(auto_fan_cards_.size());
     for (const auto& card : auto_fan_cards_) {
         if (auto* subject = printer_state_.get_fan_speed_subject(card.object_name)) {
-            fan_speed_observers_.emplace_back(subject, on_fan_speed_changed, this);
+            fan_speed_observers_.push_back(observe_int_sync<FanControlOverlay>(
+                subject, this, [](FanControlOverlay* self, int /*speed*/) {
+                    if (self->is_visible()) {
+                        self->update_fan_speeds();
+                    }
+                }));
             spdlog::trace("[{}] Subscribed to auto fan subject for '{}'", get_name(),
                           card.object_name);
         }

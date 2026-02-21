@@ -615,11 +615,6 @@ class PrintPreparationManager {
     [[nodiscard]] bool is_option_disabled_from_subject(helix::OperationCategory cat) const;
 
     /**
-     * @brief Static callback for connection state observer
-     */
-    static void on_connection_state_changed(lv_observer_t* observer, lv_subject_t* subject);
-
-    /**
      * @brief Internal implementation of macro analysis (for retries)
      *
      * Called by analyze_print_start_macro() and by retry timer callbacks.
