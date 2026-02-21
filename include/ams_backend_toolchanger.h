@@ -131,6 +131,10 @@ class AmsBackendToolChanger : public AmsBackend {
     AmsError execute_device_action(const std::string& action_id,
                                    const std::any& value = {}) override;
 
+  protected:
+    // Allow test helper access to private members
+    friend class ToolChangerCharHelper;
+
   private:
     /**
      * @brief Handle status update notifications from Moonraker

@@ -171,6 +171,7 @@ class AmsBackendHappyHare : public AmsBackend {
     friend class AmsBackendHappyHareEndlessSpoolHelper;
     friend class AmsBackendHHMultiUnitHelper;
     friend class HappyHareErrorStateHelper;
+    friend class HappyHareCharHelper;
 
   private:
     /**

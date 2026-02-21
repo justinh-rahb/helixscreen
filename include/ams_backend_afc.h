@@ -297,6 +297,7 @@ class AmsBackendAfc : public AmsBackend {
     friend class AmsBackendAfcConfigHelper;
     friend class AfcErrorHandlingHelper;
     friend class AfcErrorStateHelper;
+    friend class AfcCharHelper;
 
   private:
     /**
