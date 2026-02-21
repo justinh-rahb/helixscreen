@@ -1,0 +1,16 @@
+diff --git a/src/draw/sw/lv_draw_sw_letter.c b/src/draw/sw/lv_draw_sw_letter.c
+index 000000000..000000001 100644
+--- a/src/draw/sw/lv_draw_sw_letter.c
++++ b/src/draw/sw/lv_draw_sw_letter.c
+@@ -107,6 +107,11 @@ void lv_draw_sw_label(lv_draw_task_t * t, const lv_draw_label_dsc_t * dsc, cons
+ {
+     if(dsc->opa <= LV_OPA_MIN) return;
+
++    if(dsc->font == NULL) {
++        LV_LOG_WARN("lv_draw_sw_label: NULL font, skipping");
++        return;
++    }
++
+     LV_PROFILER_DRAW_BEGIN;
+
+ #if LV_USE_FREETYPE && LV_USE_VECTOR_GRAPHIC && LV_USE_THORVG

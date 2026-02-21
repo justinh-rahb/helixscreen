@@ -625,7 +625,7 @@ void ControlsPanel::populate_secondary_fans() {
     // 2. Clear row tracking (contains widget pointers that will become invalid)
     // 3. Clean widgets last (invalidates the pointers we just cleared)
     for (auto& obs : secondary_fan_observers_) {
-        obs.release(); // Don't try to remove from potentially-invalid subjects
+        obs.reset(); // Subjects are now guaranteed alive — safe to unsubscribe
     }
     secondary_fan_observers_.clear();
     secondary_fan_rows_.clear();

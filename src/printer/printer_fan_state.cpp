@@ -135,13 +135,10 @@ bool PrinterFanState::is_fan_controllable(FanType type) {
 
 void PrinterFanState::init_fans(const std::vector<std::string>& fan_objects,
                                 const FanRoleConfig& roles) {
-    // Deinit existing per-fan subjects before clearing (unique_ptr handles memory)
-    for (auto& [name, subject_ptr] : fan_speed_subjects_) {
-        if (subject_ptr) {
-            lv_subject_deinit(subject_ptr.get());
-        }
-    }
-    fan_speed_subjects_.clear();
+    // Build new subject map, reusing existing subjects for fans that persist
+    // across reconnections. Only deinit subjects for fans that disappeared.
+    std::unordered_map<std::string, std::unique_ptr<lv_subject_t>> new_subjects;
+    new_subjects.reserve(fan_objects.size());
 
     // Store configured fan roles for classification and naming
     roles_ = roles;
@@ -170,10 +167,6 @@ void PrinterFanState::init_fans(const std::vector<std::string>& fan_objects,
     fans_.clear();
     fans_.reserve(fan_objects.size());
 
-    // Reserve map capacity to prevent rehashing during insertion
-    // (unique_ptr makes this less critical, but still good practice)
-    fan_speed_subjects_.reserve(fan_objects.size());
-
     for (const auto& obj_name : fan_objects) {
         FanInfo info;
         info.object_name = obj_name;
@@ -192,12 +185,29 @@ void PrinterFanState::init_fans(const std::vector<std::string>& fan_objects,
                       info.is_controllable);
         fans_.push_back(std::move(info));
 
-        // Create per-fan speed subject for reactive UI updates (heap-allocated to survive rehash)
-        auto subject_ptr = std::make_unique<lv_subject_t>();
-        lv_subject_init_int(subject_ptr.get(), 0);
-        fan_speed_subjects_.emplace(obj_name, std::move(subject_ptr));
-        spdlog::trace("[PrinterFanState] Created speed subject for fan: {}", obj_name);
+        // Reuse existing subject if this fan was already tracked, otherwise create new
+        auto existing = fan_speed_subjects_.find(obj_name);
+        if (existing != fan_speed_subjects_.end() && existing->second) {
+            // Reuse — reset value but keep subject alive (observers remain valid)
+            lv_subject_set_int(existing->second.get(), 0);
+            new_subjects.emplace(obj_name, std::move(existing->second));
+            spdlog::trace("[PrinterFanState] Reused speed subject for fan: {}", obj_name);
+        } else {
+            auto subject_ptr = std::make_unique<lv_subject_t>();
+            lv_subject_init_int(subject_ptr.get(), 0);
+            new_subjects.emplace(obj_name, std::move(subject_ptr));
+            spdlog::trace("[PrinterFanState] Created speed subject for fan: {}", obj_name);
+        }
     }
+
+    // Deinit subjects for fans that no longer exist
+    for (auto& [name, subject_ptr] : fan_speed_subjects_) {
+        if (subject_ptr) {
+            spdlog::trace("[PrinterFanState] Deiniting orphaned speed subject for fan: {}", name);
+            lv_subject_deinit(subject_ptr.get());
+        }
+    }
+    fan_speed_subjects_ = std::move(new_subjects);
 
     // Initialize and bump version to notify UI
     lv_subject_set_int(&fans_version_, lv_subject_get_int(&fans_version_) + 1);

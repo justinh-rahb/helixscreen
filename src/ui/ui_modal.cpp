@@ -65,6 +65,19 @@ constexpr const char* DEFAULT_PRIMARY_TEXT = "OK";
 constexpr const char* DEFAULT_CANCEL_TEXT = "Cancel";
 } // namespace
 
+// Recursively clear user_data on an object tree to prevent stale pointer dispatch
+static void clear_user_data_recursive(lv_obj_t* obj) {
+    if (!obj)
+        return;
+    if (lv_obj_get_user_data(obj) != nullptr) {
+        lv_obj_set_user_data(obj, nullptr);
+    }
+    uint32_t child_count = lv_obj_get_child_count(obj);
+    for (uint32_t i = 0; i < child_count; i++) {
+        clear_user_data_recursive(lv_obj_get_child(obj, i));
+    }
+}
+
 // ============================================================================
 // MODALSTACK IMPLEMENTATION
 // ============================================================================
@@ -547,6 +560,14 @@ void Modal::hide() {
     }
 
     spdlog::info("[{}] Hiding modal", get_name());
+
+    // Clear user_data on all wired buttons in the dialog tree to prevent
+    // stale vtable dispatch if events fire during exit animation after
+    // the Modal subclass has been deleted (e.g. CrashReportModal's
+    // async_call(delete this) in on_hide())
+    if (dialog_) {
+        clear_user_data_recursive(dialog_);
+    }
 
     // Call hook before destruction
     on_hide();

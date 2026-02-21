@@ -136,6 +136,12 @@ inline bool safe_delete(lv_obj_t*& obj) {
         obj = nullptr;
         return false;
     }
+    // Guard against stale pointers to already-deleted objects (e.g. children
+    // auto-deleted by parent deletion before the child pointer was nulled)
+    if (!lv_obj_is_valid(obj)) {
+        obj = nullptr;
+        return false;
+    }
     // Remove entire tree from focus group before deletion to prevent LVGL from
     // auto-focusing the next element (which triggers scroll-on-focus)
     helix::ui::defocus_tree(obj);
