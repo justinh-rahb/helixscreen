@@ -6,10 +6,11 @@
 #include "ui_event_safety.h"
 #include "ui_nav_manager.h"
 #include "ui_overlay_network_settings.h"
-#include "ui_panel_home.h"
 
 #include "ethernet_manager.h"
 #include "panel_widget_registry.h"
+#include "static_panel_registry.h"
+#include "subject_debug_registry.h"
 #include "wifi_manager.h"
 
 #include <spdlog/spdlog.h>
@@ -17,12 +18,50 @@
 // Signal polling interval (5 seconds)
 static constexpr uint32_t SIGNAL_POLL_INTERVAL_MS = 5000;
 
-extern HomePanel& get_global_home_panel();
+// Subjects owned by NetworkWidget module — created before XML bindings resolve
+static lv_subject_t s_network_icon_state;
+static lv_subject_t s_network_label_subject;
+static char s_network_label_buffer[32];
+static bool s_subjects_initialized = false;
+
+static void network_widget_init_subjects() {
+    if (s_subjects_initialized) {
+        return;
+    }
+
+    // Integer subject: 0=disconnected, 1-4=wifi strength, 5=ethernet
+    lv_subject_init_int(&s_network_icon_state, 0);
+    lv_xml_register_subject(nullptr, "home_network_icon_state", &s_network_icon_state);
+    SubjectDebugRegistry::instance().register_subject(
+        &s_network_icon_state, "home_network_icon_state", LV_SUBJECT_TYPE_INT, __FILE__, __LINE__);
+
+    // String subject for network type label
+    lv_subject_init_string(&s_network_label_subject, s_network_label_buffer, nullptr,
+                           sizeof(s_network_label_buffer), "WiFi");
+    lv_xml_register_subject(nullptr, "network_label", &s_network_label_subject);
+    SubjectDebugRegistry::instance().register_subject(&s_network_label_subject, "network_label",
+                                                      LV_SUBJECT_TYPE_STRING, __FILE__, __LINE__);
+
+    s_subjects_initialized = true;
+
+    // Self-register cleanup with StaticPanelRegistry (co-located with init)
+    StaticPanelRegistry::instance().register_destroy("NetworkWidgetSubjects", []() {
+        if (s_subjects_initialized && lv_is_initialized()) {
+            lv_subject_deinit(&s_network_label_subject);
+            lv_subject_deinit(&s_network_icon_state);
+            s_subjects_initialized = false;
+            spdlog::trace("[NetworkWidget] Subjects deinitialized");
+        }
+    });
+
+    spdlog::debug("[NetworkWidget] Subjects initialized (icon_state + label)");
+}
 
 namespace {
 const bool s_registered = [] {
     helix::register_widget_factory("network",
                                    []() { return std::make_unique<helix::NetworkWidget>(); });
+    helix::register_widget_subjects("network", network_widget_init_subjects);
     return true;
 }();
 } // namespace
@@ -42,16 +81,9 @@ void NetworkWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     // Store this pointer for event callback recovery
     lv_obj_set_user_data(widget_obj_, this);
 
-    // Look up subjects by name (owned by HomePanel's SubjectManager)
-    network_icon_state_ = lv_xml_get_subject(nullptr, "home_network_icon_state");
-    network_label_subject_ = lv_xml_get_subject(nullptr, "network_label");
-
-    if (!network_icon_state_) {
-        spdlog::warn("[NetworkWidget] Subject 'home_network_icon_state' not found");
-    }
-    if (!network_label_subject_) {
-        spdlog::warn("[NetworkWidget] Subject 'network_label' not found");
-    }
+    // Use module-owned subjects (initialized via network_widget_init_subjects)
+    network_icon_state_ = &s_network_icon_state;
+    network_label_subject_ = &s_network_label_subject;
 
     // Get WiFiManager for signal strength queries
     wifi_manager_ = get_wifi_manager();
@@ -250,7 +282,25 @@ void NetworkWidget::signal_poll_timer_cb(lv_timer_t* timer) {
 
 void NetworkWidget::network_clicked_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[NetworkWidget] network_clicked_cb");
-    (void)e;
-    get_global_home_panel().handle_network_clicked();
+
+    // Recover NetworkWidget instance from the widget's user_data
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    // Walk up to find the widget root that has user_data set
+    auto* self = static_cast<NetworkWidget*>(lv_obj_get_user_data(target));
+    if (!self) {
+        // Walk up parent chain to find the widget object with user_data
+        lv_obj_t* parent = lv_obj_get_parent(target);
+        while (parent && !self) {
+            self = static_cast<NetworkWidget*>(lv_obj_get_user_data(parent));
+            parent = lv_obj_get_parent(parent);
+        }
+    }
+
+    if (self) {
+        self->handle_network_clicked();
+    } else {
+        spdlog::warn("[NetworkWidget] network_clicked_cb: could not recover widget instance");
+    }
+
     LVGL_SAFE_EVENT_CB_END();
 }

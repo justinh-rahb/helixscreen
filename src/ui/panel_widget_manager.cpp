@@ -26,6 +26,22 @@ void PanelWidgetManager::clear_shared_resources() {
     shared_resources_.clear();
 }
 
+void PanelWidgetManager::init_widget_subjects() {
+    if (widget_subjects_initialized_) {
+        return;
+    }
+
+    for (const auto& def : get_all_widget_defs()) {
+        if (def.init_subjects) {
+            spdlog::debug("[PanelWidgetManager] Initializing subjects for widget '{}'", def.id);
+            def.init_subjects();
+        }
+    }
+
+    widget_subjects_initialized_ = true;
+    spdlog::debug("[PanelWidgetManager] Widget subjects initialized");
+}
+
 void PanelWidgetManager::register_rebuild_callback(const std::string& panel_id,
                                                    RebuildCallback cb) {
     rebuild_callbacks_[panel_id] = std::move(cb);

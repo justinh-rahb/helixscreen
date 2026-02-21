@@ -56,6 +56,13 @@ class PanelWidgetManager {
     void unregister_rebuild_callback(const std::string& panel_id);
     void notify_config_changed(const std::string& panel_id);
 
+    // -- Widget subjects --
+
+    /// Initialize subjects for all registered widgets that have init_subjects hooks.
+    /// Must be called before any XML that references widget subjects is created.
+    /// Idempotent - safe to call multiple times.
+    void init_widget_subjects();
+
     // -- Widget lifecycle --
 
     /// Build widgets from PanelWidgetConfig for the given panel, creating XML
@@ -76,6 +83,7 @@ class PanelWidgetManager {
   private:
     PanelWidgetManager() = default;
 
+    bool widget_subjects_initialized_ = false;
     std::unordered_map<std::type_index, std::any> shared_resources_;
     std::unordered_map<std::string, RebuildCallback> rebuild_callbacks_;
 

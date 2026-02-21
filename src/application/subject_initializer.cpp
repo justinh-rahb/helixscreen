@@ -153,6 +153,10 @@ void SubjectInitializer::init_ams_subjects() {
 void SubjectInitializer::init_panel_subjects(MoonrakerAPI* api) {
     spdlog::trace("[SubjectInitializer] Initializing panel subjects");
 
+    // Initialize widget-owned subjects before any panel XML is created.
+    // Widgets like NetworkWidget register subjects that XML bindings reference.
+    helix::PanelWidgetManager::instance().init_widget_subjects();
+
     // Basic panels - these use PanelBase which stores API
     // Cleanup self-registered inside each panel's init_subjects()
     get_global_home_panel().init_subjects();

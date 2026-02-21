@@ -124,15 +124,14 @@ class HomePanel : public PanelBase {
     TempControlPanel* temp_control_panel_ = nullptr;
     lv_subject_t status_subject_;
     lv_subject_t temp_subject_;
-    lv_subject_t network_icon_state_; // Integer subject: 0-5 for conditional icon visibility
-    lv_subject_t network_label_subject_;
+    // Network subjects (home_network_icon_state, network_label) are owned by
+    // NetworkWidget module — looked up by name via lv_xml_get_subject() when needed
     lv_subject_t printer_type_subject_;
     lv_subject_t printer_host_subject_;
     lv_subject_t printer_info_visible_;
 
     char status_buffer_[512];
     char temp_buffer_[32];
-    char network_label_buffer_[32];
     char printer_type_buffer_[64];
     char printer_host_buffer_[64];
 

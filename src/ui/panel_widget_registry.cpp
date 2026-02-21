@@ -53,4 +53,14 @@ void register_widget_factory(std::string_view id, WidgetFactory factory) {
     spdlog::warn("[PanelWidgetRegistry] Factory registration failed: '{}' not found", id);
 }
 
+void register_widget_subjects(std::string_view id, SubjectInitFn init_fn) {
+    for (auto& def : s_widget_defs) {
+        if (id == def.id) {
+            def.init_subjects = std::move(init_fn);
+            return;
+        }
+    }
+    spdlog::warn("[PanelWidgetRegistry] Subject init registration failed: '{}' not found", id);
+}
+
 } // namespace helix

@@ -69,8 +69,6 @@ HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
     // Initialize buffer contents with default values
     std::strcpy(status_buffer_, "Welcome to HelixScreen");
     std::snprintf(temp_buffer_, sizeof(temp_buffer_), "%s°C", helix::format::UNAVAILABLE);
-    std::strcpy(network_label_buffer_, "WiFi");
-
     // Subscribe to PrinterState subjects (ObserverGuard handles cleanup)
     // Note: Connection state dimming is now handled by XML binding to printer_connection_state
     using helix::ui::observe_int_sync;
@@ -175,13 +173,9 @@ void HomePanel::init_subjects() {
                               "status_text", subjects_);
     UI_MANAGED_SUBJECT_STRING(temp_subject_, temp_buffer_, "— °C", "temp_text", subjects_);
 
-    // Network icon state: integer 0-5 for conditional icon visibility
-    // 0=disconnected, 1-4=wifi strength, 5=ethernet
-    // Note: Uses unique name to avoid conflict with navigation_bar's network_icon_state
-    UI_MANAGED_SUBJECT_INT(network_icon_state_, 0, "home_network_icon_state", subjects_);
-
-    UI_MANAGED_SUBJECT_STRING(network_label_subject_, network_label_buffer_, "WiFi",
-                              "network_label", subjects_);
+    // Network subjects (home_network_icon_state, network_label) are owned by
+    // NetworkWidget and initialized via PanelWidgetManager::init_widget_subjects()
+    // before this function runs. HomePanel looks them up by name when needed.
 
     // Printer type and host - two subjects for flexible XML layout
     UI_MANAGED_SUBJECT_STRING(printer_type_subject_, printer_type_buffer_, "", "printer_type_text",
@@ -1222,17 +1216,20 @@ void HomePanel::update(const char* status_text, int temp) {
 void HomePanel::set_network(NetworkType type) {
     current_network_ = type;
 
-    // Update label text
-    switch (type) {
-    case NetworkType::Wifi:
-        lv_subject_copy_string(&network_label_subject_, "WiFi");
-        break;
-    case NetworkType::Ethernet:
-        lv_subject_copy_string(&network_label_subject_, "Ethernet");
-        break;
-    case NetworkType::Disconnected:
-        lv_subject_copy_string(&network_label_subject_, "Disconnected");
-        break;
+    // Look up network subjects owned by NetworkWidget
+    lv_subject_t* label_subject = lv_xml_get_subject(nullptr, "network_label");
+    if (label_subject) {
+        switch (type) {
+        case NetworkType::Wifi:
+            lv_subject_copy_string(label_subject, "WiFi");
+            break;
+        case NetworkType::Ethernet:
+            lv_subject_copy_string(label_subject, "Ethernet");
+            break;
+        case NetworkType::Disconnected:
+            lv_subject_copy_string(label_subject, "Disconnected");
+            break;
+        }
     }
 
     // Update the icon state (will query WiFi signal strength if connected)
@@ -1286,11 +1283,16 @@ int HomePanel::compute_network_icon_state() {
 }
 
 void HomePanel::update_network_icon_state() {
+    lv_subject_t* icon_state = lv_xml_get_subject(nullptr, "home_network_icon_state");
+    if (!icon_state) {
+        return;
+    }
+
     int new_state = compute_network_icon_state();
-    int old_state = lv_subject_get_int(&network_icon_state_);
+    int old_state = lv_subject_get_int(icon_state);
 
     if (new_state != old_state) {
-        lv_subject_set_int(&network_icon_state_, new_state);
+        lv_subject_set_int(icon_state, new_state);
         spdlog::debug("[{}] Network icon state: {} -> {}", get_name(), old_state, new_state);
     }
 }

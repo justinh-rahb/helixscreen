@@ -14,21 +14,24 @@ namespace helix {
 class PanelWidget;
 
 using WidgetFactory = std::function<std::unique_ptr<PanelWidget>()>;
+using SubjectInitFn = std::function<void()>;
 
 struct PanelWidgetDef {
-    const char* id;                    // Stable string for JSON config
-    const char* display_name;          // For settings overlay UI
-    const char* icon;                  // Icon name
-    const char* description;           // Short description for settings overlay
-    const char* translation_tag;       // For i18n
-    const char* hardware_gate_subject; // nullptr = always available
-    bool default_enabled = true;       // Whether enabled in fresh/default config
-    WidgetFactory factory = nullptr;   // nullptr = pure XML or externally managed
+    const char* id;                        // Stable string for JSON config
+    const char* display_name;              // For settings overlay UI
+    const char* icon;                      // Icon name
+    const char* description;               // Short description for settings overlay
+    const char* translation_tag;           // For i18n
+    const char* hardware_gate_subject;     // nullptr = always available
+    bool default_enabled = true;           // Whether enabled in fresh/default config
+    WidgetFactory factory = nullptr;       // nullptr = pure XML or externally managed
+    SubjectInitFn init_subjects = nullptr; // Called once before XML creation
 };
 
 const std::vector<PanelWidgetDef>& get_all_widget_defs();
 const PanelWidgetDef* find_widget_def(std::string_view id);
 size_t widget_def_count();
 void register_widget_factory(std::string_view id, WidgetFactory factory);
+void register_widget_subjects(std::string_view id, SubjectInitFn init_fn);
 
 } // namespace helix
