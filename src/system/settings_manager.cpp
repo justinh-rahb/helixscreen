@@ -6,6 +6,7 @@
 #include "ui_toast_manager.h"
 
 #include "app_globals.h"
+#include "audio_settings_manager.h"
 #include "config.h"
 #include "display_manager.h"
 #include "led/led_controller.h"
@@ -14,6 +15,7 @@
 #include "moonraker_client.h"
 #include "printer_state.h"
 #include "runtime_config.h"
+#include "safety_settings_manager.h"
 #include "spdlog/spdlog.h"
 #include "static_subject_registry.h"
 #include "system/telemetry_manager.h"
@@ -38,9 +40,6 @@ static const char* DIM_OPTIONS_TEXT = "Never\n30 seconds\n1 minute\n2 minutes\n5
 static const int SLEEP_OPTIONS[] = {0, 60, 300, 600, 1800};
 static const int SLEEP_OPTIONS_COUNT = sizeof(SLEEP_OPTIONS) / sizeof(SLEEP_OPTIONS[0]);
 static const char* SLEEP_OPTIONS_TEXT = "Never\n1 minute\n5 minutes\n10 minutes\n30 minutes";
-
-// Completion alert options (Off=0, Notification=1, Alert=2)
-static const char* COMPLETION_ALERT_OPTIONS_TEXT = "Off\nNotification\nAlert";
 
 // Bed mesh render mode options (Auto=0, 3D=1, 2D=2)
 static const char* BED_MESH_RENDER_MODE_OPTIONS_TEXT = "Auto\n3D View\n2D Heatmap";
@@ -154,51 +153,11 @@ void SettingsManager::init_subjects() {
     // LED state (ephemeral, not persisted - start as off)
     UI_MANAGED_SUBJECT_INT(led_enabled_subject_, 0, "settings_led_enabled", subjects_);
 
-    // Sounds (default: false)
-    bool sounds = config->get<bool>("/sounds_enabled", false);
-    UI_MANAGED_SUBJECT_INT(sounds_enabled_subject_, sounds ? 1 : 0, "settings_sounds_enabled",
-                           subjects_);
+    // Delegate audio subjects to AudioSettingsManager
+    AudioSettingsManager::instance().init_subjects();
 
-    // UI sounds (default: true) — separate toggle for button taps, nav sounds
-    bool ui_sounds = config->get<bool>("/ui_sounds_enabled", true);
-    UI_MANAGED_SUBJECT_INT(ui_sounds_enabled_subject_, ui_sounds ? 1 : 0,
-                           "settings_ui_sounds_enabled", subjects_);
-
-    // Volume (0-100, default 80)
-    int volume = std::clamp(config->get<int>("/sounds/volume", 80), 0, 100);
-    UI_MANAGED_SUBJECT_INT(volume_subject_, volume, "settings_volume", subjects_);
-
-    // Completion alert mode (default: ALERT=2, handles old bool migration)
-    int completion_mode = config->get<int>("/completion_alert", 2);
-    completion_mode = std::max(0, std::min(2, completion_mode));
-    UI_MANAGED_SUBJECT_INT(completion_alert_subject_, completion_mode, "settings_completion_alert",
-                           subjects_);
-
-    // E-Stop confirmation (default: false = immediate action)
-    bool estop_confirm = config->get<bool>("/safety/estop_require_confirmation", false);
-    UI_MANAGED_SUBJECT_INT(estop_require_confirmation_subject_, estop_confirm ? 1 : 0,
-                           "settings_estop_confirm", subjects_);
-
-    // Cancel escalation (default: false = never escalate to e-stop)
-    bool cancel_escalation = config->get<bool>("/safety/cancel_escalation_enabled", false);
-    UI_MANAGED_SUBJECT_INT(cancel_escalation_enabled_subject_, cancel_escalation ? 1 : 0,
-                           "settings_cancel_escalation_enabled", subjects_);
-
-    // Cancel escalation timeout (default: 30s, stored as dropdown index 0-3 → 15/30/60/120s)
-    int cancel_escalation_timeout =
-        config->get<int>("/safety/cancel_escalation_timeout_seconds", 30);
-    // Convert seconds to dropdown index: 15→0, 30→1, 60→2, 120→3
-    int timeout_index = 1; // default 30s
-    if (cancel_escalation_timeout <= 15)
-        timeout_index = 0;
-    else if (cancel_escalation_timeout <= 30)
-        timeout_index = 1;
-    else if (cancel_escalation_timeout <= 60)
-        timeout_index = 2;
-    else
-        timeout_index = 3;
-    UI_MANAGED_SUBJECT_INT(cancel_escalation_timeout_subject_, timeout_index,
-                           "settings_cancel_escalation_timeout", subjects_);
+    // Delegate safety subjects to SafetySettingsManager
+    SafetySettingsManager::instance().init_subjects();
 
     // Scroll throw (default: 25, range 5-50)
     int scroll_throw = config->get<int>("/input/scroll_throw", 25);
@@ -278,10 +237,9 @@ void SettingsManager::init_subjects() {
                                                       [this]() { deinit_subjects(); });
 
     spdlog::debug("[SettingsManager] Subjects initialized: dark_mode={}, theme={}, "
-                  "dim={}s, sleep={}s, sounds={}, ui_sounds={}, "
-                  "completion_alert_mode={}, scroll_throw={}, scroll_limit={}, animations={}",
-                  dark_mode, get_theme_name(), dim_sec, sleep_sec, sounds, ui_sounds,
-                  completion_mode, scroll_throw, scroll_limit, animations);
+                  "dim={}s, sleep={}s, scroll_throw={}, scroll_limit={}, animations={}",
+                  dark_mode, get_theme_name(), dim_sec, sleep_sec, scroll_throw, scroll_limit,
+                  animations);
 }
 
 void SettingsManager::deinit_subjects() {
@@ -752,84 +710,12 @@ void SettingsManager::set_led_enabled(bool enabled) {
 }
 
 // =============================================================================
-// NOTIFICATION SETTINGS
+// NOTIFICATION SETTINGS — delegated to AudioSettingsManager
 // =============================================================================
 
-bool SettingsManager::get_sounds_enabled() const {
-    return lv_subject_get_int(const_cast<lv_subject_t*>(&sounds_enabled_subject_)) != 0;
-}
-
-void SettingsManager::set_sounds_enabled(bool enabled) {
-    spdlog::info("[SettingsManager] set_sounds_enabled({})", enabled);
-
-    lv_subject_set_int(&sounds_enabled_subject_, enabled ? 1 : 0);
-
-    Config* config = Config::get_instance();
-    config->set<bool>("/sounds_enabled", enabled);
-    config->save();
-}
-
-bool SettingsManager::get_ui_sounds_enabled() const {
-    return lv_subject_get_int(const_cast<lv_subject_t*>(&ui_sounds_enabled_subject_)) != 0;
-}
-
-void SettingsManager::set_ui_sounds_enabled(bool enabled) {
-    spdlog::info("[SettingsManager] set_ui_sounds_enabled({})", enabled);
-
-    lv_subject_set_int(&ui_sounds_enabled_subject_, enabled ? 1 : 0);
-
-    Config* config = Config::get_instance();
-    config->set<bool>("/ui_sounds_enabled", enabled);
-    config->save();
-}
-
-int SettingsManager::get_volume() const {
-    return lv_subject_get_int(const_cast<lv_subject_t*>(&volume_subject_));
-}
-
-void SettingsManager::set_volume(int volume) {
-    volume = std::clamp(volume, 0, 100);
-    spdlog::info("[SettingsManager] set_volume({})", volume);
-
-    lv_subject_set_int(&volume_subject_, volume);
-
-    Config* config = Config::get_instance();
-    if (config) {
-        config->set<int>("/sounds/volume", volume);
-        config->save();
-    }
-}
-
-std::string SettingsManager::get_sound_theme() const {
-    Config* config = Config::get_instance();
-    return config->get<std::string>("/sound_theme", "default");
-}
-
-void SettingsManager::set_sound_theme(const std::string& name) {
-    spdlog::info("[SettingsManager] set_sound_theme('{}')", name);
-
-    Config* config = Config::get_instance();
-    config->set<std::string>("/sound_theme", name);
-    config->save();
-}
-
-CompletionAlertMode SettingsManager::get_completion_alert_mode() const {
-    int val = lv_subject_get_int(const_cast<lv_subject_t*>(&completion_alert_subject_));
-    return static_cast<CompletionAlertMode>(std::max(0, std::min(2, val)));
-}
-
-void SettingsManager::set_completion_alert_mode(CompletionAlertMode mode) {
-    int val = static_cast<int>(mode);
-    spdlog::info("[SettingsManager] set_completion_alert_mode({})", val);
-    lv_subject_set_int(&completion_alert_subject_, val);
-    Config* config = Config::get_instance();
-    config->set<int>("/completion_alert", val);
-    config->save();
-}
-
-const char* SettingsManager::get_completion_alert_options() {
-    return COMPLETION_ALERT_OPTIONS_TEXT;
-}
+// =============================================================================
+// SAFETY SETTINGS — delegated to SafetySettingsManager
+// =============================================================================
 
 // =============================================================================
 // DISPLAY DIM OPTIONS
@@ -927,82 +813,6 @@ void SettingsManager::set_scroll_limit(int value) {
     // 3. Mark restart needed (this setting only takes effect on startup)
     restart_pending_ = true;
     spdlog::debug("[SettingsManager] Scroll limit set to {} (restart required)", clamped);
-}
-
-// =============================================================================
-// SAFETY SETTINGS
-// =============================================================================
-
-bool SettingsManager::get_estop_require_confirmation() const {
-    return lv_subject_get_int(const_cast<lv_subject_t*>(&estop_require_confirmation_subject_)) != 0;
-}
-
-void SettingsManager::set_estop_require_confirmation(bool require) {
-    spdlog::info("[SettingsManager] set_estop_require_confirmation({})", require);
-
-    // 1. Update subject (UI reacts)
-    lv_subject_set_int(&estop_require_confirmation_subject_, require ? 1 : 0);
-
-    // 2. Persist
-    Config* config = Config::get_instance();
-    config->set<bool>("/safety/estop_require_confirmation", require);
-    config->save();
-
-    spdlog::debug("[SettingsManager] E-Stop confirmation {} and saved",
-                  require ? "enabled" : "disabled");
-}
-
-bool SettingsManager::get_cancel_escalation_enabled() const {
-    return lv_subject_get_int(const_cast<lv_subject_t*>(&cancel_escalation_enabled_subject_)) != 0;
-}
-
-void SettingsManager::set_cancel_escalation_enabled(bool enabled) {
-    spdlog::info("[SettingsManager] set_cancel_escalation_enabled({})", enabled);
-
-    // 1. Update subject (UI reacts)
-    lv_subject_set_int(&cancel_escalation_enabled_subject_, enabled ? 1 : 0);
-
-    // 2. Persist
-    Config* config = Config::get_instance();
-    config->set<bool>("/safety/cancel_escalation_enabled", enabled);
-    config->save();
-
-    spdlog::debug("[SettingsManager] Cancel escalation {} and saved",
-                  enabled ? "enabled" : "disabled");
-}
-
-static constexpr int ESCALATION_TIMEOUT_VALUES[] = {15, 30, 60, 120};
-
-int SettingsManager::get_cancel_escalation_timeout_seconds() const {
-    int index = lv_subject_get_int(const_cast<lv_subject_t*>(&cancel_escalation_timeout_subject_));
-    index = std::max(0, std::min(3, index));
-    return ESCALATION_TIMEOUT_VALUES[index];
-}
-
-void SettingsManager::set_cancel_escalation_timeout_seconds(int seconds) {
-    spdlog::info("[SettingsManager] set_cancel_escalation_timeout_seconds({})", seconds);
-
-    // Convert seconds to dropdown index
-    int index = 1; // default 30s
-    if (seconds <= 15)
-        index = 0;
-    else if (seconds <= 30)
-        index = 1;
-    else if (seconds <= 60)
-        index = 2;
-    else
-        index = 3;
-
-    // 1. Update subject (UI reacts via dropdown binding)
-    lv_subject_set_int(&cancel_escalation_timeout_subject_, index);
-
-    // 2. Persist actual seconds value
-    Config* config = Config::get_instance();
-    config->set<int>("/safety/cancel_escalation_timeout_seconds", ESCALATION_TIMEOUT_VALUES[index]);
-    config->save();
-
-    spdlog::debug("[SettingsManager] Cancel escalation timeout set to {}s (index {}) and saved",
-                  ESCALATION_TIMEOUT_VALUES[index], index);
 }
 
 // =============================================================================

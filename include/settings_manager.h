@@ -4,7 +4,9 @@
 #pragma once
 
 #include "ams_types.h"
+#include "audio_settings_manager.h"
 #include "lvgl/lvgl.h"
+#include "safety_settings_manager.h"
 #include "subject_managed_panel.h"
 
 #include <functional>
@@ -478,128 +480,97 @@ class SettingsManager {
     }
 
     // =========================================================================
-    // SAFETY SETTINGS
+    // SAFETY SETTINGS (delegated to SafetySettingsManager)
     // =========================================================================
 
-    /**
-     * @brief Get E-Stop confirmation requirement
-     * @return true if confirmation dialog required before E-Stop
-     */
-    bool get_estop_require_confirmation() const;
+    /** @deprecated Use SafetySettingsManager::instance() directly */
+    bool get_estop_require_confirmation() const {
+        return SafetySettingsManager::instance().get_estop_require_confirmation();
+    }
 
-    /**
-     * @brief Set E-Stop confirmation requirement
-     *
-     * When enabled, the E-Stop button shows a confirmation dialog before
-     * sending M112. When disabled (default), E-Stop executes immediately.
-     *
-     * @param require true to require confirmation, false for immediate action
-     */
-    void set_estop_require_confirmation(bool require);
+    /** @deprecated Use SafetySettingsManager::instance() directly */
+    void set_estop_require_confirmation(bool require) {
+        SafetySettingsManager::instance().set_estop_require_confirmation(require);
+    }
 
-    /**
-     * @brief Get cancel escalation enabled state
-     * @return true if cancel should escalate to e-stop on timeout
-     */
-    bool get_cancel_escalation_enabled() const;
+    /** @deprecated Use SafetySettingsManager::instance() directly */
+    bool get_cancel_escalation_enabled() const {
+        return SafetySettingsManager::instance().get_cancel_escalation_enabled();
+    }
 
-    /**
-     * @brief Set cancel escalation enabled state
-     *
-     * When enabled, a cancel that doesn't complete within the configured
-     * timeout will escalate to M112 emergency stop. When disabled (default),
-     * cancel waits indefinitely for the printer to respond.
-     *
-     * @param enabled true to enable escalation
-     */
-    void set_cancel_escalation_enabled(bool enabled);
+    /** @deprecated Use SafetySettingsManager::instance() directly */
+    void set_cancel_escalation_enabled(bool enabled) {
+        SafetySettingsManager::instance().set_cancel_escalation_enabled(enabled);
+    }
 
-    /**
-     * @brief Get cancel escalation timeout in seconds
-     * @return Timeout in seconds (15, 30, 60, or 120)
-     */
-    int get_cancel_escalation_timeout_seconds() const;
+    /** @deprecated Use SafetySettingsManager::instance() directly */
+    int get_cancel_escalation_timeout_seconds() const {
+        return SafetySettingsManager::instance().get_cancel_escalation_timeout_seconds();
+    }
 
-    /**
-     * @brief Set cancel escalation timeout in seconds
-     * @param seconds Timeout value (clamped to 15-120)
-     */
-    void set_cancel_escalation_timeout_seconds(int seconds);
+    /** @deprecated Use SafetySettingsManager::instance() directly */
+    void set_cancel_escalation_timeout_seconds(int seconds) {
+        SafetySettingsManager::instance().set_cancel_escalation_timeout_seconds(seconds);
+    }
 
     // =========================================================================
-    // NOTIFICATION SETTINGS
+    // NOTIFICATION SETTINGS (delegated to AudioSettingsManager)
     // =========================================================================
 
-    /**
-     * @brief Get sound enabled state (master switch)
-     * @return true if sounds enabled
-     */
-    bool get_sounds_enabled() const;
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    bool get_sounds_enabled() const {
+        return AudioSettingsManager::instance().get_sounds_enabled();
+    }
 
-    /**
-     * @brief Set sound enabled state (master switch)
-     *
-     * Controls all sound playback. Updates subject and persists.
-     *
-     * @param enabled true to enable sounds
-     */
-    void set_sounds_enabled(bool enabled);
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    void set_sounds_enabled(bool enabled) {
+        AudioSettingsManager::instance().set_sounds_enabled(enabled);
+    }
 
-    /**
-     * @brief Get master volume level (0-100)
-     * @return Volume percentage (0=mute, 100=full)
-     */
-    int get_volume() const;
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    int get_volume() const {
+        return AudioSettingsManager::instance().get_volume();
+    }
 
-    /**
-     * @brief Set master volume level
-     *
-     * Attenuates all sound output. Updates subject and persists.
-     *
-     * @param volume Volume percentage (0-100, clamped)
-     */
-    void set_volume(int volume);
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    void set_volume(int volume) {
+        AudioSettingsManager::instance().set_volume(volume);
+    }
 
-    /**
-     * @brief Get UI sounds enabled state
-     * @return true if UI interaction sounds (taps, nav) enabled
-     */
-    bool get_ui_sounds_enabled() const;
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    bool get_ui_sounds_enabled() const {
+        return AudioSettingsManager::instance().get_ui_sounds_enabled();
+    }
 
-    /**
-     * @brief Set UI sounds enabled state
-     *
-     * Controls UI interaction sounds separately from event sounds.
-     * Only affects button taps, navigation, toggles, dropdowns.
-     * Print complete/error/alarm sounds are unaffected.
-     *
-     * @param enabled true to enable UI sounds
-     */
-    void set_ui_sounds_enabled(bool enabled);
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    void set_ui_sounds_enabled(bool enabled) {
+        AudioSettingsManager::instance().set_ui_sounds_enabled(enabled);
+    }
 
-    /**
-     * @brief Get current sound theme name
-     * @return Theme name (e.g., "default", "minimal")
-     */
-    std::string get_sound_theme() const;
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    std::string get_sound_theme() const {
+        return AudioSettingsManager::instance().get_sound_theme();
+    }
 
-    /**
-     * @brief Set sound theme name
-     *
-     * Persists to config. SoundManager reloads the theme.
-     *
-     * @param name Theme name (corresponds to config/sounds/<name>.json)
-     */
-    void set_sound_theme(const std::string& name);
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    void set_sound_theme(const std::string& name) {
+        AudioSettingsManager::instance().set_sound_theme(name);
+    }
 
-    /** @brief Get completion alert mode (Off/Notification/Alert) */
-    CompletionAlertMode get_completion_alert_mode() const;
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    CompletionAlertMode get_completion_alert_mode() const {
+        return AudioSettingsManager::instance().get_completion_alert_mode();
+    }
 
-    /** @brief Set completion alert mode */
-    void set_completion_alert_mode(CompletionAlertMode mode);
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    void set_completion_alert_mode(CompletionAlertMode mode) {
+        AudioSettingsManager::instance().set_completion_alert_mode(mode);
+    }
 
-    /** @brief Get dropdown options string "Off\nNotification\nAlert" */
-    static const char* get_completion_alert_options();
+    /** @deprecated Use AudioSettingsManager::instance() directly */
+    static const char* get_completion_alert_options() {
+        return AudioSettingsManager::get_completion_alert_options();
+    }
 
     // =========================================================================
     // SUBJECT ACCESSORS (for XML binding)
@@ -681,24 +652,24 @@ class SettingsManager {
         return &led_enabled_subject_;
     }
 
-    /** @brief Sounds enabled subject (integer: 0=off, 1=on) */
+    /** @deprecated Use AudioSettingsManager::instance().subject_sounds_enabled() */
     lv_subject_t* subject_sounds_enabled() {
-        return &sounds_enabled_subject_;
+        return AudioSettingsManager::instance().subject_sounds_enabled();
     }
 
-    /** @brief UI sounds enabled subject (integer: 0=off, 1=on) */
+    /** @deprecated Use AudioSettingsManager::instance().subject_ui_sounds_enabled() */
     lv_subject_t* subject_ui_sounds_enabled() {
-        return &ui_sounds_enabled_subject_;
+        return AudioSettingsManager::instance().subject_ui_sounds_enabled();
     }
 
-    /** @brief Volume subject (integer: 0-100 percent) */
+    /** @deprecated Use AudioSettingsManager::instance().subject_volume() */
     lv_subject_t* subject_volume() {
-        return &volume_subject_;
+        return AudioSettingsManager::instance().subject_volume();
     }
 
-    /** @brief Completion alert subject (integer: 0=off, 1=on) */
+    /** @deprecated Use AudioSettingsManager::instance().subject_completion_alert() */
     lv_subject_t* subject_completion_alert() {
-        return &completion_alert_subject_;
+        return AudioSettingsManager::instance().subject_completion_alert();
     }
 
     /** @brief Scroll throw subject (integer: 1-99) */
@@ -711,19 +682,19 @@ class SettingsManager {
         return &scroll_limit_subject_;
     }
 
-    /** @brief E-Stop confirmation subject (integer: 0=immediate, 1=require confirm) */
+    /** @deprecated Use SafetySettingsManager::instance().subject_estop_require_confirmation() */
     lv_subject_t* subject_estop_require_confirmation() {
-        return &estop_require_confirmation_subject_;
+        return SafetySettingsManager::instance().subject_estop_require_confirmation();
     }
 
-    /** @brief Cancel escalation enabled subject (integer: 0=disabled, 1=enabled) */
+    /** @deprecated Use SafetySettingsManager::instance().subject_cancel_escalation_enabled() */
     lv_subject_t* subject_cancel_escalation_enabled() {
-        return &cancel_escalation_enabled_subject_;
+        return SafetySettingsManager::instance().subject_cancel_escalation_enabled();
     }
 
-    /** @brief Cancel escalation timeout subject (integer: dropdown index 0-3) */
+    /** @deprecated Use SafetySettingsManager::instance().subject_cancel_escalation_timeout() */
     lv_subject_t* subject_cancel_escalation_timeout() {
-        return &cancel_escalation_timeout_subject_;
+        return SafetySettingsManager::instance().subject_cancel_escalation_timeout();
     }
 
     /** @brief Update channel subject (integer: 0=Stable, 1=Beta, 2=Dev) */
@@ -830,13 +801,8 @@ class SettingsManager {
     lv_subject_t time_format_subject_;
     lv_subject_t language_subject_;
     lv_subject_t led_enabled_subject_;
-    lv_subject_t sounds_enabled_subject_;
-    lv_subject_t ui_sounds_enabled_subject_;
-    lv_subject_t volume_subject_;
-    lv_subject_t completion_alert_subject_;
-    lv_subject_t estop_require_confirmation_subject_;
-    lv_subject_t cancel_escalation_enabled_subject_;
-    lv_subject_t cancel_escalation_timeout_subject_;
+    // Audio subjects moved to AudioSettingsManager
+    // Safety subjects moved to SafetySettingsManager
     lv_subject_t scroll_throw_subject_;
     lv_subject_t scroll_limit_subject_;
     lv_subject_t update_channel_subject_;
