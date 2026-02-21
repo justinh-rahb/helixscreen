@@ -403,22 +403,23 @@ PathSegment AmsBackendMock::get_slot_filament_segment(int slot_index) const {
         return PathSegment::NONE;
     }
 
-    // Tool changers: each tool has filament loaded all the way to the nozzle
-    if (tool_changer_mode_) {
-        if (entry->info.status == SlotStatus::AVAILABLE ||
-            entry->info.status == SlotStatus::FROM_BUFFER) {
-            return PathSegment::NOZZLE;
-        }
+    if (entry->info.status != SlotStatus::AVAILABLE &&
+        entry->info.status != SlotStatus::FROM_BUFFER) {
         return PathSegment::NONE;
     }
 
-    // Hub/linear: non-active slots have filament sitting at prep sensor
-    if (entry->info.status == SlotStatus::AVAILABLE ||
-        entry->info.status == SlotStatus::FROM_BUFFER) {
-        return PathSegment::PREP;
+    // Determine filament position based on the slot's unit topology.
+    // PARALLEL (tool changer): each lane has its own toolhead, filament loaded to nozzle.
+    // HUB/LINEAR: non-active slots have filament sitting at prep sensor.
+    bool is_parallel = tool_changer_mode_;
+    if (!is_parallel) {
+        const auto* unit = system_info_.get_unit_for_slot(slot_index);
+        if (unit && unit->topology == PathTopology::PARALLEL) {
+            is_parallel = true;
+        }
     }
 
-    return PathSegment::NONE;
+    return is_parallel ? PathSegment::NOZZLE : PathSegment::PREP;
 }
 
 PathSegment AmsBackendMock::infer_error_segment() const {
