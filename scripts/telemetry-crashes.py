@@ -34,6 +34,19 @@ from typing import Optional
 class SymbolTable:
     """Parsed nm -nC output with binary-search lookup."""
 
+    # Linker/runtime boundary symbols that aren't real functions.
+    # Resolving to these means the unwind landed in a gap.
+    GARBAGE_SYMBOLS = frozenset({
+        "data_start", "_edata", "_end", "__bss_start", "__bss_start__",
+        "__bss_end__", "__data_start", "__dso_handle", "__libc_csu_init",
+        "__libc_csu_fini", "_fini", "_init", "_fp_hw", "_IO_stdin_used",
+        "__init_array_start", "__init_array_end", "__fini_array_start",
+        "__fini_array_end", "__FRAME_END__", "__GNU_EH_FRAME_HDR",
+        "__TMC_END__", "__ehdr_start", "__exidx_start", "__exidx_end",
+        "_GLOBAL_OFFSET_TABLE_", "_DYNAMIC", "_PROCEDURE_LINKAGE_TABLE_",
+        "completed.0",
+    })
+
     def __init__(self, entries: list[tuple[int, str]]):
         # entries: sorted list of (address, demangled_name)
         self.addrs = [a for a, _ in entries]
@@ -83,6 +96,9 @@ class SymbolTable:
             return f"0x{file_offset:x}"
         base = self.addrs[idx]
         name = self.names[idx]
+        # Filter garbage linker boundary symbols (data_start, _edata, etc.)
+        if name in self.GARBAGE_SYMBOLS:
+            return f"(unknown @ 0x{file_offset:x})"
         offset = file_offset - base
         if offset == 0:
             return name

@@ -25,6 +25,19 @@ LOAD_BASE=0
 AUTO_DETECT_BASE=false
 CRASH_FILE=""
 
+# Linker/runtime boundary symbols that are NOT real functions.
+# Resolving to these means the address wasn't in any real function.
+# Uses a pipe-delimited string for O(1)-ish matching (compatible with bash 3.2+).
+readonly GARBAGE_SYMBOLS="|data_start|_edata|_end|__bss_start|__bss_start__|__bss_end__|__data_start|__dso_handle|__libc_csu_init|__libc_csu_fini|_fini|_init|_fp_hw|_IO_stdin_used|__init_array_start|__init_array_end|__fini_array_start|__fini_array_end|__FRAME_END__|__GNU_EH_FRAME_HDR|__TMC_END__|__ehdr_start|__exidx_start|__exidx_end|_GLOBAL_OFFSET_TABLE_|_DYNAMIC|_PROCEDURE_LINKAGE_TABLE_|completed.0|"
+
+# Check if a symbol name is a garbage linker boundary symbol
+is_garbage_symbol() {
+    [[ "$GARBAGE_SYMBOLS" == *"|$1|"* ]]
+}
+
+# Memory map entries parsed from crash file (array of "start_dec end_dec path" strings)
+MEMORY_MAPS=()
+
 usage() {
     echo "Usage: $(basename "$0") [options] <version> <platform> <addr1> [addr2] ..."
     echo "       $(basename "$0") --crash-file <crash.txt> [platform]"
@@ -140,6 +153,30 @@ if [[ -n "$CRASH_FILE" ]]; then
         else
             exit 1
         fi
+    fi
+
+    # Extract memory map entries for shared library resolution
+    while IFS= read -r line; do
+        map_line="${line#map:}"
+        # /proc/self/maps format: start-end perms offset dev inode pathname
+        # e.g. 7f1234000-7f1235000 r-xp 00000000 08:01 12345 /usr/lib/libfoo.so
+        # We only care about executable mappings (perms contain 'x')
+        if [[ "$map_line" =~ ^([0-9a-fA-F]+)-([0-9a-fA-F]+)[[:space:]]+(r|-)(w|-)(x)(p|s) ]]; then
+            map_start_hex="${BASH_REMATCH[1]}"
+            map_end_hex="${BASH_REMATCH[2]}"
+            map_start_dec=$((16#$map_start_hex))
+            map_end_dec=$((16#$map_end_hex))
+            # Extract the pathname (last field, may contain spaces)
+            map_path=$(echo "$map_line" | awk '{print $NF}')
+            # Skip anonymous mappings, stack, heap, vdso, etc.
+            if [[ "$map_path" == /* ]]; then
+                MEMORY_MAPS+=("${map_start_dec} ${map_end_dec} ${map_start_hex} ${map_path}")
+            fi
+        fi
+    done < <(grep "^map:" "$CRASH_FILE" || true)
+
+    if [[ ${#MEMORY_MAPS[@]} -gt 0 ]]; then
+        echo "Parsed ${#MEMORY_MAPS[@]} executable memory mappings from crash file" >&2
     fi
 
     echo "Parsed crash file: v${VERSION}/${PLATFORM}, ${#ADDRS[@]} addresses" >&2
@@ -350,6 +387,12 @@ resolve_address() {
         fi
     done < "$SYM_FILE"
 
+    # Filter garbage linker boundary symbols (data_start, _edata, etc.)
+    if [[ -n "$best_name" ]] && is_garbage_symbol "$best_name"; then
+        best_name=""
+    fi
+
+    # Resolved to a real function — print and return
     if [[ -n "$best_name" ]]; then
         local offset=$(( addr_dec - best_addr ))
         if (( LOAD_BASE > 0 )); then
@@ -357,12 +400,40 @@ resolve_address() {
         else
             printf "0x%s → %s+0x%x\n" "$addr_hex" "$best_name" "$offset"
         fi
+        return
+    fi
+
+    # Unresolved — try to identify the shared library from memory maps
+    local runtime_addr_dec
+    if (( LOAD_BASE > 0 )); then
+        local raw_hex="${addr_input#0x}"
+        raw_hex="${raw_hex#0X}"
+        runtime_addr_dec=$((16#$raw_hex))
     else
-        if (( LOAD_BASE > 0 )); then
-            printf "0x%s (file: 0x%s) → (unknown)\n" "$orig_addr_hex" "$addr_hex"
-        else
-            printf "0x%s → (unknown)\n" "$addr_hex"
+        runtime_addr_dec=$((16#$addr_hex))
+    fi
+
+    for map_entry in "${MEMORY_MAPS[@]+"${MEMORY_MAPS[@]}"}"; do
+        local map_start map_end map_start_hex map_path
+        read -r map_start map_end map_start_hex map_path <<< "$map_entry"
+        if (( runtime_addr_dec >= map_start && runtime_addr_dec < map_end )); then
+            local lib_offset=$(( runtime_addr_dec - map_start ))
+            local lib_basename
+            lib_basename=$(basename "$map_path")
+            if (( LOAD_BASE > 0 )); then
+                printf "0x%s (file: 0x%s) → (%s+0x%x)\n" "$orig_addr_hex" "$addr_hex" "$lib_basename" "$lib_offset"
+            else
+                printf "0x%s → (%s+0x%x)\n" "$addr_hex" "$lib_basename" "$lib_offset"
+            fi
+            return
         fi
+    done
+
+    # No match at all
+    if (( LOAD_BASE > 0 )); then
+        printf "0x%s (file: 0x%s) → (unknown)\n" "$orig_addr_hex" "$addr_hex"
+    else
+        printf "0x%s → (unknown)\n" "$addr_hex"
     fi
 }
 
