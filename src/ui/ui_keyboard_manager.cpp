@@ -302,6 +302,17 @@ void KeyboardManager::textarea_focus_event_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void KeyboardManager::textarea_delete_event_cb(lv_event_t* e) {
+    auto& mgr = KeyboardManager::instance();
+    lv_obj_t* textarea = lv_event_get_target_obj(e);
+
+    if (mgr.context_textarea_ == textarea) {
+        spdlog::debug("[KeyboardManager] Textarea deleted while focused: {}", (void*)textarea);
+        mgr.context_textarea_ = nullptr;
+        mgr.hide();
+    }
+}
+
 void KeyboardManager::longpress_event_handler(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("longpress_event_handler");
 
@@ -770,6 +781,7 @@ void KeyboardManager::register_textarea(lv_obj_t* textarea) {
 
     lv_obj_add_event_cb(textarea, textarea_focus_event_cb, LV_EVENT_FOCUSED, nullptr);
     lv_obj_add_event_cb(textarea, textarea_focus_event_cb, LV_EVENT_DEFOCUSED, nullptr);
+    lv_obj_add_event_cb(textarea, textarea_delete_event_cb, LV_EVENT_DELETE, nullptr);
 
     lv_group_t* default_group = lv_group_get_default();
     if (default_group) {
