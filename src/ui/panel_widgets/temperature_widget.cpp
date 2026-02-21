@@ -6,7 +6,6 @@
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav_manager.h"
-#include "ui_panel_home.h"
 #include "ui_panel_temp_control.h"
 #include "ui_temperature_utils.h"
 
@@ -17,8 +16,6 @@
 #include "printer_state.h"
 
 #include <spdlog/spdlog.h>
-
-extern HomePanel& get_global_home_panel();
 
 namespace {
 const bool s_registered = [] {
@@ -138,7 +135,19 @@ void TemperatureWidget::handle_temp_clicked() {
 
 void TemperatureWidget::temp_clicked_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[TemperatureWidget] temp_clicked_cb");
-    (void)e;
-    get_global_home_panel().handle_temp_clicked();
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<TemperatureWidget*>(lv_obj_get_user_data(target));
+    if (!self) {
+        lv_obj_t* parent = lv_obj_get_parent(target);
+        while (parent && !self) {
+            self = static_cast<TemperatureWidget*>(lv_obj_get_user_data(parent));
+            parent = lv_obj_get_parent(parent);
+        }
+    }
+    if (self) {
+        self->handle_temp_clicked();
+    } else {
+        spdlog::warn("[TemperatureWidget] temp_clicked_cb: could not recover widget instance");
+    }
     LVGL_SAFE_EVENT_CB_END();
 }

@@ -6,7 +6,6 @@
 #include "ui_event_safety.h"
 #include "ui_icon.h"
 #include "ui_nav_manager.h"
-#include "ui_panel_home.h"
 #include "ui_panel_power.h"
 #include "ui_update_queue.h"
 
@@ -17,8 +16,6 @@
 #include <spdlog/spdlog.h>
 
 #include <set>
-
-extern HomePanel& get_global_home_panel();
 
 namespace {
 const bool s_registered = [] {
@@ -52,7 +49,7 @@ void PowerWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
         spdlog::warn("[PowerWidget] Could not find 'power_icon' in widget XML");
     }
 
-    // Register XML event callbacks (transition: still delegate to HomePanel global)
+    // Register XML event callbacks
     lv_xml_register_event_cb(nullptr, "power_toggle_cb", power_toggle_cb);
     lv_xml_register_event_cb(nullptr, "power_long_press_cb", power_long_press_cb);
 
@@ -172,19 +169,41 @@ void PowerWidget::refresh_power_state() {
         });
 }
 
-// Static callbacks — transition pattern: delegate to global HomePanel
-// These are registered as XML event callbacks and route through the global instance
 void PowerWidget::power_toggle_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PowerWidget] power_toggle_cb");
-    (void)e;
-    get_global_home_panel().handle_power_toggle();
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<PowerWidget*>(lv_obj_get_user_data(target));
+    if (!self) {
+        lv_obj_t* parent = lv_obj_get_parent(target);
+        while (parent && !self) {
+            self = static_cast<PowerWidget*>(lv_obj_get_user_data(parent));
+            parent = lv_obj_get_parent(parent);
+        }
+    }
+    if (self) {
+        self->handle_power_toggle();
+    } else {
+        spdlog::warn("[PowerWidget] power_toggle_cb: could not recover widget instance");
+    }
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void PowerWidget::power_long_press_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PowerWidget] power_long_press_cb");
-    (void)e;
-    get_global_home_panel().handle_power_long_press();
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<PowerWidget*>(lv_obj_get_user_data(target));
+    if (!self) {
+        lv_obj_t* parent = lv_obj_get_parent(target);
+        while (parent && !self) {
+            self = static_cast<PowerWidget*>(lv_obj_get_user_data(parent));
+            parent = lv_obj_get_parent(parent);
+        }
+    }
+    if (self) {
+        self->handle_power_long_press();
+    } else {
+        spdlog::warn("[PowerWidget] power_long_press_cb: could not recover widget instance");
+    }
     LVGL_SAFE_EVENT_CB_END();
 }
 

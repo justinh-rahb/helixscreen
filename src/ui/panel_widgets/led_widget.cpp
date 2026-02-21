@@ -6,7 +6,6 @@
 #include "ui_event_safety.h"
 #include "ui_icon.h"
 #include "ui_nav_manager.h"
-#include "ui_panel_home.h"
 #include "ui_utils.h"
 
 #include "app_globals.h"
@@ -24,8 +23,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-
-extern HomePanel& get_global_home_panel();
 
 namespace {
 const bool s_registered = [] {
@@ -255,20 +252,41 @@ void LedWidget::on_led_state_changed(int state) {
     }
 }
 
-// Static callbacks delegate to global HomePanel (same pattern as TemperatureWidget).
-// These will be rewired to use panel_widget_from_event<LedWidget> during cleanup.
-
 void LedWidget::light_toggle_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[LedWidget] light_toggle_cb");
-    (void)e;
-    get_global_home_panel().handle_light_toggle();
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<LedWidget*>(lv_obj_get_user_data(target));
+    if (!self) {
+        lv_obj_t* parent = lv_obj_get_parent(target);
+        while (parent && !self) {
+            self = static_cast<LedWidget*>(lv_obj_get_user_data(parent));
+            parent = lv_obj_get_parent(parent);
+        }
+    }
+    if (self) {
+        self->handle_light_toggle();
+    } else {
+        spdlog::warn("[LedWidget] light_toggle_cb: could not recover widget instance");
+    }
     LVGL_SAFE_EVENT_CB_END();
 }
 
 void LedWidget::light_long_press_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[LedWidget] light_long_press_cb");
-    (void)e;
-    get_global_home_panel().handle_light_long_press();
+    auto* target = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    auto* self = static_cast<LedWidget*>(lv_obj_get_user_data(target));
+    if (!self) {
+        lv_obj_t* parent = lv_obj_get_parent(target);
+        while (parent && !self) {
+            self = static_cast<LedWidget*>(lv_obj_get_user_data(parent));
+            parent = lv_obj_get_parent(parent);
+        }
+    }
+    if (self) {
+        self->handle_light_long_press();
+    } else {
+        spdlog::warn("[LedWidget] light_long_press_cb: could not recover widget instance");
+    }
     LVGL_SAFE_EVENT_CB_END();
 }
 
