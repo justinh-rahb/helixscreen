@@ -29,6 +29,11 @@
 #include "format_utils.h"
 #include "home_widget_config.h"
 #include "home_widget_registry.h"
+#include "home_widgets/led_widget.h"
+#include "home_widgets/network_widget.h"
+#include "home_widgets/power_widget.h"
+#include "home_widgets/temp_stack_widget.h"
+#include "home_widgets/temperature_widget.h"
 #include "injection_point_manager.h"
 #include "led/led_controller.h"
 #include "led/ui_led_control_overlay.h"
@@ -131,6 +136,12 @@ HomePanel::~HomePanel() {
     // skipped if subjects_initialized_ was already false from a prior call.
     widget_gate_observers_.clear();
 
+    // Detach active HomeWidget instances
+    for (auto& w : active_widgets_) {
+        w->detach();
+    }
+    active_widgets_.clear();
+
     // Clean up timers and animations - must be deleted explicitly before LVGL shutdown
     // Check lv_is_initialized() to avoid crash during static destruction
     if (lv_is_initialized()) {
@@ -209,6 +220,20 @@ void HomePanel::init_subjects() {
     StaticPanelRegistry::instance().register_destroy(
         "HomePanelSubjects", []() { get_global_home_panel().deinit_subjects(); });
 
+    // Register widget factories for behavioral widgets
+    helix::register_widget_factory("temperature", [this]() {
+        return std::make_unique<helix::TemperatureWidget>(printer_state_, temp_control_panel_);
+    });
+    helix::register_widget_factory(
+        "led", [this]() { return std::make_unique<helix::LedWidget>(printer_state_, api_); });
+    helix::register_widget_factory("power",
+                                   [this]() { return std::make_unique<helix::PowerWidget>(api_); });
+    helix::register_widget_factory("network",
+                                   []() { return std::make_unique<helix::NetworkWidget>(); });
+    helix::register_widget_factory("temp_stack", [this]() {
+        return std::make_unique<helix::TempStackWidget>(printer_state_, temp_control_panel_);
+    });
+
     spdlog::debug("[{}] Registered subjects and event callbacks", get_name());
 
     // Set initial tip of the day
@@ -284,6 +309,12 @@ void HomePanel::populate_widgets() {
         spdlog::error("[{}] widget_container not found", get_name());
         return;
     }
+
+    // Detach active HomeWidget instances before clearing
+    for (auto& w : active_widgets_) {
+        w->detach();
+    }
+    active_widgets_.clear();
 
     // Clear existing children (for repopulation)
     lv_obj_clean(container);
@@ -365,6 +396,18 @@ void HomePanel::populate_widgets() {
             if (widget) {
                 first = false;
                 spdlog::debug("[{}] Created widget: {}", get_name(), enabled_widgets[i]);
+
+                // If this widget def has a factory, create and attach the HomeWidget instance
+                const std::string widget_id =
+                    enabled_widgets[i].substr(12); // strip "home_widget_" prefix
+                const auto* def = helix::find_widget_def(widget_id);
+                if (def && def->factory) {
+                    auto hw = def->factory();
+                    if (hw) {
+                        hw->attach(widget, parent_screen_);
+                        active_widgets_.push_back(std::move(hw));
+                    }
+                }
             } else {
                 spdlog::warn("[{}] Failed to create widget: {}", get_name(), enabled_widgets[i]);
             }
@@ -522,11 +565,27 @@ void HomePanel::on_activate() {
     // Refresh power button state from actual device status
     refresh_power_state();
 
+    // Activate behavioral widgets (network polling, power refresh, etc.)
+    for (auto& w : active_widgets_) {
+        if (auto* nw = dynamic_cast<helix::NetworkWidget*>(w.get())) {
+            nw->on_activate();
+        } else if (auto* pw = dynamic_cast<helix::PowerWidget*>(w.get())) {
+            pw->refresh_power_state();
+        }
+    }
+
     // Start Spoolman polling for AMS mini status updates
     AmsState::instance().start_spoolman_polling();
 }
 
 void HomePanel::on_deactivate() {
+    // Deactivate behavioral widgets
+    for (auto& w : active_widgets_) {
+        if (auto* nw = dynamic_cast<helix::NetworkWidget*>(w.get())) {
+            nw->on_deactivate();
+        }
+    }
+
     AmsState::instance().stop_spoolman_polling();
 
     // Cancel any in-flight tip fade animations (var=this, not an lv_obj_t*)

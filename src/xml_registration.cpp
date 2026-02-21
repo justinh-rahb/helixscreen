@@ -250,6 +250,7 @@ void register_xml_components() {
     register_xml("components/home_widget_firmware_restart.xml");
     register_xml("components/home_widget_ams.xml");
     register_xml("components/home_widget_temperature.xml");
+    register_xml("components/home_widget_temp_stack.xml");
     register_xml("components/home_widget_led.xml");
     register_xml("components/home_widget_humidity.xml");
     register_xml("components/home_widget_width_sensor.xml");

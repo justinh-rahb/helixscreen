@@ -502,6 +502,7 @@ compile_commands_full:
 #   $(OBJ_DIR)/lvgl/*/*/*/*.d - LVGL sources (three levels deep)
 -include $(wildcard $(OBJ_DIR)/*.d)
 -include $(wildcard $(OBJ_DIR)/*/*.d)
+-include $(wildcard $(OBJ_DIR)/*/*/*.d)
 -include $(wildcard $(OBJ_DIR)/tests/*.d)
 -include $(wildcard $(OBJ_DIR)/tests/*/*.d)
 # NOTE: LVGL .d files intentionally NOT included - they add 150k+ lines of deps

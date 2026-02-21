@@ -8,6 +8,7 @@
 #include "ui_panel_base.h"
 #include "ui_panel_print_status.h" // For RunoutGuidanceModal
 
+#include "home_widget.h"
 #include "led/led_controller.h"
 #include "subject_managed_panel.h"
 #include "tips_manager.h"
@@ -34,10 +35,7 @@ enum class PrintJobState;
  * @see TipsManager for tip of the day functionality
  */
 
-// Network connection types
-namespace helix {
-enum class NetworkType { Wifi, Ethernet, Disconnected };
-} // namespace helix
+#include "network_type.h"
 
 class HomePanel : public PanelBase {
   public:
@@ -112,6 +110,15 @@ class HomePanel : public PanelBase {
      */
     void set_temp_control_panel(TempControlPanel* temp_panel);
 
+    // Transition: widget callbacks delegate to these HomePanel handlers.
+    // These will move into widget classes once HomePanel code is removed.
+    void handle_light_toggle();
+    void handle_light_long_press();
+    void handle_power_toggle();
+    void handle_power_long_press();
+    void handle_temp_clicked();
+    void handle_network_clicked();
+
   private:
     SubjectManager subjects_;
     TempControlPanel* temp_control_panel_ = nullptr;
@@ -162,16 +169,12 @@ class HomePanel : public PanelBase {
     void update_network_icon_state(); // Updates the subject
     static void signal_poll_timer_cb(lv_timer_t* timer);
 
-    void handle_light_toggle();
-    void handle_light_long_press();
     void flash_light_icon();
     void ensure_led_observers();
     void handle_print_card_clicked();
     void handle_tip_text_clicked();
     void handle_tip_rotation_timer();
-    void handle_temp_clicked();
     void handle_printer_status_clicked();
-    void handle_network_clicked();
     void handle_printer_manager_clicked();
     void handle_ams_clicked();
     void on_extruder_temp_changed(int temp);
@@ -179,8 +182,6 @@ class HomePanel : public PanelBase {
     void on_led_state_changed(int state);
     void update_temp_icon_animation();
     void update_light_icon();
-    void handle_power_toggle();
-    void handle_power_long_press();
     void update_power_icon(bool is_on);
     void refresh_power_state(); // Query API to sync icon with actual device state
 
@@ -202,6 +203,9 @@ class HomePanel : public PanelBase {
     ObserverGuard led_state_observer_;
     ObserverGuard led_brightness_observer_;
     ObserverGuard ams_slot_count_observer_;
+
+    // Active HomeWidget instances (factory-created, lifecycle-managed)
+    std::vector<std::unique_ptr<helix::HomeWidget>> active_widgets_;
 
     // Observers for widget hardware gate subjects — triggers populate_widgets() on change
     std::vector<ObserverGuard> widget_gate_observers_;

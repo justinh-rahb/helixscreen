@@ -3,6 +3,8 @@
 
 #include "home_widget_registry.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <string_view>
 
@@ -10,12 +12,13 @@ namespace helix {
 
 // Vector order defines the default display order on the home panel.
 // clang-format off
-static const std::vector<HomeWidgetDef> s_widget_defs = {
+static std::vector<HomeWidgetDef> s_widget_defs = {
     {"power",            "Power",            "power_cycle",      "Moonraker power device controls",              "Power",            "power_device_count"},
     {"network",          "Network",          "wifi_strength_4",  "Wi-Fi and ethernet connection status",         "Network",          nullptr,             false},
     {"firmware_restart", "Firmware Restart",  "refresh",          "Restart Klipper firmware",                     "Firmware Restart", nullptr,             false},
     {"ams",              "AMS Status",        "filament",         "Multi-material spool status and control",      "AMS Status",       "ams_slot_count"},
     {"temperature",      "Temperature",       "thermometer",      "Monitor and set nozzle and bed temps",         "Temperature",      nullptr},
+    {"temp_stack",       "Temperatures",      "thermometer",      "Nozzle, bed, and chamber temps stacked",       "Temperatures",     nullptr,             false},
     {"led",              "LED Light",         "lightbulb_outline","Quick toggle, long press for full control",    "LED Light",        "printer_has_led"},
     {"humidity",         "Humidity",          "water",            "Enclosure humidity sensor readings",           "Humidity",         "humidity_sensor_count"},
     {"width_sensor",     "Width Sensor",      "ruler",            "Filament width sensor readings",               "Width Sensor",     "width_sensor_count"},
@@ -37,6 +40,16 @@ const HomeWidgetDef* find_widget_def(std::string_view id) {
 
 size_t widget_def_count() {
     return s_widget_defs.size();
+}
+
+void register_widget_factory(std::string_view id, WidgetFactory factory) {
+    for (auto& def : s_widget_defs) {
+        if (id == def.id) {
+            def.factory = std::move(factory);
+            return;
+        }
+    }
+    spdlog::warn("[HomeWidgetRegistry] Factory registration failed: '{}' not found", id);
 }
 
 } // namespace helix

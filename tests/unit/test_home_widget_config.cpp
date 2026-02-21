@@ -41,7 +41,7 @@ class HomeWidgetConfigFixture {
 
 TEST_CASE("HomeWidgetRegistry: returns all widget definitions", "[home][widget_config]") {
     const auto& defs = get_all_widget_defs();
-    REQUIRE(defs.size() == 11);
+    REQUIRE(defs.size() == 12);
 }
 
 TEST_CASE("HomeWidgetRegistry: all widget IDs are unique", "[home][widget_config]") {
@@ -84,7 +84,7 @@ TEST_CASE_METHOD(HomeWidgetConfigFixture,
 
     for (size_t i = 0; i < entries.size(); ++i) {
         REQUIRE(entries[i].id == defs[i].id);
-        REQUIRE(entries[i].enabled == true);
+        REQUIRE(entries[i].enabled == defs[i].default_enabled);
     }
 }
 
@@ -117,9 +117,12 @@ TEST_CASE_METHOD(HomeWidgetConfigFixture,
     REQUIRE(entries[2].id == "network");
     REQUIRE(entries[2].enabled == true);
 
-    // Remaining should be appended with enabled=true
+    // Remaining should be appended with their default_enabled value
+    const auto& all_defs = get_all_widget_defs();
     for (size_t i = 3; i < entries.size(); ++i) {
-        REQUIRE(entries[i].enabled == true);
+        const auto* def = find_widget_def(entries[i].id);
+        REQUIRE(def);
+        REQUIRE(entries[i].enabled == def->default_enabled);
     }
 }
 
@@ -286,7 +289,7 @@ TEST_CASE_METHOD(HomeWidgetConfigFixture, "HomeWidgetConfig: toggle re-enable a 
 // ============================================================================
 
 TEST_CASE_METHOD(HomeWidgetConfigFixture,
-                 "HomeWidgetConfig: new registry widget gets appended with enabled=true",
+                 "HomeWidgetConfig: new registry widget gets appended with default_enabled",
                  "[home][widget_config]") {
     // Save config with only a subset of widgets
     json widgets = json::array({
@@ -307,11 +310,11 @@ TEST_CASE_METHOD(HomeWidgetConfigFixture,
     REQUIRE(wc.entries()[1].id == "network");
     REQUIRE(wc.entries()[1].enabled == false);
 
-    // Rest should be appended with enabled=true
+    // Rest should be appended with their default_enabled value
     for (size_t i = 2; i < wc.entries().size(); ++i) {
-        REQUIRE(wc.entries()[i].enabled == true);
-        // Verify each is a valid registry widget
-        REQUIRE(find_widget_def(wc.entries()[i].id) != nullptr);
+        const auto* def = find_widget_def(wc.entries()[i].id);
+        REQUIRE(def != nullptr);
+        REQUIRE(wc.entries()[i].enabled == def->default_enabled);
     }
 }
 
@@ -365,7 +368,7 @@ TEST_CASE_METHOD(
 
     for (size_t i = 0; i < entries.size(); ++i) {
         REQUIRE(entries[i].id == defs[i].id);
-        REQUIRE(entries[i].enabled == true);
+        REQUIRE(entries[i].enabled == defs[i].default_enabled);
     }
 }
 
@@ -455,7 +458,7 @@ TEST_CASE_METHOD(HomeWidgetConfigFixture,
     REQUIRE(wc.entries().size() == defs.size());
     for (size_t i = 0; i < defs.size(); ++i) {
         REQUIRE(wc.entries()[i].id == defs[i].id);
-        REQUIRE(wc.entries()[i].enabled == true);
+        REQUIRE(wc.entries()[i].enabled == defs[i].default_enabled);
     }
 }
 
@@ -648,6 +651,6 @@ TEST_CASE_METHOD(HomeWidgetConfigFixture,
     REQUIRE(wc.entries().size() == defs.size());
     for (size_t i = 0; i < defs.size(); ++i) {
         REQUIRE(wc.entries()[i].id == defs[i].id);
-        REQUIRE(wc.entries()[i].enabled == true);
+        REQUIRE(wc.entries()[i].enabled == defs[i].default_enabled);
     }
 }
