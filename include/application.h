@@ -107,6 +107,7 @@ class Application {
                                    const char* display_name);
     void init_action_prompt();
     void check_wifi_availability();
+    void restore_flush_callback();
 
     // Owned managers (in initialization order)
     std::unique_ptr<DisplayManager> m_display;
@@ -160,4 +161,7 @@ class Application {
 
     // Splash screen lifecycle manager
     helix::application::SplashScreenManager m_splash_manager;
+
+    /// Original LVGL flush callback, saved while splash no-op is active
+    lv_display_flush_cb_t m_original_flush_cb = nullptr;
 };

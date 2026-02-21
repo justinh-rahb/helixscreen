@@ -132,6 +132,11 @@ bool DisplayManager::init(const Config& config) {
                       m_height);
     }
 
+    // Tell backend to skip FBIOBLANK when splash owns the framebuffer
+    if (config.splash_active) {
+        m_backend->set_splash_active(true);
+    }
+
     // Create LVGL display - this opens /dev/fb0 and keeps it open
     m_display = m_backend->create_display(m_width, m_height);
     if (!m_display) {
@@ -145,8 +150,16 @@ bool DisplayManager::init(const Config& config) {
     // On AD5M, the FBIOBLANK state may be tied to the fd - calling it after
     // LVGL opens /dev/fb0 ensures the unblank persists while the display runs.
     // Uses same approach as GuppyScreen: FBIOBLANK + FBIOPAN_DISPLAY.
-    if (m_backend->unblank_display()) {
-        spdlog::info("[DisplayManager] Display unblanked via framebuffer ioctl");
+    //
+    // Skip when splash is active: the splash process already unblanked the display
+    // and is actively rendering to fb0. Calling FBIOBLANK + FBIOPAN_DISPLAY disrupts
+    // the splash image and causes visible flicker.
+    if (!config.splash_active) {
+        if (m_backend->unblank_display()) {
+            spdlog::info("[DisplayManager] Display unblanked via framebuffer ioctl");
+        }
+    } else {
+        spdlog::debug("[DisplayManager] Skipping unblank — splash process owns framebuffer");
     }
 
     // Apply display rotation if configured.

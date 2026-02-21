@@ -275,6 +275,16 @@ class DisplayBackend {
     }
 
     /**
+     * @brief Tell the backend that an external splash process owns the framebuffer.
+     *
+     * When set, create_display() skips FBIOBLANK and other ioctls that would
+     * disrupt the splash image.
+     */
+    virtual void set_splash_active(bool active) {
+        (void)active;
+    }
+
+    /**
      * @brief Blank the display (turn off backlight via framebuffer ioctl)
      *
      * Blanks the display using the FBIOBLANK ioctl with FB_BLANK_NORMAL.

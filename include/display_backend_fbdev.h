@@ -127,6 +127,10 @@ class DisplayBackendFbdev : public DisplayBackend {
         return needs_calibration_;
     }
 
+    void set_splash_active(bool active) override {
+        splash_active_ = active;
+    }
+
   private:
     std::string fb_device_ = "/dev/fb0";
     std::string touch_device_; // Empty = auto-detect
@@ -148,6 +152,9 @@ class DisplayBackendFbdev : public DisplayBackend {
 
     /// TTY file descriptor for KDSETMODE console suppression (-1 = not acquired)
     int tty_fd_ = -1;
+
+    /// External splash process owns framebuffer — skip FBIOBLANK in create_display
+    bool splash_active_ = false;
 
     /**
      * @brief Suppress kernel console text output to framebuffer

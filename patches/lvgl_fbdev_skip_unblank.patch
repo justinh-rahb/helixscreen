@@ -1,0 +1,85 @@
+diff --git a/src/drivers/display/fb/lv_linux_fbdev.c b/src/drivers/display/fb/lv_linux_fbdev.c
+index 0c516de66..b26e20848 100644
+--- a/src/drivers/display/fb/lv_linux_fbdev.c
++++ b/src/drivers/display/fb/lv_linux_fbdev.c
+@@ -70,6 +70,7 @@ typedef struct {
+     bool force_refresh;
+     uint8_t * draw_buf_1;
+     uint8_t * draw_buf_2;
++    bool skip_unblank;
+ } lv_linux_fb_t;
+ 
+ /**********************
+@@ -140,10 +141,12 @@ void lv_linux_fbdev_set_file(lv_display_t * disp, const char * file)
+     }
+     LV_LOG_INFO("The framebuffer device was opened successfully");
+ 
+-    /* Make sure that the display is on.*/
+-    if(ioctl(dsc->fbfd, FBIOBLANK, FB_BLANK_UNBLANK) != 0) {
+-        perror("ioctl(FBIOBLANK)");
+-        /* Don't return. Some framebuffer drivers like efifb or simplefb don't implement FBIOBLANK.*/
++    /* Make sure that the display is on (unless another process already owns the framebuffer). */
++    if(!dsc->skip_unblank) {
++        if(ioctl(dsc->fbfd, FBIOBLANK, FB_BLANK_UNBLANK) != 0) {
++            perror("ioctl(FBIOBLANK)");
++            /* Don't return. Some framebuffer drivers like efifb or simplefb don't implement FBIOBLANK.*/
++        }
+     }
+ 
+ #if LV_LINUX_FBDEV_BSD
+@@ -186,6 +189,23 @@ void lv_linux_fbdev_set_file(lv_display_t * disp, const char * file)
+ 
+     LV_LOG_INFO("%dx%d, %dbpp", dsc->vinfo.xres, dsc->vinfo.yres, dsc->vinfo.bits_per_pixel);
+ 
++    /* AD5M and some other devices report incorrect bits_per_pixel via VSCREENINFO.
++     * The stride (line_length) is always correct, so calculate true bpp from it.
++     * Example: AD5M reports 16bpp but stride=3200 for 800px width = 4 bytes/pixel = 32bpp */
++    uint32_t stride_bpp = 0;
++    if(dsc->vinfo.xres > 0) {
++        stride_bpp = (dsc->finfo.line_length * 8) / dsc->vinfo.xres;
++    }
++
++    if(stride_bpp > 0 && stride_bpp != dsc->vinfo.bits_per_pixel) {
++        LV_LOG_WARN("bits_per_pixel mismatch: vinfo says %d, stride indicates %d. Using stride value.",
++                    dsc->vinfo.bits_per_pixel, stride_bpp);
++        dsc->vinfo.bits_per_pixel = stride_bpp;
++    }
++    else {
++        LV_LOG_INFO("bits_per_pixel %d matches stride calculation", dsc->vinfo.bits_per_pixel);
++    }
++
+     /* Figure out the size of the screen in bytes*/
+     dsc->screensize =  dsc->finfo.smem_len;/*finfo.line_length * vinfo.yres;*/
+ 
+@@ -251,6 +271,12 @@ void lv_linux_fbdev_set_file(lv_display_t * disp, const char * file)
+                 hor_res, ver_res, lv_display_get_dpi(disp));
+ }
+ 
++void lv_linux_fbdev_set_skip_unblank(lv_display_t * disp, bool skip)
++{
++    lv_linux_fb_t * dsc = lv_display_get_driver_data(disp);
++    dsc->skip_unblank = skip;
++}
++
+ void lv_linux_fbdev_set_force_refresh(lv_display_t * disp, bool enabled)
+ {
+     lv_linux_fb_t * dsc = lv_display_get_driver_data(disp);
+diff --git a/src/drivers/display/fb/lv_linux_fbdev.h b/src/drivers/display/fb/lv_linux_fbdev.h
+index 2c41aec19..776d7333c 100644
+--- a/src/drivers/display/fb/lv_linux_fbdev.h
++++ b/src/drivers/display/fb/lv_linux_fbdev.h
+@@ -33,6 +33,14 @@ lv_display_t * lv_linux_fbdev_create(void);
+ 
+ void lv_linux_fbdev_set_file(lv_display_t * disp, const char * file);
+ 
++/**
++ * Skip the FBIOBLANK unblank ioctl in lv_linux_fbdev_set_file().
++ * Use when another process (e.g. splash screen) already owns the framebuffer
++ * and calling FBIOBLANK would cause visible flicker.
++ * Must be called BEFORE lv_linux_fbdev_set_file().
++ */
++void lv_linux_fbdev_set_skip_unblank(lv_display_t * disp, bool skip);
++
+ /**
+  * Force the display to be refreshed on every change.
+  * Expected to be used with LV_DISPLAY_RENDER_MODE_DIRECT or LV_DISPLAY_RENDER_MODE_FULL.

@@ -292,7 +292,13 @@ lv_display_t* DisplayBackendFbdev::create_display(int width, int height) {
         return nullptr;
     }
 
-    // Set the framebuffer device path
+    // Skip FBIOBLANK when splash process owns the framebuffer
+    if (splash_active_) {
+        lv_linux_fbdev_set_skip_unblank(display_, true);
+        spdlog::debug("[Fbdev Backend] Splash active — FBIOBLANK skip enabled");
+    }
+
+    // Set the framebuffer device path (opens /dev/fb0 and mmaps it)
     lv_linux_fbdev_set_file(display_, fb_device_.c_str());
 
     // AD5M's LCD controller interprets XRGB8888's X byte as alpha.

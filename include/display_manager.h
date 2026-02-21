@@ -55,6 +55,7 @@ class DisplayManager {
         int scroll_throw = 25;       ///< Scroll momentum decay (1-99, higher = faster decay)
         int scroll_limit = 10;       ///< Pixels before scrolling starts
         bool require_pointer = true; ///< Fail init if no pointer device (embedded only)
+        bool splash_active = false;  ///< External splash owns framebuffer — skip unblank/pan
     };
 
     DisplayManager();
