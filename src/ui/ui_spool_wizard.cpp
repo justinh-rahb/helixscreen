@@ -3,6 +3,7 @@
 
 #include "ui_spool_wizard.h"
 
+#include "ui_callback_helpers.h"
 #include "ui_color_picker.h"
 #include "ui_global_panel_helper.h"
 #include "ui_keyboard_manager.h"
@@ -148,53 +149,40 @@ void SpoolWizardOverlay::register_callbacks() {
 
     spdlog::debug("[{}] Registering event callbacks", get_name());
 
-    // Navigation
-    lv_xml_register_event_cb(nullptr, "on_wizard_back", on_wizard_back);
-    lv_xml_register_event_cb(nullptr, "on_wizard_next", on_wizard_next);
-    lv_xml_register_event_cb(nullptr, "on_wizard_create", on_wizard_create);
+    register_xml_callbacks({
+        // Navigation
+        {"on_wizard_back", on_wizard_back},
+        {"on_wizard_next", on_wizard_next},
+        {"on_wizard_create", on_wizard_create},
 
-    // Vendor step
-    lv_xml_register_event_cb(nullptr, "on_wizard_vendor_selected", on_wizard_vendor_selected);
-    lv_xml_register_event_cb(nullptr, "on_wizard_show_create_vendor_modal",
-                             on_wizard_show_create_vendor_modal);
-    lv_xml_register_event_cb(nullptr, "on_wizard_cancel_create_vendor",
-                             on_wizard_cancel_create_vendor);
-    lv_xml_register_event_cb(nullptr, "on_wizard_vendor_search_changed",
-                             on_wizard_vendor_search_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_new_vendor_name_changed",
-                             on_wizard_new_vendor_name_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_new_vendor_url_changed",
-                             on_wizard_new_vendor_url_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_confirm_create_vendor",
-                             on_wizard_confirm_create_vendor);
+        // Vendor step
+        {"on_wizard_vendor_selected", on_wizard_vendor_selected},
+        {"on_wizard_show_create_vendor_modal", on_wizard_show_create_vendor_modal},
+        {"on_wizard_cancel_create_vendor", on_wizard_cancel_create_vendor},
+        {"on_wizard_vendor_search_changed", on_wizard_vendor_search_changed},
+        {"on_wizard_new_vendor_name_changed", on_wizard_new_vendor_name_changed},
+        {"on_wizard_new_vendor_url_changed", on_wizard_new_vendor_url_changed},
+        {"on_wizard_confirm_create_vendor", on_wizard_confirm_create_vendor},
 
-    // Filament step
-    lv_xml_register_event_cb(nullptr, "on_wizard_filament_selected", on_wizard_filament_selected);
-    lv_xml_register_event_cb(nullptr, "on_wizard_show_create_filament_modal",
-                             on_wizard_show_create_filament_modal);
-    lv_xml_register_event_cb(nullptr, "on_wizard_cancel_create_filament",
-                             on_wizard_cancel_create_filament);
-    lv_xml_register_event_cb(nullptr, "on_wizard_material_changed", on_wizard_material_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_new_filament_name_changed",
-                             on_wizard_new_filament_name_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_pick_filament_color",
-                             on_wizard_pick_filament_color);
-    lv_xml_register_event_cb(nullptr, "on_wizard_nozzle_temp_changed",
-                             on_wizard_nozzle_temp_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_bed_temp_changed", on_wizard_bed_temp_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_filament_weight_changed",
-                             on_wizard_filament_weight_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_spool_weight_changed",
-                             on_wizard_spool_weight_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_confirm_create_filament",
-                             on_wizard_confirm_create_filament);
+        // Filament step
+        {"on_wizard_filament_selected", on_wizard_filament_selected},
+        {"on_wizard_show_create_filament_modal", on_wizard_show_create_filament_modal},
+        {"on_wizard_cancel_create_filament", on_wizard_cancel_create_filament},
+        {"on_wizard_material_changed", on_wizard_material_changed},
+        {"on_wizard_new_filament_name_changed", on_wizard_new_filament_name_changed},
+        {"on_wizard_pick_filament_color", on_wizard_pick_filament_color},
+        {"on_wizard_nozzle_temp_changed", on_wizard_nozzle_temp_changed},
+        {"on_wizard_bed_temp_changed", on_wizard_bed_temp_changed},
+        {"on_wizard_filament_weight_changed", on_wizard_filament_weight_changed},
+        {"on_wizard_spool_weight_changed", on_wizard_spool_weight_changed},
+        {"on_wizard_confirm_create_filament", on_wizard_confirm_create_filament},
 
-    // Spool details step
-    lv_xml_register_event_cb(nullptr, "on_wizard_remaining_weight_changed",
-                             on_wizard_remaining_weight_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_price_changed", on_wizard_price_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_lot_changed", on_wizard_lot_changed);
-    lv_xml_register_event_cb(nullptr, "on_wizard_notes_changed", on_wizard_notes_changed);
+        // Spool details step
+        {"on_wizard_remaining_weight_changed", on_wizard_remaining_weight_changed},
+        {"on_wizard_price_changed", on_wizard_price_changed},
+        {"on_wizard_lot_changed", on_wizard_lot_changed},
+        {"on_wizard_notes_changed", on_wizard_notes_changed},
+    });
 
     callbacks_registered_ = true;
     spdlog::debug("[{}] Event callbacks registered", get_name());

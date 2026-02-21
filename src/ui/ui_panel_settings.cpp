@@ -5,6 +5,7 @@
 
 #include "ui_ams_device_operations_overlay.h"
 #include "ui_ams_spoolman_overlay.h"
+#include "ui_callback_helpers.h"
 #include "ui_change_host_modal.h"
 #include "ui_debug_bundle_modal.h"
 #include "ui_emergency_stop.h"
@@ -410,42 +411,40 @@ void SettingsPanel::init_subjects() {
     UI_MANAGED_SUBJECT_STRING(touch_cal_status_subject_, touch_cal_status_buf_, status_text,
                               "touch_cal_status", subjects_);
 
-    // Register XML event callbacks for dropdowns (already in XML)
-    lv_xml_register_event_cb(nullptr, "on_completion_alert_changed",
-                             on_completion_alert_dropdown_changed);
-    lv_xml_register_event_cb(nullptr, "on_display_dim_changed", on_display_dim_dropdown_changed);
-    lv_xml_register_event_cb(nullptr, "on_display_sleep_changed",
-                             on_display_sleep_dropdown_changed);
-    lv_xml_register_event_cb(nullptr, "on_bed_mesh_mode_changed", on_bed_mesh_mode_changed);
-    lv_xml_register_event_cb(nullptr, "on_gcode_mode_changed", on_gcode_mode_changed);
-    lv_xml_register_event_cb(nullptr, "on_z_movement_style_changed", on_z_movement_style_changed);
-    lv_xml_register_event_cb(nullptr, "on_time_format_changed", on_time_format_changed);
-    lv_xml_register_event_cb(nullptr, "on_language_changed", on_language_changed);
-    lv_xml_register_event_cb(nullptr, "on_update_channel_changed", on_update_channel_changed);
-    lv_xml_register_event_cb(nullptr, "on_version_clicked", on_version_clicked);
+    // Register XML event callbacks for dropdowns, toggles, and action rows
+    register_xml_callbacks({
+        // Dropdowns
+        {"on_completion_alert_changed", on_completion_alert_dropdown_changed},
+        {"on_display_dim_changed", on_display_dim_dropdown_changed},
+        {"on_display_sleep_changed", on_display_sleep_dropdown_changed},
+        {"on_bed_mesh_mode_changed", on_bed_mesh_mode_changed},
+        {"on_gcode_mode_changed", on_gcode_mode_changed},
+        {"on_z_movement_style_changed", on_z_movement_style_changed},
+        {"on_time_format_changed", on_time_format_changed},
+        {"on_language_changed", on_language_changed},
+        {"on_update_channel_changed", on_update_channel_changed},
+        {"on_version_clicked", on_version_clicked},
 
-    // Register XML event callbacks for toggle switches
-    lv_xml_register_event_cb(nullptr, "on_dark_mode_changed", on_dark_mode_changed);
-    lv_xml_register_event_cb(nullptr, "on_animations_changed", on_animations_changed);
-    lv_xml_register_event_cb(nullptr, "on_gcode_3d_changed", on_gcode_3d_changed);
-    lv_xml_register_event_cb(nullptr, "on_led_light_changed", on_led_light_changed);
-    lv_xml_register_event_cb(nullptr, "on_led_settings_clicked", on_led_settings_clicked);
-    // Note: on_retraction_row_clicked is registered by RetractionSettingsOverlay
-    lv_xml_register_event_cb(nullptr, "on_sound_settings_clicked", on_sound_settings_clicked);
-    lv_xml_register_event_cb(nullptr, "on_estop_confirm_changed", on_estop_confirm_changed);
-    lv_xml_register_event_cb(nullptr, "on_cancel_escalation_changed", on_cancel_escalation_changed);
-    lv_xml_register_event_cb(nullptr, "on_cancel_escalation_timeout_changed",
-                             on_cancel_escalation_timeout_changed);
-    lv_xml_register_event_cb(nullptr, "on_telemetry_changed", SettingsPanel::on_telemetry_changed);
-    lv_xml_register_event_cb(nullptr, "on_telemetry_view_data",
-                             SettingsPanel::on_telemetry_view_data);
+        // Toggle switches
+        {"on_dark_mode_changed", on_dark_mode_changed},
+        {"on_animations_changed", on_animations_changed},
+        {"on_gcode_3d_changed", on_gcode_3d_changed},
+        {"on_led_light_changed", on_led_light_changed},
+        {"on_led_settings_clicked", on_led_settings_clicked},
+        // Note: on_retraction_row_clicked is registered by RetractionSettingsOverlay
+        {"on_sound_settings_clicked", on_sound_settings_clicked},
+        {"on_estop_confirm_changed", on_estop_confirm_changed},
+        {"on_cancel_escalation_changed", on_cancel_escalation_changed},
+        {"on_cancel_escalation_timeout_changed", on_cancel_escalation_timeout_changed},
+        {"on_telemetry_changed", SettingsPanel::on_telemetry_changed},
+        {"on_telemetry_view_data", SettingsPanel::on_telemetry_view_data},
 
-    // Register XML event callbacks for action rows
-    lv_xml_register_event_cb(nullptr, "on_display_settings_clicked", on_display_settings_clicked);
-    lv_xml_register_event_cb(nullptr, "on_home_widgets_clicked",
-                             SettingsPanel::on_home_widgets_clicked);
-    // Note: on_printer_image_clicked moved to PrinterManagerOverlay
-    lv_xml_register_event_cb(nullptr, "on_filament_sensors_clicked", on_filament_sensors_clicked);
+        // Action rows
+        {"on_display_settings_clicked", on_display_settings_clicked},
+        {"on_home_widgets_clicked", SettingsPanel::on_home_widgets_clicked},
+        // Note: on_printer_image_clicked moved to PrinterManagerOverlay
+        {"on_filament_sensors_clicked", on_filament_sensors_clicked},
+    });
 
     // Note: Sensors overlay callbacks are now handled by SensorSettingsOverlay
     // See ui_settings_sensors.h
@@ -454,46 +453,33 @@ void SettingsPanel::init_subjects() {
     // Note: Display Settings overlay callbacks are now handled by DisplaySettingsOverlay
     // See ui_settings_display.h
 
-    lv_xml_register_event_cb(nullptr, "on_ams_settings_clicked", on_ams_settings_clicked);
+    // Settings action rows and overlay navigation callbacks
+    register_xml_callbacks({
+        {"on_ams_settings_clicked", on_ams_settings_clicked},
+        {"on_spoolman_settings_clicked", on_spoolman_settings_clicked},
+        {"on_macro_buttons_clicked", on_macro_buttons_clicked},
+        {"on_machine_limits_clicked", on_machine_limits_clicked},
+        {"on_network_clicked", on_network_clicked},
+        {"on_factory_reset_clicked", on_factory_reset_clicked},
+        {"on_hardware_health_clicked", on_hardware_health_clicked},
+        {"on_plugins_clicked", on_plugins_clicked},
+        // Note: on_about_clicked registered in register_settings_panel_callbacks() per [L013]
+        // Note: on_check_updates_clicked, on_install_update_clicked also registered there
+        {"on_update_download_start", on_update_download_start},
+        {"on_update_download_cancel", on_update_download_cancel},
+        {"on_update_download_dismiss", on_update_download_dismiss},
+        {"on_update_restart", on_update_restart},
 
-    // Note: AMS Settings now goes directly to Device Operations overlay
-    // See ui_ams_device_operations_overlay.h
+        // Overlay callbacks
+        {"on_restart_later_clicked", on_restart_later_clicked},
+        {"on_restart_now_clicked", on_restart_now_clicked},
 
-    lv_xml_register_event_cb(nullptr, "on_spoolman_settings_clicked", on_spoolman_settings_clicked);
-
-    // Note: Spoolman overlay for weight sync settings
-    // See ui_ams_spoolman_overlay.h
-
-    lv_xml_register_event_cb(nullptr, "on_macro_buttons_clicked", on_macro_buttons_clicked);
-
-    // Note: Macro Buttons overlay callbacks are now handled by MacroButtonsOverlay
-    // See ui_settings_macro_buttons.h
-
-    lv_xml_register_event_cb(nullptr, "on_machine_limits_clicked", on_machine_limits_clicked);
-
-    // Note: Machine limits overlay callbacks and subjects are now handled by MachineLimitsOverlay
-    // See ui_settings_machine_limits.h
-
-    lv_xml_register_event_cb(nullptr, "on_network_clicked", on_network_clicked);
-    lv_xml_register_event_cb(nullptr, "on_factory_reset_clicked", on_factory_reset_clicked);
-    lv_xml_register_event_cb(nullptr, "on_hardware_health_clicked", on_hardware_health_clicked);
-    lv_xml_register_event_cb(nullptr, "on_plugins_clicked", on_plugins_clicked);
-    // Note: on_about_clicked registered in register_settings_panel_callbacks() per [L013]
-    // Note: on_check_updates_clicked, on_install_update_clicked also registered there
-    lv_xml_register_event_cb(nullptr, "on_update_download_start", on_update_download_start);
-    lv_xml_register_event_cb(nullptr, "on_update_download_cancel", on_update_download_cancel);
-    lv_xml_register_event_cb(nullptr, "on_update_download_dismiss", on_update_download_dismiss);
-    lv_xml_register_event_cb(nullptr, "on_update_restart", on_update_restart);
-
-    // Register XML event callbacks for overlays
-    lv_xml_register_event_cb(nullptr, "on_restart_later_clicked", on_restart_later_clicked);
-    lv_xml_register_event_cb(nullptr, "on_restart_now_clicked", on_restart_now_clicked);
-
-    // Register modal dialog callbacks (self-contained XML components)
-    lv_xml_register_event_cb(nullptr, "on_factory_reset_confirm", on_factory_reset_confirm);
-    lv_xml_register_event_cb(nullptr, "on_factory_reset_cancel", on_factory_reset_cancel);
-    lv_xml_register_event_cb(nullptr, "on_header_back_clicked", on_header_back_clicked);
-    // Note: on_brightness_changed is now handled by DisplaySettingsOverlay
+        // Modal dialog callbacks
+        {"on_factory_reset_confirm", on_factory_reset_confirm},
+        {"on_factory_reset_cancel", on_factory_reset_cancel},
+        {"on_header_back_clicked", on_header_back_clicked},
+        // Note: on_brightness_changed is now handled by DisplaySettingsOverlay
+    });
 
     // Note: BedMeshPanel subjects are initialized in main.cpp during startup
 
@@ -1465,57 +1451,40 @@ SettingsPanel& get_global_settings_panel() {
 void register_settings_panel_callbacks() {
     spdlog::trace("[SettingsPanel] Registering XML callbacks for settings_panel.xml");
 
-    // Toggle callbacks used in settings_panel.xml
-    lv_xml_register_event_cb(nullptr, "on_animations_changed",
-                             SettingsPanel::on_animations_changed);
-    lv_xml_register_event_cb(nullptr, "on_gcode_3d_changed", SettingsPanel::on_gcode_3d_changed);
-    lv_xml_register_event_cb(nullptr, "on_led_light_changed", SettingsPanel::on_led_light_changed);
-    lv_xml_register_event_cb(nullptr, "on_led_settings_clicked",
-                             SettingsPanel::on_led_settings_clicked);
-    lv_xml_register_event_cb(nullptr, "on_sound_settings_clicked",
-                             SettingsPanel::on_sound_settings_clicked);
-    lv_xml_register_event_cb(nullptr, "on_estop_confirm_changed",
-                             SettingsPanel::on_estop_confirm_changed);
-    lv_xml_register_event_cb(nullptr, "on_cancel_escalation_changed",
-                             SettingsPanel::on_cancel_escalation_changed);
-    lv_xml_register_event_cb(nullptr, "on_cancel_escalation_timeout_changed",
-                             on_cancel_escalation_timeout_changed);
-    lv_xml_register_event_cb(nullptr, "on_telemetry_changed", SettingsPanel::on_telemetry_changed);
-    lv_xml_register_event_cb(nullptr, "on_telemetry_view_data",
-                             SettingsPanel::on_telemetry_view_data);
+    register_xml_callbacks({
+        // Toggle callbacks used in settings_panel.xml
+        {"on_animations_changed", SettingsPanel::on_animations_changed},
+        {"on_gcode_3d_changed", SettingsPanel::on_gcode_3d_changed},
+        {"on_led_light_changed", SettingsPanel::on_led_light_changed},
+        {"on_led_settings_clicked", SettingsPanel::on_led_settings_clicked},
+        {"on_sound_settings_clicked", SettingsPanel::on_sound_settings_clicked},
+        {"on_estop_confirm_changed", SettingsPanel::on_estop_confirm_changed},
+        {"on_cancel_escalation_changed", SettingsPanel::on_cancel_escalation_changed},
+        {"on_cancel_escalation_timeout_changed", on_cancel_escalation_timeout_changed},
+        {"on_telemetry_changed", SettingsPanel::on_telemetry_changed},
+        {"on_telemetry_view_data", SettingsPanel::on_telemetry_view_data},
 
-    // Action row callbacks used in settings_panel.xml
-    lv_xml_register_event_cb(nullptr, "on_display_settings_clicked",
-                             SettingsPanel::on_display_settings_clicked);
-    lv_xml_register_event_cb(nullptr, "on_home_widgets_clicked",
-                             SettingsPanel::on_home_widgets_clicked);
-    lv_xml_register_event_cb(nullptr, "on_filament_sensors_clicked",
-                             SettingsPanel::on_filament_sensors_clicked);
-    lv_xml_register_event_cb(nullptr, "on_macro_buttons_clicked",
-                             SettingsPanel::on_macro_buttons_clicked);
-    lv_xml_register_event_cb(nullptr, "on_machine_limits_clicked",
-                             SettingsPanel::on_machine_limits_clicked);
-    lv_xml_register_event_cb(nullptr, "on_network_clicked", SettingsPanel::on_network_clicked);
-    lv_xml_register_event_cb(nullptr, "on_touch_calibration_clicked",
-                             SettingsPanel::on_touch_calibration_clicked);
-    lv_xml_register_event_cb(nullptr, "on_factory_reset_clicked",
-                             SettingsPanel::on_factory_reset_clicked);
-    lv_xml_register_event_cb(nullptr, "on_hardware_health_clicked",
-                             SettingsPanel::on_hardware_health_clicked);
-    lv_xml_register_event_cb(nullptr, "on_restart_helix_settings_clicked",
-                             SettingsPanel::on_restart_helix_settings_clicked);
-    lv_xml_register_event_cb(nullptr, "on_print_hours_clicked",
-                             SettingsPanel::on_print_hours_clicked);
-    lv_xml_register_event_cb(nullptr, "on_change_host_clicked",
-                             SettingsPanel::on_change_host_clicked);
-    lv_xml_register_event_cb(nullptr, "on_about_clicked", SettingsPanel::on_about_clicked);
+        // Action row callbacks used in settings_panel.xml
+        {"on_display_settings_clicked", SettingsPanel::on_display_settings_clicked},
+        {"on_home_widgets_clicked", SettingsPanel::on_home_widgets_clicked},
+        {"on_filament_sensors_clicked", SettingsPanel::on_filament_sensors_clicked},
+        {"on_macro_buttons_clicked", SettingsPanel::on_macro_buttons_clicked},
+        {"on_machine_limits_clicked", SettingsPanel::on_machine_limits_clicked},
+        {"on_network_clicked", SettingsPanel::on_network_clicked},
+        {"on_touch_calibration_clicked", SettingsPanel::on_touch_calibration_clicked},
+        {"on_factory_reset_clicked", SettingsPanel::on_factory_reset_clicked},
+        {"on_hardware_health_clicked", SettingsPanel::on_hardware_health_clicked},
+        {"on_restart_helix_settings_clicked", SettingsPanel::on_restart_helix_settings_clicked},
+        {"on_print_hours_clicked", SettingsPanel::on_print_hours_clicked},
+        {"on_change_host_clicked", SettingsPanel::on_change_host_clicked},
+        {"on_about_clicked", SettingsPanel::on_about_clicked},
 
-    // Help & Support callbacks
-    lv_xml_register_event_cb(nullptr, "on_debug_bundle_clicked",
-                             SettingsPanel::on_debug_bundle_clicked);
-    lv_xml_register_event_cb(nullptr, "on_discord_clicked", SettingsPanel::on_discord_clicked);
-    lv_xml_register_event_cb(nullptr, "on_docs_clicked", SettingsPanel::on_docs_clicked);
+        // Help & Support callbacks
+        {"on_debug_bundle_clicked", SettingsPanel::on_debug_bundle_clicked},
+        {"on_discord_clicked", SettingsPanel::on_discord_clicked},
+        {"on_docs_clicked", SettingsPanel::on_docs_clicked},
 
-    lv_xml_register_event_cb(nullptr, "on_check_updates_clicked", on_check_updates_clicked);
-    lv_xml_register_event_cb(nullptr, "on_install_update_clicked", on_install_update_clicked);
+        {"on_check_updates_clicked", on_check_updates_clicked},
+        {"on_install_update_clicked", on_install_update_clicked},
+    });
 }

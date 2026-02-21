@@ -3,6 +3,7 @@
 
 #include "ui_panel_controls.h"
 
+#include "ui_callback_helpers.h"
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_fan_control_overlay.h"
@@ -226,48 +227,49 @@ void ControlsPanel::init_subjects() {
             }
         });
 
-    // Register calibration button event callbacks (direct buttons in card, no modal)
-    lv_xml_register_event_cb(nullptr, "on_calibration_bed_mesh", on_calibration_bed_mesh);
-    lv_xml_register_event_cb(nullptr, "on_calibration_zoffset", on_calibration_zoffset);
-    lv_xml_register_event_cb(nullptr, "on_calibration_screws", on_calibration_screws);
-    lv_xml_register_event_cb(nullptr, "on_calibration_motors", on_calibration_motors);
+    register_xml_callbacks({
+        // Calibration button event callbacks (direct buttons in card, no modal)
+        {"on_calibration_bed_mesh", on_calibration_bed_mesh},
+        {"on_calibration_zoffset", on_calibration_zoffset},
+        {"on_calibration_screws", on_calibration_screws},
+        {"on_calibration_motors", on_calibration_motors},
 
-    // Register V2 controls panel event callbacks (XML event_cb references)
-    // Quick Actions: Home buttons
-    lv_xml_register_event_cb(nullptr, "on_controls_home_all", on_home_all);
-    lv_xml_register_event_cb(nullptr, "on_controls_home_x", on_home_x);
-    lv_xml_register_event_cb(nullptr, "on_controls_home_y", on_home_y);
-    lv_xml_register_event_cb(nullptr, "on_controls_home_xy", on_home_xy);
-    lv_xml_register_event_cb(nullptr, "on_controls_home_z", on_home_z);
+        // Quick Actions: Home buttons
+        {"on_controls_home_all", on_home_all},
+        {"on_controls_home_x", on_home_x},
+        {"on_controls_home_y", on_home_y},
+        {"on_controls_home_xy", on_home_xy},
+        {"on_controls_home_z", on_home_z},
 
-    // Quick Actions: Leveling buttons (QGL / Z-Tilt)
-    lv_xml_register_event_cb(nullptr, "on_controls_qgl", on_qgl);
-    lv_xml_register_event_cb(nullptr, "on_controls_z_tilt", on_z_tilt);
+        // Quick Actions: Leveling buttons (QGL / Z-Tilt)
+        {"on_controls_qgl", on_qgl},
+        {"on_controls_z_tilt", on_z_tilt},
 
-    // Quick Actions: Macro buttons (unified callback with user_data index)
-    lv_xml_register_event_cb(nullptr, "on_controls_macro", on_macro);
+        // Quick Actions: Macro buttons (unified callback with user_data index)
+        {"on_controls_macro", on_macro},
 
-    // Speed/Flow override buttons
-    lv_xml_register_event_cb(nullptr, "on_controls_speed_up", on_speed_up);
-    lv_xml_register_event_cb(nullptr, "on_controls_speed_down", on_speed_down);
-    lv_xml_register_event_cb(nullptr, "on_controls_flow_up", on_flow_up);
-    lv_xml_register_event_cb(nullptr, "on_controls_flow_down", on_flow_down);
+        // Speed/Flow override buttons
+        {"on_controls_speed_up", on_speed_up},
+        {"on_controls_speed_down", on_speed_down},
+        {"on_controls_flow_up", on_flow_up},
+        {"on_controls_flow_down", on_flow_down},
 
-    // Cooling: Fan slider
-    lv_xml_register_event_cb(nullptr, "on_controls_fan_slider", on_fan_slider_changed);
+        // Cooling: Fan slider
+        {"on_controls_fan_slider", on_fan_slider_changed},
 
-    // Z-Offset banner: Save button
-    lv_xml_register_event_cb(nullptr, "on_controls_save_z_offset", on_save_z_offset);
+        // Z-Offset banner: Save button
+        {"on_controls_save_z_offset", on_save_z_offset},
 
-    // Z-Offset clickable row: Opens Print Tune overlay
-    lv_xml_register_event_cb(nullptr, "on_zoffset_tune", on_zoffset_tune);
+        // Z-Offset clickable row: Opens Print Tune overlay
+        {"on_zoffset_tune", on_zoffset_tune},
 
-    // Card click handlers (navigation to full overlay panels)
-    lv_xml_register_event_cb(nullptr, "on_controls_quick_actions", on_quick_actions_clicked);
-    lv_xml_register_event_cb(nullptr, "on_controls_temperatures", on_temperatures_clicked);
-    lv_xml_register_event_cb(nullptr, "on_nozzle_temp_clicked", on_nozzle_temp_clicked);
-    lv_xml_register_event_cb(nullptr, "on_bed_temp_clicked", on_bed_temp_clicked);
-    lv_xml_register_event_cb(nullptr, "on_controls_cooling", on_cooling_clicked);
+        // Card click handlers (navigation to full overlay panels)
+        {"on_controls_quick_actions", on_quick_actions_clicked},
+        {"on_controls_temperatures", on_temperatures_clicked},
+        {"on_nozzle_temp_clicked", on_nozzle_temp_clicked},
+        {"on_bed_temp_clicked", on_bed_temp_clicked},
+        {"on_controls_cooling", on_cooling_clicked},
+    });
 
     subjects_initialized_ = true;
     spdlog::trace("[{}] Dashboard subjects initialized", get_name());
