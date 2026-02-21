@@ -51,6 +51,7 @@
 #include "moonraker_history_api.h"
 #include "moonraker_job_api.h"
 #include "moonraker_motion_api.h"
+#include "moonraker_rest_api.h"
 #include "moonraker_spoolman_api.h"
 #include "moonraker_timelapse_api.h"
 #include "moonraker_types.h"
@@ -99,8 +100,6 @@ class MoonrakerAPI {
     using BoolCallback = std::function<void(bool)>;
     using StringCallback = std::function<void(const std::string&)>;
     using JsonCallback = std::function<void(const json&)>;
-    using RestCallback = std::function<void(const RestResponse&)>;
-
     /**
      * @brief Progress callback for file transfer operations
      *
@@ -486,90 +485,6 @@ class MoonrakerAPI {
      * @param on_error Error callback
      */
     void query_configfile(JsonCallback on_success, ErrorCallback on_error);
-
-    // ========================================================================
-    // Generic REST Endpoint Operations (for Moonraker extensions)
-    // ========================================================================
-
-    /**
-     * @brief Call a Moonraker extension REST endpoint with GET
-     *
-     * Makes an HTTP GET request to a Moonraker extension endpoint.
-     * Used for plugins like ValgACE that expose REST APIs at /server/xxx/.
-     *
-     * Example: call_rest_get("/server/ace/status", callback, error_callback)
-     *
-     * @param endpoint REST endpoint path (e.g., "/server/ace/status")
-     * @param on_complete Callback with response (success or failure)
-     */
-    virtual void call_rest_get(const std::string& endpoint, RestCallback on_complete);
-
-    /**
-     * @brief Call a Moonraker extension REST endpoint with POST
-     *
-     * Makes an HTTP POST request to a Moonraker extension endpoint.
-     * Used for plugins like ValgACE that accept commands via REST.
-     *
-     * Example: call_rest_post("/server/ace/command", {"action": "load"}, callback)
-     *
-     * @param endpoint REST endpoint path (e.g., "/server/ace/command")
-     * @param params JSON parameters to POST
-     * @param on_complete Callback with response (success or failure)
-     */
-    virtual void call_rest_post(const std::string& endpoint, const json& params,
-                                RestCallback on_complete);
-
-    // ========================================================================
-    // WLED Control Operations (Moonraker WLED Bridge)
-    // ========================================================================
-
-    /**
-     * @brief Get list of discovered WLED strips via Moonraker bridge
-     *
-     * GET /machine/wled/strips - Returns WLED devices configured in moonraker.conf.
-     *
-     * @param on_success Callback with RestResponse containing strip data
-     * @param on_error Error callback
-     */
-    virtual void wled_get_strips(RestCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Control a WLED strip via Moonraker bridge
-     *
-     * POST /machine/wled/strip with JSON body containing strip name and action.
-     * Brightness and preset are optional (-1 means omit from request).
-     *
-     * @param strip WLED strip name (as configured in moonraker.conf)
-     * @param action Action: "on", "off", or "toggle"
-     * @param brightness Brightness 0-255 (-1 to omit)
-     * @param preset WLED preset ID (-1 to omit)
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    virtual void wled_set_strip(const std::string& strip, const std::string& action, int brightness,
-                                int preset, SuccessCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Get WLED strip status via Moonraker bridge
-     *
-     * GET /machine/wled/strips - Returns current state of all WLED strips
-     * including on/off status, brightness, and active preset.
-     *
-     * @param on_success Callback with RestResponse containing status data
-     * @param on_error Error callback
-     */
-    virtual void wled_get_status(RestCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Fetch server configuration from Moonraker
-     *
-     * GET /server/config - Returns the full server configuration including
-     * WLED device addresses configured in moonraker.conf.
-     *
-     * @param on_success Callback with RestResponse containing config data
-     * @param on_error Error callback
-     */
-    virtual void get_server_config(RestCallback on_success, ErrorCallback on_error);
 
     // ========================================================================
     // HTTP File Transfer Operations
@@ -1123,6 +1038,19 @@ class MoonrakerAPI {
     }
 
     /**
+     * @brief Get REST API for generic REST endpoint and WLED operations
+     *
+     * All REST methods (call_rest_get, call_rest_post, wled_get_strips,
+     * wled_set_strip, wled_get_status, get_server_config) are available
+     * through this accessor.
+     *
+     * @return Reference to MoonrakerRestAPI
+     */
+    MoonrakerRestAPI& rest() {
+        return *rest_api_;
+    }
+
+    /**
      * @brief Get Spoolman API for filament tracking operations
      *
      * All Spoolman methods (get_spoolman_spools, set_active_spool, etc.)
@@ -1240,6 +1168,7 @@ class MoonrakerAPI {
     std::unique_ptr<MoonrakerHistoryAPI> history_api_;     ///< Print history API
     std::unique_ptr<MoonrakerJobAPI> job_api_;             ///< Job control API
     std::unique_ptr<MoonrakerMotionAPI> motion_api_;       ///< Motion control API
+    std::unique_ptr<MoonrakerRestAPI> rest_api_;           ///< REST endpoint & WLED API
     std::unique_ptr<MoonrakerSpoolmanAPI> spoolman_api_;   ///< Spoolman filament tracking API
     std::unique_ptr<MoonrakerTimelapseAPI> timelapse_api_; ///< Timelapse & webcam API
 

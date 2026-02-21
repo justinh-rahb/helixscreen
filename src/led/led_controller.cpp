@@ -284,7 +284,7 @@ void LedController::discover_wled_strips() {
 
     spdlog::debug("[LedController] Starting WLED strip discovery via Moonraker");
 
-    api_->wled_get_strips(
+    api_->rest().wled_get_strips(
         [this](const RestResponse& resp) {
             // Response format: {"result": {strip_name: {details...}, ...}}
             if (!resp.data.is_object()) {
@@ -359,7 +359,7 @@ void LedController::discover_wled_strips() {
                 spdlog::info("[LedController] Discovered {} WLED strip(s)", count);
 
                 // Fetch server config to get WLED device addresses
-                this->api_->get_server_config(
+                this->api_->rest().get_server_config(
                     [this](const RestResponse& cfg_resp) {
                         if (!cfg_resp.data.is_object())
                             return;
@@ -897,12 +897,12 @@ void WledBackend::set_on(const std::string& strip_name, NativeBackend::SuccessCa
     spdlog::debug("[WledBackend] set_on: {}", strip_name);
     // Optimistic state tracking
     strip_states_[strip_name].is_on = true;
-    api_->wled_set_strip(strip_name, "on", -1, -1, on_success,
-                         [on_error](const MoonrakerError& err) {
-                             if (on_error) {
-                                 on_error(err.message);
-                             }
-                         });
+    api_->rest().wled_set_strip(strip_name, "on", -1, -1, on_success,
+                                [on_error](const MoonrakerError& err) {
+                                    if (on_error) {
+                                        on_error(err.message);
+                                    }
+                                });
 }
 
 void WledBackend::set_off(const std::string& strip_name, NativeBackend::SuccessCallback on_success,
@@ -918,12 +918,12 @@ void WledBackend::set_off(const std::string& strip_name, NativeBackend::SuccessC
     spdlog::debug("[WledBackend] set_off: {}", strip_name);
     // Optimistic state tracking
     strip_states_[strip_name].is_on = false;
-    api_->wled_set_strip(strip_name, "off", -1, -1, on_success,
-                         [on_error](const MoonrakerError& err) {
-                             if (on_error) {
-                                 on_error(err.message);
-                             }
-                         });
+    api_->rest().wled_set_strip(strip_name, "off", -1, -1, on_success,
+                                [on_error](const MoonrakerError& err) {
+                                    if (on_error) {
+                                        on_error(err.message);
+                                    }
+                                });
 }
 
 void WledBackend::set_brightness(const std::string& strip_name, int brightness,
@@ -943,12 +943,12 @@ void WledBackend::set_brightness(const std::string& strip_name, int brightness,
 
     spdlog::debug("[WledBackend] set_brightness: {} {}% -> WLED {}", strip_name, brightness,
                   wled_brightness);
-    api_->wled_set_strip(strip_name, "on", wled_brightness, -1, on_success,
-                         [on_error](const MoonrakerError& err) {
-                             if (on_error) {
-                                 on_error(err.message);
-                             }
-                         });
+    api_->rest().wled_set_strip(strip_name, "on", wled_brightness, -1, on_success,
+                                [on_error](const MoonrakerError& err) {
+                                    if (on_error) {
+                                        on_error(err.message);
+                                    }
+                                });
 }
 
 void WledBackend::set_preset(const std::string& strip_name, int preset_id,
@@ -963,12 +963,12 @@ void WledBackend::set_preset(const std::string& strip_name, int preset_id,
     }
 
     spdlog::debug("[WledBackend] set_preset: {} preset={}", strip_name, preset_id);
-    api_->wled_set_strip(strip_name, "on", -1, preset_id, on_success,
-                         [on_error](const MoonrakerError& err) {
-                             if (on_error) {
-                                 on_error(err.message);
-                             }
-                         });
+    api_->rest().wled_set_strip(strip_name, "on", -1, preset_id, on_success,
+                                [on_error](const MoonrakerError& err) {
+                                    if (on_error) {
+                                        on_error(err.message);
+                                    }
+                                });
 }
 
 void WledBackend::toggle(const std::string& strip_name, NativeBackend::SuccessCallback on_success,
@@ -982,12 +982,12 @@ void WledBackend::toggle(const std::string& strip_name, NativeBackend::SuccessCa
     }
 
     spdlog::debug("[WledBackend] toggle: {}", strip_name);
-    api_->wled_set_strip(strip_name, "toggle", -1, -1, on_success,
-                         [on_error](const MoonrakerError& err) {
-                             if (on_error) {
-                                 on_error(err.message);
-                             }
-                         });
+    api_->rest().wled_set_strip(strip_name, "toggle", -1, -1, on_success,
+                                [on_error](const MoonrakerError& err) {
+                                    if (on_error) {
+                                        on_error(err.message);
+                                    }
+                                });
 }
 
 void WledBackend::set_strip_address(const std::string& strip_id, const std::string& address) {
@@ -1040,7 +1040,7 @@ void WledBackend::poll_status(std::function<void()> on_complete) {
         return;
     }
 
-    api_->wled_get_strips(
+    api_->rest().wled_get_strips(
         [this, on_complete](const RestResponse& resp) {
             const json& strips_data =
                 resp.data.contains("result") ? resp.data["result"] : resp.data;

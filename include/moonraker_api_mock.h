@@ -236,6 +236,48 @@ class MoonrakerTimelapseAPIMock : public MoonrakerTimelapseAPI {
 };
 
 /**
+ * @brief Mock REST API for testing without real Moonraker REST endpoints
+ *
+ * Overrides all MoonrakerRestAPI methods to return mock data.
+ * WLED state is tracked internally for toggle/brightness/preset testing.
+ */
+class MoonrakerRestAPIMock : public MoonrakerRestAPI {
+  public:
+    using SuccessCallback = MoonrakerRestAPI::SuccessCallback;
+    using ErrorCallback = MoonrakerRestAPI::ErrorCallback;
+    using RestCallback = MoonrakerRestAPI::RestCallback;
+
+    explicit MoonrakerRestAPIMock(helix::MoonrakerClient& client, const std::string& http_base_url);
+    ~MoonrakerRestAPIMock() override = default;
+
+    // ========================================================================
+    // Overridden REST Methods (return mock responses)
+    // ========================================================================
+
+    void call_rest_get(const std::string& endpoint, RestCallback on_complete) override;
+    void call_rest_post(const std::string& endpoint, const nlohmann::json& params,
+                        RestCallback on_complete) override;
+
+    // ========================================================================
+    // Overridden WLED Methods (return mock data with tracked state)
+    // ========================================================================
+
+    void wled_get_strips(RestCallback on_success, ErrorCallback on_error) override;
+    void wled_set_strip(const std::string& strip, const std::string& action, int brightness,
+                        int preset, SuccessCallback on_success, ErrorCallback on_error) override;
+    void wled_get_status(RestCallback on_success, ErrorCallback on_error) override;
+    void get_server_config(RestCallback on_success, ErrorCallback on_error) override;
+
+  private:
+    /// Mock WLED strip on/off states (strip_id -> is_on)
+    std::map<std::string, bool> mock_wled_states_;
+    /// Mock WLED active presets (strip_id -> preset_id, -1 = none)
+    std::map<std::string, int> mock_wled_presets_;
+    /// Mock WLED brightness per strip (strip_id -> 0-255)
+    std::map<std::string, int> mock_wled_brightness_;
+};
+
+/**
  * @brief Mock MoonrakerAPI for testing without real printer connection
  *
  * Overrides HTTP file transfer methods to use local test files instead
@@ -413,13 +455,6 @@ class MoonrakerAPIMock : public MoonrakerAPI {
     void set_device_power(const std::string& device, const std::string& action,
                           SuccessCallback on_success, ErrorCallback on_error) override;
 
-    // WLED control (mock: logs and calls on_success)
-    void wled_get_strips(RestCallback on_success, ErrorCallback on_error) override;
-    void wled_set_strip(const std::string& strip, const std::string& action, int brightness,
-                        int preset, SuccessCallback on_success, ErrorCallback on_error) override;
-    void wled_get_status(RestCallback on_success, ErrorCallback on_error) override;
-    void get_server_config(RestCallback on_success, ErrorCallback on_error) override;
-
     // ========================================================================
     // Shared State Methods
     // ========================================================================
@@ -530,31 +565,15 @@ class MoonrakerAPIMock : public MoonrakerAPI {
     MoonrakerTimelapseAPIMock& timelapse_mock();
 
     // ========================================================================
-    // Overridden REST Methods (return mock responses)
+    // REST Mock Access
     // ========================================================================
 
     /**
-     * @brief Mock REST GET request
+     * @brief Get the REST mock sub-API for mock-specific helpers
      *
-     * Returns mock responses for known endpoints (e.g., /server/ace/)
-     * or a generic success response for unknown endpoints.
-     *
-     * @param endpoint REST endpoint path (e.g., "/server/ace/info")
-     * @param on_complete Callback with RestResponse
+     * @return Reference to MoonrakerRestAPIMock
      */
-    void call_rest_get(const std::string& endpoint, RestCallback on_complete) override;
-
-    /**
-     * @brief Mock REST POST request
-     *
-     * Logs the request and returns a generic success response.
-     *
-     * @param endpoint REST endpoint path
-     * @param params JSON parameters
-     * @param on_complete Callback with RestResponse
-     */
-    void call_rest_post(const std::string& endpoint, const nlohmann::json& params,
-                        RestCallback on_complete) override;
+    MoonrakerRestAPIMock& rest_mock();
 
   private:
     // Shared mock state for coordination with MoonrakerClientMock
@@ -582,13 +601,6 @@ class MoonrakerAPIMock : public MoonrakerAPI {
 
     /// Mock bed state for screws tilt simulation
     MockScrewsTiltState mock_bed_state_;
-
-    /// Mock WLED strip on/off states (strip_id -> is_on)
-    std::map<std::string, bool> mock_wled_states_;
-    /// Mock WLED active presets (strip_id -> preset_id, -1 = none)
-    std::map<std::string, int> mock_wled_presets_;
-    /// Mock WLED brightness per strip (strip_id -> 0-255)
-    std::map<std::string, int> mock_wled_brightness_;
 
     // Mock subscription ID counter
     helix::SubscriptionId mock_next_subscription_id_ = 100;

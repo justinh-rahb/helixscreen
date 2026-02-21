@@ -474,7 +474,7 @@ void AmsBackendValgACE::poll_info() {
     // Capture alive_ by value (shared_ptr copy) for callback lifetime safety
     auto alive = alive_;
 
-    api_->call_rest_get("/server/ace/info", [this, state, alive](const RestResponse& resp) {
+    api_->rest().call_rest_get("/server/ace/info", [this, state, alive](const RestResponse& resp) {
         // Check if object is still alive before accessing members
         if (!alive || !alive->load()) {
             std::lock_guard<std::mutex> lock(state->mtx);
@@ -512,7 +512,7 @@ void AmsBackendValgACE::poll_status() {
     // Capture alive_ by value for callback lifetime safety
     auto alive = alive_;
 
-    api_->call_rest_get("/server/ace/status", [this, alive](const RestResponse& resp) {
+    api_->rest().call_rest_get("/server/ace/status", [this, alive](const RestResponse& resp) {
         // Check if object is still alive before accessing members
         if (!alive || !alive->load()) {
             return;
@@ -538,7 +538,7 @@ void AmsBackendValgACE::poll_slots() {
     // Capture alive_ by value for callback lifetime safety
     auto alive = alive_;
 
-    api_->call_rest_get("/server/ace/slots", [this, alive](const RestResponse& resp) {
+    api_->rest().call_rest_get("/server/ace/slots", [this, alive](const RestResponse& resp) {
         // Check if object is still alive before accessing members
         if (!alive || !alive->load()) {
             return;

@@ -35,8 +35,13 @@ MoonrakerAPIMock::MoonrakerAPIMock(MoonrakerClient& client, PrinterState& state)
     spdlog::debug("[MoonrakerAPIMock] Created - HTTP methods will use local test files");
 
     // Replace base sub-APIs with mock versions
+    rest_api_ = std::make_unique<MoonrakerRestAPIMock>(client, get_http_base_url());
     spoolman_api_ = std::make_unique<MoonrakerSpoolmanAPIMock>(client);
     timelapse_api_ = std::make_unique<MoonrakerTimelapseAPIMock>(client, get_http_base_url());
+}
+
+MoonrakerRestAPIMock& MoonrakerAPIMock::rest_mock() {
+    return static_cast<MoonrakerRestAPIMock&>(*rest_api_);
 }
 
 MoonrakerSpoolmanAPIMock& MoonrakerAPIMock::spoolman_mock() {
@@ -545,7 +550,15 @@ void MoonrakerAPIMock::set_device_power(const std::string& device, const std::st
     }
 }
 
-void MoonrakerAPIMock::wled_get_strips(RestCallback on_success, ErrorCallback /*on_error*/) {
+// ============================================================================
+// MoonrakerRestAPIMock Implementation
+// ============================================================================
+
+MoonrakerRestAPIMock::MoonrakerRestAPIMock(MoonrakerClient& client,
+                                           const std::string& http_base_url)
+    : MoonrakerRestAPI(client, http_base_url) {}
+
+void MoonrakerRestAPIMock::wled_get_strips(RestCallback on_success, ErrorCallback /*on_error*/) {
     spdlog::info("[MoonrakerAPIMock] WLED get_strips (returning mock strips from tracked state)");
 
     // Initialize defaults if not already set (same pattern as wled_get_status)
@@ -587,9 +600,9 @@ void MoonrakerAPIMock::wled_get_strips(RestCallback on_success, ErrorCallback /*
     }
 }
 
-void MoonrakerAPIMock::wled_set_strip(const std::string& strip, const std::string& action,
-                                      int brightness, int preset, SuccessCallback on_success,
-                                      ErrorCallback /*on_error*/) {
+void MoonrakerRestAPIMock::wled_set_strip(const std::string& strip, const std::string& action,
+                                          int brightness, int preset, SuccessCallback on_success,
+                                          ErrorCallback /*on_error*/) {
     spdlog::info("[MoonrakerAPIMock] WLED set_strip: strip={} action={} brightness={} preset={}",
                  strip, action, brightness, preset);
 
@@ -618,7 +631,7 @@ void MoonrakerAPIMock::wled_set_strip(const std::string& strip, const std::strin
     }
 }
 
-void MoonrakerAPIMock::wled_get_status(RestCallback on_success, ErrorCallback /*on_error*/) {
+void MoonrakerRestAPIMock::wled_get_status(RestCallback on_success, ErrorCallback /*on_error*/) {
     spdlog::info("[MoonrakerAPIMock] WLED get_status");
 
     // Initialize default states if not already set
@@ -670,7 +683,7 @@ void MoonrakerAPIMock::wled_get_status(RestCallback on_success, ErrorCallback /*
     }
 }
 
-void MoonrakerAPIMock::get_server_config(RestCallback on_success, ErrorCallback /*on_error*/) {
+void MoonrakerRestAPIMock::get_server_config(RestCallback on_success, ErrorCallback /*on_error*/) {
     spdlog::info("[MoonrakerAPIMock] get_server_config");
 
     if (on_success) {
@@ -1699,10 +1712,10 @@ void MoonrakerSpoolmanAPIMock::delete_spoolman_filament(int filament_id, Success
 }
 
 // ============================================================================
-// MoonrakerAPIMock - REST Endpoint Methods
+// MoonrakerRestAPIMock - REST Endpoint Methods
 // ============================================================================
 
-void MoonrakerAPIMock::call_rest_get(const std::string& endpoint, RestCallback on_complete) {
+void MoonrakerRestAPIMock::call_rest_get(const std::string& endpoint, RestCallback on_complete) {
     spdlog::debug("[MoonrakerAPIMock] REST GET: {}", endpoint);
 
     RestResponse resp;
@@ -1757,8 +1770,8 @@ void MoonrakerAPIMock::call_rest_get(const std::string& endpoint, RestCallback o
     }
 }
 
-void MoonrakerAPIMock::call_rest_post(const std::string& endpoint, const nlohmann::json& params,
-                                      RestCallback on_complete) {
+void MoonrakerRestAPIMock::call_rest_post(const std::string& endpoint, const nlohmann::json& params,
+                                          RestCallback on_complete) {
     spdlog::debug("[MoonrakerAPIMock] REST POST: {} ({} bytes)", endpoint, params.dump().size());
 
     RestResponse resp;
