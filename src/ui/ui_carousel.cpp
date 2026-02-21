@@ -76,11 +76,16 @@ void carousel_scroll_end_cb(lv_event_t* e) {
 
     int count = static_cast<int>(state->real_tiles.size());
     if (count > 0) {
-        if (page < 0) {
-            page = 0;
-        }
-        if (page >= count) {
-            page = count - 1;
+        // Apply same wrap/clamp logic as goto_page
+        if (state->wrap) {
+            page = ((page % count) + count) % count;
+        } else {
+            if (page < 0) {
+                page = 0;
+            }
+            if (page >= count) {
+                page = count - 1;
+            }
         }
     }
 

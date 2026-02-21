@@ -13,7 +13,7 @@
  * - Horizontal scrollable container with snap-to-page behavior
  * - Page indicator dots
  * - Optional auto-scroll timer
- * - Optional wrap-around (infinite scroll via clone tiles)
+ * - Optional wrap-around
  * - Subject binding for current page
  *
  * Usage in XML:
@@ -29,8 +29,6 @@ struct CarouselState {
     lv_obj_t* scroll_container = nullptr;
     lv_obj_t* indicator_row = nullptr;
     std::vector<lv_obj_t*> real_tiles;
-    lv_obj_t* clone_first = nullptr;
-    lv_obj_t* clone_last = nullptr;
     lv_subject_t* page_subject = nullptr;
     lv_timer_t* auto_timer = nullptr;
     int current_page = 0;
