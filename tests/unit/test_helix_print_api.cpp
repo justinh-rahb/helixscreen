@@ -81,7 +81,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
     // With disconnected client, check should report plugin unavailable
     // (error callback path returns false, not error)
 
-    api->check_helix_plugin(
+    api->job().check_helix_plugin(
         [this](bool available) {
             bool_result = available;
             success_called = true;
@@ -108,7 +108,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
                  "HelixPrint API - start_modified_print validates original filename",
                  "[print][api][security]") {
     SECTION("Rejects path traversal in original filename") {
-        api->start_modified_print(
+        api->job().start_modified_print(
             "../../../etc/passwd",       // Malicious original path
             ".helix_temp/mod_123.gcode", // Valid temp path
             {"test_mod"}, [this](const ModifiedPrintResult&) { success_called = true; },
@@ -125,7 +125,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
     }
 
     SECTION("Rejects filename with newlines") {
-        api->start_modified_print(
+        api->job().start_modified_print(
             "test\nfile.gcode",          // Newline injection
             ".helix_temp/mod_123.gcode", // Valid temp path
             {"test_mod"}, [this](const ModifiedPrintResult&) { success_called = true; },
@@ -142,7 +142,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
 
     SECTION("Accepts valid filename") {
         // This will fail due to disconnected client, but should pass validation
-        api->start_modified_print(
+        api->job().start_modified_print(
             "benchy.gcode", ".helix_temp/mod_benchy.gcode", {"bed_leveling_disabled"},
             [this](const ModifiedPrintResult& result) {
                 modified_print_result = result;
@@ -164,7 +164,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
     }
 
     SECTION("Accepts filename with subdirectory") {
-        api->start_modified_print(
+        api->job().start_modified_print(
             "prints/2024/benchy.gcode", // Valid subdirectory path
             ".helix_temp/mod_benchy.gcode", {"test_mod"},
             [this](const ModifiedPrintResult&) { success_called = true; },
@@ -186,7 +186,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
                  "HelixPrint API - start_modified_print validates temp file path",
                  "[print][api][security]") {
     SECTION("Rejects path traversal in temp path") {
-        api->start_modified_print(
+        api->job().start_modified_print(
             "benchy.gcode",        // Valid original
             "../../../etc/passwd", // Malicious temp path
             {"test_mod"}, [this](const ModifiedPrintResult&) { success_called = true; },
@@ -203,7 +203,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture,
     }
 
     SECTION("Rejects temp path with newlines") {
-        api->start_modified_print(
+        api->job().start_modified_print(
             "benchy.gcode",
             ".helix_temp/mod\n123.gcode", // Newline injection
             {"test_mod"}, [this](const ModifiedPrintResult&) { success_called = true; },
@@ -253,7 +253,7 @@ TEST_CASE("HelixPrint API - ModifiedPrintResult structure", "[slow][print][api]"
 TEST_CASE_METHOD(HelixPrintAPITestFixture, "HelixPrint API - handles empty modifications list",
                  "[print][api]") {
     // Empty modifications list should be valid
-    api->start_modified_print(
+    api->job().start_modified_print(
         "benchy.gcode", ".helix_temp/mod_benchy.gcode", {}, // Empty modifications
         [this](const ModifiedPrintResult&) { success_called = true; },
         [this](const MoonrakerError& err) {
@@ -274,7 +274,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture, "HelixPrint API - handles multiple mo
     std::vector<std::string> mods = {"bed_leveling_disabled", "z_tilt_disabled", "qgl_disabled",
                                      "nozzle_clean_disabled"};
 
-    api->start_modified_print(
+    api->job().start_modified_print(
         "benchy.gcode", ".helix_temp/mod_benchy.gcode", mods,
         [this](const ModifiedPrintResult&) { success_called = true; },
         [this](const MoonrakerError& err) {
@@ -297,7 +297,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture, "HelixPrint API - handles multiple mo
 TEST_CASE_METHOD(HelixPrintAPITestFixture, "HelixPrint API - accepts various valid temp paths",
                  "[print][api]") {
     SECTION("Standard .helix_temp path") {
-        api->start_modified_print(
+        api->job().start_modified_print(
             "print.gcode", ".helix_temp/mod_12345_print.gcode", {"test_mod"},
             [this](const ModifiedPrintResult&) { success_called = true; },
             [this](const MoonrakerError& err) {
@@ -315,7 +315,7 @@ TEST_CASE_METHOD(HelixPrintAPITestFixture, "HelixPrint API - accepts various val
     }
 
     SECTION("Path with special characters in filename") {
-        api->start_modified_print(
+        api->job().start_modified_print(
             "my-print_v2.0 (final).gcode", ".helix_temp/mod_my-print_v2.0 (final).gcode",
             {"test_mod"}, [this](const ModifiedPrintResult&) { success_called = true; },
             [this](const MoonrakerError& err) {

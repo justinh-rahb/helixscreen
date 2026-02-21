@@ -49,6 +49,7 @@
 #include "moonraker_client.h"
 #include "moonraker_error.h"
 #include "moonraker_history_api.h"
+#include "moonraker_job_api.h"
 #include "moonraker_spoolman_api.h"
 #include "moonraker_timelapse_api.h"
 #include "moonraker_types.h"
@@ -235,83 +236,6 @@ class MoonrakerAPI {
      */
     void delete_directory(const std::string& path, bool force, SuccessCallback on_success,
                           ErrorCallback on_error);
-
-    // ========================================================================
-    // Job Control Operations
-    // ========================================================================
-
-    /**
-     * @brief Start printing a file
-     *
-     * @param filename Full path to G-code file
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void start_print(const std::string& filename, SuccessCallback on_success,
-                     ErrorCallback on_error);
-
-    // ModifiedPrintResult is defined in moonraker_types.h
-    using ModifiedPrintCallback = std::function<void(const ModifiedPrintResult&)>;
-
-    /**
-     * @brief Start printing modified G-code via helix_print plugin (v2.0 API)
-     *
-     * The modified file must already be uploaded to the printer. This method
-     * tells the helix_print plugin where to find it and starts the print.
-     *
-     * Plugin workflow:
-     * - Validates temp file exists
-     * - Creates a symlink with the original filename (for print_stats)
-     * - Starts the print via the symlink
-     * - Patches history to record the original filename
-     *
-     * Use PrinterState::service_has_helix_plugin() to check availability.
-     *
-     * @param original_filename Path to the original G-code file (for history)
-     * @param temp_file_path Path to already-uploaded modified file (e.g., ".helix_temp/foo.gcode")
-     * @param modifications List of modification identifiers (e.g., "bed_leveling_disabled")
-     * @param on_success Callback with print result
-     * @param on_error Error callback
-     */
-    virtual void start_modified_print(const std::string& original_filename,
-                                      const std::string& temp_file_path,
-                                      const std::vector<std::string>& modifications,
-                                      ModifiedPrintCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Check if helix_print plugin is available
-     *
-     * Queries /server/helix/status to detect plugin availability.
-     * Call this before using start_modified_print() to decide on flow.
-     *
-     * @param on_result Callback with availability (true if plugin detected)
-     * @param on_error Error callback (also means plugin not available)
-     */
-    virtual void check_helix_plugin(BoolCallback on_result, ErrorCallback on_error);
-
-    /**
-     * @brief Pause the current print
-     *
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void pause_print(SuccessCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Resume a paused print
-     *
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void resume_print(SuccessCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Cancel the current print
-     *
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void cancel_print(SuccessCallback on_success, ErrorCallback on_error);
 
     // ========================================================================
     // Motion Control Operations
@@ -1199,6 +1123,18 @@ class MoonrakerAPI {
     }
 
     /**
+     * @brief Get Job API for print job control operations
+     *
+     * All job methods (start_print, pause_print, resume_print, cancel_print,
+     * start_modified_print, check_helix_plugin) are available through this accessor.
+     *
+     * @return Reference to MoonrakerJobAPI
+     */
+    MoonrakerJobAPI& job() {
+        return *job_api_;
+    }
+
+    /**
      * @brief Get Timelapse API for timelapse and webcam operations
      *
      * All timelapse methods (get/set settings, render, frames) and
@@ -1326,6 +1262,7 @@ class MoonrakerAPI {
 
   protected:
     std::unique_ptr<MoonrakerHistoryAPI> history_api_;     ///< Print history API
+    std::unique_ptr<MoonrakerJobAPI> job_api_;             ///< Job control API
     std::unique_ptr<MoonrakerSpoolmanAPI> spoolman_api_;   ///< Spoolman filament tracking API
     std::unique_ptr<MoonrakerTimelapseAPI> timelapse_api_; ///< Timelapse & webcam API
 

@@ -1037,7 +1037,7 @@ void PrintStatusPanel::handle_reprint_button() {
     auto alive = m_alive;
     std::string filename = current_print_filename_;
 
-    api_->start_print(
+    api_->job().start_print(
         filename,
         [this, alive, filename]() {
             spdlog::info("[{}] Reprint started: {}", get_name(), filename);

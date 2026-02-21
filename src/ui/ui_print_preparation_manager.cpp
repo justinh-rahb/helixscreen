@@ -1427,7 +1427,7 @@ void PrintPreparationManager::modify_and_print_streaming(
                     if (use_plugin) {
                         // Plugin path: Use path-based API (v2.0)
                         // The plugin will create symlink, patch history, and start print
-                        self->api_->start_modified_print(
+                        self->api_->job().start_modified_print(
                             file_path,        // Original filename for history
                             remote_temp_path, // Path to uploaded modified file
                             mod_names,
@@ -1440,7 +1440,8 @@ void PrintPreparationManager::modify_and_print_streaming(
                             on_print_error);
                     } else {
                         // Standard path: Just start print with modified file
-                        self->api_->start_print(remote_temp_path, on_print_success, on_print_error);
+                        self->api_->job().start_print(remote_temp_path, on_print_success,
+                                                      on_print_error);
                     }
                 },
                 // Upload error - clean up local file
@@ -1495,7 +1496,7 @@ void PrintPreparationManager::modify_and_print_streaming(
 void PrintPreparationManager::start_print_directly(const std::string& filename,
                                                    NavigateToStatusCallback on_navigate_to_status,
                                                    PrintCompletionCallback on_completion) {
-    api_->start_print(
+    api_->job().start_print(
         filename,
         // Success callback
         [on_navigate_to_status, on_completion]() {

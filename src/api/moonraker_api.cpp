@@ -25,6 +25,7 @@ MoonrakerAPI::MoonrakerAPI(MoonrakerClient& client, PrinterState& state) : clien
 
     // Create sub-APIs
     history_api_ = std::make_unique<MoonrakerHistoryAPI>(client);
+    job_api_ = std::make_unique<MoonrakerJobAPI>(client);
     spoolman_api_ = std::make_unique<MoonrakerSpoolmanAPI>(client);
     timelapse_api_ = std::make_unique<MoonrakerTimelapseAPI>(client, http_base_url_);
 

@@ -1663,7 +1663,7 @@ void Application::setup_discovery_callbacks() {
 
             // Detect helix_print plugin during discovery (not UI-initiated)
             // This ensures plugin status is known early for UI gating
-            c->api->check_helix_plugin(
+            c->api->job().check_helix_plugin(
                 [](bool available) { get_printer_state().set_helix_plugin_installed(available); },
                 [](const MoonrakerError&) {
                     // Silently treat errors as "plugin not installed"
