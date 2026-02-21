@@ -61,7 +61,7 @@ void PrintSelectFileProvider::refresh_files(const std::string& current_path,
     auto path_copy = current_path;
 
     // Request directory contents (includes both files AND directories)
-    api_->get_directory(
+    api_->files().get_directory(
         "gcodes", current_path,
         // Success callback
         [self, existing_data = std::move(existing_data), path_copy, on_ready,

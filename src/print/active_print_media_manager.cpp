@@ -180,7 +180,7 @@ void ActivePrintMediaManager::load_thumbnail_for_file(const std::string& filenam
     spdlog::debug("[ActivePrintMediaManager] Loading thumbnail for: {}", metadata_filename);
 
     // Get file metadata to find thumbnail path
-    api_->get_file_metadata(
+    api_->files().get_file_metadata(
         metadata_filename,
         [this, current_gen](const FileMetadata& metadata) {
             // Check if this callback is still relevant

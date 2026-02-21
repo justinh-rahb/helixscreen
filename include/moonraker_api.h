@@ -48,6 +48,7 @@
 #include "calibration_types.h"
 #include "moonraker_client.h"
 #include "moonraker_error.h"
+#include "moonraker_file_api.h"
 #include "moonraker_history_api.h"
 #include "moonraker_job_api.h"
 #include "moonraker_motion_api.h"
@@ -95,8 +96,6 @@ class MoonrakerAPI {
 
     using SuccessCallback = std::function<void()>;
     using ErrorCallback = std::function<void(const MoonrakerError&)>;
-    using FileListCallback = std::function<void(const std::vector<FileInfo>&)>;
-    using FileMetadataCallback = std::function<void(const FileMetadata&)>;
     using BoolCallback = std::function<void(bool)>;
     using StringCallback = std::function<void(const std::string&)>;
     using JsonCallback = std::function<void(const json&)>;
@@ -122,120 +121,6 @@ class MoonrakerAPI {
      */
     MoonrakerAPI(helix::MoonrakerClient& client, helix::PrinterState& state);
     virtual ~MoonrakerAPI();
-
-    // ========================================================================
-    // File Management Operations
-    // ========================================================================
-
-    /**
-     * @brief List files in a directory
-     *
-     * @param root Root directory ("gcodes", "config", "timelapse")
-     * @param path Subdirectory path (empty for root)
-     * @param recursive Include subdirectories
-     * @param on_success Callback with file list
-     * @param on_error Error callback
-     */
-    void list_files(const std::string& root, const std::string& path, bool recursive,
-                    FileListCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Get directory contents with explicit directory entries
-     *
-     * Unlike list_files() which returns a flat list, this method returns
-     * both files AND directories in the specified path. This is needed for
-     * proper directory navigation in the file browser.
-     *
-     * Uses server.files.get_directory endpoint which returns:
-     * - dirs: Array of {dirname, modified, size, permissions}
-     * - files: Array of {filename, modified, size, permissions}
-     *
-     * @param root Root directory ("gcodes", "config", "timelapse")
-     * @param path Subdirectory path (empty for root)
-     * @param on_success Callback with file list (directories have is_dir=true)
-     * @param on_error Error callback
-     */
-    void get_directory(const std::string& root, const std::string& path,
-                       FileListCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Get detailed metadata for a file
-     *
-     * @param filename Full path to file (relative to gcodes root)
-     * @param on_success Callback with metadata
-     * @param on_error Error callback
-     * @param silent If true, don't emit RPC_ERROR events (no toast on failure)
-     */
-    void get_file_metadata(const std::string& filename, FileMetadataCallback on_success,
-                           ErrorCallback on_error, bool silent = false);
-
-    /**
-     * @brief Trigger metadata scan for a file
-     *
-     * Forces Moonraker to parse and index a file's metadata. Useful when
-     * get_file_metadata returns 404 (file exists but not indexed).
-     * Returns the parsed metadata on success.
-     *
-     * @param filename Full path to file (relative to gcodes root)
-     * @param on_success Callback with metadata
-     * @param on_error Error callback
-     * @param silent If true, don't emit RPC_ERROR events (no toast on failure)
-     */
-    void metascan_file(const std::string& filename, FileMetadataCallback on_success,
-                       ErrorCallback on_error, bool silent = true);
-
-    /**
-     * @brief Delete a file
-     *
-     * @param filename Full path to file (relative to gcodes root)
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void delete_file(const std::string& filename, SuccessCallback on_success,
-                     ErrorCallback on_error);
-
-    /**
-     * @brief Move or rename a file
-     *
-     * @param source Source path (e.g., "gcodes/old_dir/file.gcode")
-     * @param dest Destination path (e.g., "gcodes/new_dir/file.gcode")
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void move_file(const std::string& source, const std::string& dest, SuccessCallback on_success,
-                   ErrorCallback on_error);
-
-    /**
-     * @brief Copy a file
-     *
-     * @param source Source path (e.g., "gcodes/original.gcode")
-     * @param dest Destination path (e.g., "gcodes/copy.gcode")
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void copy_file(const std::string& source, const std::string& dest, SuccessCallback on_success,
-                   ErrorCallback on_error);
-
-    /**
-     * @brief Create a directory
-     *
-     * @param path Directory path (e.g., "gcodes/my_folder")
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void create_directory(const std::string& path, SuccessCallback on_success,
-                          ErrorCallback on_error);
-
-    /**
-     * @brief Delete a directory
-     *
-     * @param path Directory path (e.g., "gcodes/old_folder")
-     * @param force Force deletion even if not empty
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    void delete_directory(const std::string& path, bool force, SuccessCallback on_success,
-                          ErrorCallback on_error);
 
     // ========================================================================
     // Temperature Control Operations
@@ -1062,6 +947,19 @@ class MoonrakerAPI {
         return *spoolman_api_;
     }
 
+    /**
+     * @brief Get File API for file management operations
+     *
+     * All file management methods (list_files, get_directory, get_file_metadata,
+     * metascan_file, delete_file, move_file, copy_file, create_directory,
+     * delete_directory) are available through this accessor.
+     *
+     * @return Reference to MoonrakerFileAPI
+     */
+    MoonrakerFileAPI& files() {
+        return *file_api_;
+    }
+
     // ========================================================================
     // Advanced Panel Operations - Machine Limits
     // ========================================================================
@@ -1165,6 +1063,7 @@ class MoonrakerAPI {
     std::vector<MacroInfo> get_user_macros(bool include_system = false) const;
 
   protected:
+    std::unique_ptr<MoonrakerFileAPI> file_api_;           ///< File management API
     std::unique_ptr<MoonrakerHistoryAPI> history_api_;     ///< Print history API
     std::unique_ptr<MoonrakerJobAPI> job_api_;             ///< Job control API
     std::unique_ptr<MoonrakerMotionAPI> motion_api_;       ///< Motion control API
@@ -1207,14 +1106,4 @@ class MoonrakerAPI {
      * @param func The function to execute in the thread
      */
     void launch_http_thread(std::function<void()> func);
-
-    /**
-     * @brief Parse file list response from server.files.list
-     */
-    std::vector<FileInfo> parse_file_list(const json& response);
-
-    /**
-     * @brief Parse metadata response from server.files.metadata
-     */
-    FileMetadata parse_file_metadata(const json& response);
 };

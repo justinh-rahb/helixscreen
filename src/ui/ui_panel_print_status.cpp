@@ -1914,7 +1914,7 @@ void PrintStatusPanel::load_thumbnail_for_file(const std::string& filename) {
     auto alive = m_alive;
 
     // First, get file metadata to find thumbnail path
-    api_->get_file_metadata(
+    api_->files().get_file_metadata(
         metadata_filename,
         [this, alive, current_gen](const FileMetadata& metadata) {
             // Abort if panel was destroyed during async operation
@@ -2065,7 +2065,7 @@ void PrintStatusPanel::load_gcode_for_viewing(const std::string& filename) {
     // Capture alive flag for shutdown safety [L012]
     auto alive = m_alive;
 
-    api_->get_file_metadata(
+    api_->files().get_file_metadata(
         metadata_filename,
         [this, alive, filename, temp_path](const FileMetadata& metadata) {
             // Abort if panel was destroyed during async operation

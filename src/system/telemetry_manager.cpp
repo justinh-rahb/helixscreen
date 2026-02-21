@@ -1156,7 +1156,7 @@ void on_print_state_changed_for_telemetry(lv_observer_t* observer, lv_subject_t*
 
             auto* api = get_moonraker_api();
             if (api) {
-                api->get_file_metadata(
+                api->files().get_file_metadata(
                     fname,
                     [](const FileMetadata& metadata) {
                         // Callback runs on background WebSocket thread —

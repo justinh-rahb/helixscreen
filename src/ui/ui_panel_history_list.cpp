@@ -477,7 +477,7 @@ void HistoryListPanel::fetch_timelapse_files() {
     }
 
     // List files in the timelapse directory
-    api->list_files(
+    api->files().list_files(
         "timelapse", // root
         "",          // path (root)
         false,       // non-recursive

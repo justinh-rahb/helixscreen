@@ -379,16 +379,17 @@ void MacroManager::remove_include_from_config(SuccessCallback on_success, ErrorC
 
 void MacroManager::delete_macro_file(SuccessCallback on_success, ErrorCallback on_error) {
     // Use MoonrakerAPI to delete the file
-    api_.delete_file(std::string("config/") + HELIX_MACROS_FILENAME, on_success,
-                     [on_success, on_error](const MoonrakerError& err) {
-                         // File might not exist - that's OK for uninstall
-                         if (err.type == MoonrakerErrorType::FILE_NOT_FOUND) {
-                             spdlog::debug("[HelixMacroManager] Macro file already deleted");
-                             on_success(); // Continue with success path
-                         } else {
-                             on_error(err);
-                         }
-                     });
+    api_.files().delete_file(std::string("config/") + HELIX_MACROS_FILENAME, on_success,
+                             [on_success, on_error](const MoonrakerError& err) {
+                                 // File might not exist - that's OK for uninstall
+                                 if (err.type == MoonrakerErrorType::FILE_NOT_FOUND) {
+                                     spdlog::debug(
+                                         "[HelixMacroManager] Macro file already deleted");
+                                     on_success(); // Continue with success path
+                                 } else {
+                                     on_error(err);
+                                 }
+                             });
 }
 
 void MacroManager::restart_klipper(SuccessCallback on_success, ErrorCallback on_error) {

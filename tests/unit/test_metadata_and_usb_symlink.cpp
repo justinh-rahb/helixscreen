@@ -89,7 +89,7 @@ TEST_CASE_METHOD(MetadataAPITestFixture, "get_file_metadata calls success callba
     bool success_called = false;
     bool error_called = false;
 
-    api->get_file_metadata(
+    api->files().get_file_metadata(
         "test_file.gcode", [&](const FileMetadata&) { success_called = true; },
         [&](const MoonrakerError&) { error_called = true; });
 
@@ -105,7 +105,7 @@ TEST_CASE_METHOD(MetadataAPITestFixture, "get_file_metadata with silent flag com
     bool success_called = false;
 
     // Call with silent=true (4th parameter)
-    api->get_file_metadata(
+    api->files().get_file_metadata(
         "test_file.gcode", [&](const FileMetadata&) { success_called = true; },
         [&](const MoonrakerError&) {}, true // silent
     );
@@ -119,7 +119,7 @@ TEST_CASE_METHOD(MetadataAPITestFixture, "metascan_file calls success callback w
     bool success_called = false;
     bool error_called = false;
 
-    api->metascan_file(
+    api->files().metascan_file(
         "test_file.gcode", [&](const FileMetadata&) { success_called = true; },
         [&](const MoonrakerError&) { error_called = true; });
 
@@ -133,7 +133,7 @@ TEST_CASE_METHOD(MetadataAPITestFixture, "metascan_file is silent by default",
     // metascan_file has silent=true by default (see API declaration)
     bool success_called = false;
 
-    api->metascan_file(
+    api->files().metascan_file(
         "test_file.gcode", [&](const FileMetadata&) { success_called = true; },
         [&](const MoonrakerError&) {});
 
@@ -218,7 +218,7 @@ TEST_CASE_METHOD(MetadataAPITestFixture, "list_files for usb path returns empty 
     bool success_called = false;
     std::vector<FileInfo> received_files;
 
-    api->list_files(
+    api->files().list_files(
         "gcodes", "usb", false,
         [&](const std::vector<FileInfo>& files) {
             received_files = files;
@@ -240,7 +240,7 @@ TEST_CASE_METHOD(MetadataAPITestFixture,
     bool success_called = false;
     std::vector<FileInfo> received_files;
 
-    api->list_files(
+    api->files().list_files(
         "gcodes", "usb", false,
         [&](const std::vector<FileInfo>& files) {
             received_files = files;

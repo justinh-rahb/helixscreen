@@ -59,7 +59,7 @@ static void cleanup_helix_temp_file(const std::string& filename) {
     std::string full_path = "gcodes/" + filename;
     spdlog::info("[PrintComplete] Cleaning up temp file: {}", full_path);
 
-    api->delete_file(
+    api->files().delete_file(
         full_path,
         [filename]() { spdlog::info("[PrintComplete] Deleted temp file: {}", filename); },
         [filename](const MoonrakerError& err) {
@@ -349,7 +349,7 @@ void cleanup_stale_helix_temp_files(MoonrakerAPI* api) {
     // List files in .helix_temp directory
     // Note: Moonraker returns ALL files in root, not just the path we request
     // We must filter by path prefix ourselves
-    api->list_files(
+    api->files().list_files(
         "gcodes", ".helix_temp", false,
         [api](const std::vector<FileInfo>& files) {
             // Filter to only files actually in .helix_temp/
@@ -370,7 +370,7 @@ void cleanup_stale_helix_temp_files(MoonrakerAPI* api) {
 
                 // Moonraker's delete_file requires full path including root
                 std::string filepath = "gcodes/" + file.path;
-                api->delete_file(
+                api->files().delete_file(
                     filepath,
                     [filepath]() {
                         spdlog::debug("[PrintComplete] Deleted stale temp file: {}", filepath);

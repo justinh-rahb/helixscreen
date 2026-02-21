@@ -223,7 +223,7 @@ void PrintStartAnalyzer::analyze(MoonrakerAPI* api, AnalysisCallback on_complete
     spdlog::debug("[PrintStartAnalyzer] Listing config files to find macro location...");
 
     // List all files in config directory to find which one contains the macro
-    api->list_files(
+    api->files().list_files(
         "config", "", false,
         [api, on_complete, on_error](const std::vector<FileInfo>& files) {
             // Filter to .cfg files only

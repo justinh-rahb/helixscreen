@@ -334,7 +334,7 @@ void TimelapseSettingsOverlay::fetch_video_list() {
         return;
     }
 
-    api_->list_files(
+    api_->files().list_files(
         "timelapse", "", false,
         [this](const std::vector<FileInfo>& files) {
             helix::ui::queue_update([this, files]() { populate_video_list(files); });
@@ -513,7 +513,7 @@ void TimelapseSettingsOverlay::on_delete_video_confirmed(lv_event_t* e) {
     std::string full_path = "timelapse/" + filename;
     spdlog::debug("[Timelapse Settings] Deleting video: {}", full_path);
 
-    g_timelapse_settings->api_->delete_file(
+    g_timelapse_settings->api_->files().delete_file(
         full_path,
         [filename]() {
             spdlog::info("[Timelapse Settings] Deleted video: {}", filename);

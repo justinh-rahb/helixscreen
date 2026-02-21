@@ -504,7 +504,7 @@ void PrintStartEnhancer::restore_from_backup(MoonrakerAPI* api, const std::strin
 
     // Copy backup over printer.cfg
     // Note: copy_file uses full paths like "config/printer.cfg"
-    api->copy_file(
+    api->files().copy_file(
         "config/" + backup_filename, "config/printer.cfg",
         [this, api, on_complete, safe_error, alive]() {
             if (!alive || !*alive) {
@@ -542,7 +542,7 @@ void PrintStartEnhancer::list_backups(
 
     // List files in config root matching printer.cfg.backup.*
     // list_files returns FileInfo objects via FileListCallback
-    api->list_files(
+    api->files().list_files(
         "config", "", false,
         [on_complete, alive](const std::vector<FileInfo>& file_infos) {
             if (!alive || !*alive) {
@@ -577,7 +577,8 @@ void PrintStartEnhancer::create_backup(MoonrakerAPI* api, const std::string& sou
                                        EnhancementErrorCallback on_error) {
     // Copy source config file to backup
     // Note: copy_file uses full paths like "config/macros.cfg"
-    api->copy_file("config/" + source_file, "config/" + backup_filename, on_success, on_error);
+    api->files().copy_file("config/" + source_file, "config/" + backup_filename, on_success,
+                           on_error);
 }
 
 void PrintStartEnhancer::modify_and_upload_config(
