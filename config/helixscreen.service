@@ -36,6 +36,11 @@ Group=@@HELIX_GROUP@@
 # Working directory for config/assets
 WorkingDirectory=@@INSTALL_DIR@@
 
+# Unbind framebuffer console before starting (requires root, runs before User= drop)
+# vtcon1 is the fbcon driver; vtcon0 is the dummy. Unbinding prevents kernel
+# messages (dmesg, undervoltage) from painting over the UI via fbcon.
+ExecStartPre=+/bin/sh -c 'for f in /sys/class/vtconsole/vtcon*/bind; do echo 0 > "$$f" 2>/dev/null || true; done'
+
 # Use launcher script for splash + main app
 ExecStart=@@INSTALL_DIR@@/bin/helix-launcher.sh
 
@@ -64,6 +69,10 @@ NoNewPrivileges=true
 
 # Allow framebuffer/DRM access
 SupplementaryGroups=video input render tty
+
+# Console suppression: KDSETMODE KD_GRAPHICS prevents kernel messages from
+# bleeding through LVGL's partial framebuffer repaints. Requires CAP_SYS_TTY_CONFIG.
+AmbientCapabilities=CAP_SYS_TTY_CONFIG
 
 # Logging
 StandardOutput=journal
