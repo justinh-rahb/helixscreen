@@ -1645,7 +1645,10 @@ write_release_info() {
     cat > "${release_info}.tmp" << EOF
 {"project_name":"helixscreen","project_owner":"prestonbrown","version":"${version}","asset_name":"${asset_name}"}
 EOF
-    $SUDO mv "${release_info}.tmp" "$release_info"
+    # Try without sudo first (self-update: INSTALL_DIR is user-owned under NoNewPrivileges).
+    # Fall back to sudo for fresh installs where the directory may be root-owned.
+    mv "${release_info}.tmp" "$release_info" 2>/dev/null || \
+        $SUDO mv "${release_info}.tmp" "$release_info" 2>/dev/null || true
 }
 
 # Ensure helixscreen is in moonraker.asvc (service allowlist)

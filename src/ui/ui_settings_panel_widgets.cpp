@@ -20,9 +20,8 @@
 #include "static_panel_registry.h"
 #include "theme_manager.h"
 
+#include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
-
-#include <fmt/format.h>
 
 namespace helix::settings {
 
