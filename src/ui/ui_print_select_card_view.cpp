@@ -3,8 +3,8 @@
 
 #include "ui_print_select_card_view.h"
 
+#include "ui_filename_utils.h"
 #include "ui_panel_print_select.h" // For PrintFileData, CardDimensions
-#include "ui_utils.h"              // For strip_gcode_extension
 
 #include "prerendered_images.h"
 #include "theme_manager.h"
@@ -12,6 +12,8 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+
+using helix::gcode::strip_gcode_extension;
 
 namespace helix::ui {
 

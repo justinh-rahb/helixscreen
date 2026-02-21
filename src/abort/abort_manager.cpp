@@ -2,6 +2,7 @@
 
 #include "abort_manager.h"
 
+#include "ui_effects.h"
 #include "ui_update_queue.h"
 #include "ui_utils.h"
 
@@ -721,7 +722,7 @@ void AbortManager::create_modal() {
     // Create fullscreen backdrop on lv_layer_top() so it survives screen changes
     // (Same pattern as Modal::show() but targeting lv_layer_top() instead of lv_screen_active())
     // Opacity 200 matches modal_backdrop_opacity in globals.xml
-    backdrop_ = ui_create_fullscreen_backdrop(lv_layer_top(), 200);
+    backdrop_ = helix::ui::create_fullscreen_backdrop(lv_layer_top(), 200);
     if (!backdrop_) {
         spdlog::error("[AbortManager] Failed to create backdrop on lv_layer_top()");
         return;

@@ -3,10 +3,15 @@
 
 #include "print_file_data.h"
 
-#include "ui_utils.h"
+#include "ui_format_utils.h"
 
 #include "moonraker_types.h"
 #include "usb_backend.h"
+
+using helix::ui::format_filament_weight;
+using helix::ui::format_file_size;
+using helix::ui::format_modified_date;
+using helix::ui::format_print_time;
 
 // ============================================================================
 // FACTORY METHODS

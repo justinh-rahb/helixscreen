@@ -1,0 +1,100 @@
+// Copyright (C) 2025-2026 356C LLC
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#pragma once
+
+#include <cstdint>
+#include <ctime>
+#include <string>
+
+namespace helix::ui {
+
+/**
+ * @brief Format print time from minutes to human-readable string
+ *
+ * Converts duration into compact time format.
+ * Examples: "5m", "1h30m", "8h"
+ *
+ * @param minutes Total print time in minutes
+ * @return Formatted time string
+ */
+std::string format_print_time(int minutes);
+
+/**
+ * @brief Format filament weight from grams to human-readable string
+ *
+ * Converts weight to compact format with appropriate precision.
+ * Examples: "2.5 g", "45 g", "120 g"
+ *
+ * @param grams Filament weight in grams
+ * @return Formatted weight string
+ */
+std::string format_filament_weight(float grams);
+
+/**
+ * @brief Format layer count with "layers" suffix
+ *
+ * Converts layer count to readable format.
+ * Examples: "234 layers", "1 layer", "--" (if zero/unknown)
+ *
+ * @param layer_count Total layer count
+ * @return Formatted layer string
+ */
+std::string format_layer_count(uint32_t layer_count);
+
+/**
+ * @brief Format print height in millimeters
+ *
+ * Formats object height with appropriate precision.
+ * Examples: "42.5 mm", "0.2 mm", "--" (if zero/unknown)
+ *
+ * @param height_mm Object height in millimeters
+ * @return Formatted height string
+ */
+std::string format_print_height(double height_mm);
+
+/**
+ * @brief Format file size from bytes to human-readable string
+ *
+ * Converts bytes to appropriate unit (KB/MB/GB) with decimal precision.
+ * Examples: "1.2 KB", "45 MB", "1.5 GB"
+ *
+ * @param bytes File size in bytes
+ * @return Formatted size string
+ */
+std::string format_file_size(size_t bytes);
+
+/**
+ * @brief Format Unix timestamp to date/time string
+ *
+ * Converts timestamp to localized date/time format.
+ * Respects user's 12/24 hour time format setting.
+ * Examples: "Jan 15 2:30 PM" (12H) or "Jan 15 14:30" (24H)
+ *
+ * @param timestamp Unix timestamp (time_t)
+ * @return Formatted date/time string
+ */
+std::string format_modified_date(time_t timestamp);
+
+/**
+ * @brief Format time portion only (no date)
+ *
+ * Returns time in user's preferred format.
+ * Examples: "2:30 PM" (12H) or "14:30" (24H)
+ *
+ * @param tm_info Pointer to tm struct with time to format
+ * @return Formatted time string
+ */
+std::string format_time(const struct tm* tm_info);
+
+/**
+ * @brief Get strftime format string for current time format setting
+ *
+ * Returns "%H:%M" for 24-hour or "%l:%M %p" for 12-hour format.
+ * Useful when you need to incorporate time into a larger format string.
+ *
+ * @return Format string for strftime
+ */
+const char* get_time_format_string();
+
+} // namespace helix::ui

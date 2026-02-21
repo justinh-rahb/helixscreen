@@ -15,7 +15,9 @@
 #include "ui_callback_helpers.h"
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
+#include "ui_filename_utils.h"
 #include "ui_fonts.h"
+#include "ui_format_utils.h"
 #include "ui_icon.h"
 #include "ui_modal.h"
 #include "ui_nav_manager.h"
@@ -25,7 +27,6 @@
 #include "ui_print_select_path_navigator.h"
 #include "ui_subject_registry.h"
 #include "ui_update_queue.h"
-#include "ui_utils.h"
 
 #include "app_globals.h"
 #include "config.h"
@@ -60,11 +61,14 @@
 #include <vector>
 
 using namespace helix;
+using helix::gcode::strip_gcode_extension;
+using helix::ui::format_filament_weight;
+using helix::ui::format_layer_count;
+using helix::ui::format_print_height;
+using helix::ui::format_print_time;
 
 // Forward declaration for class-based API
 PrintStatusPanel& get_global_print_status_panel();
-
-// Note: strip_gcode_extension() moved to ui_utils.h for DRY reuse across panels
 
 // ============================================================================
 // Global Instance

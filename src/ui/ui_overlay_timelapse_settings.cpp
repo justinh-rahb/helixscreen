@@ -6,11 +6,11 @@
 #include "ui_callback_helpers.h"
 #include "ui_error_reporting.h"
 #include "ui_fonts.h"
+#include "ui_format_utils.h"
 #include "ui_icon_codepoints.h"
 #include "ui_modal.h"
 #include "ui_nav_manager.h"
 #include "ui_update_queue.h"
-#include "ui_utils.h"
 
 #include "lvgl/src/xml/lv_xml.h"
 #include "runtime_config.h"
@@ -21,6 +21,8 @@
 #include <spdlog/spdlog.h>
 
 #include <cstring>
+
+using helix::ui::format_file_size;
 
 // Global instance and panel
 static std::unique_ptr<TimelapseSettingsOverlay> g_timelapse_settings;

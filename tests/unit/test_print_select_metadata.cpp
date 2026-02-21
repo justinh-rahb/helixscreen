@@ -13,8 +13,8 @@
  * travels with the file during all operations.
  */
 
+#include "ui_format_utils.h"
 #include "ui_panel_print_select.h"
-#include "ui_utils.h"
 
 #include <algorithm>
 #include <ctime>
@@ -23,6 +23,11 @@
 #include <vector>
 
 #include "../catch_amalgamated.hpp"
+
+using helix::ui::format_filament_weight;
+using helix::ui::format_file_size;
+using helix::ui::format_modified_date;
+using helix::ui::format_print_time;
 
 // ============================================================================
 // Helper Functions

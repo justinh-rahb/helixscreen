@@ -3,6 +3,7 @@
 
 #include "ui_wizard_touch_calibration.h"
 
+#include "ui_effects.h"
 #include "ui_subject_registry.h"
 #include "ui_utils.h"
 
@@ -15,6 +16,7 @@
 #include <spdlog/spdlog.h>
 
 using namespace helix;
+using helix::ui::create_ripple;
 
 // ============================================================================
 // Constants
@@ -489,7 +491,7 @@ void WizardTouchCalibrationStep::create_ripple_at(lv_coord_t x, lv_coord_t y) {
     if (!test_touch_area_) {
         return;
     }
-    ui_create_ripple(test_touch_area_, x, y);
+    create_ripple(test_touch_area_, x, y);
 }
 
 // ============================================================================

@@ -3,7 +3,7 @@
 
 #include "ui_temp_graph.h"
 
-#include "ui_utils.h"
+#include "ui_format_utils.h"
 
 #include "theme_manager.h"
 
@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+using helix::ui::get_time_format_string;
 
 // Helper: Find series metadata by ID
 static ui_temp_series_meta_t* find_series(ui_temp_graph_t* graph, int series_id) {

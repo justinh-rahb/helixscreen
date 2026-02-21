@@ -3,8 +3,8 @@
 
 #include "active_print_media_manager.h"
 
+#include "ui_filename_utils.h"
 #include "ui_update_queue.h"
-#include "ui_utils.h"
 
 #include "app_globals.h"
 #include "observer_factory.h"
@@ -15,6 +15,9 @@
 
 #include <memory>
 #include <stdexcept>
+
+using helix::gcode::get_display_filename;
+using helix::gcode::resolve_gcode_filename;
 
 namespace helix {
 

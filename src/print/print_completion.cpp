@@ -4,11 +4,11 @@
 #include "print_completion.h"
 
 #include "ui_confetti.h"
+#include "ui_filename_utils.h"
 #include "ui_modal.h"
 #include "ui_nav_manager.h"
 #include "ui_panel_print_status.h"
 #include "ui_toast_manager.h"
-#include "ui_utils.h"
 
 #include "app_globals.h"
 #include "audio_settings_manager.h"
@@ -24,6 +24,9 @@
 #include <spdlog/spdlog.h>
 
 #include <lvgl.h>
+
+using helix::gcode::get_display_filename;
+using helix::gcode::resolve_gcode_filename;
 
 namespace helix {
 

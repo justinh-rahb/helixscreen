@@ -4,6 +4,7 @@
 #include "ui_modal.h"
 
 #include "ui_callback_helpers.h"
+#include "ui_effects.h"
 #include "ui_event_safety.h"
 #include "ui_keyboard_manager.h"
 #include "ui_update_queue.h"
@@ -315,7 +316,7 @@ Modal::~Modal() {
         }
 
         // Hide immediately without calling virtual on_hide() - derived class already destroyed
-        // Note: lv_obj_safe_delete handles focus group cleanup (ui_defocus_tree)
+        // Note: lv_obj_safe_delete handles focus group cleanup (helix::ui::defocus_tree)
         ModalStack::instance().remove(backdrop_);
         helix::ui::safe_delete(backdrop_);
         // dialog_ is a child of backdrop_ and was destroyed with it
@@ -347,7 +348,7 @@ Modal& Modal::operator=(Modal&& other) noexcept {
             if (dialog_) {
                 lv_anim_delete(dialog_, nullptr);
             }
-            // Note: lv_obj_safe_delete handles focus group cleanup (ui_defocus_tree)
+            // Note: lv_obj_safe_delete handles focus group cleanup (helix::ui::defocus_tree)
             ModalStack::instance().remove(backdrop_);
             helix::ui::safe_delete(backdrop_);
             // dialog_ is a child of backdrop_ and was destroyed with it
@@ -382,7 +383,8 @@ lv_obj_t* Modal::show(const char* component_name, const char** attrs) {
     lv_obj_t* parent = lv_screen_active();
 
     // Create backdrop using shared utility
-    lv_obj_t* backdrop = ui_create_fullscreen_backdrop(parent, get_modal_backdrop_opacity());
+    lv_obj_t* backdrop =
+        helix::ui::create_fullscreen_backdrop(parent, get_modal_backdrop_opacity());
     if (!backdrop) {
         spdlog::error("[Modal] Failed to create backdrop");
         return nullptr;
@@ -461,7 +463,7 @@ void Modal::hide(lv_obj_t* dialog) {
     spdlog::info("[Modal] Hiding modal");
 
     // Remove entire tree from focus group to prevent scroll-on-focus during exit animation
-    ui_defocus_tree(backdrop);
+    helix::ui::defocus_tree(backdrop);
 
     // Mark as exiting (stays in stack until animation completes)
     stack.mark_exiting(backdrop);
@@ -558,7 +560,7 @@ void Modal::hide() {
     dialog_ = nullptr;
 
     // Remove entire tree from focus group to prevent scroll-on-focus during exit animation
-    ui_defocus_tree(backdrop);
+    helix::ui::defocus_tree(backdrop);
 
     // Mark as exiting (stays in stack until animation completes)
     ModalStack::instance().mark_exiting(backdrop);
@@ -615,7 +617,7 @@ void Modal::wire_senary_button(const char* name) {
 
 bool Modal::create_and_show(lv_obj_t* parent, const char* comp_name, const char** attrs) {
     // Create backdrop using shared utility
-    backdrop_ = ui_create_fullscreen_backdrop(parent, get_modal_backdrop_opacity());
+    backdrop_ = helix::ui::create_fullscreen_backdrop(parent, get_modal_backdrop_opacity());
     if (!backdrop_) {
         spdlog::error("[{}] Failed to create backdrop", get_name());
         return false;

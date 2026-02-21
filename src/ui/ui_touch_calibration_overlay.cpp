@@ -4,11 +4,11 @@
 #include "ui_touch_calibration_overlay.h"
 
 #include "ui_callback_helpers.h"
+#include "ui_effects.h"
 #include "ui_event_safety.h"
 #include "ui_nav_manager.h"
 #include "ui_step_progress.h"
 #include "ui_toast_manager.h"
-#include "ui_utils.h"
 
 #include "config.h"
 #include "display_manager.h"
@@ -534,7 +534,7 @@ void TouchCalibrationOverlay::handle_screen_touched(lv_event_t* e) {
             // Use overlay_root_ as parent (full screen) with screen coordinates
             lv_obj_t* content = lv_obj_find_by_name(overlay_root_, "calibration_content");
             if (content) {
-                ui_create_ripple(content, transformed.x, transformed.y);
+                create_ripple(content, transformed.x, transformed.y);
             }
 
             spdlog::debug("[{}] Verify: raw({},{}) -> transformed({},{})", get_name(), raw.x, raw.y,

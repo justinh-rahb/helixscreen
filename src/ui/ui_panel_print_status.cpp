@@ -9,6 +9,7 @@
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_exclude_objects_list_overlay.h"
+#include "ui_filename_utils.h"
 #include "ui_gcode_viewer.h"
 #include "ui_modal.h"
 #include "ui_nav_manager.h"
@@ -18,7 +19,6 @@
 #include "ui_temperature_utils.h"
 #include "ui_toast_manager.h"
 #include "ui_update_queue.h"
-#include "ui_utils.h"
 
 #include "abort_manager.h"
 #include "ams_state.h"
@@ -47,6 +47,7 @@
 #include <spdlog/spdlog.h>
 
 using namespace helix;
+using helix::gcode::resolve_gcode_filename;
 
 #include <cstdio>
 #include <cstdlib>

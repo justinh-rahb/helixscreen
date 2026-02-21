@@ -3,6 +3,7 @@
 
 #include "ui_busy_overlay.h"
 
+#include "ui_effects.h"
 #include "ui_utils.h"
 
 #include "format_utils.h"
@@ -59,7 +60,7 @@ void create_overlay_internal() {
     lv_obj_t* parent = lv_layer_top();
 
     // Create full-screen backdrop using shared utility
-    g_overlay = ui_create_fullscreen_backdrop(parent, OVERLAY_BACKDROP_OPACITY);
+    g_overlay = helix::ui::create_fullscreen_backdrop(parent, OVERLAY_BACKDROP_OPACITY);
     if (!g_overlay) {
         spdlog::error("[BusyOverlay] Failed to create backdrop");
         g_pending_show = false;
