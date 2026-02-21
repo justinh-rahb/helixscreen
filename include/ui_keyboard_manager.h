@@ -162,6 +162,10 @@ class KeyboardManager {
 
     bool initialized_ = false;
 
+    // When true, long-press auto-inserts the alt character immediately.
+    // When false, user must slide finger over the overlay to select.
+    bool auto_insert_alt_ = true;
+
     // Static alternative character mapping table
     static const AltCharMapping alt_char_map_[];
 };

@@ -381,15 +381,31 @@ void KeyboardManager::longpress_event_handler(lv_event_t* e) {
             mgr.pressed_key_area_ = btn_area;
             mgr.show_overlay(&btn_area, mgr.alternatives_);
 
-            spdlog::info("[KeyboardManager] LONG_PRESSED detected for '{}' - overlay shown",
-                         mgr.pressed_char_ ? mgr.pressed_char_ : "?");
+            // Auto-insert mode: insert the first alt char immediately on long-press
+            if (mgr.auto_insert_alt_ && mgr.alternatives_[0] && mgr.context_textarea_ != nullptr) {
+                char str[2] = {mgr.alternatives_[0], '\0'};
+                lv_textarea_add_text(mgr.context_textarea_, str);
+                mgr.longpress_state_ = LP_ALT_SELECTED;
+                spdlog::info("[KeyboardManager] LONG_PRESSED '{}' - auto-inserted alt '{}'",
+                             mgr.pressed_char_ ? mgr.pressed_char_ : "?", mgr.alternatives_[0]);
+            } else {
+                spdlog::info("[KeyboardManager] LONG_PRESSED detected for '{}' - overlay shown",
+                             mgr.pressed_char_ ? mgr.pressed_char_ : "?");
+            }
         }
 
     } else if (code == LV_EVENT_RELEASED) {
         spdlog::info("[KeyboardManager] RELEASED event - state={}, overlay={}, textarea={}",
                      (int)mgr.longpress_state_, (void*)mgr.overlay_, (void*)mgr.context_textarea_);
 
-        if (mgr.longpress_state_ == LP_LONG_DETECTED && mgr.overlay_ != nullptr) {
+        if (mgr.longpress_state_ == LP_ALT_SELECTED) {
+            // Auto-insert mode: alt char already inserted, just clean up
+            spdlog::info("[KeyboardManager] Cleaning up overlay (alt already auto-inserted)");
+            mgr.overlay_cleanup();
+            mgr.longpress_state_ = LP_IDLE;
+
+        } else if (mgr.longpress_state_ == LP_LONG_DETECTED && mgr.overlay_ != nullptr) {
+            // Slide-to-select mode: check release position to pick a character
             lv_indev_t* indev = lv_indev_active();
             lv_point_t release_point;
 
