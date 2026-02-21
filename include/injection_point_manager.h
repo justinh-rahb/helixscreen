@@ -75,8 +75,8 @@ struct InjectedWidget {
  * and plugins (which inject widgets into those containers).
  *
  * Typical flow:
- * 1. Panel creates and calls register_point("home_widget_area", container)
- * 2. Plugin calls PluginAPI::inject_widget("home_widget_area", "my_component", callbacks)
+ * 1. Panel creates and calls register_point("panel_widget_area", container)
+ * 2. Plugin calls PluginAPI::inject_widget("panel_widget_area", "my_component", callbacks)
  * 3. Manager creates widget via lv_xml_create() and adds to container
  * 4. When plugin unloads, remove_plugin_widgets() cleans up all its widgets
  *
@@ -104,7 +104,7 @@ class InjectionPointManager {
      * Called by panels to register a container where plugins can inject widgets.
      * The container is typically an lv_obj created from XML with flex layout.
      *
-     * @param point_id Unique identifier for this injection point (e.g., "home_widget_area")
+     * @param point_id Unique identifier for this injection point (e.g., "panel_widget_area")
      * @param container LVGL container object (caller retains ownership)
      */
     void register_point(const std::string& point_id, lv_obj_t* container);

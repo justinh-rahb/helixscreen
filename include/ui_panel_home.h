@@ -8,8 +8,8 @@
 #include "ui_panel_base.h"
 #include "ui_panel_print_status.h" // For RunoutGuidanceModal
 
-#include "home_widget.h"
 #include "led/led_controller.h"
+#include "panel_widget.h"
 #include "subject_managed_panel.h"
 #include "tips_manager.h"
 
@@ -60,9 +60,9 @@ class HomePanel : public PanelBase {
     }
 
     /**
-     * @brief Rebuild the widget list from current HomeWidgetConfig
+     * @brief Rebuild the widget list from current PanelWidgetConfig
      *
-     * Called from HomeWidgetsOverlay when widget toggles change.
+     * Called from PanelWidgetsOverlay when widget toggles change.
      */
     void populate_widgets();
 
@@ -124,15 +124,14 @@ class HomePanel : public PanelBase {
     TempControlPanel* temp_control_panel_ = nullptr;
     lv_subject_t status_subject_;
     lv_subject_t temp_subject_;
-    lv_subject_t network_icon_state_; // Integer subject: 0-5 for conditional icon visibility
-    lv_subject_t network_label_subject_;
+    // Network subjects (home_network_icon_state, network_label) are owned by
+    // NetworkWidget module — looked up by name via lv_xml_get_subject() when needed
     lv_subject_t printer_type_subject_;
     lv_subject_t printer_host_subject_;
     lv_subject_t printer_info_visible_;
 
     char status_buffer_[512];
     char temp_buffer_[32];
-    char network_label_buffer_[32];
     char printer_type_buffer_[64];
     char printer_host_buffer_[64];
 
@@ -204,11 +203,8 @@ class HomePanel : public PanelBase {
     ObserverGuard led_brightness_observer_;
     ObserverGuard ams_slot_count_observer_;
 
-    // Active HomeWidget instances (factory-created, lifecycle-managed)
-    std::vector<std::unique_ptr<helix::HomeWidget>> active_widgets_;
-
-    // Observers for widget hardware gate subjects — triggers populate_widgets() on change
-    std::vector<ObserverGuard> widget_gate_observers_;
+    // Active PanelWidget instances (factory-created, lifecycle-managed)
+    std::vector<std::unique_ptr<helix::PanelWidget>> active_widgets_;
 
     // Print card observers (for showing progress during active print)
     ObserverGuard print_state_observer_;

@@ -322,7 +322,7 @@ class PluginAPI {
      * point container. The widget is tracked and will be automatically removed
      * when the plugin unloads.
      *
-     * @param point_id Injection point identifier (e.g., "home_widget_area")
+     * @param point_id Injection point identifier (e.g., "panel_widget_area")
      * @param xml_component Name of registered XML component to instantiate
      * @param callbacks Optional lifecycle callbacks for widget creation/destruction
      * @return true if injection succeeded, false if point not found or creation failed

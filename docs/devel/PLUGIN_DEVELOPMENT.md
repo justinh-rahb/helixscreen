@@ -192,7 +192,7 @@ plugins/
   "ui": {
     "settings_page": true,
     "navbar_panel": false,
-    "injection_points": ["home_widget_area", "print_status_extras"]
+    "injection_points": ["panel_widget_area", "print_status_extras"]
   }
 }
 ```
@@ -635,7 +635,7 @@ Inject an XML component into a designated injection point.
 **Returns:** `true` if injection succeeded.
 
 ```cpp
-api->inject_widget("home_widget_area", "my_status_widget", {
+api->inject_widget("panel_widget_area", "my_status_widget", {
     .on_create = [](lv_obj_t* widget) {
         g_api->log_debug("Widget created!");
     },
@@ -664,7 +664,7 @@ bool helix_plugin_init(PluginAPI* api, const char* plugin_dir) {
         return false;
     }
 
-    api->inject_widget("home_widget_area", "status_widget");
+    api->inject_widget("panel_widget_area", "status_widget");
     return true;
 }
 ```
@@ -731,7 +731,7 @@ bool helix_plugin_init(PluginAPI* api, const char* plugin_dir) {
     api->register_xml_component(plugin_dir, "my_widget.xml");
 
     // Inject into home panel
-    api->inject_widget("home_widget_area", "my_status_widget");
+    api->inject_widget("panel_widget_area", "my_status_widget");
 
     return true;
 }
@@ -741,7 +741,7 @@ bool helix_plugin_init(PluginAPI* api, const char* plugin_dir) {
 
 | Point ID | Location | Description |
 |----------|----------|-------------|
-| `home_widget_area` | Home panel | Main widget area below status |
+| `panel_widget_area` | Home panel | Main widget area below status |
 | `print_status_extras` | Print Status panel | Extra widgets area in print status overlay |
 
 **Note:** More injection points may be added in future versions. Use `has_injection_point()` to check availability.
@@ -1080,7 +1080,7 @@ This enables mock data for printer state, temperatures, etc.
 
 2. **Check if services exist** before using:
    ```cpp
-   if (!api->has_injection_point("home_widget_area")) {
+   if (!api->has_injection_point("panel_widget_area")) {
        api->log_warn("Injection point not available yet");
    }
    ```
@@ -1178,7 +1178,7 @@ This example creates a custom temperature display widget and injects it into the
   "author": "HelixScreen",
   "description": "Displays nozzle temperature with custom styling",
   "ui": {
-    "injection_points": ["home_widget_area"]
+    "injection_points": ["panel_widget_area"]
   }
 }
 ```
@@ -1270,15 +1270,15 @@ extern "C" bool helix_plugin_init(PluginAPI* api, const char* plugin_dir) {
     // Inject widget when home panel is available
     api->on_event(events::NAVIGATION_CHANGED, [](const EventData& event) {
         if (event.payload.value("panel", "") == "home") {
-            if (g_api->has_injection_point("home_widget_area")) {
-                g_api->inject_widget("home_widget_area", "temp_display");
+            if (g_api->has_injection_point("panel_widget_area")) {
+                g_api->inject_widget("panel_widget_area", "temp_display");
             }
         }
     });
 
     // Try immediate injection (in case home is already showing)
-    if (api->has_injection_point("home_widget_area")) {
-        api->inject_widget("home_widget_area", "temp_display");
+    if (api->has_injection_point("panel_widget_area")) {
+        api->inject_widget("panel_widget_area", "temp_display");
     }
 
     api->log_info("Temperature Widget initialized");
