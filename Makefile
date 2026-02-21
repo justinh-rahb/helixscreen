@@ -656,11 +656,19 @@ screenshots: $(BIN)
 # Runs automatically for cross-compiled builds (STRIP_BINARY=yes).
 # Extracts symbol maps first, then strips — preserving debug info for
 # offline crash resolution while keeping the deployed binary small.
+#
+# Artifacts produced (uploaded to R2 by CI):
+#   .sym    — nm -nC output for fast function-name lookup
+#   .debug  — DWARF debug info for addr2line (file:line, inlined frames)
 # =============================================================================
+OBJCOPY_CMD := $(CROSS_COMPILE)objcopy
+
 symbols: $(TARGET)
 ifeq ($(STRIP_BINARY),yes)
 	$(NM_CMD) -nC $(TARGET) > $(TARGET).sym
 	@echo "Symbol map: $(TARGET).sym"
+	$(OBJCOPY_CMD) --only-keep-debug $(TARGET) $(TARGET).debug
+	@echo "Debug info: $(TARGET).debug ($(shell du -h $(TARGET).debug 2>/dev/null | cut -f1 || echo '?'))"
 else
 	@echo "STRIP_BINARY not set — skipping symbol extraction"
 endif

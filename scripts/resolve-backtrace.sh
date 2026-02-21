@@ -437,7 +437,80 @@ resolve_address() {
     fi
 }
 
-# Check for addr2line fallback
+# =============================================================================
+# Debug info (.debug file) and addr2line support
+# When available, addr2line gives file:line info and resolves inlined frames.
+# =============================================================================
+
+# Map platform names to cross-compile prefixes for addr2line
+platform_to_cross_prefix() {
+    case "$1" in
+        pi)         echo "aarch64-linux-gnu-" ;;
+        pi32)       echo "arm-linux-gnueabihf-" ;;
+        ad5m|cc1)   echo "arm-none-linux-gnueabihf-" ;;
+        k1)         echo "mipsel-buildroot-linux-musl-" ;;
+        k2)         echo "mipsel-k1-linux-gnu-" ;;
+        u1)         echo "arm-buildroot-linux-musleabihf-" ;;
+        x86)        echo "x86_64-linux-gnu-" ;;
+        *)          echo "" ;;
+    esac
+}
+
+# Find a working addr2line for the target platform
+find_addr2line() {
+    local platform="$1"
+    local cross_prefix
+    cross_prefix=$(platform_to_cross_prefix "$platform")
+
+    # Try cross-compile addr2line first (exact match for target arch)
+    if [[ -n "$cross_prefix" ]]; then
+        local cross_a2l="${cross_prefix}addr2line"
+        if command -v "$cross_a2l" &>/dev/null; then
+            echo "$cross_a2l"
+            return
+        fi
+    fi
+
+    # Try llvm-addr2line (arch-independent, works on any host)
+    if command -v llvm-addr2line &>/dev/null; then
+        echo "llvm-addr2line"
+        return
+    fi
+
+    # On macOS, llvm-addr2line may be in Xcode toolchain
+    local xcode_a2l="/Library/Developer/CommandLineTools/usr/bin/llvm-addr2line"
+    if [[ -x "$xcode_a2l" ]]; then
+        echo "$xcode_a2l"
+        return
+    fi
+
+    # Try plain addr2line (only works for native-arch binaries)
+    if command -v addr2line &>/dev/null; then
+        echo "addr2line"
+        return
+    fi
+
+    echo ""
+}
+
+# Try to download .debug file from R2 (same location as .sym)
+DEBUG_FILE=""
+if [[ -z "${HELIX_SYM_FILE:-}" ]]; then
+    DEBUG_FILE="${CACHE_DIR}/v${VERSION}/${PLATFORM}.debug"
+    if [[ ! -f "$DEBUG_FILE" ]]; then
+        DBG_URL="${R2_BASE_URL}/v${VERSION}/${PLATFORM}.debug"
+        echo "Downloading debug info for v${VERSION}/${PLATFORM}..." >&2
+        if ! curl -fsSL -o "$DEBUG_FILE" "$DBG_URL" 2>/dev/null; then
+            echo "No .debug file available (nm-based resolution only)" >&2
+            rm -f "$DEBUG_FILE"
+            DEBUG_FILE=""
+        else
+            echo "Cached: $DEBUG_FILE ($(du -h "$DEBUG_FILE" 2>/dev/null | cut -f1))" >&2
+        fi
+    fi
+fi
+
+# Also check for a local unstripped binary (developer builds)
 LOCAL_BINARY=""
 for candidate in \
     "build/bin/helix-screen" \
@@ -447,6 +520,55 @@ for candidate in \
         break
     fi
 done
+
+# Find addr2line tool
+ADDR2LINE=""
+ADDR2LINE_TARGET=""  # The file to pass to addr2line -e
+if [[ -n "$DEBUG_FILE" ]] || [[ -n "$LOCAL_BINARY" ]]; then
+    ADDR2LINE=$(find_addr2line "$PLATFORM")
+    if [[ -n "$ADDR2LINE" ]]; then
+        # Prefer .debug file (matches the exact release version)
+        if [[ -n "$DEBUG_FILE" ]]; then
+            ADDR2LINE_TARGET="$DEBUG_FILE"
+        else
+            ADDR2LINE_TARGET="$LOCAL_BINARY"
+        fi
+        echo "Using $ADDR2LINE with $(basename "$ADDR2LINE_TARGET")" >&2
+    fi
+fi
+
+# resolve_with_addr2line <file_offset_hex>
+# Returns "function_name at file:line" or empty string on failure
+resolve_with_addr2line() {
+    local offset_hex="$1"
+    [[ -z "$ADDR2LINE" ]] && return
+
+    local result
+    result=$("$ADDR2LINE" -e "$ADDR2LINE_TARGET" -f -C -i "0x${offset_hex}" 2>/dev/null || true)
+    [[ -z "$result" ]] && return
+
+    # addr2line returns pairs of lines: function name, then file:line
+    # With -i (inline), there may be multiple pairs
+    local func="" location="" output=""
+    while IFS= read -r line; do
+        if [[ -z "$func" ]]; then
+            func="$line"
+        else
+            location="$line"
+            # Skip unknown results
+            if [[ "$func" != "??" ]] && [[ "$location" != *"??:0"* ]]; then
+                if [[ -n "$output" ]]; then
+                    output="${output} → ${func} at ${location}"
+                else
+                    output="${func} at ${location}"
+                fi
+            fi
+            func=""
+        fi
+    done <<< "$result"
+
+    echo "$output"
+}
 
 echo "Resolving ${#@} address(es) against v${VERSION}/${PLATFORM}..."
 if (( LOAD_BASE > 0 )); then
@@ -461,11 +583,20 @@ echo ""
 for addr in "$@"; do
     resolve_address "$addr"
 
-    # If we have a local (unstripped) binary, also try addr2line for source info
-    if [[ -n "$LOCAL_BINARY" ]]; then
-        line_info=$(addr2line -e "$LOCAL_BINARY" -f -C "$addr" 2>/dev/null || true)
-        if [[ -n "$line_info" ]] && ! echo "$line_info" | grep -q "??"; then
-            echo "    $(echo "$line_info" | tail -1)"
+    # Supplement with addr2line source info when available
+    if [[ -n "$ADDR2LINE" ]]; then
+        # Compute file offset (subtract ASLR base)
+        local_hex="${addr#0x}"
+        local_hex="${local_hex#0X}"
+        local_dec=$((16#$local_hex))
+        if (( LOAD_BASE > 0 )); then
+            local_dec=$(( local_dec - LOAD_BASE ))
+        fi
+        file_hex=$(printf '%x' "$local_dec")
+
+        a2l_result=$(resolve_with_addr2line "$file_hex")
+        if [[ -n "$a2l_result" ]]; then
+            echo "    ${a2l_result}"
         fi
     fi
 done

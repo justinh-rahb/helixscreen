@@ -149,7 +149,9 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: symbols-${{ matrix.platform }}
-        path: build/${{ matrix.platform }}/bin/helix-screen.sym
+        path: |
+          build/${{ matrix.platform }}/bin/helix-screen.sym
+          build/${{ matrix.platform }}/bin/helix-screen.debug
         retention-days: 30
 
     - name: Move cache
@@ -481,6 +483,9 @@ jobs:
           if [ -f "${dir}helix-screen.sym" ]; then
             cp "${dir}helix-screen.sym" "symbol-files/${platform}.sym"
           fi
+          if [ -f "${dir}helix-screen.debug" ]; then
+            cp "${dir}helix-screen.debug" "symbol-files/${platform}.debug"
+          fi
         done
         echo "Symbol files:"
         ls -lh symbol-files/ || echo "No symbol files found"
@@ -591,7 +596,7 @@ jobs:
           echo "=== ${CHANNEL} upload complete ==="
         done
 
-        # Upload symbol maps (version-keyed, not channel-specific)
+        # Upload symbol maps and debug info (version-keyed, not channel-specific)
         echo "=== Uploading symbol maps ==="
         for symfile in symbol-files/*.sym; do
           [ -f "$symfile" ] || continue
@@ -603,7 +608,19 @@ jobs:
             --endpoint-url "$R2_ENDPOINT" \
             --content-type "text/plain"
         done
-        echo "=== Symbol map upload complete ==="
+
+        echo "=== Uploading debug info ==="
+        for dbgfile in symbol-files/*.debug; do
+          [ -f "$dbgfile" ] || continue
+          filename=$(basename "$dbgfile")
+          platform="${filename%.debug}"
+          echo "Uploading symbols/v${RELEASE_VERSION}/${platform}.debug..."
+          aws s3 cp "$dbgfile" \
+            "s3://${R2_BUCKET}/symbols/v${RELEASE_VERSION}/${platform}.debug" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type "application/octet-stream"
+        done
+        echo "=== Symbol upload complete ==="
 
         echo "All uploads complete!"
         for CHANNEL in $UPLOAD_CHANNELS; do
