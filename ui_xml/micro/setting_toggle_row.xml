@@ -1,10 +1,8 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Reusable Settings Toggle Row Component -->
-<!-- Creates a setting row with label, optional icon, and switch toggle -->
-<!-- Usage: <setting_toggle_row label="Dark Mode" label_tag="Dark Mode" icon="light" subject="settings_dark_mode"/> -->
-<!-- Optional: disabled="subject_name" to dim label and disable switch when subject = 1 -->
+<!-- MICRO OVERRIDE of ui_xml/components/setting_toggle_row.xml for 480x272 displays -->
+<!-- Divergences from standard: tighter padding (#space_xs vs #space_sm/#space_md) -->
 <component>
   <api>
     <prop name="label" type="string" default="Setting"/>

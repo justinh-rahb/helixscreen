@@ -30,8 +30,8 @@ any theme works with any layout.
 | `standard` | **Complete** | All panels — this is the default UI everyone uses today |
 | `ultrawide` | **Started** | `home_panel.xml` only (initial draft, needs refinement) |
 | `portrait` | Not started | Directory doesn't exist yet |
-| `micro` | Not started | Directory doesn't exist yet |
-| `micro-portrait` | Not started | Directory doesn't exist yet |
+| `micro` | **Started** | Controls panel, display settings, theme preview/editor, settings components |
+| `micro-portrait` | Not started | Directory exists (.gitkeep only) |
 | `tiny` | Not started | Directory doesn't exist yet |
 | `tiny-portrait` | Not started | Directory doesn't exist yet |
 
@@ -72,8 +72,8 @@ ui_xml/
     home_panel.xml         ← Ultrawide home panel (exists, needs work)
 
   portrait/                ← Portrait overrides (doesn't exist yet — create it!)
-  micro/                   ← Micro landscape overrides (doesn't exist yet)
-  micro-portrait/          ← Micro portrait overrides (doesn't exist yet)
+  micro/                   ← Micro landscape overrides (480x272, e.g. Ender 3 V3 KE)
+  micro-portrait/          ← Micro portrait overrides (not started)
   tiny/                    ← Tiny landscape overrides (doesn't exist yet)
   tiny-portrait/           ← Tiny portrait overrides (doesn't exist yet)
 ```

@@ -74,15 +74,43 @@ TEST_CASE_METHOD(LayoutFixture, "Portrait resolutions", "[layout-manager]") {
     }
 }
 
+TEST_CASE_METHOD(LayoutFixture, "Micro landscape resolutions", "[layout-manager]") {
+    auto& lm = LayoutManager::instance();
+
+    SECTION("480x272 — Ender 3 V3 KE") {
+        lm.init(480, 272);
+        REQUIRE(lm.type() == LayoutType::MICRO);
+        REQUIRE(lm.name() == "micro");
+    }
+    SECTION("320x240 — min dim ≤272 so micro, not tiny") {
+        lm.init(320, 240);
+        REQUIRE(lm.type() == LayoutType::MICRO);
+    }
+}
+
+TEST_CASE_METHOD(LayoutFixture, "Micro portrait resolutions", "[layout-manager]") {
+    auto& lm = LayoutManager::instance();
+
+    SECTION("272x480") {
+        lm.init(272, 480);
+        REQUIRE(lm.type() == LayoutType::MICRO_PORTRAIT);
+        REQUIRE(lm.name() == "micro_portrait");
+    }
+    SECTION("240x320 — min dim ≤272 so micro portrait, not tiny portrait") {
+        lm.init(240, 320);
+        REQUIRE(lm.type() == LayoutType::MICRO_PORTRAIT);
+    }
+}
+
 TEST_CASE_METHOD(LayoutFixture, "Tiny landscape resolutions", "[layout-manager]") {
     auto& lm = LayoutManager::instance();
 
-    SECTION("480x320") {
+    SECTION("480x320 — min dim >272 so stays tiny") {
         lm.init(480, 320);
         REQUIRE(lm.type() == LayoutType::TINY);
     }
-    SECTION("320x240") {
-        lm.init(320, 240);
+    SECTION("480x400") {
+        lm.init(480, 400);
         REQUIRE(lm.type() == LayoutType::TINY);
     }
 }
@@ -90,13 +118,26 @@ TEST_CASE_METHOD(LayoutFixture, "Tiny landscape resolutions", "[layout-manager]"
 TEST_CASE_METHOD(LayoutFixture, "Tiny portrait resolutions", "[layout-manager]") {
     auto& lm = LayoutManager::instance();
 
-    SECTION("320x480") {
+    SECTION("320x480 — min dim >272 so stays tiny portrait") {
         lm.init(320, 480);
         REQUIRE(lm.type() == LayoutType::TINY_PORTRAIT);
     }
-    SECTION("240x320") {
-        lm.init(240, 320);
+    SECTION("400x480") {
+        lm.init(400, 480);
         REQUIRE(lm.type() == LayoutType::TINY_PORTRAIT);
+    }
+}
+
+TEST_CASE_METHOD(LayoutFixture, "Micro/Tiny boundary at min_dim=272", "[layout-manager]") {
+    auto& lm = LayoutManager::instance();
+
+    SECTION("480x272 is micro (boundary inclusive)") {
+        lm.init(480, 272);
+        REQUIRE(lm.type() == LayoutType::MICRO);
+    }
+    SECTION("480x273 is tiny (one above boundary)") {
+        lm.init(480, 273);
+        REQUIRE(lm.type() == LayoutType::TINY);
     }
 }
 
@@ -120,10 +161,19 @@ TEST_CASE_METHOD(LayoutFixture, "Override forces layout type", "[layout-manager]
 
 TEST_CASE_METHOD(LayoutFixture, "Override normalizes hyphens to underscores", "[layout-manager]") {
     auto& lm = LayoutManager::instance();
-    lm.set_override("tiny-portrait");
-    lm.init(800, 480);
-    REQUIRE(lm.type() == LayoutType::TINY_PORTRAIT);
-    REQUIRE(lm.name() == "tiny_portrait");
+
+    SECTION("tiny-portrait") {
+        lm.set_override("tiny-portrait");
+        lm.init(800, 480);
+        REQUIRE(lm.type() == LayoutType::TINY_PORTRAIT);
+        REQUIRE(lm.name() == "tiny_portrait");
+    }
+    SECTION("micro-portrait") {
+        lm.set_override("micro-portrait");
+        lm.init(800, 480);
+        REQUIRE(lm.type() == LayoutType::MICRO_PORTRAIT);
+        REQUIRE(lm.name() == "micro_portrait");
+    }
 }
 
 TEST_CASE_METHOD(LayoutFixture, "Unknown override name defaults to standard", "[layout-manager]") {
@@ -161,6 +211,14 @@ TEST_CASE_METHOD(LayoutFixture, "is_standard returns true only for STANDARD", "[
         lm.init(480, 800);
         REQUIRE(lm.is_standard() == false);
     }
+    SECTION("MICRO") {
+        lm.init(480, 272);
+        REQUIRE(lm.is_standard() == false);
+    }
+    SECTION("MICRO_PORTRAIT") {
+        lm.init(272, 480);
+        REQUIRE(lm.is_standard() == false);
+    }
     SECTION("TINY") {
         lm.init(480, 320);
         REQUIRE(lm.is_standard() == false);
@@ -189,6 +247,14 @@ TEST_CASE_METHOD(LayoutFixture, "name returns correct string for each type", "[l
     SECTION("portrait") {
         lm.init(480, 800);
         REQUIRE(lm.name() == "portrait");
+    }
+    SECTION("micro") {
+        lm.init(480, 272);
+        REQUIRE(lm.name() == "micro");
+    }
+    SECTION("micro_portrait") {
+        lm.init(272, 480);
+        REQUIRE(lm.name() == "micro_portrait");
     }
     SECTION("tiny") {
         lm.init(480, 320);
@@ -251,4 +317,37 @@ TEST_CASE_METHOD(LayoutFixture, "has_override returns true for ultrawide home_pa
 
     REQUIRE(lm.has_override("home_panel.xml") == true);
     REQUIRE(lm.has_override("controls_panel.xml") == false);
+}
+
+// ============================================================================
+// Micro override integration (requires ui_xml/micro/ files on disk)
+// ============================================================================
+
+TEST_CASE_METHOD(LayoutFixture, "resolve_xml_path returns micro override when file exists on disk",
+                 "[layout-manager]") {
+    auto& lm = LayoutManager::instance();
+    lm.init(480, 272);
+    REQUIRE(lm.type() == LayoutType::MICRO);
+
+    // controls_panel.xml has a micro override -> should resolve to micro path
+    REQUIRE(lm.resolve_xml_path("controls_panel.xml") == "ui_xml/micro/controls_panel.xml");
+}
+
+TEST_CASE_METHOD(LayoutFixture, "resolve_xml_path falls back for panels without micro override",
+                 "[layout-manager]") {
+    auto& lm = LayoutManager::instance();
+    lm.init(480, 272);
+    REQUIRE(lm.type() == LayoutType::MICRO);
+
+    // home_panel.xml has no micro override -> should fall back to standard
+    REQUIRE(lm.resolve_xml_path("home_panel.xml") == "ui_xml/home_panel.xml");
+}
+
+TEST_CASE_METHOD(LayoutFixture, "has_override returns true for micro controls_panel",
+                 "[layout-manager]") {
+    auto& lm = LayoutManager::instance();
+    lm.init(480, 272);
+
+    REQUIRE(lm.has_override("controls_panel.xml") == true);
+    REQUIRE(lm.has_override("home_panel.xml") == false);
 }

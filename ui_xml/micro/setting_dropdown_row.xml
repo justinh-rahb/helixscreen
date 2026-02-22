@@ -1,11 +1,8 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Reusable Settings Dropdown Row Component -->
-<!-- Creates a setting row with label, optional icon, and dropdown selector -->
-<!-- Usage: <setting_dropdown_row label="Display Sleep" label_tag="Display Sleep" icon="clock"/> -->
-<!-- Note: Options can be set via options prop (use &#10; as separator) or in C++ for dynamic data -->
-<!-- Optional: disabled="subject_name" to dim label and disable dropdown when subject = 1 -->
+<!-- MICRO OVERRIDE of ui_xml/components/setting_dropdown_row.xml for 480x272 displays -->
+<!-- Divergences from standard: tighter padding (#space_xs vs #space_sm/#space_md) -->
 <component>
   <api>
     <prop name="label" type="string" default="Setting"/>

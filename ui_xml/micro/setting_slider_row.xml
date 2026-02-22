@@ -1,10 +1,8 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Reusable Settings Slider Row Component -->
-<!-- Creates a settings row with label, description, and an inline slider -->
-<!-- Usage: <setting_slider_row label="Scroll Speed" label_tag="Scroll Speed" icon="tune" description="Higher = faster" description_tag="Higher = faster" min="1" max="100" value="50"/> -->
-<!-- Optional: disabled="subject_name" to dim label and disable slider when subject = 1 -->
+<!-- MICRO OVERRIDE of ui_xml/components/setting_slider_row.xml for 480x272 displays -->
+<!-- Divergences from standard: tighter padding (#space_xs vs #space_sm) -->
 <component>
   <api>
     <prop name="label" type="string" default="Setting"/>

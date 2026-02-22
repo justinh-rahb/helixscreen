@@ -1,11 +1,8 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Reusable Settings Action Row Component -->
-<!-- Creates a clickable row that opens a sub-panel or performs an action -->
-<!-- Usage: <setting_action_row label="Network Settings" label_tag="Network Settings" icon="lan" description="WiFi and Ethernet" description_tag="WiFi and Ethernet"/> -->
-<!-- Optional: disabled="subject_name" to dim label and disable button when subject = 1 -->
-<!-- Description binding: use bind_description="subject_name" for reactive text -->
+<!-- MICRO OVERRIDE of ui_xml/components/setting_action_row.xml for 480x272 displays -->
+<!-- Divergences from standard: tighter padding (#space_xs vs #space_sm/#space_md) -->
 <component>
   <api>
     <prop name="label" type="string" default="Action"/>

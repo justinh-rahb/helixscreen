@@ -1,7 +1,12 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Controls Panel Dashboard V3 - Position card + 70/30 bottom layout -->
+<!-- MICRO OVERRIDE of ui_xml/controls_panel.xml for 480x272 displays -->
+<!-- Divergences from standard:
+     - Row 1 height: 50% (vs 55%) to reclaim vertical space
+     - Padding: #space_xs throughout (vs #space_sm/#space_md)
+     - Row 2: flex_grow (vs explicit 45%) since Row 1 is explicit 50%
+-->
 <component>
   <styles>
     <!-- Homing button styles -->

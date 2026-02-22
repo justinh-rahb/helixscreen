@@ -2,7 +2,12 @@
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 <component>
-  <!-- Reusable Header Bar Component - Improved Design v2 -->
+  <!-- MICRO OVERRIDE of ui_xml/components/header_bar.xml for 480x272 displays -->
+  <!-- Divergences from standard:
+       - Height: 40px (vs 48px standard)
+       - Title: left-aligned (vs centered) to maximize usable width
+       - Padding: #space_sm left, #space_xl right (vs larger standard padding)
+  -->
   <!-- Used in modal overlays, sub-screens, and detail views -->
   <!-- Provides consistent back button + centered title + optional action button -->
   <!-- Key improvements over v1:

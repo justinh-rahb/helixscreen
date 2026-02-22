@@ -1,9 +1,8 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Reusable Settings Section Header Component -->
-<!-- Creates a section divider with optional icon and title for settings panel groups -->
-<!-- Usage: <setting_section_header title="APPEARANCE" title_tag="APPEARANCE" icon="light"/> -->
+<!-- MICRO OVERRIDE of ui_xml/components/setting_section_header.xml for 480x272 displays -->
+<!-- Divergences from standard: tighter padding (#space_sm top vs standard) -->
 <component>
   <api>
     <prop name="title" type="string" default="Section"/>

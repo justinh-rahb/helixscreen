@@ -1,9 +1,12 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Display Settings Overlay Panel -->
-<!-- Allows adjustment of dark mode, brightness, and display sleep timeout -->
-<!-- Uses setting_* components for consistency with main settings panel -->
+<!-- MICRO OVERRIDE of ui_xml/display_settings_overlay.xml for 480x272 displays -->
+<!-- Divergences from standard:
+     - Uses #overlay_panel_width_full (vs default width)
+     - Padding: tighter content area spacing (#space_md sides, 0 top)
+     - Uses micro-specific setting_* components for compact rows
+-->
 <component>
   <view name="display_settings_overlay"
         extends="overlay_panel" width="#overlay_panel_width_full" title="Display Settings" title_tag="Display Settings"

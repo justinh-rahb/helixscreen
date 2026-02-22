@@ -1,8 +1,12 @@
 <?xml version="1.0"?>
 <!-- Copyright (C) 2025-2026 356C LLC -->
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
-<!-- Theme Explorer Overlay - Primary theme selection and preview interface -->
-<!-- Navigation: Settings → Display → Theme → (this) → Edit Colors (optional) -->
+<!-- MICRO OVERRIDE of ui_xml/theme_preview_overlay.xml for 480x272 displays -->
+<!-- Divergences from standard:
+     - Uses #overlay_panel_width_full (vs default width)
+     - Tighter padding: #space_sm (vs #space_md)
+     - Action buttons in header bar use #button_height_sm + #space_xs padding
+-->
 <component>
   <view name="theme_preview_overlay"
         extends="overlay_panel" width="#overlay_panel_width_full" title="Theme" title_tag="Theme" bg_color="#screen_bg"
