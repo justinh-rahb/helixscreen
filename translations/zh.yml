@@ -81,8 +81,7 @@ translations:
   Apply Changes: 应用更改
   Applying...: 正在应用...
   Are you sure you want to cancel this print? All progress will be lost.: 确定要取消此打印吗？所有进度将丢失。
-  Assign Klipper macros to control LEDs via on/off, toggle, or presets: 分配 Klipper
-    宏通过开/关、切换或预设控制 LED
+  Assign Klipper macros to control LEDs via on/off, toggle, or presets: 分配 Klipper 宏通过开/关、切换或预设控制 LED
   Assign a role to enable sensor monitoring: 分配角色以启用传感器监控
   Auto: 自动
   Auto Bed Mesh: 自动热床网格
@@ -129,6 +128,7 @@ translations:
   Bypass: 旁路
   Bypass Mode: 旁路模式
   Bypass controlled by hardware sensor: 旁路由硬件传感器控制
+  C: 腔
   CALIBRATION: 校准
   CAPABILITIES: 功能
   CHANGED FROM LAST SESSION: 与上次会话相比有更改
@@ -150,6 +150,7 @@ translations:
   Cancelled: 已取消
   Chamber: 腔体
   Chamber Fan: 腔体风扇
+  Chamber Temperature: 腔体温度
   Chamber and dryer humidity monitoring: 腔体和干燥器湿度监控
   'Chamber:': 腔体：
   Change LED color based on printer state: 根据打印机状态更改 LED 颜色
@@ -170,6 +171,7 @@ translations:
   Choose rendering mode for bed mesh visualization: 选择热床网格可视化的渲染模式
   Choose sound style: 选择声音风格
   Clean Nozzle: 清洁喷嘴
+  Chm: 腔体
   Clear: 清除
   Clear All: 全部清除
   Clear All Events: 清除所有事件
@@ -347,8 +349,7 @@ translations:
   Failed to apply limits: 应用限制失败
   Failed to apply settings: 应用设置失败
   Failed to delete spool: 删除料盘失败
-  Failed to download moonraker.conf.\nCheck printer connection.: 下载 moonraker.conf
-    失败。\n请检查打印机连接。
+  Failed to download moonraker.conf.\nCheck printer connection.: 下载 moonraker.conf 失败。\n请检查打印机连接。
   Failed to enable tuning tower: 启用调优塔失败
   Failed to get limits: 获取限制失败
   Failed to load overlay: 加载覆盖层失败
@@ -397,8 +398,10 @@ translations:
   Got it: 知道了
   Gray: 灰色
   Guides and reference: 指南与参考
+  H: 头
   HELP & SUPPORT: 帮助与支持
   Happy Hare MMU: Happy Hare MMU
+  HE: 喷头
   Hardware: 硬件
   Hardware Health: 硬件状态
   Hardware Issues: 硬件问题
@@ -407,9 +410,7 @@ translations:
   Hardware marked as optional: 硬件已标记为可选
   Hardware saved to config: 硬件已保存到配置
   Have a piece of paper ready.: 请准备好一张纸。
-  ? Have your bed adjustment tool (screwdriver, hex-key, etc.) ready if your bed isn't
-    adjusted with                              thumb wheels or some other built-in
-    mechanism.
+  ? Have your bed adjustment tool (screwdriver, hex-key, etc.) ready if your bed isn't adjusted with                              thumb wheels or some other built-in mechanism.
   : 如果您的热床不是用旋钮或其他内置机构调整的，请准备好热床调整工具（螺丝刀、内六角扳手等）。
   Heading: 标题
   Heat Soak: 预热浸泡
@@ -420,8 +421,7 @@ translations:
   Heating...: 正在加热...
   HelixScreen: HelixScreen
   HelixScreen Crashed: HelixScreen 崩溃
-  HelixScreen will integrate with your filament changer for multi-spool/color print operations.: HelixScreen
-    将与您的耗材更换器集成，用于多料盘/多色打印操作。
+  HelixScreen will integrate with your filament changer for multi-spool/color print operations.: HelixScreen 将与您的耗材更换器集成，用于多料盘/多色打印操作。
   Help improve HelixScreen?: 帮助改进 HelixScreen？
   Higher = faster: 越高 = 越快
   Home: 归位
@@ -457,8 +457,7 @@ translations:
   Install HelixPrint Plugin: 安装 HelixPrint 插件
   Install Plugin: 安装插件
   Install Update: 安装更新
-  'Install the HelixPrint plugin to enable fast G-code modifications. Run this command via SSH on your printer:': 安装
-    HelixPrint 插件以启用快速 G-code 修改。通过 SSH 在打印机上运行此命令：
+  'Install the HelixPrint plugin to enable fast G-code modifications. Run this command via SSH on your printer:': 安装 HelixPrint 插件以启用快速 G-code 修改。通过 SSH 在打印机上运行此命令：
   Install the timelapse plugin via SSH,\nthen tap \"Check Again\".: 通过SSH安装延时摄影插件，\n然后点击"重新检查"。
   Install timelapse plugin: 安装延时摄影插件
   Installation Failed: 安装失败
@@ -475,8 +474,7 @@ translations:
   Keyboard Test (Gboard-style): 键盘测试（Gboard 风格）
   Klipper: Klipper
   'Klipper firmware has disconnected from the host. ': 'Klipper 固件已与主机断开连接。 '
-  'Klipper has entered shutdown state. This may be due to an emergency stop, ': Klipper
-    已进入关机状态。这可能是由于紧急停止、
+  'Klipper has entered shutdown state. This may be due to an emergency stop, ': Klipper 已进入关机状态。这可能是由于紧急停止、
   Klipper will restart to apply changes: Klipper 将重启以应用更改
   Klipper will restart to apply changes.: Klipper 将重启以应用更改。
   Klipper will restart to apply new PID values.: Klipper 将重启以应用新的 PID 值。
@@ -572,8 +570,7 @@ translations:
   Motors Off: 关闭电机
   Move paper back and forth while adjusting. Stop when paper catches slightly but still slides.: 调整时前后移动纸张。当纸张有轻微阻力但仍能滑动时停止。
   Movement speed: 移动速度
-  ? Moves the print head to measure vibration frequencies on each axis. Takes 2-3
-    minutes. The printer will make noise — this is normal.
+  ? Moves the print head to measure vibration frequencies on each axis. Takes 2-3 minutes. The printer will make noise — this is normal.
   : 移动打印头以测量每个轴上的振动频率。需要 2-3 分钟。打印机会发出噪音——这是正常的。
   Multi Filament System Overview: 多耗材系统概览
   Multi-Filament: 多耗材
@@ -660,6 +657,7 @@ translations:
   Optimizes temperature control for stable, consistent heating.: 优化温度控制，实现稳定一致的加热。
   Or Enter Manually: 或手动输入
   Output Mode: 输出模式
+  P: 件
   PA: PA
   PETG: PETG
   PLA: PLA
@@ -670,6 +668,7 @@ translations:
   Paper Test Calibration: 纸张测试校准
   Part Cooling Fan: 零件冷却风扇
   Part Fan: 零件风扇
+  Part: 零件
   Password: 密码
   Password cannot be empty: 密码不能为空
   Pause: 暂停
@@ -683,10 +682,8 @@ translations:
   Phase tracking update failed: 相位跟踪更新失败
   Pick: 选取
   Pick Color: 选择颜色
-  Place PNG or JPEG files in config/custom_images/ to add custom images: 将 PNG 或 JPEG
-    文件放在 config/custom_images/ 中以添加自定义图片
-  Place plugins in the plugins directory to extend HelixScreen: 将插件放在 plugins 目录中以扩展
-    HelixScreen
+  Place PNG or JPEG files in config/custom_images/ to add custom images: 将 PNG 或 JPEG 文件放在 config/custom_images/ 中以添加自定义图片
+  Place plugins in the plugins directory to extend HelixScreen: 将插件放在 plugins 目录中以扩展 HelixScreen
   Play a test beep: 播放测试提示音
   Please enter a theme name: 请输入主题名称
   Please wait while the printer homes and probes.: 请等待打印机归位和探测。
@@ -885,6 +882,7 @@ translations:
   Set Active: 设为活动
   Settings: 设置
   Settings reset to defaults: 设置已重置为默认值
+  Settings reset to defaults. Restarting...: 设置已重置为默认值。正在重启...
   Setup Timelapse: 设置延时摄影
   Shadow Intensity: 阴影强度
   Share Usage Data: 共享使用数据
@@ -963,10 +961,8 @@ translations:
   Test Sound: 测试声音
   Test probe repeatability: 测试探针重复性
   Thanks! Anonymous usage data helps improve HelixScreen.: 感谢！匿名使用数据有助于改进 HelixScreen。
-  Thanks! TOTALLY anonymous usage data helps improve HelixScreen.: 感谢！完全匿名的使用数据有助于改进
-    HelixScreen。
-  ? The HelixPrint plugin enables fast G-code modifications directly on your printer—like
-    skipping bed mesh for quick reprints.
+  Thanks! TOTALLY anonymous usage data helps improve HelixScreen.: 感谢！完全匿名的使用数据有助于改进 HelixScreen。
+  ? The HelixPrint plugin enables fast G-code modifications directly on your printer—like skipping bed mesh for quick reprints.
   : HelixPrint 插件可在打印机上直接进行快速 G-code 修改——例如跳过热床网格以快速重新打印。
   The heater will cycle on and off several times.: 加热器将多次开关循环。
   'The runout sensor indicates no filament is loaded. ': '断料传感器显示未装载耗材。 '
@@ -978,22 +974,17 @@ translations:
   Theme changes apply after restart.: 主题更改在重启后生效。
   Theme reset to defaults: 主题已重置为默认值
   Theme, brightness, and sleep settings: 主题、亮度和休眠设置
-  This calibration uses the paper friction method to set your Z-offset.: 此校准使用纸张摩擦法设置
-    Z 偏移。
+  This calibration uses the paper friction method to set your Z-offset.: 此校准使用纸张摩擦法设置 Z 偏移。
   This cannot be undone.: 此操作无法撤销。
   This is exactly the data that will be sent: 这正是将要发送的数据
   This is what data would be sent if enabled: 这是启用后将发送的数据
   This may take up to 30 seconds: 这可能需要 30 秒
-  ? This plugin lets HelixScreen control print start options like bed mesh and QGL.
-    Once installed, use Configure PRINT_START below to enable optional steps.
+  ? This plugin lets HelixScreen control print start options like bed mesh and QGL. Once installed, use Configure PRINT_START below to enable optional steps.
   : 此插件让 HelixScreen 控制打印启动选项，如热床网格和 QGL。安装后，使用下面的配置 PRINT_START 启用可选步骤。
   This tool probes each bed screw and tells you how much to adjust.: 此工具探测每个热床螺丝并告诉您需要调整多少。
-  'This will apply the Z-offset to your endstop and restart Klipper to save the ': 这将把
-    Z 偏移应用到限位开关并重启 Klipper 以保存
-  'This will apply the Z-offset to your probe and restart Klipper to save the ': 这将把
-    Z 偏移应用到探针并重启 Klipper 以保存
-  ? This will collect system info, logs, settings, and printer data to help diagnose
-    issues. No passwords or sensitive data will be included.
+  'This will apply the Z-offset to your endstop and restart Klipper to save the ': 这将把 Z 偏移应用到限位开关并重启 Klipper 以保存
+  'This will apply the Z-offset to your probe and restart Klipper to save the ': 这将把 Z 偏移应用到探针并重启 Klipper 以保存
+  ? This will collect system info, logs, settings, and printer data to help diagnose issues. No passwords or sensitive data will be included.
   : 将收集系统信息、日志、设置和打印机数据以帮助诊断问题。不会包含密码或敏感数据。
   This will immediately halt all printer operations. The printer will require a restart to resume.: 这将立即停止所有打印机操作。打印机需要重启才能恢复。
   This will reset all settings to defaults. This action cannot be undone.: 这将把所有设置重置为默认值。此操作无法撤销。
@@ -1087,8 +1078,7 @@ translations:
   Webcam: 摄像头
   Website (optional): 网站（可选）
   Week: 周
-  ? Weight data is synced from Spoolman to display remaining filament. Changes are
-    also synced when prints start, pause, or complete.
+  ? Weight data is synced from Spoolman to display remaining filament. Changes are also synced when prints start, pause, or complete.
   : 重量数据从 Spoolman 同步以显示剩余耗材。打印开始、暂停或完成时也会同步更改。
   Weight sync settings: 重量同步设置
   What We Collect: 我们收集的内容

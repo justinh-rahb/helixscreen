@@ -519,6 +519,7 @@
                es="Bypass controlado por sensor de hardware" fr="Bypass contrôlé par capteur matériel"
                it="Bypass controllato da sensore hardware" ja="ハードウェアセンサーによるバイパス制御"
                pt="Bypass controlado por sensor de hardware" ru="Обход управляется аппаратным датчиком" zh="旁路由硬件传感器控制"/>
+  <translation tag="C" de="K" en="C" es="C" fr="C" it="C" ja="C" pt="C" ru="К" zh="腔"/>
   <translation tag="CALIBRATION"
                de="KALIBRIERUNG" en="CALIBRATION" es="CALIBRACIÓN" fr="CALIBRATION" it="CALIBRAZIONE" ja="キャリブレーション"
                pt="CALIBRAÇÃO" ru="КАЛИБРОВКА" zh="校准"/>
@@ -590,6 +591,10 @@
   <translation tag="Chamber Fan"
                de="Kammerlüfter" en="Chamber Fan" es="Ventilador de Cámara" fr="Ventilateur de chambre"
                it="Ventola camera" ja="チャンバーファン" pt="Ventoinha da Câmara" ru="Вентилятор камеры" zh="腔体风扇"/>
+  <translation tag="Chamber Temperature"
+               de="Kammertemperatur" en="Chamber Temperature" es="Temperatura de la cámara"
+               fr="Température de l'enceinte" it="Temperatura camera" ja="チャンバー温度" pt="Temperatura da câmara"
+               ru="Температура камеры" zh="腔体温度"/>
   <translation tag="Chamber and dryer humidity monitoring"
                de="Kammer- und Trockner-Feuchtigkeitsüberwachung" en="Chamber and dryer humidity monitoring"
                es="Monitoreo de humedad de cámara y secador" fr="Surveillance de l'humidité de la chambre et du sécheur"
@@ -650,6 +655,7 @@
                de="Prüfe Zeitraffer-Plugin..." en="Checking timelapse plugin..." es="Verificando plugin de timelapse..."
                fr="Vérification du plugin timelapse..." it="Verifica plugin timelapse..." ja="タイムラプスプラグインを確認中..."
                pt="Verificando plugin de timelapse..." ru="Проверка плагина таймлапса..." zh="正在检查延时摄影插件..."/>
+  <translation tag="Chm" de="Kam" en="Chm" es="Cám" fr="Chb" it="Cam" ja="ﾁｬﾝ" pt="Câm" ru="Кам" zh="腔体"/>
   <translation tag="Choose 12-hour or 24-hour time display"
                de="12-Stunden- oder 24-Stunden-Zeitformat wählen" en="Choose 12-hour or 24-hour time display"
                es="Elija visualización de hora de 12 o 24 horas" fr="Choisir l'affichage 12 heures ou 24 heures"
@@ -1609,6 +1615,8 @@
   <translation tag="Guides and reference"
                de="Anleitungen und Referenz" en="Guides and reference" es="Guías y referencia" fr="Guides et référence"
                it="Guide e riferimenti" ja="ガイドとリファレンス" pt="Guias e referência" ru="Руководства и справка" zh="指南与参考"/>
+  <translation tag="H" de="H" en="H" es="H" fr="H" it="H" ja="H" pt="H" ru="Х" zh="头"/>
+  <translation tag="HE" de="HE" en="HE" es="HE" fr="HE" it="HE" ja="HE" pt="HE" ru="ХЭ" zh="喷头"/>
   <translation tag="HELP &amp; SUPPORT"
                de="HILFE &amp; SUPPORT" en="HELP &amp; SUPPORT" es="AYUDA Y SOPORTE" fr="AIDE &amp; SUPPORT"
                it="AIUTO &amp; SUPPORTO" ja="ヘルプとサポート" pt="AJUDA E SUPORTE" ru="ПОМОЩЬ И ПОДДЕРЖКА" zh="帮助与支持"/>
@@ -2630,6 +2638,7 @@
   <translation tag="Output Mode"
                de="Ausgabemodus" en="Output Mode" es="Modo de Salida" fr="Mode de sortie" it="Modalità uscita"
                ja="出力モード" pt="Modo de Saída" ru="Режим вывода" zh="输出模式"/>
+  <translation tag="P" de="B" en="P" es="P" fr="P" it="P" ja="P" pt="P" ru="Д" zh="件"/>
   <translation tag="PA" de="PA" en="PA" es="PA" fr="PA" it="PA" ja="PA" pt="PA" ru="PA" zh="PA"/>
   <translation tag="PETG" de="PETG" en="PETG" es="PETG" fr="PETG" it="PETG" ja="PETG" pt="PETG" ru="PETG" zh="PETG"/>
   <translation tag="PLA" de="PLA" en="PLA" es="PLA" fr="PLA" it="PLA" ja="PLA" pt="PLA" ru="PLA" zh="PLA"/>
@@ -2649,6 +2658,7 @@
                de="Papiertest-Kalibrierung" en="Paper Test Calibration" es="Calibración con Prueba de Papel"
                fr="Calibration par test papier" it="Calibrazione test carta" ja="紙テストキャリブレーション"
                pt="Calibração por Teste de Papel" ru="Калибровка бумажным тестом" zh="纸张测试校准"/>
+  <translation tag="Part" de="Teil" en="Part" es="Pieza" fr="Pièce" it="Pezzo" ja="ﾊﾟｰﾂ" pt="Peça" ru="Дет" zh="零件"/>
   <translation tag="Part Cooling Fan"
                de="Teile-Kühllüfter" en="Part Cooling Fan" es="Ventilador de Enfriamiento de Pieza"
                fr="Ventilateur de refroidissement pièce" it="Ventola raffreddamento pezzo" ja="パーツ冷却ファン"
@@ -3488,6 +3498,14 @@
                it="Impostazioni ripristinate ai valori predefiniti" ja="設定をデフォルトにリセットしました"
                pt="Configurações restauradas para os padrões" ru="Настройки сброшены к значениям по умолчанию"
                zh="设置已重置为默认值"/>
+  <translation tag="Settings reset to defaults. Restarting..."
+               de="Einstellungen auf Standardwerte zurückgesetzt. Neustart..."
+               en="Settings reset to defaults. Restarting..."
+               es="Ajustes restablecidos a valores predeterminados. Reiniciando..."
+               fr="Paramètres réinitialisés par défaut. Redémarrage..."
+               it="Impostazioni ripristinate ai valori predefiniti. Riavvio..." ja="設定をデフォルトにリセットしました。再起動中..."
+               pt="Configurações restauradas para os padrões. Reiniciando..."
+               ru="Настройки сброшены к значениям по умолчанию. Перезапуск..." zh="设置已重置为默认值。正在重启..."/>
   <translation tag="Setup Timelapse"
                de="Zeitraffer einrichten" en="Setup Timelapse" es="Configurar Timelapse" fr="Configurer le timelapse"
                it="Configura timelapse" ja="タイムラプスを設定" pt="Configurar Timelapse" ru="Настроить таймлапс" zh="设置延时摄影"/>

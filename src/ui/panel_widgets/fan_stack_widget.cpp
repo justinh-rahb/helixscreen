@@ -141,8 +141,8 @@ void FanStackWidget::set_row_density(size_t widgets_in_row) {
     bool spacious = (widgets_in_row <= 4);
     struct NameMapping {
         const char* obj_name;
-        const char* compact;  // 5+ widgets per row
-        const char* spacious; // ≤4 widgets per row
+        const char* compact_key;  // translation key for 5+ widgets per row
+        const char* spacious_key; // translation key for ≤4 widgets per row
     };
     static constexpr NameMapping name_map[] = {
         {"fan_stack_part_name", "P", "Part"},
@@ -153,7 +153,7 @@ void FanStackWidget::set_row_density(size_t widgets_in_row) {
         lv_obj_t* lbl = lv_obj_find_by_name(widget_obj_, m.obj_name);
         if (lbl) {
             lv_obj_set_style_text_font(lbl, font, 0);
-            lv_label_set_text(lbl, spacious ? m.spacious : m.compact);
+            lv_label_set_text(lbl, lv_tr(spacious ? m.spacious_key : m.compact_key));
         }
     }
 
