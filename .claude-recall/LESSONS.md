@@ -37,7 +37,7 @@
 > Text-only buttons: use `align="center"` on child. Icon+text buttons with flex_flow="row": need ALL THREE flex properties - style_flex_main_place="center" (horizontal), style_flex_cross_place="center" (vertical align items), style_flex_track_place="center" (vertical position of row). Missing track_place causes content to sit at top.
 
 ### [L031] [***--|*****] XML no recompile
-- **Uses**: 27 | **Velocity**: 7.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 28 | **Velocity**: 8.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
 > XML files are loaded at RUNTIME - never rebuild after XML-only changes. Just relaunch the app. This includes layout changes, styling, bindings, event callbacks - anything in ui_xml/*.xml. Only rebuild when C++ code changes.
 
 ### [L039] [*----|-----] Unique XML callback names
@@ -129,8 +129,8 @@
 - **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-11 | **Last**: 2026-02-11 | **Category**: lvgl
 > When using flex_grow on a container with flex_flow=row_wrap, LVGL calculates wrap points based on the container's natural (content) width, NOT the flex-allocated width. Fix: set width="1" + flex_grow="1" — forces LVGL to use the grown width for wrapping. Without this, children overflow instead of wrapping.
 
-### [L067] [-----|-----] Wrap C++ UI strings in lv_tr()
-- **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-14 | **Last**: 2026-02-14 | **Category**: ui
+### [L067] [*----|***--] Wrap C++ UI strings in lv_tr()
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-14 | **Last**: 2026-02-22 | **Category**: ui
 > All user-visible English strings in C++ code must be wrapped in lv_tr() for i18n. Dropdown options are concatenated strings so they're harder to translate - but labels, help text, toasts, etc. must use lv_tr().
 
 ### [L068] [-----|-----] Cancel LVGL animations before object deletion
@@ -145,8 +145,8 @@
 - **Uses**: 3 | **Velocity**: 2 | **Learned**: 2026-02-21 | **Last**: 2026-02-22 | **Category**: ui | **Type**: constraint
 > When a parent view has an event_cb for "clicked", all child objects (lv_obj, icon, text_body, text_tiny, etc.) must have `clickable="false" event_bubble="true"` or they absorb the click before it reaches the parent's callback. LVGL objects are clickable by default.
 
-### [L070] [*----|***--] Don't lv_tr() non-translatable strings
-- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-17 | **Last**: 2026-02-21 | **Category**: i18n
+### [L070] [*----|****-] Don't lv_tr() non-translatable strings
+- **Uses**: 2 | **Velocity**: 2 | **Learned**: 2026-02-17 | **Last**: 2026-02-22 | **Category**: i18n
 > Never wrap product names (Spoolman, Klipper, Moonraker, HelixScreen), URLs/domains, technical abbreviations used as standalone labels (AMS, QGL, ADXL), or universal terms (OK, WiFi) in lv_tr(). Add '// i18n: do not translate' comment explaining why. Sentences CONTAINING product names ARE translatable — 'Restarting HelixScreen...' is fine because 'Restarting' translates. Material names (PLA, PETG, ABS, TPU, PA) also don't get translated or translation_tag in XML.
 
 ### [L072] [*----|***--] Never capture bare this in async/WebSocket callbacks
