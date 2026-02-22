@@ -7,9 +7,6 @@
 
 #include "abort_manager.h"
 #include "hv/WebSocketClient.h"
-#include "moonraker_client.h" // RequestId, INVALID_REQUEST_ID (must precede tracker header)
-#include "moonraker_error.h"
-#include "moonraker_request.h"
 
 #include <spdlog/spdlog.h>
 

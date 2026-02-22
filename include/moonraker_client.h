@@ -8,11 +8,10 @@
  * ## Responsibilities
  *
  * - WebSocket connection lifecycle (connect, reconnect, disconnect)
- * - JSON-RPC 2.0 protocol handling (request/response, notifications)
+ * - JSON-RPC 2.0 protocol handling (delegates to MoonrakerRequestTracker)
  * - Subscription management for status updates (notify_status_update)
- * - Printer discovery orchestration (objects.list -> server.info -> printer.info)
- * - Hardware data storage via PrinterDiscovery member
- * - Bed mesh data parsing and storage (from WebSocket notifications)
+ * - Printer discovery orchestration (delegates to MoonrakerDiscoverySequence)
+ * - Event system and modal suppression
  *
  * ## NOT Responsible For
  *
@@ -23,14 +22,16 @@
  *
  * ## Architecture Notes
  *
- * MoonrakerClient is the transport layer that handles raw WebSocket communication
- * with Moonraker. It receives JSON-RPC messages, parses them, and stores hardware
- * state discovered during the connection handshake.
+ * MoonrakerClient composes:
+ * - MoonrakerRequestTracker: pending request lifecycle, timeout, response routing
+ * - MoonrakerDiscoverySequence: multi-step async printer discovery
  *
  * MoonrakerAPI is the domain layer that builds on top of MoonrakerClient to provide
  * high-level operations like printing, motion control, and file management.
  *
  * @see MoonrakerAPI for domain-specific operations
+ * @see MoonrakerRequestTracker for request/response tracking
+ * @see MoonrakerDiscoverySequence for printer discovery
  * @see PrinterDiscovery for hardware capabilities
  */
 
@@ -38,9 +39,11 @@
 
 #include "hv/WebSocketClient.h"
 #include "json_fwd.h"
+#include "moonraker_discovery_sequence.h"
 #include "moonraker_error.h"
 #include "moonraker_events.h"
 #include "moonraker_request.h"
+#include "moonraker_request_tracker.h"
 #include "moonraker_types.h"
 #include "printer_detector.h" // For BuildVolume struct
 #include "printer_discovery.h"
@@ -66,17 +69,8 @@ using SubscriptionId = uint64_t;
 /** @brief Invalid subscription ID constant */
 constexpr SubscriptionId INVALID_SUBSCRIPTION_ID = 0;
 
-/**
- * @brief Unique identifier for JSON-RPC requests
- *
- * Used to track pending requests and allow cancellation.
- * Returned by send_jsonrpc() overloads that take callbacks.
- * Valid IDs are always > 0; ID 0 indicates invalid/failed request.
- */
-using RequestId = uint64_t;
+// RequestId and INVALID_REQUEST_ID are defined in moonraker_request_tracker.h
 
-/** @brief Invalid request ID constant */
-constexpr RequestId INVALID_REQUEST_ID = 0;
 } // namespace helix
 
 namespace helix {
@@ -98,6 +92,8 @@ enum class ConnectionState {
  *
  * Implements JSON-RPC 2.0 protocol for Klipper/Moonraker integration.
  * Handles connection lifecycle, automatic reconnection, and message routing.
+ * Delegates request tracking to MoonrakerRequestTracker and discovery to
+ * MoonrakerDiscoverySequence.
  */
 class MoonrakerClient : public hv::WebSocketClient {
   public:
@@ -111,6 +107,8 @@ class MoonrakerClient : public hv::WebSocketClient {
     // GcodeStoreEntry is defined in moonraker_types.h
     // Kept as a type alias for backward compatibility
     using GcodeStoreEntry = ::GcodeStoreEntry;
+
+    // ========== Connection Lifecycle ==========
 
     /**
      * @brief Connect to Moonraker WebSocket server
@@ -144,7 +142,9 @@ class MoonrakerClient : public hv::WebSocketClient {
      * Called automatically by disconnect() to prevent stale data when
      * switching between printers.
      */
-    void clear_discovery_cache();
+    void clear_discovery_cache() {
+        discovery_.clear_cache();
+    }
 
     /**
      * @brief Force full reconnection with complete state reset
@@ -165,6 +165,8 @@ class MoonrakerClient : public hv::WebSocketClient {
      * Thread-safe. Can be called from any thread.
      */
     void force_reconnect();
+
+    // ========== Subscription Management ==========
 
     /**
      * @brief Register callback for status update notifications
@@ -212,6 +214,8 @@ class MoonrakerClient : public hv::WebSocketClient {
      * @return true if handler was found and removed, false otherwise
      */
     bool unregister_method_callback(const std::string& method, const std::string& handler_name);
+
+    // ========== JSON-RPC Protocol ==========
 
     /**
      * @brief Send JSON-RPC request without parameters
@@ -278,7 +282,9 @@ class MoonrakerClient : public hv::WebSocketClient {
      * @param id Request ID returned by send_jsonrpc()
      * @return true if request was found and cancelled, false otherwise
      */
-    bool cancel_request(RequestId id);
+    bool cancel_request(RequestId id) {
+        return tracker_.cancel(id);
+    }
 
     /**
      * @brief Send G-code script command
@@ -306,6 +312,8 @@ class MoonrakerClient : public hv::WebSocketClient {
     get_gcode_store(int count, std::function<void(const std::vector<GcodeStoreEntry>&)> on_success,
                     std::function<void(const MoonrakerError&)> on_error);
 
+    // ========== Discovery (delegates to MoonrakerDiscoverySequence) ==========
+
     /**
      * @brief Perform printer auto-discovery sequence
      *
@@ -328,7 +336,9 @@ class MoonrakerClient : public hv::WebSocketClient {
      *
      * @param objects JSON array of object names
      */
-    void parse_objects(const json& objects);
+    void parse_objects(const json& objects) {
+        discovery_.parse_objects(objects);
+    }
 
     /**
      * @brief Parse bed mesh data from Moonraker notification
@@ -338,14 +348,16 @@ class MoonrakerClient : public hv::WebSocketClient {
      *
      * @param bed_mesh JSON object from bed_mesh subscription
      */
-    void parse_bed_mesh(const json& bed_mesh);
+    void parse_bed_mesh(const json& bed_mesh) {
+        discovery_.parse_bed_mesh(bed_mesh);
+    }
 
     /**
      * @brief Get discovered hardware data
      * @return Reference to PrinterDiscovery containing all discovered hardware
      */
     [[nodiscard]] const helix::PrinterDiscovery& hardware() const {
-        return hardware_;
+        return discovery_.hardware();
     }
 
     /**
@@ -357,7 +369,7 @@ class MoonrakerClient : public hv::WebSocketClient {
      * @return True if already identified to Moonraker on current connection
      */
     bool is_identified() const {
-        return identified_.load();
+        return discovery_.is_identified();
     }
 
     /**
@@ -367,7 +379,7 @@ class MoonrakerClient : public hv::WebSocketClient {
      * on disconnect. Exposed for unit tests to verify state transitions.
      */
     void reset_identified() {
-        identified_.store(false);
+        discovery_.reset_identified();
     }
 
     /**
@@ -388,6 +400,16 @@ class MoonrakerClient : public hv::WebSocketClient {
     }
 
     /**
+     * @brief Get connection generation counter
+     *
+     * Increments on each connect() call. Used by MoonrakerDiscoverySequence
+     * to detect stale callbacks from previous connections.
+     */
+    uint64_t connection_generation() const {
+        return connection_generation_.load();
+    }
+
+    /**
      * @brief Set callback for connection state changes
      *
      * @param cb Callback invoked when state changes (old_state, new_state)
@@ -404,18 +426,10 @@ class MoonrakerClient : public hv::WebSocketClient {
      * (like AMS/MMU backends) to be initialized early enough to receive the
      * initial state from the subscription.
      *
-     * Discovery timeline:
-     * 1. printer.objects.list → parse_objects() → **on_hardware_discovered_** (HERE)
-     * 2. server.info
-     * 3. printer.info
-     * 4. MCU queries
-     * 5. printer.objects.subscribe → initial state dispatched to subscribers
-     * 6. on_discovery_complete_
-     *
      * @param cb Callback invoked with discovered hardware (early)
      */
     void set_on_hardware_discovered(std::function<void(const helix::PrinterDiscovery&)> cb) {
-        on_hardware_discovered_ = cb;
+        discovery_.set_on_hardware_discovered(std::move(cb));
     }
 
     /**
@@ -427,7 +441,7 @@ class MoonrakerClient : public hv::WebSocketClient {
      * @param cb Callback invoked with discovered hardware
      */
     void set_on_discovery_complete(std::function<void(const helix::PrinterDiscovery&)> cb) {
-        on_discovery_complete_ = cb;
+        discovery_.set_on_discovery_complete(std::move(cb));
     }
 
     /**
@@ -437,14 +451,13 @@ class MoonrakerClient : public hv::WebSocketClient {
      * or initial subscription response). The callback receives the raw JSON bed_mesh
      * object for independent parsing by MoonrakerAPI.
      *
-     * This is part of the migration from Client-side storage to API-side storage.
-     *
      * @param callback Callback receiving raw bed_mesh JSON, or nullptr to disable
      */
     void set_bed_mesh_callback(std::function<void(const json&)> callback) {
-        std::lock_guard<std::mutex> lock(callbacks_mutex_);
-        bed_mesh_callback_ = std::move(callback);
+        discovery_.set_bed_mesh_callback(std::move(callback));
     }
+
+    // ========== Events ==========
 
     /**
      * @brief Register callback for transport events
@@ -474,6 +487,8 @@ class MoonrakerClient : public hv::WebSocketClient {
      */
     [[nodiscard]] bool is_disconnect_modal_suppressed() const;
 
+    // ========== Configuration ==========
+
     /**
      * @brief Set connection timeout in milliseconds
      *
@@ -489,7 +504,7 @@ class MoonrakerClient : public hv::WebSocketClient {
      * @param timeout_ms Request timeout
      */
     void set_default_request_timeout(uint32_t timeout_ms) {
-        default_request_timeout_ms_ = timeout_ms;
+        tracker_.set_default_timeout(timeout_ms);
     }
 
     /**
@@ -507,7 +522,7 @@ class MoonrakerClient : public hv::WebSocketClient {
                             uint32_t keepalive_interval_ms, uint32_t reconnect_min_delay_ms,
                             uint32_t reconnect_max_delay_ms) {
         connection_timeout_ms_ = connection_timeout_ms;
-        default_request_timeout_ms_ = request_timeout_ms;
+        tracker_.set_default_timeout(request_timeout_ms);
         keepalive_interval_ms_ = keepalive_interval_ms;
         reconnect_min_delay_ms_ = reconnect_min_delay_ms;
         reconnect_max_delay_ms_ = reconnect_max_delay_ms;
@@ -520,7 +535,9 @@ class MoonrakerClient : public hv::WebSocketClient {
      * Typically called every 1-5 seconds.
      */
     void process_timeouts() {
-        check_request_timeouts();
+        tracker_.check_timeouts(
+            [this](MoonrakerEventType type, const std::string& msg, bool is_error,
+                   const std::string& details) { emit_event(type, msg, is_error, details); });
     }
 
     // ========== Simulation Methods (for testing) ==========
@@ -549,29 +566,13 @@ class MoonrakerClient : public hv::WebSocketClient {
         return lifetime_guard_;
     }
 
-  protected:
-    /**
-     * @brief Transition to new connection state
-     *
-     * @param new_state The new state to transition to
-     */
-    void set_connection_state(ConnectionState new_state);
-
-    /**
-     * @brief Dispatch printer status to all registered notify callbacks
-     *
-     * Wraps raw status data (e.g., from subscription response) into a
-     * notify_status_update notification format and dispatches to callbacks.
-     * Used for both initial subscription state and incremental updates.
-     *
-     * @param status Raw printer status object
-     */
-    void dispatch_status_update(const json& status);
+    // ========== Methods used by composed classes ==========
 
     /**
      * @brief Emit event to registered handler
      *
      * Thread-safe. If no handler is registered, the event is logged and dropped.
+     * Public to allow MoonrakerDiscoverySequence and MoonrakerRequestTracker access.
      *
      * @param type Event type
      * @param message Human-readable message
@@ -581,59 +582,25 @@ class MoonrakerClient : public hv::WebSocketClient {
     void emit_event(MoonrakerEventType type, const std::string& message, bool is_error = false,
                     const std::string& details = "");
 
-  private:
     /**
-     * @brief Check for timed out requests and invoke error callbacks
-     */
-    void check_request_timeouts();
-
-    /**
-     * @brief Cleanup all pending requests (called on disconnect)
-     */
-    void cleanup_pending_requests();
-
-    /**
-     * @brief Continue discovery after server.connection.identify
+     * @brief Dispatch printer status to all registered notify callbacks
      *
-     * Called after the identify call completes (success or failure) to begin
-     * the actual printer discovery sequence (objects.list, server.info, etc).
+     * Wraps raw status data (e.g., from subscription response) into a
+     * notify_status_update notification format and dispatches to callbacks.
+     * Used for both initial subscription state and incremental updates.
+     * Public to allow MoonrakerDiscoverySequence access.
      *
-     * @param on_complete Callback to invoke when discovery is fully complete
-     * @param on_error Optional callback to invoke if discovery fails
+     * @param status Raw printer status object
      */
-    void continue_discovery(std::function<void()> on_complete,
-                            std::function<void(const std::string& reason)> on_error = nullptr);
-
-    /**
-     * @brief Complete discovery by subscribing to printer objects
-     *
-     * Called after MCU queries complete (or are skipped) to finish the
-     * discover_printer() sequence by subscribing to status updates.
-     *
-     * @param on_complete Callback to invoke when discovery is fully complete
-     */
-    void complete_discovery_subscription(std::function<void()> on_complete);
+    void dispatch_status_update(const json& status);
 
   protected:
-    // Auto-discovered printer objects (protected to allow mock access)
-    std::vector<std::string> heaters_;     // Controllable heaters (extruders, bed, etc.)
-    std::vector<std::string> sensors_;     // Read-only temperature sensors
-    std::vector<std::string> fans_;        // All fan types
-    std::vector<std::string> leds_;        // LED outputs
-    std::vector<std::string> steppers_;    // Stepper motors (stepper_x, stepper_z, etc.)
-    std::vector<std::string> afc_objects_; // AFC MMU objects (AFC, AFC_stepper, AFC_hub, etc.)
-    std::vector<std::string>
-        filament_sensors_; // Filament sensors (filament_switch_sensor, filament_motion_sensor)
-    helix::PrinterDiscovery hardware_; // Unified hardware discovery
-
-    // Discovery callbacks (protected to allow mock to invoke)
-    std::function<void(const helix::PrinterDiscovery&)>
-        on_hardware_discovered_; // Early phase (after parse_objects)
-    std::function<void(const helix::PrinterDiscovery&)>
-        on_discovery_complete_; // Late phase (after subscription)
-
-    // Bed mesh callback (P7b) - data now owned by MoonrakerAPI
-    std::function<void(const json&)> bed_mesh_callback_;
+    /**
+     * @brief Transition to new connection state
+     *
+     * @param new_state The new state to transition to
+     */
+    void set_connection_state(ConnectionState new_state);
 
     // Notification callbacks (protected to allow mock to trigger notifications)
     // Map of subscription ID -> callback for O(1) unsubscription
@@ -645,17 +612,15 @@ class MoonrakerClient : public hv::WebSocketClient {
     // method_name : { handler_name : callback }
     std::map<std::string, std::map<std::string, std::function<void(json)>>> method_callbacks_;
 
-  private:
-    // Pending requests keyed by request ID
-    std::map<uint64_t, PendingRequest> pending_requests_;
-    std::mutex requests_mutex_; // Protect pending_requests_ map
+    // Discovery sequence (protected to allow mock access to hardware vectors)
+    MoonrakerDiscoverySequence discovery_;
 
-    // Auto-incrementing JSON-RPC request ID
-    std::atomic_uint64_t request_id_;
+  private:
+    // Request tracker (pending requests, timeouts, response routing)
+    MoonrakerRequestTracker tracker_;
 
     // Connection state tracking
     std::atomic_bool was_connected_;
-    std::atomic_bool identified_{false}; // True after successful server.connection.identify
     std::atomic<ConnectionState> connection_state_;
     std::atomic_bool is_destroying_{false}; // Prevent callbacks during destruction
     std::atomic<uint64_t> connection_generation_{
@@ -665,9 +630,6 @@ class MoonrakerClient : public hv::WebSocketClient {
     uint32_t connection_timeout_ms_;
     uint32_t reconnect_attempts_ = 0;
     uint32_t max_reconnect_attempts_ = 0; // 0 = infinite
-
-    // Request timeout tracking
-    uint32_t default_request_timeout_ms_;
 
     // Connection parameters (from config)
     uint32_t keepalive_interval_ms_;

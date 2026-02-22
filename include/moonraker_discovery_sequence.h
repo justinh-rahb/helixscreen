@@ -103,6 +103,20 @@ class MoonrakerDiscoverySequence {
         bed_mesh_callback_ = std::move(cb);
     }
 
+    // ======== Callback invocation (for mock to trigger discovery callbacks) ========
+
+    /** @brief Invoke the on_hardware_discovered callback with current hardware */
+    void invoke_hardware_discovered() {
+        if (on_hardware_discovered_)
+            on_hardware_discovered_(hardware_);
+    }
+
+    /** @brief Invoke the on_discovery_complete callback with current hardware */
+    void invoke_discovery_complete() {
+        if (on_discovery_complete_)
+            on_discovery_complete_(hardware_);
+    }
+
     // ======== Hardware vector accessors (for mock to populate directly) ========
 
     std::vector<std::string>& heaters() {

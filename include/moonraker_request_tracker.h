@@ -4,12 +4,12 @@
 #pragma once
 
 #include "json_fwd.h"
-#include "moonraker_client.h" // RequestId, INVALID_REQUEST_ID
 #include "moonraker_error.h"
 #include "moonraker_events.h"
 #include "moonraker_request.h"
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -23,6 +23,12 @@ class WebSocketClient;
 namespace helix {
 
 using ::json;
+
+/// @brief Unique identifier for JSON-RPC requests (valid IDs > 0)
+using RequestId = uint64_t;
+
+/// @brief Invalid request ID constant
+constexpr RequestId INVALID_REQUEST_ID = 0;
 
 /**
  * @brief Owns pending JSON-RPC request lifecycle

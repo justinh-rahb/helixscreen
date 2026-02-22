@@ -419,7 +419,7 @@ class MoonrakerClientMock : public helix::MoonrakerClient {
      * @param heaters List of heater names (e.g., "extruder", "heater_bed")
      */
     void set_heaters(std::vector<std::string> heaters) {
-        heaters_ = std::move(heaters);
+        discovery_.heaters() = std::move(heaters);
         rebuild_hardware();
     }
 
@@ -428,7 +428,7 @@ class MoonrakerClientMock : public helix::MoonrakerClient {
      * @param fans List of fan names (e.g., "fan", "heater_fan hotend_fan")
      */
     void set_fans(std::vector<std::string> fans) {
-        fans_ = std::move(fans);
+        discovery_.fans() = std::move(fans);
         rebuild_hardware();
     }
 
@@ -437,7 +437,7 @@ class MoonrakerClientMock : public helix::MoonrakerClient {
      * @param leds List of LED names (e.g., "neopixel chamber_light")
      */
     void set_leds(std::vector<std::string> leds) {
-        leds_ = std::move(leds);
+        discovery_.leds() = std::move(leds);
         rebuild_hardware();
     }
 
@@ -446,7 +446,7 @@ class MoonrakerClientMock : public helix::MoonrakerClient {
      * @param sensors List of sensor names (e.g., "temperature_sensor chamber")
      */
     void set_sensors(std::vector<std::string> sensors) {
-        sensors_ = std::move(sensors);
+        discovery_.sensors() = std::move(sensors);
         rebuild_hardware();
     }
 
@@ -455,7 +455,7 @@ class MoonrakerClientMock : public helix::MoonrakerClient {
      * @param sensors List of filament sensor names (e.g., "filament_switch_sensor fsensor")
      */
     void set_filament_sensors(std::vector<std::string> sensors) {
-        filament_sensors_ = std::move(sensors);
+        discovery_.filament_sensors() = std::move(sensors);
         rebuild_hardware();
     }
 
@@ -652,8 +652,8 @@ class MoonrakerClientMock : public helix::MoonrakerClient {
     /**
      * @brief Populate hardware lists based on configured printer type
      *
-     * Directly modifies the protected member variables inherited from
-     * MoonrakerClient (heaters_, sensors_, fans_, leds_).
+     * Populates hardware vectors in discovery_ sequence
+     * (heaters, sensors, fans, leds) based on configured printer type.
      */
     void populate_hardware();
 
@@ -667,10 +667,10 @@ class MoonrakerClientMock : public helix::MoonrakerClient {
     void populate_capabilities();
 
     /**
-     * @brief Rebuild hardware_ object from current hardware vectors
+     * @brief Rebuild discovery hardware object from current hardware vectors
      *
      * Called by set_heaters/set_fans/set_leds/set_sensors/set_filament_sensors
-     * to keep the hardware_ object in sync with the legacy vectors.
+     * to keep the discovery hardware object in sync with the vectors.
      */
     void rebuild_hardware();
 
@@ -753,7 +753,7 @@ class MoonrakerClientMock : public helix::MoonrakerClient {
 
     /**
      * @brief Check if this printer profile has a chamber sensor
-     * @return true if "temperature_sensor chamber" is in sensors_ list
+     * @return true if "temperature_sensor chamber" is in sensors list
      */
     bool has_chamber_sensor() const;
 

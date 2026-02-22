@@ -53,7 +53,8 @@ MoonrakerClientMock::MoonrakerClientMock(PrinterType type, double speedup_factor
     populate_hardware();
     spdlog::debug(
         "[MoonrakerClientMock] Hardware populated: {} heaters, {} sensors, {} fans, {} LEDs",
-        heaters_.size(), sensors_.size(), fans_.size(), leds_.size());
+        discovery_.heaters().size(), discovery_.sensors().size(), discovery_.fans().size(),
+        discovery_.leds().size());
 
     // Generate synthetic bed mesh data
     generate_mock_bed_mesh();
@@ -62,7 +63,7 @@ MoonrakerClientMock::MoonrakerClientMock(PrinterType type, double speedup_factor
     // (without waiting for connect() -> discover_printer() to be called)
     populate_capabilities();
 
-    // Rebuild hardware_ from mock data (ensures hardware() accessors return complete data)
+    // Rebuild discovery hardware from mock data (ensures hardware() accessors return complete data)
     rebuild_hardware();
 
     // Check HELIX_MOCK_SPOOLMAN env var for Spoolman availability
@@ -109,7 +110,7 @@ int MoonrakerClientMock::get_total_layers() const {
 }
 
 bool MoonrakerClientMock::has_chamber_sensor() const {
-    for (const auto& s : sensors_) {
+    for (const auto& s : discovery_.sensors()) {
         if (s == "temperature_sensor chamber") {
             return true;
         }
@@ -222,19 +223,19 @@ void MoonrakerClientMock::populate_capabilities() {
     mock_objects.push_back("firmware_retraction"); // Triggers has_firmware_retraction_ capability
 
     // Add hardware objects from populated lists
-    for (const auto& heater : heaters_) {
+    for (const auto& heater : discovery_.heaters()) {
         // Skip if already added (heater_bed, extruder)
         if (heater != "heater_bed" && heater != "extruder") {
             mock_objects.push_back(heater);
         }
     }
-    for (const auto& fan : fans_) {
+    for (const auto& fan : discovery_.fans()) {
         mock_objects.push_back(fan);
     }
-    for (const auto& sensor : sensors_) {
+    for (const auto& sensor : discovery_.sensors()) {
         mock_objects.push_back(sensor);
     }
-    for (const auto& led : leds_) {
+    for (const auto& led : discovery_.leds()) {
         mock_objects.push_back(led);
     }
 
@@ -345,7 +346,7 @@ void MoonrakerClientMock::populate_capabilities() {
     }
 
     // Parse objects into hardware discovery (unified hardware access)
-    hardware_.parse_objects(mock_objects);
+    discovery_.hardware().parse_objects(mock_objects);
 
     // Mock accelerometer configuration for input shaper wizard testing
     // Real Klipper doesn't expose accelerometers in objects list (no get_status()),
@@ -371,7 +372,7 @@ void MoonrakerClientMock::populate_capabilities() {
     }
     std::string mock_kinematics = (kin_env && kin_env[0]) ? kin_env : default_kinematics;
     mock_config["printer"] = {{"kinematics", mock_kinematics}};
-    hardware_.parse_config_keys(mock_config);
+    discovery_.hardware().parse_config_keys(mock_config);
     spdlog::debug("[MoonrakerClientMock] Mock config: adxl345, resonance_tester, kinematics={}",
                   mock_kinematics);
 
@@ -381,45 +382,45 @@ void MoonrakerClientMock::populate_capabilities() {
         std::string name = obj.get<std::string>();
         all_objects.push_back(name);
     }
-    hardware_.set_printer_objects(all_objects);
+    discovery_.hardware().set_printer_objects(all_objects);
 
-    // Also populate filament_sensors_ member for subscription (same as real parse_objects)
-    filament_sensors_.clear();
+    // Also populate filament_sensors vector for subscription (same as real parse_objects)
+    discovery_.filament_sensors().clear();
     for (const auto& obj : mock_objects) {
         std::string name = obj.get<std::string>();
         if (name.rfind("filament_switch_sensor ", 0) == 0 ||
             name.rfind("filament_motion_sensor ", 0) == 0) {
-            filament_sensors_.push_back(name);
+            discovery_.filament_sensors().push_back(name);
         }
     }
 
     spdlog::debug("[MoonrakerClientMock] Hardware populated: {} macros, {} filament sensors",
-                  hardware_.macros().size(), filament_sensors_.size());
+                  discovery_.hardware().macros().size(), discovery_.filament_sensors().size());
 }
 
 void MoonrakerClientMock::rebuild_hardware() {
     json objects = json::array();
 
     // Add hardware components
-    for (const auto& h : heaters_) {
+    for (const auto& h : discovery_.heaters()) {
         objects.push_back(h);
     }
-    for (const auto& f : fans_) {
+    for (const auto& f : discovery_.fans()) {
         objects.push_back(f);
     }
-    for (const auto& s : sensors_) {
+    for (const auto& s : discovery_.sensors()) {
         // Only include sensors that have proper sensor prefixes (temperature_sensor, etc.)
-        // Skip bare heater names like "extruder", "heater_bed" - those are handled via heaters_
+        // Skip bare heater names like "extruder", "heater_bed" - those are handled via heaters
         // In Klipper's object list, heaters appear once (as "extruder" or "heater_bed"),
         // and their thermistors are accessed via the heater's temperature property.
         if (s.rfind("temperature_sensor ", 0) == 0 || s.rfind("temperature_fan ", 0) == 0) {
             objects.push_back(s);
         }
     }
-    for (const auto& l : leds_) {
+    for (const auto& l : discovery_.leds()) {
         objects.push_back(l);
     }
-    for (const auto& fs : filament_sensors_) {
+    for (const auto& fs : discovery_.filament_sensors()) {
         objects.push_back(fs);
     }
     // Include additional objects set via set_additional_objects() for capability testing
@@ -487,12 +488,12 @@ void MoonrakerClientMock::rebuild_hardware() {
     objects.push_back("mcu");
     objects.push_back("mcu EBBCan");
 
-    hardware_.parse_objects(objects);
+    discovery_.hardware().parse_objects(objects);
 
     // Set mock MCU version data (after parse_objects which clears everything)
-    hardware_.set_mcu("stm32f446xx");
-    hardware_.set_mcu_list({"stm32f446xx", "stm32g0b1xx"});
-    hardware_.set_mcu_versions(
+    discovery_.hardware().set_mcu("stm32f446xx");
+    discovery_.hardware().set_mcu_list({"stm32f446xx", "stm32g0b1xx"});
+    discovery_.hardware().set_mcu_versions(
         {{"mcu", "v0.12.0-155-g4cfa273e"}, {"mcu EBBCan", "v0.12.0-155-g4cfa273e"}});
 }
 
@@ -526,7 +527,7 @@ void MoonrakerClientMock::discover_printer(
     send_jsonrpc("server.info", json::object(), [this, on_complete](json response) {
         if (response.contains("result")) {
             auto moonraker_version = response["result"].value("moonraker_version", "unknown");
-            hardware_.set_moonraker_version(moonraker_version);
+            discovery_.hardware().set_moonraker_version(moonraker_version);
             spdlog::debug("[MoonrakerClientMock] Moonraker version: {}", moonraker_version);
         }
 
@@ -535,16 +536,16 @@ void MoonrakerClientMock::discover_printer(
             spdlog::debug("[MoonrakerClientMock] printer.info response received");
 
             // Populate capabilities - builds complete hardware state from mock data
-            // (heaters_, fans_, sensors_, leds_, plus all standard mock objects like
-            // mmu, timelapse, macros, etc.) via hardware_.parse_objects()
+            // (heaters, fans, sensors, leds, plus all standard mock objects like
+            // mmu, timelapse, macros, etc.) via discovery_.hardware().parse_objects()
             populate_capabilities();
 
             // Now set the metadata AFTER parse_objects() has run
             if (response.contains("result")) {
                 auto hostname = response["result"].value("hostname", "unknown");
                 auto software_version = response["result"].value("software_version", "unknown");
-                hardware_.set_hostname(hostname);
-                hardware_.set_software_version(software_version);
+                discovery_.hardware().set_hostname(hostname);
+                discovery_.hardware().set_software_version(software_version);
                 spdlog::debug("[MoonrakerClientMock] Printer hostname: {}", hostname);
                 spdlog::debug("[MoonrakerClientMock] Klipper software version: {}",
                               software_version);
@@ -561,7 +562,7 @@ void MoonrakerClientMock::discover_printer(
                         std::string os_name =
                             sys_response["result"]["system_info"]["distribution"]["name"]
                                 .get<std::string>();
-                        hardware_.set_os_version(os_name);
+                        discovery_.hardware().set_os_version(os_name);
                         spdlog::debug("[MoonrakerClientMock] OS version: {}", os_name);
                     }
                 },
@@ -594,19 +595,16 @@ void MoonrakerClientMock::discover_printer(
             // Log discovered hardware
             spdlog::debug("[MoonrakerClientMock] Discovered: {} heaters, {} sensors, {} fans, {} "
                           "LEDs",
-                          heaters_.size(), sensors_.size(), fans_.size(), leds_.size());
+                          discovery_.heaters().size(), discovery_.sensors().size(),
+                          discovery_.fans().size(), discovery_.leds().size());
 
             // Early hardware discovery callback (for AMS/MMU initialization)
-            // Must be called BEFORE on_discovery_complete_ to match real implementation timing
-            if (on_hardware_discovered_) {
-                spdlog::debug("[MoonrakerClientMock] Invoking early hardware discovery callback");
-                on_hardware_discovered_(hardware_);
-            }
+            // Must be called BEFORE discovery_complete to match real implementation timing
+            spdlog::debug("[MoonrakerClientMock] Invoking early hardware discovery callback");
+            discovery_.invoke_hardware_discovered();
 
             // Invoke discovery complete callback with hardware (for PrinterState binding)
-            if (on_discovery_complete_) {
-                on_discovery_complete_(hardware_);
-            }
+            discovery_.invoke_discovery_complete();
 
             // Invoke completion callback immediately (no async delay in mock)
             if (on_complete) {
@@ -617,93 +615,94 @@ void MoonrakerClientMock::discover_printer(
 }
 
 void MoonrakerClientMock::populate_hardware() {
-    // Clear existing data (inherited from MoonrakerClient)
-    heaters_.clear();
-    sensors_.clear();
-    fans_.clear();
-    leds_.clear();
+    // Clear existing data (in discovery sequence)
+    discovery_.heaters().clear();
+    discovery_.sensors().clear();
+    discovery_.fans().clear();
+    discovery_.leds().clear();
 
     // Populate based on printer type
     switch (printer_type_) {
     case PrinterType::VORON_24:
         // Voron 2.4 configuration
-        heaters_ = {"heater_bed", "extruder"};
-        sensors_ = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
-                    "extruder",   // Hotend thermistor (Klipper naming: bare heater name)
-                    "temperature_sensor chamber", "temperature_sensor raspberry_pi",
-                    "temperature_sensor mcu_temp"};
-        fans_ = {"heater_fan hotend_fan",
-                 "fan", // Part cooling fan
-                 "fan_generic nevermore", "controller_fan controller_fan"};
-        leds_ = {"neopixel chamber_light", "neopixel status_led", "led caselight",
-                 "output_pin Enclosure_LEDs"};
+        discovery_.heaters() = {"heater_bed", "extruder"};
+        discovery_.sensors() = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
+                                "extruder", // Hotend thermistor (Klipper naming: bare heater name)
+                                "temperature_sensor chamber", "temperature_sensor raspberry_pi",
+                                "temperature_sensor mcu_temp"};
+        discovery_.fans() = {"heater_fan hotend_fan",
+                             "fan", // Part cooling fan
+                             "fan_generic nevermore", "controller_fan controller_fan"};
+        discovery_.leds() = {"neopixel chamber_light", "neopixel status_led", "led caselight",
+                             "output_pin Enclosure_LEDs"};
         break;
 
     case PrinterType::VORON_TRIDENT:
         // Voron Trident configuration
-        heaters_ = {"heater_bed", "extruder"};
-        sensors_ = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
-                    "extruder",   // Hotend thermistor (Klipper naming: bare heater name)
-                    "temperature_sensor chamber",
-                    "temperature_sensor raspberry_pi",
-                    "temperature_sensor mcu_temp",
-                    "temperature_sensor z_thermal_adjust"};
-        fans_ = {"heater_fan hotend_fan", "fan", "fan_generic exhaust_fan",
-                 "controller_fan electronics_fan"};
-        leds_ = {"neopixel sb_leds", "neopixel chamber_leds"};
+        discovery_.heaters() = {"heater_bed", "extruder"};
+        discovery_.sensors() = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
+                                "extruder", // Hotend thermistor (Klipper naming: bare heater name)
+                                "temperature_sensor chamber",
+                                "temperature_sensor raspberry_pi",
+                                "temperature_sensor mcu_temp",
+                                "temperature_sensor z_thermal_adjust"};
+        discovery_.fans() = {"heater_fan hotend_fan", "fan", "fan_generic exhaust_fan",
+                             "controller_fan electronics_fan"};
+        discovery_.leds() = {"neopixel sb_leds", "neopixel chamber_leds"};
         break;
 
     case PrinterType::CREALITY_K1:
         // Creality K1/K1 Max configuration
-        heaters_ = {"heater_bed", "extruder"};
-        sensors_ = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
-                    "extruder",   // Hotend thermistor (Klipper naming: bare heater name)
-                    "temperature_sensor mcu_temp", "temperature_sensor host_temp"};
-        fans_ = {"heater_fan hotend_fan", "fan", "fan_generic auxiliary_fan"};
-        leds_ = {"neopixel logo_led"};
+        discovery_.heaters() = {"heater_bed", "extruder"};
+        discovery_.sensors() = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
+                                "extruder", // Hotend thermistor (Klipper naming: bare heater name)
+                                "temperature_sensor mcu_temp", "temperature_sensor host_temp"};
+        discovery_.fans() = {"heater_fan hotend_fan", "fan", "fan_generic auxiliary_fan"};
+        discovery_.leds() = {"neopixel logo_led"};
         break;
 
     case PrinterType::FLASHFORGE_AD5M:
         // FlashForge Adventurer 5M configuration
-        heaters_ = {"heater_bed", "extruder"};
-        sensors_ = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
-                    "extruder",   // Hotend thermistor (Klipper naming: bare heater name)
-                    "temperature_sensor chamber", "temperature_sensor mcu_temp"};
-        fans_ = {"heater_fan hotend_fan", "fan", "fan_generic chamber_fan"};
-        leds_ = {"led chamber_led"};
+        discovery_.heaters() = {"heater_bed", "extruder"};
+        discovery_.sensors() = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
+                                "extruder", // Hotend thermistor (Klipper naming: bare heater name)
+                                "temperature_sensor chamber", "temperature_sensor mcu_temp"};
+        discovery_.fans() = {"heater_fan hotend_fan", "fan", "fan_generic chamber_fan"};
+        discovery_.leds() = {"led chamber_led"};
         break;
 
     case PrinterType::GENERIC_COREXY:
         // Generic CoreXY printer
-        heaters_ = {"heater_bed", "extruder"};
-        sensors_ = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
-                    "extruder",   // Hotend thermistor (Klipper naming: bare heater name)
-                    "temperature_sensor raspberry_pi"};
-        fans_ = {"heater_fan hotend_fan", "fan"};
-        leds_ = {"neopixel chamber_led"};
+        discovery_.heaters() = {"heater_bed", "extruder"};
+        discovery_.sensors() = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
+                                "extruder", // Hotend thermistor (Klipper naming: bare heater name)
+                                "temperature_sensor raspberry_pi"};
+        discovery_.fans() = {"heater_fan hotend_fan", "fan"};
+        discovery_.leds() = {"neopixel chamber_led"};
         break;
 
     case PrinterType::GENERIC_BEDSLINGER:
         // Generic i3-style bedslinger
-        heaters_ = {"heater_bed", "extruder"};
-        sensors_ = {
+        discovery_.heaters() = {"heater_bed", "extruder"};
+        discovery_.sensors() = {
             "heater_bed", // Bed thermistor (Klipper naming: bare heater name)
             "extruder"    // Hotend thermistor (Klipper naming: bare heater name)
         };
-        fans_ = {"heater_fan hotend_fan", "fan"};
-        leds_ = {};
+        discovery_.fans() = {"heater_fan hotend_fan", "fan"};
+        discovery_.leds() = {};
         break;
 
     case PrinterType::MULTI_EXTRUDER:
         // Multi-extruder test case
-        heaters_ = {"heater_bed", "extruder", "extruder1"};
-        sensors_ = {"heater_bed", // Bed thermistor (Klipper naming: bare heater name)
-                    "extruder",   // Hotend thermistor primary (Klipper naming: bare heater name)
-                    "extruder1",  // Hotend thermistor secondary (Klipper naming: bare heater name)
-                    "temperature_sensor chamber", "temperature_sensor mcu_temp"};
-        fans_ = {"heater_fan hotend_fan", "heater_fan hotend_fan1", "fan",
-                 "fan_generic exhaust_fan"};
-        leds_ = {"neopixel chamber_light"};
+        discovery_.heaters() = {"heater_bed", "extruder", "extruder1"};
+        discovery_.sensors() = {
+            "heater_bed", // Bed thermistor (Klipper naming: bare heater name)
+            "extruder",   // Hotend thermistor primary (Klipper naming: bare heater name)
+            "extruder1",  // Hotend thermistor secondary (Klipper naming: bare heater name)
+            "temperature_sensor chamber", "temperature_sensor mcu_temp"};
+        discovery_.fans() = {"heater_fan hotend_fan", "heater_fan hotend_fan1", "fan",
+                             "fan_generic exhaust_fan"};
+        discovery_.leds() = {"neopixel chamber_light"};
         break;
     }
 
@@ -711,7 +710,7 @@ void MoonrakerClientMock::populate_hardware() {
     {
         std::lock_guard<std::mutex> lock(led_mutex_);
         led_states_.clear();
-        for (const auto& led : leds_) {
+        for (const auto& led : discovery_.leds()) {
             if (led.rfind("output_pin ", 0) == 0)
                 continue; // output_pin uses {value:} not color_data
             led_states_[led] = LedColor{0.0, 0.0, 0.0, 0.0};
@@ -719,13 +718,13 @@ void MoonrakerClientMock::populate_hardware() {
     }
 
     spdlog::trace("[MoonrakerClientMock] Populated hardware:");
-    for (const auto& h : heaters_)
+    for (const auto& h : discovery_.heaters())
         spdlog::trace("  Heater: {}", h);
-    for (const auto& s : sensors_)
+    for (const auto& s : discovery_.sensors())
         spdlog::trace("  Sensor: {}", s);
-    for (const auto& f : fans_)
+    for (const auto& f : discovery_.fans())
         spdlog::trace("  Fan: {}", f);
-    for (const auto& l : leds_)
+    for (const auto& l : discovery_.leds())
         spdlog::trace("  LED: {}", l);
 }
 
@@ -1396,7 +1395,7 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
         }
 
         if (!fan_name.empty()) {
-            // Try to find matching fan in discovered fans_ list
+            // Try to find matching fan in discovered fans list
             std::string full_fan_name = find_fan_by_suffix(fan_name);
             if (!full_fan_name.empty()) {
                 set_fan_speed_internal(full_fan_name, speed);
@@ -1711,7 +1710,7 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
 
         // Find matching LED in our list (need to match by suffix since command uses short name)
         std::string full_led_name;
-        for (const auto& led : leds_) {
+        for (const auto& led : discovery_.leds()) {
             // Match if LED name ends with the command's led_name
             // e.g., "neopixel chamber_light" matches "chamber_light"
             if (led.length() >= led_name.length()) {
@@ -2405,9 +2404,9 @@ void MoonrakerClientMock::emergency_stop_internal() {
 }
 
 bool MoonrakerClientMock::toggle_filament_runout() {
-    // Find primary runout sensor from filament_sensors_ list
+    // Find primary runout sensor from filament_sensors list
     std::string runout_sensor;
-    for (const auto& sensor : filament_sensors_) {
+    for (const auto& sensor : discovery_.filament_sensors()) {
         if (sensor.find("runout") != std::string::npos) {
             runout_sensor = sensor;
             break;
@@ -2415,8 +2414,8 @@ bool MoonrakerClientMock::toggle_filament_runout() {
     }
 
     // Fallback to first sensor if no "runout" sensor found
-    if (runout_sensor.empty() && !filament_sensors_.empty()) {
-        runout_sensor = filament_sensors_[0];
+    if (runout_sensor.empty() && !discovery_.filament_sensors().empty()) {
+        runout_sensor = discovery_.filament_sensors()[0];
     }
 
     if (runout_sensor.empty()) {
@@ -2660,7 +2659,7 @@ void MoonrakerClientMock::dispatch_initial_state() {
         }
     }
     // Add output_pin status (uses {value:} format, not color_data)
-    for (const auto& led : leds_) {
+    for (const auto& led : discovery_.leds()) {
         if (led.rfind("output_pin ", 0) == 0) {
             led_json[led] = {{"value", 0.75}}; // Mock: enclosure at 75% brightness
         }
@@ -2690,7 +2689,7 @@ void MoonrakerClientMock::dispatch_initial_state() {
         {"toolhead",
          {{"position", {x, y, z, 0.0}},
           {"homed_axes", homed},
-          {"kinematics", hardware_.kinematics()}}},
+          {"kinematics", discovery_.hardware().kinematics()}}},
         {"gcode_move",
          {{"gcode_position", {x, y, z, 0.0}}, // Commanded position (same as toolhead in mock)
           {"speed_factor", speed / 100.0},
@@ -2730,8 +2729,8 @@ void MoonrakerClientMock::dispatch_initial_state() {
         }
     }
 
-    // Add temperature sensor data for all sensors in the sensors_ list
-    for (const auto& s : sensors_) {
+    // Add temperature sensor data for all sensors in the discovery sensors list
+    for (const auto& s : discovery_.sensors()) {
         if (s.rfind("temperature_sensor ", 0) == 0) {
             std::string sensor_name = s.substr(19);
             double temp = 25.0;
@@ -2777,7 +2776,7 @@ void MoonrakerClientMock::dispatch_initial_state() {
     }
 
     // Add state for each discovered filament sensor
-    for (const auto& sensor : filament_sensors_) {
+    for (const auto& sensor : discovery_.filament_sensors()) {
         // Extract sensor name from "filament_switch_sensor fsensor" -> "fsensor"
         size_t space = sensor.rfind(' ');
         std::string short_name = (space != std::string::npos) ? sensor.substr(space + 1) : sensor;
@@ -2795,7 +2794,7 @@ void MoonrakerClientMock::dispatch_initial_state() {
     spdlog::debug("[MoonrakerClientMock] Dispatching initial state: extruder={}/{}°C, bed={}/{}°C, "
                   "homed_axes='{}', leds={}, filament_sensors={}",
                   ext_temp, ext_target, bed_temp_val, bed_target_val, homed, led_json.size(),
-                  filament_sensors_.size());
+                  discovery_.filament_sensors().size());
 
     // Use the base class dispatch method (same as real client)
     dispatch_status_update(initial_status);
@@ -2902,7 +2901,7 @@ void MoonrakerClientMock::dispatch_historical_temperatures() {
                            {"heater_bed", {{"temperature", bed_with_noise}, {"target", 0.0}}}};
 
         // Add historical temperature data for all temperature sensors
-        for (const auto& s : sensors_) {
+        for (const auto& s : discovery_.sensors()) {
             if (s.rfind("temperature_sensor ", 0) == 0) {
                 std::string sensor_name = s.substr(19);
                 double temp = 25.0;
@@ -3313,7 +3312,7 @@ void MoonrakerClientMock::temperature_simulation_loop() {
             {"toolhead",
              {{"position", {x, y, z, 0.0}},
               {"homed_axes", homed},
-              {"kinematics", hardware_.kinematics()}}},
+              {"kinematics", discovery_.hardware().kinematics()}}},
             {"gcode_move",
              {{"gcode_position", {x, y, z, 0.0}}, // Commanded position (same as toolhead in mock)
               {"speed_factor", speed / 100.0},
@@ -3448,8 +3447,8 @@ void MoonrakerClientMock::temperature_simulation_loop() {
                 {"current_object", current_obj.empty() ? json(nullptr) : json(current_obj)}};
         }
 
-        // Add temperature sensor data for all sensors in the sensors_ list
-        for (const auto& s : sensors_) {
+        // Add temperature sensor data for all sensors in the discovery sensors list
+        for (const auto& s : discovery_.sensors()) {
             if (s.rfind("temperature_sensor ", 0) == 0) {
                 std::string sensor_name = s.substr(19);
                 double temp = 25.0;
@@ -3538,7 +3537,7 @@ void MoonrakerClientMock::set_fan_speed_internal(const std::string& fan_name, do
 }
 
 std::string MoonrakerClientMock::find_fan_by_suffix(const std::string& suffix) const {
-    for (const auto& fan : fans_) {
+    for (const auto& fan : discovery_.fans()) {
         // Match if fan name ends with the suffix (e.g., "nevermore" matches "fan_generic
         // nevermore")
         if (fan.length() >= suffix.length()) {
