@@ -1560,16 +1560,33 @@ MoonrakerClient (orchestrator, ~300 lines)
 
 ### 2.5 Controls Panel Z-Offset Extraction
 
-**Status**: [ ] Not Started  [ ] In Progress  [ ] Complete
+**Status**: [ ] Not Started  [ ] In Progress  [x] Complete
+
+> **Completed 2026-02-21**: Created `helix::zoffset` namespace with shared `ZOffsetUtils` (`z_offset_utils.{h,cpp}`).
+> Extracted `format_delta`, `format_offset`, `is_auto_saved`, and `apply_and_save` utilities.
+> Migrated controls panel, print tune overlay, and calibration panel to use shared functions.
+> Fixed bug: tune overlay was calling bare SAVE_CONFIG without Z_OFFSET_APPLY_PROBE/ENDSTOP.
+> Net -105 lines across 3 consumers. 11 tests, 14 assertions.
+>
+> **Commit:** `21e72d3b`
 
 #### Problem Statement
-`ui_panel_controls.cpp` (1658 lines) contains Z-offset calibration logic that overlaps with PrintStatusPanel's Z-offset tuning. These should be unified or at least share common components.
+`ui_panel_controls.cpp` (1658 lines) contained Z-offset save/apply logic duplicated across controls panel, print tune overlay, and calibration panel. The tune overlay had a bug where it skipped the `Z_OFFSET_APPLY_*` step before `SAVE_CONFIG`.
 
-#### Proposed Solution
-- Extract `ZOffsetCalibrationPanel` for manual probe workflow
-- Extract `ZOffsetBabystepOverlay` for live baby-stepping
-- Create shared `ZOffsetUtils` for common calculations
-- Keep `MotionControlPanel` for basic motion only
+#### Solution
+- Created `ZOffsetUtils` (`helix::zoffset` namespace) for shared save/apply/format logic
+- Migrated 3 consumers to use shared utilities
+- Fixed tune overlay save bug (was skipping Z_OFFSET_APPLY_PROBE/ENDSTOP)
+- Calibration panel callback nesting reduced from 5 levels to 2
+
+#### Metrics
+| Metric | Before | After |
+|--------|--------|-------|
+| Duplicated save logic | 3 copies | 1 (`apply_and_save`) |
+| Controls panel Z-offset lines | ~160 | ~60 |
+| Calibration callback nesting | 5 levels deep | 2 levels |
+| Net lines removed | - | -105 |
+| Tests | 0 | 11 (14 assertions) |
 
 ---
 
@@ -1843,6 +1860,7 @@ Split into 4 focused, namespaced modules + slimmed residual:
 | Namespace organization | 5d | | [ ] |
 | Dependency injection | 5d | | [ ] |
 | MoonrakerClient decomposition | 3d | | [ ] |
+| Z-offset extraction | 0.5d | | [x] Complete (2026-02-21) |
 | ui_utils.cpp split (namespaced) | 1d | | [x] Complete (2026-02-21) |
 
 ---
@@ -1855,12 +1873,13 @@ Split into 4 focused, namespaced modules + slimmed residual:
 | Phase 1: Quick Wins | 5 | 5 | 100% |
 | Phase 2: Foundation | 4 | 4 | 100% |
 | Phase 3: Architecture | 5 | 4 | 80% |
-| Phase 4: Polish | 7 | 5 | 71% |
+| Phase 4: Polish | 8 | 6 | 75% |
 | Phase 5: New Findings | 5 | 4.5 | 90% |
-| **Total** | **26** | **22.5** | **87%** |
+| **Total** | **27** | **23.5** | **87%** |
 
-> **Note (2026-02-21)**: Completed SettingsManager domain split (2.8), callback batch registration (2.9),
-> observer factory full adoption (1.2), and ui_utils.cpp namespaced split (2.10). Overall progress 87%.
+> **Note (2026-02-21)**: Completed Z-offset extraction (2.5), SettingsManager domain split (2.8),
+> callback batch registration (2.9), observer factory full adoption (1.2), and ui_utils.cpp
+> namespaced split (2.10). Overall progress 87%.
 
 ### Metrics Dashboard
 | Metric | Current | Target | Progress |
@@ -2083,3 +2102,4 @@ private:
 | 2026-02-21 | Claude | **ui_utils.cpp namespaced split** (Section 2.10): Split monolith into 4 properly namespaced modules — `ui_filename_utils` (helix::gcode), `ui_format_utils` (helix::ui), `ui_effects` (helix::ui), `ui_image_helpers` (helix::ui). No forwarding headers. 20 consumer files migrated with specific includes + using declarations. Functions renamed to drop `ui_` prefix where namespace provides context. 27 files changed, 764 ins / 700 del. Overall progress: 87%. |
 | 2026-02-21 | Claude | **SettingsManager domain split** (Section 2.8): 5 domain managers extracted (Display, Audio, Safety, System, Input), 40 tests, 252 assertions. Consumer migration: 132 callsites in 40 files migrated to domain managers, net -566 lines. Header 854→165, impl 1156→215. Stale includes cleaned. **Callback batch registration** (Section 2.9): Phase 2 complete — 38 additional panels/overlays migrated via parallel agents (15 high-callback + 22 medium-callback files). Total: 42 files, ~446 registrations consolidated. Code review caught 3 consistency gaps, all fixed. **Observer factory full adoption** (Section 1.2): All class-based legacy observers migrated — 24 observers across 20 files in two commits, net -199 lines. 6 remaining usages are non-class infrastructure (widget pointers, custom structs) not suitable for factory. Overall progress: 81% (was 71%). |
 | 2026-02-21 | Claude | **MoonrakerSpoolmanAPI extracted** (Section 1.5, first domain): 20+ Spoolman methods extracted to `MoonrakerSpoolmanAPI` class with own header/impl. Consumer pattern: `api->spoolman().method()`. Mock: `MoonrakerSpoolmanAPIMock`. 8 consumer files + 4 test files migrated. 24 spoolman tests (88 assertions) all pass. Commit: 303c4473. |
+| 2026-02-21 | Claude | **Z-offset extraction** (Section 2.5): Created `helix::zoffset` namespace with `ZOffsetUtils` (format_delta, format_offset, is_auto_saved, apply_and_save). Migrated controls panel, tune overlay, calibration panel. Fixed tune overlay bug (bare SAVE_CONFIG without Z_OFFSET_APPLY_*). Net -105 lines. 11 tests, 14 assertions. Commit: 21e72d3b. |
