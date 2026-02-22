@@ -1184,24 +1184,35 @@ private:
 
 ### 1.5 MoonrakerAPI Domain Split
 
-**Status**: [ ] Not Started  [x] In Progress  [ ] Complete
+**Status**: [ ] Not Started  [ ] In Progress  [x] Complete
 
 > **2026-02-10 Partial Progress:** Abstraction boundary enforcement complete. UI code no longer
 > accesses `MoonrakerClient` directly. Added proxy methods to MoonrakerAPI for connection state,
 > subscriptions, database ops, plugin RPCs, and G-code store. Deleted dead `IMoonrakerDomainService`
-> interface. Moved shared types to `moonraker_types.h`. Remaining work: full domain sub-API split.
+> interface. Moved shared types to `moonraker_types.h`.
 >
 > **Commits:** `a5650da0` (main refactor), `ec140f65` (review fixes), `4cabd79a` (gcode_store proxy)
 >
-> **Remaining `get_moonraker_client()` in UI:** ~17 calls, mostly in `ui_wizard_connection.cpp` (10 calls,
-> legitimate transport-level connection management), plus screws_tilt, input_shaper, settings, change_host.
+> **2026-02-21 All 9 Domain APIs Extracted + Consumer Migration Complete:**
+> 9 domain sub-APIs extracted to dedicated headers/implementations. All consumers migrated
+> to `api->domain().method()` pattern — zero legacy direct calls remain.
 >
-> **2026-02-21 Spoolman Domain Extracted:** First domain sub-API extracted. Created
-> `MoonrakerSpoolmanAPI` (20+ methods) with own header/impl. Consumers migrated to
-> `api->spoolman().method()` pattern. Mock follows same pattern with `MoonrakerSpoolmanAPIMock`.
-> 8 consumer files + 4 test files updated. 24 spoolman tests (88 assertions) all pass.
+> **Extracted domains:**
+> - `MoonrakerSpoolmanAPI` (243 lines) — filament tracking, spool management
+> - `MoonrakerAdvancedAPI` (393 lines) — calibration, PID tuning, input shaper, diagnostics
+> - `MoonrakerFileTransferAPI` (235 lines) — HTTP upload/download, multipart, range requests
+> - `MoonrakerFileAPI` (184 lines) — WebSocket file operations (list, delete, move, copy, dirs)
+> - `MoonrakerRestAPI` (169 lines) — REST endpoint queries, WLED integration
+> - `MoonrakerTimelapseAPI` (142 lines) — timelapse/webcam control
+> - `MoonrakerJobAPI` (132 lines) — print control (start, pause, resume, cancel)
+> - `MoonrakerMotionAPI` (123 lines) — homing, movement, endstops, motors
+> - `MoonrakerHistoryAPI` (99 lines) — print history queries, totals, statistics
 >
-> **Commit:** `303c4473`
+> **Facade residual (645 lines):** Intentionally kept cross-cutting concerns — temperature
+> control with safety validation, gcode execution (43+ consumers), power devices, system
+> control (emergency stop, restarts), LED control, safety limits, database ops, connection proxies.
+>
+> **Key commits:** `e8c32eda` (merge of feature/moonraker-domain-split), `303c4473` (Spoolman)
 
 #### Problem Statement
 `MoonrakerAPI` is a 1190-line facade containing **70+ public methods** across 5+ unrelated domains. Finding the right method requires scrolling through a massive interface.
@@ -1524,7 +1535,18 @@ void SettingsPanel::on_some_action() {
 
 ### 2.4 MoonrakerClient Decomposition
 
-**Status**: [ ] Not Started  [ ] In Progress  [ ] Complete
+**Status**: [ ] Not Started  [ ] In Progress  [x] Complete
+
+> **Completed 2026-02-22**: Decomposed into three focused classes via composition (Approach B):
+> - `MoonrakerRequestTracker` — pending request lifecycle, timeout, response routing (136 line header, 342 line impl)
+> - `MoonrakerDiscoverySequence` — multi-step async printer discovery with stale connection guard (218 line header, 745 line impl)
+> - `MoonrakerClient` — WebSocket transport orchestrator (647 line header, 867 line impl, down from 1,855)
+>
+> Code review caught 2 bugs (emit_event under lock, send_fire_and_forget ID 0), both fixed.
+> Follow-up: stored discovery callbacks as members, added connection_generation stale guard,
+> moved source files to src/api/ for consistency. All tests pass (4,936 assertions, 140 cases).
+>
+> **Commits:** 8 commits on feature/moonraker-client-decomp, merged to main via c7d6a43f..merge
 
 #### Problem Statement
 `MoonrakerClient` (808 lines header, 1618 lines impl) mixes:
@@ -1846,7 +1868,7 @@ Split into 4 focused, namespaced modules + slimmed residual:
 | PrinterState domain split - design | 1d | | [x] Complete |
 | PrinterState domain split - implementation | 3d | | [x] Complete |
 | PrinterState migration | 2d | | [x] Complete |
-| MoonrakerAPI domain split | 2d | | [~] Abstraction boundary done, domain split pending |
+| MoonrakerAPI domain split | 2d | | [x] Complete (9 domains extracted, all consumers migrated) |
 | PrintStatusPanel decomposition | 3d | | [x] Complete (see notes) |
 
 ### Phase 4: Polish (ongoing)
@@ -1859,7 +1881,7 @@ Split into 4 focused, namespaced modules + slimmed residual:
 | Panel/overlay base class adoption | 2-3d | | [x] Complete (2026-02-21) |
 | Namespace organization | 5d | | [ ] |
 | Dependency injection | 5d | | [ ] |
-| MoonrakerClient decomposition | 3d | | [ ] |
+| MoonrakerClient decomposition | 3d | | [x] Complete (2026-02-22) |
 | Z-offset extraction | 0.5d | | [x] Complete (2026-02-21) |
 | ui_utils.cpp split (namespaced) | 1d | | [x] Complete (2026-02-21) |
 
@@ -1872,14 +1894,14 @@ Split into 4 focused, namespaced modules + slimmed residual:
 |-------|-------|----------|----------|
 | Phase 1: Quick Wins | 5 | 5 | 100% |
 | Phase 2: Foundation | 4 | 4 | 100% |
-| Phase 3: Architecture | 5 | 4 | 80% |
-| Phase 4: Polish | 8 | 6 | 75% |
+| Phase 3: Architecture | 5 | 5 | 100% |
+| Phase 4: Polish | 8 | 7 | 88% |
 | Phase 5: New Findings | 5 | 4.5 | 90% |
-| **Total** | **27** | **23.5** | **87%** |
+| **Total** | **27** | **25.5** | **94%** |
 
-> **Note (2026-02-21)**: Completed Z-offset extraction (2.5), SettingsManager domain split (2.8),
-> callback batch registration (2.9), observer factory full adoption (1.2), and ui_utils.cpp
-> namespaced split (2.10). Overall progress 87%.
+> **Note (2026-02-22)**: MoonrakerClient decomposition (2.4) COMPLETE — three-way split into
+> RequestTracker + DiscoverySequence + Client. MoonrakerAPI domain split (1.5) also COMPLETE.
+> Overall progress 94%.
 
 ### Metrics Dashboard
 | Metric | Current | Target | Progress |
@@ -1894,7 +1916,8 @@ Split into 4 focused, namespaced modules + slimmed residual:
 | Callback registration boilerplate | ~446 consolidated (42 files) | 0 individual calls | 100% |
 | Panels using SubjectManagedPanel | 100% | 100% | 100% |
 | Observer boilerplate instances | 6 (non-class infra only) | 0 class-based | 100% |
-| Extracted components | 13 domain + 8 overlays + 1 AMS base | - | Done |
+| MoonrakerAPI lines | 645 (facade) + 1,720 (9 domain APIs) | <200 facade | Facade larger but intentional |
+| Extracted components | 13 domain + 8 overlays + 1 AMS base + 9 API domains | - | Done |
 | Quick Wins completion | 5/5 | 5/5 | 100% |
 
 > **Note (2026-01-25)**: PrinterState = 13 domain classes. PrintStatusPanel decomposed into 8 extracted
@@ -1905,43 +1928,28 @@ Split into 4 focused, namespaced modules + slimmed residual:
 
 ## Recommended Next Priorities
 
-Based on current codebase state and remaining work (updated 2026-02-21):
+Based on current codebase state and remaining work (updated 2026-02-22):
 
-### High Value / Moderate Effort
+### Remaining Items (3 of 27)
 
-1. **MoonrakerAPI domain split** (Section 1.5) — IN PROGRESS
-   - 70+ methods in single class, abstraction boundary already enforced
-   - Spoolman domain extracted (20+ methods, `api->spoolman().method()` pattern)
-   - Remaining domains: files, job, motion, heating, macros, filament, history
-
-2. ~~**Observer factory broader adoption** (Section 1.2) — COMPLETE~~
-
-3. ~~**Panel/Overlay base class broader adoption** (Section 2.9) — COMPLETE~~
-
-### Medium Value / Higher Effort
-
-4. **MoonrakerClient decomposition** (Section 2.4)
-   - 808 line header, 1618 line implementation
-   - Mixes connection, protocol, subscriptions, discovery caching
-   - Moderate complexity but high maintainability impact
-
-5. ~~**SettingsManager consumer migration** (follow-up to 2.8) — COMPLETE~~
-
-### Lower Priority (Nice to Have)
-
-6. **Unified error handling with Result<T>** (Section 2.1)
-   - Three incompatible error patterns exist
+1. **Unified error handling with Result<T>** (Section 2.1)
+   - Three incompatible error patterns exist (MoonrakerError, AmsError, raw bool/string)
    - Would standardize error handling across codebase
+   - Medium value, moderate effort (~3 days)
 
-7. ~~**ui_utils.cpp split** (Section 2.10) — COMPLETE~~
-
-8. **Namespace organization** (Section 2.2)
+2. **Namespace organization** (Section 2.2)
    - Inconsistent namespace usage currently
-   - Large effort, low immediate impact
+   - Large effort (~5 days), low immediate impact
+   - Consider incremental: namespace new code, migrate opportunistically
 
-9. **Dependency injection for panels** (Section 2.3)
+3. **Dependency injection for panels** (Section 2.3)
    - Would improve testability
-   - Large scope, consider for major refactor phase
+   - Large scope (~5 days), consider for major refactor phase
+
+### Completed
+
+- ~~**MoonrakerAPI domain split** (1.5) — 9 domains extracted, all consumers migrated~~
+- ~~**MoonrakerClient decomposition** (2.4) — Three-way split: RequestTracker + DiscoverySequence + Client~~
 
 ---
 
@@ -2103,3 +2111,4 @@ private:
 | 2026-02-21 | Claude | **SettingsManager domain split** (Section 2.8): 5 domain managers extracted (Display, Audio, Safety, System, Input), 40 tests, 252 assertions. Consumer migration: 132 callsites in 40 files migrated to domain managers, net -566 lines. Header 854→165, impl 1156→215. Stale includes cleaned. **Callback batch registration** (Section 2.9): Phase 2 complete — 38 additional panels/overlays migrated via parallel agents (15 high-callback + 22 medium-callback files). Total: 42 files, ~446 registrations consolidated. Code review caught 3 consistency gaps, all fixed. **Observer factory full adoption** (Section 1.2): All class-based legacy observers migrated — 24 observers across 20 files in two commits, net -199 lines. 6 remaining usages are non-class infrastructure (widget pointers, custom structs) not suitable for factory. Overall progress: 81% (was 71%). |
 | 2026-02-21 | Claude | **MoonrakerSpoolmanAPI extracted** (Section 1.5, first domain): 20+ Spoolman methods extracted to `MoonrakerSpoolmanAPI` class with own header/impl. Consumer pattern: `api->spoolman().method()`. Mock: `MoonrakerSpoolmanAPIMock`. 8 consumer files + 4 test files migrated. 24 spoolman tests (88 assertions) all pass. Commit: 303c4473. |
 | 2026-02-21 | Claude | **Z-offset extraction** (Section 2.5): Created `helix::zoffset` namespace with `ZOffsetUtils` (format_delta, format_offset, is_auto_saved, apply_and_save). Migrated controls panel, tune overlay, calibration panel. Fixed tune overlay bug (bare SAVE_CONFIG without Z_OFFSET_APPLY_*). Net -105 lines. 11 tests, 14 assertions. Commit: 21e72d3b. |
+| 2026-02-22 | Claude | **MoonrakerAPI domain split COMPLETE** (Section 1.5): Updated plan to reflect actual state — all 9 domain APIs extracted (Spoolman, Advanced, FileTransfer, File, REST, Timelapse, Job, Motion, History), totaling 1,720 lines across 9 focused modules. All consumers migrated to `api->domain().method()` pattern. Facade residual: 645 lines of intentional cross-cutting concerns (temperature+safety, gcode execution, power, system control). Phase 3 Architecture now 100%. Overall progress: 91%. |
