@@ -223,10 +223,21 @@
     <!-- ABOUT SECTION -->
     <!-- ================================================================== -->
     <setting_section_header title="ABOUT" title_tag="ABOUT" icon="info"/>
-    <!-- Printer Name -->
-    <setting_info_row name="row_printer" label="Printer Name" label_tag="Printer Name" icon="printer_3d">
-      <text_muted name="value" bind_text="printer_value"/>
-    </setting_info_row>
+    <!-- Printer Name (7-tap easter egg trigger) -->
+    <ui_button name="row_printer" width="100%" height="content" variant="ghost" style_radius="0" style_pad_all="0">
+      <lv_obj width="100%"
+              height="content" flex_flow="row" style_flex_main_place="start" style_flex_cross_place="center"
+              style_pad_left="#space_lg" style_pad_right="#space_lg" style_pad_top="#space_md"
+              style_pad_bottom="#space_md" style_pad_gap="#space_sm" scrollable="false" clickable="false"
+              event_bubble="true">
+        <icon name="row_icon" src="printer_3d" size="sm" variant="secondary" clickable="false" event_bubble="true"/>
+        <text_body name="label"
+                   text="Printer Name" translation_tag="Printer Name" style_text_color="#text" flex_grow="1"
+                   clickable="false" event_bubble="true"/>
+        <text_muted name="value" bind_text="printer_value" clickable="false" event_bubble="true"/>
+      </lv_obj>
+      <event_cb trigger="clicked" callback="on_printer_name_clicked"/>
+    </ui_button>
     <!-- Current Version - ui_button for native press feedback (7-tap secret to toggle beta features) -->
     <ui_button name="row_version" width="100%" height="content" variant="ghost" style_radius="0" style_pad_all="0">
       <lv_obj width="100%"

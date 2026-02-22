@@ -15,7 +15,6 @@
 #include "ui_overlay_network_settings.h"
 #include "ui_panel_history_dashboard.h"
 #include "ui_panel_memory_stats.h"
-#include "ui_settings_about.h"
 #include "ui_settings_display.h"
 #include "ui_settings_hardware_health.h"
 #include "ui_settings_led.h"
@@ -27,6 +26,7 @@
 #include "ui_settings_sound.h"
 #include "ui_settings_telemetry_data.h"
 #include "ui_severity_card.h"
+#include "ui_snake_game.h"
 #include "ui_toast_manager.h"
 #include "ui_touch_calibration_overlay.h"
 #include "ui_update_queue.h"
@@ -86,7 +86,7 @@ SettingsPanel::~SettingsPanel() {
     // Applying [L041]: deinit_subjects() as first line in destructor
     deinit_subjects();
 
-    // Note: Klipper/Moonraker/OS version observers moved to AboutOverlay
+    // Note: Klipper/Moonraker/OS version observers bound declaratively in XML
     if (lv_is_initialized()) {
         // Unregister overlay callbacks to prevent dangling 'this' in callbacks
         auto& nav = NavigationManager::instance();
@@ -272,6 +272,32 @@ static void on_version_clicked(lv_event_t*) {
     }
 }
 
+// Static callback for printer name row tap — 7-tap snake easter egg
+static void on_printer_name_clicked(lv_event_t*) {
+    static int tap_count = 0;
+    static uint32_t last_tap_time = 0;
+
+    uint32_t now = lv_tick_get();
+
+    if (now - last_tap_time > kSecretTapTimeoutMs) {
+        tap_count = 0;
+    }
+    last_tap_time = now;
+    tap_count++;
+
+    int remaining = kSecretTapCount - tap_count;
+
+    if (remaining > 0 && remaining <= 3) {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d more tap%s...", remaining, remaining == 1 ? "" : "s");
+        ToastManager::instance().show(ToastSeverity::INFO, buf, 800);
+    } else if (remaining == 0) {
+        tap_count = 0;
+        spdlog::info("[SettingsPanel] Snake easter egg triggered!");
+        helix::SnakeGame::show();
+    }
+}
+
 // Note: Sensors overlay callbacks are now in SensorSettingsOverlay class
 // See ui_settings_sensors.cpp
 // Note: Macro Buttons overlay callbacks are now in MacroButtonsOverlay class
@@ -430,6 +456,7 @@ void SettingsPanel::init_subjects() {
         {"on_language_changed", on_language_changed},
         {"on_update_channel_changed", on_update_channel_changed},
         {"on_version_clicked", on_version_clicked},
+        {"on_printer_name_clicked", on_printer_name_clicked},
 
         // Toggle switches
         {"on_dark_mode_changed", on_dark_mode_changed},
@@ -469,8 +496,8 @@ void SettingsPanel::init_subjects() {
         {"on_factory_reset_clicked", on_factory_reset_clicked},
         {"on_hardware_health_clicked", on_hardware_health_clicked},
         {"on_plugins_clicked", on_plugins_clicked},
-        // Note: on_about_clicked registered in register_settings_panel_callbacks() per [L013]
-        // Note: on_check_updates_clicked, on_install_update_clicked also registered there
+        // Note: on_check_updates_clicked, on_install_update_clicked registered in
+        // register_settings_panel_callbacks()
         {"on_update_download_start", on_update_download_start},
         {"on_update_download_cancel", on_update_download_cancel},
         {"on_update_download_dismiss", on_update_download_dismiss},
@@ -718,7 +745,7 @@ void SettingsPanel::setup_action_handlers() {
         }
     }
 
-    // Note: Check for Updates row moved to AboutOverlay
+    // Note: Check for Updates row bound declaratively in XML
 }
 
 void SettingsPanel::populate_info_rows() {
@@ -761,8 +788,7 @@ void SettingsPanel::populate_info_rows() {
         }
     }
 
-    // Note: Klipper/Moonraker/OS version binding and MCU rows moved to AboutOverlay
-    // See ui_settings_about.cpp
+    // Note: Klipper/Moonraker/OS version rows bound declaratively in settings_panel.xml
 
     // Print hours: fetched on-demand via fetch_print_hours() after connection is live.
     // Called from discovery complete callback and on notify_history_changed events.
@@ -875,13 +901,6 @@ void SettingsPanel::show_restart_prompt() {
         // Clear pending flag so we don't show again until next change
         InputSettingsManager::instance().clear_restart_pending();
     }
-}
-
-void SettingsPanel::handle_about_clicked() {
-    spdlog::debug("[{}] About clicked - delegating to AboutOverlay", get_name());
-
-    auto& overlay = helix::settings::get_about_overlay();
-    overlay.show(parent_screen_);
 }
 
 void SettingsPanel::handle_debug_bundle_clicked() {
@@ -1262,12 +1281,6 @@ void SettingsPanel::on_cancel_escalation_changed(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void SettingsPanel::on_about_clicked(lv_event_t* /*e*/) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_about_clicked");
-    get_global_settings_panel().handle_about_clicked();
-    LVGL_SAFE_EVENT_CB_END();
-}
-
 void SettingsPanel::on_debug_bundle_clicked(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[SettingsPanel] on_debug_bundle_clicked");
     get_global_settings_panel().handle_debug_bundle_clicked();
@@ -1486,8 +1499,6 @@ void register_settings_panel_callbacks() {
         {"on_restart_helix_settings_clicked", SettingsPanel::on_restart_helix_settings_clicked},
         {"on_print_hours_clicked", SettingsPanel::on_print_hours_clicked},
         {"on_change_host_clicked", SettingsPanel::on_change_host_clicked},
-        {"on_about_clicked", SettingsPanel::on_about_clicked},
-
         // Help & Support callbacks
         {"on_debug_bundle_clicked", SettingsPanel::on_debug_bundle_clicked},
         {"on_discord_clicked", SettingsPanel::on_discord_clicked},
