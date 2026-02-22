@@ -453,6 +453,12 @@ void Modal::hide(lv_obj_t* dialog) {
         return;
     }
 
+    // Validate dialog widget is still alive (may have been deleted by another path)
+    if (!lv_obj_is_valid(dialog)) {
+        spdlog::warn("[Modal] hide() called with already-deleted dialog");
+        return;
+    }
+
     // Find backdrop for this dialog
     auto& stack = ModalStack::instance();
     lv_obj_t* backdrop = stack.backdrop_for(dialog);
@@ -551,6 +557,14 @@ bool Modal::show(lv_obj_t* parent, const char** attrs) {
 void Modal::hide() {
     if (!backdrop_) {
         return; // Already hidden, safe to call multiple times
+    }
+
+    // Validate backdrop is still a live LVGL object
+    if (!lv_obj_is_valid(backdrop_)) {
+        spdlog::warn("[{}] hide() called but backdrop already deleted", get_name());
+        backdrop_ = nullptr;
+        dialog_ = nullptr;
+        return;
     }
 
     // Check if already exiting (animation in progress)

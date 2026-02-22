@@ -419,6 +419,7 @@ class ControlsPanel : public PanelBase {
     static void on_bed_temp_clicked(lv_event_t* e);
     static void on_cooling_clicked(lv_event_t* e);
     static void on_secondary_fans_clicked(lv_event_t* e);
+    static void on_secondary_temps_clicked(lv_event_t* e);
     static void on_motors_confirm(lv_event_t* e);
     static void on_motors_cancel(lv_event_t* e);
     static void on_save_z_offset_confirm(lv_event_t* e);

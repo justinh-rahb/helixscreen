@@ -339,6 +339,12 @@ void ControlsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 
     // Cache dynamic container for secondary temperature sensors
     FIND_WIDGET(secondary_temps_list_, panel_, "secondary_temps_list", get_name());
+    if (secondary_temps_list_) {
+        // Make the secondary temps list clickable to open the sensor settings overlay
+        lv_obj_add_flag(secondary_temps_list_, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(secondary_temps_list_, on_secondary_temps_clicked, LV_EVENT_CLICKED,
+                            this);
+    }
 
     // Wire up card click handlers (cards need manual wiring for navigation)
     setup_card_handlers();
@@ -623,12 +629,14 @@ void ControlsPanel::populate_secondary_fans() {
     // 1. Release observers first - they may reference subjects that were already deinit'd
     //    by PrinterState::init_fans() before it notified fans_version_ observers
     // 2. Clear row tracking (contains widget pointers that will become invalid)
-    // 3. Clean widgets last (invalidates the pointers we just cleared)
+    // 3. Hide container to prevent render thread from drawing partially-deleted tree
+    // 4. Clean widgets last (invalidates the pointers we just cleared)
     for (auto& obs : secondary_fan_observers_) {
         obs.reset(); // Subjects are now guaranteed alive — safe to unsubscribe
     }
     secondary_fan_observers_.clear();
     secondary_fan_rows_.clear();
+    lv_obj_add_flag(secondary_fans_list_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clean(secondary_fans_list_);
 
     // Collect non-part-cooling fans and sort by display priority
@@ -732,18 +740,15 @@ void ControlsPanel::populate_secondary_fans() {
         lv_obj_set_style_text_color(chevron, theme_manager_get_color("secondary"), 0);
         lv_obj_set_style_text_font(chevron, &mdi_icons_16, 0);
 
-        // Tap to open fan control overlay
-        lv_obj_add_event_cb(
-            more_row,
-            [](lv_event_t* e) {
-                auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-                self->handle_secondary_fans_clicked();
-            },
-            LV_EVENT_CLICKED, this);
+        // Click is handled by the parent container's on_secondary_fans_clicked trampoline
+        // (registered once in setup()). No per-child event callback needed.
     }
 
     // Subscribe to per-fan speed subjects for reactive updates
     subscribe_to_secondary_fan_speeds();
+
+    // Unhide container now that repopulation is complete
+    lv_obj_remove_flag(secondary_fans_list_, LV_OBJ_FLAG_HIDDEN);
 
     spdlog::trace("[{}] Populated {} secondary fans ({} visible, {} additional)", get_name(),
                   secondary_fans.size(), visible_count, additional);
@@ -1468,6 +1473,7 @@ PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, nozzle_temp_clicked)
 PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, bed_temp_clicked)
 PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, cooling_clicked)
 PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, secondary_fans_clicked)
+PANEL_TRAMPOLINE(ControlsPanel, get_global_controls_panel, secondary_temps_clicked)
 
 PANEL_TRAMPOLINE_USERDATA(ControlsPanel, motors_confirm)
 PANEL_TRAMPOLINE_USERDATA(ControlsPanel, motors_cancel)
@@ -1567,12 +1573,15 @@ void ControlsPanel::populate_secondary_temps() {
         return;
     }
 
-    // Cleanup order: observers first, then tracking, then widgets
+    // Cleanup order: observers first, then tracking, then widgets.
+    // Hide container during cleanup to prevent render thread from drawing
+    // partially-deleted tree (avoids SIGSEGV in lv_draw_sw_label).
     for (auto& obs : secondary_temp_observers_) {
         obs.release();
     }
     secondary_temp_observers_.clear();
     secondary_temp_rows_.clear();
+    lv_obj_add_flag(secondary_temps_list_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_clean(secondary_temps_list_);
 
     auto& tsm = helix::sensors::TemperatureSensorManager::instance();
@@ -1668,17 +1677,14 @@ void ControlsPanel::populate_secondary_temps() {
         lv_obj_set_style_text_color(chevron, theme_manager_get_color("secondary"), 0);
         lv_obj_set_style_text_font(chevron, &mdi_icons_16, 0);
 
-        // Tap to open sensors settings overlay
-        lv_obj_add_event_cb(
-            more_row,
-            [](lv_event_t* e) {
-                auto* self = static_cast<ControlsPanel*>(lv_event_get_user_data(e));
-                self->handle_secondary_temps_clicked();
-            },
-            LV_EVENT_CLICKED, this);
+        // Click is handled by the parent container's on_secondary_temps_clicked trampoline
+        // (registered once in setup()). No per-child event callback needed.
     }
 
     subscribe_to_secondary_temp_subjects();
+
+    // Unhide container now that repopulation is complete
+    lv_obj_remove_flag(secondary_temps_list_, LV_OBJ_FLAG_HIDDEN);
 
     spdlog::trace("[{}] Populated {} secondary temp sensors ({} visible, {} additional)",
                   get_name(), visible.size(), visible_count, additional);
