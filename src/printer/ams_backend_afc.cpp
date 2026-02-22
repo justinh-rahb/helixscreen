@@ -1453,6 +1453,12 @@ void AmsBackendAfc::parse_lane_data(const nlohmann::json& lane_data) {
         initialize_slots(new_lane_names);
     }
 
+    // Track whether any lane has tool_loaded — used to update filament_loaded
+    // after scanning all lanes. Without this, filament_loaded could stay stale
+    // if no lane reports tool_loaded, leaving the Unload button stuck disabled.
+    bool any_tool_loaded = false;
+    int tool_loaded_slot = -1;
+
     // Update lane information
     for (int i = 0; i < slots_.slot_count(); ++i) {
         std::string lane_name = slots_.name_of(i);
@@ -1493,8 +1499,8 @@ void AmsBackendAfc::parse_lane_data(const nlohmann::json& lane_data) {
 
         if (tool_loaded) {
             slot.status = SlotStatus::LOADED;
-            system_info_.current_slot = i;
-            system_info_.filament_loaded = true;
+            any_tool_loaded = true;
+            tool_loaded_slot = i;
         } else if (lane.contains("loaded") && lane["loaded"].is_boolean() &&
                    lane["loaded"].get<bool>()) {
             // Hub-loaded: filament is present and ready, not at toolhead
@@ -1527,6 +1533,15 @@ void AmsBackendAfc::parse_lane_data(const nlohmann::json& lane_data) {
         if (lane.contains("total_weight") && lane["total_weight"].is_number()) {
             slot.total_weight_g = lane["total_weight"].get<float>();
         }
+    }
+
+    // Update filament_loaded from lane scan results.
+    // The top-level parse_afc_state() may also set this from AFC's own
+    // filament_loaded field, but lane data is the authoritative source for
+    // which specific slot is loaded.
+    system_info_.filament_loaded = any_tool_loaded;
+    if (any_tool_loaded) {
+        system_info_.current_slot = tool_loaded_slot;
     }
 }
 
