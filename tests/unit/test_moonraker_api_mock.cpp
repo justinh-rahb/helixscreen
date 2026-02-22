@@ -52,7 +52,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::atomic<bool> error_called{false};
     std::string downloaded_content;
 
-    api_->download_file(
+    api_->transfers().download_file(
         "gcodes", "3DBenchy.gcode",
         [&](const std::string& content) {
             downloaded_content = content;
@@ -74,7 +74,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::atomic<bool> error_called{false};
     MoonrakerError captured_error;
 
-    api_->download_file(
+    api_->transfers().download_file(
         "gcodes", "nonexistent_file_xyz123.gcode",
         [&](const std::string&) { success_called.store(true); },
         [&](const MoonrakerError& err) {
@@ -95,7 +95,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::atomic<bool> success_called{false};
     std::atomic<bool> error_called{false};
 
-    api_->download_file(
+    api_->transfers().download_file(
         "gcodes", "some/nested/path/3DBenchy.gcode",
         [&](const std::string& content) {
             success_called.store(true);
@@ -119,7 +119,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
 
     std::atomic<bool> success_called{false};
 
-    api_->download_file(
+    api_->transfers().download_file(
         "gcodes", "3DBenchy.gcode", [&](const std::string&) { success_called.store(true); },
         [&](const MoonrakerError& err) {
             // Log the error for debugging if this fails
@@ -142,7 +142,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::string downloaded_content;
     constexpr size_t MAX_BYTES = 1000; // Only first 1KB
 
-    api_->download_file_partial(
+    api_->transfers().download_file_partial(
         "gcodes", "3DBenchy.gcode", MAX_BYTES,
         [&](const std::string& content) {
             downloaded_content = content;
@@ -167,14 +167,14 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
 
     // First get full file size
     std::string full_content;
-    api_->download_file(
+    api_->transfers().download_file(
         "gcodes", "3DBenchy.gcode", [&](const std::string& content) { full_content = content; },
         [](const MoonrakerError&) {});
 
     REQUIRE(full_content.size() > 0);
 
     // Now get with large limit - should return full content
-    api_->download_file_partial(
+    api_->transfers().download_file_partial(
         "gcodes", "3DBenchy.gcode", MAX_BYTES,
         [&](const std::string& content) {
             downloaded_content = content;
@@ -196,7 +196,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::atomic<bool> error_called{false};
     MoonrakerError captured_error;
 
-    api_->download_file_partial(
+    api_->transfers().download_file_partial(
         "gcodes", "nonexistent_file_xyz123.gcode", 1000,
         [&](const std::string&) { success_called.store(true); },
         [&](const MoonrakerError& err) {
@@ -218,14 +218,14 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     constexpr size_t PARTIAL_SIZE = 500;
 
     // Get full file
-    api_->download_file(
+    api_->transfers().download_file(
         "gcodes", "3DBenchy.gcode", [&](const std::string& content) { full_content = content; },
         [](const MoonrakerError&) {});
 
     REQUIRE(full_content.size() > PARTIAL_SIZE);
 
     // Get partial file
-    api_->download_file_partial(
+    api_->transfers().download_file_partial(
         "gcodes", "3DBenchy.gcode", PARTIAL_SIZE,
         [&](const std::string& content) { partial_content = content; },
         [](const MoonrakerError&) {});
@@ -244,7 +244,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture, "MoonrakerAPIMock upload_file alwa
     std::atomic<bool> success_called{false};
     std::atomic<bool> error_called{false};
 
-    api_->upload_file(
+    api_->transfers().upload_file(
         "gcodes", "test_upload.gcode", "G28\nG1 X100 Y100 F3000\n",
         [&]() { success_called.store(true); },
         [&](const MoonrakerError&) { error_called.store(true); });
@@ -258,7 +258,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::atomic<bool> success_called{false};
     std::atomic<bool> error_called{false};
 
-    api_->upload_file_with_name(
+    api_->transfers().upload_file_with_name(
         "gcodes", "subdir/test.gcode", "custom_filename.gcode", "G28\nM104 S200\n",
         [&]() { success_called.store(true); },
         [&](const MoonrakerError&) { error_called.store(true); });
@@ -279,7 +279,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture, "MoonrakerAPIMock upload_file hand
                          std::to_string(i * 0.1) + "\n";
     }
 
-    api_->upload_file(
+    api_->transfers().upload_file(
         "gcodes", "large_file.gcode", large_content, [&]() { success_called.store(true); },
         [&](const MoonrakerError&) {});
 
@@ -304,7 +304,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     // Clean up any existing file
     std::remove(dest_path.c_str());
 
-    api_->download_file_to_path(
+    api_->transfers().download_file_to_path(
         "gcodes", "3DBenchy.gcode", dest_path,
         [&](const std::string& path) {
             received_path = path;
@@ -335,14 +335,14 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
 
     // First, get content via regular download_file
     std::string original_content;
-    api_->download_file(
+    api_->transfers().download_file(
         "gcodes", "3DBenchy.gcode", [&](const std::string& content) { original_content = content; },
         [](const MoonrakerError&) {});
 
     REQUIRE(original_content.size() > 100);
 
     // Now download to path
-    api_->download_file_to_path(
+    api_->transfers().download_file_to_path(
         "gcodes", "3DBenchy.gcode", dest_path,
         [&](const std::string&) { success_called.store(true); }, [](const MoonrakerError&) {});
 
@@ -369,7 +369,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     MoonrakerError captured_error;
     std::string dest_path = "/tmp/helix_test_download_missing.gcode";
 
-    api_->download_file_to_path(
+    api_->transfers().download_file_to_path(
         "gcodes", "nonexistent_file_xyz123.gcode", dest_path,
         [&](const std::string&) { success_called.store(true); },
         [&](const MoonrakerError& err) {
@@ -396,7 +396,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::remove(dest_path.c_str());
 
     // Path with nested directories should still find the file
-    api_->download_file_to_path(
+    api_->transfers().download_file_to_path(
         "gcodes", "some/nested/path/3DBenchy.gcode", dest_path,
         [&](const std::string&) { success_called.store(true); }, [](const MoonrakerError&) {});
 
@@ -418,7 +418,8 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::atomic<bool> error_called{false};
 
     // Should not crash when success callback is null, and file should still be found
-    REQUIRE_NOTHROW(api_->download_file("gcodes", "3DBenchy.gcode", nullptr,
+    REQUIRE_NOTHROW(
+        api_->transfers().download_file("gcodes", "3DBenchy.gcode", nullptr,
                                         [&](const MoonrakerError&) { error_called.store(true); }));
 
     // Verify no error occurred (file exists)
@@ -431,7 +432,7 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::atomic<bool> success_called{false};
 
     // Should not crash when error callback is null (for missing file)
-    REQUIRE_NOTHROW(api_->download_file(
+    REQUIRE_NOTHROW(api_->transfers().download_file(
         "gcodes", "nonexistent.gcode", [&](const std::string&) { success_called.store(true); },
         nullptr));
 
@@ -445,7 +446,8 @@ TEST_CASE_METHOD(MoonrakerAPIMockTestFixture,
     std::atomic<bool> error_called{false};
 
     // Should not crash when success callback is null
-    REQUIRE_NOTHROW(api_->upload_file("gcodes", "test.gcode", "G28", nullptr,
+    REQUIRE_NOTHROW(
+        api_->transfers().upload_file("gcodes", "test.gcode", "G28", nullptr,
                                       [&](const MoonrakerError&) { error_called.store(true); }));
 
     // Verify no error occurred (upload succeeds in mock)

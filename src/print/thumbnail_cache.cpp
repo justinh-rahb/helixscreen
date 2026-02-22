@@ -396,7 +396,7 @@ void ThumbnailCache::fetch(MoonrakerAPI* api, const std::string& relative_path,
     std::string cache_path = get_cache_path(relative_path);
     spdlog::trace("[ThumbnailCache] Downloading {} -> {}", relative_path, cache_path);
 
-    api->download_thumbnail(
+    api->transfers().download_thumbnail(
         relative_path, cache_path,
         // Success callback
         [this, on_success, relative_path](const std::string& local_path) {
@@ -658,7 +658,7 @@ void ThumbnailCache::fetch_optimized(MoonrakerAPI* api, const std::string& relat
                   cache_path);
 
     // Capture target and callbacks for the download completion handler
-    api->download_thumbnail(
+    api->transfers().download_thumbnail(
         relative_path, cache_path,
         // Success callback - PNG downloaded, now pre-scale it
         [this, on_success, on_error, relative_path, target](const std::string& local_path) {

@@ -278,7 +278,7 @@ class MoonrakerRestAPIMock : public MoonrakerRestAPI {
 };
 
 /**
- * @brief Mock MoonrakerAPI for testing without real printer connection
+ * @brief Mock File Transfer API for testing without real Moonraker HTTP
  *
  * Overrides HTTP file transfer methods to use local test files instead
  * of making actual HTTP requests to a Moonraker server.
@@ -287,12 +287,72 @@ class MoonrakerRestAPIMock : public MoonrakerRestAPI {
  * The mock tries multiple paths to find test files, supporting both:
  * - Running from project root: assets/test_gcodes/
  * - Running from build/bin/: ../../assets/test_gcodes/
+ */
+class MoonrakerFileTransferAPIMock : public MoonrakerFileTransferAPI {
+  public:
+    using SuccessCallback = MoonrakerFileTransferAPI::SuccessCallback;
+    using ErrorCallback = MoonrakerFileTransferAPI::ErrorCallback;
+    using StringCallback = MoonrakerFileTransferAPI::StringCallback;
+
+    explicit MoonrakerFileTransferAPIMock(helix::MoonrakerClient& client,
+                                          const std::string& http_base_url);
+    ~MoonrakerFileTransferAPIMock() override = default;
+
+    // ========================================================================
+    // Overridden HTTP File Transfer Methods (use local files instead of HTTP)
+    // ========================================================================
+
+    void download_file(const std::string& root, const std::string& path, StringCallback on_success,
+                       ErrorCallback on_error) override;
+
+    void download_file_partial(const std::string& root, const std::string& path, size_t max_bytes,
+                               StringCallback on_success, ErrorCallback on_error) override;
+
+    void download_file_to_path(const std::string& root, const std::string& path,
+                               const std::string& dest_path, StringCallback on_success,
+                               ErrorCallback on_error,
+                               ProgressCallback on_progress = nullptr) override;
+
+    void upload_file(const std::string& root, const std::string& path, const std::string& content,
+                     SuccessCallback on_success, ErrorCallback on_error) override;
+
+    void upload_file_with_name(const std::string& root, const std::string& path,
+                               const std::string& filename, const std::string& content,
+                               SuccessCallback on_success, ErrorCallback on_error) override;
+
+    void download_thumbnail(const std::string& thumbnail_path, const std::string& cache_path,
+                            StringCallback on_success, ErrorCallback on_error) override;
+
+  private:
+    /**
+     * @brief Find test file using fallback path search
+     *
+     * Tries multiple paths to locate test files:
+     * - assets/test_gcodes/ (from project root)
+     * - ../assets/test_gcodes/ (from build/)
+     * - ../../assets/test_gcodes/ (from build/bin/)
+     *
+     * @param filename Filename to find
+     * @return Full path to file if found, empty string otherwise
+     */
+    std::string find_test_file(const std::string& filename) const;
+
+    /// Fallback path prefixes to search (from various CWDs)
+    /// Note: Base directory is RuntimeConfig::TEST_GCODE_DIR (defined in runtime_config.h)
+    static const std::vector<std::string> PATH_PREFIXES;
+};
+
+/**
+ * @brief Mock MoonrakerAPI for testing without real printer connection
+ *
+ * Overrides connection, database, and calibration methods for mock mode.
+ * File transfer mocking is handled by MoonrakerFileTransferAPIMock (sub-API).
  *
  * Usage:
  *   MoonrakerClientMock mock_client;
  *   helix::PrinterState state;
  *   MoonrakerAPIMock mock_api(mock_client, state);
- *   // mock_api.download_file() now reads from assets/test_gcodes/
+ *   // mock_api.transfers().download_file() now reads from assets/test_gcodes/
  */
 class MoonrakerAPIMock : public MoonrakerAPI {
   public:
@@ -334,97 +394,6 @@ class MoonrakerAPIMock : public MoonrakerAPI {
                                    ErrorCallback on_error = nullptr) override;
     void set_phase_tracking_enabled(bool enabled, std::function<void(bool success)> on_success,
                                     ErrorCallback on_error = nullptr) override;
-
-    // ========================================================================
-    // Overridden HTTP File Transfer Methods (use local files instead of HTTP)
-    // ========================================================================
-
-    /**
-     * @brief Download file from local test directory
-     *
-     * Instead of making HTTP request, reads from assets/test_gcodes/{filename}.
-     * Uses fallback path search to work regardless of current working directory.
-     *
-     * @param root Root directory (ignored in mock - always uses test_gcodes)
-     * @param path File path (directory components stripped, only filename used)
-     * @param on_success Callback with file content
-     * @param on_error Error callback (FILE_NOT_FOUND if file doesn't exist)
-     */
-    void download_file(const std::string& root, const std::string& path, StringCallback on_success,
-                       ErrorCallback on_error) override;
-
-    /**
-     * @brief Mock partial file download (first N bytes)
-     *
-     * Reads first max_bytes of a local test file from assets/test_gcodes/
-     * Useful for testing G-code preamble scanning without loading entire files.
-     *
-     * @param root Root directory (ignored in mock)
-     * @param path File path - only the filename is used
-     * @param max_bytes Maximum bytes to return
-     * @param on_success Success callback with partial content
-     * @param on_error Error callback (FILE_NOT_FOUND if file doesn't exist)
-     */
-    void download_file_partial(const std::string& root, const std::string& path, size_t max_bytes,
-                               StringCallback on_success, ErrorCallback on_error) override;
-
-    /**
-     * @brief Mock streaming file download to disk
-     *
-     * Instead of making HTTP request, copies from assets/test_gcodes/{filename}
-     * to the specified destination path.
-     *
-     * @param root Root directory (ignored in mock - always uses test_gcodes)
-     * @param path File path (directory components stripped, only filename used)
-     * @param dest_path Local filesystem path to write to
-     * @param on_success Callback with dest_path on success
-     * @param on_error Error callback (FILE_NOT_FOUND if source doesn't exist)
-     * @param on_progress Optional progress callback (ignored in mock)
-     */
-    void download_file_to_path(const std::string& root, const std::string& path,
-                               const std::string& dest_path, StringCallback on_success,
-                               ErrorCallback on_error,
-                               ProgressCallback on_progress = nullptr) override;
-
-    /**
-     * @brief Mock file upload (logs but doesn't write)
-     *
-     * Logs the upload request but doesn't actually write files.
-     * Always calls success callback.
-     *
-     * @param root Root directory
-     * @param path Destination path
-     * @param content File content
-     * @param on_success Success callback
-     * @param on_error Error callback (never called - mock always succeeds)
-     */
-    void upload_file(const std::string& root, const std::string& path, const std::string& content,
-                     SuccessCallback on_success, ErrorCallback on_error) override;
-
-    /**
-     * @brief Mock file upload with custom filename (logs but doesn't write)
-     *
-     * Logs the upload request but doesn't actually write files.
-     * Always calls success callback.
-     */
-    void upload_file_with_name(const std::string& root, const std::string& path,
-                               const std::string& filename, const std::string& content,
-                               SuccessCallback on_success, ErrorCallback on_error) override;
-
-    /**
-     * @brief Mock thumbnail download (reads from local test assets)
-     *
-     * Instead of downloading from Moonraker, looks for thumbnails in
-     * assets/test_thumbnails/ or assets/test_gcodes/. For mock mode,
-     * simply returns a placeholder path since we don't have real thumbnails.
-     *
-     * @param thumbnail_path Relative path from metadata
-     * @param cache_path Destination cache path (ignored - uses placeholder)
-     * @param on_success Callback with placeholder image path
-     * @param on_error Error callback (never called - mock always returns placeholder)
-     */
-    void download_thumbnail(const std::string& thumbnail_path, const std::string& cache_path,
-                            StringCallback on_success, ErrorCallback on_error) override;
 
     // ========================================================================
     // Overridden Power Device Methods (return mock data)
@@ -544,6 +513,17 @@ class MoonrakerAPIMock : public MoonrakerAPI {
     }
 
     // ========================================================================
+    // File Transfer Mock Access
+    // ========================================================================
+
+    /**
+     * @brief Get the File Transfer mock sub-API for mock-specific access
+     *
+     * @return Reference to MoonrakerFileTransferAPIMock
+     */
+    MoonrakerFileTransferAPIMock& transfers_mock();
+
+    // ========================================================================
     // Spoolman Mock Access
     // ========================================================================
 
@@ -581,23 +561,6 @@ class MoonrakerAPIMock : public MoonrakerAPI {
 
     // Mock power device states (for toggle testing)
     std::map<std::string, bool> mock_power_states_;
-
-    /**
-     * @brief Find test file using fallback path search
-     *
-     * Tries multiple paths to locate test files:
-     * - assets/test_gcodes/ (from project root)
-     * - ../assets/test_gcodes/ (from build/)
-     * - ../../assets/test_gcodes/ (from build/bin/)
-     *
-     * @param filename Filename to find
-     * @return Full path to file if found, empty string otherwise
-     */
-    std::string find_test_file(const std::string& filename) const;
-
-    /// Fallback path prefixes to search (from various CWDs)
-    /// Note: Base directory is RuntimeConfig::TEST_GCODE_DIR (defined in runtime_config.h)
-    static const std::vector<std::string> PATH_PREFIXES;
 
     /// Mock bed state for screws tilt simulation
     MockScrewsTiltState mock_bed_state_;

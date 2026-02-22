@@ -1100,7 +1100,7 @@ void PrintSelectPanel::process_metadata_result(size_t i, const std::string& file
 
                 // Download first 100KB of gcode (thumbnails are always in header)
                 constexpr size_t THUMBNAIL_HEADER_SIZE = 100 * 1024;
-                self->api_->download_file_partial(
+                self->api_->transfers().download_file_partial(
                     "gcodes", gcode_path, THUMBNAIL_HEADER_SIZE,
                     // Success callback - extract thumbnails from gcode content
                     [self, file_idx, filename_copy, gcode_path](const std::string& content) {

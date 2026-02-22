@@ -49,6 +49,7 @@
 #include "moonraker_client.h"
 #include "moonraker_error.h"
 #include "moonraker_file_api.h"
+#include "moonraker_file_transfer_api.h"
 #include "moonraker_history_api.h"
 #include "moonraker_job_api.h"
 #include "moonraker_motion_api.h"
@@ -60,15 +61,12 @@
 #include "printer_discovery.h"
 #include "printer_state.h"
 
-#include <atomic>
 #include <functional>
-#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
-#include <thread>
 #include <vector>
 
 /**
@@ -99,17 +97,6 @@ class MoonrakerAPI {
     using BoolCallback = std::function<void(bool)>;
     using StringCallback = std::function<void(const std::string&)>;
     using JsonCallback = std::function<void(const json&)>;
-    /**
-     * @brief Progress callback for file transfer operations
-     *
-     * Called periodically during download/upload with bytes transferred and total.
-     * NOTE: Called from background HTTP thread - use helix::ui::async_call() for UI updates.
-     *
-     * @param current Bytes transferred so far
-     * @param total Total bytes to transfer
-     */
-    using ProgressCallback = std::function<void(size_t current, size_t total)>;
-
     /// Progress callback for bed mesh calibration: (current_probe, total_probes)
     using BedMeshProgressCallback = std::function<void(int current, int total)>;
 
@@ -372,144 +359,13 @@ class MoonrakerAPI {
     void query_configfile(JsonCallback on_success, ErrorCallback on_error);
 
     // ========================================================================
-    // HTTP File Transfer Operations
+    // HTTP Base URL Configuration
     // ========================================================================
 
     /**
-     * @brief Download a file's content from the printer via HTTP
+     * @brief Set the HTTP base URL for file transfers and REST operations
      *
-     * Uses GET request to /server/files/{root}/{path} endpoint.
-     * The file content is returned as a string in the callback.
-     *
-     * Virtual to allow mocking in tests (MoonrakerAPIMock reads local files).
-     *
-     * @param root Root directory ("gcodes", "config", etc.)
-     * @param path File path relative to root
-     * @param on_success Callback with file content as string
-     * @param on_error Error callback
-     */
-    virtual void download_file(const std::string& root, const std::string& path,
-                               StringCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Download only the first N bytes of a file (for scanning preambles)
-     *
-     * Uses HTTP Range request to fetch only the beginning of a file.
-     * Ideal for scanning G-code files where operations are in the preamble.
-     *
-     * @param root Root directory ("gcodes", "config", etc.)
-     * @param path File path relative to root
-     * @param max_bytes Maximum bytes to download (default 100KB)
-     * @param on_success Callback with partial file content as string
-     * @param on_error Error callback
-     */
-    virtual void download_file_partial(const std::string& root, const std::string& path,
-                                       size_t max_bytes, StringCallback on_success,
-                                       ErrorCallback on_error);
-
-    /**
-     * @brief Download a file directly to disk (streaming, low memory)
-     *
-     * Unlike download_file() which loads entire content into memory,
-     * this streams chunks directly to disk as they arrive. Essential
-     * for large G-code files on memory-constrained devices like AD5M.
-     *
-     * Uses libhv's streaming download which writes chunks to disk
-     * as they are received, avoiding memory spikes.
-     *
-     * Virtual to allow mocking in tests.
-     *
-     * @param root Root directory ("gcodes", "config", etc.)
-     * @param path File path relative to root
-     * @param dest_path Local filesystem path to write to
-     * @param on_success Callback with dest_path on success
-     * @param on_error Error callback
-     * @param on_progress Optional callback for progress updates (called from HTTP thread)
-     */
-    virtual void download_file_to_path(const std::string& root, const std::string& path,
-                                       const std::string& dest_path, StringCallback on_success,
-                                       ErrorCallback on_error,
-                                       ProgressCallback on_progress = nullptr);
-
-    /**
-     * @brief Download a thumbnail image and cache it locally
-     *
-     * Downloads thumbnail from Moonraker's HTTP server and saves to a local cache file.
-     * The callback receives the local file path (suitable for LVGL image loading).
-     *
-     * Virtual to allow mocking in tests.
-     *
-     * @param thumbnail_path Relative path from metadata (e.g., ".thumbnails/file.png")
-     * @param cache_path Local filesystem path to save the thumbnail
-     * @param on_success Callback with local cache path
-     * @param on_error Error callback
-     */
-    virtual void download_thumbnail(const std::string& thumbnail_path,
-                                    const std::string& cache_path, StringCallback on_success,
-                                    ErrorCallback on_error);
-
-    /**
-     * @brief Upload file content to the printer via HTTP multipart form
-     *
-     * Uses POST request to /server/files/upload endpoint with multipart form data.
-     * Suitable for G-code files, config files, and macro files.
-     *
-     * Virtual to allow mocking in tests (MoonrakerAPIMock logs but doesn't write).
-     *
-     * @param root Root directory ("gcodes", "config", etc.)
-     * @param path Destination path relative to root
-     * @param content File content to upload
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    virtual void upload_file(const std::string& root, const std::string& path,
-                             const std::string& content, SuccessCallback on_success,
-                             ErrorCallback on_error);
-
-    /**
-     * @brief Upload file content with custom filename
-     *
-     * Like upload_file() but allows specifying a different filename for the
-     * multipart form than the path. Useful when uploading to a subdirectory.
-     *
-     * Virtual to allow mocking in tests (MoonrakerAPIMock logs but doesn't write).
-     *
-     * @param root Root directory ("gcodes", "config", etc.)
-     * @param path Destination path relative to root (e.g., ".helix_temp/foo.gcode")
-     * @param filename Filename for form (e.g., ".helix_temp/foo.gcode")
-     * @param content File content to upload
-     * @param on_success Success callback
-     * @param on_error Error callback
-     */
-    virtual void upload_file_with_name(const std::string& root, const std::string& path,
-                                       const std::string& filename, const std::string& content,
-                                       SuccessCallback on_success, ErrorCallback on_error);
-
-    /**
-     * @brief Upload file from local filesystem path (streaming, low memory)
-     *
-     * Streams file from disk to Moonraker in chunks, never loading the entire
-     * file into memory. Essential for large G-code files on memory-constrained
-     * devices like AD5M.
-     *
-     * Virtual to allow mocking in tests.
-     *
-     * @param root Root directory ("gcodes", "config", etc.)
-     * @param dest_path Destination path relative to root (e.g., ".helix_temp/foo.gcode")
-     * @param local_path Local filesystem path to read from
-     * @param on_success Success callback
-     * @param on_error Error callback
-     * @param on_progress Optional callback for progress updates (called from HTTP thread)
-     */
-    virtual void upload_file_from_path(const std::string& root, const std::string& dest_path,
-                                       const std::string& local_path, SuccessCallback on_success,
-                                       ErrorCallback on_error,
-                                       ProgressCallback on_progress = nullptr);
-
-    /**
-     * @brief Set the HTTP base URL for file transfers
-     *
-     * Must be called before using download_file/upload_file.
+     * Must be called before using transfer/REST methods.
      * Typically derived from WebSocket URL: ws://host:port -> http://host:port
      *
      * @param base_url HTTP base URL (e.g., "http://192.168.1.100:7125")
@@ -875,6 +731,18 @@ class MoonrakerAPI {
     // ========================================================================
 
     /**
+     * @brief Get File Transfer API for HTTP download/upload operations
+     *
+     * All file transfer methods (download_file, download_thumbnail, upload_file, etc.)
+     * are available through this accessor.
+     *
+     * @return Reference to MoonrakerFileTransferAPI
+     */
+    MoonrakerFileTransferAPI& transfers() {
+        return *file_transfer_api_;
+    }
+
+    /**
      * @brief Get History API for print history operations
      *
      * All history methods (get_history_list, get_history_totals, delete_history_job)
@@ -1063,11 +931,12 @@ class MoonrakerAPI {
     std::vector<MacroInfo> get_user_macros(bool include_system = false) const;
 
   protected:
-    std::unique_ptr<MoonrakerFileAPI> file_api_;           ///< File management API
-    std::unique_ptr<MoonrakerHistoryAPI> history_api_;     ///< Print history API
-    std::unique_ptr<MoonrakerJobAPI> job_api_;             ///< Job control API
-    std::unique_ptr<MoonrakerMotionAPI> motion_api_;       ///< Motion control API
-    std::unique_ptr<MoonrakerRestAPI> rest_api_;           ///< REST endpoint & WLED API
+    std::unique_ptr<MoonrakerFileTransferAPI> file_transfer_api_; ///< HTTP file transfer API
+    std::unique_ptr<MoonrakerFileAPI> file_api_;                  ///< File management API
+    std::unique_ptr<MoonrakerHistoryAPI> history_api_;            ///< Print history API
+    std::unique_ptr<MoonrakerJobAPI> job_api_;                    ///< Job control API
+    std::unique_ptr<MoonrakerMotionAPI> motion_api_;              ///< Motion control API
+    std::unique_ptr<MoonrakerRestAPI> rest_api_;                  ///< REST endpoint & WLED API
     std::unique_ptr<MoonrakerSpoolmanAPI> spoolman_api_;   ///< Spoolman filament tracking API
     std::unique_ptr<MoonrakerTimelapseAPI> timelapse_api_; ///< Timelapse & webcam API
 
@@ -1090,20 +959,4 @@ class MoonrakerAPI {
     std::vector<std::string> bed_mesh_profiles_;
     std::map<std::string, BedMeshProfile> stored_bed_mesh_profiles_; // All profiles with mesh data
     mutable std::mutex bed_mesh_mutex_;
-
-    // Track pending HTTP request threads to ensure clean shutdown
-    // IMPORTANT: Prevents use-after-free when threads outlive the API object
-    mutable std::mutex http_threads_mutex_;
-    std::list<std::thread> http_threads_;
-    std::atomic<bool> shutting_down_{false};
-
-    /**
-     * @brief Launch an HTTP request thread with automatic lifecycle management
-     *
-     * Spawns a thread for async HTTP operations and tracks it for cleanup.
-     * Thread is automatically removed from tracking when it completes.
-     *
-     * @param func The function to execute in the thread
-     */
-    void launch_http_thread(std::function<void()> func);
 };

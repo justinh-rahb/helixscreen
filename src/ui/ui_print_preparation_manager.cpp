@@ -411,7 +411,7 @@ void PrintPreparationManager::scan_file_for_operations(const std::string& filena
     // This avoids downloading multi-MB files just to scan the first few hundred lines
     constexpr size_t SCAN_DOWNLOAD_LIMIT = 200 * 1024; // 200KB
 
-    api_->download_file_partial(
+    api_->transfers().download_file_partial(
         "gcodes", file_path, SCAN_DOWNLOAD_LIMIT,
         // Success: parse content and cache result
         // NOTE: This callback runs on a background HTTP thread, so we must defer
@@ -1258,7 +1258,7 @@ void PrintPreparationManager::modify_and_print_streaming(
     };
 
     // Step 1: Download file to disk (streaming, not memory)
-    api_->download_file_to_path(
+    api_->transfers().download_file_to_path(
         "gcodes", file_path, local_download_path,
         // Download success - NOTE: runs on HTTP thread
         [self, alive, file_path, display_filename, ops_to_disable, macro_skip_params, mod_names,
@@ -1316,7 +1316,7 @@ void PrintPreparationManager::modify_and_print_streaming(
 
             // Step 3: Upload modified file from disk
             std::string modified_path = result.modified_path; // Copy for lambda
-            self->api_->upload_file_from_path(
+            self->api_->transfers().upload_file_from_path(
                 "gcodes", remote_temp_path, modified_path,
                 // Upload success - NOTE: runs on HTTP thread, defer LVGL ops
                 [self, alive, modified_path, display_filename, remote_temp_path, file_path,

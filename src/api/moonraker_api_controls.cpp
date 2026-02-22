@@ -149,7 +149,7 @@ void MoonrakerAPI::get_power_devices(PowerDevicesCallback on_success, ErrorCallb
     std::string url = http_base_url_ + "/machine/device_power/devices";
     spdlog::debug("[Moonraker API] Fetching power devices from: {}", url);
 
-    launch_http_thread([url, on_success, on_error]() {
+    std::thread([url, on_success, on_error]() {
         auto resp = requests::get(url.c_str());
 
         if (!resp) {
@@ -208,7 +208,7 @@ void MoonrakerAPI::get_power_devices(PowerDevicesCallback on_success, ErrorCallb
                 on_error(err);
             }
         }
-    });
+    }).detach();
 }
 
 void MoonrakerAPI::set_device_power(const std::string& device, const std::string& action,
@@ -257,7 +257,7 @@ void MoonrakerAPI::set_device_power(const std::string& device, const std::string
 
     spdlog::info("[Moonraker API] Setting power device '{}' to '{}'", device, action);
 
-    launch_http_thread([url, device, action, on_success, on_error]() {
+    std::thread([url, device, action, on_success, on_error]() {
         auto resp = requests::post(url.c_str(), "");
 
         if (!resp) {
@@ -290,7 +290,7 @@ void MoonrakerAPI::set_device_power(const std::string& device, const std::string
         if (on_success) {
             on_success();
         }
-    });
+    }).detach();
 }
 
 // ============================================================================

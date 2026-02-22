@@ -476,7 +476,7 @@ void KlipperConfigEditor::download_with_includes(MoonrakerAPI& api, const std::s
 
     spdlog::debug("[ConfigEditor] Downloading config file: {}", file_path);
 
-    api.download_file(
+    api.transfers().download_file(
         "config", file_path,
         [this, &api, file_path, pending, on_all_done, on_error](const std::string& content) {
             // Cache the file content
@@ -663,7 +663,7 @@ void KlipperConfigEditor::edit_value(MoonrakerAPI& api, const std::string& secti
                 }
 
                 // Step 4: Upload modified content
-                api.upload_file(
+                api.transfers().upload_file(
                     "config", file_path, *modified,
                     [this, file_path, modified, on_success]() {
                         // Step 5: Update cache with new content
@@ -687,7 +687,7 @@ void KlipperConfigEditor::edit_value(MoonrakerAPI& api, const std::string& secti
                 do_edit(*cached_content);
             } else {
                 // Re-download if not cached
-                api.download_file(
+                api.transfers().download_file(
                     "config", file_path,
                     [do_edit](const std::string& content) { do_edit(content); },
                     [file_path, on_error](const MoonrakerError& err) {

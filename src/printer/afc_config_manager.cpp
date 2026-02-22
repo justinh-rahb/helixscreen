@@ -19,7 +19,7 @@ void AfcConfigManager::load(const std::string& filename, Callback on_done) {
 
     spdlog::info("[AfcConfigManager] Loading config file: {}", filename);
 
-    api_->download_file(
+    api_->transfers().download_file(
         "config", filename,
         // Download success
         [this, filename, on_done](const std::string& content) {
@@ -53,7 +53,7 @@ void AfcConfigManager::save(const std::string& filename, Callback on_done) {
     std::string content = parser_.serialize();
     spdlog::info("[AfcConfigManager] Saving config file: {} ({} bytes)", filename, content.size());
 
-    api_->upload_file(
+    api_->transfers().upload_file(
         "config", filename, content,
         // Upload success
         [this, filename, content, on_done]() {

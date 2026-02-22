@@ -2101,7 +2101,7 @@ void PrintStatusPanel::load_gcode_for_viewing(const std::string& filename) {
             // Stream download directly to disk (no memory spike)
             // For mock mode, this copies from test_gcodes/ directory
             // For real mode, this streams from Moonraker using libhv's chunked download
-            api_->download_file_to_path(
+            api_->transfers().download_file_to_path(
                 "gcodes", filename, temp_path,
                 [this, alive, temp_path](const std::string& path) {
                     // Abort if panel was destroyed during download [L012]

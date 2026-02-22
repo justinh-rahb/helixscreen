@@ -589,7 +589,7 @@ void PrintStartEnhancer::modify_and_upload_config(
 
     // Download current config file
     // Note: download_file takes (root, path, on_success, on_error)
-    api->download_file(
+    api->transfers().download_file(
         "config", source_file,
         [api, macro_name, source_file, enhancements, on_success, on_error,
          alive](const std::string& content) {
@@ -680,7 +680,7 @@ void PrintStartEnhancer::modify_and_upload_config(
 
             // Upload modified config
             // Note: upload_file takes (root, path, content, on_success, on_error)
-            api->upload_file(
+            api->transfers().upload_file(
                 "config", source_file, modified_content,
                 [enhancements, lines_added, on_success]() {
                     size_t ops_count = 0;

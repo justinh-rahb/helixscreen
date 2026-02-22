@@ -24,20 +24,33 @@
 using namespace helix;
 
 // Static initialization of path prefixes for fallback search
-const std::vector<std::string> MoonrakerAPIMock::PATH_PREFIXES = {
+const std::vector<std::string> MoonrakerFileTransferAPIMock::PATH_PREFIXES = {
     "",      // From project root: assets/test_gcodes/
     "../",   // From build/: ../assets/test_gcodes/
     "../../" // From build/bin/: ../../assets/test_gcodes/
 };
 
+MoonrakerFileTransferAPIMock::MoonrakerFileTransferAPIMock(MoonrakerClient& client,
+                                                           const std::string& http_base_url)
+    : MoonrakerFileTransferAPI(client, http_base_url) {
+    spdlog::debug(
+        "[MoonrakerFileTransferAPIMock] Created - HTTP methods will use local test files");
+}
+
 MoonrakerAPIMock::MoonrakerAPIMock(MoonrakerClient& client, PrinterState& state)
     : MoonrakerAPI(client, state) {
-    spdlog::debug("[MoonrakerAPIMock] Created - HTTP methods will use local test files");
+    spdlog::debug("[MoonrakerAPIMock] Created - using mock sub-APIs");
 
     // Replace base sub-APIs with mock versions
+    file_transfer_api_ =
+        std::make_unique<MoonrakerFileTransferAPIMock>(client, get_http_base_url());
     rest_api_ = std::make_unique<MoonrakerRestAPIMock>(client, get_http_base_url());
     spoolman_api_ = std::make_unique<MoonrakerSpoolmanAPIMock>(client);
     timelapse_api_ = std::make_unique<MoonrakerTimelapseAPIMock>(client, get_http_base_url());
+}
+
+MoonrakerFileTransferAPIMock& MoonrakerAPIMock::transfers_mock() {
+    return static_cast<MoonrakerFileTransferAPIMock&>(*file_transfer_api_);
 }
 
 MoonrakerRestAPIMock& MoonrakerAPIMock::rest_mock() {
@@ -134,7 +147,7 @@ void MoonrakerAPIMock::set_phase_tracking_enabled(bool enabled,
     }
 }
 
-std::string MoonrakerAPIMock::find_test_file(const std::string& filename) const {
+std::string MoonrakerFileTransferAPIMock::find_test_file(const std::string& filename) const {
     namespace fs = std::filesystem;
 
     for (const auto& prefix : PATH_PREFIXES) {
@@ -151,8 +164,9 @@ std::string MoonrakerAPIMock::find_test_file(const std::string& filename) const 
     return "";
 }
 
-void MoonrakerAPIMock::download_file(const std::string& root, const std::string& path,
-                                     StringCallback on_success, ErrorCallback on_error) {
+void MoonrakerFileTransferAPIMock::download_file(const std::string& root, const std::string& path,
+                                                 StringCallback on_success,
+                                                 ErrorCallback on_error) {
     // Strip any leading directory components to get just the filename
     std::string filename = path;
     size_t last_slash = path.rfind('/');
@@ -206,9 +220,10 @@ void MoonrakerAPIMock::download_file(const std::string& root, const std::string&
     }
 }
 
-void MoonrakerAPIMock::download_file_partial(const std::string& root, const std::string& path,
-                                             size_t max_bytes, StringCallback on_success,
-                                             ErrorCallback on_error) {
+void MoonrakerFileTransferAPIMock::download_file_partial(const std::string& root,
+                                                         const std::string& path, size_t max_bytes,
+                                                         StringCallback on_success,
+                                                         ErrorCallback on_error) {
     // Strip any leading directory components to get just the filename
     std::string filename = path;
     size_t last_slash = path.rfind('/');
@@ -261,10 +276,9 @@ void MoonrakerAPIMock::download_file_partial(const std::string& root, const std:
     }
 }
 
-void MoonrakerAPIMock::download_file_to_path(const std::string& root, const std::string& path,
-                                             const std::string& dest_path,
-                                             StringCallback on_success, ErrorCallback on_error,
-                                             ProgressCallback on_progress) {
+void MoonrakerFileTransferAPIMock::download_file_to_path(
+    const std::string& root, const std::string& path, const std::string& dest_path,
+    StringCallback on_success, ErrorCallback on_error, ProgressCallback on_progress) {
     (void)on_progress; // Progress callback ignored in mock
     // Extract just the filename from the path
     std::string filename = path;
@@ -335,9 +349,9 @@ void MoonrakerAPIMock::download_file_to_path(const std::string& root, const std:
     }
 }
 
-void MoonrakerAPIMock::upload_file(const std::string& root, const std::string& path,
-                                   const std::string& content, SuccessCallback on_success,
-                                   ErrorCallback on_error) {
+void MoonrakerFileTransferAPIMock::upload_file(const std::string& root, const std::string& path,
+                                               const std::string& content,
+                                               SuccessCallback on_success, ErrorCallback on_error) {
     (void)on_error; // Unused - mock always succeeds
 
     spdlog::info("[MoonrakerAPIMock] Mock upload_file: root='{}', path='{}', size={} bytes", root,
@@ -349,10 +363,9 @@ void MoonrakerAPIMock::upload_file(const std::string& root, const std::string& p
     }
 }
 
-void MoonrakerAPIMock::upload_file_with_name(const std::string& root, const std::string& path,
-                                             const std::string& filename,
-                                             const std::string& content, SuccessCallback on_success,
-                                             ErrorCallback on_error) {
+void MoonrakerFileTransferAPIMock::upload_file_with_name(
+    const std::string& root, const std::string& path, const std::string& filename,
+    const std::string& content, SuccessCallback on_success, ErrorCallback on_error) {
     (void)on_error; // Unused - mock always succeeds
 
     spdlog::info(
@@ -366,9 +379,10 @@ void MoonrakerAPIMock::upload_file_with_name(const std::string& root, const std:
     }
 }
 
-void MoonrakerAPIMock::download_thumbnail(const std::string& thumbnail_path,
-                                          const std::string& cache_path, StringCallback on_success,
-                                          ErrorCallback on_error) {
+void MoonrakerFileTransferAPIMock::download_thumbnail(const std::string& thumbnail_path,
+                                                      const std::string& cache_path,
+                                                      StringCallback on_success,
+                                                      ErrorCallback on_error) {
     (void)on_error; // Unused - mock falls back to placeholder on failure
 
     spdlog::debug("[MoonrakerAPIMock] download_thumbnail: path='{}' -> cache='{}'", thumbnail_path,

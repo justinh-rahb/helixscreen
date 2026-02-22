@@ -159,7 +159,7 @@ void search_next_file(std::shared_ptr<ConfigFileSearchState> state) {
     const std::string& filename = state->cfg_files[state->current_index];
     spdlog::debug("[PrintStartAnalyzer] Searching {} for macro...", filename);
 
-    state->api->download_file(
+    state->api->transfers().download_file(
         "config", filename,
         [state, filename](const std::string& content) {
             // Search for each macro name variant

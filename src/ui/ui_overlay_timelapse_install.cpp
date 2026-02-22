@@ -367,7 +367,7 @@ void TimelapseInstallOverlay::download_and_modify_config() {
     auto alive = alive_guard_;
 
     // Download moonraker.conf
-    api_->download_file(
+    api_->transfers().download_file(
         "config", "moonraker.conf",
         [this, alive](const std::string& content) {
             if (!alive || !*alive || !wizard_active_)
@@ -389,7 +389,7 @@ void TimelapseInstallOverlay::download_and_modify_config() {
             std::string modified = append_timelapse_config(content);
 
             // Upload modified config (API call, fine on bg thread)
-            api_->upload_file(
+            api_->transfers().upload_file(
                 "config", "moonraker.conf", modified,
                 [this, alive]() {
                     if (!alive || !*alive || !wizard_active_)

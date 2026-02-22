@@ -215,7 +215,7 @@ void MacroManager::upload_macro_file(SuccessCallback on_success, ErrorCallback o
 
     // Upload to config root (not gcodes)
     // The path is "" because we upload directly to the config directory
-    api_.upload_file_with_name(
+    api_.transfers().upload_file_with_name(
         "config", "", HELIX_MACROS_FILENAME, content,
         // Upload success
         [on_success]() {
@@ -238,7 +238,7 @@ void MacroManager::add_include_to_config(SuccessCallback on_success, ErrorCallba
     spdlog::info("[HelixMacroManager] Adding include line to printer.cfg");
 
     // Download printer.cfg
-    api_.download_file(
+    api_.transfers().download_file(
         "config", "printer.cfg",
         // Download success
         [this, on_success, on_error](const std::string& content) {
@@ -286,7 +286,7 @@ void MacroManager::add_include_to_config(SuccessCallback on_success, ErrorCallba
             }
 
             // Upload modified printer.cfg
-            api_.upload_file_with_name(
+            api_.transfers().upload_file_with_name(
                 "config", "", "printer.cfg", modified_content,
                 // Upload success
                 [on_success]() {
@@ -317,7 +317,7 @@ void MacroManager::remove_include_from_config(SuccessCallback on_success, ErrorC
     spdlog::info("[HelixMacroManager] Removing include line from printer.cfg");
 
     // Download printer.cfg
-    api_.download_file(
+    api_.transfers().download_file(
         "config", "printer.cfg",
         // Download success
         [this, on_success, on_error](const std::string& content) {
@@ -349,7 +349,7 @@ void MacroManager::remove_include_from_config(SuccessCallback on_success, ErrorC
                           line_end);
 
             // Upload modified printer.cfg
-            api_.upload_file_with_name(
+            api_.transfers().upload_file_with_name(
                 "config", "", "printer.cfg", modified_content,
                 // Upload success
                 [on_success]() {

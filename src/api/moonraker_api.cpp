@@ -25,6 +25,7 @@ MoonrakerAPI::MoonrakerAPI(MoonrakerClient& client, PrinterState& state) : clien
 
     // Create sub-APIs
     file_api_ = std::make_unique<MoonrakerFileAPI>(client);
+    file_transfer_api_ = std::make_unique<MoonrakerFileTransferAPI>(client, http_base_url_);
     history_api_ = std::make_unique<MoonrakerHistoryAPI>(client);
     job_api_ = std::make_unique<MoonrakerJobAPI>(client);
     motion_api_ = std::make_unique<MoonrakerMotionAPI>(client, safety_limits_);
@@ -59,68 +60,7 @@ MoonrakerAPI::~MoonrakerAPI() {
     // (same pattern as StaticSubjectRegistry — observers must be disconnected before lv_deinit)
     lv_subject_deinit(&build_volume_version_);
 
-    // Signal shutdown and wait for HTTP threads with timeout
-    // File downloads/uploads can have long timeouts (up to 1 hour in libhv),
-    // so we use a timed join to avoid blocking shutdown indefinitely.
-    shutting_down_.store(true);
-
-    std::list<std::thread> threads_to_join;
-    {
-        std::lock_guard<std::mutex> lock(http_threads_mutex_);
-        threads_to_join = std::move(http_threads_);
-    }
-
-    if (threads_to_join.empty()) {
-        return;
-    }
-
-    spdlog::debug("[Moonraker API] Waiting for {} HTTP thread(s) to finish...",
-                  threads_to_join.size());
-
-    // Timed join pattern: use a helper thread to do the join, poll for completion.
-    // We can't use std::async because its std::future destructor blocks!
-    constexpr auto kJoinTimeout = std::chrono::seconds(2);
-    constexpr auto kPollInterval = std::chrono::milliseconds(10);
-
-    for (auto& t : threads_to_join) {
-        if (!t.joinable()) {
-            continue;
-        }
-
-        // Launch helper thread to do the join
-        std::atomic<bool> joined{false};
-        std::thread join_helper([&t, &joined]() {
-            t.join();
-            joined.store(true);
-        });
-
-        // Poll for completion with timeout
-        auto start = std::chrono::steady_clock::now();
-        while (!joined.load()) {
-            if (std::chrono::steady_clock::now() - start > kJoinTimeout) {
-                // Timeout - detach BOTH the helper AND the original thread
-                // We must detach `t` to avoid std::terminate when http_threads_ is destroyed
-                // L033 warns about detach on ARM/glibc with static linking, but:
-                // 1. This only happens during shutdown with stuck HTTP requests
-                // 2. The alternative (blocking forever or std::terminate) is worse
-                // 3. Most deployments use dynamic linking
-                spdlog::warn("[Moonraker API] HTTP thread still running after {}s - "
-                             "will terminate with process",
-                             kJoinTimeout.count());
-                join_helper.detach();
-                t.detach(); // Critical: avoid std::terminate on list destruction
-                break;
-            }
-            std::this_thread::sleep_for(kPollInterval);
-        }
-
-        // Use joinable() check - returns false after detach(), preventing UB
-        // from calling join() on a detached thread (race between timeout and
-        // helper completion)
-        if (join_helper.joinable()) {
-            join_helper.join();
-        }
-    }
+    // HTTP thread cleanup is handled by ~MoonrakerFileTransferAPI and ~MoonrakerRestAPI
 }
 
 bool MoonrakerAPI::ensure_http_base_url() {
@@ -145,24 +85,6 @@ bool MoonrakerAPI::ensure_http_base_url() {
 
     spdlog::error("[Moonraker API] HTTP base URL not configured and cannot derive from WebSocket");
     return false;
-}
-
-void MoonrakerAPI::launch_http_thread(std::function<void()> func) {
-    // Check if we're shutting down - don't spawn new threads
-    if (shutting_down_.load()) {
-        return;
-    }
-
-    std::lock_guard<std::mutex> lock(http_threads_mutex_);
-
-    // Clean up any finished threads first (they've set themselves to non-joinable id)
-    http_threads_.remove_if([](std::thread& t) { return !t.joinable(); });
-
-    // Launch the new thread
-    http_threads_.emplace_back([func = std::move(func)]() {
-        func();
-        // Thread auto-removed during next launch or destructor
-    });
 }
 
 void MoonrakerAPI::notify_build_volume_changed() {
