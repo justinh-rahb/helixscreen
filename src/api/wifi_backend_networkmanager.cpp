@@ -792,11 +792,16 @@ void WifiBackendNetworkManager::status_thread_func() {
             "[WifiBackend] NM: Status cache updated (connected={}, ssid='{}', signal={}%)",
             fresh_status.connected, fresh_status.ssid, fresh_status.signal_strength);
 
-        // Sleep until next poll or wakeup signal (use dedicated CV mutex
-        // to avoid blocking get_status() callers during the wait)
+        // Sleep until next poll or wakeup signal.
+        // Uses dedicated status_cv_mutex_ (not status_mutex_) so get_status() callers
+        // aren't blocked during the 5-second wait. Safe because the predicates
+        // (status_running_, status_refresh_requested_) are both atomic.
         {
             std::unique_lock<std::mutex> lock(status_cv_mutex_);
-            status_cv_.wait_for(lock, POLL_INTERVAL, [this] { return !status_running_.load(); });
+            status_cv_.wait_for(lock, POLL_INTERVAL, [this] {
+                return !status_running_.load() || status_refresh_requested_.load();
+            });
+            status_refresh_requested_ = false;
         }
     }
 
@@ -804,6 +809,9 @@ void WifiBackendNetworkManager::status_thread_func() {
 }
 
 void WifiBackendNetworkManager::request_status_refresh() {
+    // Set flag so the thread re-polls immediately even if notification
+    // arrives while poll_status_now() is running (not waiting on CV).
+    status_refresh_requested_ = true;
     // Lock CV mutex to ensure notify isn't lost between predicate
     // check and wait_for entry in status_thread_func
     {

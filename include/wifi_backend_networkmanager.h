@@ -68,7 +68,7 @@ class WifiBackendNetworkManager : public WifiBackend {
     // Internal State
     // ========================================================================
 
-    bool running_ = false;
+    std::atomic<bool> running_{false};
     std::string wifi_interface_; ///< Detected WiFi interface (e.g., "wlan0")
 
     // Event system (thread-safe)
@@ -91,11 +91,12 @@ class WifiBackendNetworkManager : public WifiBackend {
     std::mutex status_cv_mutex_; // Dedicated mutex for condvar wait
     std::condition_variable status_cv_;
     std::atomic<bool> status_running_{false};
+    std::atomic<bool> status_refresh_requested_{false};
     ConnectionStatus cached_status_; // Protected by status_mutex_
 
     // 5GHz support — computed once at start(), never changes
-    bool supports_5ghz_cached_ = false;
-    bool supports_5ghz_resolved_ = false;
+    std::atomic<bool> supports_5ghz_cached_{false};
+    std::atomic<bool> supports_5ghz_resolved_{false};
 
     // ========================================================================
     // Internal Helpers
