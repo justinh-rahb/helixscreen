@@ -756,11 +756,9 @@ bool parse_cli_args(int argc, char** argv, CliArgs& args, int& screen_width, int
                 }
             }
         }
-        // Unknown argument
+        // Unknown argument — warn but continue (don't crash-loop on forward-compat flags)
         else {
-            printf("Unknown argument: %s\n", argv[i]);
-            printf("Use --help for usage information\n");
-            return false;
+            fprintf(stderr, "Warning: ignoring unknown argument: %s\n", argv[i]);
         }
     }
 

@@ -243,7 +243,7 @@ fi
 
 # DPI override (env var only — CLI passthrough handles --dpi directly)
 if [ -n "${HELIX_DPI:-}" ]; then
-    EXTRA_FLAGS="${EXTRA_FLAGS} --dpi=${HELIX_DPI}"
+    EXTRA_FLAGS="${EXTRA_FLAGS} --dpi ${HELIX_DPI}"
     log "DPI override: ${HELIX_DPI}"
 fi
 
