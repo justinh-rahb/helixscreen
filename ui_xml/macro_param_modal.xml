@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2025-2026 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<component>
+  <view name="macro_param_modal" extends="lv_obj"
+        width="300" height="content" max_height="400"
+        style_bg_color="#card_bg" style_bg_opa="255"
+        style_radius="#border_radius" style_pad_all="#space_md"
+        flex_flow="column" style_flex_main_place="start" style_flex_cross_place="center"
+        style_pad_gap="#space_sm" scrollable="false">
+    <!-- Title -->
+    <text_heading name="modal_title" text="Run Macro" style_text_align="center" width="100%"/>
+    <!-- Macro name subtitle -->
+    <text_body name="modal_subtitle" text="" style_text_align="center" width="100%"
+               style_text_opa="180"/>
+    <!-- Divider -->
+    <lv_obj width="100%" height="1" style_bg_color="#text_muted" style_bg_opa="38"
+            style_pad_all="0" scrollable="false"/>
+    <!-- Scrollable param list container -->
+    <lv_obj name="param_list" width="100%" height="content" max_height="200"
+            flex_flow="column" style_pad_all="0" style_pad_gap="#space_sm"
+            scrollable="true"/>
+    <!-- Button row -->
+    <modal_button_row primary_text="Run" primary_callback="macro_param_modal_run_cb"
+                      secondary_text="Cancel" secondary_callback="macro_param_modal_cancel_cb"/>
+  </view>
+</component>

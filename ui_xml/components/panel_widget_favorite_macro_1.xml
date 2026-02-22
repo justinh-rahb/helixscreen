@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<!-- Copyright (C) 2025-2026 356C LLC -->
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<component>
+  <view name="panel_widget_favorite_macro_1" extends="lv_obj"
+        height="100%" flex_grow="1" style_pad_all="0" scrollable="false"
+        flex_flow="column" style_flex_main_place="center"
+        style_flex_cross_place="center" style_flex_track_place="center"
+        clickable="true">
+    <bind_state_if_not_eq subject="printer_connection_state" state="disabled" ref_value="2"/>
+    <event_cb trigger="clicked" callback="favorite_macro_1_clicked_cb"/>
+    <event_cb trigger="long_pressed" callback="favorite_macro_1_long_press_cb"/>
+    <!-- Icon -->
+    <icon name="fav_macro_icon" src="play" size="xs" variant="secondary"
+          clickable="false" event_bubble="true"/>
+    <!-- Macro name label -->
+    <text_tiny name="fav_macro_name" text="Configure" style_text_align="center"
+              long_mode="dots" width="100%"
+              clickable="false" event_bubble="true"/>
+  </view>
+</component>

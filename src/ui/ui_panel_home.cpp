@@ -25,6 +25,7 @@
 #include "config.h"
 #include "display_settings_manager.h"
 #include "ethernet_manager.h"
+#include "favorite_macro_widget.h"
 #include "filament_sensor_manager.h"
 #include "format_utils.h"
 #include "injection_point_manager.h"
@@ -202,6 +203,11 @@ void HomePanel::init_subjects() {
         {"temp_stack_bed_cb", helix::TempStackWidget::temp_stack_bed_cb},
         {"thermistor_clicked_cb", helix::ThermistorWidget::thermistor_clicked_cb},
         {"thermistor_picker_backdrop_cb", helix::ThermistorWidget::thermistor_picker_backdrop_cb},
+        {"favorite_macro_1_clicked_cb", helix::FavoriteMacroWidget::clicked_1_cb},
+        {"favorite_macro_1_long_press_cb", helix::FavoriteMacroWidget::long_press_1_cb},
+        {"favorite_macro_2_clicked_cb", helix::FavoriteMacroWidget::clicked_2_cb},
+        {"favorite_macro_2_long_press_cb", helix::FavoriteMacroWidget::long_press_2_cb},
+        {"fav_macro_picker_backdrop_cb", helix::FavoriteMacroWidget::picker_backdrop_cb},
     });
 
     // Subscribe to AmsState slot_count to show/hide AMS indicator

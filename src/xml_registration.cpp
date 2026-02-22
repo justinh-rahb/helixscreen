@@ -258,7 +258,11 @@ void register_xml_components() {
     register_xml("components/panel_widget_filament.xml");
     register_xml("components/panel_widget_thermistor.xml");
     register_xml("components/panel_widget_fan_stack.xml");
+    register_xml("components/panel_widget_favorite_macro_1.xml");
+    register_xml("components/panel_widget_favorite_macro_2.xml");
     register_xml("thermistor_sensor_picker.xml");
+    register_xml("favorite_macro_picker.xml");
+    register_xml("macro_param_modal.xml");
 
     // Main navigation and panels
     register_xml("navigation_bar.xml");
