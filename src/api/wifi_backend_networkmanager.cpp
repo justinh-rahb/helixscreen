@@ -529,6 +529,7 @@ void WifiBackendNetworkManager::connect_thread_func(std::string ssid, std::strin
         spdlog::error("[WifiBackend] NM: Fork failed: {}", strerror(errno));
         if (connect_active_) {
             fire_event("DISCONNECTED", "Fork failed");
+            request_status_refresh();
         }
         return;
     }
@@ -577,6 +578,7 @@ void WifiBackendNetworkManager::connect_thread_func(std::string ssid, std::strin
             spdlog::error("[WifiBackend] NM: waitpid error: {}", strerror(errno));
             if (connect_active_) {
                 fire_event("DISCONNECTED", "Internal error");
+                request_status_refresh();
             }
             return;
         } else {
@@ -602,6 +604,7 @@ void WifiBackendNetworkManager::connect_thread_func(std::string ssid, std::strin
     if (timed_out) {
         spdlog::warn("[WifiBackend] NM: Connection to '{}' timed out", ssid);
         fire_event("DISCONNECTED", "Connection timed out");
+        request_status_refresh();
         return;
     }
 
@@ -610,6 +613,7 @@ void WifiBackendNetworkManager::connect_thread_func(std::string ssid, std::strin
     if (exit_code == 0) {
         spdlog::info("[WifiBackend] NM: Connected to '{}'", ssid);
         fire_event("CONNECTED");
+        request_status_refresh();
     } else {
         // nmcli exit codes: 0=success, non-zero=failure
         // Common failures: wrong password, network not found, timeout
@@ -621,6 +625,7 @@ void WifiBackendNetworkManager::connect_thread_func(std::string ssid, std::strin
         } else {
             fire_event("DISCONNECTED", "Connection failed");
         }
+        request_status_refresh();
     }
 }
 
@@ -638,6 +643,7 @@ WiFiError WifiBackendNetworkManager::disconnect_network() {
     // nmcli reports success even if already disconnected
     spdlog::debug("[WifiBackend] NM: Disconnect result: {}", result);
     fire_event("DISCONNECTED");
+    request_status_refresh();
     return WiFiErrorHelper::success();
 }
 
