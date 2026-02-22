@@ -8,10 +8,6 @@
 
 ## Active Lessons
 
-### [L004] [***--|**---] Subject init before create
-- **Uses**: 16 | **Velocity**: 0.5 | **Learned**: 2025-12-14 | **Last**: 2026-02-05 | **Category**: pattern | **Type**: informational
-> 
-
 ### [L008] [**---|-----] Design tokens and semantic widgets
 - **Uses**: 7 | **Velocity**: 0 | **Learned**: 2025-12-14 | **Last**: 2026-01-30 | **Category**: pattern | **Type**: informational
 > No hardcoded colors or spacing. Prefer semantic widgets (ui_card, ui_button, text_*, divider_*) which apply tokens automatically. Don't redundantly specify their built-in defaults (e.g., style_radius on ui_card, button_height on ui_button). See docs/LVGL9_XML_GUIDE.md "Custom Semantic Widgets" for defaults.
@@ -28,8 +24,8 @@
 - **Uses**: 30 | **Velocity**: 4 | **Learned**: 2025-12-14 | **Last**: 2026-02-21 | **Category**: gotcha | **Type**: constraint
 > When adding new XML components, must add lv_xml_component_register_from_file() call in main.cpp. Forgetting causes silent failures
 
-### [L020] [***--|-----] ObserverGuard for cleanup
-- **Uses**: 17 | **Velocity**: 0 | **Learned**: 2025-12-14 | **Last**: 2026-01-14 | **Category**: gotcha | **Type**: constraint
+### [L020] [***--|***--] ObserverGuard for cleanup
+- **Uses**: 18 | **Velocity**: 1 | **Learned**: 2025-12-14 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
 > Use ObserverGuard RAII wrapper for lv_subject observers. Manual observer cleanup is error-prone and causes use-after-free on panel destruction
 
 ### [L021] [*----|-----] Centidegrees for temps
@@ -40,17 +36,9 @@
 - **Uses**: 8 | **Velocity**: 0 | **Learned**: 2025-12-21 | **Last**: 2026-01-30 | **Category**: pattern | **Type**: constraint
 > Text-only buttons: use `align="center"` on child. Icon+text buttons with flex_flow="row": need ALL THREE flex properties - style_flex_main_place="center" (horizontal), style_flex_cross_place="center" (vertical align items), style_flex_track_place="center" (vertical position of row). Missing track_place causes content to sit at top.
 
-### [L029] [*----|-----] LVGL observer callbacks
-- **Uses**: 1 | **Velocity**: 0 | **Learned**: 2025-12-25 | **Last**: 2026-01-01 | **Category**: pattern | **Type**: constraint
-> LVGL observer callbacks use C-style function signatures (lv_observer_t*, lv_subject_t*) - NOT lambdas. Must pass user_data via lv_observer_get_user_data(observer). Also: lv_subject_set_*() from non-main threads must use ui_async_call() to avoid render-phase assertions.
-
 ### [L031] [***--|*****] XML no recompile
-- **Uses**: 24 | **Velocity**: 4.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-21 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 26 | **Velocity**: 6.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
 > XML files are loaded at RUNTIME - never rebuild after XML-only changes. Just relaunch the app. This includes layout changes, styling, bindings, event callbacks - anything in ui_xml/*.xml. Only rebuild when C++ code changes.
-
-### [L036] [*----|-----] Header file documentation
-- **Uses**: 1 | **Velocity**: 0 | **Learned**: 2025-12-28 | **Last**: 2026-01-05 | **Category**: pattern | **Type**: informational
-> Important files have documentation in their header files (include/*.h). Check the header file first when trying to understand a class or module - it often contains usage examples, design rationale, and API documentation.
 
 ### [L039] [*----|-----] Unique XML callback names
 - **Uses**: 2 | **Velocity**: 0 | **Learned**: 2025-12-30 | **Last**: 2026-01-09 | **Category**: pattern | **Type**: constraint
@@ -64,10 +52,6 @@
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2025-12-31 | **Last**: 2025-12-31 | **Category**: pattern | **Type**: informational
 > Multiple bind_flag_if_eq on same object creates independent observers where last one wins (race condition). For 'show only when X=value' logic, use single bind_flag_if_not_eq instead. Example: bind_flag_if_not_eq ref_value="0" shows only when value IS 0.
 
-### [L043] [*----|-----] Sonnet for structural reviews
-- **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-01 | **Last**: 2026-01-21 | **Category**: pattern | **Type**: informational
-> Use Sonnet (not Haiku) for architectural-level code reviews, structural changes, or final comprehensive reviews. Haiku is fine for quick single-file spot-checks with clear pass/fail criteria.
-
 ### [L045] [*----|-----] XML dropdown options use &#10; entities
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-06 | **Last**: 2026-01-23 | **Category**: gotcha | **Type**: constraint
 > LVGL dropdown options in XML use &#10; (newline entity) as separator: options="Auto&#10;3D View&#10;2D Heatmap". NEVER expand &#10; to literal newlines — XML parsers normalize literal newlines in attributes to SPACES (per XML spec), silently breaking all dropdown options into one entry. The format-xml.py correctly round-trips &#10; through lxml, but any tool that writes literal newlines into XML attributes will destroy them.
@@ -76,17 +60,9 @@
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-06 | **Last**: 2026-01-30 | **Category**: correction | **Type**: constraint
 > When XML <subjects> declares a subject with the same name as a C++-registered subject (UI_SUBJECT_INIT_AND_REGISTER_*), the XML component-local subject shadows the global C++ one. XML bindings will find the local subject (stuck at default value) instead of the C++ one. Solution: Don't declare XML subjects for values managed entirely by C++.
 
-### [L047] [*----|-----] Claude session forensics
-- **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-08 | **Last**: 2026-01-08 | **Category**: recovery | **Type**: informational
-> Recover lost session content: 1) ~/.claude/history.jsonl has user prompts + session IDs + timestamps, 2) ~/.claude/projects/<url-encoded-path>/<session-id>.jsonl has full transcripts, 3) ~/.claude/plans/ survives /clear. Key grep: -l for filename search, -o to extract JSON fields, pipe through sed 's/\n/\n/g' to decode. Use ls -lt for recency, ls -lS for size (longer sessions).
-
 ### [L048] [*----|-----] Async tests need queue drain
 - **Uses**: 3 | **Velocity**: 0 | **Learned**: 2026-01-08 | **Last**: 2026-01-12 | **Category**: pattern | **Type**: constraint
 > Tests calling async setters (functions using helix::async::invoke or ui_queue_update) must call helix::ui::UpdateQueue::instance().drain_queue_for_testing() before assertions. Without draining, the update is still pending and subjects won't have the new value. See test_printer_state.cpp for examples.
-
-### [L050] [*----|-----] Post-compaction agent recovery
-- **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-08 | **Last**: 2026-01-08 | **Category**: recovery | **Type**: informational
-> When context compacts mid-session, agent outputs are summarized away but full content is preserved in the session JSONL. To recover: 1) Find current session file in ~/.claude/projects/<project>/<session-id>.jsonl (use ls -lt to find most recent), 2) Search for agent outputs: grep "tool_result.*agentId" <file>.jsonl, 3) Search for distinctive keywords from lost work to extract full analysis. The JSONL is append-only so nothing is truly lost - compaction only affects Claude's active context window.
 
 ### [L051] [*----|-----] LVGL timer lifetime safety
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-08 | **Last**: 2026-01-23 | **Category**: gotcha | **Type**: constraint
@@ -141,10 +117,6 @@
 - **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-07 | **Last**: 2026-02-07 | **Category**: build
 > AD5M cross-compilation uses 'make ad5m-docker' (Docker-based ARM cross-compile), NOT 'make pi-test' (which targets Raspberry Pi). Deploy with 'AD5M_HOST=192.168.1.67 make ad5m-deploy'. The pi-test target is for a different device entirely.
 
-### [L063] [**---|*****] Check staging area before commit
-- **Uses**: 5 | **Velocity**: 5 | **Learned**: 2026-02-08 | **Last**: 2026-02-22 | **Category**: git
-> Run 'git status' before committing to verify no unexpected files are already staged from prior work. 'git add file1 file2' ADDS to the index but doesn't REPLACE it - pre-staged files from previous sessions will silently be included in the commit.
-
 ### [L064] [*----|***--] Commit generated translation artifacts
 - **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-10 | **Last**: 2026-02-21 | **Category**: i18n
 > After syncing translation YAML files, must also regenerate and commit the compiled artifacts: src/generated/lv_i18n_translations.c, src/generated/lv_i18n_translations.h, and ui_xml/translations/translations.xml. These are tracked in git (not gitignored) for cross-compilation support. The build regenerates them automatically, but they won't be staged unless you explicitly add them.
@@ -181,8 +153,8 @@
 - **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-22 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
 > Callbacks passed to execute_gcode(), send_jsonrpc(), or any Moonraker API call fire from the WebSocket thread AFTER the widget/panel may be destroyed. NEVER capture [this] — use weak_ptr<bool> alive guard or capture value copies only. Pattern: `std::weak_ptr<bool> weak = alive_; api->call([weak, name_copy]() { if (weak.expired()) return; ... });`
 
-### [L073] [*----|***--] ObserverGuard release vs reset
-- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-22 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
+### [L073] [*----|****-] ObserverGuard release vs reset
+- **Uses**: 2 | **Velocity**: 2 | **Learned**: 2026-02-22 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
 > Use obs.reset() when subjects are ALIVE (normal cleanup, repopulate) — properly unsubscribes. Use obs.release() ONLY when subjects may already be DESTROYED (shutdown, pre-deinit) — avoids double-free. Wrong choice = crash: reset() on dead subject = double-free, release() on live subject = dangling observer = use-after-free.
 
 ### [L074] [*----|***--] Generation counter for deferred observer callbacks

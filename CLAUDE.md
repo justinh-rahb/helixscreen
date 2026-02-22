@@ -2,7 +2,7 @@
 
 ## Quick Start
 
-**HelixScreen**: LVGL 9.5 touchscreen UI for Klipper 3D printers. XML engine in `lib/helix-xml/`. Pattern: XML → Subjects → C++.
+**HelixScreen**: LVGL 9.4 touchscreen UI for Klipper 3D printers. XML engine in `lib/lvgl/src/xml/`. Pattern: XML → Subjects → C++.
 
 ```bash
 make -j                              # Build ONLY the program binary (NOT tests)
@@ -18,8 +18,6 @@ make pi-test                         # Build on thelio + deploy + run
 scripts/setup-worktree.sh feature/my-branch  # Symlinks deps, builds fast
 ```
 
-**Nav panels:** home, print-select, controls, filament, settings, advanced
-**Overlays:** motion, print-status, console, bed-mesh, input-shaper, macros, spoolman, spool-wizard, ams, pid-calibration, zoffset-calibration, screws-tilt, history-dashboard, history-list, power, notification-history
 **Screenshots:** Press 'S' in UI, or `./scripts/screenshot.sh helix-screen output-name [panel]`
 
 ---
@@ -120,13 +118,12 @@ void MyState::init_subjects() {
 
 | Pattern | Key Point |
 |---------|-----------|
-| **Subject self-registration** | **init_subjects() MUST self-register with StaticSubjectRegistry** (see below) |
 | Subject init order | Register components → init subjects → create XML |
 | Widget lookup | `lv_obj_find_by_name()` not `lv_obj_get_child()` |
 | Overlays | `ui_nav_push_overlay()`/`ui_nav_go_back()` |
 | Modals (simple) | `Modal::show("component_name")` / `Modal::hide(dialog)` |
 | Modals (subclass) | Extend `Modal`, implement `get_name()` + `component_name()`, override `on_ok()`/`on_cancel()` |
-| Confirmation dialog | `ui_modal_show_confirmation(title, msg, severity, btn_text, on_confirm, on_cancel, data)` |
+| Confirmation dialog | `modal_show_confirmation(title, msg, severity, btn_text, on_confirm, on_cancel, data)` (in `helix::ui`) |
 | Modal buttons (XML) | `<modal_button_row primary_text="Save" primary_callback="on_save"/>` |
 
 ---
@@ -141,9 +138,8 @@ void MyState::init_subjects() {
 **Key directories**:
 | Path | Contents |
 |------|----------|
-| `src/ui/panels/` | Panel classes (HomePanel, SettingsPanel, etc.) |
-| `src/ui/overlays/` | Overlay classes (MotionOverlay, AmsPanel, etc.) |
-| `src/ui/modals/` | Modal dialogs (extend `Modal`) |
+| `src/ui/` | All UI code — flat dir, prefixed: `ui_panel_*.cpp`, `ui_overlay_*.cpp`, `ui_modal*.cpp` |
+| `src/ui/modals/` | Additional modal implementations |
 | `src/printer/` | PrinterState, MoonrakerAPI, macro/filament managers |
 | `src/system/` | Config, settings, update checker, sound, telemetry |
 | `src/application/` | App lifecycle, display, input, runtime config |
@@ -162,12 +158,6 @@ void MyState::init_subjects() {
 Trust debug output. Impossible values = bug is UPSTREAM. Ask "what ELSE?" not "did first fix work?"
 
 **Debug bundles**: `./scripts/debug-bundle.sh <SHARE_CODE> --save` to download. Save to `/tmp/` for investigation (not in repo).
-
----
-
-## Tool Fallbacks
-
-When the internal WebFetch tool fails, fall back to `curl` via Bash.
 
 ---
 
