@@ -25,6 +25,13 @@ class PanelWidget {
     /// Called before widget destruction. Clean up observers and state.
     virtual void detach() = 0;
 
+    /// Called after attach() with the number of widgets sharing this row.
+    /// Widgets can use this to adjust font sizes or layout density.
+    /// Default is no-op.
+    virtual void set_row_density(size_t widgets_in_row) {
+        (void)widgets_in_row;
+    }
+
     /// Stable identifier matching PanelWidgetDef::id
     virtual const char* id() const = 0;
 };

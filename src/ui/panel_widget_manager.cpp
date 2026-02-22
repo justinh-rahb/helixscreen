@@ -169,6 +169,7 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
                     auto hw = def->factory();
                     if (hw) {
                         hw->attach(widget, lv_scr_act());
+                        hw->set_row_density(count);
                         result.push_back(std::move(hw));
                     }
                 }

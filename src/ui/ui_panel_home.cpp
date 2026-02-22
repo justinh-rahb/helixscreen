@@ -133,6 +133,7 @@ HomePanel::~HomePanel() {
     // already be freed. Clear unconditionally — deinit_subjects() may have been
     // skipped if subjects_initialized_ was already false from a prior call.
     helix::PanelWidgetManager::instance().clear_gate_observers("home");
+    helix::PanelWidgetManager::instance().unregister_rebuild_callback("home");
 
     // Detach active PanelWidget instances
     for (auto& w : active_widgets_) {
@@ -333,6 +334,10 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     // capabilities change (e.g. power devices discovered after startup).
     // Also observe klippy_state for firmware_restart conditional injection.
     setup_widget_gate_observers();
+
+    // Register rebuild callback so settings overlay toggle changes take effect immediately
+    helix::PanelWidgetManager::instance().register_rebuild_callback(
+        "home", [this]() { populate_widgets(); });
 
     // Start tip rotation timer (60 seconds = 60000ms)
     if (!tip_rotation_timer_) {

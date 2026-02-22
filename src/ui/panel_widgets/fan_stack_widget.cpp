@@ -14,6 +14,7 @@
 #include "panel_widget_registry.h"
 #include "printer_fan_state.h"
 #include "printer_state.h"
+#include "theme_manager.h"
 #include "ui/fan_spin_animation.h"
 
 #include <spdlog/spdlog.h>
@@ -118,6 +119,45 @@ void FanStackWidget::detach() {
     aux_icon_ = nullptr;
 
     spdlog::debug("[FanStackWidget] Detached");
+}
+
+void FanStackWidget::set_row_density(size_t widgets_in_row) {
+    if (!widget_obj_)
+        return;
+
+    // Use larger font when row has more space (≤4 widgets)
+    const char* font_token = (widgets_in_row <= 4) ? "font_small" : "font_xs";
+    const lv_font_t* font = theme_manager_get_font(font_token);
+    if (!font)
+        return;
+
+    // Apply to all speed labels and name labels
+    for (auto* label : {part_label_, hotend_label_, aux_label_}) {
+        if (label)
+            lv_obj_set_style_text_font(label, font, 0);
+    }
+
+    // Name labels — use fuller abbreviations when space allows
+    bool spacious = (widgets_in_row <= 4);
+    struct NameMapping {
+        const char* obj_name;
+        const char* compact;  // 5+ widgets per row
+        const char* spacious; // ≤4 widgets per row
+    };
+    static constexpr NameMapping name_map[] = {
+        {"fan_stack_part_name", "P", "Part"},
+        {"fan_stack_hotend_name", "H", "HE"},
+        {"fan_stack_aux_name", "C", "Chm"},
+    };
+    for (const auto& m : name_map) {
+        lv_obj_t* lbl = lv_obj_find_by_name(widget_obj_, m.obj_name);
+        if (lbl) {
+            lv_obj_set_style_text_font(lbl, font, 0);
+            lv_label_set_text(lbl, spacious ? m.spacious : m.compact);
+        }
+    }
+
+    spdlog::debug("[FanStackWidget] Row density {} -> font {}", widgets_in_row, font_token);
 }
 
 void FanStackWidget::bind_fans() {

@@ -24,7 +24,7 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     {"width_sensor",     "Width Sensor",      "ruler",            "Filament width sensor readings",               "Width Sensor",     "width_sensor_count"},
     {"probe",            "Probe",             "target",           "Z probe status and offset",                    "Probe",            "probe_count"},
     {"filament",         "Filament Sensor",   "filament_alert",   "Filament runout detection status",             "Filament Sensor",  "filament_sensor_count"},
-    {"fan_stack",        "Fan Speeds",        "fan",              "Part, hotend, and auxiliary fan speeds",        "Fan Speeds",       nullptr,             false},
+    {"fan_stack",        "Fan Speeds",        "fan",              "Part, hotend, and auxiliary fan speeds",        "Fan Speeds",       nullptr},
     {"thermistor",       "Thermistor",        "thermometer",      "Monitor a custom temperature sensor",          "Thermistor",       "temp_sensor_count", false},
     {"favorite_macro_1", "Macro Button 1",    "play",             "Run a configured macro with one tap",          "Macro Button 1",   nullptr,             false},
     {"favorite_macro_2", "Macro Button 2",    "play",             "Run a configured macro with one tap",          "Macro Button 2",   nullptr,             false},
