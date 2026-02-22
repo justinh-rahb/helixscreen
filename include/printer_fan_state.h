@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "ui_observer_guard.h" // SubjectLifetime
+
 #include "subject_managed_panel.h"
 
 #include <lvgl.h>
@@ -112,14 +114,23 @@ class PrinterFanState {
     }
 
     /**
-     * @brief Get speed subject for a specific fan
+     * @brief Get speed subject for a specific fan (dynamic — requires lifetime token!)
      *
      * Returns the per-fan speed subject for reactive UI updates.
      * Each fan discovered via init_fans() has its own subject.
      *
+     * IMPORTANT: These are dynamic subjects that may be destroyed during reconnection.
+     * Always pass the returned lifetime token to your observer factory function
+     * to prevent use-after-free crashes. See ui_observer_guard.h for details.
+     *
      * @param object_name Moonraker object name (e.g., "fan", "heater_fan hotend_fan")
+     * @param[out] lifetime Receives the subject's lifetime token (empty if not found)
      * @return Pointer to subject, or nullptr if fan not found
      */
+    lv_subject_t* get_fan_speed_subject(const std::string& object_name, SubjectLifetime& lifetime);
+
+    /// @deprecated Use the overload that returns a SubjectLifetime token.
+    /// This overload exists only for call sites that don't create observers.
     lv_subject_t* get_fan_speed_subject(const std::string& object_name);
 
     /**
@@ -151,6 +162,9 @@ class PrinterFanState {
 
     // Dynamic per-fan subjects (unique_ptr prevents invalidation on rehash)
     std::unordered_map<std::string, std::unique_ptr<lv_subject_t>> fan_speed_subjects_;
+    // Lifetime tokens for dynamic fan subjects — destroyed when subject is deinited,
+    // expiring weak_ptrs in ObserverGuards to prevent use-after-free.
+    std::unordered_map<std::string, SubjectLifetime> fan_speed_lifetimes_;
 
     // Fan metadata
     std::vector<FanInfo> fans_;

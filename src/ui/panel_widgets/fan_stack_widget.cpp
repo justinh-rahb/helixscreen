@@ -174,31 +174,37 @@ void FanStackWidget::bind_fans() {
 
     // Bind part fan
     if (!part_fan_name_.empty()) {
-        lv_subject_t* subject = printer_state_.get_fan_speed_subject(part_fan_name_);
+        SubjectLifetime lifetime;
+        lv_subject_t* subject = printer_state_.get_fan_speed_subject(part_fan_name_, lifetime);
         if (subject) {
             part_observer_ = helix::ui::observe_int_sync<FanStackWidget>(
-                subject, this, [weak_alive](FanStackWidget* self, int speed) {
+                subject, this,
+                [weak_alive](FanStackWidget* self, int speed) {
                     if (weak_alive.expired())
                         return;
                     self->part_speed_ = speed;
                     self->update_label(self->part_label_, speed);
                     self->update_fan_animation(self->part_icon_, speed);
-                });
+                },
+                lifetime);
         }
     }
 
     // Bind hotend fan
     if (!hotend_fan_name_.empty()) {
-        lv_subject_t* subject = printer_state_.get_fan_speed_subject(hotend_fan_name_);
+        SubjectLifetime lifetime;
+        lv_subject_t* subject = printer_state_.get_fan_speed_subject(hotend_fan_name_, lifetime);
         if (subject) {
             hotend_observer_ = helix::ui::observe_int_sync<FanStackWidget>(
-                subject, this, [weak_alive](FanStackWidget* self, int speed) {
+                subject, this,
+                [weak_alive](FanStackWidget* self, int speed) {
                     if (weak_alive.expired())
                         return;
                     self->hotend_speed_ = speed;
                     self->update_label(self->hotend_label_, speed);
                     self->update_fan_animation(self->hotend_icon_, speed);
-                });
+                },
+                lifetime);
         }
     }
 
@@ -207,16 +213,19 @@ void FanStackWidget::bind_fans() {
         if (aux_row_) {
             lv_obj_remove_flag(aux_row_, LV_OBJ_FLAG_HIDDEN);
         }
-        lv_subject_t* subject = printer_state_.get_fan_speed_subject(aux_fan_name_);
+        SubjectLifetime lifetime;
+        lv_subject_t* subject = printer_state_.get_fan_speed_subject(aux_fan_name_, lifetime);
         if (subject) {
             aux_observer_ = helix::ui::observe_int_sync<FanStackWidget>(
-                subject, this, [weak_alive](FanStackWidget* self, int speed) {
+                subject, this,
+                [weak_alive](FanStackWidget* self, int speed) {
                     if (weak_alive.expired())
                         return;
                     self->aux_speed_ = speed;
                     self->update_label(self->aux_label_, speed);
                     self->update_fan_animation(self->aux_icon_, speed);
-                });
+                },
+                lifetime);
         }
     } else {
         if (aux_row_) {

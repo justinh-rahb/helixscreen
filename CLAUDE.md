@@ -112,6 +112,23 @@ void MyState::init_subjects() {
 
 **Never** register cleanup externally (e.g., in SubjectInitializer). Co-locating init+cleanup prevents forgotten registrations that cause shutdown crashes.
 
+**Dynamic subject lifetime safety (MANDATORY):** Per-fan, per-sensor, and per-extruder subjects are **dynamic** — they can be destroyed and recreated during reconnection/rediscovery. Observing a dynamic subject without a `SubjectLifetime` token causes **use-after-free crashes** when `lv_subject_deinit()` frees observers but `ObserverGuard` still holds a dangling pointer.
+
+| ❌ CRASH | ✅ SAFE |
+|----------|---------|
+| `auto* s = state.get_fan_speed_subject(name);` | `SubjectLifetime lt;` |
+| `obs = observe_int_sync(s, this, handler);` | `auto* s = state.get_fan_speed_subject(name, lt);` |
+| | `obs = observe_int_sync(s, this, handler, lt);` |
+
+**Dynamic subject sources** (always require lifetime token when observing):
+- `PrinterFanState::get_fan_speed_subject(name, lifetime)` — per-fan speeds
+- `TemperatureSensorManager::get_temp_subject(name, lifetime)` — per-sensor temps
+- `PrinterTemperatureState::get_extruder_temp_subject(name, lifetime)` / `get_extruder_target_subject(name, lifetime)` — per-extruder temps
+
+**Static subjects** (singleton lifetime, no token needed): `get_fan_speed_subject()` (no args), `get_bed_temp_subject()`, etc.
+
+See `ui_observer_guard.h` for full documentation of the `SubjectLifetime` pattern.
+
 ---
 
 ## Patterns

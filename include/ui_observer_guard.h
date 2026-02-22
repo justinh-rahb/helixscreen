@@ -3,21 +3,44 @@
 
 /**
  * @file ui_observer_guard.h
- * @brief RAII wrapper for LVGL observer cleanup
+ * @brief RAII wrapper for LVGL observer cleanup with subject lifetime tracking
  *
- * @pattern Guard that removes observer on destruction; release() for pre-destroyed subjects
+ * @pattern Guard that removes observer on destruction; release() for pre-destroyed subjects.
+ *          For dynamic subjects (per-fan, per-sensor, per-extruder), use SubjectLifetime
+ *          tokens to prevent use-after-free when subjects are deinited before observers.
  * @threading Main thread only
- * @gotchas Checks lv_is_initialized() - safe during LVGL shutdown
+ * @gotchas Checks lv_is_initialized() - safe during LVGL shutdown.
+ *          Dynamic subjects MUST provide a SubjectLifetime token — see printer_fan_state.h,
+ *          temperature_sensor_manager.h, printer_temperature_state.h.
  */
 
 #pragma once
 
 #include "lvgl/lvgl.h"
 
+#include <memory>
 #include <utility>
 
 /**
+ * @brief Shared token that tracks whether a dynamic subject is still alive.
+ *
+ * Dynamic subject owners (PrinterFanState, TemperatureSensorManager,
+ * PrinterTemperatureState) create a SubjectLifetime per dynamic subject.
+ * When the subject is deinited, the shared_ptr is destroyed, expiring
+ * all weak_ptr copies held by ObserverGuards. This prevents the guard
+ * from calling lv_observer_remove() on an already-freed observer.
+ *
+ * Static subjects (singleton lifetime) don't need this — pass empty token.
+ */
+using SubjectLifetime = std::shared_ptr<bool>;
+
+/**
  * @brief RAII wrapper for LVGL observers - auto-removes on destruction
+ *
+ * For observers on dynamic subjects, set an alive token via set_alive_token()
+ * or the factory functions. When the token expires (subject deinited), reset()
+ * skips lv_observer_remove() because the observer was already freed by
+ * lv_subject_deinit().
  */
 class ObserverGuard {
   public:
@@ -31,12 +54,16 @@ class ObserverGuard {
     }
 
     ObserverGuard(ObserverGuard&& other) noexcept
-        : observer_(std::exchange(other.observer_, nullptr)) {}
+        : observer_(std::exchange(other.observer_, nullptr)),
+          alive_token_(std::move(other.alive_token_)),
+          has_alive_token_(std::exchange(other.has_alive_token_, false)) {}
 
     ObserverGuard& operator=(ObserverGuard&& other) noexcept {
         if (this != &other) {
             reset();
             observer_ = std::exchange(other.observer_, nullptr);
+            alive_token_ = std::move(other.alive_token_);
+            has_alive_token_ = std::exchange(other.has_alive_token_, false);
         }
         return *this;
     }
@@ -46,13 +73,30 @@ class ObserverGuard {
 
     void reset() {
         if (observer_) {
-            if (lv_is_initialized()) {
+            // If we have a lifetime token and it expired, the subject (and our
+            // observer) was already destroyed by lv_subject_deinit(). Calling
+            // lv_observer_remove() here would be a use-after-free crash.
+            bool subject_dead = has_alive_token_ && alive_token_.expired();
+            if (!subject_dead && lv_is_initialized()) {
                 lv_observer_remove(observer_);
             }
             // If LVGL is already torn down, just release — don't log,
             // as spdlog may also be destroyed during static cleanup
             observer_ = nullptr;
+            alive_token_.reset();
+            has_alive_token_ = false;
         }
+    }
+
+    /**
+     * @brief Attach a subject lifetime token for dynamic subject safety.
+     *
+     * Call this after construction when observing a dynamic subject.
+     * The observer factory functions handle this automatically.
+     */
+    void set_alive_token(const SubjectLifetime& token) {
+        alive_token_ = token;
+        has_alive_token_ = true;
     }
 
     /**
@@ -63,6 +107,8 @@ class ObserverGuard {
      */
     void release() {
         observer_ = nullptr;
+        alive_token_.reset();
+        has_alive_token_ = false;
     }
 
     explicit operator bool() const {
@@ -74,4 +120,7 @@ class ObserverGuard {
 
   private:
     lv_observer_t* observer_ = nullptr;
+    std::weak_ptr<bool> alive_token_; ///< Tracks dynamic subject lifetime
+    bool has_alive_token_ =
+        false; ///< True if alive_token_ was set (distinguishes "never set" from "expired")
 };

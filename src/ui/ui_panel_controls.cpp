@@ -1534,13 +1534,16 @@ void ControlsPanel::subscribe_to_secondary_fan_speeds() {
 
     const uint32_t gen = fan_populate_gen_;
     for (const auto& row : secondary_fan_rows_) {
-        if (auto* subject = printer_state_.get_fan_speed_subject(row.object_name)) {
+        SubjectLifetime lifetime;
+        if (auto* subject = printer_state_.get_fan_speed_subject(row.object_name, lifetime)) {
             secondary_fan_observers_.push_back(observe_int_sync<ControlsPanel>(
-                subject, this, [name = row.object_name, gen](ControlsPanel* self, int speed_pct) {
+                subject, this,
+                [name = row.object_name, gen](ControlsPanel* self, int speed_pct) {
                     if (gen != self->fan_populate_gen_)
                         return; // stale callback — widgets gone
                     self->update_secondary_fan_speed(name, speed_pct);
-                }));
+                },
+                lifetime));
             spdlog::trace("[{}] Subscribed to speed subject for secondary fan '{}'", get_name(),
                           row.object_name);
         }
@@ -1708,14 +1711,16 @@ void ControlsPanel::subscribe_to_secondary_temp_subjects() {
     const uint32_t gen = temp_populate_gen_;
     auto& tsm = helix::sensors::TemperatureSensorManager::instance();
     for (const auto& row : secondary_temp_rows_) {
-        if (auto* subject = tsm.get_temp_subject(row.klipper_name)) {
+        SubjectLifetime lifetime;
+        if (auto* subject = tsm.get_temp_subject(row.klipper_name, lifetime)) {
             secondary_temp_observers_.push_back(observe_int_sync<ControlsPanel>(
                 subject, this,
                 [name = row.klipper_name, gen](ControlsPanel* self, int centidegrees) {
                     if (gen != self->temp_populate_gen_)
                         return; // stale callback — widgets gone
                     self->update_secondary_temp(name, centidegrees);
-                }));
+                },
+                lifetime));
             spdlog::trace("[{}] Subscribed to temp subject for sensor '{}'", get_name(),
                           row.klipper_name);
         }

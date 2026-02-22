@@ -116,8 +116,10 @@ template <typename T> class AnimatedValue {
      * @param subject LVGL subject to observe (must be int type)
      * @param on_display Callback invoked with display value during animation
      * @param config Animation configuration
+     * @param lifetime Optional lifetime token for dynamic subjects (prevents use-after-free)
      */
-    void bind(lv_subject_t* subject, DisplayCallback on_display, AnimatedValueConfig config = {}) {
+    void bind(lv_subject_t* subject, DisplayCallback on_display, AnimatedValueConfig config = {},
+              const SubjectLifetime& lifetime = {}) {
         if (!subject || !on_display) {
             return;
         }
@@ -139,9 +141,11 @@ template <typename T> class AnimatedValue {
         // Create observer for subject changes (immediate - callback only updates animation state,
         // never modifies observer lifecycle)
         observer_ = helix::ui::observe_int_immediate<AnimatedValue<T>>(
-            subject, this, [](AnimatedValue<T>* self, int value) {
+            subject, this,
+            [](AnimatedValue<T>* self, int value) {
                 self->on_subject_changed(static_cast<T>(value));
-            });
+            },
+            lifetime);
     }
 
     /**

@@ -54,7 +54,11 @@ void PrinterFanState::deinit_subjects() {
 
     spdlog::debug("[PrinterFanState] Deinitializing subjects");
 
-    // Deinit per-fan speed subjects (unique_ptr handles memory, we just need to deinit)
+    // Destroy lifetime tokens FIRST — this expires all weak_ptrs in ObserverGuards,
+    // so they won't attempt lv_observer_remove() on the observers we're about to free.
+    fan_speed_lifetimes_.clear();
+
+    // Now safe to deinit subjects (lv_subject_deinit frees attached observers)
     for (auto& [name, subject_ptr] : fan_speed_subjects_) {
         if (subject_ptr) {
             lv_subject_deinit(subject_ptr.get());
@@ -138,7 +142,9 @@ void PrinterFanState::init_fans(const std::vector<std::string>& fan_objects,
     // Build new subject map, reusing existing subjects for fans that persist
     // across reconnections. Only deinit subjects for fans that disappeared.
     std::unordered_map<std::string, std::unique_ptr<lv_subject_t>> new_subjects;
+    std::unordered_map<std::string, SubjectLifetime> new_lifetimes;
     new_subjects.reserve(fan_objects.size());
+    new_lifetimes.reserve(fan_objects.size());
 
     // Store configured fan roles for classification and naming
     roles_ = roles;
@@ -191,16 +197,32 @@ void PrinterFanState::init_fans(const std::vector<std::string>& fan_objects,
             // Reuse — reset value but keep subject alive (observers remain valid)
             lv_subject_set_int(existing->second.get(), 0);
             new_subjects.emplace(obj_name, std::move(existing->second));
+            // Reuse existing lifetime token too (observers still hold valid weak_ptrs)
+            auto lifetime_it = fan_speed_lifetimes_.find(obj_name);
+            if (lifetime_it != fan_speed_lifetimes_.end()) {
+                new_lifetimes.emplace(obj_name, std::move(lifetime_it->second));
+            } else {
+                new_lifetimes.emplace(obj_name, std::make_shared<bool>(true));
+            }
             spdlog::trace("[PrinterFanState] Reused speed subject for fan: {}", obj_name);
         } else {
             auto subject_ptr = std::make_unique<lv_subject_t>();
             lv_subject_init_int(subject_ptr.get(), 0);
             new_subjects.emplace(obj_name, std::move(subject_ptr));
+            new_lifetimes.emplace(obj_name, std::make_shared<bool>(true));
             spdlog::trace("[PrinterFanState] Created speed subject for fan: {}", obj_name);
         }
     }
 
-    // Deinit subjects for fans that no longer exist
+    // Destroy lifetime tokens for orphaned fans FIRST — expires ObserverGuard weak_ptrs
+    for (auto& [name, lifetime] : fan_speed_lifetimes_) {
+        if (new_lifetimes.find(name) == new_lifetimes.end()) {
+            spdlog::trace("[PrinterFanState] Expiring lifetime token for orphaned fan: {}", name);
+            lifetime.reset(); // Expire all weak_ptrs before we free the observers
+        }
+    }
+
+    // Now safe to deinit orphaned subjects (observers already invalidated above)
     for (auto& [name, subject_ptr] : fan_speed_subjects_) {
         if (subject_ptr) {
             spdlog::trace("[PrinterFanState] Deiniting orphaned speed subject for fan: {}", name);
@@ -208,6 +230,7 @@ void PrinterFanState::init_fans(const std::vector<std::string>& fan_objects,
         }
     }
     fan_speed_subjects_ = std::move(new_subjects);
+    fan_speed_lifetimes_ = std::move(new_lifetimes);
 
     // Initialize and bump version to notify UI
     lv_subject_set_int(&fans_version_, lv_subject_get_int(&fans_version_) + 1);
@@ -235,6 +258,20 @@ void PrinterFanState::update_fan_speed(const std::string& object_name, double sp
         }
     }
     // Fan not in list - this is normal during initial status before discovery
+}
+
+lv_subject_t* PrinterFanState::get_fan_speed_subject(const std::string& object_name,
+                                                     SubjectLifetime& lifetime) {
+    auto it = fan_speed_subjects_.find(object_name);
+    if (it != fan_speed_subjects_.end() && it->second) {
+        auto lt = fan_speed_lifetimes_.find(object_name);
+        if (lt != fan_speed_lifetimes_.end()) {
+            lifetime = lt->second;
+        }
+        return it->second.get();
+    }
+    lifetime.reset();
+    return nullptr;
 }
 
 lv_subject_t* PrinterFanState::get_fan_speed_subject(const std::string& object_name) {

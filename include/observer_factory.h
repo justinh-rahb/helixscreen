@@ -318,7 +318,8 @@ struct AsyncLambdaObserverContext {
  * @return ObserverGuard for RAII cleanup
  */
 template <typename Panel, typename Handler>
-ObserverGuard observe_int_sync(lv_subject_t* subject, Panel* panel, Handler&& handler) {
+ObserverGuard observe_int_sync(lv_subject_t* subject, Panel* panel, Handler&& handler,
+                               const SubjectLifetime& lifetime = {}) {
     if (!subject || !panel) {
         return ObserverGuard();
     }
@@ -327,7 +328,7 @@ ObserverGuard observe_int_sync(lv_subject_t* subject, Panel* panel, Handler&& ha
     auto* ctx = new detail::LambdaObserverContext<Panel, DecayedHandler>{
         panel, std::forward<Handler>(handler)};
 
-    return ObserverGuard(
+    ObserverGuard guard(
         subject,
         [](lv_observer_t* obs, lv_subject_t* subj) {
             auto* c = static_cast<detail::LambdaObserverContext<Panel, DecayedHandler>*>(
@@ -344,6 +345,10 @@ ObserverGuard observe_int_sync(lv_subject_t* subject, Panel* panel, Handler&& ha
             }
         },
         ctx);
+    if (lifetime) {
+        guard.set_alive_token(lifetime);
+    }
+    return guard;
 }
 
 /**
@@ -358,7 +363,8 @@ ObserverGuard observe_int_sync(lv_subject_t* subject, Panel* panel, Handler&& ha
  * @tparam Handler Callable type: void(Panel*, int)
  */
 template <typename Panel, typename Handler>
-ObserverGuard observe_int_immediate(lv_subject_t* subject, Panel* panel, Handler&& handler) {
+ObserverGuard observe_int_immediate(lv_subject_t* subject, Panel* panel, Handler&& handler,
+                                    const SubjectLifetime& lifetime = {}) {
     if (!subject || !panel) {
         return ObserverGuard();
     }
@@ -367,7 +373,7 @@ ObserverGuard observe_int_immediate(lv_subject_t* subject, Panel* panel, Handler
     auto* ctx = new detail::LambdaObserverContext<Panel, DecayedHandler>{
         panel, std::forward<Handler>(handler)};
 
-    return ObserverGuard(
+    ObserverGuard guard(
         subject,
         [](lv_observer_t* obs, lv_subject_t* subj) {
             auto* c = static_cast<detail::LambdaObserverContext<Panel, DecayedHandler>*>(
@@ -378,6 +384,10 @@ ObserverGuard observe_int_immediate(lv_subject_t* subject, Panel* panel, Handler
             }
         },
         ctx);
+    if (lifetime) {
+        guard.set_alive_token(lifetime);
+    }
+    return guard;
 }
 
 /**
@@ -438,7 +448,8 @@ ObserverGuard observe_int_async(lv_subject_t* subject, Panel* panel, ValueHandle
  * @tparam Handler Callable: void(Panel*, const char*)
  */
 template <typename Panel, typename Handler>
-ObserverGuard observe_string(lv_subject_t* subject, Panel* panel, Handler&& handler) {
+ObserverGuard observe_string(lv_subject_t* subject, Panel* panel, Handler&& handler,
+                             const SubjectLifetime& lifetime = {}) {
     if (!subject || !panel) {
         return ObserverGuard();
     }
@@ -447,7 +458,7 @@ ObserverGuard observe_string(lv_subject_t* subject, Panel* panel, Handler&& hand
     auto* ctx = new detail::LambdaObserverContext<Panel, DecayedHandler>{
         panel, std::forward<Handler>(handler)};
 
-    return ObserverGuard(
+    ObserverGuard guard(
         subject,
         [](lv_observer_t* obs, lv_subject_t* subj) {
             auto* c = static_cast<detail::LambdaObserverContext<Panel, DecayedHandler>*>(
@@ -463,6 +474,10 @@ ObserverGuard observe_string(lv_subject_t* subject, Panel* panel, Handler&& hand
             }
         },
         ctx);
+    if (lifetime) {
+        guard.set_alive_token(lifetime);
+    }
+    return guard;
 }
 
 /**
@@ -475,7 +490,8 @@ ObserverGuard observe_string(lv_subject_t* subject, Panel* panel, Handler&& hand
  * @tparam Handler Callable: void(Panel*, const char*)
  */
 template <typename Panel, typename Handler>
-ObserverGuard observe_string_immediate(lv_subject_t* subject, Panel* panel, Handler&& handler) {
+ObserverGuard observe_string_immediate(lv_subject_t* subject, Panel* panel, Handler&& handler,
+                                       const SubjectLifetime& lifetime = {}) {
     if (!subject || !panel) {
         return ObserverGuard();
     }
@@ -484,7 +500,7 @@ ObserverGuard observe_string_immediate(lv_subject_t* subject, Panel* panel, Hand
     auto* ctx = new detail::LambdaObserverContext<Panel, DecayedHandler>{
         panel, std::forward<Handler>(handler)};
 
-    return ObserverGuard(
+    ObserverGuard guard(
         subject,
         [](lv_observer_t* obs, lv_subject_t* subj) {
             auto* c = static_cast<detail::LambdaObserverContext<Panel, DecayedHandler>*>(
@@ -497,6 +513,10 @@ ObserverGuard observe_string_immediate(lv_subject_t* subject, Panel* panel, Hand
             }
         },
         ctx);
+    if (lifetime) {
+        guard.set_alive_token(lifetime);
+    }
+    return guard;
 }
 
 /**

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "ui_observer_guard.h" // SubjectLifetime
+
 #include "lvgl.h"
 #include "sensor_registry.h"
 #include "subject_managed_panel.h"
@@ -61,8 +63,13 @@ class TemperatureSensorManager : public ISensorManager {
     struct DynamicIntSubject {
         lv_subject_t subject{};
         bool initialized = false;
+        SubjectLifetime lifetime; ///< Alive token for ObserverGuard safety
 
         ~DynamicIntSubject() {
+            // Expire lifetime token BEFORE deiniting subject — this invalidates
+            // all ObserverGuard weak_ptrs so they won't call lv_observer_remove()
+            // on the observers that lv_subject_deinit() is about to free.
+            lifetime.reset();
             if (initialized && lv_is_initialized()) {
                 lv_subject_deinit(&subject);
             }
@@ -194,10 +201,19 @@ class TemperatureSensorManager : public ISensorManager {
     // ========================================================================
 
     /**
-     * @brief Get dynamic subject for a specific sensor's temperature
+     * @brief Get dynamic subject for a specific sensor's temperature (with lifetime token)
+     *
+     * IMPORTANT: When creating observers on this subject, always use the returned
+     * lifetime token to prevent use-after-free during sensor rediscovery.
+     *
      * @param klipper_name Full Klipper object name
+     * @param[out] lifetime Receives the subject's lifetime token
      * @return Subject (int: centidegrees), or nullptr if sensor unknown
      */
+    [[nodiscard]] lv_subject_t* get_temp_subject(const std::string& klipper_name,
+                                                 SubjectLifetime& lifetime);
+
+    /// @brief Get dynamic subject without lifetime token (only for non-observer uses)
     [[nodiscard]] lv_subject_t* get_temp_subject(const std::string& klipper_name);
 
     /**

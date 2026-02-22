@@ -10,6 +10,7 @@
 #include "ui_notification.h"
 
 #include "app_globals.h"
+#include "display_settings_manager.h"
 #include "format_utils.h"
 #include "lvgl/src/xml/lv_xml.h"
 #include "moonraker_api.h"
@@ -20,6 +21,11 @@
 #include <cstdio>
 
 using namespace helix;
+
+/// Minimum spin duration at 100% fan speed (ms per full rotation)
+static constexpr uint32_t MIN_SPIN_DURATION_MS = 600;
+/// Maximum spin duration at ~1% fan speed (slow crawl)
+static constexpr uint32_t MAX_SPIN_DURATION_MS = 6000;
 
 // ============================================================================
 // GLOBAL INSTANCE
@@ -116,6 +122,15 @@ void FanControlOverlay::on_activate() {
             });
     }
 
+    // Observe animation setting changes to refresh spin animations
+    anim_settings_observer_ = observe_int_sync<FanControlOverlay>(
+        DisplaySettingsManager::instance().subject_animations_enabled(), this,
+        [](FanControlOverlay* self, int /* enabled */) {
+            if (self->is_visible()) {
+                self->refresh_all_auto_fan_animations();
+            }
+        });
+
     // Subscribe to per-fan speed subjects for reactive updates
     subscribe_to_fan_speeds();
 
@@ -130,6 +145,7 @@ void FanControlOverlay::on_deactivate() {
 
     // Unsubscribe from all observers
     fans_observer_.reset();
+    anim_settings_observer_.reset();
     unsubscribe_from_fan_speeds();
 
     spdlog::debug("[{}] Deactivated", get_name());
@@ -139,7 +155,12 @@ void FanControlOverlay::cleanup() {
     spdlog::debug("[{}] Cleanup", get_name());
     // Clear observers first (they reference this object)
     fans_observer_.reset();
+    anim_settings_observer_.reset();
     unsubscribe_from_fan_speeds();
+    // Stop spin animations before clearing cards
+    for (auto& card : auto_fan_cards_) {
+        stop_spin(card.fan_icon);
+    }
     // Clear widget tracking vectors (widgets will be destroyed by OverlayBase::cleanup)
     animated_fan_dials_.clear();
     auto_fan_cards_.clear();
@@ -210,10 +231,27 @@ void FanControlOverlay::populate_fans() {
                 // Find arc for live updates
                 lv_obj_t* arc = lv_obj_find_by_name(card, "dial_arc");
 
+                // Find fan icon for spin animation
+                lv_obj_t* fan_icon = lv_obj_find_by_name(card, "fan_icon");
+                if (fan_icon) {
+                    lv_obj_set_style_transform_pivot_x(fan_icon, LV_PCT(50), 0);
+                    lv_obj_set_style_transform_pivot_y(fan_icon, LV_PCT(50), 0);
+                }
+
                 // Attach auto-resize for dynamic arc scaling
                 helix::ui::fan_arc_attach_auto_resize(card);
 
-                auto_fan_cards_.push_back({fan.object_name, card, speed_label, arc});
+                AutoFanCard afc;
+                afc.object_name = fan.object_name;
+                afc.card = card;
+                afc.speed_label = speed_label;
+                afc.arc = arc;
+                afc.fan_icon = fan_icon;
+                afc.last_speed_pct = fan.speed_percent;
+                auto_fan_cards_.push_back(std::move(afc));
+
+                // Start spin animation if fan is running
+                update_auto_fan_animation(auto_fan_cards_.back(), fan.speed_percent);
 
                 spdlog::trace("[{}] Created fan_status_card for '{}' ({}%)", get_name(),
                               fan.display_name, fan.speed_percent);
@@ -248,6 +286,8 @@ void FanControlOverlay::update_fan_speeds() {
                 if (card_info.arc) {
                     lv_arc_set_value(card_info.arc, fan.speed_percent);
                 }
+                // Update fan icon spin animation
+                update_auto_fan_animation(card_info, fan.speed_percent);
                 break;
             }
         }
@@ -288,14 +328,16 @@ void FanControlOverlay::subscribe_to_fan_speeds() {
 
     // Bind AnimatedValue for each FanDial - provides smooth animation when speed changes
     for (auto& afd : animated_fan_dials_) {
-        if (auto* subject = printer_state_.get_fan_speed_subject(afd.object_name)) {
+        SubjectLifetime lifetime;
+        if (auto* subject = printer_state_.get_fan_speed_subject(afd.object_name, lifetime)) {
             FanDial* dial_ptr = afd.dial.get();
             // 2% threshold to avoid micro-updates
             helix::ui::AnimatedValueConfig anim_config;
             anim_config.duration_ms = 300;
             anim_config.threshold = 2;
             afd.animation.bind(
-                subject, [dial_ptr](int percent) { dial_ptr->set_speed(percent); }, anim_config);
+                subject, [dial_ptr](int percent) { dial_ptr->set_speed(percent); }, anim_config,
+                lifetime);
             spdlog::trace("[{}] Bound AnimatedValue for '{}'", get_name(), afd.object_name);
         }
     }
@@ -303,13 +345,16 @@ void FanControlOverlay::subscribe_to_fan_speeds() {
     // Subscribe to auto fan subjects using observer factory (deferred, no animation)
     fan_speed_observers_.reserve(auto_fan_cards_.size());
     for (const auto& card : auto_fan_cards_) {
-        if (auto* subject = printer_state_.get_fan_speed_subject(card.object_name)) {
+        SubjectLifetime lifetime;
+        if (auto* subject = printer_state_.get_fan_speed_subject(card.object_name, lifetime)) {
             fan_speed_observers_.push_back(observe_int_sync<FanControlOverlay>(
-                subject, this, [](FanControlOverlay* self, int /*speed*/) {
+                subject, this,
+                [](FanControlOverlay* self, int /*speed*/) {
                     if (self->is_visible()) {
                         self->update_fan_speeds();
                     }
-                }));
+                },
+                lifetime));
             spdlog::trace("[{}] Subscribed to auto fan subject for '{}'", get_name(),
                           card.object_name);
         }
@@ -329,4 +374,60 @@ void FanControlOverlay::unsubscribe_from_fan_speeds() {
     fan_speed_observers_.clear();
 
     spdlog::trace("[{}] Unsubscribed from fan speed subjects", get_name());
+}
+
+// ============================================================================
+// FAN ICON SPIN ANIMATION
+// ============================================================================
+
+void FanControlOverlay::update_auto_fan_animation(AutoFanCard& card, int speed_pct) {
+    card.last_speed_pct = speed_pct;
+    if (!card.fan_icon)
+        return;
+
+    if (!DisplaySettingsManager::instance().get_animations_enabled() || speed_pct <= 0) {
+        stop_spin(card.fan_icon);
+    } else {
+        start_spin(card.fan_icon, speed_pct);
+    }
+}
+
+void FanControlOverlay::refresh_all_auto_fan_animations() {
+    for (auto& card : auto_fan_cards_) {
+        update_auto_fan_animation(card, card.last_speed_pct);
+    }
+}
+
+void FanControlOverlay::spin_anim_cb(void* var, int32_t value) {
+    lv_obj_set_style_transform_rotation(static_cast<lv_obj_t*>(var), value, 0);
+}
+
+void FanControlOverlay::stop_spin(lv_obj_t* icon) {
+    if (!icon)
+        return;
+    lv_anim_delete(icon, spin_anim_cb);
+    lv_obj_set_style_transform_rotation(icon, 0, 0);
+}
+
+void FanControlOverlay::start_spin(lv_obj_t* icon, int speed_pct) {
+    if (!icon || speed_pct <= 0)
+        return;
+
+    // Scale duration inversely with speed: 100% → MIN, 1% → MAX
+    uint32_t duration =
+        MAX_SPIN_DURATION_MS -
+        static_cast<uint32_t>((MAX_SPIN_DURATION_MS - MIN_SPIN_DURATION_MS) * speed_pct / 100);
+
+    // Delete existing animation and restart with new duration
+    lv_anim_delete(icon, spin_anim_cb);
+
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, icon);
+    lv_anim_set_exec_cb(&anim, spin_anim_cb);
+    lv_anim_set_values(&anim, 0, 3600); // 0° to 360° (LVGL uses 0.1° units)
+    lv_anim_set_duration(&anim, duration);
+    lv_anim_set_repeat_count(&anim, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_set_path_cb(&anim, lv_anim_path_linear);
+    lv_anim_start(&anim);
 }
