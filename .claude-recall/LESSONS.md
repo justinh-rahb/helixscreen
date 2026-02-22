@@ -104,8 +104,8 @@
 - **Uses**: 4 | **Velocity**: 0 | **Learned**: 2026-01-10 | **Last**: 2026-01-10 | **Category**: gotcha | **Type**: constraint
 > Singleton queues (like UpdateQueue) MUST clear pending callbacks in shutdown(), not just null the timer. Without clearing, stale callbacks remain queued and execute on next init() with pointers to destroyed objects → use-after-free. Pattern: std::queue<T>().swap(pending_) to clear, then null timer.
 
-### [L055] [*----|-----] LVGL pad_all excludes flex gaps
-- **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-10 | **Last**: 2026-01-10 | **Category**: gotcha | **Type**: constraint
+### [L055] [*----|***--] LVGL pad_all excludes flex gaps
+- **Uses**: 2 | **Velocity**: 1 | **Learned**: 2026-01-10 | **Last**: 2026-02-21 | **Category**: gotcha | **Type**: constraint
 > `style_pad_all` only sets edge padding (top/bottom/left/right), NOT inter-item spacing. For zero-gap flex layouts, also need `style_pad_row="0"` (column) or `style_pad_column="0"` (row), or `style_pad_gap="0"` for both.
 
 ### [L056] [*----|-----] lv_subject_t no shallow copy
@@ -120,8 +120,8 @@
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-20 | **Last**: 2026-01-20 | **Category**: pattern | **Type**: constraint
 > Always use lv_obj_safe_delete() instead of raw lv_obj_delete() - it guards against shutdown race conditions by checking lv_is_initialized() and lv_display_get_next() before deletion, and auto-nulls the pointer to prevent use-after-free
 
-### [L060] [*----|*----] Interactive UI testing requires user
-- **Uses**: 1 | **Velocity**: 0.01 | **Learned**: 2026-02-01 | **Last**: 2026-02-02 | **Category**: correction | **Type**: constraint
+### [L060] [*----|***--] Interactive UI testing requires user
+- **Uses**: 2 | **Velocity**: 1.01 | **Learned**: 2026-02-01 | **Last**: 2026-02-21 | **Category**: correction | **Type**: constraint
 > NEVER use timed delays expecting automatic navigation. THE EXACT PATTERN THAT WORKS:
 > **Step 1** - Start app with Bash tool using `run_in_background: true`:
 > ```bash
@@ -141,12 +141,12 @@
 - **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-07 | **Last**: 2026-02-07 | **Category**: build
 > AD5M cross-compilation uses 'make ad5m-docker' (Docker-based ARM cross-compile), NOT 'make pi-test' (which targets Raspberry Pi). Deploy with 'AD5M_HOST=192.168.1.67 make ad5m-deploy'. The pi-test target is for a different device entirely.
 
-### [L063] [*----|***--] Check staging area before commit
-- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-08 | **Last**: 2026-02-21 | **Category**: git
+### [L063] [**---|*****] Check staging area before commit
+- **Uses**: 5 | **Velocity**: 5 | **Learned**: 2026-02-08 | **Last**: 2026-02-22 | **Category**: git
 > Run 'git status' before committing to verify no unexpected files are already staged from prior work. 'git add file1 file2' ADDS to the index but doesn't REPLACE it - pre-staged files from previous sessions will silently be included in the commit.
 
-### [L064] [-----|-----] Commit generated translation artifacts
-- **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-10 | **Last**: 2026-02-10 | **Category**: i18n
+### [L064] [*----|***--] Commit generated translation artifacts
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-10 | **Last**: 2026-02-21 | **Category**: i18n
 > After syncing translation YAML files, must also regenerate and commit the compiled artifacts: src/generated/lv_i18n_translations.c, src/generated/lv_i18n_translations.h, and ui_xml/translations/translations.xml. These are tracked in git (not gitignored) for cross-compilation support. The build regenerates them automatically, but they won't be staged unless you explicitly add them.
 
 ### [L065] [-----|-----] No test-only methods on production classes
@@ -173,7 +173,27 @@
 - **Uses**: 2 | **Velocity**: 1 | **Learned**: 2026-02-21 | **Last**: 2026-02-21 | **Category**: ui | **Type**: constraint
 > When a parent view has an event_cb for "clicked", all child objects (lv_obj, icon, text_body, text_tiny, etc.) must have `clickable="false" event_bubble="true"` or they absorb the click before it reaches the parent's callback. LVGL objects are clickable by default.
 
-### [L070] [-----|-----] Don't lv_tr() non-translatable strings
-- **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-17 | **Last**: 2026-02-17 | **Category**: i18n
+### [L070] [*----|***--] Don't lv_tr() non-translatable strings
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-17 | **Last**: 2026-02-21 | **Category**: i18n
 > Never wrap product names (Spoolman, Klipper, Moonraker, HelixScreen), URLs/domains, technical abbreviations used as standalone labels (AMS, QGL, ADXL), or universal terms (OK, WiFi) in lv_tr(). Add '// i18n: do not translate' comment explaining why. Sentences CONTAINING product names ARE translatable — 'Restarting HelixScreen...' is fine because 'Restarting' translates. Material names (PLA, PETG, ABS, TPU, PA) also don't get translated or translation_tag in XML.
+
+### [L072] [*----|***--] Never capture bare this in async/WebSocket callbacks
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-22 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
+> Callbacks passed to execute_gcode(), send_jsonrpc(), or any Moonraker API call fire from the WebSocket thread AFTER the widget/panel may be destroyed. NEVER capture [this] — use weak_ptr<bool> alive guard or capture value copies only. Pattern: `std::weak_ptr<bool> weak = alive_; api->call([weak, name_copy]() { if (weak.expired()) return; ... });`
+
+### [L073] [*----|***--] ObserverGuard release vs reset
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-22 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
+> Use obs.reset() when subjects are ALIVE (normal cleanup, repopulate) — properly unsubscribes. Use obs.release() ONLY when subjects may already be DESTROYED (shutdown, pre-deinit) — avoids double-free. Wrong choice = crash: reset() on dead subject = double-free, release() on live subject = dangling observer = use-after-free.
+
+### [L074] [*----|***--] Generation counter for deferred observer callbacks
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-22 | **Last**: 2026-02-22 | **Category**: pattern | **Type**: informational
+> When repopulating dynamic widget lists with observers, bump a generation counter BEFORE cleanup. Capture the counter in observer callbacks and check `if (gen != self->gen_) return;` to skip stale deferred callbacks that fire after the old widgets are deleted. Prevents use-after-free from observe_int_sync's deferred dispatch.
+
+### [L075] [*----|***--] Validate lv_obj before accessing children
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-22 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
+> Before calling lv_obj_find_by_name(), lv_obj_get_child(), or lv_obj_get_child_count() on a cached widget pointer, ensure the pointer is not stale. Use null checks and alive guards (weak_ptr pattern) — NOT lv_obj_is_valid() which is O(n) recursive and can stack overflow on Pi (see L076). Use safe_delete_obj() instead of raw lv_obj_delete() to null pointers after deletion. For async callbacks, use alive guards to detect if the owning panel was destroyed.
+
+### [L076] [*----|***--] NEVER use lv_obj_is_valid() in hot paths
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-22 | **Last**: 2026-02-22 | **Category**: gotcha
+> lv_obj_is_valid() does a RECURSIVE O(n) walk of ALL screens and ALL children via obj_valid_child(). On Pi with thousands of widgets, this causes stack overflow SIGSEGV. NEVER use in: observer callbacks, animation callbacks (pulse_anim_cb), timer callbacks, loops, destructor paths, or safe_delete_obj(). Use simple null pointer checks instead. Only safe in one-shot event handlers (button clicks) where tree is stable and call happens once. This caused a real user crash in v0.10.14 — HeatingIconAnimator::apply_color() called lv_obj_is_valid(icon_) from observer callback during startup, recursed infinitely, SIGSEGV after 1 second.
 
