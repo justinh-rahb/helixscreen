@@ -2400,3 +2400,120 @@ TEST_CASE("AFC slot transitions from LOADED to AVAILABLE on unload", "[ams][afc]
     info = helper.get_system_info();
     REQUIRE(info.get_slot_global(0)->status == SlotStatus::AVAILABLE);
 }
+
+// ============================================================================
+// filament_loaded derived from stepper tool_loaded (no top-level AFC field)
+// ============================================================================
+
+TEST_CASE("AFC filament_loaded derived from stepper tool_loaded", "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_slots_from_discovery();
+
+    // Simulate AFC version without top-level "filament_loaded" field:
+    // only lane stepper data drives loaded state
+    helper.feed_afc_stepper("lane4", {{"tool_loaded", true},
+                                      {"status", "Tooled"},
+                                      {"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"map", "T3"},
+                                      {"material", "ABS"}});
+
+    auto info = helper.get_system_info();
+    REQUIRE(info.filament_loaded);
+    REQUIRE(info.current_slot == 3); // lane4 = slot index 3
+    REQUIRE(info.get_slot_global(3)->status == SlotStatus::LOADED);
+}
+
+TEST_CASE("AFC filament_loaded clears when tool_loaded goes false", "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_slots_from_discovery();
+
+    // Load lane4
+    helper.feed_afc_stepper("lane4", {{"tool_loaded", true},
+                                      {"status", "Tooled"},
+                                      {"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"map", "T3"},
+                                      {"material", "ABS"}});
+
+    auto info = helper.get_system_info();
+    REQUIRE(info.filament_loaded);
+
+    // Unload — tool_loaded goes false
+    helper.feed_afc_stepper("lane4", {{"tool_loaded", false},
+                                      {"status", "Loaded"},
+                                      {"prep", true},
+                                      {"load", true},
+                                      {"loaded_to_hub", true},
+                                      {"map", "T3"},
+                                      {"material", "ABS"}});
+
+    info = helper.get_system_info();
+    REQUIRE_FALSE(info.filament_loaded);
+    REQUIRE(info.get_slot_global(3)->status == SlotStatus::AVAILABLE);
+}
+
+TEST_CASE("AFC current_load fallback sets current_slot and filament_loaded", "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_slots_from_discovery();
+
+    // AFC state with current_load (not current_lane) and no filament_loaded field
+    helper.feed_afc_state({{"current_load", "lane1"},
+                           {"current_state", "Idle"},
+                           {"lanes", {"lane1", "lane2", "lane3", "lane4"}}});
+
+    auto info = helper.get_system_info();
+    REQUIRE(info.current_slot == 0); // lane1 = slot index 0
+    // filament_loaded derived from current_load
+    REQUIRE(info.filament_loaded);
+}
+
+TEST_CASE("AFC explicit filament_loaded not overridden by stepper post-scan",
+          "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_slots_from_discovery();
+
+    // Single notification with both AFC state (explicit filament_loaded=false during
+    // unload transition) and stepper data that still shows tool_loaded=true
+    nlohmann::json params;
+    params["AFC"] = {{"filament_loaded", false}, {"current_state", "Unloading"}};
+    params["AFC_stepper lane1"] = {
+        {"tool_loaded", true}, {"status", "Tooled"}, {"prep", true}, {"load", true}, {"map", "T0"}};
+    helper.feed_status_update(params);
+
+    auto info = helper.get_system_info();
+    // Explicit filament_loaded=false from AFC takes priority over stepper post-scan
+    REQUIRE_FALSE(info.filament_loaded);
+    // But slot status should still reflect the stepper data
+    REQUIRE(info.get_slot_global(0)->status == SlotStatus::LOADED);
+}
+
+TEST_CASE("AFC current_load null clears filament state", "[ams][afc][status]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes(4);
+    helper.initialize_slots_from_discovery();
+
+    // First: loaded via current_load
+    helper.feed_afc_state({{"current_load", "lane1"},
+                           {"current_state", "Idle"},
+                           {"lanes", {"lane1", "lane2", "lane3", "lane4"}}});
+
+    auto info = helper.get_system_info();
+    REQUIRE(info.filament_loaded);
+    REQUIRE(info.current_slot == 0);
+
+    // Then: unloaded — current_load becomes null
+    helper.feed_afc_state({{"current_load", nullptr},
+                           {"current_state", "Idle"},
+                           {"lanes", {"lane1", "lane2", "lane3", "lane4"}}});
+
+    info = helper.get_system_info();
+    REQUIRE_FALSE(info.filament_loaded);
+    REQUIRE(info.current_slot == -1);
+}

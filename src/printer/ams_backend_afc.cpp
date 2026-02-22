@@ -385,6 +385,16 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
 
+        // Check if AFC provides an explicit filament_loaded field — if so, the
+        // post-scan should not override it (newer AFC versions are authoritative)
+        bool has_explicit_filament_loaded = false;
+        if (params.contains("AFC") && params["AFC"].is_object()) {
+            has_explicit_filament_loaded = params["AFC"].contains("filament_loaded");
+        }
+        if (!has_explicit_filament_loaded && params.contains("afc") && params["afc"].is_object()) {
+            has_explicit_filament_loaded = params["afc"].contains("filament_loaded");
+        }
+
         // Parse global AFC state if present
         if (params.contains("AFC") && params["AFC"].is_object()) {
             parse_afc_state(params["AFC"], deferred_error_event);
@@ -399,12 +409,14 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
 
         // Parse AFC_stepper lane objects for sensor states
         // Keys like "AFC_stepper lane1", "AFC_stepper lane2", etc.
+        bool lanes_updated = false;
         for (int i = 0; i < slots_.slot_count(); ++i) {
             std::string lane_name = slots_.name_of(i);
             std::string key = "AFC_stepper " + lane_name;
             if (params.contains(key) && params[key].is_object()) {
                 parse_afc_stepper(lane_name, params[key]);
                 state_changed = true;
+                lanes_updated = true;
             }
         }
 
@@ -416,7 +428,27 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
             if (params.contains(key) && params[key].is_object()) {
                 parse_afc_stepper(lane_name, params[key]);
                 state_changed = true;
+                lanes_updated = true;
             }
+        }
+
+        // After processing lane updates, reconcile filament_loaded from slot
+        // statuses. Only needed on AFC versions that lack an explicit
+        // "filament_loaded" field — when present, parse_afc_state() already set
+        // the authoritative value and the post-scan must not override it.
+        if (lanes_updated && slots_.is_initialized() && !has_explicit_filament_loaded) {
+            bool any_loaded = false;
+            int loaded_slot = -1;
+            for (int i = 0; i < slots_.slot_count(); ++i) {
+                const auto* entry = slots_.get(i);
+                if (entry && entry->info.status == SlotStatus::LOADED) {
+                    any_loaded = true;
+                    loaded_slot = i;
+                    break;
+                }
+            }
+            system_info_.filament_loaded = any_loaded;
+            system_info_.current_slot = any_loaded ? loaded_slot : -1;
         }
 
         // Parse AFC_hub objects for hub sensor state
@@ -477,13 +509,20 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
 
 void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data,
                                     std::string& deferred_error_event) {
-    // Parse current lane (AFC reports this as "current_lane")
+    // Parse current lane — try "current_lane" first, fall back to "current_load"
+    // Some AFC versions use "current_load" instead of "current_lane"
+    std::string loaded_lane;
     if (afc_data.contains("current_lane") && afc_data["current_lane"].is_string()) {
-        std::string lane_name = afc_data["current_lane"].get<std::string>();
-        int slot_index = slots_.index_of(lane_name);
+        loaded_lane = afc_data["current_lane"].get<std::string>();
+    } else if (afc_data.contains("current_load") && afc_data["current_load"].is_string()) {
+        loaded_lane = afc_data["current_load"].get<std::string>();
+    }
+
+    if (!loaded_lane.empty()) {
+        int slot_index = slots_.index_of(loaded_lane);
         if (slot_index >= 0) {
             system_info_.current_slot = slot_index;
-            spdlog::trace("[AMS AFC] Current lane: {} (slot {})", lane_name,
+            spdlog::trace("[AMS AFC] Current lane: {} (slot {})", loaded_lane,
                           system_info_.current_slot);
         }
     }
@@ -494,10 +533,20 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data,
         spdlog::trace("[AMS AFC] Current tool: {}", system_info_.current_tool);
     }
 
-    // Parse filament loaded state
+    // Parse filament loaded state — try explicit field first, derive from current_load
     if (afc_data.contains("filament_loaded") && afc_data["filament_loaded"].is_boolean()) {
         system_info_.filament_loaded = afc_data["filament_loaded"].get<bool>();
         spdlog::trace("[AMS AFC] Filament loaded: {}", system_info_.filament_loaded);
+    } else if (!loaded_lane.empty()) {
+        // AFC versions without "filament_loaded" field: derive from current_load
+        // If a lane is reported as currently loaded, filament is at the toolhead
+        system_info_.filament_loaded = true;
+        spdlog::trace("[AMS AFC] Filament loaded (derived from current_load={})", loaded_lane);
+    } else if (afc_data.contains("current_load") && afc_data["current_load"].is_null()) {
+        // current_load went null (unloaded) — clear filament state
+        system_info_.filament_loaded = false;
+        system_info_.current_slot = -1;
+        spdlog::trace("[AMS AFC] Filament unloaded (current_load=null)");
     }
 
     // Parse action/status
