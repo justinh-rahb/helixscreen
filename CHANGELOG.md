@@ -5,6 +5,13 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.14] - 2026-02-22
+
+### Fixed
+- AFC unload button and context menu now work on AFC firmware versions that don't expose a top-level `filament_loaded` field (e.g., Box Turtle with `lane_data_enabled=false`)
+- AFC `current_load` field parsed as fallback when `current_lane` is absent, fixing loaded lane detection on newer AFC versions
+- Crash-hardened 15 vectors found during 48-hour audit
+
 ## [0.10.13] - 2026-02-22
 
 Crash hardening and new features — favorite macro widgets let you pin and run macros from the home panel, filament controls get dedicated Extrude/Retract buttons, and Wi-Fi status updates are now async and responsive. Under the hood, the MoonrakerAPI monolith has been split into domain-specific modules.
@@ -915,6 +922,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.10.14]: https://github.com/prestonbrown/helixscreen/compare/v0.10.13...v0.10.14
 [0.10.13]: https://github.com/prestonbrown/helixscreen/compare/v0.10.12...v0.10.13
 [0.10.12]: https://github.com/prestonbrown/helixscreen/compare/v0.10.11...v0.10.12
 [0.10.11]: https://github.com/prestonbrown/helixscreen/compare/v0.10.10...v0.10.11
