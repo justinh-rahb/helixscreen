@@ -505,7 +505,7 @@ void icon_subject_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
     lv_obj_t* icon = static_cast<lv_obj_t*>(lv_observer_get_target_obj(observer));
     lv_obj_t* btn = static_cast<lv_obj_t*>(lv_observer_get_user_data(observer));
 
-    if (!icon || !lv_obj_is_valid(icon)) {
+    if (!icon) {
         return;
     }
 
@@ -544,7 +544,7 @@ void icon_subject_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
     }
 
     // Re-apply text contrast if we have the button reference
-    if (btn && lv_obj_is_valid(btn)) {
+    if (btn) {
         update_button_text_contrast(btn);
     }
 }
@@ -611,7 +611,7 @@ void ui_button_apply(lv_xml_parser_state_t* state, const char** attrs) {
                 subject,
                 [](lv_observer_t* obs, lv_subject_t*) {
                     lv_obj_t* parent_btn = static_cast<lv_obj_t*>(lv_observer_get_target_obj(obs));
-                    if (parent_btn && lv_obj_is_valid(parent_btn)) {
+                    if (parent_btn) {
                         helix::ui::async_call(
                             parent_btn,
                             [](void* ud) { lv_obj_invalidate(static_cast<lv_obj_t*>(ud)); },

@@ -116,12 +116,11 @@ void FanStackWidget::detach() {
     anim_settings_observer_.reset();
 
     // Stop any running animations before clearing pointers
-    // Check validity first — parent deletion may have already freed these
-    if (part_icon_ && lv_obj_is_valid(part_icon_))
+    if (part_icon_)
         stop_spin(part_icon_);
-    if (hotend_icon_ && lv_obj_is_valid(hotend_icon_))
+    if (hotend_icon_)
         stop_spin(hotend_icon_);
-    if (aux_icon_ && lv_obj_is_valid(aux_icon_))
+    if (aux_icon_)
         stop_spin(aux_icon_);
 
     widget_obj_ = nullptr;

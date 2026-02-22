@@ -50,11 +50,6 @@ inline void safe_delete_obj(lv_obj_t*& obj) {
         obj = nullptr;
         return;
     }
-    // Guard against double-free if parent already deleted this child
-    if (!lv_obj_is_valid(obj)) {
-        obj = nullptr;
-        return;
-    }
     lv_obj_del(obj);
     obj = nullptr;
 }

@@ -427,7 +427,7 @@ void FilamentPanel::update_nozzle_label() {
 void FilamentPanel::update_all_temps() {
     // Unified update handler for temperature observer bundle.
     // Called on UI thread after any temperature value changes.
-    if (!panel_ || !lv_obj_is_valid(panel_))
+    if (!panel_)
         return;
 
     // Always update current-temp-dependent displays
@@ -602,12 +602,11 @@ void FilamentPanel::update_left_card_temps() {
 
     // Update temperature label colors using 4-state heating logic
     // (matches temp_display widget: gray=off, red=heating, green=at-temp, blue=cooling)
-    // Note: lv_obj_is_valid() guards against async callbacks firing after display destruction
-    if (nozzle_current_label_ && lv_obj_is_valid(nozzle_current_label_)) {
+    if (nozzle_current_label_) {
         lv_color_t nozzle_color = get_heating_state_color(nozzle_current_, nozzle_target_);
         lv_obj_set_style_text_color(nozzle_current_label_, nozzle_color, LV_PART_MAIN);
     }
-    if (bed_current_label_ && lv_obj_is_valid(bed_current_label_)) {
+    if (bed_current_label_) {
         lv_color_t bed_color = get_heating_state_color(bed_current_, bed_target_);
         lv_obj_set_style_text_color(bed_current_label_, bed_color, LV_PART_MAIN);
     }
