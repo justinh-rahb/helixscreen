@@ -876,13 +876,6 @@ void HomePanel::handle_network_clicked() {
 }
 
 void HomePanel::handle_printer_manager_clicked() {
-    // Gate behind beta features flag
-    Config* config = Config::get_instance();
-    if (!config || !config->is_beta_features_enabled()) {
-        spdlog::debug("[{}] Printer Manager requires beta features", get_name());
-        return;
-    }
-
     spdlog::info("[{}] Printer image clicked - opening Printer Manager overlay", get_name());
 
     auto& overlay = get_printer_manager_overlay();
