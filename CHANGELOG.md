@@ -5,6 +5,31 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.13] - 2026-02-22
+
+Crash hardening and new features — favorite macro widgets let you pin and run macros from the home panel, filament controls get dedicated Extrude/Retract buttons, and Wi-Fi status updates are now async and responsive. Under the hood, the MoonrakerAPI monolith has been split into domain-specific modules.
+
+### Added
+- Favorite macro panel widgets with macro picker and automatic parameter detection
+- Extrude and Retract buttons replace Purge on filament page, with configurable speed
+- Wi-Fi status updates respond immediately to connect/disconnect events
+
+### Fixed
+- Multiple crash fixes: glyph null guard, use-after-free in async AMS/telemetry callbacks, SIGSEGV in widget cleanup and render thread race
+- AFC Unload button now re-enables after lane scan detects filament state change
+- Observer generation counters prevent stale callbacks after controls repopulate
+- Unknown CLI arguments warn instead of crash-looping
+- Z-offset tune overlay save bug
+- Macro parameter modal no longer stomps across widget slots
+- Widget picker and overlay cleanup uses safe deletion
+- USB drive callbacks marshaled to main thread to prevent crashes
+- Panel widget padding and font clipping on small screens
+
+### Changed
+- MoonrakerAPI split into 8 domain-specific modules (Job, Motion, File, FileTransfer, Advanced, Rest, Timelapse, History)
+- Wi-Fi backend uses async status polling instead of blocking queries
+- Z-offset utilities extracted into shared module
+
 ## [0.10.12] - 2026-02-21
 
 A stability and polish release focused on crash fixes, responsive UI improvements, and internal refactoring. The home panel widget system is now fully decoupled from HomePanel, keyboard input is more reliable, and several threading bugs have been resolved.
@@ -890,6 +915,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.10.13]: https://github.com/prestonbrown/helixscreen/compare/v0.10.12...v0.10.13
 [0.10.12]: https://github.com/prestonbrown/helixscreen/compare/v0.10.11...v0.10.12
 [0.10.11]: https://github.com/prestonbrown/helixscreen/compare/v0.10.10...v0.10.11
 [0.10.10]: https://github.com/prestonbrown/helixscreen/compare/v0.10.9...v0.10.10
