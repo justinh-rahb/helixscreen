@@ -696,6 +696,26 @@ void ui_button_apply(lv_xml_parser_state_t* state, const char** attrs) {
         }
     }
 
+    // Handle long_mode - set label text truncation mode (dots, clip, scroll, etc.)
+    const char* long_mode = lv_xml_get_value_of(attrs, "long_mode");
+    if (long_mode && data && data->magic == UiButtonData::MAGIC && data->label) {
+        lv_label_long_mode_t mode = LV_LABEL_LONG_MODE_WRAP; // default
+        if (strcmp(long_mode, "dots") == 0)
+            mode = LV_LABEL_LONG_MODE_DOTS;
+        else if (strcmp(long_mode, "clip") == 0)
+            mode = LV_LABEL_LONG_MODE_CLIP;
+        else if (strcmp(long_mode, "scroll") == 0)
+            mode = LV_LABEL_LONG_MODE_SCROLL;
+        else if (strcmp(long_mode, "scroll_circular") == 0)
+            mode = LV_LABEL_LONG_MODE_SCROLL_CIRCULAR;
+        lv_label_set_long_mode(data->label, mode);
+        // Label must have a bounded width for long_mode to take effect
+        lv_obj_set_width(data->label, lv_pct(100));
+        // Center text within the expanded label
+        lv_obj_set_style_text_align(data->label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
+        spdlog::trace("[ui_button] Set long_mode to '{}'", long_mode);
+    }
+
     // If button has a name, give icon a derived name so it can be found
     const char* btn_name = lv_obj_get_name(btn);
     if (btn_name && strlen(btn_name) > 0) {
