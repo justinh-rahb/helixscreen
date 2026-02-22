@@ -799,7 +799,7 @@ Located under the `panel_widgets` key, grouped by panel ID:
       {"id": "width_sensor", "enabled": true},
       {"id": "probe", "enabled": true},
       {"id": "filament", "enabled": true},
-      {"id": "fan_stack", "enabled": false},
+      {"id": "fan_stack", "enabled": true},
       {"id": "thermistor", "enabled": false},
       {"id": "notifications", "enabled": true}
     ]
@@ -832,7 +832,7 @@ Located under the `panel_widgets` key, grouped by panel ID:
 | `width_sensor` | Filament width sensor | Enabled | Yes (requires sensor) |
 | `probe` | Z probe status and offset | Enabled | Yes (requires probe) |
 | `filament` | Filament runout detection | Enabled | Yes (requires sensor) |
-| `fan_stack` | Part, hotend, and auxiliary fan speeds | Disabled | No |
+| `fan_stack` | Part, hotend, and auxiliary fan speeds | Enabled | No |
 | `thermistor` | Custom temperature sensor (chamber, etc.) | Disabled | Yes (requires sensor) |
 | `notifications` | Pending alerts with severity badge | Enabled | No |
 
@@ -1380,7 +1380,7 @@ Environment="HELIX_TOUCH_DEVICE=/dev/input/event0"
       {"id": "probe", "enabled": false},
       {"id": "filament", "enabled": false},
       {"id": "temp_stack", "enabled": false},
-      {"id": "fan_stack", "enabled": false},
+      {"id": "fan_stack", "enabled": true},
       {"id": "thermistor", "enabled": false}
     ]
   },

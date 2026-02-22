@@ -21,13 +21,22 @@ When you need help troubleshooting an issue:
 3. Tap **Upload** to send the bundle securely
 4. Share the resulting code with the HelixScreen team on Discord or GitHub
 
+Debug bundles include:
+
+- **System logs** — recent HelixScreen log output
+- **Configuration** — your settings (sanitized, no passwords or API keys)
+- **System info** — OS version, hardware details, display resolution
+- **Crash data** — if a crash occurred, the crash report and backtrace
+- **Crash history** — past crash submissions with their GitHub issue references (helps support identify recurring issues)
+- **Device identifier** — a double-hashed ID used only for correlating telemetry data (not personally identifiable)
+
 Debug bundles contain only technical information needed for troubleshooting — no passwords, API keys, or personal data.
 
 ---
 
 ## About
 
-Tap **About HelixScreen** to open the About overlay with system information and update management.
+The About section at the bottom of the Settings panel shows system information and update management.
 
 | Item | Description |
 |------|-------------|

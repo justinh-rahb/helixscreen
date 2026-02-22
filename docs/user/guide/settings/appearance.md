@@ -61,12 +61,31 @@ Override with the `--layout` command-line flag if auto-detection picks the wrong
 
 Tap **Home Widgets** to configure which widgets appear on your Home Panel dashboard and in what order.
 
-- **Toggle** individual widgets on or off (maximum 10 enabled)
+- **Toggle** individual widgets on or off (maximum 10 enabled) — changes appear on the Home Panel in real time as you flip each switch
 - **Reorder** by long-pressing the drag handle on any row and dragging it up or down
 - Widgets tied to specific hardware (AMS, humidity sensor, probe, etc.) show "(not detected)" and are disabled if that hardware isn't present
-- Changes apply immediately when you close the overlay
 
-See [Home Panel — Home Widgets](../home-panel.md#home-widgets) for details on each widget.
+### Widget Details
+
+| Widget | Description |
+|--------|-------------|
+| **Power** | Toggle Moonraker power devices. Only appears if power devices are configured. |
+| **Network** | WiFi signal strength or Ethernet status. Disabled by default. |
+| **Firmware Restart** | Restart Klipper firmware with one tap. Always shown in SHUTDOWN state, even if disabled. Disabled by default. |
+| **AMS Status** | Mini view of multi-material spool slots. Only appears if an AMS/MMU system is detected. |
+| **Temperature** | Nozzle temperature with animated heating icon. Tap to open the Temperature panel. |
+| **Temperatures** | Stacked nozzle, bed, and chamber temperatures. Tap the chamber row to open the Chamber Temperature panel. Disabled by default. |
+| **LED Light** | Quick LED toggle. Long-press for full LED Control Overlay. |
+| **Humidity** | Enclosure humidity sensor reading. Only appears if a humidity sensor is detected. |
+| **Width Sensor** | Filament width sensor reading. Only appears if a width sensor is detected. |
+| **Probe** | Z probe status and offset. Only appears if a probe is configured. |
+| **Filament Sensor** | Filament runout detection status. Only appears if a filament sensor is detected. |
+| **Fan Speeds** | Part, hotend, and auxiliary fan speeds. Fan icons spin when running. Labels switch to compact abbreviations (P/H/C) when many widgets are active. Tap to open the Fan Control overlay. |
+| **Thermistor** | Monitor a custom temperature sensor (e.g., chamber, enclosure). Only appears if extra sensors are detected. Disabled by default. |
+| **Macro Button 1–4** | Run a configured macro with one tap. Auto-detects and prompts for parameters. Disabled by default. |
+| **Notifications** | Pending alerts with severity badge. Tap to open notification history. |
+
+See [Home Panel — Home Widgets](../home-panel.md#home-widgets) for more on widget layout and hardware gating.
 
 ---
 

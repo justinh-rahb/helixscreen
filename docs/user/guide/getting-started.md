@@ -95,10 +95,10 @@ The wizard shows signal strength for each network and indicates which one you're
 Enter your Moonraker connection details:
 
 - **Hostname or IP**: Your printer's address (e.g., `voron.local` or `192.168.1.100`)
-- **Port**: Usually `7125` (the default)
+- **Port**: Defaults to `7125` (auto-filled when you tap **Test Connection** if left empty)
 - **API Key**: Only needed if Moonraker requires authentication
 
-Tap **Test Connection** to verify before continuing. HelixScreen auto-discovers printers on your network when possible — tap a discovered printer to auto-fill the connection details.
+Tap **Test Connection** to verify before continuing. If the port field is empty, it auto-fills with the default port `7125`. HelixScreen auto-discovers printers on your network when possible — tap a discovered printer to auto-fill the connection details.
 
 ### Hardware Discovery
 

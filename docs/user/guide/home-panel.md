@@ -36,7 +36,7 @@ Below the status area, the Home Panel displays a row of **configurable widgets**
 | **Width Sensor** | Filament width sensor reading. Only appears if a width sensor is detected. |
 | **Probe** | Z probe status and offset. Only appears if a probe is configured. |
 | **Filament Sensor** | Filament runout detection status. Only appears if a filament sensor is detected. |
-| **Fan Speeds** | Part cooling, hotend, and auxiliary fan speeds at a glance. Disabled by default. |
+| **Fan Speeds** | Part cooling, hotend, and auxiliary fan speeds at a glance. Fan icons spin when the fan is running. When many widgets are active, labels switch to compact abbreviations (P/H/C). Tap to open the Fan Control overlay. |
 | **Thermistor** | Monitor a custom temperature sensor (e.g., chamber, enclosure heater). Only appears if extra temperature sensors are detected. Disabled by default. |
 | **Notifications** | Pending alerts with severity badge. Tap to open notification history. |
 
@@ -53,7 +53,7 @@ To change which widgets appear and their order:
 1. Go to **Settings** → **Home Widgets** (in the Appearance section)
 2. **Toggle** widgets on or off with the switch on each row
 3. **Reorder** by long-pressing the drag handle (arrows icon) on a row and dragging it to a new position
-4. Changes take effect immediately when you leave the overlay
+4. Changes take effect immediately — widgets appear and disappear in real time as you toggle them
 
 To reset to defaults, disable all widgets and re-enable the ones you want, or edit the config file directly (see [Configuration Reference](../CONFIGURATION.md#panel-widget-settings)).
 
