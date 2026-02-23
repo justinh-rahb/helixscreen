@@ -1050,9 +1050,12 @@ void AmsState::sync_current_loaded_from_backend() {
         // Filament is loaded - show slot info from the backend that has it loaded
         SlotInfo slot_info = loaded_backend->get_slot_info(slot_index);
 
-        // Sync Spoolman active spool when slot with spoolman_id is loaded
+        // Sync Spoolman active spool when slot with spoolman_id is loaded.
+        // Skip when the backend manages active spool itself (e.g., AFC calls
+        // spoolman_set_active_spool on tool load/unload natively).
         if (api_ && slot_info.spoolman_id > 0 &&
-            slot_info.spoolman_id != last_synced_spoolman_id_) {
+            slot_info.spoolman_id != last_synced_spoolman_id_ &&
+            !loaded_backend->manages_active_spool()) {
             last_synced_spoolman_id_ = slot_info.spoolman_id;
             spdlog::info("[AMS State] Setting active Spoolman spool to {} (slot {})",
                          slot_info.spoolman_id, slot_index);

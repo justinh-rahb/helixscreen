@@ -1417,3 +1417,12 @@ TEST_CASE("Happy Hare active_unit parsed from status", "[ams][happy_hare][v4][mu
     auto info = helper.get_system_info();
     REQUIRE(info.units.size() == 2);
 }
+
+// ============================================================================
+// manages_active_spool() — Happy Hare does NOT manage Spoolman active spool
+// ============================================================================
+
+TEST_CASE("Happy Hare backend reports manages_active_spool=false", "[ams][happy_hare][spoolman]") {
+    AmsBackendHappyHareTestHelper helper;
+    REQUIRE(helper.manages_active_spool() == false);
+}

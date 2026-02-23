@@ -150,6 +150,19 @@ class AmsBackend {
     [[nodiscard]] virtual AmsType get_type() const = 0;
 
     /**
+     * @brief Whether this backend manages the Spoolman active spool itself
+     *
+     * Some backends (e.g., AFC) call spoolman_set_active_spool on tool
+     * load/unload natively. When true, HelixScreen must NOT call
+     * server.spoolman.post_spool_id to avoid racing with the backend.
+     *
+     * @return true if the backend manages active spool tracking
+     */
+    [[nodiscard]] virtual bool manages_active_spool() const {
+        return false;
+    }
+
+    /**
      * @brief Get information about a specific slot
      * @param slot_index Slot index (0 to total_slots-1)
      * @return SlotInfo struct (copy, safe for caller to hold)

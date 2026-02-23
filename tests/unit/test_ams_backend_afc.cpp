@@ -2517,3 +2517,21 @@ TEST_CASE("AFC current_load null clears filament state", "[ams][afc][status]") {
     REQUIRE_FALSE(info.filament_loaded);
     REQUIRE(info.current_slot == -1);
 }
+
+// ============================================================================
+// manages_active_spool() Tests
+//
+// AFC manages Spoolman's active spool natively (calls spoolman_set_active_spool
+// on tool load/unload). HelixScreen must NOT call set_active_spool when AFC is
+// the active backend, to avoid racing with AFC's own calls.
+// ============================================================================
+
+TEST_CASE("AFC backend reports manages_active_spool=true", "[ams][afc][spoolman]") {
+    AmsBackendAfcTestHelper helper;
+    REQUIRE(helper.manages_active_spool() == true);
+}
+
+TEST_CASE("AFC get_type returns AFC", "[ams][afc][spoolman]") {
+    AmsBackendAfcTestHelper helper;
+    REQUIRE(helper.get_type() == AmsType::AFC);
+}

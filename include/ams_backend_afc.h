@@ -93,6 +93,9 @@ class AmsBackendAfc : public AmsSubscriptionBackend {
     // State queries
     [[nodiscard]] AmsSystemInfo get_system_info() const override;
     [[nodiscard]] AmsType get_type() const override;
+    [[nodiscard]] bool manages_active_spool() const override {
+        return true;
+    }
     [[nodiscard]] SlotInfo get_slot_info(int slot_index) const override;
 
     // Path visualization

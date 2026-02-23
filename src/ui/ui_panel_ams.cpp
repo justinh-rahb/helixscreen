@@ -182,10 +182,11 @@ void AmsPanel::init_subjects() {
             self->update_current_slot_highlight(slot);
             self->update_path_canvas_from_backend();
 
-            // Auto-set active Spoolman spool when slot becomes active
+            // Auto-set active Spoolman spool when slot becomes active.
+            // Skip when the backend manages active spool itself (e.g., AFC).
             if (slot >= 0 && self->api_) {
                 auto* backend = AmsState::instance().get_backend();
-                if (backend) {
+                if (backend && !backend->manages_active_spool()) {
                     SlotInfo slot_info = backend->get_slot_info(slot);
                     if (slot_info.spoolman_id > 0) {
                         spdlog::info(
@@ -380,7 +381,7 @@ void AmsPanel::sync_spoolman_active_spool() {
     }
 
     auto* backend = AmsState::instance().get_backend();
-    if (!backend) {
+    if (!backend || backend->manages_active_spool()) {
         return;
     }
 

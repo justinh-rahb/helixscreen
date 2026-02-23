@@ -517,3 +517,21 @@ TEST_CASE("Mock backend: slot data matches first N Spoolman mock spools",
 
     backend->stop();
 }
+
+// ============================================================================
+// manages_active_spool() — Mock never manages active spool (no real firmware)
+// ============================================================================
+
+TEST_CASE("Mock backend reports manages_active_spool=false", "[ams][mock][spoolman]") {
+    auto backend = std::make_unique<AmsBackendMock>(4);
+    REQUIRE(backend->manages_active_spool() == false);
+}
+
+TEST_CASE("Mock backend in AFC mode still reports manages_active_spool=false",
+          "[ams][mock][spoolman]") {
+    // Mock pretends to be AFC for UI testing but doesn't have real firmware
+    // managing Spoolman, so HelixScreen should still call set_active_spool
+    auto backend = std::make_unique<AmsBackendMock>(4);
+    backend->set_afc_mode(true);
+    REQUIRE(backend->manages_active_spool() == false);
+}
