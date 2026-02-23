@@ -173,6 +173,9 @@ void ams_detail_setup_path_canvas(lv_obj_t* canvas, lv_obj_t* slot_grid, int uni
     // Hub-only mode: only draw slots -> hub, skip downstream
     ui_filament_path_canvas_set_hub_only(canvas, hub_only);
 
+    // Hide bypass path for backends that don't support it (e.g. tool changers)
+    ui_filament_path_canvas_set_show_bypass(canvas, info.supports_bypass);
+
     // Determine slot count and offset for this unit
     int slot_count = info.total_slots;
     int slot_offset = 0;

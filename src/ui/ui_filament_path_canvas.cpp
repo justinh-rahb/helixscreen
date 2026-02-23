@@ -128,6 +128,7 @@ struct FilamentPathData {
     bool bypass_active = false;       // External spool bypass mode
     uint32_t bypass_color = 0x888888; // Default gray for bypass filament
     bool bypass_has_spool = false;    // true when external spool is assigned
+    bool show_bypass = true; // false = hide bypass path/spool entirely (e.g. tool changers)
 
     // Rendering mode
     bool hub_only = false;             // true = stop rendering at hub (skip downstream)
@@ -1538,7 +1539,7 @@ static void filament_path_draw_cb(lv_event_t* e) {
     // ========================================================================
     int32_t bypass_merge_y = y_off + (int32_t)(height * BYPASS_MERGE_Y_RATIO);
 
-    if (!data->hub_only) {
+    if (!data->hub_only && data->show_bypass) {
         int32_t bypass_x = x_off + (int32_t)(width * BYPASS_X_RATIO);
 
         // Determine bypass colors
@@ -1680,11 +1681,10 @@ static void filament_path_draw_cb(lv_event_t* e) {
     }
 
     // ========================================================================
-    // Draw output section (hub output sensor + hub-to-merge segment)
+    // Draw output section (hub output sensor + hub-to-merge/toolhead segment)
     // Output sensor is butted against hub bottom (mirrors input sensors at hub top).
-    // Segment from output sensor → bypass merge point is:
-    //   - ACTIVE when AMS filament is flowing (not bypass)
-    //   - IDLE when bypass is active (bypass joins at merge point, not through hub)
+    // When bypass is shown, segment goes output → bypass merge point.
+    // When bypass is hidden, segment goes output → toolhead directly.
     // ========================================================================
     if (!data->hub_only) {
         // Hub output sensor — determine if AMS filament is passing through
@@ -1704,28 +1704,32 @@ static void filament_path_draw_cb(lv_event_t* e) {
         }
         draw_sensor_dot(layer, center_x, output_y, output_dot_color, output_dot_filled, sensor_r);
 
-        // Segment: output sensor → bypass merge point
+        // When bypass is hidden, output connects directly to toolhead (no merge point gap)
+        int32_t output_end_y = data->show_bypass ? bypass_merge_y : toolhead_y;
+
+        // Segment: output sensor → merge point (or toolhead when bypass hidden)
         // Only colored when AMS filament flows through hub (NOT during bypass)
         if (ams_output_active) {
             lv_color_t seg_color = active_color;
             if (has_error && error_seg == PathSegment::OUTPUT) {
                 seg_color = error_color;
             }
-            draw_glow_line(layer, center_x, output_y + sensor_r, center_x,
-                           bypass_merge_y - sensor_r, seg_color, line_active);
-            draw_vertical_line(layer, center_x, output_y + sensor_r, bypass_merge_y - sensor_r,
+            draw_glow_line(layer, center_x, output_y + sensor_r, center_x, output_end_y - sensor_r,
+                           seg_color, line_active);
+            draw_vertical_line(layer, center_x, output_y + sensor_r, output_end_y - sensor_r,
                                seg_color, line_active);
         } else {
-            draw_hollow_vertical_line(layer, center_x, output_y + sensor_r,
-                                      bypass_merge_y - sensor_r, idle_color, bg_color, line_active);
+            draw_hollow_vertical_line(layer, center_x, output_y + sensor_r, output_end_y - sensor_r,
+                                      idle_color, bg_color, line_active);
         }
     }
 
     // ========================================================================
     // Draw toolhead section (bypass merge → toolhead)
     // Active when ANY filament is flowing (AMS or bypass)
+    // Skipped when bypass is hidden — output section draws directly to toolhead
     // ========================================================================
-    if (!data->hub_only) {
+    if (!data->hub_only && data->show_bypass) {
         lv_color_t toolhead_color = idle_color;
         bool toolhead_active = false;
         if (data->bypass_active) {
@@ -2023,7 +2027,7 @@ static void filament_path_click_cb(lv_event_t* e) {
 
     // Check if bypass spool box was clicked (right side) — check before entry area
     // Y-range guard because the spool box may be outside the slot entry area
-    if (data->bypass_callback) {
+    if (data->show_bypass && data->bypass_callback) {
         int32_t bypass_x = x_off + (int32_t)(width * BYPASS_X_RATIO);
         int32_t bypass_merge_y = y_off + (int32_t)(height * BYPASS_MERGE_Y_RATIO);
         int32_t sensor_r = data->sensor_radius;
@@ -2153,6 +2157,9 @@ static void filament_path_xml_apply(lv_xml_parser_state_t* state, const char** a
             needs_redraw = true;
         } else if (strcmp(name, "bypass_active") == 0) {
             data->bypass_active = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0);
+            needs_redraw = true;
+        } else if (strcmp(name, "show_bypass") == 0) {
+            data->show_bypass = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0);
             needs_redraw = true;
         } else if (strcmp(name, "faceted_toolhead") == 0) {
             data->use_faceted_toolhead = (strcmp(value, "true") == 0 || strcmp(value, "1") == 0);
@@ -2439,6 +2446,18 @@ void ui_filament_path_canvas_clear_slot_filaments(lv_obj_t* obj) {
 
     if (changed) {
         spdlog::trace("[FilamentPath] Cleared all slot filament states");
+        lv_obj_invalidate(obj);
+    }
+}
+
+void ui_filament_path_canvas_set_show_bypass(lv_obj_t* obj, bool show) {
+    auto* data = get_data(obj);
+    if (!data)
+        return;
+
+    if (data->show_bypass != show) {
+        data->show_bypass = show;
+        spdlog::debug("[FilamentPath] Show bypass: {}", show ? "yes" : "no");
         lv_obj_invalidate(obj);
     }
 }

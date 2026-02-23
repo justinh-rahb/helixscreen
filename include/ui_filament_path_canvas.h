@@ -246,6 +246,18 @@ void ui_filament_path_canvas_set_slot_prep_sensor(lv_obj_t* obj, int slot, bool 
 void ui_filament_path_canvas_clear_slot_filaments(lv_obj_t* obj);
 
 /**
+ * @brief Show or hide the bypass path entirely
+ *
+ * When false, the bypass spool, label, path line, and merge sensor are
+ * all suppressed.  Used for tool changers where bypass is not a thing.
+ * Default: true (bypass drawn when not in hub_only mode).
+ *
+ * @param obj The filament_path_canvas widget
+ * @param show true to draw bypass elements, false to hide them
+ */
+void ui_filament_path_canvas_set_show_bypass(lv_obj_t* obj, bool show);
+
+/**
  * @brief Set bypass mode active state
  *
  * When bypass is active, shows an alternate filament path from the bypass
