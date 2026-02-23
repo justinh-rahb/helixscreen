@@ -617,7 +617,8 @@ struct SlotInfo {
  */
 struct AmsUnit {
     int unit_index = 0;              ///< Unit number (0-based)
-    std::string name;                ///< Unit name/identifier (e.g., "MMU", "Box Turtle 1")
+    std::string name;                ///< Internal name for matching (e.g., "Box_Turtle Turtle_1")
+    std::string display_name;        ///< Pretty name for UI (e.g., "Turtle 1") — empty = use name
     int slot_count = 0;              ///< Number of slots on this unit
     int first_slot_global_index = 0; ///< Global index of first slot
 

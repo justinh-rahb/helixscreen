@@ -10,6 +10,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -189,12 +190,16 @@ std::string WizardAmsIdentifyStep::get_ams_details() const {
         details = std::to_string(info.total_slots) + " lanes";
     }
 
-    // Add unit name if available (e.g., "• Turtle_1")
+    // Add unit name if available (e.g., "• Turtle 1")
     if (!info.units.empty() && !info.units[0].name.empty()) {
         if (!details.empty()) {
             details += " • ";
         }
-        details += info.units[0].name;
+        // Prefer display_name (short, no type prefix), replace _ with spaces
+        std::string uname =
+            !info.units[0].display_name.empty() ? info.units[0].display_name : info.units[0].name;
+        std::replace(uname.begin(), uname.end(), '_', ' ');
+        details += uname;
     }
 
     return details.empty() ? "System detected" : details;

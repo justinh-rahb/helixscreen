@@ -208,6 +208,38 @@ TEST_CASE("ams_draw::get_unit_display_name falls back to Unit N", "[ams_draw][di
     REQUIRE(ams_draw::get_unit_display_name(unit, 2) == "Unit 3");
 }
 
+TEST_CASE("ams_draw::get_unit_display_name prefers display_name over name",
+          "[ams_draw][display_name]") {
+    AmsUnit unit;
+    unit.name = "Box_Turtle Turtle_1";
+    unit.display_name = "Turtle_1";
+    // display_name is used, and underscores are replaced with spaces
+    REQUIRE(ams_draw::get_unit_display_name(unit, 0) == "Turtle 1");
+}
+
+TEST_CASE("ams_draw::get_unit_display_name replaces underscores with spaces",
+          "[ams_draw][display_name]") {
+    AmsUnit unit;
+    unit.name = "Box_Turtle Turtle_1";
+    // No display_name set — falls back to name with underscores replaced
+    REQUIRE(ams_draw::get_unit_display_name(unit, 0) == "Box Turtle Turtle 1");
+}
+
+TEST_CASE("ams_draw::get_unit_display_name leaves clean names unchanged",
+          "[ams_draw][display_name]") {
+    AmsUnit unit;
+    unit.name = "Happy Hare MMU";
+    REQUIRE(ams_draw::get_unit_display_name(unit, 0) == "Happy Hare MMU");
+}
+
+TEST_CASE("ams_draw::get_unit_display_name with display_name no underscores",
+          "[ams_draw][display_name]") {
+    AmsUnit unit;
+    unit.name = "internal_key";
+    unit.display_name = "My Unit";
+    REQUIRE(ams_draw::get_unit_display_name(unit, 0) == "My Unit");
+}
+
 // ============================================================================
 // Transparent Container
 // ============================================================================

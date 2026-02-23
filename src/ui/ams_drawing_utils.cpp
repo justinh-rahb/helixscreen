@@ -85,10 +85,19 @@ int32_t calc_bar_width(int32_t container_width, int slot_count, int32_t gap, int
 // ============================================================================
 
 std::string get_unit_display_name(const AmsUnit& unit, int unit_index) {
-    if (!unit.name.empty()) {
-        return unit.name;
+    // Prefer display_name (short, pretty) over internal name
+    std::string raw;
+    if (!unit.display_name.empty()) {
+        raw = unit.display_name;
+    } else if (!unit.name.empty()) {
+        raw = unit.name;
+    } else {
+        return "Unit " + std::to_string(unit_index + 1);
     }
-    return "Unit " + std::to_string(unit_index + 1);
+
+    // Replace underscores with spaces for readability
+    std::replace(raw.begin(), raw.end(), '_', ' ');
+    return raw;
 }
 
 // ============================================================================

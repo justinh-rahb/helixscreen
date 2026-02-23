@@ -31,6 +31,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cctype>
 #include <cstring>
@@ -1094,19 +1095,21 @@ void AmsState::sync_current_loaded_from_backend() {
                 snprintf(current_slot_text_buf_, sizeof(current_slot_text_buf_), "Current: Tool %d",
                          slot_index);
             } else {
-                const char* unit_name = nullptr;
+                std::string unit_display;
                 int display_slot = slot_index + 1; // 1-based global slot number
                 for (const auto& unit : sys.units) {
                     if (slot_index >= unit.first_slot_global_index &&
                         slot_index < unit.first_slot_global_index + unit.slot_count) {
-                        unit_name = unit.name.c_str();
+                        // Prefer display_name, fall back to name, replace _ with spaces
+                        unit_display = !unit.display_name.empty() ? unit.display_name : unit.name;
+                        std::replace(unit_display.begin(), unit_display.end(), '_', ' ');
                         break;
                     }
                 }
-                if (unit_name && sys.units.size() > 1) {
+                if (!unit_display.empty() && sys.units.size() > 1) {
                     // Multi-unit: show unit name + slot number on one line
                     snprintf(current_slot_text_buf_, sizeof(current_slot_text_buf_),
-                             "Current: %s · Slot %d", unit_name, display_slot);
+                             "Current: %s · Slot %d", unit_display.c_str(), display_slot);
                 } else {
                     snprintf(current_slot_text_buf_, sizeof(current_slot_text_buf_),
                              "Current: Slot %d", display_slot);

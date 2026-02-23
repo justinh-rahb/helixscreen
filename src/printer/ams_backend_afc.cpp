@@ -164,6 +164,7 @@ AmsSystemInfo AmsBackendAfc::get_system_info() const {
     // Copy unit-level metadata not managed by registry
     for (size_t u = 0; u < info.units.size() && u < system_info_.units.size(); ++u) {
         info.units[u].name = system_info_.units[u].name;
+        info.units[u].display_name = system_info_.units[u].display_name;
         info.units[u].connected = system_info_.units[u].connected;
         info.units[u].has_hub_sensor = system_info_.units[u].has_hub_sensor;
         info.units[u].hub_sensor_triggered = system_info_.units[u].hub_sensor_triggered;
@@ -1669,7 +1670,16 @@ void AmsBackendAfc::reorganize_slots() {
     if (unit_lane_map_.size() <= 1) {
         // Single unit - just update the name if available
         if (!unit_lane_map_.empty() && !system_info_.units.empty()) {
-            system_info_.units[0].name = unit_lane_map_.begin()->first;
+            const auto& map_name = unit_lane_map_.begin()->first;
+            system_info_.units[0].name = map_name;
+            // Set pretty display name from unit_infos_ if available
+            for (const auto& uinfo : unit_infos_) {
+                std::string full_name = uinfo.type + " " + uinfo.name;
+                if (full_name == map_name) {
+                    system_info_.units[0].display_name = uinfo.name;
+                    break;
+                }
+            }
         }
         return;
     }
@@ -1689,6 +1699,17 @@ void AmsBackendAfc::reorganize_slots() {
         AmsUnit unit;
         unit.unit_index = unit_idx;
         unit.name = unit_name;
+
+        // Set pretty display name: look up just the instance name from unit_infos_
+        // (e.g., "Turtle_1" instead of full "Box_Turtle Turtle_1")
+        for (const auto& uinfo : unit_infos_) {
+            std::string full_name = uinfo.type + " " + uinfo.name;
+            if (full_name == unit_name) {
+                unit.display_name = uinfo.name;
+                break;
+            }
+        }
+
         unit.slot_count = static_cast<int>(lanes.size());
         unit.first_slot_global_index = global_slot_offset;
         unit.connected = true;
