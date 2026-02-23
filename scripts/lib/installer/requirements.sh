@@ -63,10 +63,10 @@ install_runtime_deps() {
 
     log_info "Checking runtime dependencies for display/input..."
 
-    # Required libraries for DRM display and libinput
-    # Note: GPU libs (libgles2, libegl1, libgbm1) not needed - using software rendering
+    # Required libraries for DRM display, libinput, and GPU rendering (EGL/OpenGL ES)
+    # GPU libs are needed for DRM+EGL hardware-accelerated rendering on Pi
     # Note: OpenSSL is statically linked for Pi builds, no runtime libssl needed
-    local deps="libdrm2 libinput10"
+    local deps="libdrm2 libinput10 libgbm1 libegl1 libgles2"
     local missing=""
 
     for dep in $deps; do

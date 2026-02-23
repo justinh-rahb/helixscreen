@@ -45,9 +45,9 @@ ExecStartPre=+/bin/sh -c 'for f in /sys/class/vtconsole/vtcon*/bind; do echo 0 >
 ExecStart=@@INSTALL_DIR@@/bin/helix-launcher.sh
 
 # Environment variables
-# Use fbdev display backend on Pi (DRM atomic modesetting has compatibility issues
-# with some SoCs like Allwinner H616). fbdev works reliably across all Pi hardware.
-Environment="HELIX_DISPLAY_BACKEND=fbdev"
+# Display backend: auto-detected (DRM+EGL preferred, fbdev fallback)
+# Override with: Environment="HELIX_DISPLAY_BACKEND=fbdev" or "drm"
+# Environment="HELIX_DISPLAY_BACKEND=fbdev"
 # Override asset directory if ui_xml/assets/config are not under WorkingDirectory
 # Environment="HELIX_DATA_DIR=/usr/share/helixscreen"
 # Logging: auto-detects journal on systemd systems (can override with HELIX_LOG_DEST)
