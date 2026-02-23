@@ -124,6 +124,11 @@ AmsType AmsBackendHappyHare::get_type() const {
     return AmsType::HAPPY_HARE;
 }
 
+bool AmsBackendHappyHare::manages_active_spool() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return system_info_.spoolman_mode != SpoolmanMode::OFF;
+}
+
 SlotInfo AmsBackendHappyHare::get_slot_info(int slot_index) const {
     std::lock_guard<std::mutex> lock(mutex_);
 

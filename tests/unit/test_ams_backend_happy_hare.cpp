@@ -1419,10 +1419,40 @@ TEST_CASE("Happy Hare active_unit parsed from status", "[ams][happy_hare][v4][mu
 }
 
 // ============================================================================
-// manages_active_spool() — Happy Hare does NOT manage Spoolman active spool
+// manages_active_spool() — depends on Happy Hare's spoolman_support setting
 // ============================================================================
 
-TEST_CASE("Happy Hare backend reports manages_active_spool=false", "[ams][happy_hare][spoolman]") {
+TEST_CASE("Happy Hare manages_active_spool=false when spoolman off (default)",
+          "[ams][happy_hare][spoolman]") {
     AmsBackendHappyHareTestHelper helper;
+    // Default spoolman_mode is OFF
     REQUIRE(helper.manages_active_spool() == false);
+}
+
+TEST_CASE("Happy Hare manages_active_spool=true when spoolman enabled",
+          "[ams][happy_hare][spoolman]") {
+    AmsBackendHappyHareTestHelper helper;
+    helper.initialize_test_gates(4);
+
+    SECTION("readonly mode") {
+        helper.test_parse_mmu_state({{"spoolman_support", "readonly"}});
+        REQUIRE(helper.manages_active_spool() == true);
+    }
+
+    SECTION("push mode") {
+        helper.test_parse_mmu_state({{"spoolman_support", "push"}});
+        REQUIRE(helper.manages_active_spool() == true);
+    }
+
+    SECTION("pull mode") {
+        helper.test_parse_mmu_state({{"spoolman_support", "pull"}});
+        REQUIRE(helper.manages_active_spool() == true);
+    }
+
+    SECTION("off mode — back to false") {
+        helper.test_parse_mmu_state({{"spoolman_support", "readonly"}});
+        REQUIRE(helper.manages_active_spool() == true);
+        helper.test_parse_mmu_state({{"spoolman_support", "off"}});
+        REQUIRE(helper.manages_active_spool() == false);
+    }
 }
