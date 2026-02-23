@@ -20,6 +20,25 @@ set -euo pipefail
 
 readonly CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/helixscreen/symbols"
 readonly R2_BASE_URL="${HELIX_R2_URL:-https://releases.helixscreen.org}/symbols"
+readonly CACHE_RETAIN_COUNT=10
+
+# Prune old cached symbol versions, keeping the most recent N by modification time
+prune_cache() {
+    [[ -d "$CACHE_DIR" ]] || return 0
+    local count
+    count=$(find "$CACHE_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')
+    if [[ "$count" -gt "$CACHE_RETAIN_COUNT" ]]; then
+        local to_delete
+        to_delete=$(ls -1dt "$CACHE_DIR"/v*/ 2>/dev/null | tail -n +"$((CACHE_RETAIN_COUNT + 1))")
+        if [[ -n "$to_delete" ]]; then
+            echo "Pruning local cache (keeping $CACHE_RETAIN_COUNT most recent)..." >&2
+            echo "$to_delete" | while read -r dir; do
+                echo "  Removing $(basename "$dir")" >&2
+                rm -rf "$dir"
+            done
+        fi
+    fi
+}
 
 LOAD_BASE=0
 AUTO_DETECT_BASE=false
@@ -315,6 +334,7 @@ else
             exit 1
         fi
         echo "Cached: $SYM_FILE" >&2
+        prune_cache
     fi
 fi
 
