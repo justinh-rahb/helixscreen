@@ -63,6 +63,10 @@ void HeatingIconAnimator::attach(lv_obj_t* icon) {
     current_opacity_ = LV_OPA_COVER;
     apply_color();
 
+    // Auto-detach when the icon widget is destroyed — prevents dangling pointer
+    // when a shared TempControlPanel outlives the overlay panel (issue #177)
+    lv_obj_add_event_cb(icon_, icon_delete_cb, LV_EVENT_DELETE, this);
+
     // Subscribe to theme changes — ObserverGuard handles cleanup on detach/destroy
     lv_subject_t* theme_subject = theme_manager_get_changed_subject();
     if (theme_subject) {
@@ -78,6 +82,9 @@ void HeatingIconAnimator::detach() {
         return;
     }
     stop_pulse();
+
+    // Remove our delete callback to prevent re-entrant detach
+    lv_obj_remove_event_cb_with_user_data(icon_, icon_delete_cb, this);
 
     // ObserverGuard::reset() removes the observer from the subject
     theme_observer_.reset();
@@ -279,4 +286,22 @@ void HeatingIconAnimator::theme_change_cb(lv_observer_t* observer, lv_subject_t*
         spdlog::debug("[HeatingIconAnimator] Theme changed, refreshing colors");
         animator->refresh_theme();
     }
+}
+
+void HeatingIconAnimator::icon_delete_cb(lv_event_t* e) {
+    auto* animator = static_cast<HeatingIconAnimator*>(lv_event_get_user_data(e));
+    if (!animator) {
+        return;
+    }
+
+    spdlog::debug("[HeatingIconAnimator] Icon widget destroyed, auto-detaching");
+
+    // Stop pulse animation (references icon_)
+    animator->stop_pulse();
+
+    // Remove theme observer
+    animator->theme_observer_.reset();
+
+    // Null out icon_ — the widget is already being destroyed, don't touch it further
+    animator->icon_ = nullptr;
 }
