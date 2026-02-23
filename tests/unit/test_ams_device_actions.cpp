@@ -279,8 +279,8 @@ TEST_CASE("AmsBackendMock device actions - default configuration", "[ams][device
     SECTION("get_device_sections returns default HH sections") {
         auto sections = backend.get_device_sections();
 
-        // Mock defaults to Happy Hare mode with 3 sections
-        REQUIRE(sections.size() == 3);
+        // Mock defaults to Happy Hare mode with 4 sections
+        REQUIRE(sections.size() == 4);
 
         // Find setup section
         auto it = std::find_if(sections.begin(), sections.end(),
@@ -294,6 +294,12 @@ TEST_CASE("AmsBackendMock device actions - default configuration", "[ams][device
                           [](const DeviceSection& s) { return s.id == "speed"; });
         REQUIRE(it != sections.end());
         CHECK(it->label == "Speed");
+
+        // Find accessories section
+        it = std::find_if(sections.begin(), sections.end(),
+                          [](const DeviceSection& s) { return s.id == "accessories"; });
+        REQUIRE(it != sections.end());
+        CHECK(it->label == "Accessories");
 
         // Find maintenance section
         it = std::find_if(sections.begin(), sections.end(),
