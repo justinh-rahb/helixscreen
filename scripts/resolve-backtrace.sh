@@ -597,18 +597,33 @@ find_addr2line() {
 }
 
 # Try to download .debug file from R2 (same location as .sym)
+# Debug files are stored compressed (.debug.zst) since v0.12.0
 DEBUG_FILE=""
 if [[ -z "${HELIX_SYM_FILE:-}" ]]; then
     DEBUG_FILE="${CACHE_DIR}/v${VERSION}/${PLATFORM}.debug"
     if [[ ! -f "$DEBUG_FILE" ]]; then
+        # Try compressed (.debug.zst) first, fall back to uncompressed (.debug)
+        DBG_ZST_URL="${R2_BASE_URL}/v${VERSION}/${PLATFORM}.debug.zst"
         DBG_URL="${R2_BASE_URL}/v${VERSION}/${PLATFORM}.debug"
         echo "Downloading debug info for v${VERSION}/${PLATFORM}..." >&2
-        if ! curl -fsSL -o "$DEBUG_FILE" "$DBG_URL" 2>/dev/null; then
-            echo "No .debug file available (nm-based resolution only)" >&2
-            rm -f "$DEBUG_FILE"
-            DEBUG_FILE=""
-        else
+        if curl -fsSL -o "${DEBUG_FILE}.zst" "$DBG_ZST_URL" 2>/dev/null; then
+            echo "Decompressing debug info..." >&2
+            if command -v zstd >/dev/null 2>&1; then
+                zstd -d --rm -q "${DEBUG_FILE}.zst"
+                echo "Cached: $DEBUG_FILE ($(du -h "$DEBUG_FILE" 2>/dev/null | cut -f1))" >&2
+            else
+                echo "Warning: zstd not installed, cannot decompress .debug.zst" >&2
+                echo "Install with: brew install zstd (macOS) or apt install zstd (Linux)" >&2
+                rm -f "${DEBUG_FILE}.zst"
+                DEBUG_FILE=""
+            fi
+        elif curl -fsSL -o "$DEBUG_FILE" "$DBG_URL" 2>/dev/null; then
+            # Legacy uncompressed format (pre-v0.12.0)
             echo "Cached: $DEBUG_FILE ($(du -h "$DEBUG_FILE" 2>/dev/null | cut -f1))" >&2
+        else
+            echo "No .debug file available (nm-based resolution only)" >&2
+            rm -f "$DEBUG_FILE" "${DEBUG_FILE}.zst"
+            DEBUG_FILE=""
         fi
     fi
 fi
