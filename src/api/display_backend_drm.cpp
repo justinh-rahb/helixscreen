@@ -230,20 +230,32 @@ DetectedResolution DisplayBackendDRM::detect_resolution() const {
 }
 
 lv_display_t* DisplayBackendDRM::create_display(int width, int height) {
+    LV_UNUSED(width);
+    LV_UNUSED(height);
+
     spdlog::info("[DRM Backend] Creating DRM display on {}", drm_device_);
 
-    // LVGL's DRM driver
     display_ = lv_linux_drm_create();
-
     if (display_ == nullptr) {
         spdlog::error("[DRM Backend] Failed to create DRM display");
         return nullptr;
     }
 
-    // Set the DRM device path
-    lv_linux_drm_set_file(display_, drm_device_.c_str(), -1);
+    lv_result_t result = lv_linux_drm_set_file(display_, drm_device_.c_str(), -1);
+    if (result != LV_RESULT_OK) {
+        spdlog::error("[DRM Backend] Failed to initialize DRM on {}", drm_device_);
+        lv_display_delete(display_); // error-path cleanup: display not yet returned to caller
+        display_ = nullptr;
+        return nullptr;
+    }
 
-    spdlog::info("[DRM Backend] DRM display created: {}x{} on {}", width, height, drm_device_);
+#ifdef HELIX_ENABLE_OPENGLES
+    using_egl_ = true;
+    spdlog::info("[DRM Backend] GPU-accelerated display active (EGL/OpenGL ES)");
+#else
+    spdlog::info("[DRM Backend] DRM display active (dumb buffers, CPU rendering)");
+#endif
+
     return display_;
 }
 

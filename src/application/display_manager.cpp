@@ -17,6 +17,10 @@
 #include "display_backend_fbdev.h"
 #endif
 
+#ifdef HELIX_DISPLAY_DRM
+#include "display_backend_drm.h"
+#endif
+
 #include "ui_fatal_error.h"
 #include "ui_update_queue.h"
 
@@ -152,6 +156,17 @@ bool DisplayManager::init(const Config& config) {
         lv_deinit();
         return false;
     }
+
+    // Log GPU acceleration status for DRM backend
+#ifdef HELIX_DISPLAY_DRM
+    if (auto* drm = dynamic_cast<DisplayBackendDRM*>(m_backend.get())) {
+        if (drm->is_gpu_accelerated()) {
+            spdlog::info("[DisplayManager] Rendering: GPU-accelerated (OpenGL ES via EGL)");
+        } else {
+            spdlog::info("[DisplayManager] Rendering: CPU (DRM dumb buffers)");
+        }
+    }
+#endif
 
     // Unblank display via framebuffer ioctl AFTER creating LVGL display.
     // On AD5M, the FBIOBLANK state may be tied to the fd - calling it after
