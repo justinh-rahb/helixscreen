@@ -170,6 +170,12 @@ target_compile_options(main PRIVATE
     -Wno-unused-function
 )
 
+# Use the same precompiled header as the Makefile build — it force-includes
+# lvgl.h, helix_xml.h, spdlog, and common STL headers into every TU.
+target_precompile_headers(main PRIVATE
+    "$<$<COMPILE_LANGUAGE:CXX>:${PROJECT_ROOT}/include/lvgl_pch.h>"
+)
+
 # Link everything
 find_library(log-lib log)
 find_library(z-lib z)
