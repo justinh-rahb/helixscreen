@@ -240,16 +240,20 @@ void AmsPanel::init_subjects() {
     external_spool_observer_ = observe_int_sync<AmsPanel>(
         AmsState::instance().get_external_spool_color_subject(), this,
         [](AmsPanel* self, int /*color_int*/) {
-            if (!self->path_canvas_)
-                return;
-            // Use full spool info check (not just color != 0) to handle black spools correctly
-            auto ext_spool = AmsState::instance().get_external_spool_info();
-            bool has_spool = ext_spool.has_value();
-            ui_filament_path_canvas_set_bypass_has_spool(self->path_canvas_, has_spool);
-            if (has_spool) {
-                ui_filament_path_canvas_set_bypass_color(
-                    self->path_canvas_, static_cast<uint32_t>(ext_spool->color_rgb));
+            // Update path canvas bypass indicator
+            if (self->path_canvas_) {
+                // Use full spool info check (not just color != 0) to handle black spools correctly
+                auto ext_spool = AmsState::instance().get_external_spool_info();
+                bool has_spool = ext_spool.has_value();
+                ui_filament_path_canvas_set_bypass_has_spool(self->path_canvas_, has_spool);
+                if (has_spool) {
+                    ui_filament_path_canvas_set_bypass_color(
+                        self->path_canvas_, static_cast<uint32_t>(ext_spool->color_rgb));
+                }
             }
+
+            // Update bypass spool holder (3D spool in left column)
+            self->update_bypass_spool_from_state();
         });
 
     // UI module subjects are now encapsulated in their respective classes:
@@ -278,6 +282,9 @@ void AmsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     setup_system_header();
     setup_slots();
     setup_path_canvas();
+
+    // Setup bypass spool holder (left column, below path canvas)
+    setup_bypass_spool();
 
     // Setup endless spool arrows
     setup_endless_arrows();
@@ -326,6 +333,12 @@ void AmsPanel::on_activate() {
         lv_obj_t* dryer_card = lv_obj_find_by_name(panel_, "dryer_card");
         if (dryer_card)
             lv_obj_add_flag(dryer_card, LV_OBJ_FLAG_HIDDEN);
+        // Hide bypass spool holder in scoped view (bypass is system-level)
+        if (bypass_spool_box_) {
+            lv_obj_delete(bypass_spool_box_);
+            bypass_spool_box_ = nullptr;
+            bypass_spool_ = nullptr;
+        }
     } else {
         // Non-scoped: show all system slots
         int slot_count = lv_subject_get_int(AmsState::instance().get_slot_count_subject());
@@ -414,6 +427,8 @@ void AmsPanel::clear_panel_reference() {
     slot_grid_ = nullptr;
     detail_widgets_ = AmsDetailWidgets{};
     path_canvas_ = nullptr;
+    bypass_spool_box_ = nullptr;
+    bypass_spool_ = nullptr;
     endless_arrows_ = nullptr;
     current_slot_count_ = 0;
 
@@ -652,6 +667,107 @@ void AmsPanel::setup_path_canvas() {
 
 void AmsPanel::update_path_canvas_from_backend() {
     ams_detail_setup_path_canvas(path_canvas_, slot_grid_, scoped_unit_index_, false);
+}
+
+void AmsPanel::setup_bypass_spool() {
+    if (!path_canvas_) {
+        spdlog::debug("[{}] No path canvas — skipping bypass spool setup", get_name());
+        return;
+    }
+
+    // Check if bypass is supported
+    auto* backend = AmsState::instance().get_backend();
+    if (!backend || !backend->get_system_info().supports_bypass) {
+        spdlog::debug("[{}] Bypass not supported — skipping spool holder", get_name());
+        return;
+    }
+
+    // Create a small card container as child of path_container (sibling of path_canvas)
+    // with absolute positioning to overlay at the bypass endpoint location
+    lv_obj_t* path_container = lv_obj_get_parent(path_canvas_);
+    if (!path_container) {
+        return;
+    }
+
+    bypass_spool_box_ = lv_obj_create(path_container);
+    lv_obj_set_size(bypass_spool_box_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_style_pad_all(bypass_spool_box_, 4, 0);
+    lv_obj_set_style_bg_opa(bypass_spool_box_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_color(bypass_spool_box_, theme_manager_get_color("card_bg"), 0);
+    lv_obj_set_style_radius(bypass_spool_box_, theme_manager_get_spacing("border_radius"), 0);
+    lv_obj_set_style_border_width(bypass_spool_box_, 0, 0);
+    lv_obj_remove_flag(bypass_spool_box_, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Create spool_canvas inside the card
+    static constexpr int32_t BYPASS_SPOOL_SIZE = 48;
+    bypass_spool_ = ui_spool_canvas_create(bypass_spool_box_, BYPASS_SPOOL_SIZE);
+    if (!bypass_spool_) {
+        spdlog::warn("[{}] Failed to create bypass spool canvas", get_name());
+        lv_obj_delete(bypass_spool_box_);
+        bypass_spool_box_ = nullptr;
+        return;
+    }
+
+    // Position will be set after layout in update_bypass_spool_position()
+    // For now, use flag-based flow positioning (will be corrected on first layout update)
+    lv_obj_add_flag(bypass_spool_box_, LV_OBJ_FLAG_FLOATING);
+
+    // Make clickable → opens edit modal for external spool (slot -2)
+    lv_obj_add_flag(bypass_spool_box_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(
+        bypass_spool_box_,
+        [](lv_event_t* e) {
+            auto* self = static_cast<AmsPanel*>(lv_event_get_user_data(e));
+            if (self) {
+                self->show_edit_modal(-2);
+            }
+        },
+        LV_EVENT_CLICKED, this);
+
+    // Set initial color/fill
+    update_bypass_spool_from_state();
+
+    // Position spool widget relative to bypass merge point in path canvas.
+    // Layout: "Bypass" label → horizontal line → spool widget (top to bottom)
+    lv_obj_update_layout(path_canvas_);
+    int32_t canvas_w = lv_obj_get_width(path_canvas_);
+    int32_t canvas_h = lv_obj_get_height(path_canvas_);
+    int32_t canvas_x = lv_obj_get_x(path_canvas_);
+    int32_t canvas_y = lv_obj_get_y(path_canvas_);
+
+    // Match the path canvas bypass ratios — spool aligns with bypass merge sensor
+    static constexpr float BYPASS_X_RATIO = 0.85f;
+    static constexpr float BYPASS_MERGE_Y_RATIO = 0.44f;
+    int32_t bypass_x = canvas_x + (int32_t)(canvas_w * BYPASS_X_RATIO);
+    int32_t bypass_merge_y = canvas_y + (int32_t)(canvas_h * BYPASS_MERGE_Y_RATIO);
+
+    // Spool goes BELOW the "Bypass" label (which is canvas-drawn above bypass_merge_y).
+    // Place spool top edge at bypass_merge_y so it sits just under the label.
+    lv_obj_update_layout(bypass_spool_box_);
+    int32_t box_w = lv_obj_get_width(bypass_spool_box_);
+    lv_obj_set_pos(bypass_spool_box_, bypass_x - box_w / 2, bypass_merge_y);
+
+    spdlog::debug("[{}] Bypass spool: box_w={} at ({},{}), merge_y={}", get_name(), box_w,
+                  bypass_x - box_w / 2, bypass_merge_y, bypass_merge_y);
+}
+
+void AmsPanel::update_bypass_spool_from_state() {
+    if (!bypass_spool_) {
+        return;
+    }
+
+    auto ext = AmsState::instance().get_external_spool_info();
+    if (ext.has_value()) {
+        ui_spool_canvas_set_color(bypass_spool_, lv_color_hex(ext->color_rgb));
+        float fill =
+            (ext->total_weight_g > 0) ? ext->remaining_weight_g / ext->total_weight_g : 0.75f;
+        ui_spool_canvas_set_fill_level(bypass_spool_, fill);
+    } else {
+        // No spool assigned — show muted empty spool
+        ui_spool_canvas_set_color(bypass_spool_, lv_color_hex(0x505050));
+        ui_spool_canvas_set_fill_level(bypass_spool_, 0.0f);
+    }
+    ui_spool_canvas_redraw(bypass_spool_);
 }
 
 void AmsPanel::setup_endless_arrows() {

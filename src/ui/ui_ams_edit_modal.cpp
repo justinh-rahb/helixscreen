@@ -625,7 +625,12 @@ void AmsEditModal::update_ui() {
     }
 
     // Update slot indicator via subject (used in header)
-    snprintf(slot_indicator_buf_, sizeof(slot_indicator_buf_), "Slot %d Filament", slot_index_ + 1);
+    if (slot_index_ < 0) {
+        snprintf(slot_indicator_buf_, sizeof(slot_indicator_buf_), "External Filament");
+    } else {
+        snprintf(slot_indicator_buf_, sizeof(slot_indicator_buf_), "Slot %d Filament",
+                 slot_index_ + 1);
+    }
     lv_subject_copy_string(&slot_indicator_subject_, slot_indicator_buf_);
 
     // Update Spoolman ID label in header

@@ -184,6 +184,22 @@ void AmsOperationSidebar::init_observers() {
                 self->handle_load_complete();
             }
 
+            // Detect UNLOADING -> IDLE: if bypass is pending, enable it now
+            if (self->pending_bypass_enable_ && action == AmsAction::IDLE &&
+                self->prev_ams_action_ == AmsAction::UNLOADING) {
+                self->pending_bypass_enable_ = false;
+                AmsBackend* backend = AmsState::instance().get_backend();
+                if (backend) {
+                    spdlog::info("[AmsSidebar] Unload complete — enabling bypass");
+                    AmsError err = backend->enable_bypass();
+                    if (err.result == AmsResult::SUCCESS) {
+                        NOTIFY_INFO("Bypass enabled");
+                    } else {
+                        NOTIFY_ERROR("Bypass failed: {}", err.user_msg);
+                    }
+                }
+            }
+
             // Update step progress (BEFORE updating prev_ams_action_)
             self->update_action_display(action);
 
@@ -198,6 +214,15 @@ void AmsOperationSidebar::init_observers() {
                                                       return;
                                                   self->update_current_loaded_display();
                                               });
+
+    // Bypass spool color observer: refreshes loaded card when external spool changes
+    bypass_spool_observer_ = observe_int_sync<AmsOperationSidebar>(
+        AmsState::instance().get_external_spool_color_subject(), this,
+        [](AmsOperationSidebar* self, int /*color_rgb*/) {
+            if (!self->sidebar_root_)
+                return;
+            self->update_current_loaded_display();
+        });
 
     // Extruder temp observer: checks pending preheat load
     extruder_temp_observer_ = observe_int_sync<AmsOperationSidebar>(
@@ -216,6 +241,7 @@ void AmsOperationSidebar::cleanup() {
     // Clear observers (except extruder_temp if preheat pending)
     action_observer_.reset();
     current_slot_observer_.reset();
+    bypass_spool_observer_.reset();
 
     if (pending_load_slot_ < 0) {
         extruder_temp_observer_.reset();
@@ -223,6 +249,7 @@ void AmsOperationSidebar::cleanup() {
     // extruder_temp_observer_ intentionally kept if preheat pending
 
     // Don't cancel preheat state
+    pending_bypass_enable_ = false;
     prev_ams_action_ = AmsAction::IDLE;
 
     // Clear widget refs
@@ -600,6 +627,23 @@ void AmsOperationSidebar::handle_bypass_toggle() {
             NOTIFY_INFO("Bypass disabled");
         }
     } else {
+        // If filament is loaded from an AMS slot, unload first (full animation),
+        // then enable bypass after unload completes via action observer
+        if (info.current_slot >= 0 && info.filament_loaded) {
+            spdlog::info("[AmsSidebar] Unloading slot {} before enabling bypass",
+                         info.current_slot);
+            pending_bypass_enable_ = true;
+            error = backend->unload_filament();
+            if (error.result == AmsResult::SUCCESS) {
+                NOTIFY_INFO("Unloading before bypass...");
+            } else {
+                pending_bypass_enable_ = false;
+                NOTIFY_ERROR("Unload failed: {}", error.user_msg);
+            }
+            return;
+        }
+
+        // No filament loaded — enable bypass directly
         error = backend->enable_bypass();
         if (error.result == AmsResult::SUCCESS) {
             NOTIFY_INFO("Bypass enabled");

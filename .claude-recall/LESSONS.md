@@ -21,7 +21,7 @@
 > Avoid mutex locks in destructors during static destruction phase. Other objects may already be destroyed, causing deadlock or crash on exit
 
 ### [L014] [***--|*****] Register all XML components
-- **Uses**: 30 | **Velocity**: 4 | **Learned**: 2025-12-14 | **Last**: 2026-02-21 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 31 | **Velocity**: 5 | **Learned**: 2025-12-14 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
 > When adding new XML components, must add lv_xml_component_register_from_file() call in main.cpp. Forgetting causes silent failures
 
 ### [L020] [***--|***--] ObserverGuard for cleanup
@@ -37,7 +37,7 @@
 > Text-only buttons: use `align="center"` on child. Icon+text buttons with flex_flow="row": need ALL THREE flex properties - style_flex_main_place="center" (horizontal), style_flex_cross_place="center" (vertical align items), style_flex_track_place="center" (vertical position of row). Missing track_place causes content to sit at top.
 
 ### [L031] [***--|*****] XML no recompile
-- **Uses**: 28 | **Velocity**: 8.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 31 | **Velocity**: 11.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-22 | **Category**: gotcha | **Type**: constraint
 > XML files are loaded at RUNTIME - never rebuild after XML-only changes. Just relaunch the app. This includes layout changes, styling, bindings, event callbacks - anything in ui_xml/*.xml. Only rebuild when C++ code changes.
 
 ### [L039] [*----|-----] Unique XML callback names
@@ -97,7 +97,7 @@
 > Always use lv_obj_safe_delete() instead of raw lv_obj_delete() - it guards against shutdown race conditions by checking lv_is_initialized() and lv_display_get_next() before deletion, and auto-nulls the pointer to prevent use-after-free
 
 ### [L060] [**---|*****] Interactive UI testing requires user
-- **Uses**: 5 | **Velocity**: 4.01 | **Learned**: 2026-02-01 | **Last**: 2026-02-22 | **Category**: correction | **Type**: constraint
+- **Uses**: 7 | **Velocity**: 6.01 | **Learned**: 2026-02-01 | **Last**: 2026-02-22 | **Category**: correction | **Type**: constraint
 > NEVER use timed delays expecting automatic navigation. THE EXACT PATTERN THAT WORKS:
 > **Step 1** - Start app with Bash tool using `run_in_background: true`:
 > ```bash
@@ -109,8 +109,8 @@
 > **Step 4** - Read the log file: `Read tool on /tmp/test.log`
 > FAILURES: shell `&`, `timeout X cmd &`, multiple attempts, assuming automatic navigation. ONE background task, tee for logging, user does interaction, you read results.
 
-### [L061] [-----|-----] AD5M test printer environment
-- **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-07 | **Last**: 2026-02-07 | **Category**: system
+### [L061] [*----|***--] AD5M test printer environment
+- **Uses**: 1 | **Velocity**: 1 | **Learned**: 2026-02-07 | **Last**: 2026-02-22 | **Category**: system
 > AD5M (192.168.1.67, root@) runs armv7l Linux 5.4.61 (BusyBox). Key gotchas: (1) No curl, only wget - and wget has NO HTTPS support (compiled without SSL). (2) No sftp-server - use 'scp -O' (legacy protocol) instead of default scp. (3) Logging: default level is WARN, app logs to BOTH /tmp/helixscreen.log AND syslog (/var/log/messages) - syslog has the CURRENT session, /tmp/helixscreen.log may be stale from previous session. (4) No CA certificate bundle shipped - /etc/ssl/certs/ is empty, breaks ALL outbound HTTPS (libhv, wget). Must ship ca-certificates.crt with install. (5) No openssl CLI command. (6) No inotify support. (7) No WiFi (wpa_supplicant present but no interfaces). (8) OpenSSL 1.1 libs exist at /usr/lib/libssl.so.1.1. (9) Binary at /opt/helixscreen/, config at /opt/helixscreen/config/helixconfig.json. (10) ldd may return empty for statically-linked ARM binaries.
 
 ### [L062] [-----|-----] AD5M build and deploy targets

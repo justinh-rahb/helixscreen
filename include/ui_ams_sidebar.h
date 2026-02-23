@@ -109,10 +109,16 @@ class AmsOperationSidebar {
     // Extracted UI modules
     std::unique_ptr<AmsDryerCard> dryer_card_;
 
+    // Bypass spool observer (updates sidebar if needed)
+    ObserverGuard bypass_spool_observer_;
+
     // Observers
     ObserverGuard action_observer_;
     ObserverGuard current_slot_observer_;
     ObserverGuard extruder_temp_observer_;
+
+    // Bypass-after-unload state
+    bool pending_bypass_enable_ = false;
 
     // Preheat state
     int pending_load_slot_ = -1;
