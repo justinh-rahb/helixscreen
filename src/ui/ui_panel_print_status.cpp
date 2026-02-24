@@ -1539,6 +1539,21 @@ void PrintStatusPanel::on_print_start_phase_changed(int phase) {
     lv_subject_set_int(&preparing_visible_subject_, preparing ? 1 : 0);
 
     if (preparing) {
+        // Clear stale state from previous print immediately so users don't see
+        // the old thumbnail/progress flash before the new print's data loads
+        if (print_thumbnail_) {
+            lv_image_set_src(print_thumbnail_, nullptr);
+        }
+        cached_thumbnail_path_.clear();
+        loaded_thumbnail_filename_.clear();
+        if (progress_bar_) {
+            lv_bar_set_value(progress_bar_, 0, LV_ANIM_OFF);
+        }
+        std::snprintf(progress_text_buf_, sizeof(progress_text_buf_), "0%%");
+        lv_subject_copy_string(&progress_text_subject_, progress_text_buf_);
+        std::snprintf(layer_text_buf_, sizeof(layer_text_buf_), " ");
+        lv_subject_copy_string(&layer_text_subject_, layer_text_buf_);
+
         // Initialize elapsed display to 0m (preprint observer will update it)
         format_time(0, elapsed_buf_, sizeof(elapsed_buf_));
         lv_subject_copy_string(&elapsed_subject_, elapsed_buf_);
