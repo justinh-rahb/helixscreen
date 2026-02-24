@@ -19,6 +19,7 @@
 #include "moonraker_api.h"
 #include "observer_factory.h"
 #include "printer_state.h"
+#include "ui/ui_cleanup_helpers.h"
 
 #include <spdlog/spdlog.h>
 
@@ -353,10 +354,7 @@ void AmsOperationSidebar::recreate_step_progress_for_operation(StepOperationType
     }
 
     // Delete existing step progress widget if any
-    if (step_progress_) {
-        lv_obj_del(step_progress_);
-        step_progress_ = nullptr;
-    }
+    safe_delete_obj(step_progress_);
 
     current_operation_type_ = op_type;
 
