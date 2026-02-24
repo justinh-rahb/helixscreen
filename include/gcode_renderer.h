@@ -221,6 +221,17 @@ class GCodeRenderer {
     }
 
     /**
+     * @brief Set vertical content offset (stub)
+     * @param offset_percent Offset as percentage of canvas height (-1.0 to 1.0)
+     *
+     * In the 3D renderer, this shifts the projection vertically.
+     * In the 2D renderer, this is handled by GCodeLayerRenderer directly.
+     */
+    void set_content_offset_y(float offset_percent) {
+        (void)offset_percent; // No-op in base renderer
+    }
+
+    /**
      * @brief Set ghost layer render mode (stub)
      * @param mode Ghost rendering style
      *

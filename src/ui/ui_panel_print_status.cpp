@@ -1272,6 +1272,7 @@ void PrintStatusPanel::on_print_state_changed(PrintJobState job_state) {
             loaded_thumbnail_filename_.clear();
             cached_thumbnail_path_.clear();
             pending_gcode_filename_.clear();
+            requested_gcode_filename_.clear();
             // Panel's local gcode_loaded_ mirrors lifecycle's decision
             if (result.clear_gcode_loaded) {
                 gcode_loaded_ = false;
@@ -1557,6 +1558,7 @@ void PrintStatusPanel::on_print_start_phase_changed(int phase) {
         }
         cached_thumbnail_path_.clear();
         loaded_thumbnail_filename_.clear();
+        requested_gcode_filename_.clear();
         if (progress_bar_) {
             lv_bar_set_value(progress_bar_, 0, LV_ANIM_OFF);
         }
@@ -2204,16 +2206,26 @@ void PrintStatusPanel::set_filename(const char* filename) {
         spdlog::debug("[{}] Loading thumbnail for: {}", get_name(), effective_filename);
         load_thumbnail_for_file(effective_filename);
 
-        // G-code loading: immediate if panel active, deferred otherwise
-        if (is_active_) {
-            // Panel is already visible - load immediately instead of deferring
-            spdlog::debug("[{}] Panel active, loading G-code immediately: {}", get_name(),
-                          effective_filename);
-            load_gcode_for_viewing(effective_filename);
-            pending_gcode_filename_.clear();
+        // G-code loading: deduplicate to avoid redundant expensive downloads.
+        // Multiple observers can fire in rapid succession (filename changed,
+        // thumbnail source set) causing set_filename() to be called several
+        // times with the same effective filename before the async download
+        // completes. requested_gcode_filename_ tracks what we've already
+        // requested, preventing duplicate loads.
+        if (effective_filename != requested_gcode_filename_) {
+            requested_gcode_filename_ = effective_filename;
+            if (is_active_) {
+                spdlog::debug("[{}] Panel active, loading G-code immediately: {}", get_name(),
+                              effective_filename);
+                load_gcode_for_viewing(effective_filename);
+                pending_gcode_filename_.clear();
+            } else {
+                // Panel not visible - defer to on_activate()
+                pending_gcode_filename_ = effective_filename;
+            }
         } else {
-            // Panel not visible - defer to on_activate()
-            pending_gcode_filename_ = effective_filename;
+            spdlog::debug("[{}] Skipping duplicate G-code load request for: {}", get_name(),
+                          effective_filename);
         }
         loaded_thumbnail_filename_ = effective_filename;
     }

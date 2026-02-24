@@ -78,7 +78,10 @@ int16_t QuantizationParams::quantize(float value, float min_bound) const {
 }
 
 float QuantizationParams::dequantize(int16_t value, float min_bound) const {
-    return static_cast<float>(value) / scale_factor + min_bound;
+    // Use double precision intermediates to avoid float rounding accumulation
+    // when scale_factor and min_bound differ by several orders of magnitude.
+    return static_cast<float>(static_cast<double>(value) / static_cast<double>(scale_factor) +
+                              static_cast<double>(min_bound));
 }
 
 QuantizedVertex QuantizationParams::quantize_vec3(const glm::vec3& v) const {
@@ -160,6 +163,83 @@ void RibbonGeometry::clear() {
 }
 
 // ============================================================================
+// RibbonGeometry Validation
+// ============================================================================
+
+void RibbonGeometry::validate() const {
+    size_t issues = 0;
+
+    // Spot-check vertex positions for NaN/Inf (check every 100th vertex, plus first and last)
+    if (!vertices.empty()) {
+        auto check_vertex = [&](size_t idx) {
+            const auto& v = vertices[idx];
+            glm::vec3 pos = quantization.dequantize_vec3(v.position);
+            if (std::isnan(pos.x) || std::isnan(pos.y) || std::isnan(pos.z) || std::isinf(pos.x) ||
+                std::isinf(pos.y) || std::isinf(pos.z)) {
+                spdlog::warn("[GCode::Builder] Vertex {} has NaN/Inf position: ({}, {}, {})", idx,
+                             pos.x, pos.y, pos.z);
+                ++issues;
+            }
+        };
+
+        check_vertex(0);
+        check_vertex(vertices.size() - 1);
+        for (size_t i = 100; i < vertices.size(); i += 100) {
+            check_vertex(i);
+        }
+    }
+
+    // Validate layer strip ranges are within bounds
+    for (size_t layer = 0; layer < layer_strip_ranges.size(); ++layer) {
+        auto [first, count] = layer_strip_ranges[layer];
+        if (count == 0)
+            continue;
+        if (first + count > strips.size()) {
+            spdlog::warn("[GCode::Builder] Layer {} strip range [{}, +{}) exceeds strip count {}",
+                         layer, first, count, strips.size());
+            ++issues;
+        }
+    }
+
+    // Validate color palette indices in vertices (spot-check)
+    size_t color_palette_size = color_palette.size();
+    size_t normal_palette_size = normal_palette.size();
+    for (size_t i = 0; i < vertices.size(); i += std::max(size_t(1), vertices.size() / 200)) {
+        const auto& v = vertices[i];
+        if (v.color_index >= color_palette_size) {
+            spdlog::warn("[GCode::Builder] Vertex {} color_index {} >= palette size {}", i,
+                         v.color_index, color_palette_size);
+            ++issues;
+        }
+        if (v.normal_index >= normal_palette_size) {
+            spdlog::warn("[GCode::Builder] Vertex {} normal_index {} >= palette size {}", i,
+                         v.normal_index, normal_palette_size);
+            ++issues;
+        }
+    }
+
+    // Validate strip vertex indices are within bounds (spot-check)
+    for (size_t i = 0; i < strips.size(); i += std::max(size_t(1), strips.size() / 200)) {
+        for (uint32_t idx : strips[i]) {
+            if (idx >= vertices.size()) {
+                spdlog::warn("[GCode::Builder] Strip {} references vertex {} >= vertex count {}", i,
+                             idx, vertices.size());
+                ++issues;
+                break;
+            }
+        }
+    }
+
+    if (issues > 0) {
+        spdlog::warn("[GCode::Builder] Geometry validation found {} issue(s)", issues);
+    } else {
+        spdlog::debug("[GCode::Builder] Geometry validation passed ({} vertices, {} strips, "
+                      "{} layers)",
+                      vertices.size(), strips.size(), layer_strip_ranges.size());
+    }
+}
+
+// ============================================================================
 // BuildStats Implementation
 // ============================================================================
 
@@ -210,8 +290,8 @@ GeometryBuilder::GeometryBuilder() {
 // ============================================================================
 
 uint16_t GeometryBuilder::add_to_normal_palette(RibbonGeometry& geometry, const glm::vec3& normal) {
-    // Very light quantization (0.001) to merge nearly-identical normals without visible banding
-    constexpr float QUANT_STEP = 0.01f; // Increased from 0.001 for better deduplication
+    // Light quantization to merge nearly-identical normals without visible banding
+    constexpr float QUANT_STEP = 0.002f; // Balanced: reduces banding while still deduplicating
     glm::vec3 quantized;
     quantized.x = std::round(normal.x / QUANT_STEP) * QUANT_STEP;
     quantized.y = std::round(normal.y / QUANT_STEP) * QUANT_STEP;
@@ -388,11 +468,18 @@ RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
         // Use source layer index stamped during segment collection
         uint16_t layer_idx = segment.layer_index;
 
-        // Expand per-layer bounding box for frustum culling
+        // Expand per-layer bounding box for frustum culling.
+        // Include tube width: geometry extends perpendicular to the segment direction,
+        // so expand by max(extrusion_width, segment.width) * 0.5 * sqrt(2).
         if (layer_idx < geometry.layer_bboxes.size()) {
             AABB& layer_bbox = geometry.layer_bboxes[layer_idx];
-            layer_bbox.expand(segment.start);
-            layer_bbox.expand(segment.end);
+            float tube_width = std::max(extrusion_width_mm_, segment.width);
+            float expansion = tube_width * 0.5f * 1.41421356f; // sqrt(2) for diagonal
+            glm::vec3 expand_vec(expansion, expansion, expansion);
+            layer_bbox.expand(segment.start - expand_vec);
+            layer_bbox.expand(segment.start + expand_vec);
+            layer_bbox.expand(segment.end - expand_vec);
+            layer_bbox.expand(segment.end + expand_vec);
         }
 
         // Check if we can share vertices with previous segment
@@ -427,13 +514,31 @@ RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
     // Build layer_strip_ranges from accumulated data
     // Initialize with empty ranges for all layers
     geometry.layer_strip_ranges.resize(gcode.layers.size(), {0, 0});
+    size_t non_contiguous_layers = 0;
     for (const auto& [layer_idx, strip_indices] : layer_to_strip_indices) {
         if (!strip_indices.empty() && layer_idx < geometry.layer_strip_ranges.size()) {
-            // Find contiguous range (strips should be mostly contiguous per layer)
             size_t first = strip_indices.front();
-            size_t count = strip_indices.size();
-            geometry.layer_strip_ranges[layer_idx] = {first, count};
+            size_t last = strip_indices.back();
+            size_t span = last - first + 1;
+
+            // Contiguity check: if the span exceeds the index count, there are gaps
+            if (span != strip_indices.size()) {
+                non_contiguous_layers++;
+                spdlog::trace("[GCode::Builder] Layer {} strips are non-contiguous: "
+                              "{} indices spanning {} slots (gaps present)",
+                              layer_idx, strip_indices.size(), span);
+            }
+
+            // Use the full span range (first, span) to cover all strips including gaps.
+            // This may include strips from other layers in the gap, but the renderer
+            // draws by layer range so this is safe for single-VBO-per-layer upload.
+            geometry.layer_strip_ranges[layer_idx] = {first, span};
         }
+    }
+    if (non_contiguous_layers > 0) {
+        spdlog::warn("[GCode::Builder] {} layers have non-contiguous strip ranges "
+                     "(using span-based ranges as fallback)",
+                     non_contiguous_layers);
     }
 
     // Store quantization parameters for dequantization during rendering
@@ -449,6 +554,9 @@ RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
     stats_.memory_bytes = geometry.memory_usage();
 
     stats_.log();
+
+    // Validate geometry integrity before returning
+    geometry.validate();
 
     // End timing
     auto build_end = std::chrono::high_resolution_clock::now();
@@ -482,16 +590,18 @@ GeometryBuilder::simplify_segments(const std::vector<ToolpathSegment>& segments,
 
         // Can only merge segments if:
         // 1. Same move type (both extrusion or both travel)
-        // 2. Endpoints connect (current.end ≈ next.start)
-        // 3. Same object (for per-object highlighting)
-        // 4. Collinear within tolerance
+        // 2. Same layer (segments in different layers must NEVER be merged)
+        // 3. Endpoints connect (current.end ≈ next.start)
+        // 4. Same object (for per-object highlighting)
+        // 5. Collinear within tolerance
 
         bool same_type = (current.is_extrusion == next.is_extrusion);
+        bool same_layer = (current.layer_index == next.layer_index);
         bool endpoints_connect = glm::distance2(current.end, next.start) < 0.0001f;
         bool same_object = (current.object_name == next.object_name);
         bool same_width = (std::abs(current.width - next.width) < 0.001f);
 
-        if (same_type && endpoints_connect && same_object && same_width) {
+        if (same_type && same_layer && endpoints_connect && same_object && same_width) {
             // Direction check: prevent merging segments with significantly different directions.
             // This preserves zigzag fill patterns where perpendicular distance is small but
             // the direction changes sharply (e.g., 90-degree turns in solid infill).
@@ -617,14 +727,8 @@ GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, Ribbon
 
     // Record tool → palette index mapping for per-tool recoloring (AMS overrides)
     if (segment.tool_index >= 0) {
-        auto tool_idx = static_cast<size_t>(segment.tool_index);
-        constexpr size_t MAX_TOOLS = 256;
-        if (tool_idx < MAX_TOOLS) {
-            if (tool_idx >= geometry.tool_palette_map.size()) {
-                geometry.tool_palette_map.resize(tool_idx + 1, 0);
-            }
-            geometry.tool_palette_map[tool_idx] = color_idx;
-        }
+        auto tool_idx = static_cast<uint8_t>(segment.tool_index);
+        geometry.tool_palette_map[tool_idx] = color_idx;
     }
 
     // Face colors: one color per face (N faces total)

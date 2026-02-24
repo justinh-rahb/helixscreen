@@ -9,6 +9,7 @@
 
 #include "gcode_parser.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <memory>
@@ -75,6 +76,34 @@ struct QuantizationParams {
      * @brief Dequantize to 3D vector
      */
     glm::vec3 dequantize_vec3(const QuantizedVertex& qv) const;
+};
+
+// ============================================================================
+// Packed Vertex Layout (for GPU upload)
+// ============================================================================
+
+/**
+ * @brief Interleaved vertex format for GPU upload: position(3f) + normal(3f) + color(3f)
+ *
+ * Centralizes the vertex attribute layout so that upload code (geometry builder)
+ * and draw code (renderer) stay in sync. 36 bytes per vertex.
+ */
+struct PackedVertex {
+    float position[3];
+    float normal[3];
+    float color[3];
+    static constexpr size_t stride() {
+        return sizeof(PackedVertex);
+    }
+    static constexpr size_t position_offset() {
+        return offsetof(PackedVertex, position);
+    }
+    static constexpr size_t normal_offset() {
+        return offsetof(PackedVertex, normal);
+    }
+    static constexpr size_t color_offset() {
+        return offsetof(PackedVertex, color);
+    }
 };
 
 // ============================================================================
@@ -164,7 +193,7 @@ struct RibbonGeometry {
 
     /// Maps tool_index → color_palette index. Allows recoloring VBOs by tool
     /// (e.g., AMS slot colors) without rebuilding geometry.
-    std::vector<uint8_t> tool_palette_map;
+    std::unordered_map<uint8_t, uint8_t> tool_palette_map;
 
     // Layer tracking for two-pass ghost layer rendering
     std::vector<uint16_t> strip_layer_index; ///< Layer index per strip (parallel to strips vector)
@@ -200,6 +229,15 @@ struct RibbonGeometry {
      * @brief Clear all geometry data
      */
     void clear();
+
+    /**
+     * @brief Validate geometry integrity (vertex data, layer ranges, palette indices)
+     *
+     * Spot-checks vertex positions for NaN/Inf, verifies layer strip ranges are
+     * within bounds, and checks color palette indices. Logs warnings for any
+     * issues found.
+     */
+    void validate() const;
 
     /**
      * @brief Destructor - clean up cache pointers

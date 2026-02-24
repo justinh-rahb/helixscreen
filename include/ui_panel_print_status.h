@@ -335,6 +335,12 @@ class PrintStatusPanel : public OverlayBase {
     // large files unless user actually navigates to print status panel
     std::string pending_gcode_filename_;
 
+    // Track what G-code file we've already requested to load (deduplication).
+    // Unlike loaded_thumbnail_filename_ which guards thumbnail loads, this guards
+    // the expensive async G-code download. Set when load_gcode_for_viewing() is
+    // called or deferred; cleared when print ends or a different file is loaded.
+    std::string requested_gcode_filename_;
+
     // Track whether G-code was successfully loaded into the viewer
     // When false (memory check failed), don't switch to viewer mode on state changes
     bool gcode_loaded_ = false;
