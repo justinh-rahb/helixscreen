@@ -1902,7 +1902,7 @@ void PrintStatusPanel::load_thumbnail_for_file(const std::string& filename) {
 
             get_thumbnail_cache().fetch_for_detail_view(
                 api_, thumbnail_rel_path, ctx,
-                [this, current_gen](const std::string& lvgl_path) {
+                [this, current_gen, alive](const std::string& lvgl_path) {
                     // Note: alive check is done by fetch_for_detail_view's guard.
                     // We still need generation check since we passed nullptr for generation.
                     if (current_gen != thumbnail_load_generation_) {
@@ -1914,17 +1914,27 @@ void PrintStatusPanel::load_thumbnail_for_file(const std::string& filename) {
                     // Store the cached path (without "A:" prefix for internal use)
                     cached_thumbnail_path_ = lvgl_path;
 
-                    // Share the thumbnail path via PrinterState for other panels (e.g., HomePanel)
-                    get_printer_state().set_print_thumbnail_path(lvgl_path);
+                    // Defer LVGL calls to main thread — this callback runs on the
+                    // WebSocket/libhv background thread (prestonbrown/helixscreen#192)
+                    helix::ui::queue_update([this, alive_ref = alive, lvgl_path, current_gen]() {
+                        if (!alive_ref->load()) {
+                            return;
+                        }
+                        if (current_gen != thumbnail_load_generation_) {
+                            return;
+                        }
 
-                    if (print_thumbnail_) {
-                        lv_image_set_src(print_thumbnail_, lvgl_path.c_str());
-                        spdlog::info("[{}] Thumbnail loaded and displayed: {}", get_name(),
-                                     lvgl_path);
-                    } else {
-                        spdlog::info("[{}] Thumbnail cached (panel not yet displayed): {}",
-                                     get_name(), lvgl_path);
-                    }
+                        get_printer_state().set_print_thumbnail_path(lvgl_path);
+
+                        if (print_thumbnail_) {
+                            lv_image_set_src(print_thumbnail_, lvgl_path.c_str());
+                            spdlog::info("[{}] Thumbnail loaded and displayed: {}", get_name(),
+                                         lvgl_path);
+                        } else {
+                            spdlog::info("[{}] Thumbnail cached (panel not yet displayed): {}",
+                                         get_name(), lvgl_path);
+                        }
+                    });
                 },
                 [this](const std::string& error) {
                     spdlog::warn("[{}] Failed to fetch thumbnail: {}", get_name(), error);

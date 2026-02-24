@@ -449,8 +449,8 @@ void PrinterPrintState::set_print_outcome(PrintOutcome outcome) {
 }
 
 void PrinterPrintState::set_print_thumbnail_path(const std::string& path) {
-    // Thumbnail path is set from PrintStatusPanel's main-thread callback,
-    // so we can safely update the subject directly without ui_async_call.
+    // Thumbnail path is set from PrintStatusPanel via ui_queue_update(),
+    // so this runs on the main thread and can update the subject directly.
     if (path.empty()) {
         spdlog::debug("[PrinterPrintState] Clearing print thumbnail path");
     } else {
