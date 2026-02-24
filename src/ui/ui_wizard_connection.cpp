@@ -75,6 +75,9 @@ WizardConnectionStep::WizardConnectionStep() {
 }
 
 WizardConnectionStep::~WizardConnectionStep() {
+    // Signal async callbacks to abort — must be first! (prestonbrown/helixscreen#193)
+    m_alive->store(false);
+
     // NOTE: Do NOT call LVGL functions here - LVGL may be destroyed first
     // NOTE: Do NOT log here - spdlog may be destroyed first
     screen_root_ = nullptr;
@@ -953,7 +956,11 @@ lv_obj_t* WizardConnectionStep::create(lv_obj_t* parent) {
         mdns_discovery_ = std::make_unique<MdnsDiscovery>();
     }
     spdlog::debug("[{}] Starting mDNS discovery", get_name());
-    mdns_discovery_->start_discovery([this](const std::vector<DiscoveredPrinter>& printers) {
+    auto alive = m_alive;
+    mdns_discovery_->start_discovery([this, alive](const std::vector<DiscoveredPrinter>& printers) {
+        if (!alive->load()) {
+            return;
+        }
         on_printers_discovered(printers);
     });
 
