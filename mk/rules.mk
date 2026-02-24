@@ -316,17 +316,17 @@ endif
 	}
 	$(call emit-compile-command,$(CXX),$(SUBMODULE_CXXFLAGS) $(PCH_FLAGS) $(INCLUDES) $(LV_CONF),$<,$@)
 
-# Compile LVGL OpenGL ES sources as C++ (raw string literals require C++11)
-# These are .c files compiled with CXX, like ThorVG but for the opengles driver.
+# Compile lv_opengles_shader.c as C++ (uses C++11 raw string literals R"(...)").
+# -fpermissive: the file is C code with void* implicit casts that C++ rejects.
 # Only built when ENABLE_OPENGLES=yes (LVGL_OPENGLES_OBJS is empty otherwise).
 $(LVGL_OPENGLES_OBJS): $(OBJ_DIR)/lvgl/%.o: $(LVGL_DIR)/%.c lv_conf.h
 	$(Q)mkdir -p $(dir $@)
 	$(ECHO) "$(CYAN)[CXX/GLES]$(RESET) $<"
-	$(Q)$(CXX) $(SUBMODULE_CXXFLAGS) $(INCLUDES) $(LV_CONF) -c $< -o $@ || { \
+	$(Q)$(CXX) $(SUBMODULE_CXXFLAGS) -fpermissive $(INCLUDES) $(LV_CONF) -c $< -o $@ || { \
 		echo "$(RED)$(BOLD)✗ Compilation failed:$(RESET) $<"; \
 		exit 1; \
 	}
-	$(call emit-compile-command,$(CXX),$(SUBMODULE_CXXFLAGS) $(INCLUDES) $(LV_CONF),$<,$@)
+	$(call emit-compile-command,$(CXX),$(SUBMODULE_CXXFLAGS) -fpermissive $(INCLUDES) $(LV_CONF),$<,$@)
 
 # Compile lv_markdown sources (vendored C library - use SUBMODULE_CFLAGS)
 # Includes both src/*.c and deps/md4c/md4c.c

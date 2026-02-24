@@ -223,14 +223,14 @@ endif
 LVGL_SRCS := $(filter-out $(wildcard $(LVGL_DIR)/src/xml/*.c $(LVGL_DIR)/src/xml/parsers/*.c $(LVGL_DIR)/src/libs/expat/*.c),$(shell find $(LVGL_DIR)/src -name "*.c" 2>/dev/null))
 LVGL_OBJS := $(patsubst $(LVGL_DIR)/%.c,$(OBJ_DIR)/lvgl/%.o,$(LVGL_SRCS))
 
-# When OpenGL ES is enabled, the opengles driver sources contain C++11 raw string
-# literals (R"(...)") that can't compile as C. Filter them from C sources and compile
-# as C++ separately (like ThorVG).
+# When OpenGL ES is enabled, lv_opengles_shader.c uses C++11 raw string literals
+# (R"(...)") that can't compile as C. Filter ONLY that file from C sources and compile
+# it as C++ separately. The other opengles .c files are plain C and stay with LVGL_SRCS.
 ifeq ($(ENABLE_OPENGLES),yes)
-    LVGL_OPENGLES_SRCS := $(filter $(LVGL_DIR)/src/drivers/opengles/%,$(LVGL_SRCS))
-    LVGL_SRCS := $(filter-out $(LVGL_DIR)/src/drivers/opengles/%,$(LVGL_SRCS))
+    LVGL_OPENGLES_SHADER := $(LVGL_DIR)/src/drivers/opengles/assets/lv_opengles_shader.c
+    LVGL_SRCS := $(filter-out $(LVGL_OPENGLES_SHADER),$(LVGL_SRCS))
     LVGL_OBJS := $(patsubst $(LVGL_DIR)/%.c,$(OBJ_DIR)/lvgl/%.o,$(LVGL_SRCS))
-    LVGL_OPENGLES_OBJS := $(patsubst $(LVGL_DIR)/%.c,$(OBJ_DIR)/lvgl/%.o,$(LVGL_OPENGLES_SRCS))
+    LVGL_OPENGLES_OBJS := $(OBJ_DIR)/lvgl/src/drivers/opengles/assets/lv_opengles_shader.o
 else
     LVGL_OPENGLES_OBJS :=
 endif
@@ -501,8 +501,9 @@ ifneq ($(CROSS_COMPILE),)
     ifeq ($(DISPLAY_BACKEND),drm)
         LDFLAGS += -ldrm -linput
         # GPU-accelerated rendering via EGL/OpenGL ES
+        # -ldl: LVGL's EGL loader uses dlopen/dlsym to load libEGL at runtime
         ifeq ($(ENABLE_OPENGLES),yes)
-            LDFLAGS += -lEGL -lGLESv2 -lgbm
+            LDFLAGS += -lEGL -lGLESv2 -lgbm -ldl
         endif
     endif
     PLATFORM := Linux-$(TARGET_ARCH)
