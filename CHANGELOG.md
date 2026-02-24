@@ -20,6 +20,8 @@ The rendering engine gets a major upgrade — the 3D G-code viewer is ported fro
 - G-code render mode setting visible when 3D rendering is available
 - Chamber temperature overlay on controls panel
 - Print lifecycle state extraction for cleaner print status management
+- 3D G-code viewer in print file detail panel with async loading and AMS color support
+- Pinch-to-zoom gesture support for 3D G-code viewer
 - Icons on Delete and Print buttons in print details card
 - SSL enabled for native desktop builds
 - Translation updates with 7 obsolete keys removed
@@ -28,6 +30,7 @@ The rendering engine gets a major upgrade — the 3D G-code viewer is ported fro
 - Use-after-free crashes in G-code viewer, power panel, mDNS callbacks, thumbnail loading, and AMS widget cleanup (#182, #192, #193)
 - Scroll jitter in virtual list views caused by layout-invalidating calls
 - Safe name-based widget lookup prevents miscast crashes in event handlers (#194, #195)
+- GLES 3D build correctly disabled on macOS (no EGL headers)
 - Stale thumbnail and progress data no longer persists when a new print starts
 - AMS spools no longer show as full when Spoolman initial_weight is null
 - AMS loaded filament card swatch color now updates reactively
