@@ -602,8 +602,21 @@ void ui_gcode_viewer_register(void);
 // C++ API Extensions
 // ==============================================
 
+#include <cstdint>
 #include <string>
 #include <unordered_set>
+#include <vector>
+
+/**
+ * @brief Set per-tool AMS color overrides for multi-color prints
+ * @param obj Viewer widget
+ * @param colors Vector of RGB colors indexed by tool (0xRRGGBB)
+ *
+ * Overrides slicer-embedded colors with real AMS filament colors.
+ * For 3D: updates geometry palette and triggers VBO re-upload.
+ * For 2D: replaces tool_palette_ entries; resolves at render time.
+ */
+void ui_gcode_viewer_set_tool_colors(lv_obj_t* obj, const std::vector<uint32_t>& colors);
 
 /**
  * @brief Set highlighted objects (multi-select support)

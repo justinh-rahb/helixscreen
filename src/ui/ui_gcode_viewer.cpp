@@ -197,8 +197,9 @@ class GCodeViewerState {
 
     // Rendering settings
     bool use_filament_color{true};
-    bool has_external_color_override{false}; ///< True when external color (AMS/Spoolman) is set
-    lv_color_t external_color_override{};    ///< Stored override color for lazy-init renderers
+    bool has_external_color_override{false};    ///< True when external color (AMS/Spoolman) is set
+    lv_color_t external_color_override{};       ///< Stored override color for lazy-init renderers
+    std::vector<uint32_t> tool_color_overrides; ///< Per-tool AMS colors for lazy-init renderers
     bool first_render{true};
     bool rendering_paused_{
         false}; ///< When true, draw_cb skips rendering (for visibility optimization)
@@ -386,8 +387,17 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
             st->layer_renderer_2d_->set_canvas_size(width, height);
             st->layer_renderer_2d_->auto_fit();
 
-            // Apply color: external override (AMS/Spoolman) takes priority over gcode metadata
-            if (st->has_external_color_override) {
+            // Apply tool color palette for multi-color prints
+            if (!st->gcode_file->tool_color_palette.empty()) {
+                st->layer_renderer_2d_->set_tool_color_palette(st->gcode_file->tool_color_palette);
+            }
+
+            // Apply per-tool AMS color overrides (takes priority over single-color override)
+            if (!st->tool_color_overrides.empty()) {
+                st->layer_renderer_2d_->set_tool_color_overrides(st->tool_color_overrides);
+                spdlog::debug("[GCode Viewer] 2D renderer using {} tool color overrides",
+                              st->tool_color_overrides.size());
+            } else if (st->has_external_color_override) {
                 st->layer_renderer_2d_->set_extrusion_color(st->external_color_override);
                 spdlog::debug("[GCode Viewer] 2D renderer using external color override");
             } else if (st->use_filament_color && st->gcode_file->filament_color_hex.length() >= 2) {
@@ -660,8 +670,15 @@ static void gcode_viewer_pressing_cb(lv_event_t* e) {
     if (dx != 0 || dy != 0) {
         // Convert pixel movement to rotation angles
         // Scale factor: ~0.5 degrees per pixel
-        float delta_azimuth = dx * 0.5f;
-        float delta_elevation = -dy * 0.5f; // Flip Y for intuitive control
+        // Touch: finger drags model surface (follows finger direction)
+        // Mouse: grab-and-rotate background (opposite to drag direction)
+#if LV_USE_SDL
+        constexpr float sign = -1.0f; // Mouse: invert
+#else
+        constexpr float sign = 1.0f; // Touch: direct
+#endif
+        float delta_azimuth = sign * dx * 0.5f;
+        float delta_elevation = sign * -dy * 0.5f;
 
         st->camera_->rotate(delta_azimuth, delta_elevation);
 
@@ -1255,6 +1272,10 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                     // Update 2D renderer if it exists (prevents dangling pointer)
                     if (st->layer_renderer_2d_) {
                         st->layer_renderer_2d_->set_gcode(st->gcode_file.get());
+                        if (!st->gcode_file->tool_color_palette.empty()) {
+                            st->layer_renderer_2d_->set_tool_color_palette(
+                                st->gcode_file->tool_color_palette);
+                        }
                         st->layer_renderer_2d_->auto_fit();
                     }
 
@@ -1272,11 +1293,14 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                     st->viewer_state = GcodeViewerState::Loaded;
                     spdlog::debug("[GCode Viewer] State set to LOADED");
 
-                    // Auto-apply filament color from gcode metadata
-                    // Always apply the first filament color — even multi-tool gcodes
-                    // declare colors for all tools but usually only use one
-                    if (st->use_filament_color &&
-                        st->gcode_file->filament_color_hex.length() >= 2) {
+                    // Auto-apply filament color from gcode metadata (unless
+                    // AMS/Spoolman has already set an external override)
+                    if (st->has_external_color_override) {
+                        st->renderer_->set_extrusion_color(st->external_color_override);
+                        spdlog::debug(
+                            "[GCode Viewer] Applied external color override (AMS/Spoolman)");
+                    } else if (st->use_filament_color &&
+                               st->gcode_file->filament_color_hex.length() >= 2) {
                         lv_color_t color = lv_color_hex(static_cast<uint32_t>(std::strtol(
                             st->gcode_file->filament_color_hex.c_str() + 1, nullptr, 16)));
                         st->renderer_->set_extrusion_color(color);
@@ -1429,6 +1453,9 @@ void ui_gcode_viewer_set_render_mode(lv_obj_t* obj, GcodeViewerRenderMode mode) 
     if (st->is_using_2d_mode() && st->gcode_file && !st->layer_renderer_2d_) {
         st->layer_renderer_2d_ = std::make_unique<helix::gcode::GCodeLayerRenderer>();
         st->layer_renderer_2d_->set_gcode(st->gcode_file.get());
+        if (!st->gcode_file->tool_color_palette.empty()) {
+            st->layer_renderer_2d_->set_tool_color_palette(st->gcode_file->tool_color_palette);
+        }
 
         lv_area_t coords;
         lv_obj_get_coords(obj, &coords);
@@ -1715,6 +1742,31 @@ void ui_gcode_viewer_set_extrusion_color(lv_obj_t* obj, lv_color_t color) {
         st->layer_renderer_2d_->set_extrusion_color(color);
     }
     lv_obj_invalidate(obj);
+}
+
+void ui_gcode_viewer_set_tool_colors(lv_obj_t* obj, const std::vector<uint32_t>& colors) {
+    gcode_viewer_state_t* st = get_state(obj);
+    if (!st || colors.empty())
+        return;
+
+    // Store for lazy-init paths
+    st->tool_color_overrides = colors;
+
+    // Per-tool overrides supersede the single-color external override
+    st->has_external_color_override = false;
+
+    // Apply to 3D renderer
+#ifdef ENABLE_3D_RENDERER
+    st->renderer_->set_tool_color_overrides(colors);
+#endif
+
+    // Apply to 2D renderer
+    if (st->layer_renderer_2d_) {
+        st->layer_renderer_2d_->set_tool_color_overrides(colors);
+    }
+
+    lv_obj_invalidate(obj);
+    spdlog::debug("[GCode Viewer] Applied {} per-tool AMS color overrides", colors.size());
 }
 
 void ui_gcode_viewer_set_travel_color(lv_obj_t* obj, lv_color_t color) {

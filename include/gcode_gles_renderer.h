@@ -6,6 +6,7 @@
 #ifdef ENABLE_GLES_3D
 
 #include "gcode_camera.h"
+#include "gcode_color_palette.h"
 #include "gcode_geometry_builder.h"
 #include "gcode_parser.h"
 
@@ -72,8 +73,9 @@ class GCodeGLESRenderer {
     void set_specular(float intensity, float shininess);
     void set_debug_face_colors(bool enable);
 
-    // Compatibility stubs (no-op)
-    void set_extrusion_color(lv_color_t) {}
+    // Color setters (lv_color_t interface used by gcode viewer widget)
+    void set_extrusion_color(lv_color_t color);
+    void set_tool_color_overrides(const std::vector<uint32_t>& ams_colors);
     void set_travel_color(lv_color_t) {}
     void set_brightness_factor(float) {}
 
@@ -127,6 +129,9 @@ class GCodeGLESRenderer {
     // ====== GL Resource Management ======
 
     bool init_gl();
+#if !LV_USE_SDL
+    bool try_egl_display(void* native_display, const char* label);
+#endif
     bool compile_shaders();
     bool create_fbo(int width, int height);
     void destroy_fbo();
@@ -146,7 +151,7 @@ class GCodeGLESRenderer {
 
     void render_to_fbo(const ParsedGCodeFile& gcode, const GCodeCamera& camera);
     void draw_layers(const std::vector<LayerVBO>& vbos, int layer_start, int layer_end,
-                     const glm::vec4& color, float ghost_alpha);
+                     float color_scale, float ghost_alpha);
     void blit_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_coords);
 
     // ====== Frame Skip ======
@@ -167,13 +172,22 @@ class GCodeGLESRenderer {
         }
     };
 
-    // ====== EGL State ======
+    // ====== GL Backend State ======
 
+#if LV_USE_SDL
+    // SDL GL backend (desktop)
+    void* sdl_gl_window_ = nullptr;  // SDL_Window*
+    void* sdl_gl_context_ = nullptr; // SDL_GLContext
+#else
+    // EGL backend (Pi/embedded)
     void* egl_display_ = nullptr; // EGLDisplay
     void* egl_context_ = nullptr; // EGLContext
+    void* egl_surface_ = nullptr; // EGLSurface (PBuffer for non-surfaceless drivers)
     void* gbm_device_ = nullptr;  // struct gbm_device*
     int drm_fd_ = -1;             // DRM file descriptor (owned by us)
+#endif
     bool gl_initialized_ = false;
+    bool gl_init_failed_ = false; // Prevents repeated init attempts
 
     // ====== Shader State ======
 
@@ -191,6 +205,9 @@ class GCodeGLESRenderer {
     // Attribute locations
     int a_position_ = -1;
     int a_normal_ = -1;
+    int a_color_ = -1;
+    int u_use_vertex_color_ = -1;
+    int u_color_scale_ = -1;
 
     // ====== FBO State ======
 
@@ -215,22 +232,19 @@ class GCodeGLESRenderer {
     // ====== Geometry ======
 
     std::unique_ptr<RibbonGeometry> geometry_;
-    std::unique_ptr<RibbonGeometry> coarse_geometry_;
     RibbonGeometry* active_geometry_ = nullptr;
     std::string current_filename_;
 
     std::vector<LayerVBO> layer_vbos_;
-    std::vector<LayerVBO> coarse_layer_vbos_;
     bool geometry_uploaded_ = false;
-    bool coarse_geometry_uploaded_ = false;
 
     // ====== Configuration ======
 
+    GCodeColorPalette palette_; ///< Tool color palette for per-vertex coloring
     glm::vec4 filament_color_{0.15f, 0.65f, 0.60f, 1.0f}; // #26A69A
-    float specular_intensity_ = 0.10f;
+    float specular_intensity_ = 0.075f;                   // Match OrcaSlicer (0.125 * 0.6)
     float specular_shininess_ = 20.0f;
     float extrusion_width_ = 0.5f;
-    float simplification_tolerance_ = 0.15f;
     bool smooth_shading_ = false;
     bool debug_face_colors_ = false;
     bool show_travels_ = false;

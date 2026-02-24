@@ -162,6 +162,10 @@ struct RibbonGeometry {
     std::vector<glm::vec3> normal_palette; ///< Unique normals (max 256)
     std::vector<uint32_t> color_palette;   ///< Unique colors in RGB format (max 256)
 
+    /// Maps tool_index → color_palette index. Allows recoloring VBOs by tool
+    /// (e.g., AMS slot colors) without rebuilding geometry.
+    std::vector<uint8_t> tool_palette_map;
+
     // Layer tracking for two-pass ghost layer rendering
     std::vector<uint16_t> strip_layer_index; ///< Layer index per strip (parallel to strips vector)
     /// Layer strip ranges: [layer_idx] -> (first_strip_idx, strip_count)

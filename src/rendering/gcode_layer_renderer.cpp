@@ -130,6 +130,33 @@ void GCodeLayerRenderer::set_support_color(lv_color_t color) {
     use_custom_support_color_ = true;
 }
 
+void GCodeLayerRenderer::set_tool_color_palette(const std::vector<std::string>& hex_colors) {
+    tool_palette_.set_from_hex_palette(hex_colors);
+    if (tool_palette_.has_tool_colors()) {
+        spdlog::debug("[GCodeLayerRenderer] Set tool color palette: {} colors", hex_colors.size());
+    }
+}
+
+void GCodeLayerRenderer::set_tool_color_overrides(const std::vector<uint32_t>& ams_colors) {
+    if (ams_colors.empty()) {
+        return;
+    }
+
+    // Replace tool_palette_ entries with AMS colors
+    tool_palette_.tool_colors.resize(ams_colors.size());
+    for (size_t i = 0; i < ams_colors.size(); ++i) {
+        tool_palette_.tool_colors[i] = lv_color_hex(ams_colors[i]);
+    }
+
+    // Clear any single-color override since per-tool overrides supersede it
+    tool_palette_.has_override = false;
+
+    // Invalidate caches so new colors take effect
+    invalidate_cache();
+
+    spdlog::debug("[GCodeLayerRenderer] Applied {} tool color overrides", ams_colors.size());
+}
+
 void GCodeLayerRenderer::reset_colors() {
     // Use theme colors for default appearance
     // Extrusion: info blue for visibility against dark background
@@ -144,6 +171,7 @@ void GCodeLayerRenderer::reset_colors() {
     use_custom_extrusion_color_ = false;
     use_custom_travel_color_ = false;
     use_custom_support_color_ = false;
+    tool_palette_ = GCodeColorPalette{};
 }
 
 void GCodeLayerRenderer::set_excluded_objects(const std::unordered_set<std::string>& names) {
@@ -457,11 +485,6 @@ void GCodeLayerRenderer::render_layers_to_cache(int from_layer, int to_layer) {
     // Compute extrusion line width in pixels (scale-dependent)
     int line_width = get_extrusion_pixel_width();
 
-    // Compute base color once (full filament color with full alpha)
-    uint8_t base_r = color_extrusion_.red;
-    uint8_t base_g = color_extrusion_.green;
-    uint8_t base_b = color_extrusion_.blue;
-
     for (int layer_idx = from_layer; layer_idx <= to_layer; ++layer_idx) {
         if (layer_idx < 0 || layer_idx >= layer_count)
             continue;
@@ -500,17 +523,23 @@ void GCodeLayerRenderer::render_layers_to_cache(int from_layer, int to_layer) {
             if (p1.x == p2.x && p1.y == p2.y)
                 continue;
 
+            // Per-segment tool color (or fallback to single extrusion color)
+            lv_color_t seg_color = color_extrusion_;
+            if (tool_palette_.has_tool_colors()) {
+                seg_color = tool_palette_.resolve(seg.tool_index, color_extrusion_);
+            }
+            uint8_t r = seg_color.red, g = seg_color.green, b = seg_color.blue;
+
             // Calculate color with depth shading for 3D-like appearance
-            uint8_t r = base_r, g = base_g, b = base_b;
             if (depth_shading_ && view_mode_ == ViewMode::FRONT) {
                 float avg_z = (seg.start.z + seg.end.z) * 0.5f;
                 float avg_y = (seg.start.y + seg.end.y) * 0.5f;
                 float brightness = compute_depth_brightness(avg_z, bounds_min_z_, bounds_max_z_,
                                                             avg_y, bounds_min_y_, bounds_max_y_);
 
-                r = static_cast<uint8_t>(base_r * brightness);
-                g = static_cast<uint8_t>(base_g * brightness);
-                b = static_cast<uint8_t>(base_b * brightness);
+                r = static_cast<uint8_t>(r * brightness);
+                g = static_cast<uint8_t>(g * brightness);
+                b = static_cast<uint8_t>(b * brightness);
             }
 
             // Override color for excluded/highlighted objects
@@ -543,9 +572,9 @@ void GCodeLayerRenderer::render_layers_to_cache(int from_layer, int to_layer) {
     }
 
     spdlog::trace("[GCodeLayerRenderer] Rendered layers {}-{}: {} segments to cache (direct), "
-                  "color=#{:02X}{:02X}{:02X}, buf={}x{} stride={}",
-                  from_layer, to_layer, segments_rendered, base_r, base_g, base_b, cached_width_,
-                  cached_height_, cache_buf_ ? cache_buf_->header.stride : 0);
+                  "buf={}x{} stride={}",
+                  from_layer, to_layer, segments_rendered, cached_width_, cached_height_,
+                  cache_buf_ ? cache_buf_->header.stride : 0);
 }
 
 void GCodeLayerRenderer::blit_cache(lv_layer_t* target) {
@@ -1071,6 +1100,10 @@ lv_color_t GCodeLayerRenderer::get_segment_color(const ToolpathSegment& seg) con
     if (is_support_segment(seg)) {
         return color_support_;
     }
+    // Per-tool color from palette (multi-color prints or AMS overrides)
+    if (tool_palette_.has_tool_colors()) {
+        return tool_palette_.resolve(seg.tool_index, color_extrusion_);
+    }
     return color_extrusion_;
 }
 
@@ -1275,6 +1308,10 @@ void GCodeLayerRenderer::background_ghost_render_thread() {
     // Color (can be changed via set_extrusion_color() on main thread)
     const lv_color_t local_color_extrusion = color_extrusion_;
 
+    // Tool palette (for multi-color ghost rendering)
+    const GCodeColorPalette local_tool_palette = tool_palette_;
+    const bool local_use_custom_extrusion = use_custom_extrusion_color_;
+
     // Capture extrusion pixel width (uses scale_ which may change on main thread)
     const int local_line_width = get_extrusion_pixel_width();
 
@@ -1340,8 +1377,15 @@ void GCodeLayerRenderer::background_ghost_render_thread() {
             if (p1.x == p2.x && p1.y == p2.y)
                 continue;
 
-            // Use excluded color for excluded objects even in ghost
+            // Per-segment ghost color (tool palette or single color)
             uint32_t seg_color = ghost_color;
+            if (local_tool_palette.has_tool_colors()) {
+                lv_color_t tc = local_tool_palette.resolve(seg.tool_index, local_color_extrusion);
+                uint8_t tr = tc.red * 40 / 100;
+                uint8_t tg = tc.green * 40 / 100;
+                uint8_t tb = tc.blue * 40 / 100;
+                seg_color = (255u << 24) | (tr << 16) | (tg << 8) | tb;
+            }
             if (!seg.object_name.empty() && local_excluded.count(seg.object_name) > 0) {
                 // Excluded: dim orange-red
                 uint8_t ex_r = 0xFF * 40 / 100;

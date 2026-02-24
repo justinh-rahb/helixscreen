@@ -18,13 +18,13 @@ GCodeCamera::GCodeCamera() {
 }
 
 void GCodeCamera::reset() {
-    // Default isometric view matching common slicer thumbnail angles
-    // Most slicers (OrcaSlicer, PrusaSlicer, Bambu) show front-left view
-    azimuth_ = -45.0f;  // Front-left (was 45° = back-right)
-    elevation_ = 20.0f; // Match OrcaSlicer thumbnail angle
+    // Default isometric view matching OrcaSlicer thumbnail camera:
+    // OrcaSlicer uses zenit=45°, phi=45° (Camera.cpp line 682-691)
+    azimuth_ = -45.0f;  // Front-left view (OrcaSlicer phi=45° maps to our -45°)
+    elevation_ = 45.0f; // Match OrcaSlicer zenit=45°
     target_ = glm::vec3(0, 0, 0);
     distance_ = 100.0f;
-    zoom_level_ = 1.8f; // Tighter framing to match thumbnails (was 1.4)
+    zoom_level_ = 1.4f; // Fit model with margin (OrcaSlicer uses ~2.5% margin)
     projection_type_ = ProjectionType::ORTHOGRAPHIC;
 
     update_matrices();
@@ -93,7 +93,7 @@ void GCodeCamera::fit_to_bounds(const AABB& bounds) {
     distance_ = max_dimension * 2.0f; // Far enough for near/far planes
 
     // Preserve custom zoom if explicitly set (> default), otherwise reset to default
-    constexpr float DEFAULT_ZOOM = 1.8f; // Match slicer thumbnail framing
+    constexpr float DEFAULT_ZOOM = 1.4f; // Match OrcaSlicer thumbnail framing
     if (zoom_level_ <= DEFAULT_ZOOM) {
         zoom_level_ = DEFAULT_ZOOM;
     }

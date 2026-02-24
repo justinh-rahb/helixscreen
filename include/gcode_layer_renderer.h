@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "gcode_color_palette.h"
 #include "gcode_parser.h"
 #include "gcode_projection.h"
 #include "gcode_streaming_controller.h"
@@ -292,6 +293,21 @@ class GCodeLayerRenderer {
     void set_support_color(lv_color_t color);
 
     /**
+     * @brief Set tool color palette for multi-color prints
+     * @param hex_colors Vector of hex color strings (e.g., "#ED1C24")
+     */
+    void set_tool_color_palette(const std::vector<std::string>& hex_colors);
+
+    /**
+     * @brief Override per-tool colors with AMS slot colors
+     * @param ams_colors Vector of RGB colors indexed by tool (0xRRGGBB)
+     *
+     * Replaces tool_palette_ entries with real AMS filament colors.
+     * Colors resolve at render time per-segment — no rebuild needed.
+     */
+    void set_tool_color_overrides(const std::vector<uint32_t>& ams_colors);
+
+    /**
      * @brief Reset all colors to theme defaults
      */
     void reset_colors();
@@ -492,6 +508,7 @@ class GCodeLayerRenderer {
     bool use_custom_extrusion_color_ = false;
     bool use_custom_travel_color_ = false;
     bool use_custom_support_color_ = false;
+    GCodeColorPalette tool_palette_; ///< Per-tool colors for multi-color prints
 
     // Object exclusion/highlight state
     std::unordered_set<std::string> excluded_objects_;

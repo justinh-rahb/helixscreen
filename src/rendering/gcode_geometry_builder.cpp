@@ -105,6 +105,7 @@ RibbonGeometry::RibbonGeometry(RibbonGeometry&& other) noexcept
     : vertices(std::move(other.vertices)), indices(std::move(other.indices)),
       strips(std::move(other.strips)), normal_palette(std::move(other.normal_palette)),
       color_palette(std::move(other.color_palette)),
+      tool_palette_map(std::move(other.tool_palette_map)),
       strip_layer_index(std::move(other.strip_layer_index)),
       layer_strip_ranges(std::move(other.layer_strip_ranges)),
       max_layer_index(other.max_layer_index), layer_bboxes(std::move(other.layer_bboxes)),
@@ -120,6 +121,7 @@ RibbonGeometry& RibbonGeometry::operator=(RibbonGeometry&& other) noexcept {
         strips = std::move(other.strips);
         normal_palette = std::move(other.normal_palette);
         color_palette = std::move(other.color_palette);
+        tool_palette_map = std::move(other.tool_palette_map);
         strip_layer_index = std::move(other.strip_layer_index);
         layer_strip_ranges = std::move(other.layer_strip_ranges);
         layer_bboxes = std::move(other.layer_bboxes);
@@ -139,6 +141,7 @@ void RibbonGeometry::clear() {
     strips.clear();
     normal_palette.clear();
     color_palette.clear();
+    tool_palette_map.clear();
     strip_layer_index.clear();
     layer_strip_ranges.clear();
     layer_bboxes.clear();
@@ -722,6 +725,15 @@ GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, Ribbon
     }
 
     uint8_t color_idx = add_to_color_palette(geometry, rgb);
+
+    // Record tool → palette index mapping for per-tool recoloring (AMS overrides)
+    if (segment.tool_index >= 0) {
+        auto tool_idx = static_cast<size_t>(segment.tool_index);
+        if (tool_idx >= geometry.tool_palette_map.size()) {
+            geometry.tool_palette_map.resize(tool_idx + 1, 0);
+        }
+        geometry.tool_palette_map[tool_idx] = color_idx;
+    }
 
     // Face colors: one color per face (N faces total)
     std::vector<uint8_t> face_colors(static_cast<size_t>(N), color_idx);

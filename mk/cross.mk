@@ -5,15 +5,21 @@
 #
 # Usage:
 #   make                       # Native build (SDL)
-#   make PLATFORM_TARGET=pi    # Cross-compile for Raspberry Pi (aarch64)
-#   make PLATFORM_TARGET=pi32  # Cross-compile for Raspberry Pi (armhf/armv7l)
+#   make PLATFORM_TARGET=pi    # Cross-compile for Raspberry Pi (aarch64, DRM+GLES)
+#   make PLATFORM_TARGET=pi-fbdev  # Cross-compile for Pi (aarch64, fbdev fallback)
+#   make PLATFORM_TARGET=pi32  # Cross-compile for Raspberry Pi (armhf, DRM+GLES)
+#   make PLATFORM_TARGET=pi32-fbdev  # Cross-compile for Pi (armhf, fbdev fallback)
 #   make PLATFORM_TARGET=ad5m  # Cross-compile for Adventurer 5M (armv7-a)
 #   make PLATFORM_TARGET=cc1   # Cross-compile for Centauri Carbon 1 (armv7-a)
 #   make PLATFORM_TARGET=k1    # Cross-compile for Creality K1 series (MIPS32)
 #   make PLATFORM_TARGET=k2    # Cross-compile for Creality K2 series (ARM)
 #   make PLATFORM_TARGET=snapmaker-u1 # Cross-compile for Snapmaker U1 (aarch64)
-#   make pi-docker             # Docker-based Pi build (64-bit)
-#   make pi32-docker           # Docker-based Pi build (32-bit)
+#   make pi-docker             # Docker-based Pi build (64-bit, DRM+GLES)
+#   make pi-fbdev-docker       # Docker-based Pi build (64-bit, fbdev fallback)
+#   make pi-all-docker         # Docker-based Pi build (both variants)
+#   make pi32-docker           # Docker-based Pi build (32-bit, DRM+GLES)
+#   make pi32-fbdev-docker     # Docker-based Pi build (32-bit, fbdev fallback)
+#   make pi32-all-docker       # Docker-based Pi build (both 32-bit variants)
 #   make ad5m-docker           # Docker-based AD5M build
 #   make cc1-docker            # Docker-based CC1 build
 #   make k1-docker             # Docker-based K1 build
