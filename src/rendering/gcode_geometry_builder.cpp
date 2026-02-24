@@ -787,20 +787,18 @@ GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, Ribbon
             half_width * std::cos(angle) * right + half_height * std::sin(angle) * perp_up;
     }
 
-    // Generate N face normals (one per face)
-    // Face normal points outward from face center (midpoint between adjacent vertices)
-    // Face i connects vertex i to vertex (i+1)%N, so face center is at angle (i+0.5)*angle_step
-    std::vector<glm::vec3> face_normals(static_cast<size_t>(N));
-
+    // Per-vertex radial normals for smooth shading
+    // Each vertex at angle theta gets normal = normalize(cos(theta)*right + sin(theta)*perp_up)
+    std::vector<glm::vec3> vertex_normals(static_cast<size_t>(N));
     for (int i = 0; i < N; i++) {
-        float face_angle = (i + 0.5f) * angle_step; // Midpoint between vertices i and i+1
-        glm::vec3 face_center_offset = half_width * std::cos(face_angle) * right +
-                                       half_height * std::sin(face_angle) * perp_up;
-        float len = glm::length(face_center_offset);
+        float angle = i * angle_step;
+        glm::vec3 radial =
+            half_width * std::cos(angle) * right + half_height * std::sin(angle) * perp_up;
+        float len = glm::length(radial);
         if (len > 1e-6f) {
-            face_normals[static_cast<size_t>(i)] = face_center_offset / len;
+            vertex_normals[static_cast<size_t>(i)] = radial / len;
         } else {
-            face_normals[static_cast<size_t>(i)] = glm::vec3(0.0f, 0.0f, 1.0f);
+            vertex_normals[static_cast<size_t>(i)] = glm::vec3(0.0f, 0.0f, 1.0f);
         }
     }
 
@@ -834,36 +832,42 @@ GeometryBuilder::generate_ribbon_vertices(const ToolpathSegment& segment, Ribbon
     // ========== PREV SIDE FACE VERTICES ==========
     // Generate 2N prev vertices (2 vertices per face, N faces)
     // Each face connects vertex (i+1)%N to vertex i (going backwards around circle for correct
-    // winding)
+    // winding). Per-vertex radial normals for smooth shading.
     for (int i = 0; i < N; i++) {
         int next_i = (i + 1) % N;
         glm::vec3 pos_v1 =
             prev_pos + vertex_offsets[static_cast<size_t>(next_i)]; // REVERSED: next_i first
         glm::vec3 pos_v2 = prev_pos + vertex_offsets[static_cast<size_t>(i)]; // then i
-        uint16_t normal_idx = add_to_normal_palette(geometry, face_normals[static_cast<size_t>(i)]);
+        uint16_t normal_idx_v1 =
+            add_to_normal_palette(geometry, vertex_normals[static_cast<size_t>(next_i)]);
+        uint16_t normal_idx_v2 =
+            add_to_normal_palette(geometry, vertex_normals[static_cast<size_t>(i)]);
 
         geometry.vertices.push_back(
-            {quant.quantize_vec3(pos_v1), normal_idx, face_colors[static_cast<size_t>(i)]});
+            {quant.quantize_vec3(pos_v1), normal_idx_v1, face_colors[static_cast<size_t>(i)]});
         geometry.vertices.push_back(
-            {quant.quantize_vec3(pos_v2), normal_idx, face_colors[static_cast<size_t>(i)]});
+            {quant.quantize_vec3(pos_v2), normal_idx_v2, face_colors[static_cast<size_t>(i)]});
     }
     idx_start += static_cast<uint32_t>(2 * N);
 
     // ========== CURR SIDE FACE VERTICES ==========
     // Generate 2N curr vertices (2 vertices per face, N faces)
     // Each face connects vertex (i+1)%N to vertex i (going backwards around circle for correct
-    // winding)
+    // winding). Per-vertex radial normals for smooth shading.
     for (int i = 0; i < N; i++) {
         int next_i = (i + 1) % N;
         glm::vec3 pos_v1 =
             curr_pos + vertex_offsets[static_cast<size_t>(next_i)]; // REVERSED: next_i first
         glm::vec3 pos_v2 = curr_pos + vertex_offsets[static_cast<size_t>(i)]; // then i
-        uint16_t normal_idx = add_to_normal_palette(geometry, face_normals[static_cast<size_t>(i)]);
+        uint16_t normal_idx_v1 =
+            add_to_normal_palette(geometry, vertex_normals[static_cast<size_t>(next_i)]);
+        uint16_t normal_idx_v2 =
+            add_to_normal_palette(geometry, vertex_normals[static_cast<size_t>(i)]);
 
         geometry.vertices.push_back(
-            {quant.quantize_vec3(pos_v1), normal_idx, face_colors[static_cast<size_t>(i)]});
+            {quant.quantize_vec3(pos_v1), normal_idx_v1, face_colors[static_cast<size_t>(i)]});
         geometry.vertices.push_back(
-            {quant.quantize_vec3(pos_v2), normal_idx, face_colors[static_cast<size_t>(i)]});
+            {quant.quantize_vec3(pos_v2), normal_idx_v2, face_colors[static_cast<size_t>(i)]});
     }
     idx_start += static_cast<uint32_t>(2 * N);
 

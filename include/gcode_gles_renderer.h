@@ -202,6 +202,8 @@ class GCodeGLESRenderer {
     int u_specular_intensity_ = -1;
     int u_specular_shininess_ = -1;
     int u_ghost_alpha_ = -1;
+    int u_model_view_ = -1;
+    int u_base_alpha_ = -1;
     // Attribute locations
     int a_position_ = -1;
     int a_normal_ = -1;
@@ -242,8 +244,8 @@ class GCodeGLESRenderer {
 
     GCodeColorPalette palette_; ///< Tool color palette for per-vertex coloring
     glm::vec4 filament_color_{0.15f, 0.65f, 0.60f, 1.0f}; // #26A69A
-    float specular_intensity_ = 0.075f;                   // Match OrcaSlicer (0.125 * 0.6)
-    float specular_shininess_ = 20.0f;
+    float specular_intensity_ = 0.25f;                    // Visible plastic sheen
+    float specular_shininess_ = 48.0f;                    // Tighter highlight
     float extrusion_width_ = 0.5f;
     bool debug_face_colors_ = false;
     bool show_travels_ = false;

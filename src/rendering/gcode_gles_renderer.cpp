@@ -147,15 +147,11 @@ class EglContextGuard {
 // ============================================================
 
 static const char* kVertexShaderSource = R"(
-    // Gouraud lighting with per-vertex color support
+    // Per-pixel Phong shading with camera-following light
     uniform mat4 u_mvp;
+    uniform mat4 u_model_view;
     uniform mat3 u_normal_matrix;
-    uniform vec3 u_light_dir[2];
-    uniform vec3 u_light_color[2];
-    uniform vec3 u_ambient;
     uniform vec4 u_base_color;
-    uniform float u_specular_intensity;
-    uniform float u_specular_shininess;
     uniform float u_use_vertex_color;
     uniform float u_color_scale;
 
@@ -163,67 +159,66 @@ static const char* kVertexShaderSource = R"(
     attribute vec3 a_normal;
     attribute vec3 a_color;
 
-    varying vec4 v_color;
+    varying vec3 v_normal;
+    varying vec3 v_position;
+    varying vec3 v_base_color;
 
     void main() {
         gl_Position = u_mvp * vec4(a_position, 1.0);
-        vec3 n = normalize(u_normal_matrix * a_normal);
+        v_normal = normalize(u_normal_matrix * a_normal);
+        v_position = (u_model_view * vec4(a_position, 1.0)).xyz;
+        v_base_color = mix(u_base_color.rgb, a_color, u_use_vertex_color) * u_color_scale;
+    }
+)";
 
-        // Select base color: per-vertex or uniform override
-        vec3 base = mix(u_base_color.rgb, a_color, u_use_vertex_color);
-        base *= u_color_scale;
+static const char* kFragmentShaderSource = R"(
+    precision mediump float;
+    varying vec3 v_normal;
+    varying vec3 v_position;
+    varying vec3 v_base_color;
 
-        // Diffuse lighting from two directional lights
+    uniform vec3 u_light_dir[2];
+    uniform vec3 u_light_color[2];
+    uniform vec3 u_ambient;
+    uniform float u_specular_intensity;
+    uniform float u_specular_shininess;
+    uniform float u_base_alpha;
+    uniform float u_ghost_alpha;
+
+    void main() {
+        if (u_ghost_alpha < 1.0) {
+            vec2 fc = floor(gl_FragCoord.xy);
+            if (mod(fc.x + fc.y, 2.0) < 0.5) discard;
+        }
+
+        vec3 n = normalize(v_normal);
+        vec3 view_dir = normalize(-v_position);
+
+        // Diffuse from two lights
         vec3 diffuse = u_ambient;
         for (int i = 0; i < 2; i++) {
             float NdotL = max(dot(n, u_light_dir[i]), 0.0);
             diffuse += u_light_color[i] * NdotL;
         }
 
-        // Specular (Blinn-Phong, top light only — matches OrcaSlicer)
-        vec3 view_dir = vec3(0.0, 0.0, 1.0);
-        vec3 half_dir = normalize(u_light_dir[0] + view_dir);
-        float spec = pow(max(dot(n, half_dir), 0.0), u_specular_shininess);
-
-        v_color = vec4(base * diffuse + vec3(spec * u_specular_intensity),
-                       u_base_color.a);
-    }
-)";
-
-static const char* kFragmentShaderSource = R"(
-    precision mediump float;
-    varying vec4 v_color;
-    uniform float u_ghost_alpha;
-
-    void main() {
-        // Stipple emulation for ghost mode (screen-door transparency)
-        if (u_ghost_alpha < 1.0) {
-            // 50% checkerboard discard pattern
-            vec2 fc = floor(gl_FragCoord.xy);
-            if (mod(fc.x + fc.y, 2.0) < 0.5) discard;
+        // Blinn-Phong specular from both lights
+        float spec = 0.0;
+        for (int i = 0; i < 2; i++) {
+            vec3 half_dir = normalize(u_light_dir[i] + view_dir);
+            spec += pow(max(dot(n, half_dir), 0.0), u_specular_shininess);
         }
-        gl_FragColor = v_color;
+
+        vec3 color = v_base_color * diffuse + vec3(spec * u_specular_intensity);
+        gl_FragColor = vec4(color, u_base_alpha);
     }
 )";
 
 // ============================================================
-// Lighting Constants (match TinyGL setup_lighting)
+// Lighting Constants
 // ============================================================
 
-static constexpr float INTENSITY_CORRECTION = 0.6f; // Match OrcaSlicer
-static constexpr float INTENSITY_AMBIENT = 0.3f;    // Match OrcaSlicer
-
-// Top light: primary from above-right (OrcaSlicer LIGHT_TOP_DIR)
-static constexpr glm::vec3 kLightTopDir{-0.4574957f, 0.4574957f, 0.7624929f};
-static constexpr glm::vec3 kLightTopColor{0.8f * INTENSITY_CORRECTION, 0.8f * INTENSITY_CORRECTION,
-                                          0.8f * INTENSITY_CORRECTION};
-
-// Front light: fill from front-right (OrcaSlicer LIGHT_FRONT_DIR)
+// Fixed fill light direction (front-right)
 static constexpr glm::vec3 kLightFrontDir{0.6985074f, 0.1397015f, 0.6985074f};
-static constexpr glm::vec3 kLightFrontColor{
-    0.3f * INTENSITY_CORRECTION, 0.3f * INTENSITY_CORRECTION, 0.3f * INTENSITY_CORRECTION};
-
-static constexpr glm::vec3 kAmbientColor{INTENSITY_AMBIENT, INTENSITY_AMBIENT, INTENSITY_AMBIENT};
 
 // ============================================================
 // Construction / Destruction
@@ -523,6 +518,8 @@ bool GCodeGLESRenderer::compile_shaders() {
     u_specular_intensity_ = glGetUniformLocation(program_, "u_specular_intensity");
     u_specular_shininess_ = glGetUniformLocation(program_, "u_specular_shininess");
     u_ghost_alpha_ = glGetUniformLocation(program_, "u_ghost_alpha");
+    u_model_view_ = glGetUniformLocation(program_, "u_model_view");
+    u_base_alpha_ = glGetUniformLocation(program_, "u_base_alpha");
     a_position_ = glGetAttribLocation(program_, "a_position");
     a_normal_ = glGetAttribLocation(program_, "a_normal");
     a_color_ = glGetAttribLocation(program_, "a_color");
@@ -942,15 +939,26 @@ void GCodeGLESRenderer::render_to_fbo(const ParsedGCodeFile& /*gcode*/, const GC
     glUniformMatrix4fv(u_mvp_, 1, GL_FALSE, glm::value_ptr(mvp));
     glUniformMatrix3fv(u_normal_matrix_, 1, GL_FALSE, glm::value_ptr(normal_mat));
 
-    // Lighting — transform light directions from world space to view-model space
-    // (normals are in view-model space via u_normal_matrix, so lights must match)
+    glm::mat4 model_view = view * model;
+    glUniformMatrix4fv(u_model_view_, 1, GL_FALSE, glm::value_ptr(model_view));
+
+    // Light 0: Camera-following directional light (tracks camera position)
+    glm::vec3 cam_pos = camera.get_camera_position();
+    glm::vec3 cam_target = camera.get_target();
+    glm::vec3 cam_light_world = glm::normalize(cam_pos - cam_target);
+
+    // Light 1: Fixed fill light from front-right (prevents black shadows)
+    // Both transformed to view space (normals are in view space via u_normal_matrix)
     glm::mat3 view_model_rot = glm::mat3(view * model);
-    glm::vec3 light_dirs[2] = {glm::normalize(view_model_rot * kLightTopDir),
+    glm::vec3 light_dirs[2] = {glm::normalize(view_model_rot * cam_light_world),
                                glm::normalize(view_model_rot * kLightFrontDir)};
-    glm::vec3 light_colors[2] = {kLightTopColor, kLightFrontColor};
+    glm::vec3 light_colors[2] = {{0.6f, 0.6f, 0.6f},  // Camera light: primary
+                                 {0.2f, 0.2f, 0.2f}}; // Fill light: subtle
     glUniform3fv(u_light_dir_, 2, glm::value_ptr(light_dirs[0]));
     glUniform3fv(u_light_color_, 2, glm::value_ptr(light_colors[0]));
-    glUniform3fv(u_ambient_, 1, glm::value_ptr(kAmbientColor));
+
+    glm::vec3 ambient{0.25f, 0.25f, 0.25f};
+    glUniform3fv(u_ambient_, 1, glm::value_ptr(ambient));
 
     // Material
     glUniform1f(u_specular_intensity_, specular_intensity_);
@@ -1000,6 +1008,7 @@ void GCodeGLESRenderer::draw_layers(const std::vector<LayerVBO>& vbos, int layer
     glUniform4fv(u_base_color_, 1, glm::value_ptr(filament_color_));
     glUniform1f(u_color_scale_, color_scale);
     glUniform1f(u_ghost_alpha_, ghost_alpha);
+    glUniform1f(u_base_alpha_, 1.0f);
 
     constexpr size_t kStride = 9 * sizeof(float);
 
