@@ -171,7 +171,7 @@ class GCodeLayerRenderer {
      * @param show true to show travel moves
      */
     void set_show_travels(bool show) {
-        show_travels_ = show;
+        show_travels_.store(show, std::memory_order_relaxed);
     }
 
     /**
@@ -179,7 +179,7 @@ class GCodeLayerRenderer {
      * @param show true to show extrusion moves
      */
     void set_show_extrusions(bool show) {
-        show_extrusions_ = show;
+        show_extrusions_.store(show, std::memory_order_relaxed);
     }
 
     /**
@@ -187,17 +187,17 @@ class GCodeLayerRenderer {
      * @param show true to show support structures
      */
     void set_show_supports(bool show) {
-        show_supports_ = show;
+        show_supports_.store(show, std::memory_order_relaxed);
     }
 
     /** @brief Check if travel moves are shown */
     bool get_show_travels() const {
-        return show_travels_;
+        return show_travels_.load(std::memory_order_relaxed);
     }
 
     /** @brief Check if support structures are shown */
     bool get_show_supports() const {
-        return show_supports_;
+        return show_supports_.load(std::memory_order_relaxed);
     }
 
     /**
@@ -210,12 +210,12 @@ class GCodeLayerRenderer {
      * @param enable true to enable depth shading
      */
     void set_depth_shading(bool enable) {
-        depth_shading_ = enable;
+        depth_shading_.store(enable, std::memory_order_relaxed);
     }
 
     /** @brief Check if depth shading is enabled */
     bool get_depth_shading() const {
-        return depth_shading_;
+        return depth_shading_.load(std::memory_order_relaxed);
     }
 
     /**
@@ -223,12 +223,12 @@ class GCodeLayerRenderer {
      * @param enable true to enable ghost mode (default: ON)
      */
     void set_ghost_mode(bool enable) {
-        ghost_mode_enabled_ = enable;
+        ghost_mode_enabled_.store(enable, std::memory_order_relaxed);
     }
 
     /** @brief Check if ghost mode is enabled */
     bool get_ghost_mode() const {
-        return ghost_mode_enabled_;
+        return ghost_mode_enabled_.load(std::memory_order_relaxed);
     }
 
     /**
@@ -261,13 +261,13 @@ class GCodeLayerRenderer {
      * @param mode View mode (TOP_DOWN, FRONT, or ISOMETRIC)
      */
     void set_view_mode(ViewMode mode) {
-        view_mode_ = mode;
+        view_mode_.store(static_cast<int>(mode), std::memory_order_relaxed);
         bounds_valid_ = false; // Recompute scale for new projection
     }
 
     /** @brief Get current view mode */
     ViewMode get_view_mode() const {
-        return view_mode_;
+        return static_cast<ViewMode>(view_mode_.load(std::memory_order_relaxed));
     }
 
     // =========================================================================
@@ -414,7 +414,7 @@ class GCodeLayerRenderer {
      * @param layer LVGL draw layer
      *
      * Draws wireframe corner brackets at all 8 projected corners of each
-     * highlighted object's AABB. Ported from TinyGL renderer's render_bounding_box().
+     * highlighted object's AABB.
      */
     void render_selection_brackets(lv_layer_t* layer);
 
@@ -435,7 +435,13 @@ class GCodeLayerRenderer {
     using TransformParams = helix::gcode::ProjectionParams;
 
     /**
-     * @brief Capture current transformation parameters (thread-safe snapshot)
+     * @brief Capture current transformation parameters as a thread-safe snapshot
+     *
+     * The background ghost render thread calls this ONCE at thread start to
+     * snapshot all transform state (scale, offset, canvas size, etc.). Each
+     * field is a plain float/int read, and the main thread only modifies these
+     * between render() calls, so no additional synchronization is needed.
+     *
      * @return TransformParams struct with current values
      */
     TransformParams capture_transform_params() const;
@@ -494,12 +500,12 @@ class GCodeLayerRenderer {
     float offset_y_ = 0.0f; // World-space center Y
     float offset_z_ = 0.0f; // World-space center Z (for FRONT view)
 
-    // Display options
-    bool show_travels_ = false;
-    bool show_extrusions_ = true;
-    bool show_supports_ = true;
-    bool depth_shading_ = true;            // Enabled by default for 3D-like appearance
-    ViewMode view_mode_ = ViewMode::FRONT; // Default to front view
+    // Display options (atomic: read by background ghost thread, written by main thread)
+    std::atomic<bool> show_travels_{false};
+    std::atomic<bool> show_extrusions_{true};
+    std::atomic<bool> show_supports_{true};
+    std::atomic<bool> depth_shading_{true}; // Enabled by default for 3D-like appearance
+    std::atomic<int> view_mode_{static_cast<int>(ViewMode::FRONT)}; // Default to front view
 
     // Colors
     lv_color_t color_extrusion_;
@@ -544,9 +550,11 @@ class GCodeLayerRenderer {
     // Note: We only use draw buffers (no canvas widgets) to avoid clip area
     // contamination from overlays/toasts on lv_layer_top().
     lv_draw_buf_t* ghost_buf_ = nullptr;
+    int ghost_cached_width_ = 0;
+    int ghost_cached_height_ = 0;
     bool ghost_cache_valid_ = false;
-    bool ghost_mode_enabled_ = true; // Enable ghost mode by default
-    int ghost_rendered_up_to_ = -1;  // Progress tracker for progressive ghost rendering
+    std::atomic<bool> ghost_mode_enabled_{true}; // Enable ghost mode by default
+    int ghost_rendered_up_to_ = -1;              // Progress tracker for progressive ghost rendering
 
     // Progressive rendering - render N layers per frame to avoid blocking UI
     // These are defaults; actual values come from config or adaptive adjustment

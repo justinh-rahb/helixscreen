@@ -21,6 +21,48 @@ namespace helix {
 namespace gcode {
 
 // ============================================================================
+// Named Color Constants
+// ============================================================================
+
+namespace {
+
+/// Orange-red color for excluded objects (strikethrough style)
+constexpr uint32_t kExcludedObjectColor = 0xFF6B35;
+constexpr uint8_t kExcludedR = (kExcludedObjectColor >> 16) & 0xFF;
+constexpr uint8_t kExcludedG = (kExcludedObjectColor >> 8) & 0xFF;
+constexpr uint8_t kExcludedB = kExcludedObjectColor & 0xFF;
+
+/// Selection blue for highlighted objects
+constexpr uint32_t kHighlightedObjectColor = 0x42A5F5;
+constexpr uint8_t kHighlightedR = (kHighlightedObjectColor >> 16) & 0xFF;
+constexpr uint8_t kHighlightedG = (kHighlightedObjectColor >> 8) & 0xFF;
+constexpr uint8_t kHighlightedB = kHighlightedObjectColor & 0xFF;
+
+/// Light grey for selection bracket wireframes
+constexpr uint32_t kBracketColor = 0xC0C0C0;
+
+/// Object pick distance threshold (pixels)
+constexpr float kPickThresholdPx = 15.0f;
+
+/// Alpha value for excluded objects (60%)
+constexpr uint8_t kExcludedAlpha = 153;
+
+/// Ghost darkening factor (40% brightness)
+constexpr int kGhostDarkenPercent = 40;
+
+/// Default extrusion width when metadata is unavailable (mm)
+constexpr float kDefaultExtrusionWidthMm = 0.4f;
+
+/// Extrusion pixel width clamp range
+constexpr int kMinExtrusionPixelWidth = 1;
+constexpr int kMaxExtrusionPixelWidth = 8;
+
+/// Minimum line length for thick line perpendicular computation
+constexpr float kMinLineLength = 0.001f;
+
+} // namespace
+
+// ============================================================================
 // Construction
 // ============================================================================
 
@@ -270,7 +312,8 @@ void GCodeLayerRenderer::auto_fit() {
     }
 
     // Use shared auto-fit computation
-    auto fit = helix::gcode::compute_auto_fit(bb, view_mode_, canvas_width_, canvas_height_);
+    ViewMode current_view = get_view_mode();
+    auto fit = helix::gcode::compute_auto_fit(bb, current_view, canvas_width_, canvas_height_);
     scale_ = fit.scale;
     offset_x_ = fit.offset_x;
     offset_y_ = fit.offset_y;
@@ -288,7 +331,7 @@ void GCodeLayerRenderer::auto_fit() {
 
     spdlog::debug("[GCodeLayerRenderer] auto_fit: canvas={}x{}, mode={}, "
                   "scale={:.2f}, center=({:.1f},{:.1f},{:.1f})",
-                  canvas_width_, canvas_height_, static_cast<int>(view_mode_), scale_, offset_x_,
+                  canvas_width_, canvas_height_, static_cast<int>(current_view), scale_, offset_x_,
                   offset_y_, offset_z_);
 }
 
@@ -531,7 +574,8 @@ void GCodeLayerRenderer::render_layers_to_cache(int from_layer, int to_layer) {
             uint8_t r = seg_color.red, g = seg_color.green, b = seg_color.blue;
 
             // Calculate color with depth shading for 3D-like appearance
-            if (depth_shading_ && view_mode_ == ViewMode::FRONT) {
+            if (depth_shading_.load(std::memory_order_relaxed) &&
+                get_view_mode() == ViewMode::FRONT) {
                 float avg_z = (seg.start.z + seg.end.z) * 0.5f;
                 float avg_y = (seg.start.y + seg.end.y) * 0.5f;
                 float brightness = compute_depth_brightness(avg_z, bounds_min_z_, bounds_max_z_,
@@ -546,19 +590,20 @@ void GCodeLayerRenderer::render_layers_to_cache(int from_layer, int to_layer) {
             if (!seg.object_name.empty()) {
                 if (excluded_objects_.count(seg.object_name) > 0) {
                     // Excluded: orange-red with reduced alpha
-                    r = 0xFF;
-                    g = 0x6B;
-                    b = 0x35;
-                    uint32_t color = (153u << 24) | (r << 16) | (g << 8) | b; // 60% alpha
+                    r = kExcludedR;
+                    g = kExcludedG;
+                    b = kExcludedB;
+                    uint32_t color =
+                        (static_cast<uint32_t>(kExcludedAlpha) << 24) | (r << 16) | (g << 8) | b;
                     draw_thick_line_bresenham_solid(p1.x, p1.y, p2.x, p2.y, color, line_width);
                     ++segments_rendered;
                     continue;
                 }
                 if (highlighted_objects_.count(seg.object_name) > 0) {
                     // Highlighted: selection blue, full alpha
-                    r = 0x42;
-                    g = 0xA5;
-                    b = 0xF5;
+                    r = kHighlightedR;
+                    g = kHighlightedG;
+                    b = kHighlightedB;
                 }
             }
 
@@ -602,19 +647,19 @@ void GCodeLayerRenderer::destroy_ghost_cache() {
         }
         ghost_buf_ = nullptr;
     }
+    ghost_cached_width_ = 0;
+    ghost_cached_height_ = 0;
     ghost_cache_valid_ = false;
     ghost_rendered_up_to_ = -1;
 }
 
 void GCodeLayerRenderer::ensure_ghost_cache(int width, int height) {
-    // Recreate if dimensions changed
-    if (ghost_buf_ && (cached_width_ != width || cached_height_ != height)) {
+    // Recreate if dimensions changed (tracked independently from solid cache)
+    if (ghost_buf_ && (ghost_cached_width_ != width || ghost_cached_height_ != height)) {
         destroy_ghost_cache();
     }
 
     if (!ghost_buf_) {
-        // Create the draw buffer (no canvas widget - avoids clip area contamination
-        // from overlays/toasts on lv_layer_top())
         ghost_buf_ = lv_draw_buf_create(width, height, LV_COLOR_FORMAT_ARGB8888, LV_STRIDE_AUTO);
         if (!ghost_buf_) {
             spdlog::error("[GCodeLayerRenderer] Failed to create ghost buffer {}x{}", width,
@@ -623,7 +668,8 @@ void GCodeLayerRenderer::ensure_ghost_cache(int width, int height) {
         }
 
         lv_draw_buf_clear(ghost_buf_, nullptr);
-
+        ghost_cached_width_ = width;
+        ghost_cached_height_ = height;
         ghost_cache_valid_ = false;
         spdlog::debug("[GCodeLayerRenderer] Created ghost cache buffer: {}x{}", width, height);
         helix::MemoryMonitor::log_now("gcode_ghost_buffer_created");
@@ -642,8 +688,8 @@ void GCodeLayerRenderer::render_ghost_layers(int from_layer, int to_layer) {
     ghost_layer.color_format = LV_COLOR_FORMAT_ARGB8888;
     ghost_layer.buf_area.x1 = 0;
     ghost_layer.buf_area.y1 = 0;
-    ghost_layer.buf_area.x2 = cached_width_ - 1;
-    ghost_layer.buf_area.y2 = cached_height_ - 1;
+    ghost_layer.buf_area.x2 = ghost_cached_width_ - 1;
+    ghost_layer.buf_area.y2 = ghost_cached_height_ - 1;
     ghost_layer._clip_area = ghost_layer.buf_area; // Full buffer as clip area
     ghost_layer.phy_clip_area = ghost_layer.buf_area;
 
@@ -693,8 +739,9 @@ void GCodeLayerRenderer::blit_ghost_cache(lv_layer_t* target) {
     dsc.src = ghost_buf_;
     dsc.opa = LV_OPA_40; // 40% opacity for ghost
 
-    lv_area_t coords = {widget_offset_x_, widget_offset_y_, widget_offset_x_ + cached_width_ - 1,
-                        widget_offset_y_ + cached_height_ - 1};
+    lv_area_t coords = {widget_offset_x_, widget_offset_y_,
+                        widget_offset_x_ + ghost_cached_width_ - 1,
+                        widget_offset_y_ + ghost_cached_height_ - 1};
 
     lv_draw_image(target, &dsc, &coords);
 }
@@ -727,13 +774,16 @@ void GCodeLayerRenderer::render(lv_layer_t* layer, const lv_area_t* widget_area)
 
     size_t segments_rendered = 0;
 
+    // Snapshot view mode once per frame for consistent use throughout render()
+    ViewMode current_view_mode = get_view_mode();
+
     // For FRONT view, use incremental cache with progressive rendering
-    if (view_mode_ == ViewMode::FRONT) {
+    if (current_view_mode == ViewMode::FRONT) {
         int target_layer = std::min(current_layer_, layer_count - 1);
 
         // Ensure cache buffers exist and are correct size
         ensure_cache(canvas_width_, canvas_height_);
-        if (ghost_mode_enabled_) {
+        if (ghost_mode_enabled_.load(std::memory_order_relaxed)) {
             ensure_ghost_cache(canvas_width_, canvas_height_);
         }
 
@@ -743,7 +793,8 @@ void GCodeLayerRenderer::render(lv_layer_t* layer, const lv_area_t* widget_area)
         // The background thread renders all layers to a raw buffer, then we copy
         // to LVGL buffer on main thread when ready.
         // =====================================================================
-        if (ghost_mode_enabled_ && ghost_buf_ && !ghost_cache_valid_) {
+        bool ghost_enabled = ghost_mode_enabled_.load(std::memory_order_relaxed);
+        if (ghost_enabled && ghost_buf_ && !ghost_cache_valid_) {
             if (ghost_thread_ready_.load()) {
                 // Background thread finished - copy to LVGL buffer
                 copy_raw_to_ghost_buf();
@@ -760,7 +811,7 @@ void GCodeLayerRenderer::render(lv_layer_t* layer, const lv_area_t* widget_area)
         if (warmup_frames_remaining_ > 0) {
             warmup_frames_remaining_--;
             // Just blit ghost cache (if available) and return - no heavy caching yet
-            if (ghost_mode_enabled_ && ghost_buf_) {
+            if (ghost_enabled && ghost_buf_) {
                 blit_ghost_cache(layer);
             }
             // Request another frame to continue after warmup
@@ -804,7 +855,7 @@ void GCodeLayerRenderer::render(lv_layer_t* layer, const lv_area_t* widget_area)
             // =====================================================================
             // BLIT: Ghost first (underneath), then solid on top
             // =====================================================================
-            if (ghost_mode_enabled_ && ghost_buf_) {
+            if (ghost_enabled && ghost_buf_) {
                 blit_ghost_cache(layer);
             }
             blit_cache(layer);
@@ -851,7 +902,7 @@ void GCodeLayerRenderer::render(lv_layer_t* layer, const lv_area_t* widget_area)
     last_segment_count_ = segments_rendered;
 
     // Adapt layers_per_frame for next frame (if in adaptive mode)
-    if (config_layers_per_frame_ == 0 && view_mode_ == ViewMode::FRONT) {
+    if (config_layers_per_frame_ == 0 && current_view_mode == ViewMode::FRONT) {
         adapt_layers_per_frame();
     }
 
@@ -870,7 +921,7 @@ bool GCodeLayerRenderer::needs_more_frames() const {
     }
 
     // Only relevant for FRONT view mode (uses caching)
-    if (view_mode_ != ViewMode::FRONT) {
+    if (get_view_mode() != ViewMode::FRONT) {
         return false;
     }
 
@@ -883,7 +934,7 @@ bool GCodeLayerRenderer::needs_more_frames() const {
 
     // Ghost rendering in background?
     // Keep triggering frames while ghost is building so we can show progress
-    if (ghost_mode_enabled_ && !ghost_cache_valid_) {
+    if (ghost_mode_enabled_.load(std::memory_order_relaxed) && !ghost_cache_valid_) {
         if (ghost_thread_running_.load() || ghost_thread_ready_.load()) {
             return true;
         }
@@ -895,11 +946,11 @@ bool GCodeLayerRenderer::needs_more_frames() const {
 bool GCodeLayerRenderer::should_render_segment(const ToolpathSegment& seg) const {
     if (seg.is_extrusion) {
         if (is_support_segment(seg)) {
-            return show_supports_;
+            return show_supports_.load(std::memory_order_relaxed);
         }
-        return show_extrusions_;
+        return show_extrusions_.load(std::memory_order_relaxed);
     }
-    return show_travels_;
+    return show_travels_.load(std::memory_order_relaxed);
 }
 
 void GCodeLayerRenderer::render_segment(lv_layer_t* layer, const ToolpathSegment& seg, bool ghost) {
@@ -921,15 +972,16 @@ void GCodeLayerRenderer::render_segment(lv_layer_t* layer, const ToolpathSegment
         // Ghost mode: use darkened version of the model's extrusion color
         // This provides visual continuity between ghost and solid layers
         lv_color_t model_color = color_extrusion_;
-        // Darken to 40% brightness for ghost effect
-        base_color = lv_color_make(model_color.red * 40 / 100, model_color.green * 40 / 100,
-                                   model_color.blue * 40 / 100);
+        // Darken for ghost effect
+        base_color = lv_color_make(model_color.red * kGhostDarkenPercent / 100,
+                                   model_color.green * kGhostDarkenPercent / 100,
+                                   model_color.blue * kGhostDarkenPercent / 100);
     } else {
         base_color = get_segment_color(seg);
     }
 
     // Apply depth shading for 3D-like appearance
-    if (depth_shading_ && view_mode_ == ViewMode::FRONT) {
+    if (depth_shading_.load(std::memory_order_relaxed) && get_view_mode() == ViewMode::FRONT) {
         float avg_z = (seg.start.z + seg.end.z) * 0.5f;
         float avg_y = (seg.start.y + seg.end.y) * 0.5f;
         float brightness = compute_depth_brightness(avg_z, bounds_min_z_, bounds_max_z_, avg_y,
@@ -977,7 +1029,7 @@ void GCodeLayerRenderer::render_segment(lv_layer_t* layer, const ToolpathSegment
 
 GCodeLayerRenderer::TransformParams GCodeLayerRenderer::capture_transform_params() const {
     return TransformParams{
-        .view_mode = view_mode_,
+        .view_mode = get_view_mode(),
         .scale = scale_,
         .offset_x = offset_x_,
         .offset_y = offset_y_,
@@ -1006,14 +1058,30 @@ bool GCodeLayerRenderer::is_support_segment(const ToolpathSegment& seg) const {
     // Common patterns used by slicers for support structures:
     // - OrcaSlicer/PrusaSlicer: "support_*", "*_support", "SUPPORT_*"
     // - Cura: "support", "Support"
+    //
+    // Case-insensitive substring search without allocation (hot path optimization)
+    static constexpr const char kSupport[] = "support";
+    static constexpr size_t kSupportLen = 7; // strlen("support")
+
     const std::string& name = seg.object_name;
+    if (name.size() < kSupportLen) {
+        return false;
+    }
 
-    // Case-insensitive check for "support" anywhere in the name
-    std::string lower_name = name;
-    std::transform(lower_name.begin(), lower_name.end(), lower_name.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
-
-    return lower_name.find("support") != std::string::npos;
+    // Scan for "support" substring case-insensitively without allocating
+    for (size_t i = 0; i <= name.size() - kSupportLen; ++i) {
+        bool match = true;
+        for (size_t j = 0; j < kSupportLen; ++j) {
+            if (std::tolower(static_cast<unsigned char>(name[i + j])) != kSupport[j]) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::optional<std::string> GCodeLayerRenderer::pick_object_at(int screen_x, int screen_y) const {
@@ -1028,7 +1096,7 @@ std::optional<std::string> GCodeLayerRenderer::pick_object_at(int screen_x, int 
     // Capture transform params (no widget offset for cache coords)
     TransformParams transform = capture_transform_params();
 
-    const float PICK_THRESHOLD = 15.0f; // pixels
+    const float PICK_THRESHOLD = kPickThresholdPx;
     float closest_distance = std::numeric_limits<float>::max();
     std::optional<std::string> picked_object;
 
@@ -1086,10 +1154,10 @@ lv_color_t GCodeLayerRenderer::get_segment_color(const ToolpathSegment& seg) con
     // Check excluded/highlighted state first
     if (!seg.object_name.empty()) {
         if (excluded_objects_.count(seg.object_name) > 0) {
-            return lv_color_hex(0xFF6B35); // Orange-red for excluded
+            return lv_color_hex(kExcludedObjectColor);
         }
         if (highlighted_objects_.count(seg.object_name) > 0) {
-            return lv_color_hex(0x42A5F5); // Selection blue for highlighted
+            return lv_color_hex(kHighlightedObjectColor);
         }
     }
 
@@ -1122,7 +1190,7 @@ void GCodeLayerRenderer::render_selection_brackets(lv_layer_t* layer) {
         const AABB& bbox = it->second.bounding_box;
 
         // Calculate corner bracket length (20% of shortest edge, capped at 5mm)
-        // Same formula as TinyGL renderer
+        // Same formula as 3D renderer
         float dx = bbox.max.x - bbox.min.x;
         float dy = bbox.max.y - bbox.min.y;
         float dz = bbox.max.z - bbox.min.z;
@@ -1137,7 +1205,7 @@ void GCodeLayerRenderer::render_selection_brackets(lv_layer_t* layer) {
         // Set up line drawing style
         lv_draw_line_dsc_t dsc;
         lv_draw_line_dsc_init(&dsc);
-        dsc.color = lv_color_hex(0xC0C0C0); // Light grey - visible against dark background
+        dsc.color = lv_color_hex(kBracketColor);
         dsc.width = 2;
         dsc.opa = LV_OPA_COVER;
 
@@ -1219,8 +1287,8 @@ void GCodeLayerRenderer::start_background_ghost_render() {
     // Allocate raw buffer if dimensions changed or not allocated
     int width = canvas_width_;
     int height = canvas_height_;
-    size_t stride = width * 4; // ARGB8888 = 4 bytes per pixel
-    size_t buffer_size = stride * height;
+    size_t stride = static_cast<size_t>(width) * 4; // ARGB8888 = 4 bytes per pixel
+    size_t buffer_size = stride * static_cast<size_t>(height);
 
     if (ghost_raw_width_ != width || ghost_raw_height_ != height || !ghost_raw_buffer_) {
         ghost_raw_buffer_ = std::make_unique<uint8_t[]>(buffer_size);
@@ -1235,10 +1303,15 @@ void GCodeLayerRenderer::start_background_ghost_render() {
     // Reset flags
     ghost_thread_cancel_.store(false);
     ghost_thread_ready_.store(false);
-    ghost_thread_running_.store(true);
 
-    // Launch background thread
-    ghost_thread_ = std::thread(&GCodeLayerRenderer::background_ghost_render_thread, this);
+    // Launch background thread - only set running flag after successful creation
+    try {
+        ghost_thread_ = std::thread(&GCodeLayerRenderer::background_ghost_render_thread, this);
+        ghost_thread_running_.store(true);
+    } catch (const std::system_error& e) {
+        spdlog::error("[GCodeLayerRenderer] Failed to start ghost render thread: {}", e.what());
+        return;
+    }
 
     spdlog::debug("[GCodeLayerRenderer] Started background ghost render thread ({}x{})", width,
                   height);
@@ -1301,9 +1374,9 @@ void GCodeLayerRenderer::background_ghost_render_thread() {
     transform.canvas_height = ghost_raw_height_;
 
     // Visibility flags (can be changed via set_show_*() on main thread)
-    const bool local_show_travels = show_travels_;
-    const bool local_show_extrusions = show_extrusions_;
-    const bool local_show_supports = show_supports_;
+    const bool local_show_travels = show_travels_.load(std::memory_order_relaxed);
+    const bool local_show_extrusions = show_extrusions_.load(std::memory_order_relaxed);
+    const bool local_show_supports = show_supports_.load(std::memory_order_relaxed);
 
     // Color (can be changed via set_extrusion_color() on main thread)
     const lv_color_t local_color_extrusion = color_extrusion_;
@@ -1330,9 +1403,9 @@ void GCodeLayerRenderer::background_ghost_render_thread() {
 
     // Compute ghost color once (darkened extrusion color from captured value)
     // ARGB8888: A in high byte, R, G, B in lower bytes
-    uint8_t ghost_r = local_color_extrusion.red * 40 / 100;
-    uint8_t ghost_g = local_color_extrusion.green * 40 / 100;
-    uint8_t ghost_b = local_color_extrusion.blue * 40 / 100;
+    uint8_t ghost_r = local_color_extrusion.red * kGhostDarkenPercent / 100;
+    uint8_t ghost_g = local_color_extrusion.green * kGhostDarkenPercent / 100;
+    uint8_t ghost_b = local_color_extrusion.blue * kGhostDarkenPercent / 100;
     uint8_t ghost_a = 255; // Full alpha, we'll apply 40% when blitting
     uint32_t ghost_color = (ghost_a << 24) | (ghost_r << 16) | (ghost_g << 8) | ghost_b;
 
@@ -1381,16 +1454,16 @@ void GCodeLayerRenderer::background_ghost_render_thread() {
             uint32_t seg_color = ghost_color;
             if (local_tool_palette.has_tool_colors()) {
                 lv_color_t tc = local_tool_palette.resolve(seg.tool_index, local_color_extrusion);
-                uint8_t tr = tc.red * 40 / 100;
-                uint8_t tg = tc.green * 40 / 100;
-                uint8_t tb = tc.blue * 40 / 100;
+                uint8_t tr = tc.red * kGhostDarkenPercent / 100;
+                uint8_t tg = tc.green * kGhostDarkenPercent / 100;
+                uint8_t tb = tc.blue * kGhostDarkenPercent / 100;
                 seg_color = (255u << 24) | (tr << 16) | (tg << 8) | tb;
             }
             if (!seg.object_name.empty() && local_excluded.count(seg.object_name) > 0) {
                 // Excluded: dim orange-red
-                uint8_t ex_r = 0xFF * 40 / 100;
-                uint8_t ex_g = 0x6B * 40 / 100;
-                uint8_t ex_b = 0x35 * 40 / 100;
+                uint8_t ex_r = kExcludedR * kGhostDarkenPercent / 100;
+                uint8_t ex_g = kExcludedG * kGhostDarkenPercent / 100;
+                uint8_t ex_b = kExcludedB * kGhostDarkenPercent / 100;
                 seg_color = (255u << 24) | (ex_r << 16) | (ex_g << 8) | ex_b;
             }
 
@@ -1437,7 +1510,7 @@ void GCodeLayerRenderer::copy_raw_to_ghost_buf() {
 
     if (static_cast<int>(lvgl_stride) == ghost_raw_stride_) {
         // Fast path: strides match, single memcpy
-        size_t buffer_size = ghost_raw_stride_ * ghost_raw_height_;
+        size_t buffer_size = static_cast<size_t>(ghost_raw_stride_) * ghost_raw_height_;
         std::memcpy(ghost_buf_->data, ghost_raw_buffer_.get(), buffer_size);
     } else {
         // Slow path: strides differ, copy row by row
@@ -1494,7 +1567,7 @@ void GCodeLayerRenderer::blend_pixel_solid(int x, int y, uint32_t color) {
 }
 
 int GCodeLayerRenderer::get_extrusion_pixel_width() const {
-    float width_mm = 0.4f; // Default fallback
+    float width_mm = kDefaultExtrusionWidthMm;
 
     if (gcode_) {
         // Full-file mode: prefer extrusion_width_mm, then nozzle_diameter_mm
@@ -1507,7 +1580,7 @@ int GCodeLayerRenderer::get_extrusion_pixel_width() const {
     // Streaming mode: no metadata available, use default 0.4mm
 
     int pixel_width = static_cast<int>(std::round(width_mm * scale_));
-    return std::clamp(pixel_width, 1, 8);
+    return std::clamp(pixel_width, kMinExtrusionPixelWidth, kMaxExtrusionPixelWidth);
 }
 
 void GCodeLayerRenderer::draw_thick_line_bresenham(int x0, int y0, int x1, int y1, uint32_t color,
@@ -1522,7 +1595,7 @@ void GCodeLayerRenderer::draw_thick_line_bresenham(int x0, int y0, int x1, int y
     float dy = static_cast<float>(y1 - y0);
     float len = std::sqrt(dx * dx + dy * dy);
 
-    if (len < 0.001f) {
+    if (len < kMinLineLength) {
         draw_line_bresenham(x0, y0, x1, y1, color);
         return;
     }
@@ -1553,7 +1626,7 @@ void GCodeLayerRenderer::draw_thick_line_bresenham_solid(int x0, int y0, int x1,
     float dy = static_cast<float>(y1 - y0);
     float len = std::sqrt(dx * dx + dy * dy);
 
-    if (len < 0.001f) {
+    if (len < kMinLineLength) {
         draw_line_bresenham_solid(x0, y0, x1, y1, color);
         return;
     }

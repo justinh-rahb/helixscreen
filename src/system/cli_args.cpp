@@ -161,7 +161,7 @@ static void print_help(const char* program_name) {
     printf("  --gcode-zoom <n>     Set camera zoom level (positive number)\n");
     printf("  --gcode-debug-colors Enable per-face debug coloring\n");
     printf("  --render-2d          Force 2D layer renderer (fast, no 3D)\n");
-    printf("  --render-3d          Force 3D TinyGL renderer\n");
+    printf("  --render-3d          Force 3D GLES renderer\n");
     printf("\nAvailable panels:\n");
     printf("  Base: home, controls, filament, settings, advanced\n");
     printf("  Print: print-select (cards), print-select-list, print-detail\n");

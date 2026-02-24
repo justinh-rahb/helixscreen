@@ -303,6 +303,7 @@ void PrintStatusPanel::init_subjects() {
         {"on_print_status_nozzle_clicked", on_nozzle_card_clicked},
         {"on_print_status_bed_clicked", on_bed_card_clicked},
         {"on_print_status_objects", on_objects_clicked},
+        {"on_print_status_dismiss_overlay", on_dismiss_overlay_clicked},
     });
 
     subjects_initialized_ = true;
@@ -1084,6 +1085,16 @@ void PrintStatusPanel::on_bed_card_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void PrintStatusPanel::on_dismiss_overlay_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_dismiss_overlay_clicked");
+    auto* overlay = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+    if (overlay) {
+        lv_obj_add_flag(overlay, LV_OBJ_FLAG_HIDDEN);
+        spdlog::debug("[PrintStatusPanel] Dismissed print end overlay");
+    }
+    LVGL_SAFE_EVENT_CB_END();
+}
+
 void PrintStatusPanel::on_pause_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PrintStatusPanel] on_pause_clicked");
     (void)e;
@@ -1261,6 +1272,7 @@ void PrintStatusPanel::on_print_state_changed(PrintJobState job_state) {
             loaded_thumbnail_filename_.clear();
             cached_thumbnail_path_.clear();
             pending_gcode_filename_.clear();
+            requested_gcode_filename_.clear();
             // Panel's local gcode_loaded_ mirrors lifecycle's decision
             if (result.clear_gcode_loaded) {
                 gcode_loaded_ = false;
@@ -1546,6 +1558,7 @@ void PrintStatusPanel::on_print_start_phase_changed(int phase) {
         }
         cached_thumbnail_path_.clear();
         loaded_thumbnail_filename_.clear();
+        requested_gcode_filename_.clear();
         if (progress_bar_) {
             lv_bar_set_value(progress_bar_, 0, LV_ANIM_OFF);
         }
@@ -2193,16 +2206,26 @@ void PrintStatusPanel::set_filename(const char* filename) {
         spdlog::debug("[{}] Loading thumbnail for: {}", get_name(), effective_filename);
         load_thumbnail_for_file(effective_filename);
 
-        // G-code loading: immediate if panel active, deferred otherwise
-        if (is_active_) {
-            // Panel is already visible - load immediately instead of deferring
-            spdlog::debug("[{}] Panel active, loading G-code immediately: {}", get_name(),
-                          effective_filename);
-            load_gcode_for_viewing(effective_filename);
-            pending_gcode_filename_.clear();
+        // G-code loading: deduplicate to avoid redundant expensive downloads.
+        // Multiple observers can fire in rapid succession (filename changed,
+        // thumbnail source set) causing set_filename() to be called several
+        // times with the same effective filename before the async download
+        // completes. requested_gcode_filename_ tracks what we've already
+        // requested, preventing duplicate loads.
+        if (effective_filename != requested_gcode_filename_) {
+            requested_gcode_filename_ = effective_filename;
+            if (is_active_) {
+                spdlog::debug("[{}] Panel active, loading G-code immediately: {}", get_name(),
+                              effective_filename);
+                load_gcode_for_viewing(effective_filename);
+                pending_gcode_filename_.clear();
+            } else {
+                // Panel not visible - defer to on_activate()
+                pending_gcode_filename_ = effective_filename;
+            }
         } else {
-            // Panel not visible - defer to on_activate()
-            pending_gcode_filename_ = effective_filename;
+            spdlog::debug("[{}] Skipping duplicate G-code load request for: {}", get_name(),
+                          effective_filename);
         }
         loaded_thumbnail_filename_ = effective_filename;
     }

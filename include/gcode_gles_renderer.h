@@ -13,8 +13,10 @@
 #include <lvgl/lvgl.h>
 
 #include <array>
+#include <cmath>
 #include <glm/glm.hpp>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -23,15 +25,47 @@
 namespace helix {
 namespace gcode {
 
-// Re-use GhostRenderMode from TinyGL header for API compat
-// (already defined in gcode_tinygl_renderer.h when both exist)
-#ifndef HELIX_GHOST_RENDER_MODE_DEFINED
-#define HELIX_GHOST_RENDER_MODE_DEFINED
 enum class GhostRenderMode : uint8_t { Dimmed = 0, Stipple = 1 };
 constexpr GhostRenderMode kDefaultGhostRenderMode = GhostRenderMode::Stipple;
-#endif
 
-/// Return type for get_options() — matches TinyGL API
+// ====== Named Constants (rendering parameters) ======
+
+// Specular material defaults (plastic-like sheen)
+constexpr float kDefaultSpecularIntensity = 0.25f;
+constexpr float kDefaultSpecularShininess = 48.0f;
+
+// Specular clamp ranges
+constexpr float kMinSpecularIntensity = 0.0f;
+constexpr float kMaxSpecularIntensity = 1.0f;
+constexpr float kMinSpecularShininess = 1.0f;
+constexpr float kMaxSpecularShininess = 128.0f;
+
+// Lighting intensities
+constexpr float kCameraLightIntensity = 0.6f;
+constexpr float kFillLightIntensity = 0.2f;
+constexpr float kAmbientIntensity = 0.25f;
+
+// Background color (neutral gray for contrast with light and dark filaments)
+constexpr float kBackgroundGray = 0.45f;
+constexpr float kBackgroundGrayBlue = 0.47f;
+
+// Default filament color (#26A69A teal)
+constexpr glm::vec4 kDefaultFilamentColor{0.15f, 0.65f, 0.60f, 1.0f};
+
+// Ghost layer default opacity (out of 255)
+constexpr uint8_t kDefaultGhostOpacity = 5; // ~2% opacity — ghost layers should barely be visible
+
+// Object picking screen-space threshold (pixels)
+constexpr float kPickThresholdPx = 15.0f;
+
+// Near-zero threshold for clipping space W division
+constexpr float kClipSpaceWEpsilon = 0.0001f;
+
+// Frame-skip epsilon for float comparisons
+constexpr float kAngleEpsilon = 1e-5f;
+constexpr float kZoomEpsilon = 1e-3f;
+
+/// Return type for get_options()
 struct RenderingOptions {
     bool show_extrusions = true;
     bool show_travels = false;
@@ -40,10 +74,68 @@ struct RenderingOptions {
     std::string highlighted_object;
 };
 
+// ====== RAII Wrappers for GL Resource Handles ======
+// Prevent resource leaks by tying GL object lifetime to C++ scope.
+// These are lightweight (just a GLuint), movable, non-copyable.
+
+struct GLBufferHandle {
+    unsigned int id = 0;
+    GLBufferHandle() = default;
+    explicit GLBufferHandle(unsigned int existing_id) : id(existing_id) {}
+    ~GLBufferHandle();
+    GLBufferHandle(const GLBufferHandle&) = delete;
+    GLBufferHandle& operator=(const GLBufferHandle&) = delete;
+    GLBufferHandle(GLBufferHandle&& o) noexcept : id(o.id) {
+        o.id = 0;
+    }
+    GLBufferHandle& operator=(GLBufferHandle&& o) noexcept {
+        std::swap(id, o.id);
+        return *this;
+    }
+    operator unsigned int() const {
+        return id;
+    }
+};
+
+struct GLFramebufferHandle {
+    unsigned int id = 0;
+    GLFramebufferHandle() = default;
+    ~GLFramebufferHandle();
+    GLFramebufferHandle(const GLFramebufferHandle&) = delete;
+    GLFramebufferHandle& operator=(const GLFramebufferHandle&) = delete;
+    GLFramebufferHandle(GLFramebufferHandle&& o) noexcept : id(o.id) {
+        o.id = 0;
+    }
+    GLFramebufferHandle& operator=(GLFramebufferHandle&& o) noexcept {
+        std::swap(id, o.id);
+        return *this;
+    }
+    operator unsigned int() const {
+        return id;
+    }
+};
+
+struct GLRenderbufferHandle {
+    unsigned int id = 0;
+    GLRenderbufferHandle() = default;
+    ~GLRenderbufferHandle();
+    GLRenderbufferHandle(const GLRenderbufferHandle&) = delete;
+    GLRenderbufferHandle& operator=(const GLRenderbufferHandle&) = delete;
+    GLRenderbufferHandle(GLRenderbufferHandle&& o) noexcept : id(o.id) {
+        o.id = 0;
+    }
+    GLRenderbufferHandle& operator=(GLRenderbufferHandle&& o) noexcept {
+        std::swap(id, o.id);
+        return *this;
+    }
+    operator unsigned int() const {
+        return id;
+    }
+};
+
 /// GPU-accelerated G-code 3D renderer using OpenGL ES 2.0
 ///
-/// Drop-in replacement for GCodeTinyGLRenderer. Renders to FBO,
-/// reads pixels back into lv_draw_buf_t for LVGL compositing.
+/// Renders to FBO, reads pixels back into lv_draw_buf_t for LVGL compositing.
 /// Requires DRM+EGL display backend.
 class GCodeGLESRenderer {
   public:
@@ -102,6 +194,7 @@ class GCodeGLESRenderer {
     void set_print_progress_layer(int current_layer);
     void set_ghost_opacity(lv_opa_t opacity);
     void set_ghost_render_mode(GhostRenderMode mode);
+    void set_content_offset_y(float offset_percent);
     GhostRenderMode get_ghost_render_mode() const {
         return ghost_render_mode_;
     }
@@ -140,7 +233,7 @@ class GCodeGLESRenderer {
     // ====== Geometry Upload ======
 
     struct LayerVBO {
-        unsigned int vbo = 0; // GLuint
+        GLBufferHandle vbo;
         size_t vertex_count = 0;
     };
 
@@ -151,7 +244,7 @@ class GCodeGLESRenderer {
 
     void render_to_fbo(const ParsedGCodeFile& gcode, const GCodeCamera& camera);
     void draw_layers(const std::vector<LayerVBO>& vbos, int layer_start, int layer_end,
-                     float color_scale, float ghost_alpha);
+                     float color_scale, float alpha);
     void blit_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_coords);
 
     // ====== Frame Skip ======
@@ -166,6 +259,8 @@ class GCodeGLESRenderer {
         int layer_end = -2;
         size_t highlight_count = 0;
         size_t exclude_count = 0;
+        glm::vec4 filament_color{-1.0f};
+        uint8_t ghost_opacity = 0;
         bool operator==(const CachedRenderState& o) const;
         bool operator!=(const CachedRenderState& o) const {
             return !(*this == o);
@@ -201,7 +296,8 @@ class GCodeGLESRenderer {
     int u_base_color_ = -1;
     int u_specular_intensity_ = -1;
     int u_specular_shininess_ = -1;
-    int u_ghost_alpha_ = -1;
+    int u_model_view_ = -1;
+    int u_base_alpha_ = -1;
     // Attribute locations
     int a_position_ = -1;
     int a_normal_ = -1;
@@ -211,9 +307,9 @@ class GCodeGLESRenderer {
 
     // ====== FBO State ======
 
-    unsigned int fbo_ = 0;
-    unsigned int color_rbo_ = 0;
-    unsigned int depth_rbo_ = 0;
+    GLFramebufferHandle fbo_;
+    GLRenderbufferHandle color_rbo_;
+    GLRenderbufferHandle depth_rbo_;
     int fbo_width_ = 0;
     int fbo_height_ = 0;
 
@@ -241,11 +337,11 @@ class GCodeGLESRenderer {
     // ====== Configuration ======
 
     GCodeColorPalette palette_; ///< Tool color palette for per-vertex coloring
-    glm::vec4 filament_color_{0.15f, 0.65f, 0.60f, 1.0f}; // #26A69A
-    float specular_intensity_ = 0.075f;                   // Match OrcaSlicer (0.125 * 0.6)
-    float specular_shininess_ = 20.0f;
+    std::mutex palette_mutex_;  ///< Guards geometry color palette reads/writes
+    glm::vec4 filament_color_{kDefaultFilamentColor};
+    float specular_intensity_ = kDefaultSpecularIntensity;
+    float specular_shininess_ = kDefaultSpecularShininess;
     float extrusion_width_ = 0.5f;
-    bool smooth_shading_ = false;
     bool debug_face_colors_ = false;
     bool show_travels_ = false;
     bool show_extrusions_ = true;
@@ -259,14 +355,23 @@ class GCodeGLESRenderer {
     // ====== Ghost / Progress ======
 
     int progress_layer_ = -1;
-    lv_opa_t ghost_opacity_ = 77;
+    lv_opa_t ghost_opacity_ = kDefaultGhostOpacity;
     GhostRenderMode ghost_render_mode_ = kDefaultGhostRenderMode;
+    float content_offset_y_percent_ = 0.0f;
 
     // ====== Frame Skip ======
 
     CachedRenderState cached_state_;
     bool frame_dirty_ = true;
     size_t triangles_rendered_ = 0;
+
+    // ====== Readback Buffer (persistent to avoid per-frame allocation) ======
+
+    std::vector<uint8_t> readback_buf_;
+
+    // ====== Render Deferral (avoid blocking panel animations) ======
+
+    int render_defer_frames_ = 0; ///< Skip N draw callbacks before first GPU render
 };
 
 } // namespace gcode

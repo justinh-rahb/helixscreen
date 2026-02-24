@@ -21,6 +21,7 @@
 
 // GLES2 function declarations and common headers (both paths)
 #include <GLES2/gl2.h>
+#include <GLES2/gl2ext.h>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -29,6 +30,43 @@
 
 namespace helix {
 namespace gcode {
+
+// ============================================================
+// RAII GL Handle Destructors
+// ============================================================
+
+GLBufferHandle::~GLBufferHandle() {
+    if (id) {
+        glDeleteBuffers(1, &id);
+    }
+}
+
+GLFramebufferHandle::~GLFramebufferHandle() {
+    if (id) {
+        glDeleteFramebuffers(1, &id);
+    }
+}
+
+GLRenderbufferHandle::~GLRenderbufferHandle() {
+    if (id) {
+        glDeleteRenderbuffers(1, &id);
+    }
+}
+
+// ============================================================
+// GL Error Checking
+// ============================================================
+
+/// Check for GL errors after significant GPU operations.
+/// Returns true if no error, false on error (with spdlog output).
+static inline bool check_gl_error(const char* operation) {
+    GLenum err = glGetError();
+    if (err != GL_NO_ERROR) {
+        spdlog::error("[GCode GLES] GL error after {}: 0x{:04X}", operation, err);
+        return false;
+    }
+    return true;
+}
 
 // ============================================================
 // GL Context Save/Restore (RAII)
@@ -147,15 +185,11 @@ class EglContextGuard {
 // ============================================================
 
 static const char* kVertexShaderSource = R"(
-    // Gouraud lighting with per-vertex color support
+    // Per-pixel Phong shading with camera-following light
     uniform mat4 u_mvp;
+    uniform mat4 u_model_view;
     uniform mat3 u_normal_matrix;
-    uniform vec3 u_light_dir[2];
-    uniform vec3 u_light_color[2];
-    uniform vec3 u_ambient;
     uniform vec4 u_base_color;
-    uniform float u_specular_intensity;
-    uniform float u_specular_shininess;
     uniform float u_use_vertex_color;
     uniform float u_color_scale;
 
@@ -163,67 +197,60 @@ static const char* kVertexShaderSource = R"(
     attribute vec3 a_normal;
     attribute vec3 a_color;
 
-    varying vec4 v_color;
+    varying vec3 v_normal;
+    varying vec3 v_position;
+    varying vec3 v_base_color;
 
     void main() {
         gl_Position = u_mvp * vec4(a_position, 1.0);
-        vec3 n = normalize(u_normal_matrix * a_normal);
+        v_normal = normalize(u_normal_matrix * a_normal);
+        v_position = (u_model_view * vec4(a_position, 1.0)).xyz;
+        v_base_color = mix(u_base_color.rgb, a_color, u_use_vertex_color) * u_color_scale;
+    }
+)";
 
-        // Select base color: per-vertex or uniform override
-        vec3 base = mix(u_base_color.rgb, a_color, u_use_vertex_color);
-        base *= u_color_scale;
+static const char* kFragmentShaderSource = R"(
+    precision mediump float;
+    varying vec3 v_normal;
+    varying vec3 v_position;
+    varying vec3 v_base_color;
 
-        // Diffuse lighting from two directional lights
+    uniform vec3 u_light_dir[2];
+    uniform vec3 u_light_color[2];
+    uniform vec3 u_ambient;
+    uniform float u_specular_intensity;
+    uniform float u_specular_shininess;
+    uniform float u_base_alpha;
+
+    void main() {
+        vec3 n = normalize(v_normal);
+        vec3 view_dir = normalize(-v_position);
+
+        // Diffuse from two lights
         vec3 diffuse = u_ambient;
         for (int i = 0; i < 2; i++) {
             float NdotL = max(dot(n, u_light_dir[i]), 0.0);
             diffuse += u_light_color[i] * NdotL;
         }
 
-        // Specular (Blinn-Phong, top light only — matches OrcaSlicer)
-        vec3 view_dir = vec3(0.0, 0.0, 1.0);
-        vec3 half_dir = normalize(u_light_dir[0] + view_dir);
-        float spec = pow(max(dot(n, half_dir), 0.0), u_specular_shininess);
-
-        v_color = vec4(base * diffuse + vec3(spec * u_specular_intensity),
-                       u_base_color.a);
-    }
-)";
-
-static const char* kFragmentShaderSource = R"(
-    precision mediump float;
-    varying vec4 v_color;
-    uniform float u_ghost_alpha;
-
-    void main() {
-        // Stipple emulation for ghost mode (screen-door transparency)
-        if (u_ghost_alpha < 1.0) {
-            // 50% checkerboard discard pattern
-            vec2 fc = floor(gl_FragCoord.xy);
-            if (mod(fc.x + fc.y, 2.0) < 0.5) discard;
+        // Blinn-Phong specular from both lights
+        float spec = 0.0;
+        for (int i = 0; i < 2; i++) {
+            vec3 half_dir = normalize(u_light_dir[i] + view_dir);
+            spec += pow(max(dot(n, half_dir), 0.0), u_specular_shininess);
         }
-        gl_FragColor = v_color;
+
+        vec3 color = v_base_color * diffuse + vec3(spec * u_specular_intensity);
+        gl_FragColor = vec4(color, u_base_alpha);
     }
 )";
 
 // ============================================================
-// Lighting Constants (match TinyGL setup_lighting)
+// Lighting Constants
 // ============================================================
 
-static constexpr float INTENSITY_CORRECTION = 0.6f; // Match OrcaSlicer
-static constexpr float INTENSITY_AMBIENT = 0.3f;    // Match OrcaSlicer
-
-// Top light: primary from above-right (OrcaSlicer LIGHT_TOP_DIR)
-static constexpr glm::vec3 kLightTopDir{-0.4574957f, 0.4574957f, 0.7624929f};
-static constexpr glm::vec3 kLightTopColor{0.8f * INTENSITY_CORRECTION, 0.8f * INTENSITY_CORRECTION,
-                                          0.8f * INTENSITY_CORRECTION};
-
-// Front light: fill from front-right (OrcaSlicer LIGHT_FRONT_DIR)
+// Fixed fill light direction (front-right)
 static constexpr glm::vec3 kLightFrontDir{0.6985074f, 0.1397015f, 0.6985074f};
-static constexpr glm::vec3 kLightFrontColor{
-    0.3f * INTENSITY_CORRECTION, 0.3f * INTENSITY_CORRECTION, 0.3f * INTENSITY_CORRECTION};
-
-static constexpr glm::vec3 kAmbientColor{INTENSITY_AMBIENT, INTENSITY_AMBIENT, INTENSITY_AMBIENT};
 
 // ============================================================
 // Construction / Destruction
@@ -460,6 +487,7 @@ static GLuint compile_shader(GLenum type, const char* source) {
     GLuint shader = glCreateShader(type);
     glShaderSource(shader, 1, &source, nullptr);
     glCompileShader(shader);
+    check_gl_error("glCompileShader");
 
     GLint ok = 0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
@@ -496,6 +524,7 @@ bool GCodeGLESRenderer::compile_shaders() {
     glAttachShader(program_, vs);
     glAttachShader(program_, fs);
     glLinkProgram(program_);
+    check_gl_error("glLinkProgram");
 
     GLint ok = 0;
     glGetProgramiv(program_, GL_LINK_STATUS, &ok);
@@ -522,38 +551,64 @@ bool GCodeGLESRenderer::compile_shaders() {
     u_base_color_ = glGetUniformLocation(program_, "u_base_color");
     u_specular_intensity_ = glGetUniformLocation(program_, "u_specular_intensity");
     u_specular_shininess_ = glGetUniformLocation(program_, "u_specular_shininess");
-    u_ghost_alpha_ = glGetUniformLocation(program_, "u_ghost_alpha");
+    u_model_view_ = glGetUniformLocation(program_, "u_model_view");
+    u_base_alpha_ = glGetUniformLocation(program_, "u_base_alpha");
     a_position_ = glGetAttribLocation(program_, "a_position");
     a_normal_ = glGetAttribLocation(program_, "a_normal");
     a_color_ = glGetAttribLocation(program_, "a_color");
     u_use_vertex_color_ = glGetUniformLocation(program_, "u_use_vertex_color");
     u_color_scale_ = glGetUniformLocation(program_, "u_color_scale");
 
+    if (a_position_ < 0 || a_normal_ < 0) {
+        spdlog::error("[GCode GLES] Required attribute not found: a_position={}, a_normal={}",
+                      a_position_, a_normal_);
+        glDeleteProgram(program_);
+        program_ = 0;
+        return false;
+    }
+
     spdlog::debug("[GCode GLES] Shaders compiled and linked (program={})", program_);
     return true;
 }
 
 bool GCodeGLESRenderer::create_fbo(int width, int height) {
-    if (fbo_ && fbo_width_ == width && fbo_height_ == height) {
+    if (fbo_.id && fbo_width_ == width && fbo_height_ == height) {
         return true; // Already correct size
     }
 
     destroy_fbo();
 
-    glGenFramebuffers(1, &fbo_);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    glGenFramebuffers(1, &fbo_.id);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_.id);
+    if (!check_gl_error("glGenFramebuffers/glBindFramebuffer")) {
+        destroy_fbo();
+        return false;
+    }
 
-    // Color renderbuffer (RGBA8)
-    glGenRenderbuffers(1, &color_rbo_);
-    glBindRenderbuffer(GL_RENDERBUFFER, color_rbo_);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA4, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, color_rbo_);
+    // Color renderbuffer — use GL_RGBA8 (8 bits per channel) to match the
+    // GL_RGBA/GL_UNSIGNED_BYTE format used by glReadPixels in blit_to_lvgl().
+    // GL_RGBA4 would cause precision loss (4 bits stored, 8 bits read back).
+    // GL_RGBA8 is available via OES_rgb8_rgba8 on GLES2 and natively on desktop GL.
+    glGenRenderbuffers(1, &color_rbo_.id);
+    glBindRenderbuffer(GL_RENDERBUFFER, color_rbo_.id);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8_OES, width, height);
+    if (!check_gl_error("glRenderbufferStorage(color)")) {
+        destroy_fbo();
+        return false;
+    }
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, color_rbo_.id);
+    check_gl_error("glFramebufferRenderbuffer(color)");
 
     // Depth renderbuffer (16-bit)
-    glGenRenderbuffers(1, &depth_rbo_);
-    glBindRenderbuffer(GL_RENDERBUFFER, depth_rbo_);
+    glGenRenderbuffers(1, &depth_rbo_.id);
+    glBindRenderbuffer(GL_RENDERBUFFER, depth_rbo_.id);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, width, height);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rbo_);
+    if (!check_gl_error("glRenderbufferStorage(depth)")) {
+        destroy_fbo();
+        return false;
+    }
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rbo_.id);
+    check_gl_error("glFramebufferRenderbuffer(depth)");
 
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
@@ -571,18 +626,10 @@ bool GCodeGLESRenderer::create_fbo(int width, int height) {
 }
 
 void GCodeGLESRenderer::destroy_fbo() {
-    if (depth_rbo_) {
-        glDeleteRenderbuffers(1, &depth_rbo_);
-        depth_rbo_ = 0;
-    }
-    if (color_rbo_) {
-        glDeleteRenderbuffers(1, &color_rbo_);
-        color_rbo_ = 0;
-    }
-    if (fbo_) {
-        glDeleteFramebuffers(1, &fbo_);
-        fbo_ = 0;
-    }
+    // RAII handles call glDelete* in their destructors via move-assignment
+    depth_rbo_ = GLRenderbufferHandle();
+    color_rbo_ = GLRenderbufferHandle();
+    fbo_ = GLFramebufferHandle();
     fbo_width_ = 0;
     fbo_height_ = 0;
 }
@@ -692,6 +739,9 @@ void GCodeGLESRenderer::destroy_gl() {
 // ============================================================
 
 void GCodeGLESRenderer::upload_geometry(const RibbonGeometry& geom, std::vector<LayerVBO>& vbos) {
+    // Lock palette during read to prevent data races with set_tool_color_overrides
+    std::lock_guard<std::mutex> lock(palette_mutex_);
+
     free_vbos(vbos);
 
     if (geom.strips.empty() || geom.vertices.empty()) {
@@ -704,7 +754,11 @@ void GCodeGLESRenderer::upload_geometry(const RibbonGeometry& geom, std::vector<
     vbos.resize(num_layers);
 
     // Interleaved vertex format: position(3f) + normal(3f) + color(3f) = 36 bytes per vertex
-    constexpr size_t kVertexStride = 9 * sizeof(float);
+    constexpr size_t kVertexStride = PackedVertex::stride();
+    constexpr size_t kFloatsPerVertex = kVertexStride / sizeof(float);
+
+    // Reuse upload buffer across layers (sized to largest layer)
+    std::vector<float> buf;
 
     for (size_t layer = 0; layer < num_layers; ++layer) {
         size_t first_strip = 0;
@@ -717,14 +771,17 @@ void GCodeGLESRenderer::upload_geometry(const RibbonGeometry& geom, std::vector<
         }
 
         if (strip_count == 0) {
-            vbos[layer].vbo = 0;
+            vbos[layer].vbo = GLBufferHandle();
             vbos[layer].vertex_count = 0;
             continue;
         }
 
         // Each strip = 4 vertices → 2 triangles → 6 vertices (for GL_TRIANGLES)
         size_t total_verts = strip_count * 6;
-        std::vector<float> buf(total_verts * 9); // 9 floats per vertex
+        size_t buf_floats = total_verts * kFloatsPerVertex;
+        if (buf.size() < buf_floats) {
+            buf.resize(buf_floats);
+        }
 
         size_t out_idx = 0;
         for (size_t s = 0; s < strip_count; ++s) {
@@ -756,14 +813,22 @@ void GCodeGLESRenderer::upload_geometry(const RibbonGeometry& geom, std::vector<
             }
         }
 
-        GLuint vbo = 0;
-        glGenBuffers(1, &vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        GLBufferHandle vbo_handle;
+        glGenBuffers(1, &vbo_handle.id);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_handle.id);
         glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(total_verts * kVertexStride),
                      buf.data(), GL_STATIC_DRAW);
+        bool buf_ok = check_gl_error("glBufferData");
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        vbos[layer].vbo = vbo;
+        if (!buf_ok) {
+            spdlog::error("[GCode GLES] VBO creation failed for layer {}", layer);
+            vbos[layer].vbo = GLBufferHandle();
+            vbos[layer].vertex_count = 0;
+            continue;
+        }
+
+        vbos[layer].vbo = std::move(vbo_handle);
         vbos[layer].vertex_count = total_verts;
     }
 
@@ -772,14 +837,7 @@ void GCodeGLESRenderer::upload_geometry(const RibbonGeometry& geom, std::vector<
 }
 
 void GCodeGLESRenderer::free_vbos(std::vector<LayerVBO>& vbos) {
-    for (auto& lv : vbos) {
-        if (lv.vbo) {
-            GLuint vbo = lv.vbo;
-            glDeleteBuffers(1, &vbo);
-            lv.vbo = 0;
-            lv.vertex_count = 0;
-        }
-    }
+    // RAII handles (GLBufferHandle) call glDeleteBuffers in their destructors
     vbos.clear();
 }
 
@@ -813,6 +871,17 @@ void GCodeGLESRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode,
     if (!geometry_uploaded_ && geometry_) {
         upload_geometry(*geometry_, layer_vbos_);
         geometry_uploaded_ = true;
+        // Defer first GPU render by a few frames to avoid blocking panel animations
+        render_defer_frames_ = 3;
+    }
+
+    // If deferring, just blit the cached buffer (or skip) and count down
+    if (render_defer_frames_ > 0) {
+        render_defer_frames_--;
+        if (draw_buf_) {
+            blit_to_lvgl(layer, widget_coords);
+        }
+        return;
     }
     // Build current render state for frame-skip check
     CachedRenderState current_state;
@@ -825,6 +894,8 @@ void GCodeGLESRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode,
     current_state.layer_end = layer_end_;
     current_state.highlight_count = highlighted_objects_.size();
     current_state.exclude_count = excluded_objects_.size();
+    current_state.filament_color = filament_color_;
+    current_state.ghost_opacity = ghost_opacity_;
 
     // Skip GPU render if state unchanged and we have a valid cached framebuffer
     if (!frame_dirty_ && current_state == cached_state_ && draw_buf_) {
@@ -872,11 +943,11 @@ void GCodeGLESRenderer::render_to_fbo(const ParsedGCodeFile& /*gcode*/, const GC
         return;
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_.id);
     glViewport(0, 0, render_w, render_h);
 
     // Neutral gray background — light and dark filaments both contrast well
-    glClearColor(0.45f, 0.45f, 0.47f, 1.0f);
+    glClearColor(kBackgroundGray, kBackgroundGray, kBackgroundGrayBlue, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
 
@@ -896,6 +967,14 @@ void GCodeGLESRenderer::render_to_fbo(const ParsedGCodeFile& /*gcode*/, const GC
     glm::mat4 model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0, 0, 1));
     glm::mat4 view = camera.get_view_matrix();
     glm::mat4 proj = camera.get_projection_matrix();
+
+    // Apply vertical content offset (shifts scene up to avoid metadata overlay at bottom)
+    if (std::abs(content_offset_y_percent_) > 0.001f) {
+        // Translate in NDC space: offset_percent of -0.1 shifts content up by 10%
+        // In NDC, Y range is [-1, 1], so multiply by 2
+        proj[3][1] += -content_offset_y_percent_ * 2.0f;
+    }
+
     glm::mat4 mvp = proj * view * model;
 
     // Normal matrix (inverse transpose of upper-left 3x3 of model-view)
@@ -905,15 +984,26 @@ void GCodeGLESRenderer::render_to_fbo(const ParsedGCodeFile& /*gcode*/, const GC
     glUniformMatrix4fv(u_mvp_, 1, GL_FALSE, glm::value_ptr(mvp));
     glUniformMatrix3fv(u_normal_matrix_, 1, GL_FALSE, glm::value_ptr(normal_mat));
 
-    // Lighting — transform light directions from world space to view space
-    // (normals are in view space via u_normal_matrix, so lights must match)
-    glm::mat3 view_rot = glm::mat3(view);
-    glm::vec3 light_dirs[2] = {glm::normalize(view_rot * kLightTopDir),
-                               glm::normalize(view_rot * kLightFrontDir)};
-    glm::vec3 light_colors[2] = {kLightTopColor, kLightFrontColor};
+    glm::mat4 model_view = view * model;
+    glUniformMatrix4fv(u_model_view_, 1, GL_FALSE, glm::value_ptr(model_view));
+
+    // Light 0: Camera-following directional light (tracks camera position)
+    glm::vec3 cam_pos = camera.get_camera_position();
+    glm::vec3 cam_target = camera.get_target();
+    glm::vec3 cam_light_world = glm::normalize(cam_pos - cam_target);
+
+    // Light 1: Fixed fill light from front-right (prevents black shadows)
+    // Both transformed to view space (normals are in view space via u_normal_matrix)
+    glm::mat3 view_model_rot = glm::mat3(view * model);
+    glm::vec3 light_dirs[2] = {glm::normalize(view_model_rot * cam_light_world),
+                               glm::normalize(view_model_rot * kLightFrontDir)};
+    glm::vec3 light_colors[2] = {glm::vec3(kCameraLightIntensity), // Camera light: primary
+                                 glm::vec3(kFillLightIntensity)};  // Fill light: subtle
     glUniform3fv(u_light_dir_, 2, glm::value_ptr(light_dirs[0]));
     glUniform3fv(u_light_color_, 2, glm::value_ptr(light_colors[0]));
-    glUniform3fv(u_ambient_, 1, glm::value_ptr(kAmbientColor));
+
+    glm::vec3 ambient{kAmbientIntensity};
+    glUniform3fv(u_ambient_, 1, glm::value_ptr(ambient));
 
     // Material
     glUniform1f(u_specular_intensity_, specular_intensity_);
@@ -942,11 +1032,18 @@ void GCodeGLESRenderer::render_to_fbo(const ParsedGCodeFile& /*gcode*/, const GC
             draw_layers(*active_vbos, draw_start, solid_end, 1.0f, 1.0f);
         }
 
-        // Pass 2: Ghost layers (progress_layer_+1 to end)
+        // Pass 2: Ghost layers (progress_layer_+1 to end) with alpha blending
+        // Use elevated color_scale to lighten ghost colors (washes toward white)
         int ghost_start = std::max(progress_layer_ + 1, draw_start);
         if (ghost_start <= draw_end) {
-            draw_layers(*active_vbos, ghost_start, draw_end, ghost_opacity_ / 255.0f,
-                        (ghost_render_mode_ == GhostRenderMode::Stipple) ? 0.5f : 1.0f);
+            float alpha = ghost_opacity_ / 255.0f;
+            constexpr float kGhostLightenScale = 4.0f;
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_FALSE); // Don't write ghost depth (prevents z-fighting)
+            draw_layers(*active_vbos, ghost_start, draw_end, kGhostLightenScale, alpha);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
         }
     } else {
         // Normal: all layers solid
@@ -958,13 +1055,21 @@ void GCodeGLESRenderer::render_to_fbo(const ParsedGCodeFile& /*gcode*/, const GC
 }
 
 void GCodeGLESRenderer::draw_layers(const std::vector<LayerVBO>& vbos, int layer_start,
-                                    int layer_end, float color_scale, float ghost_alpha) {
+                                    int layer_end, float color_scale, float alpha) {
     // Set uniforms for this draw batch
     glUniform4fv(u_base_color_, 1, glm::value_ptr(filament_color_));
     glUniform1f(u_color_scale_, color_scale);
-    glUniform1f(u_ghost_alpha_, ghost_alpha);
+    glUniform1f(u_base_alpha_, alpha);
 
-    constexpr size_t kStride = 9 * sizeof(float);
+    constexpr size_t kStride = PackedVertex::stride();
+
+    // Enable vertex attributes once before the loop (a_position_ and a_normal_
+    // are validated >= 0 during compile_shaders)
+    glEnableVertexAttribArray(static_cast<GLuint>(a_position_));
+    glEnableVertexAttribArray(static_cast<GLuint>(a_normal_));
+    if (a_color_ >= 0) {
+        glEnableVertexAttribArray(static_cast<GLuint>(a_color_));
+    }
 
     for (int layer = layer_start; layer <= layer_end; ++layer) {
         if (layer < 0 || layer >= static_cast<int>(vbos.size()))
@@ -975,20 +1080,17 @@ void GCodeGLESRenderer::draw_layers(const std::vector<LayerVBO>& vbos, int layer
 
         glBindBuffer(GL_ARRAY_BUFFER, lv.vbo);
 
-        glEnableVertexAttribArray(static_cast<GLuint>(a_position_));
         glVertexAttribPointer(static_cast<GLuint>(a_position_), 3, GL_FLOAT, GL_FALSE,
                               static_cast<GLsizei>(kStride), reinterpret_cast<void*>(0));
 
-        glEnableVertexAttribArray(static_cast<GLuint>(a_normal_));
         glVertexAttribPointer(static_cast<GLuint>(a_normal_), 3, GL_FLOAT, GL_FALSE,
                               static_cast<GLsizei>(kStride),
-                              reinterpret_cast<void*>(3 * sizeof(float)));
+                              reinterpret_cast<void*>(PackedVertex::normal_offset()));
 
         if (a_color_ >= 0) {
-            glEnableVertexAttribArray(static_cast<GLuint>(a_color_));
             glVertexAttribPointer(static_cast<GLuint>(a_color_), 3, GL_FLOAT, GL_FALSE,
                                   static_cast<GLsizei>(kStride),
-                                  reinterpret_cast<void*>(6 * sizeof(float)));
+                                  reinterpret_cast<void*>(PackedVertex::color_offset()));
         }
 
         glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(lv.vertex_count));
@@ -1026,40 +1128,57 @@ void GCodeGLESRenderer::blit_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_
         draw_buf_height_ = widget_h;
     }
 
-    if (!fbo_)
+    if (!fbo_.id)
         return;
 
     // Read pixels from FBO
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_.id);
 
-    // Read RGBA from GPU
-    std::vector<uint8_t> rgba(static_cast<size_t>(fbo_width_ * fbo_height_ * 4));
-    glReadPixels(0, 0, fbo_width_, fbo_height_, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+    // Read RGBA from GPU (matches GL_RGBA8_OES renderbuffer format)
+    // Reuse persistent readback buffer to avoid per-frame allocation
+    size_t readback_size = static_cast<size_t>(fbo_width_ * fbo_height_ * 4);
+    if (readback_buf_.size() != readback_size) {
+        readback_buf_.resize(readback_size);
+    }
+    glReadPixels(0, 0, fbo_width_, fbo_height_, GL_RGBA, GL_UNSIGNED_BYTE, readback_buf_.data());
+    check_gl_error("glReadPixels");
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Convert GL RGBA → LVGL RGB888 (BGR byte order), flip Y, and scale if needed
+    if (!draw_buf_->data) {
+        spdlog::error("[GCode GLES] draw_buf_ data is null");
+        return;
+    }
     auto* dest = static_cast<uint8_t*>(draw_buf_->data);
+    const auto* src = readback_buf_.data();
     bool needs_scale = (fbo_width_ != widget_w || fbo_height_ != widget_h);
 
+    // Row-based conversion: RGBA→BGR with Y-flip
     for (int dy = 0; dy < widget_h; ++dy) {
-        for (int dx = 0; dx < widget_w; ++dx) {
-            int sx, sy;
-            if (needs_scale) {
-                sx = dx * fbo_width_ / widget_w;
-                sy = dy * fbo_height_ / widget_h;
-            } else {
-                sx = dx;
-                sy = dy;
-            }
-            // Flip Y: OpenGL row 0 = bottom
-            int gl_row = fbo_height_ - 1 - sy;
-            size_t src_idx = static_cast<size_t>((gl_row * fbo_width_ + sx) * 4);
-            size_t dst_idx = static_cast<size_t>((dy * widget_w + dx) * 3);
+        int sy = needs_scale ? (dy * fbo_height_ / widget_h) : dy;
+        int gl_row = fbo_height_ - 1 - sy;
+        const auto* src_row = src + static_cast<size_t>(gl_row * fbo_width_) * 4;
+        auto* dst_row = dest + static_cast<size_t>(dy * widget_w) * 3;
 
-            dest[dst_idx + 0] = rgba[src_idx + 2]; // B (LVGL RGB888 = BGR byte order)
-            dest[dst_idx + 1] = rgba[src_idx + 1]; // G
-            dest[dst_idx + 2] = rgba[src_idx + 0]; // R
+        if (needs_scale) {
+            for (int dx = 0; dx < widget_w; ++dx) {
+                int sx = dx * fbo_width_ / widget_w;
+                size_t si = static_cast<size_t>(sx) * 4;
+                size_t di = static_cast<size_t>(dx) * 3;
+                dst_row[di + 0] = src_row[si + 2]; // B
+                dst_row[di + 1] = src_row[si + 1]; // G
+                dst_row[di + 2] = src_row[si + 0]; // R
+            }
+        } else {
+            // No scaling: convert entire row RGBA→BGR
+            for (int dx = 0; dx < widget_w; ++dx) {
+                size_t si = static_cast<size_t>(dx) * 4;
+                size_t di = static_cast<size_t>(dx) * 3;
+                dst_row[di + 0] = src_row[si + 2]; // B
+                dst_row[di + 1] = src_row[si + 1]; // G
+                dst_row[di + 2] = src_row[si + 0]; // R
+            }
         }
     }
 
@@ -1077,10 +1196,16 @@ void GCodeGLESRenderer::blit_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_
 // ============================================================
 
 bool GCodeGLESRenderer::CachedRenderState::operator==(const CachedRenderState& o) const {
-    return azimuth == o.azimuth && elevation == o.elevation && distance == o.distance &&
-           target == o.target && progress_layer == o.progress_layer &&
-           layer_start == o.layer_start && layer_end == o.layer_end &&
-           highlight_count == o.highlight_count && exclude_count == o.exclude_count;
+    // Epsilon comparisons: tighter for angles, looser for zoom/distance
+    auto near_angle = [](float a, float b) { return std::abs(a - b) < kAngleEpsilon; };
+    auto near_zoom = [](float a, float b) { return std::abs(a - b) < kZoomEpsilon; };
+    return near_angle(azimuth, o.azimuth) && near_angle(elevation, o.elevation) &&
+           near_zoom(distance, o.distance) && near_angle(target.x, o.target.x) &&
+           near_angle(target.y, o.target.y) && near_angle(target.z, o.target.z) &&
+           progress_layer == o.progress_layer && layer_start == o.layer_start &&
+           layer_end == o.layer_end && highlight_count == o.highlight_count &&
+           exclude_count == o.exclude_count && filament_color == o.filament_color &&
+           ghost_opacity == o.ghost_opacity;
 }
 
 // ============================================================
@@ -1128,13 +1253,17 @@ void GCodeGLESRenderer::set_tool_color_overrides(const std::vector<uint32_t>& am
         return;
     }
 
+    // Lock palette during modification to prevent data races with render path
+    std::lock_guard<std::mutex> lock(palette_mutex_);
+
     // Replace palette entries using tool→palette mapping from geometry build
     bool changed = false;
     for (size_t tool = 0; tool < ams_colors.size(); ++tool) {
-        if (tool >= geometry_->tool_palette_map.size()) {
+        auto it = geometry_->tool_palette_map.find(static_cast<uint8_t>(tool));
+        if (it == geometry_->tool_palette_map.end()) {
             continue;
         }
-        uint8_t palette_idx = geometry_->tool_palette_map[tool];
+        uint8_t palette_idx = it->second;
         if (palette_idx < geometry_->color_palette.size() &&
             geometry_->color_palette[palette_idx] != ams_colors[tool]) {
             geometry_->color_palette[palette_idx] = ams_colors[tool];
@@ -1154,8 +1283,7 @@ void GCodeGLESRenderer::set_tool_color_overrides(const std::vector<uint32_t>& am
     }
 }
 
-void GCodeGLESRenderer::set_smooth_shading(bool enable) {
-    smooth_shading_ = enable;
+void GCodeGLESRenderer::set_smooth_shading(bool /*enable*/) {
     frame_dirty_ = true;
 }
 
@@ -1168,8 +1296,8 @@ void GCodeGLESRenderer::set_simplification_tolerance(float /*tolerance_mm*/) {
 }
 
 void GCodeGLESRenderer::set_specular(float intensity, float shininess) {
-    specular_intensity_ = std::clamp(intensity, 0.0f, 1.0f);
-    specular_shininess_ = std::clamp(shininess, 1.0f, 128.0f);
+    specular_intensity_ = std::clamp(intensity, kMinSpecularIntensity, kMaxSpecularIntensity);
+    specular_shininess_ = std::clamp(shininess, kMinSpecularShininess, kMaxSpecularShininess);
     frame_dirty_ = true;
 }
 
@@ -1222,7 +1350,7 @@ void GCodeGLESRenderer::set_global_opacity(lv_opa_t opacity) {
 
 void GCodeGLESRenderer::reset_colors() {
     palette_.has_override = false;
-    filament_color_ = glm::vec4(0.15f, 0.65f, 0.60f, 1.0f);
+    filament_color_ = kDefaultFilamentColor;
     frame_dirty_ = true;
 }
 
@@ -1249,6 +1377,11 @@ void GCodeGLESRenderer::set_print_progress_layer(int current_layer) {
 
 void GCodeGLESRenderer::set_ghost_opacity(lv_opa_t opacity) {
     ghost_opacity_ = opacity;
+    frame_dirty_ = true;
+}
+
+void GCodeGLESRenderer::set_content_offset_y(float offset_percent) {
+    content_offset_y_percent_ = std::clamp(offset_percent, -1.0f, 1.0f);
     frame_dirty_ = true;
 }
 
@@ -1302,6 +1435,16 @@ size_t GCodeGLESRenderer::get_memory_usage() const {
     if (draw_buf_) {
         total += static_cast<size_t>(draw_buf_width_ * draw_buf_height_ * 3);
     }
+    // Approximate GPU VRAM usage (VBOs + FBO)
+    for (const auto& lv : layer_vbos_) {
+        if (lv.vbo) {
+            total += lv.vertex_count * PackedVertex::stride();
+        }
+    }
+    if (fbo_.id) {
+        // Color RBO (RGBA8 = 4 bytes/pixel) + Depth RBO (16-bit = 2 bytes/pixel)
+        total += static_cast<size_t>(fbo_width_ * fbo_height_ * 6);
+    }
     return total;
 }
 
@@ -1322,7 +1465,7 @@ std::optional<std::string> GCodeGLESRenderer::pick_object(const glm::vec2& scree
     float closest_distance = std::numeric_limits<float>::max();
     std::optional<std::string> picked_object;
 
-    constexpr float PICK_THRESHOLD = 15.0f;
+    constexpr float PICK_THRESHOLD = kPickThresholdPx;
 
     int ls = layer_start_;
     int le = (layer_end_ < 0 || layer_end_ >= static_cast<int>(gcode.layers.size()))
@@ -1343,7 +1486,8 @@ std::optional<std::string> GCodeGLESRenderer::pick_object(const glm::vec2& scree
             glm::vec4 start_clip = transform * glm::vec4(segment.start, 1.0f);
             glm::vec4 end_clip = transform * glm::vec4(segment.end, 1.0f);
 
-            if (std::abs(start_clip.w) < 0.0001f || std::abs(end_clip.w) < 0.0001f)
+            if (std::abs(start_clip.w) < kClipSpaceWEpsilon ||
+                std::abs(end_clip.w) < kClipSpaceWEpsilon)
                 continue;
 
             glm::vec3 start_ndc = glm::vec3(start_clip) / start_clip.w;

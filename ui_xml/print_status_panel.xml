@@ -96,12 +96,14 @@
 
         <!-- PRINT COMPLETE OVERLAY: Shown when print finishes successfully -->
         <!-- Hidden by default. Binding removes hidden ONLY when outcome == COMPLETE (1) -->
+        <!-- Tap to dismiss overlay and interact with 3D viewer underneath -->
         <lv_obj name="print_complete_overlay"
                 width="100%" height="100%" align="top_mid" style_radius="0" style_pad_all="#space_lg"
                 style_pad_bottom="#metadata_clip_height" flex_flow="column" style_flex_main_place="center"
                 style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_sm"
-                scrollable="false" hidden="true">
+                scrollable="false" clickable="true" hidden="true">
           <bind_flag_if_not_eq subject="print_outcome" flag="hidden" ref_value="1"/>
+          <event_cb trigger="clicked" callback="on_print_status_dismiss_overlay"/>
           <!-- Green success badge with checkmark (animated on appearance) -->
           <!-- Uses ui_button for auto-contrast text via update_button_text_contrast() -->
           <ui_button name="success_badge"
@@ -113,12 +115,14 @@
 
         <!-- PRINT CANCELLED OVERLAY: Shown when print is cancelled -->
         <!-- Hidden by default. Binding removes hidden ONLY when outcome == CANCELLED (2) -->
+        <!-- Tap to dismiss overlay and interact with 3D viewer underneath -->
         <lv_obj name="print_cancelled_overlay"
                 width="100%" height="100%" align="top_mid" style_radius="0" style_pad_all="#space_lg"
                 style_pad_bottom="#metadata_clip_height" flex_flow="column" style_flex_main_place="center"
                 style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_sm"
-                scrollable="false" hidden="true">
+                scrollable="false" clickable="true" hidden="true">
           <bind_flag_if_not_eq subject="print_outcome" flag="hidden" ref_value="2"/>
+          <event_cb trigger="clicked" callback="on_print_status_dismiss_overlay"/>
           <!-- Orange warning badge with cancel icon (animated on appearance) -->
           <!-- Uses ui_button for auto-contrast text via update_button_text_contrast() -->
           <ui_button name="cancel_badge"
@@ -130,12 +134,14 @@
 
         <!-- PRINT ERROR OVERLAY: Shown when print fails with error -->
         <!-- Hidden by default. Binding removes hidden ONLY when outcome == ERROR (3) -->
+        <!-- Tap to dismiss overlay and interact with 3D viewer underneath -->
         <lv_obj name="print_error_overlay"
                 width="100%" height="100%" align="top_mid" style_radius="0" style_pad_all="#space_lg"
                 style_pad_bottom="#metadata_clip_height" flex_flow="column" style_flex_main_place="center"
                 style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_sm"
-                scrollable="false" hidden="true">
+                scrollable="false" clickable="true" hidden="true">
           <bind_flag_if_not_eq subject="print_outcome" flag="hidden" ref_value="3"/>
+          <event_cb trigger="clicked" callback="on_print_status_dismiss_overlay"/>
           <!-- Red danger badge with alert icon (animated on appearance) -->
           <!-- Uses ui_button for auto-contrast text via update_button_text_contrast() -->
           <ui_button name="error_badge"

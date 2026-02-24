@@ -3,12 +3,13 @@
 //
 // G-Code Geometry Builder
 // Converts parsed G-code toolpath segments into optimized 3D ribbon geometry
-// for TinyGL rendering with coordinate quantization and segment simplification.
+// with coordinate quantization and segment simplification.
 
 #pragma once
 
 #include "gcode_parser.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <glm/glm.hpp>
 #include <memory>
@@ -75,6 +76,34 @@ struct QuantizationParams {
      * @brief Dequantize to 3D vector
      */
     glm::vec3 dequantize_vec3(const QuantizedVertex& qv) const;
+};
+
+// ============================================================================
+// Packed Vertex Layout (for GPU upload)
+// ============================================================================
+
+/**
+ * @brief Interleaved vertex format for GPU upload: position(3f) + normal(3f) + color(3f)
+ *
+ * Centralizes the vertex attribute layout so that upload code (geometry builder)
+ * and draw code (renderer) stay in sync. 36 bytes per vertex.
+ */
+struct PackedVertex {
+    float position[3];
+    float normal[3];
+    float color[3];
+    static constexpr size_t stride() {
+        return sizeof(PackedVertex);
+    }
+    static constexpr size_t position_offset() {
+        return offsetof(PackedVertex, position);
+    }
+    static constexpr size_t normal_offset() {
+        return offsetof(PackedVertex, normal);
+    }
+    static constexpr size_t color_offset() {
+        return offsetof(PackedVertex, color);
+    }
 };
 
 // ============================================================================
@@ -164,7 +193,7 @@ struct RibbonGeometry {
 
     /// Maps tool_index → color_palette index. Allows recoloring VBOs by tool
     /// (e.g., AMS slot colors) without rebuilding geometry.
-    std::vector<uint8_t> tool_palette_map;
+    std::unordered_map<uint8_t, uint8_t> tool_palette_map;
 
     // Layer tracking for two-pass ghost layer rendering
     std::vector<uint16_t> strip_layer_index; ///< Layer index per strip (parallel to strips vector)
@@ -202,6 +231,15 @@ struct RibbonGeometry {
     void clear();
 
     /**
+     * @brief Validate geometry integrity (vertex data, layer ranges, palette indices)
+     *
+     * Spot-checks vertex positions for NaN/Inf, verifies layer strip ranges are
+     * within bounds, and checks color palette indices. Logs warnings for any
+     * issues found.
+     */
+    void validate() const;
+
+    /**
      * @brief Destructor - clean up cache pointers
      */
     ~RibbonGeometry();
@@ -223,18 +261,20 @@ struct RibbonGeometry {
  */
 struct SimplificationOptions {
     bool enable_merging = true; ///< Enable collinear segment merging
-    float tolerance_mm = 0.15f; ///< Merge tolerance (0.01 - 1.0mm) - higher = more aggressive
+    float tolerance_mm = 0.01f; ///< Merge tolerance (mm) - only merge truly collinear segments
     float min_segment_length_mm = 0.01f; ///< Minimum segment length to keep (filter micro-segments)
+    float max_direction_change_deg = 15.0f; ///< Max angle (degrees) between segments to allow merge
 
     /**
      * @brief Validate and clamp tolerance to safe range
      *
      * Max tolerance of 5.0mm allows very aggressive simplification for LOD
-     * during interaction. For final quality rendering, use 0.5mm or less.
+     * during interaction. For final quality rendering, use 0.01mm or less.
      */
     void validate() {
-        tolerance_mm = std::max(0.01f, std::min(5.0f, tolerance_mm));
+        tolerance_mm = std::max(0.001f, std::min(5.0f, tolerance_mm));
         min_segment_length_mm = std::max(0.0001f, min_segment_length_mm);
+        max_direction_change_deg = std::max(1.0f, std::min(90.0f, max_direction_change_deg));
     }
 };
 
@@ -265,7 +305,7 @@ class GeometryBuilder {
      *
      * @param gcode Parsed G-code file with toolpath segments
      * @param options Simplification configuration
-     * @return Optimized ribbon geometry ready for TinyGL rendering
+     * @return Optimized ribbon geometry ready for 3D rendering
      */
     RibbonGeometry build(const ParsedGCodeFile& gcode, const SimplificationOptions& options);
 
@@ -437,6 +477,7 @@ class GeometryBuilder {
         highlighted_objects_;                     ///< Object names to highlight (empty = none)
     bool debug_face_colors_ = false;              ///< Enable per-face debug coloring
     std::vector<std::string> tool_color_palette_; ///< Hex colors per tool (multi-color prints)
+    int tube_sides_ = 16;                         ///< Tube cross-section sides (valid: 4, 8, 16)
 
     // Build statistics
     BuildStats stats_;

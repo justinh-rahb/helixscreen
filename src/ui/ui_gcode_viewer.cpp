@@ -25,7 +25,13 @@ using GCode3DRenderer = helix::gcode::GCodeGLESRenderer;
 #endif
 
 // FPS tracking constants (for diagnostic logging, not mode selection)
-constexpr size_t GCODE_FPS_WINDOW_SIZE = 10; // Rolling window of frame times
+constexpr size_t GCODE_FPS_WINDOW_SIZE = 10;        // Rolling window of frame times
+constexpr float MIN_ACTUAL_RENDER_MS = 2.0f;        // Minimum render time to count as actual render
+constexpr float FPS_EMA_ALPHA = 0.1f;               // Exponential moving average smoothing factor
+constexpr int FPS_LOG_INTERVAL_FRAMES = 30;         // Log FPS every N frames
+constexpr float ROTATION_DEGREES_PER_PIXEL = 0.5f;  // Camera rotation sensitivity
+constexpr uint32_t DRAG_THROTTLE_MIN_FRAME_MS = 33; // ~30fps throttle during drag
+constexpr int CLICK_DISTANCE_THRESHOLD = 10;        // Pixels: distinguish click from drag
 
 #include <spdlog/spdlog.h>
 
@@ -35,6 +41,7 @@ constexpr size_t GCODE_FPS_WINDOW_SIZE = 10; // Rolling window of frame times
 using namespace helix;
 
 #include <atomic>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -63,7 +70,6 @@ class GCodeViewerState {
 #endif
 
         // Check HELIX_GCODE_MODE env var for render mode override
-        // Default is 2D (TinyGL is too slow for production on ALL platforms)
         const char* mode_env = std::getenv("HELIX_GCODE_MODE");
         if (mode_env) {
             if (std::strcmp(mode_env, "3D") == 0) {
@@ -232,7 +238,7 @@ class GCodeViewerState {
     float content_offset_y_percent_{0.0f};
 
     /// Render mode setting - set by constructor based on HELIX_GCODE_MODE env var
-    /// Default is 2D_LAYER (TinyGL is too slow for production use everywhere)
+    /// Render mode setting - configurable via HELIX_GCODE_MODE env var
     GcodeViewerRenderMode render_mode_{GcodeViewerRenderMode::Layer2D};
 
     /// Helper to check if currently using 2D layer renderer
@@ -292,12 +298,12 @@ class GCodeViewerState {
      * This prevents a completed-but-superseded load from deleting widgets
      * that belong to the current load.
      */
-    uint32_t load_generation() const {
+    uint64_t load_generation() const {
         return load_generation_.load();
     }
 
-    /// Bump generation counter — call at the start of each new file load
-    uint32_t bump_generation() {
+    /// Bump generation counter -- call at the start of each new file load
+    uint64_t bump_generation() {
         return load_generation_.fetch_add(1) + 1;
     }
 
@@ -305,7 +311,7 @@ class GCodeViewerState {
     std::thread build_thread_;
     std::atomic<bool> building_{false};
     std::atomic<bool> cancel_flag_{false};
-    std::atomic<uint32_t> load_generation_{0};
+    std::atomic<uint64_t> load_generation_{0};
 };
 
 // Type alias for compatibility with existing code
@@ -328,7 +334,7 @@ static bool has_gcode_data(const gcode_viewer_state_t* st) {
 /**
  * @brief Main draw callback - renders G-code using custom renderer
  *
- * Dispatches to either the 3D TinyGL renderer or the 2D layer renderer
+ * Dispatches to either the 3D GLES renderer or the 2D layer renderer
  * based on current render mode and AUTO fallback state.
  */
 static void gcode_viewer_draw_cb(lv_event_t* e) {
@@ -485,7 +491,7 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
                 label_to_delete);
         }
     } else {
-        // 3D TinyGL Renderer (isometric ribbon view)
+        // 3D GLES Renderer (isometric ribbon view)
         st->renderer_->render(layer, *st->gcode_file, *st->camera_, &widget_coords);
     }
 
@@ -494,7 +500,6 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
         std::chrono::duration_cast<std::chrono::microseconds>(render_end - render_start).count();
 
     // FPS tracking for AUTO mode evaluation
-    static constexpr float MIN_ACTUAL_RENDER_MS = 2.0f;
     float render_time_ms = render_duration_us / 1000.0f;
 
     // Record frame time for AUTO mode evaluation (only count actual renders)
@@ -504,17 +509,15 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
 
     // Periodic FPS logging (every 30 frames) - use per-widget state to avoid
     // corruption when multiple gcode_viewer widgets exist
-    constexpr float FPS_ALPHA = 0.1f;
-
     if (render_time_ms > MIN_ACTUAL_RENDER_MS) {
-        st->fps_render_time_avg_ms_ =
-            (st->fps_render_time_avg_ms_ == 0.0f)
-                ? render_time_ms
-                : (FPS_ALPHA * render_time_ms + (1.0f - FPS_ALPHA) * st->fps_render_time_avg_ms_);
+        st->fps_render_time_avg_ms_ = (st->fps_render_time_avg_ms_ == 0.0f)
+                                          ? render_time_ms
+                                          : (FPS_EMA_ALPHA * render_time_ms +
+                                             (1.0f - FPS_EMA_ALPHA) * st->fps_render_time_avg_ms_);
         st->fps_actual_render_count_++;
     }
 
-    if (++st->fps_log_frame_count_ >= 30) {
+    if (++st->fps_log_frame_count_ >= FPS_LOG_INTERVAL_FRAMES) {
         if (st->fps_actual_render_count_ > 0 &&
             st->fps_render_time_avg_ms_ > MIN_ACTUAL_RENDER_MS) {
             float avg_fps = 1000.0f / st->fps_render_time_avg_ms_;
@@ -615,10 +618,13 @@ static void gcode_viewer_press_cb(lv_event_t* e) {
         // Cancel any existing timer
         if (st->long_press_timer_) {
             lv_timer_delete(st->long_press_timer_);
+            st->long_press_timer_ = nullptr;
         }
         // Start new timer for long-press detection
         st->long_press_timer_ = lv_timer_create(long_press_timer_cb, LONG_PRESS_THRESHOLD_MS, obj);
-        lv_timer_set_repeat_count(st->long_press_timer_, 1); // One-shot timer
+        if (st->long_press_timer_) {
+            lv_timer_set_repeat_count(st->long_press_timer_, 1); // One-shot timer
+        }
     }
 
     spdlog::trace("[GCode Viewer] Press at ({}, {})", point.x, point.y);
@@ -668,17 +674,11 @@ static void gcode_viewer_pressing_cb(lv_event_t* e) {
     int dy = point.y - st->last_drag_pos.y;
 
     if (dx != 0 || dy != 0) {
-        // Convert pixel movement to rotation angles
-        // Scale factor: ~0.5 degrees per pixel
-        // Touch: finger drags model surface (follows finger direction)
-        // Mouse: grab-and-rotate background (opposite to drag direction)
-#if LV_USE_SDL
-        constexpr float sign = -1.0f; // Mouse: invert
-#else
-        constexpr float sign = 1.0f; // Touch: direct
-#endif
-        float delta_azimuth = sign * dx * 0.5f;
-        float delta_elevation = sign * -dy * 0.5f;
+        // Convert pixel movement to rotation angles (~0.5 degrees per pixel)
+        // Azimuth: drag right = orbit right
+        // Elevation: drag up = tilt up (screen Y is inverted, so positive dy = down)
+        float delta_azimuth = dx * ROTATION_DEGREES_PER_PIXEL;
+        float delta_elevation = dy * ROTATION_DEGREES_PER_PIXEL;
 
         st->camera_->rotate(delta_azimuth, delta_elevation);
 
@@ -686,9 +686,7 @@ static void gcode_viewer_pressing_cb(lv_event_t* e) {
         // Final frame is always rendered on RELEASED event
         static uint32_t last_invalidate_ms = 0;
         uint32_t now_ms = lv_tick_get();
-        constexpr uint32_t MIN_FRAME_MS = 33; // ~30fps
-
-        if (now_ms - last_invalidate_ms >= MIN_FRAME_MS) {
+        if (now_ms - last_invalidate_ms >= DRAG_THROTTLE_MIN_FRAME_MS) {
             lv_obj_invalidate(obj);
             last_invalidate_ms = now_ms;
         }
@@ -732,7 +730,7 @@ static void gcode_viewer_release_cb(lv_event_t* e) {
     int dx = abs(point.x - st->drag_start.x);
     int dy = abs(point.y - st->drag_start.y);
 
-    const int CLICK_THRESHOLD = 10; // pixels - distinguish click from drag
+    const int CLICK_THRESHOLD = CLICK_DISTANCE_THRESHOLD;
 
     // Skip tap handling if long-press already fired
     if (st->long_press_fired) {
@@ -944,7 +942,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
     st->first_render = true; // Reset for new file
 
     // Bump generation so any in-flight async callbacks from a prior load are rejected
-    const uint32_t gen = st->bump_generation();
+    const uint64_t gen = st->bump_generation();
 
     // Clear any existing data sources (mutually exclusive: streaming XOR full-file)
     st->streaming_controller_.reset();
@@ -971,6 +969,8 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
     if (st->loading_container) {
         helix::ui::safe_delete(st->loading_container);
         st->loading_container = nullptr;
+        st->loading_spinner = nullptr;
+        st->loading_label = nullptr;
     }
 
     // =========================================================================
@@ -1040,6 +1040,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                 // Clean up loading UI
                 if (st->loading_container) {
                     helix::ui::safe_delete(st->loading_container);
+                    st->loading_container = nullptr;
                     st->loading_spinner = nullptr;
                     st->loading_label = nullptr;
                 }
@@ -1259,6 +1260,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                 // Clean up loading UI
                 if (st->loading_container) {
                     helix::ui::safe_delete(st->loading_container);
+                    st->loading_container = nullptr;
                     st->loading_spinner = nullptr;
                     st->loading_label = nullptr;
                 }
@@ -1289,6 +1291,11 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
 
                     // Fit camera to model bounds
                     st->camera_->fit_to_bounds(st->gcode_file->global_bounding_box);
+
+                    // Apply any stored content offset to 3D renderer
+                    if (st->content_offset_y_percent_ != 0.0f) {
+                        st->renderer_->set_content_offset_y(st->content_offset_y_percent_);
+                    }
 
                     st->viewer_state = GcodeViewerState::Loaded;
                     spdlog::debug("[GCode Viewer] State set to LOADED");
@@ -1912,6 +1919,14 @@ void ui_gcode_viewer_set_content_offset_y(lv_obj_t* obj, float offset_percent) {
     // Apply to 2D renderer if it exists
     if (st->layer_renderer_2d_) {
         st->layer_renderer_2d_->set_content_offset_y(offset_percent);
+    }
+
+    // Apply to 3D renderer if it exists
+    if (st->renderer_) {
+        st->renderer_->set_content_offset_y(offset_percent);
+    }
+
+    if (st->layer_renderer_2d_ || st->renderer_) {
         lv_obj_invalidate(obj);
         spdlog::debug("[GCode Viewer] Applied content offset: {}%", offset_percent * 100);
     } else {
@@ -2123,7 +2138,7 @@ void ui_gcode_viewer_set_specular(lv_obj_t* obj, float intensity, float shinines
 #else
     (void)intensity;
     (void)shininess;
-    spdlog::warn("[GCode Viewer] set_specular() ignored - not using TinyGL 3D renderer");
+    spdlog::warn("[GCode Viewer] set_specular() ignored - 3D renderer not available");
 #endif
 }
 
