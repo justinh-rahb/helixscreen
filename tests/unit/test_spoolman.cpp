@@ -1,6 +1,7 @@
 // Copyright (C) 2025-2026 356C LLC
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "json_utils.h"
 #include "moonraker_api_mock.h"
 #include "moonraker_client_mock.h"
 #include "printer_state.h"
@@ -953,5 +954,92 @@ TEST_CASE("SpoolInfo - realistic spool scenarios", "[filament][integration]") {
 
         REQUIRE(spool.remaining_percent() == Catch::Approx(66.666666).margin(0.001));
         REQUIRE(spool.is_low() == false);
+    }
+}
+
+// ============================================================================
+// JSON Null-Safe Weight Parsing Tests
+// ============================================================================
+
+TEST_CASE("safe_double handles null initial_weight from Spoolman", "[filament][parsing]") {
+    using helix::json_util::safe_double;
+
+    SECTION("null initial_weight returns 0") {
+        auto j = nlohmann::json::parse(R"({"remaining_weight": 800.0, "initial_weight": null})");
+        REQUIRE(safe_double(j, "initial_weight") == 0.0);
+        REQUIRE(safe_double(j, "remaining_weight") == Catch::Approx(800.0));
+    }
+
+    SECTION("missing initial_weight returns 0") {
+        auto j = nlohmann::json::parse(R"({"remaining_weight": 800.0})");
+        REQUIRE(safe_double(j, "initial_weight") == 0.0);
+    }
+
+    SECTION("present initial_weight parsed correctly") {
+        auto j = nlohmann::json::parse(R"({"initial_weight": 1000.0})");
+        REQUIRE(safe_double(j, "initial_weight") == Catch::Approx(1000.0));
+    }
+}
+
+TEST_CASE("parse_spool_info fallback: filament.weight for initial_weight", "[filament][parsing]") {
+    using helix::json_util::safe_double;
+
+    SECTION("filament.weight used when initial_weight is null") {
+        auto j = nlohmann::json::parse(R"({
+            "remaining_weight": 800.0,
+            "initial_weight": null,
+            "filament": {"weight": 1000.0, "material": "PLA"}
+        })");
+
+        double initial = safe_double(j, "initial_weight");
+        REQUIRE(initial == 0.0);
+
+        // Simulate fallback to filament.weight
+        if (initial <= 0 && j.contains("filament") && j["filament"].is_object()) {
+            initial = safe_double(j["filament"], "weight");
+        }
+        REQUIRE(initial == Catch::Approx(1000.0));
+
+        SpoolInfo spool;
+        spool.initial_weight_g = initial;
+        spool.remaining_weight_g = safe_double(j, "remaining_weight");
+        REQUIRE(spool.remaining_percent() == Catch::Approx(80.0));
+    }
+
+    SECTION("used_weight fallback when both initial_weight and filament.weight are null") {
+        auto j = nlohmann::json::parse(R"({
+            "remaining_weight": 800.0,
+            "initial_weight": null,
+            "used_weight": 200.0,
+            "filament": {"weight": null, "material": "PLA"}
+        })");
+
+        double initial = safe_double(j, "initial_weight");
+        if (initial <= 0 && j.contains("filament") && j["filament"].is_object()) {
+            initial = safe_double(j["filament"], "weight");
+        }
+        double used = safe_double(j, "used_weight");
+        if (initial <= 0 && used > 0) {
+            initial = safe_double(j, "remaining_weight") + used;
+        }
+        REQUIRE(initial == Catch::Approx(1000.0));
+
+        SpoolInfo spool;
+        spool.initial_weight_g = initial;
+        spool.remaining_weight_g = safe_double(j, "remaining_weight");
+        REQUIRE(spool.remaining_percent() == Catch::Approx(80.0));
+    }
+
+    SECTION("explicit initial_weight takes priority over fallbacks") {
+        auto j = nlohmann::json::parse(R"({
+            "remaining_weight": 800.0,
+            "initial_weight": 1200.0,
+            "used_weight": 200.0,
+            "filament": {"weight": 1000.0}
+        })");
+
+        double initial = safe_double(j, "initial_weight");
+        // Should NOT fall through to filament.weight since initial_weight > 0
+        REQUIRE(initial == Catch::Approx(1200.0));
     }
 }

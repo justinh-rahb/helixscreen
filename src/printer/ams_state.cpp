@@ -1230,13 +1230,10 @@ void AmsState::refresh_spoolman_weights() {
         return;
     }
 
-    // Skip Spoolman weight polling when the backend tracks weight locally
-    // (e.g., AFC decrements weight via extruder position every 10s during
-    // printing). Spoolman's weight is stale because these backends never
-    // write back to it, so polling would overwrite accurate live data.
-    if (backend->tracks_weight_locally()) {
-        return;
-    }
+    // When the backend tracks weight locally (e.g., AFC decrements weight
+    // via extruder position), we still need total_weight_g (initial weight)
+    // from Spoolman — the backend only provides remaining weight.
+    bool local_weight = backend->tracks_weight_locally();
 
     int slot_count = backend->get_system_info().total_slots;
     int linked_count = 0;
@@ -1250,7 +1247,7 @@ void AmsState::refresh_spoolman_weights() {
 
             api_->spoolman().get_spoolman_spool(
                 spoolman_id,
-                [slot_index, spoolman_id](const std::optional<SpoolInfo>& spool_opt) {
+                [slot_index, spoolman_id, local_weight](const std::optional<SpoolInfo>& spool_opt) {
                     if (!spool_opt.has_value()) {
                         spdlog::warn("[AmsState] Spoolman spool {} not found", spoolman_id);
                         return;
@@ -1264,11 +1261,12 @@ void AmsState::refresh_spoolman_weights() {
                         int expected_spoolman_id; // To verify slot wasn't reassigned
                         float remaining_weight_g;
                         float total_weight_g;
+                        bool local_weight; // Backend tracks remaining weight locally
                     };
 
                     auto update_data = std::make_unique<WeightUpdate>(WeightUpdate{
                         slot_index, spoolman_id, static_cast<float>(spool.remaining_weight_g),
-                        static_cast<float>(spool.initial_weight_g)});
+                        static_cast<float>(spool.initial_weight_g), local_weight});
 
                     helix::ui::queue_update<WeightUpdate>(std::move(update_data), [](WeightUpdate*
                                                                                          d) {
@@ -1295,12 +1293,18 @@ void AmsState::refresh_spoolman_weights() {
                             return;
                         }
 
+                        // When backend tracks weight locally, only update total_weight
+                        // (initial weight from Spoolman). Preserve the backend's
+                        // remaining_weight which is more accurate than Spoolman's.
+                        float new_remaining =
+                            d->local_weight ? slot.remaining_weight_g : d->remaining_weight_g;
+
                         // Skip update if weights haven't changed (avoids UI refresh cascade)
-                        if (slot.remaining_weight_g == d->remaining_weight_g &&
+                        if (slot.remaining_weight_g == new_remaining &&
                             slot.total_weight_g == d->total_weight_g) {
                             spdlog::trace(
                                 "[AmsState] Slot {} weights unchanged ({:.0f}g / {:.0f}g)",
-                                d->slot_index, d->remaining_weight_g, d->total_weight_g);
+                                d->slot_index, new_remaining, d->total_weight_g);
                             return;
                         }
 
@@ -1314,13 +1318,14 @@ void AmsState::refresh_spoolman_weights() {
                         // fires 16+ G-code commands per cycle and saturates the CPU.
                         // Since these weights come FROM Spoolman (an external source),
                         // there's no need to write them back to firmware.
-                        slot.remaining_weight_g = d->remaining_weight_g;
+                        slot.remaining_weight_g = new_remaining;
                         slot.total_weight_g = d->total_weight_g;
                         primary->set_slot_info(d->slot_index, slot, /*persist=*/false);
                         state.bump_slots_version();
 
-                        spdlog::debug("[AmsState] Updated slot {} weights: {:.0f}g / {:.0f}g",
-                                      d->slot_index, d->remaining_weight_g, d->total_weight_g);
+                        spdlog::debug("[AmsState] Updated slot {} weights: {:.0f}g / {:.0f}g{}",
+                                      d->slot_index, new_remaining, d->total_weight_g,
+                                      d->local_weight ? " (local remaining)" : "");
                     });
                 },
                 [spoolman_id](const MoonrakerError& err) {

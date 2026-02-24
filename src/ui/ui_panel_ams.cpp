@@ -948,6 +948,9 @@ void AmsPanel::update_slot_colors() {
             if (slot_info.total_weight_g > 0.0f) {
                 float fill_level = slot_info.remaining_weight_g / slot_info.total_weight_g;
                 ui_ams_slot_set_fill_level(slot_widgets_[i], fill_level);
+            } else if (slot_info.has_filament_info()) {
+                // Weight data unknown — show 75% rather than defaulting to full
+                ui_ams_slot_set_fill_level(slot_widgets_[i], 0.75f);
             }
 
             // Refresh slot to update tool badge and other dynamic state
