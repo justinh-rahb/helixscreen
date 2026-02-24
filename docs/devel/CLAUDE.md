@@ -42,6 +42,7 @@ All developer documentation lives here. When working on features, look up the re
 | `INPUT_SHAPER.md` | Calibration panels, frequency response charts, CSV parser, PID |
 | `PREPRINT_PREDICTION.md` | ETA prediction engine, phase timing, weighted history |
 | `EXCLUDE_OBJECTS.md` | Object exclusion, per-object thumbnails, slicer setup |
+| `PRINT_STATE_MACHINE.md` | Print lifecycle state machine: states, transitions, guards, resource lifecycle |
 | `PRINT_START_PROFILES.md` | Print start phase detection, JSON profiles |
 | `PRINT_START_INTEGRATION.md` | User-facing macro setup for print start tracking |
 | `UPDATE_SYSTEM.md` | Update channels (stable/beta/dev), R2 CDN, Moonraker updater |
