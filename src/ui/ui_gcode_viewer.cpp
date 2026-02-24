@@ -184,7 +184,10 @@ class GCodeViewerState {
     bool is_dragging{false};
     lv_point_t drag_start{0, 0};
     lv_point_t last_drag_pos{0, 0};
+#if LV_USE_GESTURE_RECOGNITION
     float last_pinch_scale{1.0f}; ///< Previous cumulative pinch scale for delta computation
+    bool is_pinching{false};      ///< True during active pinch gesture (suppresses drag rotation)
+#endif
 
     // Selection and exclusion state
     std::unordered_set<std::string> selected_objects;
@@ -652,6 +655,14 @@ static void gcode_viewer_pressing_cb(lv_event_t* e) {
     if (st->is_using_2d_mode())
         return;
 
+#if LV_USE_GESTURE_RECOGNITION
+    // Suppress drag rotation during pinch-to-zoom to prevent fighting
+    if (st->is_pinching) {
+        spdlog::debug("[GCode Viewer] PRESSING suppressed (pinching)");
+        return;
+    }
+#endif
+
     lv_indev_t* indev = lv_indev_active();
     if (!indev)
         return;
@@ -742,6 +753,15 @@ static void gcode_viewer_release_cb(lv_event_t* e) {
         return;
     }
 
+#if LV_USE_GESTURE_RECOGNITION
+    // Skip tap handling after pinch gesture
+    if (st->is_pinching) {
+        spdlog::trace("[GCode Viewer] Release after pinch - skipping tap handling");
+        st->is_dragging = false;
+        return;
+    }
+#endif
+
     // If movement was minimal, treat as click and try to pick object
     if (dx < CLICK_THRESHOLD && dy < CLICK_THRESHOLD && has_gcode_data(st)) {
         spdlog::debug("[GCode Viewer] Click detected at ({}, {})", point.x, point.y);
@@ -795,6 +815,7 @@ static void gcode_viewer_release_cb(lv_event_t* e) {
     spdlog::trace("[GCode Viewer] Release at ({}, {}), drag=({}, {})", point.x, point.y, dx, dy);
 }
 
+#if LV_USE_GESTURE_RECOGNITION
 /**
  * @brief Gesture callback - handle pinch-to-zoom (3D mode only)
  *
@@ -810,10 +831,16 @@ static void gcode_viewer_gesture_cb(lv_event_t* e) {
         return;
 
     auto gesture_type = lv_event_get_gesture_type(e);
+    spdlog::debug("[GCode Viewer] GESTURE event: type={}", static_cast<int>(gesture_type));
     if (gesture_type != LV_INDEV_GESTURE_PINCH)
         return;
 
     auto state = lv_event_get_gesture_state(e, LV_INDEV_GESTURE_PINCH);
+    spdlog::debug("[GCode Viewer] Pinch gesture state={}", static_cast<int>(state));
+
+    if (state == LV_INDEV_GESTURE_STATE_ONGOING || state == LV_INDEV_GESTURE_STATE_RECOGNIZED) {
+        st->is_pinching = true;
+    }
 
     if (state == LV_INDEV_GESTURE_STATE_RECOGNIZED) {
         float cumulative_scale = lv_event_get_pinch_scale(e);
@@ -821,14 +848,16 @@ static void gcode_viewer_gesture_cb(lv_event_t* e) {
             float delta = cumulative_scale / st->last_pinch_scale;
             st->camera_->zoom(delta);
             lv_obj_invalidate(obj);
-            spdlog::trace("[GCode Viewer] Pinch zoom: scale={:.3f}, delta={:.3f}", cumulative_scale,
+            spdlog::debug("[GCode Viewer] Pinch zoom: scale={:.3f}, delta={:.3f}", cumulative_scale,
                           delta);
         }
         st->last_pinch_scale = cumulative_scale;
     } else if (state == LV_INDEV_GESTURE_STATE_ENDED || state == LV_INDEV_GESTURE_STATE_CANCELED) {
         st->last_pinch_scale = 1.0f;
+        st->is_pinching = false;
     }
 }
+#endif
 
 /**
  * @brief Size changed callback - update camera aspect ratio on resize
@@ -928,7 +957,9 @@ lv_obj_t* ui_gcode_viewer_create(lv_obj_t* parent) {
     lv_obj_add_event_cb(obj, gcode_viewer_press_cb, LV_EVENT_PRESSED, nullptr);
     lv_obj_add_event_cb(obj, gcode_viewer_pressing_cb, LV_EVENT_PRESSING, nullptr);
     lv_obj_add_event_cb(obj, gcode_viewer_release_cb, LV_EVENT_RELEASED, nullptr);
+#if LV_USE_GESTURE_RECOGNITION
     lv_obj_add_event_cb(obj, gcode_viewer_gesture_cb, LV_EVENT_GESTURE, nullptr);
+#endif
     lv_obj_add_event_cb(obj, gcode_viewer_delete_cb, LV_EVENT_DELETE, nullptr);
 
     // Initialize viewport size based on current widget dimensions
