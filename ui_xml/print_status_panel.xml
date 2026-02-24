@@ -65,7 +65,7 @@
         <!-- Rotate hint icon (shown in 3D[1] mode only, hidden in thumbnail[0] and 2D[2]) -->
         <lv_label name="rotate_hint"
                   text="#icon_rotate_3d" style_text_font="mdi_icons_24" style_text_color="#text_muted"
-                  style_text_opa="180" align="top_right" style_translate_x="-#space_md" style_translate_y="#space_md">
+                  style_text_opa="180" align="top_right" style_translate_x="-12" style_translate_y="#space_md">
           <bind_flag_if_not_eq subject="gcode_viewer_mode" flag="hidden" ref_value="1"/>
         </lv_label>
 
