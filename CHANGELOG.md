@@ -5,6 +5,45 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-02-24
+
+The rendering engine gets a major upgrade — the 3D G-code viewer is ported from TinyGL to OpenGL ES 2.0 with per-pixel Phong shading, and Pi builds gain GPU-accelerated DRM+EGL rendering with automatic framebuffer fallback. A first-boot rotation probe auto-detects display orientation, and the UI gains carousel modes for temperature and fan widgets, frosted-glass modal backdrops, and a new shared progress bar component with gradient indicators.
+
+### Added
+- GPU-accelerated DRM+EGL rendering for Raspberry Pi with automatic fbdev fallback
+- 3D G-code renderer ported from TinyGL to OpenGL ES 2.0 with per-pixel Phong shading and camera-following light
+- First-boot display rotation probe with auto-rotating touch coordinates
+- Automatic DRM/fbdev binary selection and dual-binary Pi releases
+- Carousel display mode for temperature and fan stack widgets with long-press toggle
+- Shared progress bar component with dynamic gradient indicator
+- Frosted-glass backdrop blur effect on modals
+- G-code render mode setting visible when 3D rendering is available
+- Chamber temperature overlay on controls panel
+- Print lifecycle state extraction for cleaner print status management
+- Icons on Delete and Print buttons in print details card
+- SSL enabled for native desktop builds
+- Translation updates with 7 obsolete keys removed
+
+### Fixed
+- Use-after-free crashes in G-code viewer, power panel, mDNS callbacks, thumbnail loading, and AMS widget cleanup (#182, #192, #193)
+- Scroll jitter in virtual list views caused by layout-invalidating calls
+- Safe name-based widget lookup prevents miscast crashes in event handlers (#194, #195)
+- Stale thumbnail and progress data no longer persists when a new print starts
+- AMS spools no longer show as full when Spoolman initial_weight is null
+- AMS loaded filament card swatch color now updates reactively
+- Overlays now close when clicking the navbar button for the active panel
+- Progress bar draw no longer triggers lv_inv_area assertion
+- Overflow row click passthrough on controls panel
+- Temperature chart validates widget before updating series data
+- Renamed Voron Micron to PFA Micron in printer database
+
+### Changed
+- Tertiary theme color changed from orange to blue-violet
+- Inline progress bars replaced with shared progress_bar component
+- AMS panels refined with more compact loaded filament card and tighter spacing
+- Edit icons changed from secondary to tertiary color
+- Deprecated AMS mock environment variables removed
+
 ## [0.12.1] - 2026-02-23
 
 ### Added
@@ -1031,6 +1070,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.0]: https://github.com/prestonbrown/helixscreen/compare/v0.12.1...v0.13.0
 [0.12.1]: https://github.com/prestonbrown/helixscreen/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/prestonbrown/helixscreen/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/prestonbrown/helixscreen/compare/v0.11.0...v0.11.1
