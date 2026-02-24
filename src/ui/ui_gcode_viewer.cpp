@@ -183,6 +183,7 @@ class GCodeViewerState {
     bool is_dragging{false};
     lv_point_t drag_start{0, 0};
     lv_point_t last_drag_pos{0, 0};
+    float last_pinch_scale{1.0f}; ///< Previous cumulative pinch scale for delta computation
 
     // Selection and exclusion state
     std::unordered_set<std::string> selected_objects;
@@ -794,6 +795,41 @@ static void gcode_viewer_release_cb(lv_event_t* e) {
 }
 
 /**
+ * @brief Gesture callback - handle pinch-to-zoom (3D mode only)
+ *
+ * Uses LVGL's built-in gesture recognition. Pinch scale is cumulative
+ * (>1 = spread apart, <1 = pinched together), so we compute delta from
+ * the previous scale to get incremental zoom factor.
+ */
+static void gcode_viewer_gesture_cb(lv_event_t* e) {
+    lv_obj_t* obj = lv_event_get_target_obj(e);
+    gcode_viewer_state_t* st = get_state(obj);
+
+    if (!st || st->is_using_2d_mode())
+        return;
+
+    auto gesture_type = lv_event_get_gesture_type(e);
+    if (gesture_type != LV_INDEV_GESTURE_PINCH)
+        return;
+
+    auto state = lv_event_get_gesture_state(e, LV_INDEV_GESTURE_PINCH);
+
+    if (state == LV_INDEV_GESTURE_STATE_RECOGNIZED) {
+        float cumulative_scale = lv_event_get_pinch_scale(e);
+        if (cumulative_scale > 0.0f && st->last_pinch_scale > 0.0f) {
+            float delta = cumulative_scale / st->last_pinch_scale;
+            st->camera_->zoom(delta);
+            lv_obj_invalidate(obj);
+            spdlog::trace("[GCode Viewer] Pinch zoom: scale={:.3f}, delta={:.3f}", cumulative_scale,
+                          delta);
+        }
+        st->last_pinch_scale = cumulative_scale;
+    } else if (state == LV_INDEV_GESTURE_STATE_ENDED || state == LV_INDEV_GESTURE_STATE_CANCELED) {
+        st->last_pinch_scale = 1.0f;
+    }
+}
+
+/**
  * @brief Size changed callback - update camera aspect ratio on resize
  */
 static void gcode_viewer_size_changed_cb(lv_event_t* e) {
@@ -891,6 +927,7 @@ lv_obj_t* ui_gcode_viewer_create(lv_obj_t* parent) {
     lv_obj_add_event_cb(obj, gcode_viewer_press_cb, LV_EVENT_PRESSED, nullptr);
     lv_obj_add_event_cb(obj, gcode_viewer_pressing_cb, LV_EVENT_PRESSING, nullptr);
     lv_obj_add_event_cb(obj, gcode_viewer_release_cb, LV_EVENT_RELEASED, nullptr);
+    lv_obj_add_event_cb(obj, gcode_viewer_gesture_cb, LV_EVENT_GESTURE, nullptr);
     lv_obj_add_event_cb(obj, gcode_viewer_delete_cb, LV_EVENT_DELETE, nullptr);
 
     // Initialize viewport size based on current widget dimensions
