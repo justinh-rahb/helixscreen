@@ -63,12 +63,15 @@ std::string get_device_name(int event_num) {
  * @brief Check if an event device has touch/absolute input capabilities
  *
  * Reads /sys/class/input/eventN/device/capabilities/abs and checks for
- * ABS_X (bit 0) and ABS_Y (bit 1) capabilities.
+ * ABS_X/ABS_Y (single-touch) or ABS_MT_POSITION_X/ABS_MT_POSITION_Y
+ * (multitouch) capabilities. Some touchscreens (e.g., Goodix gt9xxnew_ts)
+ * only report MT axes without legacy single-touch axes.
  *
  * @param event_num Event device number
- * @return true if device has ABS_X and ABS_Y capabilities
+ * @param[out] caps_out If non-null, populated with parsed capabilities
+ * @return true if device has single-touch or multitouch ABS capabilities
  */
-bool has_touch_capabilities(int event_num) {
+bool has_touch_capabilities(int event_num, helix::AbsCapabilities* caps_out = nullptr) {
     std::string path =
         "/sys/class/input/event" + std::to_string(event_num) + "/device/capabilities/abs";
     std::string caps = read_sysfs_file(path);
@@ -77,21 +80,18 @@ bool has_touch_capabilities(int event_num) {
         return false;
     }
 
-    // The capabilities file contains space-separated hex values
-    // The first value contains ABS_X (bit 0) and ABS_Y (bit 1)
-    // We need both bits set (0x3) for a touchscreen
-    try {
-        // Find the last hex value (rightmost = lowest bits)
-        size_t last_space = caps.rfind(' ');
-        std::string last_hex =
-            (last_space != std::string::npos) ? caps.substr(last_space + 1) : caps;
-
-        unsigned long value = std::stoul(last_hex, nullptr, 16);
-        // Check for ABS_X (bit 0) and ABS_Y (bit 1)
-        return (value & 0x3) == 0x3;
-    } catch (...) {
-        return false;
+    auto result = helix::parse_abs_capabilities(caps);
+    if (caps_out) {
+        *caps_out = result;
     }
+
+    if (result.has_multitouch && !result.has_single_touch) {
+        spdlog::debug(
+            "[Fbdev Backend] event{}: MT-only touchscreen detected (no legacy ABS_X/ABS_Y)",
+            event_num);
+    }
+
+    return result.has_single_touch || result.has_multitouch;
 }
 
 // is_known_touchscreen_name() is now in touch_calibration.h (helix::is_known_touchscreen_name)
@@ -348,11 +348,14 @@ lv_indev_t* DisplayBackendFbdev::create_input_pointer() {
         dev_phys =
             read_sysfs_file("/sys/class/input/event" + std::to_string(event_num) + "/device/phys");
     }
-    bool has_abs = (event_num >= 0) && has_touch_capabilities(event_num);
+    helix::AbsCapabilities abs_caps;
+    bool has_abs = (event_num >= 0) && has_touch_capabilities(event_num, &abs_caps);
 
     needs_calibration_ = helix::device_needs_calibration(dev_name, dev_phys, has_abs);
-    spdlog::info("[Fbdev Backend] Input device '{}' phys='{}' abs={} → calibration {}", dev_name,
-                 dev_phys, has_abs, needs_calibration_ ? "needed" : "not needed");
+    spdlog::info(
+        "[Fbdev Backend] Input device '{}' phys='{}' abs={} (st={} mt={}) → calibration {}",
+        dev_name, dev_phys, has_abs, abs_caps.has_single_touch, abs_caps.has_multitouch,
+        needs_calibration_ ? "needed" : "not needed");
 
     // Read and log ABS ranges for diagnostic purposes, and check for mismatch
     // on capacitive screens that may report coordinates for a different resolution
@@ -363,6 +366,14 @@ lv_indev_t* DisplayBackendFbdev::create_input_pointer() {
             struct input_absinfo abs_y = {};
             bool got_x = (ioctl(fd, EVIOCGABS(ABS_X), &abs_x) == 0);
             bool got_y = (ioctl(fd, EVIOCGABS(ABS_Y), &abs_y) == 0);
+
+            // MT-only devices (e.g., Goodix gt9xxnew_ts) don't have legacy ABS_X/ABS_Y.
+            // Fall back to ABS_MT_POSITION_X/ABS_MT_POSITION_Y for range queries.
+            if ((!got_x || !got_y) && abs_caps.has_multitouch) {
+                spdlog::debug("[Fbdev Backend] ABS_X/ABS_Y query failed, trying MT axes");
+                got_x = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &abs_x) == 0);
+                got_y = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &abs_y) == 0);
+            }
             close(fd);
 
             if (got_x && got_y) {
@@ -507,8 +518,9 @@ std::string DisplayBackendFbdev::auto_detect_touch_device() const {
         // Get device name from sysfs (do this once, before capability check)
         std::string name = get_device_name(event_num);
 
-        // Check for ABS_X and ABS_Y capabilities (required for touchscreen)
-        if (!has_touch_capabilities(event_num)) {
+        // Check for ABS capabilities (single-touch or multitouch)
+        helix::AbsCapabilities dev_abs_caps;
+        if (!has_touch_capabilities(event_num, &dev_abs_caps)) {
             spdlog::trace("[Fbdev Backend] {} ({}) - no touch capabilities", device_path, name);
             continue;
         }
