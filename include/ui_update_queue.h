@@ -108,6 +108,10 @@ class UpdateQueue {
      */
     void queue(UpdateCallback callback) {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (!initialized_) {
+            // Silently discard — queue is shut down, panels may be destroyed
+            return;
+        }
         pending_.push(std::move(callback));
     }
 
@@ -119,12 +123,16 @@ class UpdateQueue {
      * destroyed. The actual LVGL timer is freed by lv_deinit().
      */
     void shutdown() {
+        // Drain pending callbacks while panels are still alive, then gate off
+        // new enqueues so background threads (libhv WebSocket) that arrive late
+        // silently discard instead of pushing stale panel pointers.
+        process_pending();
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            std::queue<UpdateCallback>().swap(pending_); // Clear pending queue
+            initialized_ = false;
+            std::queue<UpdateCallback>().swap(pending_); // Discard any stragglers
         }
         timer_ = nullptr;
-        initialized_ = false;
     }
 
     /**

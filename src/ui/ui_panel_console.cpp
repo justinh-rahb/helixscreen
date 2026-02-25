@@ -162,6 +162,7 @@ ConsolePanel::ConsolePanel() {
 }
 
 ConsolePanel::~ConsolePanel() {
+    alive_->store(false);
     deinit_subjects();
 }
 
@@ -563,14 +564,20 @@ void ConsolePanel::on_gcode_response(const nlohmann::json& msg) {
     entry.type = GcodeEntry::Type::RESPONSE;
     entry.is_error = is_error_message(line);
 
-    // CRITICAL: Defer LVGL operations to main thread via ui_queue_update [L012]
+    // CRITICAL: Defer LVGL operations to main thread via ui_queue_update [L012][L072]
     // WebSocket callbacks run on libhv thread - direct LVGL calls cause crashes
     struct Ctx {
         ConsolePanel* panel;
+        std::weak_ptr<std::atomic<bool>> alive;
         GcodeEntry entry;
     };
-    auto ctx = std::make_unique<Ctx>(Ctx{this, std::move(entry)});
-    helix::ui::queue_update<Ctx>(std::move(ctx), [](Ctx* c) { c->panel->add_entry(c->entry); });
+    auto ctx = std::make_unique<Ctx>(Ctx{this, alive_, std::move(entry)});
+    helix::ui::queue_update<Ctx>(std::move(ctx), [](Ctx* c) {
+        auto alive = c->alive.lock();
+        if (!alive || !alive->load())
+            return;
+        c->panel->add_entry(c->entry);
+    });
 }
 
 void ConsolePanel::add_entry(const GcodeEntry& entry) {

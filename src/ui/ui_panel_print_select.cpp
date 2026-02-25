@@ -416,16 +416,23 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     // Initialize file data provider for Moonraker files
     file_provider_ = std::make_unique<helix::ui::PrintSelectFileProvider>();
     file_provider_->set_api(api_);
-    file_provider_->set_on_files_ready([self](std::vector<PrintFileData>&& files) {
-        // CRITICAL: Defer ALL work to main thread [L012]
-        // This callback runs on WebSocket thread - LVGL operations must be on main thread
+    file_provider_->set_on_files_ready([self,
+                                        alive = std::weak_ptr<std::atomic<bool>>(self->alive_)](
+                                           std::vector<PrintFileData>&& files) {
+        // CRITICAL: Defer ALL work to main thread [L012][L072]
+        // WebSocket callbacks run on libhv thread - direct LVGL calls cause crashes
         struct FilesReadyContext {
             PrintSelectPanel* panel;
+            std::weak_ptr<std::atomic<bool>> alive;
             std::vector<PrintFileData> files;
         };
-        auto ctx = std::make_unique<FilesReadyContext>(FilesReadyContext{self, std::move(files)});
+        auto ctx =
+            std::make_unique<FilesReadyContext>(FilesReadyContext{self, alive, std::move(files)});
 
         helix::ui::queue_update<FilesReadyContext>(std::move(ctx), [](FilesReadyContext* c) {
+            auto a = c->alive.lock();
+            if (!a || !a->load())
+                return;
             auto* panel = c->panel;
 
             // Move data into panel (now safe - on main thread)
@@ -479,71 +486,77 @@ void PrintSelectPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
                                         static_cast<size_t>(visible_end));
         });
     });
-    file_provider_->set_on_metadata_updated([self](size_t index, const PrintFileData& updated) {
-        // CRITICAL: Defer all work to main thread [L012]
-        // This callback runs on WebSocket thread - LVGL operations must be on main thread
-        struct MetadataUpdateContext {
-            PrintSelectPanel* panel;
-            size_t index;
-            PrintFileData updated; // Copy the data
-        };
-        auto ctx =
-            std::make_unique<MetadataUpdateContext>(MetadataUpdateContext{self, index, updated});
-        helix::ui::queue_update<MetadataUpdateContext>(
-            std::move(ctx), [](MetadataUpdateContext* c) {
-                auto* panel = c->panel;
-                size_t idx = c->index;
-                const auto& upd = c->updated;
+    file_provider_->set_on_metadata_updated(
+        [self, alive = std::weak_ptr<std::atomic<bool>>(self->alive_)](
+            size_t index, const PrintFileData& updated) {
+            // CRITICAL: Defer all work to main thread [L012][L072]
+            // WebSocket callbacks run on libhv thread - direct LVGL calls cause crashes
+            struct MetadataUpdateContext {
+                PrintSelectPanel* panel;
+                std::weak_ptr<std::atomic<bool>> alive;
+                size_t index;
+                PrintFileData updated; // Copy the data
+            };
+            auto ctx = std::make_unique<MetadataUpdateContext>(
+                MetadataUpdateContext{self, alive, index, updated});
+            helix::ui::queue_update<MetadataUpdateContext>(
+                std::move(ctx), [](MetadataUpdateContext* c) {
+                    auto a = c->alive.lock();
+                    if (!a || !a->load())
+                        return;
+                    auto* panel = c->panel;
+                    size_t idx = c->index;
+                    const auto& upd = c->updated;
 
-                // Update file in list
-                if (idx < panel->file_list_.size() &&
-                    panel->file_list_[idx].filename == upd.filename) {
-                    // Merge updated fields
-                    if (upd.print_time_minutes > 0) {
-                        panel->file_list_[idx].print_time_minutes = upd.print_time_minutes;
-                        panel->file_list_[idx].print_time_str = upd.print_time_str;
-                    }
-                    if (upd.filament_grams > 0) {
-                        panel->file_list_[idx].filament_grams = upd.filament_grams;
-                        panel->file_list_[idx].filament_str = upd.filament_str;
-                    }
-                    if (!upd.filament_type.empty()) {
-                        panel->file_list_[idx].filament_type = upd.filament_type;
-                    }
-                    if (upd.layer_count > 0) {
-                        panel->file_list_[idx].layer_count = upd.layer_count;
-                        panel->file_list_[idx].layer_count_str = upd.layer_count_str;
-                    }
-                    if (!upd.thumbnail_path.empty() &&
-                        !helix::ui::PrintSelectCardView::is_placeholder_thumbnail(
-                            upd.thumbnail_path)) {
-                        panel->file_list_[idx].thumbnail_path = upd.thumbnail_path;
-                    }
+                    // Update file in list
+                    if (idx < panel->file_list_.size() &&
+                        panel->file_list_[idx].filename == upd.filename) {
+                        // Merge updated fields
+                        if (upd.print_time_minutes > 0) {
+                            panel->file_list_[idx].print_time_minutes = upd.print_time_minutes;
+                            panel->file_list_[idx].print_time_str = upd.print_time_str;
+                        }
+                        if (upd.filament_grams > 0) {
+                            panel->file_list_[idx].filament_grams = upd.filament_grams;
+                            panel->file_list_[idx].filament_str = upd.filament_str;
+                        }
+                        if (!upd.filament_type.empty()) {
+                            panel->file_list_[idx].filament_type = upd.filament_type;
+                        }
+                        if (upd.layer_count > 0) {
+                            panel->file_list_[idx].layer_count = upd.layer_count;
+                            panel->file_list_[idx].layer_count_str = upd.layer_count_str;
+                        }
+                        if (!upd.thumbnail_path.empty() &&
+                            !helix::ui::PrintSelectCardView::is_placeholder_thumbnail(
+                                upd.thumbnail_path)) {
+                            panel->file_list_[idx].thumbnail_path = upd.thumbnail_path;
+                        }
 
-                    // Schedule debounced view refresh
-                    panel->schedule_view_refresh();
+                        // Schedule debounced view refresh
+                        panel->schedule_view_refresh();
 
-                    // Update detail view if this file is selected
-                    if (strcmp(panel->selected_filename_buffer_, upd.filename.c_str()) == 0) {
-                        // Use filament_name if available, otherwise filament_type
-                        const std::string& filament_display =
-                            !panel->file_list_[idx].filament_name.empty()
-                                ? panel->file_list_[idx].filament_name
-                                : panel->file_list_[idx].filament_type;
-                        panel->set_selected_file(
-                            upd.filename.c_str(), panel->file_list_[idx].thumbnail_path.c_str(),
-                            panel->file_list_[idx].original_thumbnail_url.c_str(),
-                            panel->file_list_[idx].print_time_str.c_str(),
-                            panel->file_list_[idx].filament_str.c_str(),
-                            panel->file_list_[idx].layer_count_str.c_str(),
-                            panel->file_list_[idx].print_height_str.c_str(),
-                            panel->file_list_[idx].modified_timestamp,
-                            panel->file_list_[idx].layer_height_str.c_str(),
-                            filament_display.c_str());
+                        // Update detail view if this file is selected
+                        if (strcmp(panel->selected_filename_buffer_, upd.filename.c_str()) == 0) {
+                            // Use filament_name if available, otherwise filament_type
+                            const std::string& filament_display =
+                                !panel->file_list_[idx].filament_name.empty()
+                                    ? panel->file_list_[idx].filament_name
+                                    : panel->file_list_[idx].filament_type;
+                            panel->set_selected_file(
+                                upd.filename.c_str(), panel->file_list_[idx].thumbnail_path.c_str(),
+                                panel->file_list_[idx].original_thumbnail_url.c_str(),
+                                panel->file_list_[idx].print_time_str.c_str(),
+                                panel->file_list_[idx].filament_str.c_str(),
+                                panel->file_list_[idx].layer_count_str.c_str(),
+                                panel->file_list_[idx].print_height_str.c_str(),
+                                panel->file_list_[idx].modified_timestamp,
+                                panel->file_list_[idx].layer_height_str.c_str(),
+                                filament_display.c_str());
+                        }
                     }
-                }
-            });
-    });
+                });
+        });
     file_provider_->set_on_error([self](const std::string& error) {
         NOTIFY_ERROR("Failed to refresh file list");
         LOG_ERROR_INTERNAL("[{}] File list refresh error: {}", self->get_name(), error);

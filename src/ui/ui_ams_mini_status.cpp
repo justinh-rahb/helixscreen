@@ -558,11 +558,13 @@ void ui_ams_mini_status_set_slot(lv_obj_t* obj, int slot_index, uint32_t color_r
 /** Timer callback for deferred refresh */
 static void deferred_refresh_cb(lv_timer_t* timer) {
     lv_obj_t* container = static_cast<lv_obj_t*>(lv_timer_get_user_data(timer));
-    if (!container) {
+    if (!container || !lv_is_initialized()) {
         lv_timer_delete(timer);
         return;
     }
 
+    // Registry lookup validates the widget is still alive — on_delete() removes
+    // the entry before freeing data, so get_data() returns nullptr for dead widgets.
     auto* data = get_data(container);
     if (data) {
         rebuild_bars(data);

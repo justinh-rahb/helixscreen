@@ -2383,6 +2383,11 @@ void Application::shutdown() {
     // after m_panels.reset() causes use-after-free (SIGSEGV).
     helix::ui::update_queue_shutdown();
 
+    // Stop ALL LVGL animations before destroying panels.
+    // Animations hold widget pointers; completion callbacks fired during
+    // lv_anim_delete_all() would dereference freed objects if panels are gone.
+    lv_anim_delete_all();
+
     m_panels.reset();
     m_subjects.reset();
 
@@ -2390,11 +2395,6 @@ void Application::shutdown() {
     if (m_display) {
         m_display->restore_display_on_shutdown();
     }
-
-    // Stop ALL LVGL animations before destroying panels.
-    // Animations hold pointers to objects; if panels are destroyed first,
-    // a pending anim_timer tick can try to refresh styles on freed objects.
-    lv_anim_delete_all();
 
     // Destroy ALL static panel/overlay globals via self-registration pattern.
     // This deinits local subjects (via SubjectManager) and releases ObserverGuards.

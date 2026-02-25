@@ -118,6 +118,9 @@ void NavigationManager::clear_overlay_stack() {
 // ============================================================================
 
 void NavigationManager::overlay_slide_out_complete_cb(lv_anim_t* anim) {
+    if (NavigationManager::instance().is_shutting_down()) {
+        return; // Shutdown in progress — widget may be freed
+    }
     lv_obj_t* panel = static_cast<lv_obj_t*>(anim->var);
     lv_obj_add_flag(panel, LV_OBJ_FLAG_HIDDEN);
     // Reset all transform and opacity properties for potential reuse

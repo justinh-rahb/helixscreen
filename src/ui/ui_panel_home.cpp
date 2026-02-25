@@ -149,6 +149,11 @@ HomePanel::~HomePanel() {
         tip_animating_ = false;
         lv_anim_delete(this, nullptr);
 
+        // Stop light-flash animation (var=light_icon_, not this)
+        if (light_icon_) {
+            lv_anim_delete(light_icon_, nullptr);
+        }
+
         if (snapshot_timer_) {
             lv_timer_delete(snapshot_timer_);
             snapshot_timer_ = nullptr;
