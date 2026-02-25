@@ -53,6 +53,25 @@ Point transform_point(const TouchCalibration& cal, Point raw, int max_x = 0, int
  */
 bool is_calibration_valid(const TouchCalibration& cal);
 
+/**
+ * @brief Validate calibration result by checking back-transform residuals
+ *
+ * Transforms each raw calibration point through the matrix and checks how close
+ * the result is to the expected screen position. Also checks that the center
+ * of the touch range maps to somewhere on-screen.
+ *
+ * @param cal Computed calibration to validate
+ * @param screen_points 3 expected screen positions
+ * @param touch_points 3 raw touch positions used to compute cal
+ * @param screen_width Display width in pixels
+ * @param screen_height Display height in pixels
+ * @param max_residual Maximum allowed back-transform error in pixels (default: 10)
+ * @return true if calibration passes validation
+ */
+bool validate_calibration_result(const TouchCalibration& cal, const Point screen_points[3],
+                                 const Point touch_points[3], int screen_width, int screen_height,
+                                 float max_residual = 10.0f);
+
 /// Maximum reasonable coefficient value for validation
 constexpr float MAX_CALIBRATION_COEFFICIENT = 1000.0f;
 

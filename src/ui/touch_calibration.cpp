@@ -3,6 +3,8 @@
 
 #include "touch_calibration.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cmath>
 #include <initializer_list>
@@ -112,6 +114,48 @@ bool is_calibration_valid(const TouchCalibration& cal) {
         std::abs(cal.d) > MAX_CALIBRATION_COEFFICIENT ||
         std::abs(cal.e) > MAX_CALIBRATION_COEFFICIENT ||
         std::abs(cal.f) > MAX_CALIBRATION_COEFFICIENT) {
+        return false;
+    }
+
+    return true;
+}
+
+bool validate_calibration_result(const TouchCalibration& cal, const Point screen_points[3],
+                                 const Point touch_points[3], int screen_width, int screen_height,
+                                 float max_residual) {
+    if (!cal.valid) {
+        return false;
+    }
+
+    // Check 1: Back-transform residuals
+    for (int i = 0; i < 3; i++) {
+        Point transformed = transform_point(cal, touch_points[i]);
+        float dx = static_cast<float>(transformed.x - screen_points[i].x);
+        float dy = static_cast<float>(transformed.y - screen_points[i].y);
+        float residual = std::sqrt(dx * dx + dy * dy);
+
+        if (residual > max_residual) {
+            spdlog::warn("[TouchCalibration] Back-transform residual {:.1f}px at point {} "
+                         "(expected ({},{}), got ({},{}))",
+                         residual, i, screen_points[i].x, screen_points[i].y, transformed.x,
+                         transformed.y);
+            return false;
+        }
+    }
+
+    // Check 2: Center of touch range should map to somewhere near the screen
+    int center_x = (touch_points[0].x + touch_points[1].x + touch_points[2].x) / 3;
+    int center_y = (touch_points[0].y + touch_points[1].y + touch_points[2].y) / 3;
+    Point center_transformed = transform_point(cal, {center_x, center_y});
+
+    int margin_x = screen_width / 2;
+    int margin_y = screen_height / 2;
+    if (center_transformed.x < -margin_x || center_transformed.x > screen_width + margin_x ||
+        center_transformed.y < -margin_y || center_transformed.y > screen_height + margin_y) {
+        spdlog::warn("[TouchCalibration] Center of touch range ({},{}) maps to ({},{}), "
+                     "which is far off-screen ({}x{})",
+                     center_x, center_y, center_transformed.x, center_transformed.y, screen_width,
+                     screen_height);
         return false;
     }
 

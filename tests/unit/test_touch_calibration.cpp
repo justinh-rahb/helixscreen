@@ -796,3 +796,71 @@ TEST_CASE("TouchCalibration: scoring factors for common touchscreen types",
         // Score: 2 (known name) + 0 (not USB) = 2, plus PROP_DIRECT on real hw
     }
 }
+
+// ============================================================================
+// Post-Compute Validation Tests
+// ============================================================================
+
+TEST_CASE("TouchCalibration: validate_calibration_result accepts good calibration",
+          "[touch-calibration][validate]") {
+    // Identity calibration: residuals should be 0
+    Point screen_points[3] = {{120, 86}, {400, 408}, {680, 86}};
+    Point touch_points[3] = {{120, 86}, {400, 408}, {680, 86}};
+    TouchCalibration cal;
+    compute_calibration(screen_points, touch_points, cal);
+
+    REQUIRE(validate_calibration_result(cal, screen_points, touch_points, 800, 480) == true);
+}
+
+TEST_CASE("TouchCalibration: validate_calibration_result rejects high residual",
+          "[touch-calibration][validate]") {
+    // Manually craft a calibration with large back-transform error
+    TouchCalibration cal;
+    cal.valid = true;
+    cal.a = 0.5f;
+    cal.b = 0.0f;
+    cal.c = 0.0f;
+    cal.d = 0.0f;
+    cal.e = 0.5f;
+    cal.f = 0.0f;
+
+    Point screen_points[3] = {{120, 86}, {400, 408}, {680, 86}};
+    Point touch_points[3] = {{120, 86}, {400, 408}, {680, 86}};
+
+    REQUIRE(validate_calibration_result(cal, screen_points, touch_points, 800, 480) == false);
+}
+
+TEST_CASE("TouchCalibration: validate_calibration_result rejects off-screen center",
+          "[touch-calibration][validate]") {
+    TouchCalibration cal;
+    cal.valid = true;
+    cal.a = 1.0f;
+    cal.b = 0.0f;
+    cal.c = 5000.0f;
+    cal.d = 0.0f;
+    cal.e = 1.0f;
+    cal.f = 0.0f;
+
+    Point screen_points[3] = {{120, 86}, {400, 408}, {680, 86}};
+    Point touch_points[3] = {{500, 500}, {2000, 3500}, {3500, 500}};
+
+    REQUIRE(validate_calibration_result(cal, screen_points, touch_points, 800, 480) == false);
+}
+
+TEST_CASE("TouchCalibration: validate_calibration_result accepts real ns2009 calibration",
+          "[touch-calibration][validate]") {
+    TouchCalibration cal;
+    cal.valid = true;
+    cal.a = 0.1258f;
+    cal.b = -0.0025f;
+    cal.c = -12.63f;
+    cal.d = -0.0005f;
+    cal.e = 0.0748f;
+    cal.f = -16.20f;
+
+    // Approximate raw->screen mapping for 480x272 display with 12-bit ADC
+    Point screen_points[3] = {{72, 49}, {240, 231}, {408, 49}};
+    Point touch_points[3] = {{673, 872}, {2007, 3307}, {3342, 872}};
+
+    REQUIRE(validate_calibration_result(cal, screen_points, touch_points, 480, 272) == true);
+}
