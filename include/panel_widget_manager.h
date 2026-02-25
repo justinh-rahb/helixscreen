@@ -81,6 +81,9 @@ class PanelWidgetManager {
     /// Release gate observers for a panel (call during deinit/shutdown).
     void clear_gate_observers(const std::string& panel_id);
 
+    /// Get the PanelWidgetConfig for a panel (creates if needed).
+    class PanelWidgetConfig& get_widget_config(const std::string& panel_id);
+
   private:
     PanelWidgetManager() = default;
 

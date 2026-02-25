@@ -7,6 +7,7 @@
 #include "ui_observer_guard.h"
 #include "ui_panel_base.h"
 
+#include "grid_edit_mode.h"
 #include "led/led_controller.h"
 #include "panel_widget.h"
 #include "subject_managed_panel.h"
@@ -148,6 +149,7 @@ class HomePanel : public PanelBase {
     static void printer_status_clicked_cb(lv_event_t* e);
     static void network_clicked_cb(lv_event_t* e);
     static void ams_clicked_cb(lv_event_t* e);
+    static void on_home_grid_long_press(lv_event_t* e);
 
     ObserverGuard extruder_temp_observer_;
     ObserverGuard extruder_target_observer_;
@@ -157,6 +159,9 @@ class HomePanel : public PanelBase {
 
     // Active PanelWidget instances (factory-created, lifecycle-managed)
     std::vector<std::unique_ptr<helix::PanelWidget>> active_widgets_;
+
+    // Grid edit mode state machine (long-press to rearrange widgets)
+    helix::GridEditMode grid_edit_mode_;
 
     // Heating icon animator (gradient color + pulse while heating)
     HeatingIconAnimator temp_icon_animator_;

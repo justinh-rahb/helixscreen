@@ -27,6 +27,7 @@
 #include "led/ui_led_control_overlay.h"
 #include "moonraker_api.h"
 #include "observer_factory.h"
+#include "panel_widget_config.h"
 #include "panel_widget_manager.h"
 #include "panel_widgets/fan_stack_widget.h"
 #include "panel_widgets/network_widget.h"
@@ -147,6 +148,7 @@ void HomePanel::init_subjects() {
         {"favorite_macro_2_clicked_cb", helix::FavoriteMacroWidget::clicked_2_cb},
         {"favorite_macro_2_long_press_cb", helix::FavoriteMacroWidget::long_press_2_cb},
         {"fav_macro_picker_backdrop_cb", helix::FavoriteMacroWidget::picker_backdrop_cb},
+        {"on_home_grid_long_press", on_home_grid_long_press},
     });
 
     // Subscribe to AmsState slot_count for AMS widget visibility
@@ -923,6 +925,19 @@ void HomePanel::ams_clicked_cb(lv_event_t* e) {
     (void)e;
     extern HomePanel& get_global_home_panel();
     get_global_home_panel().handle_ams_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void HomePanel::on_home_grid_long_press(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[HomePanel] on_home_grid_long_press");
+    (void)e;
+    extern HomePanel& get_global_home_panel();
+    auto& panel = get_global_home_panel();
+    if (!panel.grid_edit_mode_.is_active()) {
+        auto* container = lv_obj_find_by_name(panel.panel_, "widget_container");
+        auto& config = helix::PanelWidgetManager::instance().get_widget_config("home");
+        panel.grid_edit_mode_.enter(container, &config);
+    }
     LVGL_SAFE_EVENT_CB_END();
 }
 

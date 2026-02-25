@@ -65,7 +65,7 @@ void PanelWidgetManager::notify_config_changed(const std::string& panel_id) {
     }
 }
 
-static PanelWidgetConfig& get_widget_config(const std::string& panel_id) {
+static PanelWidgetConfig& get_widget_config_impl(const std::string& panel_id) {
     // Per-panel config instances cached by panel ID
     static std::unordered_map<std::string, PanelWidgetConfig> configs;
     auto it = configs.find(panel_id);
@@ -95,7 +95,7 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
     // Clear existing children (for repopulation)
     lv_obj_clean(container);
 
-    auto& widget_config = get_widget_config(panel_id);
+    auto& widget_config = get_widget_config_impl(panel_id);
 
     // Resolved widget slot: holds the widget ID, resolved XML component name,
     // per-widget config, and optionally a pre-created PanelWidget instance.
@@ -371,6 +371,10 @@ void PanelWidgetManager::clear_gate_observers(const std::string& panel_id) {
                       it->second.size(), panel_id);
         gate_observers_.erase(it);
     }
+}
+
+PanelWidgetConfig& PanelWidgetManager::get_widget_config(const std::string& panel_id) {
+    return get_widget_config_impl(panel_id);
 }
 
 } // namespace helix
