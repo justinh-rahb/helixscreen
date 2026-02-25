@@ -113,6 +113,16 @@ helix::PrinterState& get_printer_state();
 lv_subject_t& get_notification_subject();
 
 /**
+ * @brief Get the global home edit mode subject
+ *
+ * Controls navbar done button visibility during grid edit mode.
+ * Value 0 = not editing, 1 = editing.
+ *
+ * @return Reference to the home edit mode subject
+ */
+lv_subject_t& get_home_edit_mode_subject();
+
+/**
  * @brief Initialize all global subjects
  *
  * Must be called during app initialization after LVGL is initialized.

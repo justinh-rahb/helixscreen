@@ -99,6 +99,9 @@ class HomePanel : public PanelBase {
     void handle_temp_clicked();
     void handle_network_clicked();
 
+    /// Exit grid edit mode (called by navbar done button)
+    void exit_grid_edit_mode();
+
   private:
     SubjectManager subjects_;
     TempControlPanel* temp_control_panel_ = nullptr;

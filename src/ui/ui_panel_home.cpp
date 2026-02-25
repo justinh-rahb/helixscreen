@@ -941,6 +941,12 @@ void HomePanel::on_home_grid_long_press(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void HomePanel::exit_grid_edit_mode() {
+    if (grid_edit_mode_.is_active()) {
+        grid_edit_mode_.exit();
+    }
+}
+
 static std::unique_ptr<HomePanel> g_home_panel;
 
 HomePanel& get_global_home_panel() {

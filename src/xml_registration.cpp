@@ -16,6 +16,7 @@
 #include "ui_icon_codepoints.h"
 #include "ui_markdown.h"
 #include "ui_notification_badge.h"
+#include "ui_panel_home.h"
 #include "ui_panel_settings.h"
 #include "ui_progress_bar.h"
 #include "ui_spinner.h"
@@ -156,6 +157,8 @@ void register_xml_components() {
     // Global utility callbacks used by multiple components
     lv_xml_register_event_cb(nullptr, "on_toggle_password_visibility",
                              on_toggle_password_visibility);
+    lv_xml_register_event_cb(nullptr, "on_edit_done_clicked",
+                             [](lv_event_t*) { get_global_home_panel().exit_grid_edit_mode(); });
     lv_subject_init_int(&s_noop_subject, 0);
     lv_xml_register_subject(nullptr, "", &s_noop_subject);
     s_noop_subject_initialized = true;

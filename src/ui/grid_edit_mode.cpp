@@ -2,6 +2,7 @@
 
 #include "grid_edit_mode.h"
 
+#include "app_globals.h"
 #include "panel_widget_config.h"
 
 #include <spdlog/spdlog.h>
@@ -22,6 +23,7 @@ void GridEditMode::enter(lv_obj_t* container, PanelWidgetConfig* config) {
     active_ = true;
     container_ = container;
     config_ = config;
+    lv_subject_set_int(&get_home_edit_mode_subject(), 1);
     spdlog::info("[GridEditMode] Entered edit mode");
 }
 
@@ -30,6 +32,7 @@ void GridEditMode::exit() {
         return;
     }
     active_ = false;
+    lv_subject_set_int(&get_home_edit_mode_subject(), 0);
 
     if (config_) {
         config_->save();

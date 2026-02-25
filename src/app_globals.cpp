@@ -52,6 +52,7 @@ static TemperatureHistoryManager* g_temp_history_manager = nullptr;
 static SubjectManager g_subjects;
 static lv_subject_t g_notification_subject;
 static lv_subject_t g_show_beta_features_subject;
+static lv_subject_t g_home_edit_mode_subject;
 
 // Application quit flag (volatile sig_atomic_t for async-signal-safety)
 static volatile sig_atomic_t g_quit_requested = 0;
@@ -113,6 +114,10 @@ lv_subject_t& get_notification_subject() {
     return g_notification_subject;
 }
 
+lv_subject_t& get_home_edit_mode_subject() {
+    return g_home_edit_mode_subject;
+}
+
 // Track if subjects are initialized
 static bool g_subjects_initialized = false;
 
@@ -134,6 +139,11 @@ void app_globals_init_subjects() {
     lv_subject_init_int(&g_show_beta_features_subject, beta_enabled ? 1 : 0);
     g_subjects.register_subject(&g_show_beta_features_subject);
     lv_xml_register_subject(nullptr, "show_beta_features", &g_show_beta_features_subject);
+
+    // Initialize home edit mode subject (controls navbar done button visibility)
+    lv_subject_init_int(&g_home_edit_mode_subject, 0);
+    g_subjects.register_subject(&g_home_edit_mode_subject);
+    lv_xml_register_subject(nullptr, "home_edit_mode", &g_home_edit_mode_subject);
 
     // Initialize modal dialog subjects (for modal_dialog.xml binding)
     helix::ui::modal_init_subjects();
