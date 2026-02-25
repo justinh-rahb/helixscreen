@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "grid_edit_mode.h"
+#include "panel_widget_registry.h"
 
 #include "../catch_amalgamated.hpp"
 
@@ -131,4 +132,67 @@ TEST_CASE("GridEditMode: screen_to_grid_cell center of each cell", "[grid_edit][
             CHECK(cell.second == r);
         }
     }
+}
+
+// =============================================================================
+// clamp_span
+// =============================================================================
+
+TEST_CASE("GridEditMode: clamp_span respects min/max from registry", "[grid_edit][resize]") {
+    // printer_image: min 1x1, max 4x3 (from registry)
+    const auto* def = find_widget_def("printer_image");
+    REQUIRE(def != nullptr);
+    REQUIRE(def->is_scalable());
+
+    // Over max — clamp down
+    auto [c, r] = GridEditMode::clamp_span("printer_image", 5, 4);
+    CHECK(c == def->effective_max_colspan());
+    CHECK(r == def->effective_max_rowspan());
+
+    // Under min — clamp up
+    auto [c2, r2] = GridEditMode::clamp_span("printer_image", 0, 0);
+    CHECK(c2 == def->effective_min_colspan());
+    CHECK(r2 == def->effective_min_rowspan());
+
+    // Within range — unchanged
+    auto [c3, r3] = GridEditMode::clamp_span("printer_image", 2, 2);
+    CHECK(c3 == 2);
+    CHECK(r3 == 2);
+}
+
+TEST_CASE("GridEditMode: clamp_span non-scalable widget stays fixed", "[grid_edit][resize]") {
+    // "power" has no min/max overrides, so effective min == max == default (1x1)
+    const auto* def = find_widget_def("power");
+    REQUIRE(def != nullptr);
+    REQUIRE_FALSE(def->is_scalable());
+
+    auto [c, r] = GridEditMode::clamp_span("power", 3, 3);
+    CHECK(c == def->effective_min_colspan());
+    CHECK(r == def->effective_min_rowspan());
+    // Both should equal the default colspan/rowspan (1x1)
+    CHECK(c == 1);
+    CHECK(r == 1);
+}
+
+TEST_CASE("GridEditMode: clamp_span unknown widget returns at least 1x1", "[grid_edit][resize]") {
+    auto [c, r] = GridEditMode::clamp_span("nonexistent_widget_xyz", 0, 0);
+    CHECK(c >= 1);
+    CHECK(r >= 1);
+}
+
+TEST_CASE("GridEditMode: clamp_span tips widget respects range", "[grid_edit][resize]") {
+    // tips: colspan default=3, min=2, max=6, rowspan default=1, min=1, max=1
+    const auto* def = find_widget_def("tips");
+    REQUIRE(def != nullptr);
+    REQUIRE(def->is_scalable());
+
+    // Max colspan 6, only 1 row allowed
+    auto [c, r] = GridEditMode::clamp_span("tips", 10, 5);
+    CHECK(c == def->effective_max_colspan());
+    CHECK(r == def->effective_max_rowspan());
+
+    // Min colspan 2
+    auto [c2, r2] = GridEditMode::clamp_span("tips", 1, 1);
+    CHECK(c2 == def->effective_min_colspan());
+    CHECK(r2 == 1);
 }

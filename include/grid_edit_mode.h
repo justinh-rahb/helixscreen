@@ -6,6 +6,7 @@
 
 #include <functional>
 #include <string>
+#include <tuple>
 #include <utility>
 
 namespace helix {
@@ -64,6 +65,11 @@ class GridEditMode {
                                                    int container_y, int container_w,
                                                    int container_h, int ncols, int nrows);
 
+    /// Clamp desired colspan/rowspan to the min/max allowed by the widget registry.
+    /// Returns {clamped_colspan, clamped_rowspan}.
+    static std::pair<int, int> clamp_span(const std::string& widget_id, int desired_colspan,
+                                          int desired_rowspan);
+
   private:
     void create_dots_overlay();
     void destroy_dots_overlay();
@@ -85,6 +91,12 @@ class GridEditMode {
     void destroy_snap_preview();
     void cleanup_drag_state();
 
+    // Resize helpers
+    bool is_near_bottom_right_corner(int px, int py, const lv_area_t& widget_area) const;
+    bool is_selected_widget_resizable() const;
+    void handle_resize_move(lv_event_t* e);
+    void handle_resize_end(lv_event_t* e);
+
     bool active_ = false;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* dots_overlay_ = nullptr;
@@ -105,6 +117,11 @@ class GridEditMode {
     lv_obj_t* snap_preview_ = nullptr;
     int snap_preview_col_ = -1;
     int snap_preview_row_ = -1;
+
+    // Resize state
+    bool resizing_ = false;
+    int resize_preview_colspan_ = -1;
+    int resize_preview_rowspan_ = -1;
 };
 
 } // namespace helix
