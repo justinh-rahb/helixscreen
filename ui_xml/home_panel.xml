@@ -8,6 +8,7 @@
     <!-- Grid container: all widgets placed dynamically by PanelWidgetManager -->
     <lv_obj name="widget_container" width="100%" height="100%" style_pad_all="#space_sm" scrollable="false">
       <event_cb trigger="long_pressed" callback="on_home_grid_long_press"/>
+      <event_cb trigger="clicked" callback="on_home_grid_clicked"/>
     </lv_obj>
   </view>
 </component>

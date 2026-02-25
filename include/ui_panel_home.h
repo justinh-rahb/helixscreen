@@ -153,6 +153,7 @@ class HomePanel : public PanelBase {
     static void network_clicked_cb(lv_event_t* e);
     static void ams_clicked_cb(lv_event_t* e);
     static void on_home_grid_long_press(lv_event_t* e);
+    static void on_home_grid_clicked(lv_event_t* e);
 
     ObserverGuard extruder_temp_observer_;
     ObserverGuard extruder_target_observer_;
