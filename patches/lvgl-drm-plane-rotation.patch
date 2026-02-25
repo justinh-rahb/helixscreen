@@ -129,3 +129,27 @@ index 2a6ca6ed0..1d31bfaeb 100644
      ret = 0;
  
  free_res:
+diff --git a/src/drivers/display/drm/lv_linux_drm.h b/src/drivers/display/drm/lv_linux_drm.h
+index 5afede049..08b30a906 100644
+--- a/src/drivers/display/drm/lv_linux_drm.h
++++ b/src/drivers/display/drm/lv_linux_drm.h
+@@ -90,6 +90,19 @@ char * lv_linux_drm_find_device_path(void);
+  */
+ void lv_linux_drm_set_mode_cb(lv_display_t * disp, lv_linux_drm_select_mode_cb_t callback);
+ 
++/**
++ * @brief Set the DRM plane rotation property
++ *
++ * Configures the hardware rotation via the DRM plane "rotation" property.
++ * This is necessary because LVGL's software rotation (lv_display_set_rotation)
++ * does not work with LV_DISPLAY_RENDER_MODE_DIRECT used by the DRM backend.
++ *
++ * @param disp      Pointer to the display object created with lv_linux_drm_create()
++ * @param rotation  DRM rotation bitmask (DRM_MODE_ROTATE_0, DRM_MODE_ROTATE_90,
++ *                  DRM_MODE_ROTATE_180, DRM_MODE_ROTATE_270)
++ */
++void lv_linux_drm_set_rotation(lv_display_t * disp, uint64_t rotation);
++
+ /**
+  * Get the horizontal resolution of a DRM mode
+  * @param mode pointer to the DRM mode object
