@@ -421,7 +421,7 @@ void cleanup_stale_old_install() {
     }
 
     std::string old_dir = install_root + ".old";
-    struct stat st{};
+    struct stat st {};
     if (stat(old_dir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
         return; // no .old directory
     }
@@ -686,7 +686,7 @@ static const char* const DOWNLOAD_FILENAME = "helixscreen-update.tar.gz";
 
 // Check if a directory is writable and return available bytes (0 on failure)
 static size_t get_available_space(const std::string& dir) {
-    struct statvfs stat{};
+    struct statvfs stat {};
     if (statvfs(dir.c_str(), &stat) != 0) {
         return 0;
     }
@@ -910,7 +910,7 @@ void UpdateChecker::do_download() {
         return;
     }
 
-    // Verify file size sanity (reject < 1MB or > 50MB)
+    // Verify file size sanity (reject < 1MB or > 150MB)
     if (result < 1024 * 1024) {
         spdlog::error("[UpdateChecker] Downloaded file too small: {} bytes", result);
         std::remove(download_path.c_str());
@@ -918,7 +918,7 @@ void UpdateChecker::do_download() {
                                "Downloaded file is too small");
         return;
     }
-    if (result > 50 * 1024 * 1024) {
+    if (result > 150 * 1024 * 1024) {
         spdlog::error("[UpdateChecker] Downloaded file too large: {} bytes", result);
         std::remove(download_path.c_str());
         report_download_status(DownloadStatus::Error, 0, "Error: Invalid download",
@@ -1077,7 +1077,7 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
             std::string env_src = install_root + "/config/helixscreen.env";
             const std::string cp_bin = resolve_tool("cp");
 
-            struct stat st{};
+            struct stat st {};
             if (stat(config_src.c_str(), &st) == 0) {
                 int ret = safe_exec({cp_bin, "-f", config_src, PREUPDATE_CONFIG_BACKUP});
                 if (ret == 0) {
@@ -1152,7 +1152,7 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
                   geteuid(), getpid());
     }
     {
-        struct stat st{};
+        struct stat st {};
         if (stat(tarball_path.c_str(), &st) == 0) {
             flog_info("[UpdateChecker] tarball size: {} bytes", st.st_size);
         } else {
@@ -1246,7 +1246,7 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
 
         // Read back the install log and emit every line through spdlog
         {
-            struct stat log_stat{};
+            struct stat log_stat {};
             if (stat(install_log.c_str(), &log_stat) == 0) {
                 flog_info("[UpdateChecker] Install log exists: {} bytes", log_stat.st_size);
             } else {
