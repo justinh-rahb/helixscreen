@@ -304,7 +304,7 @@ class AmsState {
 
     /**
      * @brief Get toolchange visibility subject (1=visible, 0=hidden)
-     * Non-zero when AFC reports expected tool changes for current print.
+     * Non-zero when the filament backend (AFC, Happy Hare) reports expected tool changes.
      */
     lv_subject_t* get_toolchange_visible_subject() {
         return &toolchange_visible_;
@@ -884,7 +884,7 @@ class AmsState {
     // Tool change progress (AFC multi-color prints)
     lv_subject_t toolchange_visible_; // 1 when swaps expected, 0 otherwise
     lv_subject_t toolchange_text_;    // "2 / 5" formatted display
-    char toolchange_text_buf_[16]{};  // Buffer for formatted text
+    char toolchange_text_buf_[32]{};  // Buffer for formatted text
 
     // Filament path visualization subjects
     lv_subject_t path_topology_;

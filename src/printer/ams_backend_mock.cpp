@@ -77,10 +77,6 @@ AmsBackendMock::AmsBackendMock(int slot_count) {
     system_info_.tip_method = caps.tip_method;
     system_info_.has_hardware_bypass_sensor = false; // Mock default: virtual toggle
 
-    // Simulate mid-print tool change progress (3rd of 5 swaps)
-    system_info_.current_toolchange = 2;
-    system_info_.number_of_toolchanges = 5;
-
     // Initialize registry with single unit
     std::vector<std::string> slot_names;
     slot_names.reserve(slot_count);
