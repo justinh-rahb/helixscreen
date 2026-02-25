@@ -2332,6 +2332,15 @@ void Application::shutdown() {
 
     spdlog::info("[Application] Shutting down...");
 
+    // Disconnect the WebSocket client FIRST to stop background threads
+    // (mock simulation, WebSocket I/O). This prevents races where the
+    // background thread delivers notifications that trigger new API requests
+    // (history fetch, metascan, webcam detection) after we've started teardown.
+    // The client object remains valid for later unregister_method_callback() calls.
+    if (m_moonraker && m_moonraker->client()) {
+        m_moonraker->client()->disconnect();
+    }
+
     // Clear app_globals references BEFORE destroying managers to prevent
     // destructors (e.g., PrintSelectPanel) from accessing destroyed objects
     set_moonraker_manager(nullptr);
@@ -2361,13 +2370,6 @@ void Application::shutdown() {
     if (m_plugin_manager) {
         m_plugin_manager->unload_all();
         m_plugin_manager.reset();
-    }
-
-    // Disconnect the client FIRST to stop background threads (mock simulation, WebSocket).
-    // This prevents races where the simulation thread dispatches callbacks from
-    // method_callbacks_ while we're erasing/destroying entries on the main thread.
-    if (m_moonraker && m_moonraker->client()) {
-        m_moonraker->client()->disconnect();
     }
 
     // Reset managers in reverse order (MoonrakerManager handles print_start_collector cleanup)
