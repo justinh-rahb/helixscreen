@@ -152,6 +152,7 @@ bool AmsOperationSidebar::setup(lv_obj_t* panel) {
     // Hide settings button if no device sections
     update_settings_visibility();
 
+    active_ = true;
     spdlog::debug("[AmsSidebar] Setup complete");
     return true;
 }
@@ -178,7 +179,7 @@ void AmsOperationSidebar::init_observers() {
     action_observer_ = observe_int_sync<AmsOperationSidebar>(
         AmsState::instance().get_ams_action_subject(), this,
         [](AmsOperationSidebar* self, int action_int) {
-            if (!self->sidebar_root_)
+            if (!self->active_ || !self->sidebar_root_)
                 return;
             auto action = static_cast<AmsAction>(action_int);
             spdlog::debug("[AmsSidebar] Action changed: {} (prev={})", ams_action_to_string(action),
@@ -216,7 +217,7 @@ void AmsOperationSidebar::init_observers() {
     current_slot_observer_ =
         observe_int_sync<AmsOperationSidebar>(AmsState::instance().get_current_slot_subject(), this,
                                               [](AmsOperationSidebar* self, int /*slot_index*/) {
-                                                  if (!self->sidebar_root_)
+                                                  if (!self->active_ || !self->sidebar_root_)
                                                       return;
                                                   self->update_current_loaded_display();
                                               });
@@ -225,7 +226,7 @@ void AmsOperationSidebar::init_observers() {
     bypass_spool_observer_ = observe_int_sync<AmsOperationSidebar>(
         AmsState::instance().get_external_spool_color_subject(), this,
         [](AmsOperationSidebar* self, int /*color_rgb*/) {
-            if (!self->sidebar_root_)
+            if (!self->active_ || !self->sidebar_root_)
                 return;
             self->update_current_loaded_display();
         });
@@ -234,7 +235,7 @@ void AmsOperationSidebar::init_observers() {
     color_observer_ = observe_int_sync<AmsOperationSidebar>(
         AmsState::instance().get_current_color_subject(), this,
         [](AmsOperationSidebar* self, int color_int) {
-            if (!self->sidebar_root_)
+            if (!self->active_ || !self->sidebar_root_)
                 return;
             lv_obj_t* swatch = lv_obj_find_by_name(self->sidebar_root_, "loaded_swatch");
             if (swatch) {
@@ -255,6 +256,9 @@ void AmsOperationSidebar::init_observers() {
 // ============================================================================
 
 void AmsOperationSidebar::cleanup() {
+    // Clear active flag FIRST to prevent observer callbacks from using freed widgets
+    active_ = false;
+
     // Reset dryer card
     dryer_card_.reset();
 
@@ -359,7 +363,7 @@ void AmsOperationSidebar::update_action_display(AmsAction action) {
 // ============================================================================
 
 void AmsOperationSidebar::recreate_step_progress_for_operation(StepOperationType op_type) {
-    if (!step_progress_container_) {
+    if (!active_ || !step_progress_container_) {
         return;
     }
 
@@ -520,7 +524,7 @@ void AmsOperationSidebar::start_operation(StepOperationType op_type, int target_
 }
 
 void AmsOperationSidebar::update_step_progress(AmsAction action) {
-    if (!step_progress_container_) {
+    if (!active_ || !step_progress_container_) {
         return;
     }
 

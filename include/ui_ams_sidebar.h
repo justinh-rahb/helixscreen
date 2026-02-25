@@ -127,6 +127,10 @@ class AmsOperationSidebar {
     bool ui_initiated_heat_ = false;
     AmsAction prev_ams_action_ = AmsAction::IDLE;
 
+    // Lifecycle flag — set in setup(), cleared in cleanup().
+    // Guards widget operations against use-after-free on dangling lv_obj_t* pointers.
+    bool active_ = false;
+
     // Step progress state
     StepOperationType current_operation_type_ = StepOperationType::LOAD_FRESH;
     int current_step_count_ = 4;
