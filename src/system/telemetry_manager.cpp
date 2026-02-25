@@ -642,10 +642,20 @@ void TelemetryManager::save_queue() const {
     std::lock_guard<std::mutex> lock(mutex_);
     try {
         std::string path = get_queue_path();
-        std::ofstream file(path);
+        std::string tmp_path = path + ".tmp";
+
+        // Write to temp file first, then atomic rename to prevent
+        // empty/corrupt queue file if process is killed mid-write
+        std::ofstream file(tmp_path);
         if (file.good()) {
             file << json(queue_).dump(2);
-            spdlog::trace("[TelemetryManager] Saved {} events to {}", queue_.size(), path);
+            file.close();
+            if (std::rename(tmp_path.c_str(), path.c_str()) != 0) {
+                spdlog::warn("[TelemetryManager] Failed to rename queue temp file: {}",
+                             strerror(errno));
+            } else {
+                spdlog::trace("[TelemetryManager] Saved {} events to {}", queue_.size(), path);
+            }
         } else {
             spdlog::warn("[TelemetryManager] Failed to open queue file for writing: {}", path);
         }
@@ -662,6 +672,12 @@ void TelemetryManager::load_queue() {
         if (!file.good()) {
             spdlog::debug("[TelemetryManager] No queue file at {}, starting with empty queue",
                           path);
+            return;
+        }
+
+        // Guard against empty file left by interrupted save_queue()
+        if (file.peek() == std::ifstream::traits_type::eof()) {
+            spdlog::debug("[TelemetryManager] Queue file is empty, starting fresh");
             return;
         }
 
