@@ -1505,13 +1505,34 @@ void Application::create_overlays() {
         spdlog::info("[Application] Opened sensor settings overlay via CLI");
     }
 
-    if (m_args.overlays.touch_calibration) {
+    // Force touch calibration: --calibrate-touch flag OR config force_calibration option
+    bool force_touch_cal = m_args.calibrate_touch;
+    if (!force_touch_cal && m_config) {
+        force_touch_cal = m_config->get<bool>("/input/force_calibration", false);
+    }
+
+    if (force_touch_cal || m_args.overlays.touch_calibration) {
         auto& overlay = helix::ui::get_touch_calibration_overlay();
         overlay.init_subjects();
+        overlay.register_callbacks();
+        overlay.set_auto_start(force_touch_cal);
         lv_obj_t* panel_obj = overlay.create(m_screen);
         if (panel_obj) {
             NavigationManager::instance().push_overlay(panel_obj);
-            spdlog::info("[Application] Opened touch calibration overlay via CLI");
+            spdlog::info("[Application] Opened touch calibration overlay (force={})",
+                         force_touch_cal);
+        }
+
+        // If triggered by config flag, auto-clear after successful calibration
+        if (m_config && m_config->get<bool>("/input/force_calibration", false)) {
+            overlay.show([this](bool success) {
+                if (success && m_config) {
+                    m_config->set<bool>("/input/force_calibration", false);
+                    m_config->save();
+                    spdlog::info(
+                        "[Application] Cleared force_calibration config flag after success");
+                }
+            });
         }
     }
 
