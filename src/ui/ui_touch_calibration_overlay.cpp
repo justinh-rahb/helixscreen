@@ -147,6 +147,26 @@ TouchCalibrationOverlay::TouchCalibrationOverlay() {
         update_step_progress();
     });
 
+    // Set up fast-revert callback for broken matrix detection during verify
+    panel_->set_fast_revert_callback([this]() {
+        spdlog::warn("[{}] Fast-revert: broken matrix detected, reverting", get_name());
+
+        // Restore backup calibration
+        if (has_backup_) {
+            DisplayManager* dm = DisplayManager::instance();
+            if (dm) {
+                dm->apply_touch_calibration(backup_calibration_);
+            }
+            has_backup_ = false;
+        }
+
+        panel_->retry();
+        update_state_subject();
+        update_instruction_text();
+        update_crosshair_position();
+        update_step_progress();
+    });
+
     spdlog::debug("[{}] Instance created", get_name());
 }
 
@@ -539,6 +559,14 @@ void TouchCalibrationOverlay::handle_screen_touched(lv_event_t* e) {
 
             spdlog::debug("[{}] Verify: raw({},{}) -> transformed({},{})", get_name(), raw.x, raw.y,
                           transformed.x, transformed.y);
+
+            // Report to panel for fast-revert tracking
+            bool on_screen = (transformed.x >= 0 && transformed.x < dm->width() &&
+                              transformed.y >= 0 && transformed.y < dm->height());
+            panel_->report_verify_touch(on_screen);
+        } else {
+            // No valid calibration/DM — report as off-screen
+            panel_->report_verify_touch(false);
         }
         return;
     }

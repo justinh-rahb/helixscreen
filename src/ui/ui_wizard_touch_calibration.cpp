@@ -132,6 +132,32 @@ WizardTouchCalibrationStep::WizardTouchCalibrationStep() {
         lv_subject_set_int(&wizard_show_skip, 1);
     });
 
+    // Set up fast-revert callback for broken matrix detection during verify
+    panel_->set_fast_revert_callback([this]() {
+        spdlog::warn("[{}] Fast-revert: broken matrix detected, reverting", get_name());
+
+        // Restore backup calibration
+        if (has_backup_) {
+            DisplayManager::instance()->apply_touch_calibration(backup_calibration_);
+            has_backup_ = false;
+        }
+
+        // Show failure message
+        lv_subject_copy_string(&wizard_subtitle,
+                               "Calibration produced bad results. Touch the targets to try again.");
+
+        // Reset to pending state
+        has_pending_calibration_ = false;
+
+        // Restart calibration from POINT_1
+        panel_->start();
+        update_crosshair_position();
+        update_button_visibility();
+
+        // Reset button text to "Skip" since we're back to calibrating
+        lv_subject_set_int(&wizard_show_skip, 1);
+    });
+
     spdlog::debug("[{}] Instance created", get_name());
 }
 

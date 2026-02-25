@@ -23,6 +23,7 @@ TouchCalibrationPanel::TouchCalibrationPanel() = default;
 
 TouchCalibrationPanel::~TouchCalibrationPanel() {
     stop_countdown_timer();
+    stop_fast_revert_timer();
 }
 
 void TouchCalibrationPanel::set_completion_callback(CompletionCallback cb) {
@@ -39,6 +40,10 @@ void TouchCalibrationPanel::set_countdown_callback(CountdownCallback cb) {
 
 void TouchCalibrationPanel::set_timeout_callback(TimeoutCallback cb) {
     timeout_callback_ = std::move(cb);
+}
+
+void TouchCalibrationPanel::set_fast_revert_callback(FastRevertCallback cb) {
+    fast_revert_callback_ = std::move(cb);
 }
 
 void TouchCalibrationPanel::set_verify_timeout_seconds(int seconds) {
@@ -103,6 +108,7 @@ void TouchCalibrationPanel::capture_point(Point raw) {
                                             screen_width_, screen_height_)) {
                 state_ = State::VERIFY;
                 start_countdown_timer();
+                start_fast_revert_timer();
             } else {
                 spdlog::warn("[TouchCalibrationPanel] Calibration matrix failed validation, "
                              "restarting");
@@ -188,6 +194,7 @@ void TouchCalibrationPanel::add_sample(Point raw) {
 
 void TouchCalibrationPanel::accept() {
     stop_countdown_timer();
+    stop_fast_revert_timer();
 
     if (state_ != State::VERIFY) {
         return;
@@ -201,6 +208,7 @@ void TouchCalibrationPanel::accept() {
 
 void TouchCalibrationPanel::retry() {
     stop_countdown_timer();
+    stop_fast_revert_timer();
 
     if (state_ != State::VERIFY) {
         return;
@@ -218,6 +226,7 @@ void TouchCalibrationPanel::retry() {
 
 void TouchCalibrationPanel::cancel() {
     stop_countdown_timer();
+    stop_fast_revert_timer();
 
     state_ = State::IDLE;
     calibration_.valid = false;
@@ -281,6 +290,50 @@ void TouchCalibrationPanel::countdown_timer_cb(lv_timer_t* timer) {
             self->timeout_callback_();
         }
         self->stop_countdown_timer();
+    }
+}
+
+void TouchCalibrationPanel::report_verify_touch(bool on_screen) {
+    if (state_ != State::VERIFY)
+        return;
+    verify_raw_touch_count_++;
+    if (on_screen) {
+        verify_onscreen_touch_count_++;
+    }
+}
+
+void TouchCalibrationPanel::start_fast_revert_timer() {
+    verify_raw_touch_count_ = 0;
+    verify_onscreen_touch_count_ = 0;
+    fast_revert_timer_ = lv_timer_create(fast_revert_timer_cb, FAST_REVERT_CHECK_MS, this);
+    lv_timer_set_repeat_count(fast_revert_timer_, 1);
+    spdlog::debug("[TouchCalibrationPanel] Started fast-revert timer ({}ms)", FAST_REVERT_CHECK_MS);
+}
+
+void TouchCalibrationPanel::stop_fast_revert_timer() {
+    if (fast_revert_timer_) {
+        lv_timer_delete(fast_revert_timer_);
+        fast_revert_timer_ = nullptr;
+    }
+}
+
+void TouchCalibrationPanel::fast_revert_timer_cb(lv_timer_t* timer) {
+    auto* self = static_cast<TouchCalibrationPanel*>(lv_timer_get_user_data(timer));
+    self->fast_revert_timer_ = nullptr; // Timer auto-deletes (repeat_count=1)
+
+    if (self->state_ != State::VERIFY)
+        return;
+
+    if (self->verify_raw_touch_count_ > 0 && self->verify_onscreen_touch_count_ == 0) {
+        spdlog::warn("[TouchCalibrationPanel] Fast-revert: {} raw touches, 0 on-screen — "
+                     "matrix is broken, reverting",
+                     self->verify_raw_touch_count_);
+        if (self->fast_revert_callback_) {
+            self->fast_revert_callback_();
+        }
+    } else {
+        spdlog::debug("[TouchCalibrationPanel] Fast-revert check passed: {}/{} on-screen",
+                      self->verify_onscreen_touch_count_, self->verify_raw_touch_count_);
     }
 }
 

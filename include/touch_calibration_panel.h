@@ -60,7 +60,7 @@ class TouchCalibrationPanel {
 
     /**
      * @brief Callback invoked each second during verify countdown
-     * @param seconds_remaining Seconds until timeout (15, 14, 13, ...)
+     * @param seconds_remaining Seconds until timeout (10, 9, 8, ...)
      */
     using CountdownCallback = std::function<void(int seconds_remaining)>;
 
@@ -68,6 +68,11 @@ class TouchCalibrationPanel {
      * @brief Callback invoked when verify timeout expires without accept
      */
     using TimeoutCallback = std::function<void()>;
+
+    /**
+     * @brief Callback invoked when fast-revert triggers (broken matrix detected)
+     */
+    using FastRevertCallback = std::function<void()>;
 
     TouchCalibrationPanel();
     ~TouchCalibrationPanel();
@@ -103,9 +108,20 @@ class TouchCalibrationPanel {
     void set_timeout_callback(TimeoutCallback cb);
 
     /**
-     * @brief Set verify timeout duration (default: 15 seconds)
+     * @brief Set callback for fast-revert (broken matrix during verify)
+     */
+    void set_fast_revert_callback(FastRevertCallback cb);
+
+    /**
+     * @brief Set verify timeout duration (default: 10 seconds)
      */
     void set_verify_timeout_seconds(int seconds);
+
+    /**
+     * @brief Report a touch event during verify state for broken-matrix detection
+     * @param on_screen Whether the transformed point is within screen bounds
+     */
+    void report_verify_touch(bool on_screen);
 
     /**
      * @brief Set the screen dimensions for target position calculations
@@ -198,7 +214,8 @@ class TouchCalibrationPanel {
     FailureCallback failure_callback_;
     CountdownCallback countdown_callback_;
     TimeoutCallback timeout_callback_;
-    int verify_timeout_seconds_ = 15;
+    FastRevertCallback fast_revert_callback_;
+    int verify_timeout_seconds_ = 10;
     int countdown_remaining_ = 0;
     lv_timer_t* countdown_timer_ = nullptr;
 
@@ -237,6 +254,16 @@ class TouchCalibrationPanel {
 
     /// Timer callback - static member
     static void countdown_timer_cb(lv_timer_t* timer);
+
+    // Fast-revert: detect broken matrices during verify by tracking touch events
+    int verify_raw_touch_count_ = 0;
+    int verify_onscreen_touch_count_ = 0;
+    lv_timer_t* fast_revert_timer_ = nullptr;
+    static constexpr int FAST_REVERT_CHECK_MS = 3000;
+
+    void start_fast_revert_timer();
+    void stop_fast_revert_timer();
+    static void fast_revert_timer_cb(lv_timer_t* timer);
 
     // Calibration target positions as screen ratios
     // These form a well-distributed triangle for accurate affine transform
