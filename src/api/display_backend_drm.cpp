@@ -87,6 +87,23 @@ bool drm_device_supports_display(const std::string& device_path) {
 }
 
 /**
+ * @brief Check if a path points to a valid DRM device (exists and responds to DRM ioctls)
+ */
+bool is_valid_drm_device(const std::string& path) {
+    int fd = open(path.c_str(), O_RDWR | O_CLOEXEC);
+    if (fd < 0) {
+        return false;
+    }
+    drmVersionPtr version = drmGetVersion(fd);
+    close(fd);
+    if (!version) {
+        return false;
+    }
+    drmFreeVersion(version);
+    return true;
+}
+
+/**
  * @brief Auto-detect the best DRM device
  *
  * Priority order for device selection:
@@ -100,16 +117,26 @@ std::string auto_detect_drm_device() {
     // Priority 1: Environment variable override (for debugging/testing)
     const char* env_device = std::getenv("HELIX_DRM_DEVICE");
     if (env_device && env_device[0] != '\0') {
-        spdlog::info("[DRM Backend] Using DRM device from HELIX_DRM_DEVICE: {}", env_device);
-        return env_device;
+        if (is_valid_drm_device(env_device)) {
+            spdlog::info("[DRM Backend] Using DRM device from HELIX_DRM_DEVICE: {}", env_device);
+            return env_device;
+        }
+        spdlog::warn("[DRM Backend] HELIX_DRM_DEVICE='{}' is not a valid DRM device, "
+                     "falling back to auto-detection",
+                     env_device);
     }
 
     // Priority 2: Config file override
     helix::Config* cfg = helix::Config::get_instance();
     std::string config_device = cfg->get<std::string>("/display/drm_device", "");
     if (!config_device.empty()) {
-        spdlog::info("[DRM Backend] Using DRM device from config: {}", config_device);
-        return config_device;
+        if (is_valid_drm_device(config_device)) {
+            spdlog::info("[DRM Backend] Using DRM device from config: {}", config_device);
+            return config_device;
+        }
+        spdlog::warn("[DRM Backend] Config drm_device '{}' is not a valid DRM device, "
+                     "falling back to auto-detection",
+                     config_device);
     }
 
     // Priority 3: Auto-detection
