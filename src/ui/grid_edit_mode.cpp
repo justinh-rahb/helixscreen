@@ -11,10 +11,20 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+
 namespace helix {
 
 // MDI icon_xmark glyph (U+F0156)
 static constexpr const char* ICON_XMARK = "\xF3\xB0\x85\x96";
+
+// Drag visual constants
+static constexpr int GHOST_BORDER_WIDTH = 2;
+static constexpr lv_opa_t GHOST_BORDER_OPA = LV_OPA_50;
+static constexpr int PREVIEW_BORDER_WIDTH = 3;
+static constexpr lv_opa_t DRAG_SHADOW_OPA = LV_OPA_40;
+static constexpr int DRAG_SHADOW_WIDTH = 12;
+static constexpr int DRAG_SHADOW_OFS = 4;
 
 GridEditMode::~GridEditMode() {
     if (active_) {
@@ -40,6 +50,7 @@ void GridEditMode::exit() {
         return;
     }
     active_ = false;
+    cleanup_drag_state();
     destroy_selection_chrome();
     selected_ = nullptr;
     destroy_dots_overlay();
@@ -223,15 +234,13 @@ void GridEditMode::destroy_selection_chrome() {
     }
 }
 
-void GridEditMode::remove_selected_widget() {
-    if (!selected_ || !config_) {
-        spdlog::warn("[GridEditMode] remove_selected_widget: no selection or config");
-        return;
+int GridEditMode::find_config_index_for_widget(lv_obj_t* widget) const {
+    if (!widget || !container_ || !config_) {
+        return -1;
     }
 
-    // Find config entry matching the selected widget by comparing grid positions.
-    // Container children are in creation order which matches enabled entries order.
-    // Iterate container children to find the index of the selected widget.
+    // Container children are in creation order matching enabled entries order.
+    // Find which grid-child index this widget corresponds to.
     int widget_child_index = -1;
     int grid_child_count = 0;
     uint32_t total_children = lv_obj_get_child_count(container_);
@@ -240,48 +249,55 @@ void GridEditMode::remove_selected_widget() {
         if (!child || child == dots_overlay_ || child == selection_overlay_) {
             continue;
         }
+        if (child == drag_ghost_ || child == snap_preview_) {
+            continue;
+        }
         if (lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
             continue;
         }
-        if (child == selected_) {
+        if (child == widget) {
             widget_child_index = grid_child_count;
         }
         ++grid_child_count;
     }
 
     if (widget_child_index < 0) {
-        spdlog::warn("[GridEditMode] Selected widget not found among container children");
-        select_widget(nullptr);
-        return;
+        return -1;
     }
 
     // Map child index to config entry: count enabled entries
     const auto& entries = config_->entries();
     int enabled_index = 0;
-    size_t config_index = 0;
-    bool found = false;
     for (size_t i = 0; i < entries.size(); ++i) {
         if (entries[i].enabled) {
             if (enabled_index == widget_child_index) {
-                config_index = i;
-                found = true;
-                break;
+                return static_cast<int>(i);
             }
             ++enabled_index;
         }
     }
+    return -1;
+}
 
-    if (!found) {
-        spdlog::warn("[GridEditMode] No config entry for child index {}", widget_child_index);
+void GridEditMode::remove_selected_widget() {
+    if (!selected_ || !config_) {
+        spdlog::warn("[GridEditMode] remove_selected_widget: no selection or config");
+        return;
+    }
+
+    int config_index = find_config_index_for_widget(selected_);
+    if (config_index < 0) {
+        spdlog::warn("[GridEditMode] Selected widget not found in config");
         select_widget(nullptr);
         return;
     }
 
-    spdlog::info("[GridEditMode] Removing widget '{}' (config index {})", entries[config_index].id,
-                 config_index);
+    const auto& entries = config_->entries();
+    spdlog::info("[GridEditMode] Removing widget '{}' (config index {})",
+                 entries[static_cast<size_t>(config_index)].id, config_index);
 
     // Disable the widget in config
-    config_->set_enabled(config_index, false);
+    config_->set_enabled(static_cast<size_t>(config_index), false);
 
     // Deselect before rebuild (chrome will be destroyed)
     select_widget(nullptr);
@@ -291,6 +307,476 @@ void GridEditMode::remove_selected_widget() {
     if (rebuild_cb_) {
         rebuild_cb_();
     }
+}
+
+// ---------------------------------------------------------------------------
+// screen_to_grid_cell
+// ---------------------------------------------------------------------------
+
+std::pair<int, int> GridEditMode::screen_to_grid_cell(int screen_x, int screen_y, int container_x,
+                                                      int container_y, int container_w,
+                                                      int container_h, int ncols, int nrows) {
+    // Convert screen coordinates to container-relative
+    int rel_x = screen_x - container_x;
+    int rel_y = screen_y - container_y;
+
+    // Compute cell indices
+    int col = (rel_x * ncols) / container_w;
+    int row = (rel_y * nrows) / container_h;
+
+    // Clamp to valid range
+    col = std::clamp(col, 0, ncols - 1);
+    row = std::clamp(row, 0, nrows - 1);
+
+    return {col, row};
+}
+
+// ---------------------------------------------------------------------------
+// Drag lifecycle — public entry points
+// ---------------------------------------------------------------------------
+
+void GridEditMode::handle_long_press(lv_event_t* e) {
+    if (!active_ || !container_ || !selected_) {
+        return;
+    }
+    handle_drag_start(e);
+}
+
+void GridEditMode::handle_pressing(lv_event_t* e) {
+    if (!active_ || !dragging_) {
+        return;
+    }
+    handle_drag_move(e);
+}
+
+void GridEditMode::handle_released(lv_event_t* e) {
+    if (!active_ || !dragging_) {
+        return;
+    }
+    handle_drag_end(e);
+}
+
+// ---------------------------------------------------------------------------
+// Drag start
+// ---------------------------------------------------------------------------
+
+void GridEditMode::handle_drag_start(lv_event_t* /*e*/) {
+    if (dragging_) {
+        return;
+    }
+
+    // Verify pointer is on the selected widget
+    lv_indev_t* indev = lv_indev_active();
+    if (!indev) {
+        return;
+    }
+    lv_point_t point;
+    lv_indev_get_point(indev, &point);
+
+    lv_area_t sel_area;
+    lv_obj_get_coords(selected_, &sel_area);
+    if (point.x < sel_area.x1 || point.x > sel_area.x2 || point.y < sel_area.y1 ||
+        point.y > sel_area.y2) {
+        return; // Long-press not on selected widget
+    }
+
+    // Look up config entry for the selected widget
+    int cfg_idx = find_config_index_for_widget(selected_);
+    if (cfg_idx < 0) {
+        spdlog::warn("[GridEditMode] Drag start: widget not in config");
+        return;
+    }
+
+    const auto& entry = config_->entries()[static_cast<size_t>(cfg_idx)];
+    drag_orig_col_ = entry.col;
+    drag_orig_row_ = entry.row;
+    drag_orig_colspan_ = entry.colspan;
+    drag_orig_rowspan_ = entry.rowspan;
+
+    // Record drag offset: distance from pointer to widget top-left
+    drag_offset_.x = point.x - sel_area.x1;
+    drag_offset_.y = point.y - sel_area.y1;
+
+    // Hide selection chrome during drag (will rebuild after)
+    destroy_selection_chrome();
+
+    // Make widget float above the grid so it can be freely positioned
+    lv_obj_add_flag(selected_, LV_OBJ_FLAG_FLOATING);
+
+    // Elevation: shadow + slight visual lift
+    lv_obj_set_style_shadow_width(selected_, DRAG_SHADOW_WIDTH, 0);
+    lv_obj_set_style_shadow_ofs_x(selected_, DRAG_SHADOW_OFS, 0);
+    lv_obj_set_style_shadow_ofs_y(selected_, DRAG_SHADOW_OFS, 0);
+    lv_obj_set_style_shadow_opa(selected_, DRAG_SHADOW_OPA, 0);
+    lv_obj_set_style_shadow_color(selected_, lv_color_black(), 0);
+    lv_obj_set_style_transform_scale(selected_, 260, 0); // ~1.02x (256 = 1.0x)
+
+    // Create ghost outline at original position
+    create_drag_ghost(drag_orig_col_, drag_orig_row_, drag_orig_colspan_, drag_orig_rowspan_);
+
+    dragging_ = true;
+    snap_preview_col_ = -1;
+    snap_preview_row_ = -1;
+
+    spdlog::info("[GridEditMode] Drag started: widget '{}' from ({},{}) span {}x{}", entry.id,
+                 drag_orig_col_, drag_orig_row_, drag_orig_colspan_, drag_orig_rowspan_);
+}
+
+// ---------------------------------------------------------------------------
+// Drag move
+// ---------------------------------------------------------------------------
+
+void GridEditMode::handle_drag_move(lv_event_t* /*e*/) {
+    if (!selected_ || !container_) {
+        return;
+    }
+
+    lv_indev_t* indev = lv_indev_active();
+    if (!indev) {
+        return;
+    }
+    lv_point_t point;
+    lv_indev_get_point(indev, &point);
+
+    // Move the widget to follow the pointer (adjusted by drag offset)
+    lv_area_t container_area;
+    lv_obj_get_coords(container_, &container_area);
+    int new_x = point.x - drag_offset_.x - container_area.x1;
+    int new_y = point.y - drag_offset_.y - container_area.y1;
+    lv_obj_set_pos(selected_, new_x, new_y);
+
+    // Compute target grid cell from pointer position
+    lv_area_t content_area;
+    lv_obj_get_content_coords(container_, &content_area);
+    int cw = content_area.x2 - content_area.x1;
+    int ch = content_area.y2 - content_area.y1;
+
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+    int ncols = GridLayout::get_cols(breakpoint);
+    int nrows = GridLayout::get_rows(breakpoint);
+
+    auto [target_col, target_row] = screen_to_grid_cell(point.x, point.y, content_area.x1,
+                                                        content_area.y1, cw, ch, ncols, nrows);
+
+    // Only update preview if target cell changed
+    if (target_col == snap_preview_col_ && target_row == snap_preview_row_) {
+        return;
+    }
+
+    // Skip if hovering over the original position
+    if (target_col == drag_orig_col_ && target_row == drag_orig_row_) {
+        destroy_snap_preview();
+        snap_preview_col_ = target_col;
+        snap_preview_row_ = target_row;
+        return;
+    }
+
+    // Check placement validity: build a temporary grid with all widgets except the dragged one
+    GridLayout temp_grid(breakpoint);
+    const auto& entries = config_->entries();
+    std::string dragged_id;
+    int cfg_idx = find_config_index_for_widget(selected_);
+    if (cfg_idx >= 0) {
+        dragged_id = entries[static_cast<size_t>(cfg_idx)].id;
+    }
+
+    // Occupant at target position (for potential swap)
+    std::string occupant_id;
+    int occupant_colspan = 0;
+    int occupant_rowspan = 0;
+
+    for (const auto& entry : entries) {
+        if (!entry.enabled || !entry.has_grid_position()) {
+            continue;
+        }
+        if (entry.id == dragged_id) {
+            continue; // Skip the widget being dragged
+        }
+        temp_grid.place({entry.id, entry.col, entry.row, entry.colspan, entry.rowspan});
+
+        // Check if this entry occupies the target cell
+        if (target_col >= entry.col && target_col < entry.col + entry.colspan &&
+            target_row >= entry.row && target_row < entry.row + entry.rowspan) {
+            occupant_id = entry.id;
+            occupant_colspan = entry.colspan;
+            occupant_rowspan = entry.rowspan;
+        }
+    }
+
+    bool valid = false;
+    if (occupant_id.empty()) {
+        // Target is empty — check if the dragged widget fits
+        // Remove all placements temporarily to check just the target position bounds
+        valid = (target_col + drag_orig_colspan_ <= ncols) &&
+                (target_row + drag_orig_rowspan_ <= nrows) &&
+                temp_grid.can_place(target_col, target_row, drag_orig_colspan_, drag_orig_rowspan_);
+    } else {
+        // Target occupied — allow swap only if same size
+        valid = (occupant_colspan == drag_orig_colspan_ && occupant_rowspan == drag_orig_rowspan_);
+    }
+
+    update_snap_preview(target_col, target_row, drag_orig_colspan_, drag_orig_rowspan_, valid);
+    snap_preview_col_ = target_col;
+    snap_preview_row_ = target_row;
+}
+
+// ---------------------------------------------------------------------------
+// Drag end
+// ---------------------------------------------------------------------------
+
+void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
+    if (!selected_ || !container_ || !config_) {
+        cleanup_drag_state();
+        return;
+    }
+
+    lv_indev_t* indev = lv_indev_active();
+    lv_point_t point = {0, 0};
+    if (indev) {
+        lv_indev_get_point(indev, &point);
+    }
+
+    // Compute final target cell
+    lv_area_t content_area;
+    lv_obj_get_content_coords(container_, &content_area);
+    int cw = content_area.x2 - content_area.x1;
+    int ch = content_area.y2 - content_area.y1;
+
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+    int ncols = GridLayout::get_cols(breakpoint);
+    int nrows = GridLayout::get_rows(breakpoint);
+
+    auto [target_col, target_row] = screen_to_grid_cell(point.x, point.y, content_area.x1,
+                                                        content_area.y1, cw, ch, ncols, nrows);
+
+    bool did_move = false;
+
+    // Don't allow drop on the same position
+    if (target_col != drag_orig_col_ || target_row != drag_orig_row_) {
+        int cfg_idx = find_config_index_for_widget(selected_);
+        if (cfg_idx >= 0) {
+            auto& entries = const_cast<std::vector<PanelWidgetEntry>&>(config_->entries());
+            auto& dragged_entry = entries[static_cast<size_t>(cfg_idx)];
+
+            // Check for occupant at target
+            int occupant_cfg_idx = -1;
+            for (size_t i = 0; i < entries.size(); ++i) {
+                if (!entries[i].enabled || !entries[i].has_grid_position()) {
+                    continue;
+                }
+                if (static_cast<int>(i) == cfg_idx) {
+                    continue;
+                }
+                if (target_col >= entries[i].col &&
+                    target_col < entries[i].col + entries[i].colspan &&
+                    target_row >= entries[i].row &&
+                    target_row < entries[i].row + entries[i].rowspan) {
+                    occupant_cfg_idx = static_cast<int>(i);
+                    break;
+                }
+            }
+
+            if (occupant_cfg_idx >= 0) {
+                // Swap: only if same size
+                auto& occupant = entries[static_cast<size_t>(occupant_cfg_idx)];
+                if (occupant.colspan == drag_orig_colspan_ &&
+                    occupant.rowspan == drag_orig_rowspan_) {
+                    spdlog::info("[GridEditMode] Swapping '{}' ({},{}) <-> '{}' ({},{})",
+                                 dragged_entry.id, drag_orig_col_, drag_orig_row_, occupant.id,
+                                 occupant.col, occupant.row);
+                    // Swap grid positions
+                    occupant.col = drag_orig_col_;
+                    occupant.row = drag_orig_row_;
+                    dragged_entry.col = target_col;
+                    dragged_entry.row = target_row;
+                    did_move = true;
+                }
+            } else {
+                // Empty cell — check bounds and collision
+                GridLayout temp_grid(breakpoint);
+                for (const auto& entry : entries) {
+                    if (!entry.enabled || !entry.has_grid_position()) {
+                        continue;
+                    }
+                    if (entry.id == dragged_entry.id) {
+                        continue;
+                    }
+                    temp_grid.place({entry.id, entry.col, entry.row, entry.colspan, entry.rowspan});
+                }
+                if (temp_grid.can_place(target_col, target_row, drag_orig_colspan_,
+                                        drag_orig_rowspan_)) {
+                    spdlog::info("[GridEditMode] Moving '{}' from ({},{}) to ({},{})",
+                                 dragged_entry.id, drag_orig_col_, drag_orig_row_, target_col,
+                                 target_row);
+                    dragged_entry.col = target_col;
+                    dragged_entry.row = target_row;
+                    did_move = true;
+                }
+            }
+        }
+    }
+
+    if (!did_move) {
+        spdlog::debug("[GridEditMode] Drag cancelled, snapping back to ({},{})", drag_orig_col_,
+                      drag_orig_row_);
+    }
+
+    // Clean up visual state before rebuild
+    lv_obj_t* was_selected = selected_;
+    cleanup_drag_state();
+
+    if (did_move) {
+        // Deselect and rebuild
+        selected_ = nullptr;
+        config_->save();
+        if (rebuild_cb_) {
+            rebuild_cb_();
+        }
+    } else {
+        // Re-select to show chrome again (widget snaps back via grid layout)
+        selected_ = nullptr;
+        // Force LVGL to recalculate positions
+        lv_obj_invalidate(container_);
+        // Reselect the widget to show chrome at snapped-back position
+        lv_obj_update_layout(container_);
+        select_widget(was_selected);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Drag visual helpers
+// ---------------------------------------------------------------------------
+
+void GridEditMode::create_drag_ghost(int col, int row, int colspan, int rowspan) {
+    if (!container_) {
+        return;
+    }
+
+    // Compute cell pixel positions from container content area
+    lv_area_t content_area;
+    lv_obj_get_content_coords(container_, &content_area);
+    int cw = content_area.x2 - content_area.x1;
+    int ch = content_area.y2 - content_area.y1;
+
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+    int ncols = GridLayout::get_cols(breakpoint);
+    int nrows = GridLayout::get_rows(breakpoint);
+
+    int cell_w = cw / ncols;
+    int cell_h = ch / nrows;
+
+    int ghost_x = col * cell_w;
+    int ghost_y = row * cell_h;
+    int ghost_w = colspan * cell_w;
+    int ghost_h = rowspan * cell_h;
+
+    drag_ghost_ = lv_obj_create(container_);
+    lv_obj_set_pos(drag_ghost_, ghost_x, ghost_y);
+    lv_obj_set_size(drag_ghost_, ghost_w, ghost_h);
+    lv_obj_add_flag(drag_ghost_, LV_OBJ_FLAG_FLOATING);
+    lv_obj_remove_flag(drag_ghost_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(drag_ghost_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_opa(drag_ghost_, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(drag_ghost_, GHOST_BORDER_WIDTH, 0);
+    lv_obj_set_style_border_color(drag_ghost_, theme_manager_get_color("text_secondary"), 0);
+    lv_obj_set_style_border_opa(drag_ghost_, GHOST_BORDER_OPA, 0);
+    lv_obj_set_style_radius(drag_ghost_, 8, 0);
+    lv_obj_set_style_pad_all(drag_ghost_, 0, 0);
+
+    spdlog::debug("[GridEditMode] Created drag ghost at ({},{}) {}x{}", col, row, colspan, rowspan);
+}
+
+void GridEditMode::destroy_drag_ghost() {
+    if (drag_ghost_) {
+        lv_obj_delete(drag_ghost_);
+        drag_ghost_ = nullptr;
+    }
+}
+
+void GridEditMode::update_snap_preview(int col, int row, int colspan, int rowspan, bool valid) {
+    destroy_snap_preview();
+    if (!container_) {
+        return;
+    }
+
+    lv_area_t content_area;
+    lv_obj_get_content_coords(container_, &content_area);
+    int cw = content_area.x2 - content_area.x1;
+    int ch = content_area.y2 - content_area.y1;
+
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+    int ncols = GridLayout::get_cols(breakpoint);
+    int nrows = GridLayout::get_rows(breakpoint);
+
+    int cell_w = cw / ncols;
+    int cell_h = ch / nrows;
+
+    int px = col * cell_w;
+    int py = row * cell_h;
+    int pw = colspan * cell_w;
+    int ph = rowspan * cell_h;
+
+    snap_preview_ = lv_obj_create(container_);
+    lv_obj_set_pos(snap_preview_, px, py);
+    lv_obj_set_size(snap_preview_, pw, ph);
+    lv_obj_add_flag(snap_preview_, LV_OBJ_FLAG_FLOATING);
+    lv_obj_remove_flag(snap_preview_, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(snap_preview_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_border_width(snap_preview_, PREVIEW_BORDER_WIDTH, 0);
+    lv_obj_set_style_radius(snap_preview_, 8, 0);
+    lv_obj_set_style_pad_all(snap_preview_, 0, 0);
+
+    if (valid) {
+        lv_obj_set_style_bg_color(snap_preview_, theme_get_accent_color(), 0);
+        lv_obj_set_style_bg_opa(snap_preview_, LV_OPA_10, 0);
+        lv_obj_set_style_border_color(snap_preview_, theme_get_accent_color(), 0);
+        lv_obj_set_style_border_opa(snap_preview_, LV_OPA_70, 0);
+    } else {
+        lv_obj_set_style_bg_color(snap_preview_, ThemeManager::instance().get_color("danger"), 0);
+        lv_obj_set_style_bg_opa(snap_preview_, LV_OPA_10, 0);
+        lv_obj_set_style_border_color(snap_preview_, ThemeManager::instance().get_color("danger"),
+                                      0);
+        lv_obj_set_style_border_opa(snap_preview_, LV_OPA_50, 0);
+    }
+}
+
+void GridEditMode::destroy_snap_preview() {
+    if (snap_preview_) {
+        lv_obj_delete(snap_preview_);
+        snap_preview_ = nullptr;
+    }
+    snap_preview_col_ = -1;
+    snap_preview_row_ = -1;
+}
+
+void GridEditMode::cleanup_drag_state() {
+    if (!dragging_) {
+        return;
+    }
+
+    // Remove floating flag and drag styling from the widget
+    if (selected_) {
+        lv_obj_remove_flag(selected_, LV_OBJ_FLAG_FLOATING);
+        lv_obj_set_style_shadow_width(selected_, 0, 0);
+        lv_obj_set_style_shadow_ofs_x(selected_, 0, 0);
+        lv_obj_set_style_shadow_ofs_y(selected_, 0, 0);
+        lv_obj_set_style_shadow_opa(selected_, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_transform_scale(selected_, 256, 0); // Reset to 1.0x
+    }
+
+    destroy_drag_ghost();
+    destroy_snap_preview();
+
+    dragging_ = false;
+    drag_orig_col_ = -1;
+    drag_orig_row_ = -1;
+    drag_orig_colspan_ = 1;
+    drag_orig_rowspan_ = 1;
+    drag_offset_ = {0, 0};
 }
 
 void GridEditMode::create_dots_overlay() {

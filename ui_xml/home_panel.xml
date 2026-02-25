@@ -9,6 +9,8 @@
     <lv_obj name="widget_container" width="100%" height="100%" style_pad_all="#space_sm" scrollable="false">
       <event_cb trigger="long_pressed" callback="on_home_grid_long_press"/>
       <event_cb trigger="clicked" callback="on_home_grid_clicked"/>
+      <event_cb trigger="pressing" callback="on_home_grid_pressing"/>
+      <event_cb trigger="released" callback="on_home_grid_released"/>
     </lv_obj>
   </view>
 </component>

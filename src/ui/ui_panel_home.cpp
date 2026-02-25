@@ -150,6 +150,8 @@ void HomePanel::init_subjects() {
         {"fav_macro_picker_backdrop_cb", helix::FavoriteMacroWidget::picker_backdrop_cb},
         {"on_home_grid_long_press", on_home_grid_long_press},
         {"on_home_grid_clicked", on_home_grid_clicked},
+        {"on_home_grid_pressing", on_home_grid_pressing},
+        {"on_home_grid_released", on_home_grid_released},
     });
 
     // Subscribe to AmsState slot_count for AMS widget visibility
@@ -931,14 +933,17 @@ void HomePanel::ams_clicked_cb(lv_event_t* e) {
 
 void HomePanel::on_home_grid_long_press(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[HomePanel] on_home_grid_long_press");
-    (void)e;
     extern HomePanel& get_global_home_panel();
     auto& panel = get_global_home_panel();
     if (!panel.grid_edit_mode_.is_active()) {
+        // Enter edit mode on first long-press
         auto* container = lv_obj_find_by_name(panel.panel_, "widget_container");
         auto& config = helix::PanelWidgetManager::instance().get_widget_config("home");
         panel.grid_edit_mode_.set_rebuild_callback([&panel]() { panel.populate_widgets(); });
         panel.grid_edit_mode_.enter(container, &config);
+    } else {
+        // Already in edit mode — start drag if a widget is selected
+        panel.grid_edit_mode_.handle_long_press(e);
     }
     LVGL_SAFE_EVENT_CB_END();
 }
@@ -949,6 +954,26 @@ void HomePanel::on_home_grid_clicked(lv_event_t* e) {
     auto& panel = get_global_home_panel();
     if (panel.grid_edit_mode_.is_active()) {
         panel.grid_edit_mode_.handle_click(e);
+    }
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void HomePanel::on_home_grid_pressing(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[HomePanel] on_home_grid_pressing");
+    extern HomePanel& get_global_home_panel();
+    auto& panel = get_global_home_panel();
+    if (panel.grid_edit_mode_.is_active()) {
+        panel.grid_edit_mode_.handle_pressing(e);
+    }
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void HomePanel::on_home_grid_released(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[HomePanel] on_home_grid_released");
+    extern HomePanel& get_global_home_panel();
+    auto& panel = get_global_home_panel();
+    if (panel.grid_edit_mode_.is_active()) {
+        panel.grid_edit_mode_.handle_released(e);
     }
     LVGL_SAFE_EVENT_CB_END();
 }
