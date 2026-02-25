@@ -19,12 +19,18 @@ void register_network_widget();
 void register_led_widget();
 void register_thermistor_widget();
 void register_favorite_macro_widgets();
+void register_tips_widget();
+void register_printer_image_widget();
+void register_print_status_widget();
 
 // Vector order defines the default display order on the home panel.
 // NOTE: Factories are registered at runtime via init_widget_registrations(),
 // NOT during static initialization. Do not add file-scope self-registration.
 // clang-format off
 static std::vector<PanelWidgetDef> s_widget_defs = {
+    //                                                                                                                                     en  col row min_c min_r max_c max_r
+    {"printer_image",    "Printer Image",    "printer_3d_nozzle","3D printer visualization",                     "Printer Image",    nullptr,             true,  2, 2, 1, 1, 4, 3},
+    {"print_status",     "Print Status",     "printer_3d",       "Print progress and file selection",            "Print Status",     nullptr,             true,  2, 2, 2, 1, 4, 3},
     {"power",            "Power",            "power_cycle",      "Moonraker power device controls",              "Power",            "power_device_count"},
     {"network",          "Network",          "wifi_strength_4",  "Wi-Fi and ethernet connection status",         "Network",          nullptr,             false},
     {"firmware_restart", "Firmware Restart",  "refresh",          "Restart Klipper firmware",                     "Firmware Restart", nullptr,             false},
@@ -41,6 +47,8 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     {"favorite_macro_1", "Macro Button 1",    "play",             "Run a configured macro with one tap",          "Macro Button 1",   nullptr,             false},
     {"favorite_macro_2", "Macro Button 2",    "play",             "Run a configured macro with one tap",          "Macro Button 2",   nullptr,             false},
     {"notifications",    "Notifications",     "notifications",    "Pending alerts and system messages",           "Notifications",    nullptr},
+    //                                                                                                                                     en  col row min_c min_r max_c max_r
+    {"tips",             "Tips",              "help_circle",      "Rotating tips and helpful information",        "Tips",             nullptr,             true,  3, 1, 2, 1, 6, 1},
 };
 // clang-format on
 
@@ -85,6 +93,8 @@ void init_widget_registrations() {
     }
     initialized = true;
 
+    register_printer_image_widget();
+    register_print_status_widget();
     register_power_widget();
     register_network_widget();
     register_temperature_widget();
@@ -93,6 +103,7 @@ void init_widget_registrations() {
     register_fan_stack_widget();
     register_thermistor_widget();
     register_favorite_macro_widgets();
+    register_tips_widget();
 
     spdlog::debug("[PanelWidgetRegistry] All widget factories registered");
 }

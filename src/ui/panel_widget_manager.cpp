@@ -6,6 +6,7 @@
 #include "ui_ams_mini_status.h"
 
 #include "config.h"
+#include "grid_layout.h"
 #include "observer_factory.h"
 #include "panel_widget.h"
 #include "panel_widget_config.h"
@@ -82,6 +83,14 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
         spdlog::debug("[PanelWidgetManager] populate_widgets: null container for '{}'", panel_id);
         return {};
     }
+
+    if (populating_) {
+        spdlog::debug(
+            "[PanelWidgetManager] populate_widgets: already in progress for '{}', skipping",
+            panel_id);
+        return {};
+    }
+    populating_ = true;
 
     // Clear existing children (for repopulation)
     lv_obj_clean(container);
@@ -164,83 +173,144 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
     }
 
     if (enabled_widgets.empty()) {
+        populating_ = false;
         return {};
     }
 
-    // Smart row layout:
-    //   1-4 widgets  -> 1 row
-    //   5-8 widgets  -> 2 rows, first row has 4
-    //   9-10 widgets -> 2 rows, first row has 5
-    size_t total = enabled_widgets.size();
-    size_t first_row_count;
-    if (total <= 4) {
-        first_row_count = total; // Single row
-    } else if (total <= 8) {
-        first_row_count = 4; // 2 rows: 4 + remainder
-    } else {
-        first_row_count = 5; // 2 rows: 5 + remainder
+    // --- Grid layout: compute placements first, then build minimal grid ---
+
+    // Get current breakpoint for column count
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2; // Default to MEDIUM
+
+    // Build grid placement tracker to compute positions
+    GridLayout grid(breakpoint);
+
+    // Correlate widget entries with config entries to get grid positions
+    const auto& entries = widget_config.entries();
+
+    // First pass: compute all placements (determine grid positions)
+    struct PlacedSlot {
+        size_t slot_index; // Index into enabled_widgets
+        int col, row, colspan, rowspan;
+    };
+    std::vector<PlacedSlot> placed;
+
+    for (size_t i = 0; i < enabled_widgets.size(); ++i) {
+        auto& slot = enabled_widgets[i];
+        int col, row, colspan, rowspan;
+
+        // Look up the widget entry from config for explicit grid coords
+        auto entry_it =
+            std::find_if(entries.begin(), entries.end(),
+                         [&](const PanelWidgetEntry& e) { return e.id == slot.widget_id; });
+
+        if (entry_it != entries.end() && entry_it->has_grid_position()) {
+            col = entry_it->col;
+            row = entry_it->row;
+            colspan = entry_it->colspan;
+            rowspan = entry_it->rowspan;
+        } else {
+            // Auto-place: get span from registry def, then find first available spot
+            const auto* def = find_widget_def(slot.widget_id);
+            colspan = def ? def->colspan : 1;
+            rowspan = def ? def->rowspan : 1;
+
+            auto pos = grid.find_available(colspan, rowspan);
+            if (!pos) {
+                spdlog::warn("[PanelWidgetManager] No grid space for widget '{}'", slot.widget_id);
+                continue;
+            }
+            col = pos->first;
+            row = pos->second;
+        }
+
+        // Validate and register placement in the grid tracker
+        if (!grid.place({slot.widget_id, col, row, colspan, rowspan})) {
+            spdlog::warn("[PanelWidgetManager] Cannot place widget '{}' at ({},{} {}x{})",
+                         slot.widget_id, col, row, colspan, rowspan);
+            continue;
+        }
+
+        placed.push_back({i, col, row, colspan, rowspan});
     }
 
+    // Compute the actual number of rows used (not the full breakpoint row count)
+    int max_row_used = 0;
+    for (const auto& p : placed) {
+        int bottom = p.row + p.rowspan;
+        if (bottom > max_row_used) {
+            max_row_used = bottom;
+        }
+    }
+    if (max_row_used == 0) {
+        max_row_used = 1; // At least 1 row if any widgets placed
+    }
+
+    // Generate grid descriptors sized to actual content
+    // Columns: use breakpoint column count (fills available width)
+    // Rows: only create rows that are actually occupied (avoids empty rows stealing space)
+    auto& dsc = grid_descriptors_[panel_id];
+    dsc.col_dsc = GridLayout::make_col_dsc(breakpoint);
+    dsc.row_dsc.clear();
+    for (int r = 0; r < max_row_used; ++r) {
+        dsc.row_dsc.push_back(LV_GRID_FR(1));
+    }
+    dsc.row_dsc.push_back(LV_GRID_TEMPLATE_LAST);
+
+    // Set up grid on container
+    lv_obj_set_layout(container, LV_LAYOUT_GRID);
+    lv_obj_set_grid_dsc_array(container, dsc.col_dsc.data(), dsc.row_dsc.data());
+    lv_obj_set_style_pad_column(container, theme_manager_get_spacing("space_xs"), 0);
+    lv_obj_set_style_pad_row(container, theme_manager_get_spacing("space_xs"), 0);
+
+    spdlog::debug("[PanelWidgetManager] Grid layout: {}cols x {}rows (bp={}) for '{}'",
+                  GridLayout::get_cols(breakpoint), max_row_used, breakpoint, panel_id);
+
+    // Second pass: create XML components and place in grid cells
     std::vector<std::unique_ptr<PanelWidget>> result;
 
-    auto create_row = [&](size_t start, size_t count) {
-        lv_obj_t* row = lv_obj_create(container);
-        lv_obj_set_width(row, LV_PCT(100));
-        lv_obj_set_flex_grow(row, 1);
-        lv_obj_set_style_pad_all(row, 0, 0);
-        lv_obj_set_style_pad_column(row, theme_manager_get_spacing("space_xs"), 0);
-        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
-        lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-        lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    for (const auto& p : placed) {
+        auto& slot = enabled_widgets[p.slot_index];
 
-        bool first = true;
-        for (size_t i = start; i < start + count && i < enabled_widgets.size(); ++i) {
-            // Add divider between widgets (not before first)
-            if (!first) {
-                const char* div_attrs[] = {"height", "80%", nullptr, nullptr};
-                lv_xml_create(row, "divider_vertical", div_attrs);
-            }
+        // Create XML component
+        auto* widget =
+            static_cast<lv_obj_t*>(lv_xml_create(container, slot.component_name.c_str(), nullptr));
+        if (!widget) {
+            spdlog::warn("[PanelWidgetManager] Failed to create widget: {} (component: {})",
+                         slot.widget_id, slot.component_name);
+            continue;
+        }
 
-            auto& slot = enabled_widgets[i];
-            auto* widget =
-                static_cast<lv_obj_t*>(lv_xml_create(row, slot.component_name.c_str(), nullptr));
-            if (widget) {
-                first = false;
-                spdlog::debug("[PanelWidgetManager] Created widget: {} (component: {})",
-                              slot.widget_id, slot.component_name);
+        // Place in grid cell
+        lv_obj_set_grid_cell(widget, LV_GRID_ALIGN_STRETCH, p.col, p.colspan, LV_GRID_ALIGN_STRETCH,
+                             p.row, p.rowspan);
 
-                // Attach the pre-created PanelWidget instance if present
-                if (slot.instance) {
-                    slot.instance->attach(widget, lv_scr_act());
-                    slot.instance->set_row_density(count);
-                    result.push_back(std::move(slot.instance));
-                }
+        spdlog::debug("[PanelWidgetManager] Placed widget '{}' at ({},{} {}x{})", slot.widget_id,
+                      p.col, p.row, p.colspan, p.rowspan);
 
-                // Propagate row density to AMS mini status (pure XML widget, no PanelWidget)
-                if (slot.widget_id == "ams") {
-                    lv_obj_t* ams_child = lv_obj_get_child(widget, 0);
-                    if (ams_child && ui_ams_mini_status_is_valid(ams_child)) {
-                        ui_ams_mini_status_set_row_density(ams_child, static_cast<int>(count));
-                    }
-                }
-            } else {
-                spdlog::warn("[PanelWidgetManager] Failed to create widget: {} (component: {})",
-                             slot.widget_id, slot.component_name);
+        // Attach the pre-created PanelWidget instance if present
+        if (slot.instance) {
+            slot.instance->attach(widget, lv_scr_act());
+            // Row density: approximate as widgets per row in the grid
+            int cols = GridLayout::get_cols(breakpoint);
+            slot.instance->set_row_density(static_cast<size_t>(cols));
+            result.push_back(std::move(slot.instance));
+        }
+
+        // Propagate row density to AMS mini status (pure XML widget, no PanelWidget)
+        if (slot.widget_id == "ams") {
+            lv_obj_t* ams_child = lv_obj_get_child(widget, 0);
+            if (ams_child && ui_ams_mini_status_is_valid(ams_child)) {
+                ui_ams_mini_status_set_row_density(ams_child, GridLayout::get_cols(breakpoint));
             }
         }
-    };
-
-    // Create first row
-    create_row(0, first_row_count);
-
-    // Create second row if needed
-    if (total > first_row_count) {
-        create_row(first_row_count, total - first_row_count);
     }
 
-    spdlog::debug("[PanelWidgetManager] Populated {} widgets ({} with factories) for '{}'", total,
-                  result.size(), panel_id);
+    spdlog::debug("[PanelWidgetManager] Populated {} widgets ({} with factories) via grid for '{}'",
+                  placed.size(), result.size(), panel_id);
 
+    populating_ = false;
     return result;
 }
 

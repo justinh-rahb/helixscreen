@@ -6,12 +6,10 @@
 #include "ui_heating_animator.h"
 #include "ui_observer_guard.h"
 #include "ui_panel_base.h"
-#include "ui_panel_print_status.h" // For RunoutGuidanceModal
 
 #include "led/led_controller.h"
 #include "panel_widget.h"
 #include "subject_managed_panel.h"
-#include "tips_manager.h"
 
 #include <memory>
 #include <vector>
@@ -22,28 +20,20 @@ class WiFiManager;
 }
 class EthernetManager;
 class TempControlPanel;
-namespace helix {
-enum class PrintJobState;
-}
 
 /**
  * @brief Home panel - Main dashboard showing printer status and quick actions
  *
- * Displays printer image, temperature, network status, light toggle, and
- * tip of the day with auto-rotation. Responsive sizing based on screen dimensions.
- *
- * @see TipsManager for tip of the day functionality
+ * Pure grid container: all visible elements (printer image, tips, print status,
+ * temperature, network, LED, power, etc.) are placed as PanelWidgets by
+ * PanelWidgetManager. HomePanel retains LED control, temperature icon animation,
+ * network detection, and power control logic that widgets delegate back to.
  */
 
 #include "network_type.h"
 
 class HomePanel : public PanelBase {
   public:
-    /**
-     * @brief Construct HomePanel with injected dependencies
-     * @param printer_state Reference to helix::PrinterState
-     * @param api Pointer to MoonrakerAPI (for light control)
-     */
     HomePanel(helix::PrinterState& printer_state, MoonrakerAPI* api);
     ~HomePanel() override;
 
@@ -66,13 +56,6 @@ class HomePanel : public PanelBase {
      */
     void populate_widgets();
 
-    /**
-     * @brief Update status text and temperature display
-     * @param status_text New status/tip text (nullptr to keep current)
-     * @param temp Temperature in degrees Celsius
-     */
-    void update(const char* status_text, int temp);
-
     /** @brief Set network status display */
     void set_network(helix::NetworkType type);
 
@@ -84,21 +67,17 @@ class HomePanel : public PanelBase {
     }
 
     /**
-     * @brief Reload printer image and LED visibility from config
+     * @brief Reload LED visibility from config
      *
-     * Called after wizard completion to update the home panel with
-     * newly configured printer type and LED settings.
+     * Called after wizard completion to update LED settings.
+     * Printer image reload is handled by PrinterImageWidget.
      */
     void reload_from_config();
-
-    /// Re-check printer image setting and update the home panel image widget
-    void refresh_printer_image();
 
     /**
      * @brief Trigger a deferred runout check (used after wizard completes)
      *
-     * Resets the shown flag and re-checks runout condition.
-     * This allows the modal to show after wizard if conditions are met.
+     * Delegates to PrintStatusWidget if it is active in the widget grid.
      */
     void trigger_idle_runout_check();
 
@@ -122,34 +101,14 @@ class HomePanel : public PanelBase {
   private:
     SubjectManager subjects_;
     TempControlPanel* temp_control_panel_ = nullptr;
-    lv_subject_t status_subject_;
-    lv_subject_t temp_subject_;
-    // Network subjects (home_network_icon_state, network_label) are owned by
-    // NetworkWidget module — looked up by name via lv_xml_get_subject() when needed
-    lv_subject_t printer_type_subject_;
-    lv_subject_t printer_host_subject_;
-    lv_subject_t printer_info_visible_;
-
-    char status_buffer_[512];
-    char temp_buffer_[32];
-    char printer_type_buffer_[64];
-    char printer_host_buffer_[64];
 
     bool light_on_ = false;
     bool light_long_pressed_ = false; // Suppress click after long-press
     bool power_on_ = false;           // Tracks power state for icon
     bool power_long_pressed_ = false; // Suppress click after long-press for power button
+    bool populating_widgets_ = false; // Reentrancy guard for populate_widgets()
     helix::NetworkType current_network_ = helix::NetworkType::Wifi;
-    helix::PrintingTip current_tip_;
-    helix::PrintingTip pending_tip_; // Tip waiting to be displayed after fade-out
-    // configured_leds_ removed - read LedController::selected_strips() lazily
-    lv_timer_t* tip_rotation_timer_ = nullptr;
-    lv_obj_t* tip_label_ = nullptr; // Cached for fade animation
 
-    // Pre-scaled printer image snapshot — eliminates per-frame bilinear scaling
-    lv_draw_buf_t* cached_printer_snapshot_ = nullptr;
-    lv_timer_t* snapshot_timer_ = nullptr;
-    bool tip_animating_ = false;                        // Prevents overlapping animations
     lv_timer_t* signal_poll_timer_ = nullptr;           // Polls WiFi signal strength every 5s
     std::shared_ptr<helix::WiFiManager> wifi_manager_;  // For signal strength queries
     std::unique_ptr<EthernetManager> ethernet_manager_; // For Ethernet status queries
@@ -164,23 +123,14 @@ class HomePanel : public PanelBase {
 
     void setup_widget_gate_observers();
     void cache_widget_references();
-    void update_tip_of_day();
-    void start_tip_fade_transition(const helix::PrintingTip& new_tip);
-    void apply_pending_tip();               // Called when fade-out completes
-    void schedule_printer_image_snapshot(); // Deferred snapshot after layout
-    void take_printer_image_snapshot();     // Timer callback: capture pre-scaled image
-    void detect_network_type();             // Detects WiFi vs Ethernet vs disconnected
-    int compute_network_icon_state();       // Maps network type + signal → 0-5
-    void update_network_icon_state();       // Updates the subject
+    void detect_network_type();       // Detects WiFi vs Ethernet vs disconnected
+    int compute_network_icon_state(); // Maps network type + signal -> 0-5
+    void update_network_icon_state(); // Updates the subject
     static void signal_poll_timer_cb(lv_timer_t* timer);
 
     void flash_light_icon();
     void ensure_led_observers();
-    void handle_print_card_clicked();
-    void handle_tip_text_clicked();
-    void handle_tip_rotation_timer();
     void handle_printer_status_clicked();
-    void handle_printer_manager_clicked();
     void handle_ams_clicked();
     void on_extruder_temp_changed(int temp);
     void on_extruder_target_changed(int target);
@@ -194,14 +144,10 @@ class HomePanel : public PanelBase {
     static void light_long_press_cb(lv_event_t* e);
     static void power_toggle_cb(lv_event_t* e);
     static void power_long_press_cb(lv_event_t* e);
-    static void print_card_clicked_cb(lv_event_t* e);
-    static void tip_text_clicked_cb(lv_event_t* e);
     static void temp_clicked_cb(lv_event_t* e);
     static void printer_status_clicked_cb(lv_event_t* e);
     static void network_clicked_cb(lv_event_t* e);
-    static void printer_manager_clicked_cb(lv_event_t* e);
     static void ams_clicked_cb(lv_event_t* e);
-    static void tip_rotation_timer_cb(lv_timer_t* timer);
 
     ObserverGuard extruder_temp_observer_;
     ObserverGuard extruder_target_observer_;
@@ -212,40 +158,10 @@ class HomePanel : public PanelBase {
     // Active PanelWidget instances (factory-created, lifecycle-managed)
     std::vector<std::unique_ptr<helix::PanelWidget>> active_widgets_;
 
-    // Print card observers (for showing progress during active print)
-    ObserverGuard print_state_observer_;
-    ObserverGuard print_progress_observer_;
-    ObserverGuard print_time_left_observer_;
-    ObserverGuard print_thumbnail_path_observer_; // Observes shared thumbnail from PrintStatusPanel
-
-    // Filament runout observer and modal (shows when idle + runout detected)
-    ObserverGuard filament_runout_observer_;
-    RunoutGuidanceModal runout_modal_;
-    bool runout_modal_shown_ = false; // Prevent repeated modals
-
-    // Print card widgets (looked up after XML creation)
-    lv_obj_t* print_card_thumb_ = nullptr;        // Idle state thumbnail
-    lv_obj_t* print_card_active_thumb_ = nullptr; // Active print thumbnail
-    lv_obj_t* print_card_label_ = nullptr;
-
     // Heating icon animator (gradient color + pulse while heating)
     HeatingIconAnimator temp_icon_animator_;
     int cached_extruder_temp_ = 25;
     int cached_extruder_target_ = 0;
-
-    void update_ams_indicator(int slot_count);
-
-    // Print card update methods
-    void on_print_state_changed(helix::PrintJobState state);
-    void on_print_progress_or_time_changed();
-    void on_print_thumbnail_path_changed(const char* path);
-    void update_print_card_from_state();
-    void update_print_card_label(int progress, int time_left_secs);
-    void reset_print_card_to_idle();
-
-    // Filament runout handling
-    void check_and_show_idle_runout_modal();
-    void show_idle_runout_modal();
 };
 
 // Global instance accessor (needed by main.cpp)

@@ -6,6 +6,7 @@
 #include "ui_observer_guard.h"
 
 #include <any>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -84,11 +85,20 @@ class PanelWidgetManager {
     PanelWidgetManager() = default;
 
     bool widget_subjects_initialized_ = false;
+    bool populating_ = false;
     std::unordered_map<std::type_index, std::any> shared_resources_;
     std::unordered_map<std::string, RebuildCallback> rebuild_callbacks_;
 
     /// Per-panel gate observers that trigger widget rebuilds on hardware changes
     std::unordered_map<std::string, std::vector<ObserverGuard>> gate_observers_;
+
+    /// Per-panel grid descriptor arrays — must persist while the grid layout is active
+    /// on the associated container. Keyed by panel_id to support multiple panels.
+    struct GridDescriptors {
+        std::vector<int32_t> col_dsc;
+        std::vector<int32_t> row_dsc;
+    };
+    std::unordered_map<std::string, GridDescriptors> grid_descriptors_;
 };
 
 } // namespace helix

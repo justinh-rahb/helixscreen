@@ -253,6 +253,7 @@ void register_xml_components() {
     register_xml("print_file_detail.xml");
 
     // Panel widget components (dynamic instantiation from PanelWidgetConfig)
+    register_xml("components/panel_widget_printer_image.xml");
     register_xml("components/panel_widget_power.xml");
     register_xml("components/panel_widget_network.xml");
     register_xml("components/panel_widget_notifications.xml");
@@ -271,6 +272,8 @@ void register_xml_components() {
     register_xml("components/panel_widget_fan_carousel.xml");
     register_xml("components/panel_widget_favorite_macro_1.xml");
     register_xml("components/panel_widget_favorite_macro_2.xml");
+    register_xml("components/panel_widget_tips.xml");
+    register_xml("components/panel_widget_print_status.xml");
     register_xml("thermistor_sensor_picker.xml");
     register_xml("favorite_macro_picker.xml");
     register_xml("macro_param_modal.xml");
