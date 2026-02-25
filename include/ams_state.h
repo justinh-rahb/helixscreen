@@ -303,6 +303,23 @@ class AmsState {
     }
 
     /**
+     * @brief Get toolchange visibility subject (1=visible, 0=hidden)
+     * Non-zero when AFC reports expected tool changes for current print.
+     */
+    lv_subject_t* get_toolchange_visible_subject() {
+        return &toolchange_visible_;
+    }
+
+    /**
+     * @brief Get toolchange text subject ("2 / 5" formatted)
+     * 1-based display: current_toolchange+1 of number_of_toolchanges.
+     * Empty string when not applicable.
+     */
+    lv_subject_t* get_toolchange_text_subject() {
+        return &toolchange_text_;
+    }
+
+    /**
      * @brief Get filament loaded subject
      * @return Subject holding 0 (not loaded) or 1 (loaded)
      */
@@ -863,6 +880,11 @@ class AmsState {
     char system_name_buf_[32];
     lv_subject_t ams_current_tool_text_;
     char ams_current_tool_text_buf_[16]; // "T0" to "T15" or "---"
+
+    // Tool change progress (AFC multi-color prints)
+    lv_subject_t toolchange_visible_; // 1 when swaps expected, 0 otherwise
+    lv_subject_t toolchange_text_;    // "2 / 5" formatted display
+    char toolchange_text_buf_[16]{};  // Buffer for formatted text
 
     // Filament path visualization subjects
     lv_subject_t path_topology_;

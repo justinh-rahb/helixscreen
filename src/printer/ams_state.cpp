@@ -217,6 +217,10 @@ void AmsState::init_subjects(bool register_xml) {
 
     INIT_SUBJECT_STRING(ams_current_tool_text, "---", subjects_, register_xml);
 
+    // Tool change progress subjects
+    INIT_SUBJECT_INT(toolchange_visible, 0, subjects_, register_xml);
+    INIT_SUBJECT_STRING(toolchange_text, "", subjects_, register_xml);
+
     // Filament path visualization subjects
     INIT_SUBJECT_INT(path_topology, static_cast<int>(PathTopology::HUB), subjects_, register_xml);
     INIT_SUBJECT_INT(path_active_slot, -1, subjects_, register_xml);
@@ -701,6 +705,18 @@ void AmsState::sync_from_backend() {
     lv_subject_set_int(&external_spool_color_,
                        ext_spool.has_value() ? static_cast<int>(ext_spool->color_rgb) : 0);
     lv_subject_set_int(&ams_slot_count_, info.total_slots);
+
+    // Update tool change progress display
+    if (info.number_of_toolchanges > 0) {
+        lv_subject_set_int(&toolchange_visible_, 1);
+        int display_current = std::max(0, info.current_toolchange + 1); // 1-based
+        snprintf(toolchange_text_buf_, sizeof(toolchange_text_buf_), "%d / %d", display_current,
+                 info.number_of_toolchanges);
+        lv_subject_copy_string(&toolchange_text_, toolchange_text_buf_);
+    } else {
+        lv_subject_set_int(&toolchange_visible_, 0);
+        lv_subject_copy_string(&toolchange_text_, "");
+    }
 
     // Update action detail string
     if (!info.operation_detail.empty()) {
