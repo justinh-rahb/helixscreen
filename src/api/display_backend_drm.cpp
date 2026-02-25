@@ -358,6 +358,36 @@ lv_indev_t* DisplayBackendDRM::create_input_pointer() {
     return nullptr;
 }
 
+void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys_w, int phys_h) {
+    (void)phys_w;
+    (void)phys_h;
+
+    if (display_ == nullptr) {
+        spdlog::warn("[DRM Backend] Cannot set rotation — display not created");
+        return;
+    }
+
+    // Map LVGL rotation enum to DRM plane rotation constants
+    uint64_t drm_rot = DRM_MODE_ROTATE_0;
+    switch (rot) {
+    case LV_DISPLAY_ROTATION_0:
+        drm_rot = DRM_MODE_ROTATE_0;
+        break;
+    case LV_DISPLAY_ROTATION_90:
+        drm_rot = DRM_MODE_ROTATE_90;
+        break;
+    case LV_DISPLAY_ROTATION_180:
+        drm_rot = DRM_MODE_ROTATE_180;
+        break;
+    case LV_DISPLAY_ROTATION_270:
+        drm_rot = DRM_MODE_ROTATE_270;
+        break;
+    }
+
+    lv_linux_drm_set_rotation(display_, drm_rot);
+    spdlog::info("[DRM Backend] DRM plane rotation set to {}°", static_cast<int>(rot) * 90);
+}
+
 bool DisplayBackendDRM::clear_framebuffer(uint32_t color) {
     // For DRM, we can try to clear via /dev/fb0 if it exists (legacy fbdev emulation)
     // Many DRM systems provide /dev/fb0 as a compatibility layer

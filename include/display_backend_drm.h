@@ -62,6 +62,9 @@ class DisplayBackendDRM : public DisplayBackend {
     // Input device creation
     lv_indev_t* create_input_pointer() override;
 
+    // Display rotation via DRM plane property
+    void set_display_rotation(lv_display_rotation_t rot, int phys_w, int phys_h) override;
+
     // Backend info
     DisplayBackendType type() const override {
         return DisplayBackendType::DRM;
