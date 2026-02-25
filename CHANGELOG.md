@@ -5,6 +5,24 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.3] - 2026-02-25
+
+### Added
+- AFC tool change progress display on print status panel with current/total tool change counter
+- AFC mock tool change progress in test mode for development
+
+### Fixed
+- MT-only touchscreens (e.g., Goodix gt9xxnew_ts on Nebula Pad) now detected correctly — previously invisible due to missing ABS_MT_POSITION_X/Y bit checks
+- ABS range queries fall back to multitouch axes when legacy ABS_X/ABS_Y are absent, enabling rotation mismatch detection on MT-only devices
+- Installer now preserves user data directories (custom_images, printer_database.d) during upgrades
+- Watchdog no longer launches external splash screen in DRM mode, preventing a crash loop
+- ObserverGuard cleanup lambda prevents use-after-free when releasing observers
+- Print status filament row decluttered by removing redundant "Filament" and "Active" labels
+- AFC mock toolchange progress default now set in constructor for consistent test behavior
+
+### Changed
+- README LVGL badge updated to 9.5, added helixscreen.org link
+
 ## [0.13.2] - 2026-02-25
 
 ### Added
@@ -1123,6 +1141,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.3]: https://github.com/prestonbrown/helixscreen/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/prestonbrown/helixscreen/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/prestonbrown/helixscreen/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/prestonbrown/helixscreen/compare/v0.12.1...v0.13.0
