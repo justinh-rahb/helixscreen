@@ -827,6 +827,9 @@ void KeyboardManager::show(lv_obj_t* textarea) {
 
     spdlog::info("[KeyboardManager] Showing keyboard for textarea: {}", (void*)textarea);
 
+    // Track which textarea receives key input from our custom handler
+    context_textarea_ = textarea;
+
     // Cancel any in-progress hide animation
     lv_anim_delete(keyboard_, nullptr);
 
