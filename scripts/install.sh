@@ -2305,6 +2305,24 @@ extract_release() {
         fi
     fi
 
+    # Restore any remaining user data from previous config/ (custom_images/,
+    # printer_database.d/, etc.).  Only copies items that don't already exist in
+    # the new install so bundled files are never overwritten.
+    # Uses [ ! -e ] instead of cp -n for BusyBox compatibility.
+    if [ -n "${INSTALL_BACKUP:-}" ] && [ -d "${INSTALL_BACKUP}/config" ]; then
+        for _item in "${INSTALL_BACKUP}/config"/*; do
+            [ -e "$_item" ] || continue
+            _base=$(basename "$_item")
+            if [ ! -e "${INSTALL_DIR}/config/${_base}" ]; then
+                if $(file_sudo "${INSTALL_DIR}/config") cp -r "$_item" "${INSTALL_DIR}/config/${_base}" 2>/dev/null; then
+                    log_info "Restored user data: config/${_base}"
+                else
+                    log_warn "Failed to restore user data: config/${_base}"
+                fi
+            fi
+        done
+    fi
+
     # Cleanup
     rm -rf "$extract_dir"
     log_success "Extracted to ${INSTALL_DIR}"
