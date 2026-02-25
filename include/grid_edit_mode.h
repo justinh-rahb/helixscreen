@@ -11,7 +11,7 @@ namespace helix {
 class PanelWidgetConfig;
 
 /// Manages in-panel grid editing for the home dashboard.
-/// Pure state machine: enter/exit transitions, no visuals (yet).
+/// Handles enter/exit transitions with grid intersection dot overlay.
 class GridEditMode {
   public:
     using SaveCallback = std::function<void()>;
@@ -36,8 +36,12 @@ class GridEditMode {
     }
 
   private:
+    void create_dots_overlay();
+    void destroy_dots_overlay();
+
     bool active_ = false;
     lv_obj_t* container_ = nullptr;
+    lv_obj_t* dots_overlay_ = nullptr;
     PanelWidgetConfig* config_ = nullptr;
     SaveCallback save_cb_;
 };
