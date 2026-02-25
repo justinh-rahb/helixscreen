@@ -875,12 +875,12 @@ void GCodeGLESRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode,
         render_defer_frames_ = 3;
     }
 
-    // If deferring, blit the cached buffer and count down.
+    // If deferring, draw the cached buffer and count down.
     // If no cached buffer exists, skip the defer entirely — nothing to show.
     if (render_defer_frames_ > 0) {
         if (draw_buf_) {
             render_defer_frames_--;
-            blit_to_lvgl(layer, widget_coords);
+            draw_cached_to_lvgl(layer, widget_coords);
             return;
         }
         render_defer_frames_ = 0;
@@ -900,9 +900,10 @@ void GCodeGLESRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode,
     current_state.filament_color = filament_color_;
     current_state.ghost_opacity = ghost_opacity_;
 
-    // Skip GPU render if state unchanged and we have a valid cached framebuffer
+    // Skip GPU render if state unchanged and we have a valid cached framebuffer.
+    // draw_cached_to_lvgl skips glReadPixels — just blits the existing draw_buf_.
     if (!frame_dirty_ && current_state == cached_state_ && draw_buf_) {
-        blit_to_lvgl(layer, widget_coords);
+        draw_cached_to_lvgl(layer, widget_coords);
         return;
     }
 
@@ -916,7 +917,7 @@ void GCodeGLESRenderer::render(lv_layer_t* layer, const ParsedGCodeFile& gcode,
 
     auto t1 = std::chrono::high_resolution_clock::now();
 
-    // Blit to LVGL
+    // Read pixels from FBO and blit to LVGL
     blit_to_lvgl(layer, widget_coords);
 
     auto t2 = std::chrono::high_resolution_clock::now();
@@ -1111,6 +1112,20 @@ void GCodeGLESRenderer::draw_layers(const std::vector<LayerVBO>& vbos, int layer
 // ============================================================
 // LVGL Output
 // ============================================================
+
+void GCodeGLESRenderer::draw_cached_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_coords) {
+    // Fast path: draw the existing draw_buf_ without GPU readback.
+    // Used when the frame hasn't changed (frame-skip) or during render deferral.
+    if (!draw_buf_ || !draw_buf_->data)
+        return;
+
+    lv_draw_image_dsc_t img_dsc;
+    lv_draw_image_dsc_init(&img_dsc);
+    img_dsc.src = draw_buf_;
+
+    lv_area_t area = *widget_coords;
+    lv_draw_image(layer, &img_dsc, &area);
+}
 
 void GCodeGLESRenderer::blit_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_coords) {
     int widget_w = lv_area_get_width(widget_coords);

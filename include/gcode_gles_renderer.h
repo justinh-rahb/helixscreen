@@ -247,6 +247,7 @@ class GCodeGLESRenderer {
     void draw_layers(const std::vector<LayerVBO>& vbos, int layer_start, int layer_end,
                      float color_scale, float alpha);
     void blit_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_coords);
+    void draw_cached_to_lvgl(lv_layer_t* layer, const lv_area_t* widget_coords);
 
     // ====== Frame Skip ======
 
