@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ams_backend_afc.h"
+#include "ams_backend_happy_hare.h"
+#include "ams_backend_mock.h"
 #include "ams_types.h"
 
 #include "../catch_amalgamated.hpp"
@@ -74,8 +76,6 @@ TEST_CASE("AFC backend parses toolchange fields from status update", "[afc][tool
     }
 }
 
-#include "ams_backend_happy_hare.h"
-
 // Test helper for HH toolchange — reuses the pattern from test_ams_backend_happy_hare.cpp
 class HHToolchangeTestHelper : public AmsBackendHappyHare {
   public:
@@ -131,8 +131,6 @@ TEST_CASE("Happy Hare backend parses toolchange fields", "[hh][toolchange]") {
         REQUIRE(hh.info().number_of_toolchanges == 0);
     }
 }
-
-#include "ams_backend_mock.h"
 
 TEST_CASE("Mock backend supports toolchange simulation", "[afc][toolchange][mock]") {
     AmsBackendMock mock(4);

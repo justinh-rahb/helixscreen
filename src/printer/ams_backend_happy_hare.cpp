@@ -532,6 +532,8 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
             system_info_.number_of_toolchanges = stm["total_toolchanges"].get<int>();
             spdlog::trace("[AMS HappyHare] Total toolchanges from slicer: {}",
                           system_info_.number_of_toolchanges);
+        } else {
+            system_info_.number_of_toolchanges = 0;
         }
     }
 

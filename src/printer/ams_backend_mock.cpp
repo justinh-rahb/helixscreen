@@ -921,6 +921,7 @@ void AmsBackendMock::set_toolchange_progress(int current, int total) {
     std::lock_guard<std::mutex> lock(mutex_);
     system_info_.current_toolchange = current;
     system_info_.number_of_toolchanges = total;
+    spdlog::debug("[AmsBackendMock] Toolchange progress set to {}/{}", current, total);
 }
 
 void AmsBackendMock::set_dryer_enabled(bool enabled) {
