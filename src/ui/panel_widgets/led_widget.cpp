@@ -54,6 +54,7 @@ void LedWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
 
     // Register XML event callbacks
     lv_xml_register_event_cb(nullptr, "light_toggle_cb", light_toggle_cb);
+    lv_xml_register_event_cb(nullptr, "light_double_click_cb", light_double_click_cb);
 
     // Find light icon for dynamic brightness/color updates
     light_icon_ = lv_obj_find_by_name(widget_obj_, "light_icon");
