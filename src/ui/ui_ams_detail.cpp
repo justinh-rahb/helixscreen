@@ -87,14 +87,20 @@ AmsDetailSlotResult ams_detail_create_slots(AmsDetailWidgets& w, lv_obj_t* slot_
     lv_obj_set_style_pad_column(w.slot_grid, result.layout.overlap > 0 ? -result.layout.overlap : 0,
                                 LV_PART_MAIN);
 
+    // Center slots within the tray by adding left padding for the rounding remainder
+    if (result.layout.centering_offset > 0) {
+        lv_obj_set_style_pad_left(w.slot_grid, result.layout.centering_offset, LV_PART_MAIN);
+    }
+
     for (int i = 0; i < count; ++i) {
         if (slot_widgets[i]) {
             lv_obj_set_width(slot_widgets[i], result.layout.slot_width);
         }
     }
 
-    spdlog::debug("[AmsDetail] Created {} slots (offset={}, width={}, overlap={})", count,
-                  slot_offset, result.layout.slot_width, result.layout.overlap);
+    spdlog::debug("[AmsDetail] Created {} slots (offset={}, width={}, overlap={}, center_pad={})",
+                  count, slot_offset, result.layout.slot_width, result.layout.overlap,
+                  result.layout.centering_offset);
 
     return result;
 }
@@ -151,7 +157,9 @@ void ams_detail_update_labels(AmsDetailWidgets& w, lv_obj_t* slot_widgets[], int
 
     for (int i = 0; i < slot_count; ++i) {
         if (slot_widgets[i]) {
-            int32_t slot_center_x = layout.slot_width / 2 + i * slot_spacing;
+            // Formula matches slot_grid flex positions, plus centering offset
+            int32_t slot_center_x =
+                layout.centering_offset + layout.slot_width / 2 + i * slot_spacing;
             ui_ams_slot_move_label_to_layer(slot_widgets[i], w.labels_layer, slot_center_x);
         }
     }
