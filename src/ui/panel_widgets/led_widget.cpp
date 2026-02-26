@@ -56,6 +56,13 @@ void LedWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     lv_xml_register_event_cb(nullptr, "light_toggle_cb", light_toggle_cb);
     lv_xml_register_event_cb(nullptr, "light_double_click_cb", light_double_click_cb);
 
+    // Set user_data on the light_button (where event_cb is registered in XML)
+    // so the callback can recover this widget instance via lv_obj_get_user_data()
+    auto* light_button = lv_obj_find_by_name(widget_obj_, "light_button");
+    if (light_button) {
+        lv_obj_set_user_data(light_button, this);
+    }
+
     // Find light icon for dynamic brightness/color updates
     light_icon_ = lv_obj_find_by_name(widget_obj_, "light_icon");
     if (light_icon_) {
@@ -77,6 +84,10 @@ void LedWidget::detach() {
 
     // Nullify widget pointers BEFORE resetting observers
     if (widget_obj_) {
+        auto* light_button = lv_obj_find_by_name(widget_obj_, "light_button");
+        if (light_button) {
+            lv_obj_set_user_data(light_button, nullptr);
+        }
         lv_obj_set_user_data(widget_obj_, nullptr);
     }
     widget_obj_ = nullptr;
@@ -114,7 +125,6 @@ void LedWidget::handle_light_toggle() {
     }
 
     ensure_led_observers();
-
     led_ctrl.light_toggle();
 
     if (led_ctrl.light_state_trackable()) {

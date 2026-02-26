@@ -94,6 +94,13 @@ void PrinterImageWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     // Store this pointer for event callback recovery
     lv_obj_set_user_data(widget_obj_, this);
 
+    // Set user_data on the printer_container child (where event_cb is registered in XML)
+    // so the callback can recover this widget instance via lv_obj_get_user_data()
+    auto* container = lv_obj_find_by_name(widget_obj_, "printer_container");
+    if (container) {
+        lv_obj_set_user_data(container, this);
+    }
+
     // Register XML callback
     lv_xml_register_event_cb(nullptr, "printer_manager_clicked_cb", printer_manager_clicked_cb);
 
@@ -123,6 +130,10 @@ void PrinterImageWidget::detach() {
     }
 
     if (widget_obj_) {
+        auto* container = lv_obj_find_by_name(widget_obj_, "printer_container");
+        if (container) {
+            lv_obj_set_user_data(container, nullptr);
+        }
         lv_obj_set_user_data(widget_obj_, nullptr);
         widget_obj_ = nullptr;
     }

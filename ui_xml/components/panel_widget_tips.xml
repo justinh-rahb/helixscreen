@@ -10,7 +10,7 @@
         width="100%" height="100%" style_pad_all="0" style_pad_gap="0"
         style_bg_opa="0%" scrollable="false">
     <!-- Tip container: left border acts as accent bar, auto-sizes to text height -->
-    <lv_obj width="100%"
+    <lv_obj name="tip_container" width="100%"
             height="100%" flex_flow="row" style_bg_opa="0%" style_radius="0"
             style_border_width="#accent_bar_width" style_border_side="left" style_border_color="#primary"
             style_pad_top="#space_sm" style_pad_bottom="#space_sm" style_pad_left="#accent_bar_gap"
