@@ -317,12 +317,16 @@ static void start_segment_animation(lv_obj_t* obj, FilamentPathData* data, int f
     lv_anim_set_exec_cb(&anim, segment_anim_cb);
     lv_anim_start(&anim);
 
-    // Start flow particles along the active path
-    start_flow_animation(obj, data);
+    // Start flow particles only for real filament movement (small steps).
+    // Big jumps (e.g., 0→4 on initial state setup) are not real flow operations.
+    int step = std::abs(to_segment - from_segment);
+    if (step <= 2) {
+        start_flow_animation(obj, data);
+    }
 
-    spdlog::trace("[FilamentPath] Started segment animation: {} -> {} ({})", from_segment,
+    spdlog::trace("[FilamentPath] Started segment animation: {} -> {} ({}, step={})", from_segment,
                   to_segment,
-                  data->anim_direction == AnimDirection::LOADING ? "loading" : "unloading");
+                  data->anim_direction == AnimDirection::LOADING ? "loading" : "unloading", step);
 }
 
 // Stop segment animation
@@ -353,10 +357,17 @@ static void segment_anim_cb(void* var, int32_t value) {
         data->prev_segment = data->filament_segment;
         spdlog::info("[FilamentPath] Segment anim complete at segment {} (flow_active={})",
                      data->filament_segment, data->flow_anim_active);
-        // Keep flow animation running between segment steps — the glowing dot
-        // should persist while the filament pauses at each sensor position.
-        // Flow will be stopped when segment reaches a terminal position
-        // (NONE for unload complete, NOZZLE for load complete) in set_filament_segment.
+        // Stop flow at terminal positions (NONE=unload complete, NOZZLE=load complete)
+        // or when no further transitions are expected. Flow between intermediate steps
+        // is stopped here rather than relying solely on set_filament_segment, which
+        // may not fire again after the final step.
+        if (data->flow_anim_active) {
+            int seg = data->filament_segment;
+            bool is_terminal = (seg == 0 || seg == PATH_SEGMENT_COUNT - 1);
+            if (is_terminal) {
+                stop_flow_animation(obj, data);
+            }
+        }
     }
 
     // Defer invalidation to avoid calling during render phase
@@ -513,9 +524,15 @@ static void flow_anim_cb(void* var, int32_t value) {
     if (!data)
         return;
 
+    int old_offset = data->flow_offset;
     data->flow_offset = value;
-    helix::ui::async_call(
-        obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
+
+    // Throttle redraws: only invalidate when dots visibly move (~2px change).
+    // Flow dots are 1px radius at low opacity — sub-pixel changes are invisible.
+    if (std::abs(value - old_offset) >= 2) {
+        helix::ui::async_call(
+            obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
+    }
 }
 
 // Output X slide animation callback (LINEAR topology)
@@ -2215,6 +2232,7 @@ static void filament_path_delete_cb(lv_event_t* e) {
             lv_anim_delete(obj, segment_anim_cb);
             lv_anim_delete(obj, error_pulse_anim_cb);
             lv_anim_delete(obj, heat_pulse_anim_cb);
+            lv_anim_delete(obj, flow_anim_cb);
         }
         s_registry.erase(it);
         // data automatically freed when unique_ptr goes out of scope
@@ -2547,7 +2565,7 @@ bool ui_filament_path_canvas_is_animating(lv_obj_t* obj) {
     if (!data)
         return false;
 
-    return data->segment_anim_active || data->error_pulse_active;
+    return data->segment_anim_active || data->error_pulse_active || data->flow_anim_active;
 }
 
 void ui_filament_path_canvas_stop_animations(lv_obj_t* obj) {
@@ -2557,6 +2575,8 @@ void ui_filament_path_canvas_stop_animations(lv_obj_t* obj) {
 
     stop_segment_animation(obj, data);
     stop_error_pulse(obj, data);
+    stop_flow_animation(obj, data);
+    stop_heat_pulse(obj, data);
     lv_obj_invalidate(obj);
 }
 
