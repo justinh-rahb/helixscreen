@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "ui_coalesced_timer.h"
 #include "ui_observer_guard.h"
 
 #include <any>
@@ -102,6 +103,10 @@ class PanelWidgetManager {
         std::vector<int32_t> row_dsc;
     };
     std::unordered_map<std::string, GridDescriptors> grid_descriptors_;
+
+    /// Per-panel coalesced rebuild timers — batches rapid gate observer changes
+    /// into a single rebuild per LVGL frame instead of one per subject change
+    std::unordered_map<std::string, ui::CoalescedTimer> rebuild_timers_;
 };
 
 } // namespace helix

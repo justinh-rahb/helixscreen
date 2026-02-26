@@ -42,8 +42,8 @@ class HomePanel : public PanelBase {
     /// Rebuild the widget list from current PanelWidgetConfig
     void populate_widgets();
 
-    /// Delegate config reload to all active widgets
-    void reload_from_config();
+    /// Apply printer-level config (delegates to PrinterImageWidget)
+    void apply_printer_config();
 
     /// Delegate printer image refresh to PrinterImageWidget if active
     void refresh_printer_image();
@@ -60,6 +60,9 @@ class HomePanel : public PanelBase {
   private:
     SubjectManager subjects_;
     bool populating_widgets_ = false; // Reentrancy guard for populate_widgets()
+
+    // Cached image path for skipping redundant refresh_printer_image() calls
+    std::string last_printer_image_path_;
 
     // Active PanelWidget instances (factory-created, lifecycle-managed)
     std::vector<std::unique_ptr<helix::PanelWidget>> active_widgets_;

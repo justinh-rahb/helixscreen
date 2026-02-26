@@ -146,6 +146,10 @@ bool KeyboardManager::point_in_area(const lv_area_t* area, const lv_point_t* poi
 
 void KeyboardManager::overlay_cleanup() {
     helix::ui::safe_delete(overlay_);
+}
+
+void KeyboardManager::longpress_reset() {
+    overlay_cleanup();
     alternatives_ = nullptr;
     pressed_char_ = 0;
     pressed_btn_id_ = 0;
@@ -159,7 +163,17 @@ void KeyboardManager::show_overlay(const lv_area_t* key_area, const char* altern
 
     overlay_cleanup();
 
-    overlay_ = lv_obj_create(lv_screen_active());
+    lv_obj_t* screen = lv_screen_active();
+    if (!screen) {
+        spdlog::warn("[KeyboardManager] show_overlay: no active screen");
+        return;
+    }
+
+    overlay_ = lv_obj_create(screen);
+    if (!overlay_) {
+        spdlog::error("[KeyboardManager] show_overlay: failed to create overlay");
+        return;
+    }
 
     size_t alt_count = strlen(alternatives);
     const int32_t char_width = 50;
@@ -214,7 +228,6 @@ void KeyboardManager::show_overlay(const lv_area_t* key_area, const char* altern
     int32_t overlay_x = key_center_x - (overlay_width / 2);
     int32_t overlay_y = key_area->y1 - overlay_height - 10;
 
-    lv_obj_t* screen = lv_screen_active();
     int32_t screen_width = lv_obj_get_width(screen);
 
     if (overlay_x < 0) {
@@ -320,7 +333,12 @@ void KeyboardManager::longpress_event_handler(lv_event_t* e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t* keyboard = lv_event_get_target_obj(e);
 
-    spdlog::info("[KeyboardManager] EVENT RECEIVED: code={}", (int)code);
+    if (keyboard == nullptr) {
+        spdlog::warn("[KeyboardManager] longpress_event_handler: keyboard target is NULL");
+        return;
+    }
+
+    spdlog::debug("[KeyboardManager] EVENT RECEIVED: code={}", (int)code);
 
     if (code == LV_EVENT_PRESSED) {
         uint32_t btn_id = lv_buttonmatrix_get_selected_button(keyboard);
@@ -387,7 +405,7 @@ void KeyboardManager::longpress_event_handler(lv_event_t* e) {
         if (mgr.longpress_state_ == LP_ALT_SELECTED) {
             // Auto-insert mode: alt char already inserted, just clean up
             spdlog::info("[KeyboardManager] Cleaning up overlay (alt already auto-inserted)");
-            mgr.overlay_cleanup();
+            mgr.longpress_reset();
             mgr.longpress_state_ = LP_IDLE;
 
         } else if (mgr.longpress_state_ == LP_LONG_DETECTED && mgr.overlay_ != nullptr) {
@@ -450,13 +468,13 @@ void KeyboardManager::longpress_event_handler(lv_event_t* e) {
             }
 
             spdlog::info("[KeyboardManager] Cleaning up overlay");
-            mgr.overlay_cleanup();
+            mgr.longpress_reset();
             mgr.longpress_state_ = LP_IDLE;
 
         } else if (mgr.longpress_state_ == LP_PRESSED) {
             spdlog::debug("[KeyboardManager] Short press - normal input");
+            mgr.longpress_reset();
             mgr.longpress_state_ = LP_IDLE;
-            mgr.overlay_cleanup();
         }
     }
 
@@ -469,6 +487,11 @@ void KeyboardManager::keyboard_event_cb(lv_event_t* e) {
     auto& mgr = KeyboardManager::instance();
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t* keyboard = lv_event_get_target_obj(e);
+
+    if (keyboard == nullptr) {
+        spdlog::warn("[KeyboardManager] keyboard_event_cb: keyboard target is NULL");
+        return;
+    }
 
     if (code == LV_EVENT_READY) {
         spdlog::debug("[KeyboardManager] Enter pressed");
@@ -603,6 +626,9 @@ void KeyboardManager::keyboard_draw_alternative_chars(lv_event_t* e) {
     auto& mgr = KeyboardManager::instance();
     lv_obj_t* keyboard = lv_event_get_target_obj(e);
     lv_layer_t* layer = lv_event_get_layer(e);
+
+    if (keyboard == nullptr)
+        return;
 
     const char* const* map = lv_buttonmatrix_get_map(keyboard);
     if (!map)
@@ -936,7 +962,7 @@ void KeyboardManager::hide() {
     // Cancel any in-progress show animation
     lv_anim_delete(keyboard_, nullptr);
 
-    overlay_cleanup();
+    longpress_reset();
     longpress_state_ = LP_IDLE;
 
     lv_keyboard_set_textarea(keyboard_, nullptr);

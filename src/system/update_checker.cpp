@@ -28,6 +28,7 @@
 #include "lvgl/src/others/translation/lv_translation.h"
 #include "printer_state.h"
 #include "spdlog/spdlog.h"
+#include "system/telemetry_manager.h"
 #include "version.h"
 
 #include <chrono>
@@ -38,7 +39,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
-#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
@@ -824,6 +824,8 @@ void UpdateChecker::start_download() {
         spdlog::warn("[UpdateChecker] Cannot download update while printing");
         report_download_status(DownloadStatus::Error, 0, "Error: Cannot update while printing",
                                "Stop the print before installing updates");
+        TelemetryManager::instance().record_update_failure("print_in_progress", "",
+                                                           get_platform_key());
         return;
     }
 
@@ -835,6 +837,8 @@ void UpdateChecker::start_download() {
         lock.unlock();
         report_download_status(DownloadStatus::Error, 0, "Error: No update available",
                                "No update information cached");
+        TelemetryManager::instance().record_update_failure("no_cached_update", "",
+                                                           get_platform_key());
         return;
     }
 
@@ -876,6 +880,8 @@ void UpdateChecker::do_download() {
     if (download_path.empty()) {
         report_download_status(DownloadStatus::Error, 0, "Error: No space for download",
                                "Could not find a writable directory with enough free space");
+        TelemetryManager::instance().record_update_failure("no_disk_space", version,
+                                                           get_platform_key());
         return;
     }
     spdlog::info("[UpdateChecker] Downloading {} to {}", url, download_path);
@@ -915,6 +921,8 @@ void UpdateChecker::do_download() {
         std::remove(download_path.c_str()); // Clean up partial download
         report_download_status(DownloadStatus::Error, 0, "Error: Download failed",
                                "Failed to download update file");
+        TelemetryManager::instance().record_update_failure("download_failed", version,
+                                                           get_platform_key());
         return;
     }
 
@@ -924,6 +932,8 @@ void UpdateChecker::do_download() {
         std::remove(download_path.c_str());
         report_download_status(DownloadStatus::Error, 0, "Error: Invalid download",
                                "Downloaded file is too small");
+        TelemetryManager::instance().record_update_failure(
+            "file_too_small", version, get_platform_key(), -1, static_cast<int64_t>(result));
         return;
     }
     if (result > 150 * 1024 * 1024) {
@@ -931,6 +941,8 @@ void UpdateChecker::do_download() {
         std::remove(download_path.c_str());
         report_download_status(DownloadStatus::Error, 0, "Error: Invalid download",
                                "Downloaded file is too large");
+        TelemetryManager::instance().record_update_failure(
+            "file_too_large", version, get_platform_key(), -1, static_cast<int64_t>(result));
         return;
     }
 
@@ -944,6 +956,8 @@ void UpdateChecker::do_download() {
         std::remove(download_path.c_str());
         report_download_status(DownloadStatus::Error, 0, "Error: Corrupt download",
                                "Downloaded file failed integrity check");
+        TelemetryManager::instance().record_update_failure(
+            "corrupt_download", version, get_platform_key(), -1, static_cast<int64_t>(result));
         return;
     }
 
@@ -955,6 +969,8 @@ void UpdateChecker::do_download() {
         std::remove(download_path.c_str());
         report_download_status(DownloadStatus::Error, 0, "Error: Wrong architecture",
                                "Downloaded binary doesn't match this device's architecture");
+        TelemetryManager::instance().record_update_failure("wrong_architecture", version,
+                                                           get_platform_key());
         return;
     }
 
@@ -962,30 +978,26 @@ void UpdateChecker::do_download() {
 }
 
 bool UpdateChecker::validate_elf_architecture(const std::string& tarball_path) {
-    struct utsname uts;
-    if (uname(&uts) != 0) {
-        spdlog::warn("[UpdateChecker] uname() failed, skipping arch validation");
-        return true; // Can't determine, allow
-    }
+    // Use the compile-time platform key to determine expected architecture.
+    // uname().machine is unreliable: Pi4 with 64-bit kernel + 32-bit userspace
+    // reports "aarch64" even though only 32-bit ARM binaries can execute.
+    std::string platform = get_platform_key();
+    spdlog::info("[UpdateChecker] Platform key: {}", platform);
 
-    std::string machine(uts.machine);
-    spdlog::info("[UpdateChecker] Runtime architecture: {}", machine);
-
-    // Determine expected ELF properties from runtime architecture
     uint8_t expected_class = 0;
     uint16_t expected_machine = 0;
     std::string expected_arch_name;
 
-    if (machine == "armv7l") {
+    if (platform == "pi32" || platform == "ad5m") {
         expected_class = 1;      // ELFCLASS32
         expected_machine = 0x28; // EM_ARM
         expected_arch_name = "ARM 32-bit";
-    } else if (machine == "aarch64") {
+    } else if (platform == "pi") {
         expected_class = 2;      // ELFCLASS64
         expected_machine = 0xB7; // EM_AARCH64
         expected_arch_name = "AARCH64 64-bit";
     } else {
-        spdlog::warn("[UpdateChecker] Unknown architecture '{}', skipping validation", machine);
+        spdlog::info("[UpdateChecker] Platform '{}' — skipping ELF validation", platform);
         return true;
     }
 
@@ -1058,6 +1070,12 @@ bool UpdateChecker::validate_elf_architecture(const std::string& tarball_path) {
 
 void UpdateChecker::do_install(const std::string& tarball_path) {
     flog_info("[UpdateChecker] do_install() ENTER: tarball={}", tarball_path);
+
+    std::string version;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        version = cached_info_ ? cached_info_->version : "unknown";
+    }
 
     if (download_cancelled_.load()) {
         flog_info("[UpdateChecker] do_install() cancelled, aborting");
@@ -1142,6 +1160,8 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
         flog_error("[UpdateChecker] Cannot find install.sh");
         report_download_status(DownloadStatus::Error, 0, "Error: Installer not found",
                                "Cannot locate install.sh script");
+        TelemetryManager::instance().record_update_failure("installer_not_found", version,
+                                                           get_platform_key());
         return;
     }
 
@@ -1172,6 +1192,7 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
     // Using a file instead of a pipe means we get the full output even if this
     // process is killed by systemd's stop_service during the install step.
     int ret = -1;
+    bool timed_out = false;
     {
         int log_fd = open(install_log.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
         if (log_fd < 0) {
@@ -1245,6 +1266,7 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
                     "[UpdateChecker] install.sh exit: code={} normal={} signaled={} signal={}", ret,
                     normal_exit, signaled, sig);
             } else {
+                timed_out = true;
                 flog_error("[UpdateChecker] install.sh timed out after {}s, killing",
                            timeout_seconds);
                 kill(pid, SIGKILL);
@@ -1298,16 +1320,17 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
         flog_error("[UpdateChecker] Install script failed with code {}", ret);
         report_download_status(DownloadStatus::Error, 0, "Error: Installation failed",
                                "install.sh returned error code " + std::to_string(ret));
+        std::string reason = timed_out ? "install_timeout" : "install_failed";
+        TelemetryManager::instance().record_update_failure(reason, version, get_platform_key(), -1,
+                                                           -1, ret);
         return;
     }
 
     spdlog::info("[UpdateChecker] Update installed successfully!");
 
-    std::string version;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        version = cached_info_ ? cached_info_->version : "unknown";
-    }
+    // Write update success flag for telemetry (picked up on next boot)
+    TelemetryManager::write_update_success_flag("config", version, HELIX_VERSION,
+                                                get_platform_key());
 
     report_download_status(DownloadStatus::Complete, 100,
                            "v" + version + " installed! Restarting...");

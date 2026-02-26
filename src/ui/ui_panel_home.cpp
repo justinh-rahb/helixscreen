@@ -52,7 +52,11 @@ HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
     // Subscribe to printer image changes for immediate refresh
     image_changed_observer_ = helix::ui::observe_int_sync<HomePanel>(
         helix::PrinterImageManager::instance().get_image_changed_subject(), this,
-        [](HomePanel* self, int /*ver*/) { self->refresh_printer_image(); });
+        [](HomePanel* self, int /*ver*/) {
+            // Clear cache so refresh_printer_image() actually applies the new image
+            self->last_printer_image_path_.clear();
+            self->refresh_printer_image();
+        });
 }
 
 HomePanel::~HomePanel() {
@@ -188,8 +192,8 @@ void HomePanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     helix::PanelWidgetManager::instance().register_rebuild_callback(
         "home", [this]() { populate_widgets(); });
 
-    // Delegate initial config load to all widgets
-    reload_from_config();
+    // Widgets handle their own initialization via version observers
+    // (no explicit config reload needed)
 
     spdlog::debug("[{}] Setup complete!", get_name());
 }
@@ -218,10 +222,10 @@ void HomePanel::on_deactivate() {
     AmsState::instance().stop_spoolman_polling();
 }
 
-void HomePanel::reload_from_config() {
-    for (auto& w : active_widgets_) {
-        w->reload_from_config();
-    }
+void HomePanel::apply_printer_config() {
+    // Widgets use version observers for auto-binding (LED, power, etc.)
+    // Just refresh the printer image (delegated to PrinterImageWidget)
+    refresh_printer_image();
 }
 
 void HomePanel::refresh_printer_image() {

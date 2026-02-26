@@ -223,11 +223,14 @@ For power users and developers. These override config file settings and are usef
 | `HELIX_TOUCH_MAX_X` | Maximum raw X value (linear calibration) | `3580` |
 | `HELIX_TOUCH_MIN_Y` | Minimum raw Y value (linear calibration) | `3200` |
 | `HELIX_TOUCH_MAX_Y` | Maximum raw Y value (linear calibration) | `900` |
-| `HELIX_TOUCH_SWAP_AXES` | Swap X and Y axes | `1` |
+| `HELIX_TOUCH_SWAP_AXES` | Swap X and Y axes (auto-detected during calibration; use this to force it) | `1` |
 | `HELIX_DISPLAY_ROTATION` | Display rotation (touch auto-adjusts) | `90`, `180`, `270` |
 | `HELIX_DEBUG_TOUCHES` | Draw ripple at each touch point | `1` |
+| `HELIX_TOUCH_JITTER` | Touch jitter filter dead zone (pixels) | `15` |
 
 > **Note:** The MIN/MAX variables provide a simple linear calibration that bypasses the 3-point system. Most users should use the built-in calibration instead.
+>
+> **Jitter filter:** If taps are being misread as swipes, the jitter filter suppresses small coordinate noise from the touch controller. The default of 15 pixels works well for most screens. Increase it for very noisy controllers, or set to `0` to disable.
 
 **Setting environment variables in systemd:**
 
