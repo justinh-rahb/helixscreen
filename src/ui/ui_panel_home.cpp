@@ -322,6 +322,11 @@ void HomePanel::on_activate() {
 }
 
 void HomePanel::on_deactivate() {
+    // Exit grid edit mode if active (prevents stale state on panel switch)
+    if (grid_edit_mode_.is_active()) {
+        grid_edit_mode_.exit();
+    }
+
     // Deactivate behavioral widgets
     for (auto& w : active_widgets_) {
         if (auto* nw = dynamic_cast<helix::NetworkWidget*>(w.get())) {

@@ -312,6 +312,10 @@ void GridEditMode::remove_selected_widget() {
     if (rebuild_cb_) {
         rebuild_cb_();
     }
+    // Recreate dots overlay (rebuild destroys all container children)
+    if (active_) {
+        create_dots_overlay();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -678,7 +682,7 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
     if (target_col != drag_orig_col_ || target_row != drag_orig_row_) {
         int cfg_idx = find_config_index_for_widget(selected_);
         if (cfg_idx >= 0) {
-            auto& entries = const_cast<std::vector<PanelWidgetEntry>&>(config_->entries());
+            auto& entries = config_->mutable_entries();
             auto& dragged_entry = entries[static_cast<size_t>(cfg_idx)];
 
             // Check for occupant at target
@@ -754,6 +758,10 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
         config_->save();
         if (rebuild_cb_) {
             rebuild_cb_();
+        }
+        // Recreate dots overlay (rebuild destroys all container children)
+        if (active_) {
+            create_dots_overlay();
         }
     } else {
         // Re-select to show chrome again (widget snaps back via grid layout)
@@ -859,7 +867,7 @@ void GridEditMode::handle_resize_end(lv_event_t* /*e*/) {
 
     if (cfg_idx >= 0 && resize_preview_colspan_ > 0 && resize_preview_rowspan_ > 0) {
         // Check if size actually changed
-        auto& entries = const_cast<std::vector<PanelWidgetEntry>&>(config_->entries());
+        auto& entries = config_->mutable_entries();
         auto& entry = entries[static_cast<size_t>(cfg_idx)];
 
         if (resize_preview_colspan_ != drag_orig_colspan_ ||
@@ -907,6 +915,10 @@ void GridEditMode::handle_resize_end(lv_event_t* /*e*/) {
         config_->save();
         if (rebuild_cb_) {
             rebuild_cb_();
+        }
+        // Recreate dots overlay (rebuild destroys all container children)
+        if (active_) {
+            create_dots_overlay();
         }
     } else {
         // Reselect to restore chrome
@@ -1221,7 +1233,7 @@ void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
 
     // Enable the widget in config with the computed grid position.
     // Find the entry by ID — it should exist as disabled.
-    auto& mutable_entries = const_cast<std::vector<PanelWidgetEntry>&>(config_->entries());
+    auto& mutable_entries = config_->mutable_entries();
     bool found = false;
     for (auto& entry : mutable_entries) {
         if (entry.id == widget_id) {
@@ -1252,6 +1264,10 @@ void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
     config_->save();
     if (rebuild_cb_) {
         rebuild_cb_();
+    }
+    // Recreate dots overlay (rebuild destroys all container children)
+    if (active_) {
+        create_dots_overlay();
     }
 }
 

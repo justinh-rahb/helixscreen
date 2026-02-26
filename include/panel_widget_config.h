@@ -48,6 +48,10 @@ class PanelWidgetConfig {
         return entries_;
     }
 
+    std::vector<PanelWidgetEntry>& mutable_entries() {
+        return entries_;
+    }
+
     /// Move widget between positions. No-op if indices are equal or out of bounds.
     void reorder(size_t from_index, size_t to_index);
 
