@@ -34,6 +34,7 @@ class TemperatureWidget : public PanelWidget {
     TempControlPanel* temp_control_panel_;
 
     lv_obj_t* widget_obj_ = nullptr;
+    lv_obj_t* temp_btn_ = nullptr;
     lv_obj_t* parent_screen_ = nullptr;
     lv_obj_t* nozzle_temp_panel_ = nullptr;
 
