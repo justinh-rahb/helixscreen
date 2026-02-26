@@ -159,6 +159,8 @@ void register_xml_components() {
                              on_toggle_password_visibility);
     lv_xml_register_event_cb(nullptr, "on_edit_done_clicked",
                              [](lv_event_t*) { get_global_home_panel().exit_grid_edit_mode(); });
+    lv_xml_register_event_cb(nullptr, "on_edit_add_widget_clicked",
+                             [](lv_event_t*) { get_global_home_panel().open_widget_catalog(); });
     lv_subject_init_int(&s_noop_subject, 0);
     lv_xml_register_subject(nullptr, "", &s_noop_subject);
     s_noop_subject_initialized = true;

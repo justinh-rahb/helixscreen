@@ -54,6 +54,9 @@ class HomePanel : public PanelBase {
     /// Exit grid edit mode (called by navbar done button)
     void exit_grid_edit_mode();
 
+    /// Open widget catalog overlay (called by navbar + button)
+    void open_widget_catalog();
+
   private:
     SubjectManager subjects_;
     bool populating_widgets_ = false; // Reentrancy guard for populate_widgets()

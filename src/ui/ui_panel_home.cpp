@@ -363,6 +363,12 @@ void HomePanel::exit_grid_edit_mode() {
     }
 }
 
+void HomePanel::open_widget_catalog() {
+    if (grid_edit_mode_.is_active() && parent_screen_) {
+        grid_edit_mode_.open_widget_catalog(parent_screen_);
+    }
+}
+
 // ============================================================================
 // Global instance
 // ============================================================================
