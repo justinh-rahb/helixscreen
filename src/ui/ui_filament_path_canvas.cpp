@@ -1361,6 +1361,12 @@ static void filament_path_draw_cb(lv_event_t* e) {
     int32_t line_active = data->line_width_active;
     int32_t sensor_r = data->sensor_radius;
 
+    // LINEAR topology: butt SELECTOR directly against prep sensors (no gap/lines between)
+    if (data->topology == 0) {
+        hub_y = prep_y + sensor_r + hub_h / 2;
+        output_y = hub_y + hub_h / 2;
+    }
+
     // Determine which segment has error (if any)
     bool has_error = data->error_segment > 0;
     PathSegment error_seg = static_cast<PathSegment>(data->error_segment);
@@ -1491,17 +1497,7 @@ static void filament_path_draw_cb(lv_event_t* e) {
             }
             draw_sensor_dot(layer, hub_dot_x, hub_top, dot_color, dot_filled, sensor_r);
         } else if (data->topology == 0) {
-            // LINEAR topology: straight vertical lanes dropping into the selector box
-            int32_t hub_top = hub_y - hub_h / 2;
-            if (merge_is_idle) {
-                draw_hollow_vertical_line(layer, slot_x, prep_y + sensor_r, hub_top, idle_color,
-                                          bg_color, line_active);
-            } else {
-                draw_glow_line(layer, slot_x, prep_y + sensor_r, slot_x, hub_top, merge_line_color,
-                               lane_width);
-                draw_vertical_line(layer, slot_x, prep_y + sensor_r, hub_top, merge_line_color,
-                                   lane_width);
-            }
+            // LINEAR topology: SELECTOR is butted against prep sensors — no lines between
         } else {
             // Other non-hub topologies: converge to center merge point (S-curve)
             int32_t start_y_other = prep_y + sensor_r;
@@ -1798,9 +1794,7 @@ static void filament_path_draw_cb(lv_event_t* e) {
             draw_flow_dots_curve(layer, slot_x, fd_start_y, fd_cp1_x, fd_cp1_y, fd_cp2_x, fd_cp2_y,
                                  hub_dot_x, fd_end_y, flow_color, data->flow_offset, reverse);
         } else if (data->topology == 0) {
-            int32_t hub_top = hub_y - hub_h / 2;
-            draw_flow_dots_line(layer, slot_x, prep_y + sensor_r, slot_x, hub_top, flow_color,
-                                data->flow_offset, reverse);
+            // LINEAR: no gap between prep sensors and SELECTOR — skip flow dots here
         }
 
         // Flow dots on center path: hub → output → toolhead sensor

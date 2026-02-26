@@ -1161,7 +1161,7 @@ void AmsBackendMock::set_tool_changer_mode(bool enabled) {
         system_info_.type = AmsType::HAPPY_HARE;
         system_info_.type_name = "Happy Hare (Mock)";
         system_info_.supports_bypass = true;
-        topology_ = PathTopology::HUB;
+        topology_ = PathTopology::LINEAR;
 
         if (!system_info_.units.empty()) {
             system_info_.units[0].name = "Mock MMU";
@@ -1320,7 +1320,7 @@ void AmsBackendMock::set_afc_mode(bool enabled) {
         system_info_.type_name = "Happy Hare (Mock)";
         system_info_.version = "2.7.0-mock";
         system_info_.supports_bypass = true;
-        topology_ = PathTopology::HUB;
+        topology_ = PathTopology::LINEAR;
 
         if (!system_info_.units.empty()) {
             system_info_.units[0].name = "Mock MMU";
@@ -1486,7 +1486,7 @@ void AmsBackendMock::set_multi_unit_mode(bool enabled) {
         system_info_.type_name = "Happy Hare (Mock)";
         system_info_.version = "2.7.0-mock";
         system_info_.supports_bypass = true;
-        topology_ = PathTopology::HUB;
+        topology_ = PathTopology::LINEAR;
 
         if (!system_info_.units.empty()) {
             system_info_.units[0].name = "Mock MMU";
@@ -1669,7 +1669,7 @@ void AmsBackendMock::set_mixed_topology_mode(bool enabled) {
         system_info_.type_name = "Happy Hare (Mock)";
         system_info_.version = "2.7.0-mock";
         system_info_.supports_bypass = true;
-        topology_ = PathTopology::HUB;
+        topology_ = PathTopology::LINEAR;
 
         if (!system_info_.units.empty()) {
             system_info_.units[0].name = "Mock MMU";
