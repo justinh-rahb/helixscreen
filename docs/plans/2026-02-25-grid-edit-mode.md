@@ -45,6 +45,53 @@
 - [ ] New widget types (clock, camera, print stats, quick actions, print queue)
 - [ ] Animation/transition polish for edit mode enter/exit
 - [ ] Debounce timer fallback for saving positions (for users who never enter edit mode)
+- [ ] Visual polish: every widget at every breakpoint × aspect ratio (see Phase 6 below)
+
+### Phase 6: Visual Polish — Every Widget × Every Breakpoint × Every Aspect Ratio
+
+Iteratively test and fix each widget's visual appearance across all screen sizes.
+One widget at a time, reviewed together before moving to the next.
+
+**Test matrix:**
+
+| Breakpoint | Resolution | Aspect | Grid | CLI flag |
+|------------|-----------|--------|------|----------|
+| TINY       | 480×320   | 3:2    | 4×3  | `-s 480x320`  |
+| SMALL      | 480×400   | 6:5    | 6×4  | `-s 480x400`  |
+| SMALL (UW) | 1920×440  | ~4:1   | 6×4  | `-s 1920x440` |
+| MEDIUM     | 800×480   | 5:3    | 6×4  | `-s 800x480`  |
+| LARGE      | 1024×600  | ~17:10 | 8×5  | `-s 1024x600` |
+| XLARGE     | 1280×720  | 16:9   | 8×5  | `-s 1280x720` |
+
+**Widgets to polish (19 total):**
+
+1. `printer_image` — 3D printer visualization (2×2, resizable 1-4 × 1-3)
+2. `print_status` — Print progress card (2×2, resizable 2-4 × 1-3)
+3. `tips` — Rotating tips (4×1 anchor, resizable 2-6 × 1)
+4. `temperature` — Nozzle temp (1×1)
+5. `fan_stack` — Fan speeds (1×1)
+6. `notifications` — Pending alerts (1×1)
+7. `ams` — Multi-material spool status (1×1)
+8. `power` — Moonraker power controls (1×1, hardware-gated)
+9. `led` — LED light toggle (1×1, hardware-gated)
+10. `humidity` — Humidity sensor (1×1, hardware-gated)
+11. `width_sensor` — Filament width sensor (1×1, hardware-gated)
+12. `probe` — Z probe status (1×1, hardware-gated)
+13. `filament` — Filament sensor (1×1, hardware-gated)
+14. `network` — Wi-Fi/ethernet status (1×1, default disabled)
+15. `firmware_restart` — Klipper restart (1×1, default disabled)
+16. `temp_stack` — Multi-temp stacked (1×1, default disabled)
+17. `thermistor` — Custom temp sensor (1×1, default disabled)
+18. `favorite_macro_1` — Macro button (1×1, default disabled)
+19. `favorite_macro_2` — Macro button (1×1, default disabled)
+
+**Process per widget:**
+1. Launch app at each resolution: `./build/bin/helix-screen --test -vv -s WxH`
+2. Screenshot or visually inspect the widget
+3. Check: text truncation, icon alignment, padding, touch target size, overflow
+4. Fix XML/theme issues (applying [L040]: inline attrs override bind_style)
+5. Re-verify at all resolutions
+6. Move to next widget
 
 ---
 
