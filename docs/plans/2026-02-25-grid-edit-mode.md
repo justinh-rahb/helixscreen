@@ -56,7 +56,7 @@ One widget at a time, reviewed together before moving to the next.
 
 | Breakpoint | Resolution | Aspect | Grid | CLI flag |
 |------------|-----------|--------|------|----------|
-| TINY       | 480×320   | 3:2    | 4×3  | `-s 480x320`  |
+| TINY       | 480×320   | 3:2    | 6×4  | `-s 480x320`  |
 | SMALL      | 480×400   | 6:5    | 6×4  | `-s 480x400`  |
 | SMALL (UW) | 1920×440  | ~4:1   | 6×4  | `-s 1920x440` |
 | MEDIUM     | 800×480   | 5:3    | 6×4  | `-s 800x480`  |

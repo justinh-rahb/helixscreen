@@ -18,12 +18,12 @@ using namespace helix;
 // Grid dimensions per breakpoint
 // =============================================================================
 
-TEST_CASE("GridLayout dimensions: TINY (bp 0) = 4x3", "[grid_layout][dimensions]") {
+TEST_CASE("GridLayout dimensions: TINY (bp 0) = 6x4", "[grid_layout][dimensions]") {
     auto dims = GridLayout::get_dimensions(0);
-    CHECK(dims.cols == 4);
-    CHECK(dims.rows == 3);
-    CHECK(GridLayout::get_cols(0) == 4);
-    CHECK(GridLayout::get_rows(0) == 3);
+    CHECK(dims.cols == 6);
+    CHECK(dims.rows == 4);
+    CHECK(GridLayout::get_cols(0) == 6);
+    CHECK(GridLayout::get_rows(0) == 4);
 }
 
 TEST_CASE("GridLayout dimensions: SMALL (bp 1) = 6x4", "[grid_layout][dimensions]") {
@@ -53,8 +53,8 @@ TEST_CASE("GridLayout dimensions: XLARGE (bp 4) = 8x5", "[grid_layout][dimension
 TEST_CASE("GridLayout dimensions: out-of-range breakpoints are clamped",
           "[grid_layout][dimensions]") {
     // Negative clamps to 0 (TINY)
-    CHECK(GridLayout::get_cols(-1) == 4);
-    CHECK(GridLayout::get_rows(-1) == 3);
+    CHECK(GridLayout::get_cols(-1) == 6);
+    CHECK(GridLayout::get_rows(-1) == 4);
 
     // Above max clamps to 4 (XLARGE)
     CHECK(GridLayout::get_cols(99) == 8);
@@ -66,13 +66,13 @@ TEST_CASE("GridLayout dimensions: out-of-range breakpoints are clamped",
 // =============================================================================
 
 TEST_CASE("GridLayout make_col_dsc: correct length and values", "[grid_layout][descriptor]") {
-    SECTION("TINY (4 cols)") {
+    SECTION("TINY (6 cols)") {
         auto dsc = GridLayout::make_col_dsc(0);
-        REQUIRE(dsc.size() == 5); // 4 FR values + terminator
-        for (int i = 0; i < 4; ++i) {
+        REQUIRE(dsc.size() == 7); // 6 FR values + terminator
+        for (int i = 0; i < 6; ++i) {
             CHECK(dsc[static_cast<size_t>(i)] == LV_GRID_FR(1));
         }
-        CHECK(dsc[4] == LV_GRID_TEMPLATE_LAST);
+        CHECK(dsc[6] == LV_GRID_TEMPLATE_LAST);
     }
 
     SECTION("LARGE (8 cols)") {
@@ -86,13 +86,13 @@ TEST_CASE("GridLayout make_col_dsc: correct length and values", "[grid_layout][d
 }
 
 TEST_CASE("GridLayout make_row_dsc: correct length and values", "[grid_layout][descriptor]") {
-    SECTION("TINY (3 rows)") {
+    SECTION("TINY (4 rows)") {
         auto dsc = GridLayout::make_row_dsc(0);
-        REQUIRE(dsc.size() == 4); // 3 FR values + terminator
-        for (int i = 0; i < 3; ++i) {
+        REQUIRE(dsc.size() == 5); // 4 FR values + terminator
+        for (int i = 0; i < 4; ++i) {
             CHECK(dsc[static_cast<size_t>(i)] == LV_GRID_FR(1));
         }
-        CHECK(dsc[3] == LV_GRID_TEMPLATE_LAST);
+        CHECK(dsc[4] == LV_GRID_TEMPLATE_LAST);
     }
 
     SECTION("LARGE (5 rows)") {
@@ -107,7 +107,7 @@ TEST_CASE("GridLayout make_row_dsc: correct length and values", "[grid_layout][d
 // =============================================================================
 
 TEST_CASE("GridLayout place: single widget at origin", "[grid_layout][placement]") {
-    GridLayout grid(0); // TINY 4x3
+    GridLayout grid(0); // TINY 6x4
     REQUIRE(grid.place({"widget_a", 0, 0, 2, 1}));
     REQUIRE(grid.placements().size() == 1);
     CHECK(grid.placements()[0].widget_id == "widget_a");
@@ -123,8 +123,8 @@ TEST_CASE("GridLayout place: multiple non-overlapping widgets", "[grid_layout][p
 }
 
 TEST_CASE("GridLayout place: widget filling entire grid", "[grid_layout][placement]") {
-    GridLayout grid(0); // TINY 4x3
-    REQUIRE(grid.place({"full", 0, 0, 4, 3}));
+    GridLayout grid(0); // TINY 6x4
+    REQUIRE(grid.place({"full", 0, 0, 6, 4}));
     CHECK(grid.placements().size() == 1);
 }
 
@@ -150,7 +150,7 @@ TEST_CASE("GridLayout place: rejects overlapping placements", "[grid_layout][col
 }
 
 TEST_CASE("GridLayout can_place: returns false for occupied cells", "[grid_layout][collision]") {
-    GridLayout grid(0); // TINY 4x3
+    GridLayout grid(0); // TINY 6x4
     grid.place({"w1", 0, 0, 2, 2});
 
     CHECK_FALSE(grid.can_place(0, 0, 1, 1));
@@ -164,13 +164,13 @@ TEST_CASE("GridLayout can_place: returns false for occupied cells", "[grid_layou
 // =============================================================================
 
 TEST_CASE("GridLayout place: rejects out-of-bounds placements", "[grid_layout][bounds]") {
-    GridLayout grid(0); // TINY 4x3
+    GridLayout grid(0); // TINY 6x4
 
     // Exceeds columns
-    CHECK_FALSE(grid.place({"oob1", 3, 0, 2, 1})); // col 3 + span 2 = 5 > 4
+    CHECK_FALSE(grid.place({"oob1", 5, 0, 2, 1})); // col 5 + span 2 = 7 > 6
 
     // Exceeds rows
-    CHECK_FALSE(grid.place({"oob2", 0, 2, 1, 2})); // row 2 + span 2 = 4 > 3
+    CHECK_FALSE(grid.place({"oob2", 0, 3, 1, 2})); // row 3 + span 2 = 5 > 4
 
     // Negative position
     CHECK_FALSE(grid.place({"oob3", -1, 0, 1, 1}));
@@ -180,7 +180,7 @@ TEST_CASE("GridLayout place: rejects out-of-bounds placements", "[grid_layout][b
     CHECK_FALSE(grid.place({"oob5", 0, 0, 1, 0}));
 
     // Exactly at boundary — should succeed
-    CHECK(grid.place({"edge", 3, 2, 1, 1}));
+    CHECK(grid.place({"edge", 5, 3, 1, 1}));
 }
 
 // =============================================================================
@@ -188,7 +188,7 @@ TEST_CASE("GridLayout place: rejects out-of-bounds placements", "[grid_layout][b
 // =============================================================================
 
 TEST_CASE("GridLayout find_available: finds first open position", "[grid_layout][find]") {
-    GridLayout grid(0); // TINY 4x3
+    GridLayout grid(0); // TINY 6x4
     grid.place({"w1", 0, 0, 2, 1});
 
     auto pos = grid.find_available(2, 1);
@@ -213,12 +213,12 @@ TEST_CASE("GridLayout find_available: scans top-to-bottom, left-to-right", "[gri
 }
 
 TEST_CASE("GridLayout find_available: returns nullopt when no space", "[grid_layout][find]") {
-    GridLayout grid(0); // TINY 4x3
+    GridLayout grid(0); // TINY 6x4
 
     // Fill the entire grid with 1x1 widgets
     int id = 0;
-    for (int r = 0; r < 3; ++r) {
-        for (int c = 0; c < 4; ++c) {
+    for (int r = 0; r < 4; ++r) {
+        for (int c = 0; c < 6; ++c) {
             REQUIRE(grid.place({"fill_" + std::to_string(id++), c, r, 1, 1}));
         }
     }
@@ -251,7 +251,7 @@ TEST_CASE("GridLayout find_available: large widget in fragmented grid", "[grid_l
 // =============================================================================
 
 TEST_CASE("GridLayout remove: removes existing widget", "[grid_layout][remove]") {
-    GridLayout grid(0); // TINY 4x3
+    GridLayout grid(0); // TINY 6x4
     grid.place({"w1", 0, 0, 2, 2});
     grid.place({"w2", 2, 0, 2, 2});
 
@@ -273,14 +273,14 @@ TEST_CASE("GridLayout remove: returns false for nonexistent widget", "[grid_layo
 // =============================================================================
 
 TEST_CASE("GridLayout clear: removes all placements", "[grid_layout][clear]") {
-    GridLayout grid(0); // TINY 4x3
+    GridLayout grid(0); // TINY 6x4
     grid.place({"w1", 0, 0, 1, 1});
     grid.place({"w2", 1, 0, 1, 1});
     REQUIRE(grid.placements().size() == 2);
 
     grid.clear();
     CHECK(grid.placements().empty());
-    CHECK(grid.can_place(0, 0, 4, 3)); // full grid available
+    CHECK(grid.can_place(0, 0, 6, 4)); // full grid available
 }
 
 // =============================================================================
@@ -290,13 +290,13 @@ TEST_CASE("GridLayout clear: removes all placements", "[grid_layout][clear]") {
 TEST_CASE("GridLayout filter_for_breakpoint: separates fitting vs non-fitting",
           "[grid_layout][filter]") {
     std::vector<GridPlacement> all = {
-        {"fits_1", 0, 0, 2, 2},   // fits in 4x3
-        {"fits_2", 2, 0, 2, 1},   // fits in 4x3
-        {"too_wide", 0, 0, 5, 1}, // needs 5 cols, TINY has 4
-        {"too_tall", 0, 0, 1, 4}, // needs 4 rows, TINY has 3
+        {"fits_1", 0, 0, 2, 2},   // fits in 6x4
+        {"fits_2", 2, 0, 2, 1},   // fits in 6x4
+        {"too_wide", 0, 0, 7, 1}, // needs 7 cols, TINY has 6
+        {"too_tall", 0, 0, 1, 5}, // needs 5 rows, TINY has 4
     };
 
-    auto [fits, no_fit] = GridLayout::filter_for_breakpoint(0, all); // TINY 4x3
+    auto [fits, no_fit] = GridLayout::filter_for_breakpoint(0, all); // TINY 6x4
 
     REQUIRE(fits.size() == 2);
     REQUIRE(no_fit.size() == 2);
@@ -322,19 +322,19 @@ TEST_CASE("GridLayout filter_for_breakpoint: all fit in LARGE", "[grid_layout][f
 // Breakpoint transition scenarios
 // =============================================================================
 
-TEST_CASE("GridLayout breakpoint transition: 6x4 placement does not fit in TINY",
+TEST_CASE("GridLayout breakpoint transition: 8x5 placement does not fit in TINY",
           "[grid_layout][transition]") {
-    // A widget placed at col 5 in a 6-col (SMALL) grid should not fit in TINY (4-col)
+    // A widget placed at col 7 in an 8-col (LARGE) grid should not fit in TINY (6-col)
     std::vector<GridPlacement> placements = {
-        {"corner", 5, 3, 1, 1}, // col 5 + span 1 = 6, TINY only has 4 cols
+        {"corner", 7, 4, 1, 1}, // col 7 + span 1 = 8, TINY only has 6 cols; row 4 + 1 = 5 > 4
     };
 
-    auto [fits, no_fit] = GridLayout::filter_for_breakpoint(0, placements); // TINY
+    auto [fits, no_fit] = GridLayout::filter_for_breakpoint(0, placements); // TINY 6x4
     CHECK(fits.empty());
     CHECK(no_fit.size() == 1);
 
-    // Same placement fits in SMALL (6x4)
-    auto [fits2, no_fit2] = GridLayout::filter_for_breakpoint(1, placements);
+    // Same placement fits in LARGE (8x5)
+    auto [fits2, no_fit2] = GridLayout::filter_for_breakpoint(3, placements);
     CHECK(fits2.size() == 1);
     CHECK(no_fit2.empty());
 }
