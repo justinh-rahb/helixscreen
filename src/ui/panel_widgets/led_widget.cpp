@@ -85,13 +85,6 @@ void LedWidget::detach() {
 }
 
 void LedWidget::handle_light_toggle() {
-    // Suppress click that follows a long-press gesture
-    if (light_long_pressed_) {
-        light_long_pressed_ = false;
-        spdlog::debug("[LedWidget] Light click suppressed (follows long-press)");
-        return;
-    }
-
     spdlog::info("[LedWidget] Light button clicked");
 
     auto& led_ctrl = helix::led::LedController::instance();
@@ -113,8 +106,8 @@ void LedWidget::handle_light_toggle() {
     }
 }
 
-void LedWidget::handle_light_long_press() {
-    spdlog::info("[LedWidget] Light long-press: opening LED control overlay");
+void LedWidget::handle_light_double_click() {
+    spdlog::info("[LedWidget] Light double-click: opening LED control overlay");
 
     // Lazy-create overlay on first access
     if (!led_control_panel_ && parent_screen_) {
@@ -136,7 +129,6 @@ void LedWidget::handle_light_long_press() {
     }
 
     if (led_control_panel_) {
-        light_long_pressed_ = true; // Suppress the click that follows long-press
         get_led_control_overlay().set_api(api_);
         NavigationManager::instance().push_overlay(led_control_panel_);
     }
@@ -261,14 +253,14 @@ void LedWidget::light_toggle_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void LedWidget::light_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[LedWidget] light_long_press_cb");
+void LedWidget::light_double_click_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[LedWidget] light_double_click_cb");
     auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
     auto* self = static_cast<LedWidget*>(lv_obj_get_user_data(target));
     if (self) {
-        self->handle_light_long_press();
+        self->handle_light_double_click();
     } else {
-        spdlog::warn("[LedWidget] light_long_press_cb: could not recover widget instance");
+        spdlog::warn("[LedWidget] light_double_click_cb: could not recover widget instance");
     }
     LVGL_SAFE_EVENT_CB_END();
 }

@@ -125,7 +125,7 @@ void HomePanel::init_subjects() {
     // Register event callbacks BEFORE loading XML
     register_xml_callbacks({
         {"light_toggle_cb", light_toggle_cb},
-        {"light_long_press_cb", light_long_press_cb},
+        {"light_double_click_cb", light_double_click_cb},
         {"power_toggle_cb", power_toggle_cb},
         {"power_long_press_cb", power_long_press_cb},
         {"temp_clicked_cb", temp_clicked_cb},
@@ -133,13 +133,13 @@ void HomePanel::init_subjects() {
         {"network_clicked_cb", network_clicked_cb},
         {"ams_clicked_cb", ams_clicked_cb},
         {"on_fan_stack_clicked", helix::FanStackWidget::on_fan_stack_clicked},
-        {"fan_stack_long_press_cb", helix::FanStackWidget::fan_stack_long_press_cb},
-        {"fan_carousel_long_press_cb", helix::FanStackWidget::fan_carousel_long_press_cb},
+        {"fan_stack_double_click_cb", helix::FanStackWidget::fan_stack_double_click_cb},
+        {"fan_carousel_double_click_cb", helix::FanStackWidget::fan_carousel_double_click_cb},
         {"temp_stack_nozzle_cb", helix::TempStackWidget::temp_stack_nozzle_cb},
         {"temp_stack_bed_cb", helix::TempStackWidget::temp_stack_bed_cb},
         {"temp_stack_chamber_cb", helix::TempStackWidget::temp_stack_chamber_cb},
-        {"temp_stack_long_press_cb", helix::TempStackWidget::temp_stack_long_press_cb},
-        {"temp_carousel_long_press_cb", helix::TempStackWidget::temp_carousel_long_press_cb},
+        {"temp_stack_double_click_cb", helix::TempStackWidget::temp_stack_double_click_cb},
+        {"temp_carousel_double_click_cb", helix::TempStackWidget::temp_carousel_double_click_cb},
         {"temp_carousel_page_cb", helix::TempStackWidget::temp_carousel_page_cb},
         {"thermistor_clicked_cb", helix::ThermistorWidget::thermistor_clicked_cb},
         {"thermistor_picker_backdrop_cb", helix::ThermistorWidget::thermistor_picker_backdrop_cb},
@@ -368,13 +368,6 @@ void HomePanel::detect_network_type() {
 }
 
 void HomePanel::handle_light_toggle() {
-    // Suppress click that follows a long-press gesture
-    if (light_long_pressed_) {
-        light_long_pressed_ = false;
-        spdlog::debug("[{}] Light click suppressed (follows long-press)", get_name());
-        return;
-    }
-
     spdlog::info("[{}] Light button clicked", get_name());
 
     auto& led_ctrl = helix::led::LedController::instance();
@@ -396,8 +389,8 @@ void HomePanel::handle_light_toggle() {
     }
 }
 
-void HomePanel::handle_light_long_press() {
-    spdlog::info("[{}] Light long-press: opening LED control overlay", get_name());
+void HomePanel::handle_light_double_click() {
+    spdlog::info("[{}] Light double-click: opening LED control overlay", get_name());
 
     // Lazy-create overlay on first access
     if (!led_control_panel_ && parent_screen_) {
@@ -419,7 +412,6 @@ void HomePanel::handle_light_long_press() {
     }
 
     if (led_control_panel_) {
-        light_long_pressed_ = true; // Suppress the click that follows long-press
         get_led_control_overlay().set_api(api_);
         NavigationManager::instance().push_overlay(led_control_panel_);
     }
@@ -875,11 +867,11 @@ void HomePanel::light_toggle_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void HomePanel::light_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[HomePanel] light_long_press_cb");
+void HomePanel::light_double_click_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[HomePanel] light_double_click_cb");
     (void)e;
     extern HomePanel& get_global_home_panel();
-    get_global_home_panel().handle_light_long_press();
+    get_global_home_panel().handle_light_double_click();
     LVGL_SAFE_EVENT_CB_END();
 }
 

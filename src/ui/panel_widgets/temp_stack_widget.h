@@ -53,9 +53,6 @@ class TempStackWidget : public PanelWidget {
 
     std::shared_ptr<bool> alive_ = std::make_shared<bool>(false);
 
-    // Long-press click suppression flag
-    bool long_pressed_ = false;
-
     // Observers
     ObserverGuard nozzle_temp_observer_;
     ObserverGuard nozzle_target_observer_;
@@ -82,9 +79,9 @@ class TempStackWidget : public PanelWidget {
     static void temp_stack_bed_cb(lv_event_t* e);
     static void temp_stack_chamber_cb(lv_event_t* e);
 
-    // Long-press callbacks for toggling display mode
-    static void temp_stack_long_press_cb(lv_event_t* e);
-    static void temp_carousel_long_press_cb(lv_event_t* e);
+    // Double-click callbacks for toggling display mode
+    static void temp_stack_double_click_cb(lv_event_t* e);
+    static void temp_carousel_double_click_cb(lv_event_t* e);
 
     // Carousel page click callback
     static void temp_carousel_page_cb(lv_event_t* e);

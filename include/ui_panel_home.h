@@ -93,7 +93,7 @@ class HomePanel : public PanelBase {
     // Transition: widget callbacks delegate to these HomePanel handlers.
     // These will move into widget classes once HomePanel code is removed.
     void handle_light_toggle();
-    void handle_light_long_press();
+    void handle_light_double_click();
     void handle_power_toggle();
     void handle_power_long_press();
     void handle_temp_clicked();
@@ -107,7 +107,6 @@ class HomePanel : public PanelBase {
     TempControlPanel* temp_control_panel_ = nullptr;
 
     bool light_on_ = false;
-    bool light_long_pressed_ = false; // Suppress click after long-press
     bool power_on_ = false;           // Tracks power state for icon
     bool power_long_pressed_ = false; // Suppress click after long-press for power button
     bool populating_widgets_ = false; // Reentrancy guard for populate_widgets()
@@ -145,7 +144,7 @@ class HomePanel : public PanelBase {
     void refresh_power_state(); // Query API to sync icon with actual device state
 
     static void light_toggle_cb(lv_event_t* e);
-    static void light_long_press_cb(lv_event_t* e);
+    static void light_double_click_cb(lv_event_t* e);
     static void power_toggle_cb(lv_event_t* e);
     static void power_long_press_cb(lv_event_t* e);
     static void temp_clicked_cb(lv_event_t* e);

@@ -39,14 +39,14 @@ helix::PanelWidgetConfig& get_widget_config_ref() {
     config.load();
     return config;
 }
-// Recursively add long-press handler to all descendants of an LVGL object
-static void add_long_press_recursive(lv_obj_t* obj, lv_event_cb_t cb, void* user_data) {
+// Recursively add double-click handler to all descendants of an LVGL object
+static void add_double_click_recursive(lv_obj_t* obj, lv_event_cb_t cb, void* user_data) {
     if (!obj)
         return;
-    lv_obj_add_event_cb(obj, cb, LV_EVENT_LONG_PRESSED, user_data);
+    lv_obj_add_event_cb(obj, cb, LV_EVENT_DOUBLE_CLICKED, user_data);
     uint32_t count = lv_obj_get_child_count(obj);
     for (uint32_t i = 0; i < count; i++) {
-        add_long_press_recursive(lv_obj_get_child(obj, i), cb, user_data);
+        add_double_click_recursive(lv_obj_get_child(obj, i), cb, user_data);
     }
 }
 
@@ -194,9 +194,9 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
         lv_obj_add_flag(page, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_name(page, page_name);
 
-        // Click callback to open temp overlay; long-press to toggle mode
+        // Click callback to open temp overlay; double-click to toggle mode
         lv_obj_add_event_cb(page, temp_carousel_page_cb, LV_EVENT_CLICKED, nullptr);
-        lv_obj_add_event_cb(page, temp_carousel_long_press_cb, LV_EVENT_LONG_PRESSED, nullptr);
+        lv_obj_add_event_cb(page, temp_carousel_double_click_cb, LV_EVENT_DOUBLE_CLICKED, nullptr);
 
         // Icon
         const char* icon_attrs[] = {"src",       icon_src, "size",    "sm",   "variant",
@@ -228,7 +228,8 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
     lv_obj_add_flag(nozzle_page, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_name(nozzle_page, "nozzle");
     lv_obj_add_event_cb(nozzle_page, temp_carousel_page_cb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_add_event_cb(nozzle_page, temp_carousel_long_press_cb, LV_EVENT_LONG_PRESSED, nullptr);
+    lv_obj_add_event_cb(nozzle_page, temp_carousel_double_click_cb, LV_EVENT_DOUBLE_CLICKED,
+                        nullptr);
 
     const char* nozzle_icon_attrs[] = {
         "size", "sm", "badge_subject", "", "name", "carousel_nozzle_icon", nullptr};
@@ -388,12 +389,6 @@ void TempStackWidget::on_bed_target_changed(int target_centi) {
 }
 
 void TempStackWidget::handle_nozzle_clicked() {
-    if (long_pressed_) {
-        long_pressed_ = false;
-        spdlog::debug("[TempStackWidget] Nozzle click suppressed (follows long-press)");
-        return;
-    }
-
     spdlog::info("[TempStackWidget] Nozzle clicked - opening nozzle temp panel");
 
     if (!temp_control_panel_) {
@@ -424,12 +419,6 @@ void TempStackWidget::handle_nozzle_clicked() {
 }
 
 void TempStackWidget::handle_bed_clicked() {
-    if (long_pressed_) {
-        long_pressed_ = false;
-        spdlog::debug("[TempStackWidget] Bed click suppressed (follows long-press)");
-        return;
-    }
-
     spdlog::info("[TempStackWidget] Bed clicked - opening bed temp panel");
 
     if (!temp_control_panel_) {
@@ -460,12 +449,6 @@ void TempStackWidget::handle_bed_clicked() {
 }
 
 void TempStackWidget::handle_chamber_clicked() {
-    if (long_pressed_) {
-        long_pressed_ = false;
-        spdlog::debug("[TempStackWidget] Chamber click suppressed (follows long-press)");
-        return;
-    }
-
     spdlog::info("[TempStackWidget] Chamber clicked - opening chamber temp panel");
 
     if (!temp_control_panel_) {
@@ -522,21 +505,19 @@ void TempStackWidget::temp_stack_chamber_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void TempStackWidget::temp_stack_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_stack_long_press_cb");
+void TempStackWidget::temp_stack_double_click_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_stack_double_click_cb");
     (void)e;
     if (s_active_instance) {
-        s_active_instance->long_pressed_ = true;
         s_active_instance->toggle_display_mode();
     }
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void TempStackWidget::temp_carousel_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_carousel_long_press_cb");
+void TempStackWidget::temp_carousel_double_click_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_carousel_double_click_cb");
     (void)e;
     if (s_active_instance) {
-        s_active_instance->long_pressed_ = true;
         s_active_instance->toggle_display_mode();
     }
     LVGL_SAFE_EVENT_CB_END();
@@ -545,20 +526,15 @@ void TempStackWidget::temp_carousel_long_press_cb(lv_event_t* e) {
 void TempStackWidget::temp_carousel_page_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_carousel_page_cb");
     if (s_active_instance) {
-        if (s_active_instance->long_pressed_) {
-            s_active_instance->long_pressed_ = false;
-            spdlog::debug("[TempStackWidget] Carousel page click suppressed (follows long-press)");
-        } else {
-            auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-            const char* page_id = lv_obj_get_name(target);
-            if (page_id) {
-                if (std::strcmp(page_id, "nozzle") == 0) {
-                    s_active_instance->handle_nozzle_clicked();
-                } else if (std::strcmp(page_id, "bed") == 0) {
-                    s_active_instance->handle_bed_clicked();
-                } else if (std::strcmp(page_id, "chamber") == 0) {
-                    s_active_instance->handle_chamber_clicked();
-                }
+        auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+        const char* page_id = lv_obj_get_name(target);
+        if (page_id) {
+            if (std::strcmp(page_id, "nozzle") == 0) {
+                s_active_instance->handle_nozzle_clicked();
+            } else if (std::strcmp(page_id, "bed") == 0) {
+                s_active_instance->handle_bed_clicked();
+            } else if (std::strcmp(page_id, "chamber") == 0) {
+                s_active_instance->handle_chamber_clicked();
             }
         }
     }

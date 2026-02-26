@@ -30,19 +30,19 @@
 
 namespace {
 
-// Recursively add long-press handler to all descendants of an LVGL object,
-// skipping lv_arc widgets (dragging the arc knob must not trigger mode toggle)
-static void add_long_press_recursive(lv_obj_t* obj, lv_event_cb_t cb, void* user_data) {
+// Recursively add double-click handler to all descendants of an LVGL object,
+// skipping lv_arc widgets (interacting with the arc knob must not trigger mode toggle)
+static void add_double_click_recursive(lv_obj_t* obj, lv_event_cb_t cb, void* user_data) {
     if (!obj)
         return;
-    // Skip arc widgets — long-press on the knob is part of normal arc interaction
+    // Skip arc widgets — interactions on the knob are part of normal arc behavior
     if (lv_obj_check_type(obj, &lv_arc_class)) {
         return;
     }
-    lv_obj_add_event_cb(obj, cb, LV_EVENT_LONG_PRESSED, user_data);
+    lv_obj_add_event_cb(obj, cb, LV_EVENT_DOUBLE_CLICKED, user_data);
     uint32_t count = lv_obj_get_child_count(obj);
     for (uint32_t i = 0; i < count; i++) {
-        add_long_press_recursive(lv_obj_get_child(obj, i), cb, user_data);
+        add_double_click_recursive(lv_obj_get_child(obj, i), cb, user_data);
     }
 }
 
@@ -501,8 +501,8 @@ void FanStackWidget::bind_carousel_fans() {
             carousel_observers_.push_back(std::move(obs));
         }
 
-        // Wire long-press on all FanDial descendants so mode toggle works
-        add_long_press_recursive(root, carousel_dial_long_press_cb, this);
+        // Wire double-click on all FanDial descendants so mode toggle works
+        add_double_click_recursive(root, carousel_dial_double_click_cb, this);
 
         fan_dials_.push_back(std::move(dial));
     }
@@ -550,12 +550,6 @@ void FanStackWidget::start_spin(lv_obj_t* icon, int speed_pct) {
 }
 
 void FanStackWidget::handle_clicked() {
-    if (long_pressed_) {
-        long_pressed_ = false;
-        spdlog::debug("[FanStackWidget] Click suppressed (follows long-press)");
-        return;
-    }
-
     spdlog::debug("[FanStackWidget] Clicked - opening fan control overlay");
 
     if (!fan_control_panel_ && parent_screen_) {
@@ -593,8 +587,8 @@ void FanStackWidget::on_fan_stack_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void FanStackWidget::fan_stack_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] fan_stack_long_press_cb");
+void FanStackWidget::fan_stack_double_click_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] fan_stack_double_click_cb");
     auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
     auto* self = static_cast<FanStackWidget*>(lv_obj_get_user_data(target));
     if (!self) {
@@ -605,14 +599,13 @@ void FanStackWidget::fan_stack_long_press_cb(lv_event_t* e) {
         }
     }
     if (self) {
-        self->long_pressed_ = true;
         self->toggle_display_mode();
     }
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void FanStackWidget::fan_carousel_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] fan_carousel_long_press_cb");
+void FanStackWidget::fan_carousel_double_click_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] fan_carousel_double_click_cb");
     auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
     auto* self = static_cast<FanStackWidget*>(lv_obj_get_user_data(target));
     if (!self) {
@@ -623,17 +616,15 @@ void FanStackWidget::fan_carousel_long_press_cb(lv_event_t* e) {
         }
     }
     if (self) {
-        self->long_pressed_ = true;
         self->toggle_display_mode();
     }
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void FanStackWidget::carousel_dial_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] carousel_dial_long_press_cb");
+void FanStackWidget::carousel_dial_double_click_cb(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] carousel_dial_double_click_cb");
     auto* self = static_cast<FanStackWidget*>(lv_event_get_user_data(e));
     if (self && self->widget_obj_) {
-        self->long_pressed_ = true;
         self->toggle_display_mode();
     }
     LVGL_SAFE_EVENT_CB_END();
