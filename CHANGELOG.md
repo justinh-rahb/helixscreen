@@ -5,6 +5,25 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.4] - 2026-02-25
+
+### Added
+- BMP and GIF format support for custom printer images
+- Invalid custom printer images shown as disabled with lazy import and instant gallery refresh
+- In-process fbdev display fallback when DRM initialization fails (no restart needed)
+- Top-level exception handler prevents unhandled crashes from silently terminating the application
+
+### Fixed
+- SonicPad Goodix (gt9xxnew_ts) touchscreen now triggers calibration wizard when kernel reports zero ABS ranges
+- DRM backend no longer falls back to `/dev/dri/card0` when no suitable DRM device exists
+- Fan carousel arc thumb disabled on auto-controlled fans that don't accept manual speed changes
+- Observer cleanup ordering hardened to prevent cascading use-after-free during shutdown
+- Thread safety and crash telemetry improvements across observer guards and lifecycle management
+
+### Changed
+- Macro search resolves only active include-chain config files, improving performance on large configurations
+- Touch calibration and wizard skip decisions promoted to info-level logging for easier diagnostics
+
 ## [0.13.3] - 2026-02-25
 
 ### Added
@@ -1141,6 +1160,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.4]: https://github.com/prestonbrown/helixscreen/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/prestonbrown/helixscreen/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/prestonbrown/helixscreen/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/prestonbrown/helixscreen/compare/v0.13.0...v0.13.1
