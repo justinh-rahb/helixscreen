@@ -209,8 +209,9 @@ void HomePanel::on_activate() {
 }
 
 void HomePanel::on_deactivate() {
-    // Exit grid edit mode if active (prevents stale state on panel switch)
-    if (grid_edit_mode_.is_active()) {
+    // Exit grid edit mode if active, UNLESS the widget catalog overlay is open
+    // (push_overlay triggers on_deactivate, but edit mode must survive)
+    if (grid_edit_mode_.is_active() && !grid_edit_mode_.is_catalog_open()) {
         grid_edit_mode_.exit();
     }
 

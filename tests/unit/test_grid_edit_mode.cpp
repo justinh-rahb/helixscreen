@@ -1165,3 +1165,20 @@ TEST_CASE("Drag end uses snap preview position, not release point", "[grid_edit]
     int no_preview_row = -1;
     CHECK_FALSE((no_preview_col >= 0 && no_preview_row >= 0));
 }
+
+// ============================================================================
+// Widget Catalog: catalog_open flag
+// ============================================================================
+
+TEST_CASE("GridEditMode: catalog_open starts false", "[grid_edit][catalog]") {
+    GridEditMode em;
+    REQUIRE_FALSE(em.is_catalog_open());
+}
+
+TEST_CASE("GridEditMode: catalog_open flag not affected by enter/exit", "[grid_edit][catalog]") {
+    GridEditMode em;
+    em.enter(nullptr, nullptr);
+    REQUIRE_FALSE(em.is_catalog_open());
+    em.exit();
+    REQUIRE_FALSE(em.is_catalog_open());
+}

@@ -26,15 +26,21 @@ namespace {
 struct CatalogState {
     lv_obj_t* overlay_root = nullptr;
     WidgetSelectedCallback on_select;
+    CatalogClosedCallback on_close;
 };
 
 CatalogState g_catalog_state;
 
 void close_catalog() {
     if (g_catalog_state.overlay_root) {
+        auto on_close = std::move(g_catalog_state.on_close);
         NavigationManager::instance().go_back();
         g_catalog_state.overlay_root = nullptr;
         g_catalog_state.on_select = nullptr;
+        g_catalog_state.on_close = nullptr;
+        if (on_close) {
+            on_close();
+        }
     }
 }
 
@@ -171,7 +177,7 @@ void WidgetCatalogOverlay::populate_rows(lv_obj_t* scroll, const PanelWidgetConf
 // ============================================================================
 
 void WidgetCatalogOverlay::show(lv_obj_t* parent_screen, const PanelWidgetConfig& config,
-                                WidgetSelectedCallback on_select) {
+                                WidgetSelectedCallback on_select, CatalogClosedCallback on_close) {
     if (g_catalog_state.overlay_root) {
         spdlog::warn("[WidgetCatalog] Already open, ignoring duplicate show()");
         return;
@@ -191,6 +197,22 @@ void WidgetCatalogOverlay::show(lv_obj_t* parent_screen, const PanelWidgetConfig
     // Store state
     g_catalog_state.overlay_root = overlay;
     g_catalog_state.on_select = std::move(on_select);
+    g_catalog_state.on_close = std::move(on_close);
+
+    // DELETE cleanup exception: detect when NavigationManager pops the overlay
+    // without going through close_catalog() (e.g., system back navigation)
+    lv_obj_add_event_cb(
+        overlay,
+        [](lv_event_t* /*e*/) {
+            auto on_close_cb = std::move(g_catalog_state.on_close);
+            g_catalog_state.overlay_root = nullptr;
+            g_catalog_state.on_select = nullptr;
+            g_catalog_state.on_close = nullptr;
+            if (on_close_cb) {
+                on_close_cb();
+            }
+        },
+        LV_EVENT_DELETE, nullptr);
 
     // Find scroll container and populate
     lv_obj_t* scroll = lv_obj_find_by_name(overlay, "catalog_scroll");

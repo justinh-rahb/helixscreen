@@ -37,6 +37,11 @@ class GridEditMode {
         return active_;
     }
 
+    /// True when the widget catalog overlay is open (suppresses deactivate exit)
+    bool is_catalog_open() const {
+        return catalog_open_;
+    }
+
     void set_save_callback(SaveCallback cb) {
         save_cb_ = std::move(cb);
     }
@@ -145,6 +150,10 @@ class GridEditMode {
     // Widget catalog placement: grid cell where the long-press originated
     int catalog_origin_col_ = -1;
     int catalog_origin_row_ = -1;
+
+    // Set while the widget catalog overlay is open to prevent
+    // on_deactivate → exit() from killing edit mode state.
+    bool catalog_open_ = false;
 };
 
 } // namespace helix

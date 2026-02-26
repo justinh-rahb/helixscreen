@@ -1484,9 +1484,11 @@ void GridEditMode::open_widget_catalog(lv_obj_t* screen) {
     spdlog::info("[GridEditMode] Opening widget catalog (origin cell: {}, {})", catalog_origin_col_,
                  catalog_origin_row_);
 
-    WidgetCatalogOverlay::show(screen, *config_, [this](const std::string& widget_id) {
-        place_widget_from_catalog(widget_id);
-    });
+    catalog_open_ = true;
+    WidgetCatalogOverlay::show(
+        screen, *config_,
+        [this](const std::string& widget_id) { place_widget_from_catalog(widget_id); },
+        [this]() { catalog_open_ = false; });
 }
 
 void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {

@@ -15,6 +15,9 @@ class PanelWidgetConfig;
 /// Receives the widget definition ID (e.g. "temperature", "network").
 using WidgetSelectedCallback = std::function<void(const std::string& widget_id)>;
 
+/// Callback invoked when the catalog overlay is closed (selection or back navigation).
+using CatalogClosedCallback = std::function<void()>;
+
 /// Shows a half-width overlay listing available widgets for grid placement.
 /// Widgets already placed are shown dimmed with a "Placed" badge.
 /// On selection, the callback fires and the overlay closes itself.
@@ -24,8 +27,9 @@ class WidgetCatalogOverlay {
     /// @param parent_screen  Screen to parent the overlay on
     /// @param config         Current widget config (to determine which are already placed)
     /// @param on_select      Called with the chosen widget ID when user taps a row
+    /// @param on_close       Called when the overlay is closed for any reason
     static void show(lv_obj_t* parent_screen, const PanelWidgetConfig& config,
-                     WidgetSelectedCallback on_select);
+                     WidgetSelectedCallback on_select, CatalogClosedCallback on_close = nullptr);
 
   private:
     /// Populate the scroll container with one row per registered widget
