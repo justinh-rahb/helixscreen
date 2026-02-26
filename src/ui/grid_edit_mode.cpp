@@ -3,6 +3,7 @@
 #include "grid_edit_mode.h"
 
 #include "ui_fonts.h"
+#include "ui_widget_catalog_overlay.h"
 
 #include "app_globals.h"
 #include "grid_layout.h"
@@ -388,9 +389,46 @@ bool GridEditMode::is_selected_widget_resizable() const {
 // ---------------------------------------------------------------------------
 
 void GridEditMode::handle_long_press(lv_event_t* e) {
-    if (!active_ || !container_ || !selected_) {
+    if (!active_ || !container_) {
         return;
     }
+
+    // If no widget is selected, check if the long-press is on an empty area
+    if (!selected_) {
+        lv_indev_t* indev = lv_indev_active();
+        if (!indev) {
+            return;
+        }
+        lv_point_t point;
+        lv_indev_get_point(indev, &point);
+
+        // If the press lands on an empty area, open the widget catalog
+        if (!hit_test_any_widget(point.x, point.y)) {
+            // Compute which grid cell was pressed
+            lv_area_t content_area;
+            lv_obj_get_content_coords(container_, &content_area);
+            int cw = content_area.x2 - content_area.x1;
+            int ch = content_area.y2 - content_area.y1;
+
+            lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+            int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+            int ncols = GridLayout::get_cols(breakpoint);
+            int nrows = GridLayout::get_rows(breakpoint);
+
+            auto [col, row] = screen_to_grid_cell(point.x, point.y, content_area.x1,
+                                                  content_area.y1, cw, ch, ncols, nrows);
+            catalog_origin_col_ = col;
+            catalog_origin_row_ = row;
+
+            // Open the catalog — caller provides the parent screen
+            lv_obj_t* screen = lv_obj_get_screen(container_);
+            if (screen) {
+                open_widget_catalog(screen);
+            }
+        }
+        return;
+    }
+
     handle_drag_start(e);
 }
 
@@ -1076,6 +1114,144 @@ void GridEditMode::destroy_dots_overlay() {
     if (dots_overlay_) {
         lv_obj_delete(dots_overlay_);
         dots_overlay_ = nullptr;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hit-test: check if screen coordinates land on any grid widget
+// ---------------------------------------------------------------------------
+
+bool GridEditMode::hit_test_any_widget(int screen_x, int screen_y) const {
+    if (!container_) {
+        return false;
+    }
+    uint32_t child_count = lv_obj_get_child_count(container_);
+    for (uint32_t i = 0; i < child_count; ++i) {
+        lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(i));
+        if (!child) {
+            continue;
+        }
+        if (child == dots_overlay_ || child == selection_overlay_) {
+            continue;
+        }
+        if (child == drag_ghost_ || child == snap_preview_) {
+            continue;
+        }
+        if (lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
+            continue;
+        }
+        lv_area_t coords;
+        lv_obj_get_coords(child, &coords);
+        if (screen_x >= coords.x1 && screen_x <= coords.x2 && screen_y >= coords.y1 &&
+            screen_y <= coords.y2) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Widget catalog integration
+// ---------------------------------------------------------------------------
+
+void GridEditMode::open_widget_catalog(lv_obj_t* screen) {
+    if (!config_) {
+        spdlog::warn("[GridEditMode] Cannot open catalog: no config");
+        return;
+    }
+
+    spdlog::info("[GridEditMode] Opening widget catalog (origin cell: {}, {})", catalog_origin_col_,
+                 catalog_origin_row_);
+
+    WidgetCatalogOverlay::show(screen, *config_, [this](const std::string& widget_id) {
+        place_widget_from_catalog(widget_id);
+    });
+}
+
+void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
+    if (!config_ || !container_) {
+        spdlog::warn("[GridEditMode] place_widget_from_catalog: no config or container");
+        return;
+    }
+
+    const auto* def = find_widget_def(widget_id);
+    if (!def) {
+        spdlog::warn("[GridEditMode] Unknown widget ID: {}", widget_id);
+        return;
+    }
+
+    int colspan = def->colspan;
+    int rowspan = def->rowspan;
+
+    // Determine current breakpoint and build a temporary grid
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+
+    GridLayout temp_grid(breakpoint);
+    const auto& entries = config_->entries();
+    for (const auto& entry : entries) {
+        if (!entry.enabled || !entry.has_grid_position()) {
+            continue;
+        }
+        temp_grid.place({entry.id, entry.col, entry.row, entry.colspan, entry.rowspan});
+    }
+
+    int place_col = -1;
+    int place_row = -1;
+
+    // Try the catalog origin cell first
+    if (catalog_origin_col_ >= 0 && catalog_origin_row_ >= 0 &&
+        temp_grid.can_place(catalog_origin_col_, catalog_origin_row_, colspan, rowspan)) {
+        place_col = catalog_origin_col_;
+        place_row = catalog_origin_row_;
+    } else {
+        // Fall back to first available position
+        auto pos = temp_grid.find_available(colspan, rowspan);
+        if (pos) {
+            place_col = pos->first;
+            place_row = pos->second;
+        }
+    }
+
+    if (place_col < 0 || place_row < 0) {
+        spdlog::warn("[GridEditMode] No available grid position for widget '{}' ({}x{})", widget_id,
+                     colspan, rowspan);
+        return;
+    }
+
+    // Enable the widget in config with the computed grid position.
+    // Find the entry by ID — it should exist as disabled.
+    auto& mutable_entries = const_cast<std::vector<PanelWidgetEntry>&>(config_->entries());
+    bool found = false;
+    for (auto& entry : mutable_entries) {
+        if (entry.id == widget_id) {
+            entry.enabled = true;
+            entry.col = place_col;
+            entry.row = place_row;
+            entry.colspan = colspan;
+            entry.rowspan = rowspan;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        spdlog::warn("[GridEditMode] Widget '{}' not found in config entries", widget_id);
+        return;
+    }
+
+    spdlog::info("[GridEditMode] Placed widget '{}' at ({},{}) {}x{}", widget_id, place_col,
+                 place_row, colspan, rowspan);
+
+    // Reset catalog origin
+    catalog_origin_col_ = -1;
+    catalog_origin_row_ = -1;
+
+    // Deselect, save, and rebuild
+    select_widget(nullptr);
+    config_->save();
+    if (rebuild_cb_) {
+        rebuild_cb_();
     }
 }
 

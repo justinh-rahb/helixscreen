@@ -8,6 +8,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace helix {
 
@@ -60,6 +61,10 @@ class GridEditMode {
     void handle_pressing(lv_event_t* e);
     void handle_released(lv_event_t* e);
 
+    /// Open the widget catalog overlay for adding a new widget.
+    /// @param screen  The parent screen to host the overlay
+    void open_widget_catalog(lv_obj_t* screen);
+
     /// Map screen coordinates to grid cell (col, row). Clamps to valid range.
     static std::pair<int, int> screen_to_grid_cell(int screen_x, int screen_y, int container_x,
                                                    int container_y, int container_w,
@@ -97,6 +102,10 @@ class GridEditMode {
     void handle_resize_move(lv_event_t* e);
     void handle_resize_end(lv_event_t* e);
 
+    // Widget catalog placement
+    void place_widget_from_catalog(const std::string& widget_id);
+    bool hit_test_any_widget(int screen_x, int screen_y) const;
+
     bool active_ = false;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* dots_overlay_ = nullptr;
@@ -122,6 +131,10 @@ class GridEditMode {
     bool resizing_ = false;
     int resize_preview_colspan_ = -1;
     int resize_preview_rowspan_ = -1;
+
+    // Widget catalog placement: grid cell where the long-press originated
+    int catalog_origin_col_ = -1;
+    int catalog_origin_row_ = -1;
 };
 
 } // namespace helix
