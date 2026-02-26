@@ -565,6 +565,37 @@ Or set `HELIX_DEBUG_TOUCHES=1` in your environment for persistent debugging.
 
 Try different `rotate` values (0, 90, 180, 270) until touch aligns with visuals. Or remove the rotation config entirely and restart to re-trigger automatic detection (see "Display upside down or rotated" above).
 
+### Calibration doesn't help — touches still wildly off
+
+**Symptoms:**
+- Calibration wizard completes but touches still land far from where you tap
+- Accuracy varies wildly across different screen regions
+- Recalibrating multiple times doesn't improve things
+
+**Cause:**
+Some touchscreen controllers report X/Y axes that don't match the display orientation. The calibration math tries to compensate but produces a numerically unstable matrix — it technically "works" at the calibration points but falls apart everywhere else.
+
+This is common on devices where the touch controller is mounted at a different orientation than the display panel (e.g., some Sonic Pad configurations).
+
+**Solutions:**
+
+**1. Update to the latest version (recommended):**
+
+HelixScreen v0.9+ automatically detects swapped touch axes during calibration and corrects them. Update and recalibrate:
+```bash
+# Update HelixScreen, then recalibrate:
+# Settings > System > Recalibrate Touch
+```
+
+**2. Manual workaround (older versions):**
+
+Set the axis swap environment variable, then recalibrate:
+```bash
+# Add to your helixscreen.env:
+HELIX_TOUCH_SWAP_AXES=1
+```
+Then restart HelixScreen and run the calibration wizard again. The swap is applied before calibration, so the resulting matrix will be clean and stable.
+
 ---
 
 ## Print Issues
