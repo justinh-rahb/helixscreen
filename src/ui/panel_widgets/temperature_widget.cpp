@@ -25,6 +25,9 @@ void register_temperature_widget() {
         auto* tcp = PanelWidgetManager::instance().shared_resource<TempControlPanel>();
         return std::make_unique<TemperatureWidget>(ps, tcp);
     });
+
+    // Register XML event callbacks at startup (before any XML is parsed)
+    lv_xml_register_event_cb(nullptr, "temp_clicked_cb", TemperatureWidget::temp_clicked_cb);
 }
 } // namespace helix
 
@@ -49,9 +52,6 @@ void TemperatureWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     if (temp_btn_) {
         lv_obj_set_user_data(temp_btn_, this);
     }
-
-    // Register XML event callback
-    lv_xml_register_event_cb(nullptr, "temp_clicked_cb", temp_clicked_cb);
 
     // Set up temperature observers with alive guard
     using helix::ui::observe_int_sync;

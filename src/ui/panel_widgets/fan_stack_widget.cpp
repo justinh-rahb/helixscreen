@@ -60,6 +60,13 @@ void register_fan_stack_widget() {
         auto& ps = get_printer_state();
         return std::make_unique<FanStackWidget>(ps);
     });
+
+    // Register XML event callbacks at startup (before any XML is parsed)
+    lv_xml_register_event_cb(nullptr, "on_fan_stack_clicked", FanStackWidget::on_fan_stack_clicked);
+    lv_xml_register_event_cb(nullptr, "fan_stack_long_press_cb",
+                             FanStackWidget::fan_stack_long_press_cb);
+    lv_xml_register_event_cb(nullptr, "fan_carousel_long_press_cb",
+                             FanStackWidget::fan_carousel_long_press_cb);
 }
 } // namespace helix
 
@@ -94,11 +101,6 @@ void FanStackWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     parent_screen_ = parent_screen;
     *alive_ = true;
     lv_obj_set_user_data(widget_obj_, this);
-
-    // Register XML event callbacks
-    lv_xml_register_event_cb(nullptr, "on_fan_stack_clicked", on_fan_stack_clicked);
-    lv_xml_register_event_cb(nullptr, "fan_stack_long_press_cb", fan_stack_long_press_cb);
-    lv_xml_register_event_cb(nullptr, "fan_carousel_long_press_cb", fan_carousel_long_press_cb);
 
     if (is_carousel_mode()) {
         attach_carousel(widget_obj);
