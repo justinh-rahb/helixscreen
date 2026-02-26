@@ -86,11 +86,36 @@ Widgets that currently use long-press for "more" functionality must migrate to *
 
 Long-press is now globally reserved for edit mode entry on the home panel.
 
+## Default Grid Layout (6×4, MEDIUM breakpoint)
+
+```
+  Col 0    Col 1    Col 2    Col 3    Col 4    Col 5
++--------+--------+--------+--------+--------+--------+
+| Printer Image   | Tips (4×1)                         |  Row 0
+|  (2×2)          |                                    |
++                 +--------+--------+--------+--------+
+|                 |  (1×1 widgets, dynamic)             |  Row 1
++--------+--------+--------+--------+--------+--------+
+| Print Status    |  (1×1 widgets, dynamic)             |  Row 2
+|  (2×2)          |                                    |
++                 +--------+--------+--------+--------+
+|                 |  (1×1 widgets, dynamic)             |  Row 3
++--------+--------+--------+--------+--------+--------+
+```
+
+**Anchor widgets** (fixed positions): printer_image (0,0 2×2), print_status (0,2 2×2), tips (2,0 4×1).
+
+**1×1 widgets** are dynamically placed at populate time using **bottom-right-first packing**: free cells are scanned from (5,3) to (2,1), and widgets fill from the bottom-right corner upward. This ensures widgets cluster in the lower-right area and shift gracefully as hardware gates fire (adding/removing hardware-gated widgets).
+
 ## Config Persistence
 
 - Uses existing `PanelWidgetConfig` with grid coordinates (`col`, `row`, `colspan`, `rowspan`).
-- Changes saved on exit via `PanelWidgetConfig::save()`.
-- Triggers `PanelWidgetManager::notify_config_changed("home")` to rebuild the widget layout.
+- **Anchor widgets** always have explicit positions in config.
+- **1×1 widgets** start with no positions (`col=-1, row=-1`) and get positions computed dynamically at each `populate_widgets()` call.
+- Computed positions are written back to config entries **in-memory** after each populate.
+- Positions are persisted to disk when **edit mode is entered** (stabilization snapshot) and when **edit mode is exited** (save user changes).
+- Hardware gate observers trigger `populate_widgets()` on hardware discovery, causing dynamic re-packing as widgets appear/disappear.
+- There is no single "hardware discovery complete" signal — AMS, power devices, sensors, and LEDs all discover asynchronously via different paths.
 
 ## Key Files
 

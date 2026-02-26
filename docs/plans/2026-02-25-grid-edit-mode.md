@@ -12,6 +12,42 @@
 
 ---
 
+## Progress
+
+| Task | Status | Commit |
+|------|--------|--------|
+| Phase 1: Grid Infrastructure | DONE | `14da6f31` |
+| Phase 2: Widget Extraction (printer_image, print_status, tips) | DONE | `d51f0564` |
+| Task 1: GridEditMode Skeleton | DONE | `1b80edb2` |
+| Task 2: Navbar Done Button | DONE | `9e9d14a0` |
+| Task 3: Grid Dots Overlay | DONE | `ae3a7d30` |
+| Task 4: Widget Selection + Corner Brackets | DONE | `7f6e2a42` |
+| Task 5: Drag-to-Reposition | DONE | `1648d68d` |
+| Task 6: Drag-to-Resize | DONE | `49035091` |
+| Task 7: Widget Catalog Overlay | DONE | `84664673` |
+| Task 8: Double-Tap Migration | DONE | `36272c90` |
+| Task 9: Code Review Fixes | DONE | `1601228b` |
+| Dynamic bottom-right packing + config persistence | DONE | `4d50706e` |
+| Phase 5: Polish & Edge Cases | TODO | — |
+
+### Post-review architectural changes (session 2026-02-25)
+
+- **Dynamic placement**: 1×1 widgets no longer get positions at config-build time. Positions are computed dynamically at each `populate_widgets()` call using bottom-right-first packing.
+- **Config persistence**: Positions written back to config entries in-memory after each populate. Saved to disk on edit mode enter/exit only.
+- **Segfault fix**: Added `UpdateQueue::drain()` after widget detach in populate to prevent use-after-free from deferred observer callbacks.
+- **Default layout**: Only 3 anchor widgets (printer_image, print_status, tips) get fixed grid positions. All other widgets are auto-placed.
+
+### Remaining work
+
+- [ ] Settings entry "Customize Home Panel" (replaces current "Home Widgets" reorder list)
+- [ ] Breakpoint adaptation (widget clamping/hiding on smaller screens)
+- [ ] Per-widget config UIs (macro picker for macro grid, etc.)
+- [ ] New widget types (clock, camera, print stats, quick actions, print queue)
+- [ ] Animation/transition polish for edit mode enter/exit
+- [ ] Debounce timer fallback for saving positions (for users who never enter edit mode)
+
+---
+
 ## Task 1: GridEditMode Skeleton — State Machine + Enter/Exit
 
 Create the `GridEditMode` class with basic state management. No visuals yet — just the state transitions and integration with HomePanel.
