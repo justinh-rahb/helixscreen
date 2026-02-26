@@ -1005,11 +1005,13 @@ TEST_CASE_METHOD(PanelWidgetConfigFixture,
     const auto& defs = get_all_widget_defs();
     REQUIRE(grid.size() == defs.size());
 
-    // All enabled widgets should have grid positions
+    // Anchor widgets (printer_image, print_status, tips) get explicit grid positions.
+    // All other widgets get col=-1, row=-1 (auto-place).
+    const std::set<std::string> anchors = {"printer_image", "print_status", "tips"};
     for (const auto& entry : grid) {
         INFO("Widget " << entry.id << " enabled=" << entry.enabled << " col=" << entry.col
                        << " row=" << entry.row);
-        if (entry.enabled) {
+        if (anchors.count(entry.id)) {
             REQUIRE(entry.has_grid_position());
         } else {
             REQUIRE_FALSE(entry.has_grid_position());
@@ -1062,25 +1064,22 @@ TEST_CASE("PanelWidgetConfig: build_default_grid produces correct layout",
     REQUIRE(ps->colspan == 2);
     REQUIRE(ps->rowspan == 2);
 
-    // Tips: right of printer image, 3×1
+    // Tips: right of printer image, 4×1
     auto* tips = find_entry("tips");
     REQUIRE(tips);
     REQUIRE(tips->enabled);
     REQUIRE(tips->col == 2);
     REQUIRE(tips->row == 0);
-    REQUIRE(tips->colspan == 3);
+    REQUIRE(tips->colspan == 4);
     REQUIRE(tips->rowspan == 1);
 
-    // All default-enabled 1×1 widgets should be in the right side (cols 2-5, rows 1-3)
-    // Bottom rows fill first (3, 2), overflow goes to row 1
-    for (const auto& e : placed) {
-        if (e.id == "printer_image" || e.id == "print_status" || e.id == "tips")
+    // Non-anchor enabled widgets should NOT have grid positions (auto-placed at populate time)
+    const std::set<std::string> anchors = {"printer_image", "print_status", "tips"};
+    for (const auto& e : entries) {
+        if (anchors.count(e.id))
             continue;
         INFO("Widget " << e.id << " at (" << e.col << "," << e.row << ")");
-        REQUIRE(e.colspan == 1);
-        REQUIRE(e.rowspan == 1);
-        REQUIRE(e.col >= 2); // Right of the 2-wide fixed widgets
-        REQUIRE(e.row >= 1); // Below tips row, fills bottom-up
+        REQUIRE_FALSE(e.has_grid_position());
     }
 
     // Disabled widgets should have no grid position
@@ -1089,16 +1088,16 @@ TEST_CASE("PanelWidgetConfig: build_default_grid produces correct layout",
         REQUIRE_FALSE(e.has_grid_position());
     }
 
-    // fan_stack and notifications must be placed (they are default_enabled, no gate)
+    // fan_stack and notifications must be enabled (default_enabled, no gate) but NOT placed
     auto* fs = find_entry("fan_stack");
     REQUIRE(fs);
     REQUIRE(fs->enabled);
-    REQUIRE(fs->has_grid_position());
+    REQUIRE_FALSE(fs->has_grid_position());
 
     auto* notif = find_entry("notifications");
     REQUIRE(notif);
     REQUIRE(notif->enabled);
-    REQUIRE(notif->has_grid_position());
+    REQUIRE_FALSE(notif->has_grid_position());
 }
 
 TEST_CASE_METHOD(PanelWidgetConfigFixture, "PanelWidgetConfig: is_grid_format detects grid entries",

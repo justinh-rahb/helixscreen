@@ -208,10 +208,14 @@ void HomePanel::populate_widgets() {
         w->detach();
     }
 
+    // Flush any deferred observer callbacks that captured raw widget pointers.
+    // observe_int_sync / observe_string defer via ui_queue_update(), so lambdas
+    // may already be queued with a `self` pointer to a widget we're about to
+    // destroy.  Draining now ensures they run while the C++ objects still exist
+    // (detach() cleared widget_obj_ so the guards will skip the work).
+    helix::ui::UpdateQueue::instance().drain();
+
     // Destroy LVGL children BEFORE destroying C++ widget instances.
-    // Pending async_call callbacks capture widget_obj_ as a validity guard —
-    // if C++ objects are freed while LVGL objects still exist, the guard passes
-    // but the captured `this` is dangling.
     lv_obj_clean(container);
     active_widgets_.clear();
 

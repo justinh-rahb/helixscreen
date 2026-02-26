@@ -93,12 +93,12 @@ class GridLayout {
     /// Clear all placements
     void clear();
 
+    /// Check if a cell is occupied by any existing placement
+    bool is_occupied(int col, int row) const;
+
   private:
     int breakpoint_;
     std::vector<GridPlacement> placements_;
-
-    /// Check if a cell is occupied by any existing placement
-    bool is_occupied(int col, int row) const;
 };
 
 } // namespace helix

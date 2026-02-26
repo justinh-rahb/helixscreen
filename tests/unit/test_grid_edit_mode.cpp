@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "grid_edit_mode.h"
+#include "grid_layout.h"
+#include "panel_widget_config.h"
 #include "panel_widget_registry.h"
 
 #include "../catch_amalgamated.hpp"
@@ -195,4 +197,264 @@ TEST_CASE("GridEditMode: clamp_span tips widget respects range", "[grid_edit][re
     auto [c2, r2] = GridEditMode::clamp_span("tips", 1, 1);
     CHECK(c2 == def->effective_min_colspan());
     CHECK(r2 == 1);
+}
+
+// =============================================================================
+// build_default_grid — anchor positions and auto-place defaults
+// =============================================================================
+
+TEST_CASE("build_default_grid only sets positions for anchor widgets", "[grid]") {
+    auto entries = PanelWidgetConfig::build_default_grid();
+    REQUIRE(entries.size() > 3); // At least the 3 anchors + some auto-place widgets
+
+    // Find anchor entries and verify their fixed positions
+    const PanelWidgetEntry* printer_image = nullptr;
+    const PanelWidgetEntry* print_status = nullptr;
+    const PanelWidgetEntry* tips = nullptr;
+
+    for (const auto& e : entries) {
+        if (e.id == "printer_image")
+            printer_image = &e;
+        if (e.id == "print_status")
+            print_status = &e;
+        if (e.id == "tips")
+            tips = &e;
+    }
+
+    REQUIRE(printer_image != nullptr);
+    CHECK(printer_image->col == 0);
+    CHECK(printer_image->row == 0);
+    CHECK(printer_image->colspan == 2);
+    CHECK(printer_image->rowspan == 2);
+    CHECK(printer_image->has_grid_position());
+
+    REQUIRE(print_status != nullptr);
+    CHECK(print_status->col == 0);
+    CHECK(print_status->row == 2);
+    CHECK(print_status->colspan == 2);
+    CHECK(print_status->rowspan == 2);
+    CHECK(print_status->has_grid_position());
+
+    REQUIRE(tips != nullptr);
+    CHECK(tips->col == 2);
+    CHECK(tips->row == 0);
+    CHECK(tips->colspan == 4);
+    CHECK(tips->rowspan == 1);
+    CHECK(tips->has_grid_position());
+
+    // All non-anchor entries must have col=-1, row=-1 (auto-place)
+    for (const auto& e : entries) {
+        if (e.id == "printer_image" || e.id == "print_status" || e.id == "tips") {
+            continue;
+        }
+        INFO("Widget '" << e.id << "' should be auto-place (col=-1, row=-1)");
+        CHECK(e.col == -1);
+        CHECK(e.row == -1);
+        CHECK_FALSE(e.has_grid_position());
+    }
+}
+
+// =============================================================================
+// GridLayout bottom-right packing — free cell ordering
+// =============================================================================
+
+TEST_CASE("GridLayout bottom-right packing fills cells correctly", "[grid]") {
+    // Breakpoint 2 = MEDIUM = 6x4 grid
+    GridLayout grid(2);
+    REQUIRE(grid.cols() == 6);
+    REQUIRE(grid.rows() == 4);
+
+    // Place the 3 anchor widgets
+    REQUIRE(grid.place({"printer_image", 0, 0, 2, 2}));
+    REQUIRE(grid.place({"print_status", 0, 2, 2, 2}));
+    REQUIRE(grid.place({"tips", 2, 0, 4, 1}));
+
+    // Collect free cells scanning bottom-right to top-left (same as populate_widgets)
+    int grid_cols = grid.cols();
+    int grid_rows = grid.rows();
+
+    std::vector<std::pair<int, int>> free_cells;
+    for (int r = grid_rows - 1; r >= 0; --r) {
+        for (int c = grid_cols - 1; c >= 0; --c) {
+            if (!grid.is_occupied(c, r)) {
+                free_cells.push_back({c, r});
+            }
+        }
+    }
+
+    // Expected free cells in bottom-right to top-left order:
+    // Row 3: (5,3), (4,3), (3,3), (2,3)  — cols 0-1 occupied by print_status
+    // Row 2: (5,2), (4,2), (3,2), (2,2)  — cols 0-1 occupied by print_status
+    // Row 1: (5,1), (4,1), (3,1), (2,1)  — cols 0-1 occupied by printer_image, cols 2-5 free
+    // Row 0: all occupied (printer_image 0-1, tips 2-5)
+    REQUIRE(free_cells.size() == 12);
+
+    CHECK(free_cells[0] == std::make_pair(5, 3));
+    CHECK(free_cells[1] == std::make_pair(4, 3));
+    CHECK(free_cells[2] == std::make_pair(3, 3));
+    CHECK(free_cells[3] == std::make_pair(2, 3));
+    CHECK(free_cells[4] == std::make_pair(5, 2));
+    CHECK(free_cells[5] == std::make_pair(4, 2));
+    CHECK(free_cells[6] == std::make_pair(3, 2));
+    CHECK(free_cells[7] == std::make_pair(2, 2));
+    CHECK(free_cells[8] == std::make_pair(5, 1));
+    CHECK(free_cells[9] == std::make_pair(4, 1));
+    CHECK(free_cells[10] == std::make_pair(3, 1));
+    CHECK(free_cells[11] == std::make_pair(2, 1));
+
+    // With 4 auto-place widgets, the mapping is:
+    //   widget i of n_auto → cell (n_auto - 1 - i)
+    // So: widget 0 → cell 3 = (2,3)
+    //     widget 1 → cell 2 = (3,3)
+    //     widget 2 → cell 1 = (4,3)
+    //     widget 3 → cell 0 = (5,3)
+    // Result: left-to-right fill in the bottom row
+    size_t n_auto = 4;
+    std::vector<std::pair<int, int>> assigned;
+    for (size_t i = 0; i < n_auto; ++i) {
+        size_t cell_idx = n_auto - 1 - i;
+        REQUIRE(cell_idx < free_cells.size());
+        assigned.push_back(free_cells[cell_idx]);
+    }
+
+    CHECK(assigned[0] == std::make_pair(2, 3));
+    CHECK(assigned[1] == std::make_pair(3, 3));
+    CHECK(assigned[2] == std::make_pair(4, 3));
+    CHECK(assigned[3] == std::make_pair(5, 3));
+}
+
+// =============================================================================
+// Auto-place entries get positions written back after placement
+// =============================================================================
+
+TEST_CASE("auto-place entries get positions written back after placement", "[grid]") {
+    // Simulate the populate_widgets writeback logic without LVGL.
+    // Build entries: 3 anchors with positions + 4 auto-place widgets.
+    std::vector<PanelWidgetEntry> entries = {
+        {"printer_image", true, {}, 0, 0, 2, 2}, {"print_status", true, {}, 0, 2, 2, 2},
+        {"tips", true, {}, 2, 0, 4, 1},          {"widget_a", true, {}, -1, -1, 1, 1},
+        {"widget_b", true, {}, -1, -1, 1, 1},    {"widget_c", true, {}, -1, -1, 1, 1},
+        {"widget_d", true, {}, -1, -1, 1, 1},
+    };
+
+    // Verify auto-place entries start without positions
+    for (size_t i = 3; i < entries.size(); ++i) {
+        REQUIRE_FALSE(entries[i].has_grid_position());
+    }
+
+    // Replicate the two-pass placement from populate_widgets
+    int breakpoint = 2; // MEDIUM = 6x4
+    GridLayout grid(breakpoint);
+
+    struct PlacedSlot {
+        size_t entry_index;
+        int col, row, colspan, rowspan;
+    };
+    std::vector<PlacedSlot> placed;
+    std::vector<size_t> auto_place_indices;
+
+    // First pass: place entries with explicit positions
+    for (size_t i = 0; i < entries.size(); ++i) {
+        if (entries[i].has_grid_position()) {
+            bool ok = grid.place({entries[i].id, entries[i].col, entries[i].row, entries[i].colspan,
+                                  entries[i].rowspan});
+            REQUIRE(ok);
+            placed.push_back(
+                {i, entries[i].col, entries[i].row, entries[i].colspan, entries[i].rowspan});
+        } else {
+            auto_place_indices.push_back(i);
+        }
+    }
+
+    REQUIRE(placed.size() == 3);
+    REQUIRE(auto_place_indices.size() == 4);
+
+    // Second pass: bottom-right packing for 1x1 auto-place widgets
+    int grid_cols = grid.cols();
+    int grid_rows = grid.rows();
+
+    std::vector<std::pair<int, int>> free_cells;
+    for (int r = grid_rows - 1; r >= 0; --r) {
+        for (int c = grid_cols - 1; c >= 0; --c) {
+            if (!grid.is_occupied(c, r)) {
+                free_cells.push_back({c, r});
+            }
+        }
+    }
+
+    size_t n_auto = auto_place_indices.size();
+    for (size_t i = 0; i < n_auto; ++i) {
+        size_t entry_idx = auto_place_indices[i];
+        int colspan = entries[entry_idx].colspan;
+        int rowspan = entries[entry_idx].rowspan;
+
+        if (colspan == 1 && rowspan == 1) {
+            size_t cell_idx = n_auto - 1 - i;
+            if (cell_idx < free_cells.size()) {
+                auto [col, row] = free_cells[cell_idx];
+                if (grid.place({entries[entry_idx].id, col, row, 1, 1})) {
+                    placed.push_back({entry_idx, col, row, 1, 1});
+                    continue;
+                }
+            }
+        }
+
+        // Fallback
+        auto pos = grid.find_available(colspan, rowspan);
+        REQUIRE(pos.has_value());
+        REQUIRE(grid.place({entries[entry_idx].id, pos->first, pos->second, colspan, rowspan}));
+        placed.push_back({entry_idx, pos->first, pos->second, colspan, rowspan});
+    }
+
+    REQUIRE(placed.size() == 7); // All 7 widgets placed
+
+    // Write computed positions back to entries (same as populate_widgets)
+    for (const auto& p : placed) {
+        entries[p.entry_index].col = p.col;
+        entries[p.entry_index].row = p.row;
+        entries[p.entry_index].colspan = p.colspan;
+        entries[p.entry_index].rowspan = p.rowspan;
+    }
+
+    // Verify: all entries now have valid grid positions
+    for (const auto& e : entries) {
+        INFO("Widget '" << e.id << "' should have valid position after writeback");
+        CHECK(e.has_grid_position());
+        CHECK(e.col >= 0);
+        CHECK(e.row >= 0);
+        CHECK(e.colspan >= 1);
+        CHECK(e.rowspan >= 1);
+    }
+
+    // Verify anchors kept their original positions
+    CHECK(entries[0].col == 0); // printer_image
+    CHECK(entries[0].row == 0);
+    CHECK(entries[1].col == 0); // print_status
+    CHECK(entries[1].row == 2);
+    CHECK(entries[2].col == 2); // tips
+    CHECK(entries[2].row == 0);
+
+    // Verify auto-placed widgets landed in the bottom row (row 3) left-to-right
+    CHECK(entries[3].col == 2); // widget_a
+    CHECK(entries[3].row == 3);
+    CHECK(entries[4].col == 3); // widget_b
+    CHECK(entries[4].row == 3);
+    CHECK(entries[5].col == 4); // widget_c
+    CHECK(entries[5].row == 3);
+    CHECK(entries[6].col == 5); // widget_d
+    CHECK(entries[6].row == 3);
+
+    // Verify no two widgets occupy the same cell
+    for (size_t i = 0; i < entries.size(); ++i) {
+        for (size_t j = i + 1; j < entries.size(); ++j) {
+            // Check that bounding boxes don't overlap
+            bool overlap = entries[i].col < entries[j].col + entries[j].colspan &&
+                           entries[j].col < entries[i].col + entries[i].colspan &&
+                           entries[i].row < entries[j].row + entries[j].rowspan &&
+                           entries[j].row < entries[i].row + entries[i].rowspan;
+            INFO("Widgets '" << entries[i].id << "' and '" << entries[j].id
+                             << "' should not overlap");
+            CHECK_FALSE(overlap);
+        }
+    }
 }

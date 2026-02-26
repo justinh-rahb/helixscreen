@@ -189,50 +189,104 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
     // Correlate widget entries with config entries to get grid positions
     const auto& entries = widget_config.entries();
 
-    // First pass: compute all placements (determine grid positions)
+    // First pass: place widgets with explicit grid positions (anchors + user-positioned)
     struct PlacedSlot {
         size_t slot_index; // Index into enabled_widgets
         int col, row, colspan, rowspan;
     };
     std::vector<PlacedSlot> placed;
+    std::vector<size_t> auto_place_indices; // Widgets needing dynamic placement
 
     for (size_t i = 0; i < enabled_widgets.size(); ++i) {
         auto& slot = enabled_widgets[i];
-        int col, row, colspan, rowspan;
 
-        // Look up the widget entry from config for explicit grid coords
         auto entry_it =
             std::find_if(entries.begin(), entries.end(),
                          [&](const PanelWidgetEntry& e) { return e.id == slot.widget_id; });
 
         if (entry_it != entries.end() && entry_it->has_grid_position()) {
-            col = entry_it->col;
-            row = entry_it->row;
-            colspan = entry_it->colspan;
-            rowspan = entry_it->rowspan;
-        } else {
-            // Auto-place: get span from registry def, then find first available spot
-            const auto* def = find_widget_def(slot.widget_id);
-            colspan = def ? def->colspan : 1;
-            rowspan = def ? def->rowspan : 1;
+            int col = entry_it->col;
+            int row = entry_it->row;
+            int colspan = entry_it->colspan;
+            int rowspan = entry_it->rowspan;
 
-            auto pos = grid.find_available(colspan, rowspan);
-            if (!pos) {
-                spdlog::warn("[PanelWidgetManager] No grid space for widget '{}'", slot.widget_id);
-                continue;
+            if (grid.place({slot.widget_id, col, row, colspan, rowspan})) {
+                placed.push_back({i, col, row, colspan, rowspan});
+            } else {
+                spdlog::warn("[PanelWidgetManager] Cannot place widget '{}' at ({},{} {}x{})",
+                             slot.widget_id, col, row, colspan, rowspan);
+                auto_place_indices.push_back(i); // Fall back to auto-place
             }
-            col = pos->first;
-            row = pos->second;
+        } else {
+            auto_place_indices.push_back(i);
+        }
+    }
+
+    // Second pass: pack auto-place widgets bottom-right first.
+    // Collect free cells scanning bottom-right to top-left.
+    int grid_cols = GridLayout::get_cols(breakpoint);
+    int grid_rows = GridLayout::get_rows(breakpoint);
+
+    std::vector<std::pair<int, int>> free_cells;
+    for (int r = grid_rows - 1; r >= 0; --r) {
+        for (int c = grid_cols - 1; c >= 0; --c) {
+            if (!grid.is_occupied(c, r)) {
+                free_cells.push_back({c, r});
+            }
+        }
+    }
+
+    // Assign: last widget → bottom-right cell, first → top-left of the block
+    size_t n_auto = auto_place_indices.size();
+    size_t n_cells = free_cells.size();
+    for (size_t i = 0; i < n_auto; ++i) {
+        size_t slot_idx = auto_place_indices[i];
+        auto& slot = enabled_widgets[slot_idx];
+
+        const auto* def = find_widget_def(slot.widget_id);
+        int colspan = def ? def->colspan : 1;
+        int rowspan = def ? def->rowspan : 1;
+
+        // For 1×1 widgets, use bottom-right packing
+        if (colspan == 1 && rowspan == 1) {
+            // Map: widget i (of n_auto) → cell (n_auto-1-i) from bottom-right
+            size_t cell_idx = n_auto - 1 - i;
+            if (cell_idx < n_cells) {
+                auto [col, row] = free_cells[cell_idx];
+                if (grid.place({slot.widget_id, col, row, 1, 1})) {
+                    placed.push_back({slot_idx, col, row, 1, 1});
+                    continue;
+                }
+            }
         }
 
-        // Validate and register placement in the grid tracker
-        if (!grid.place({slot.widget_id, col, row, colspan, rowspan})) {
-            spdlog::warn("[PanelWidgetManager] Cannot place widget '{}' at ({},{} {}x{})",
-                         slot.widget_id, col, row, colspan, rowspan);
-            continue;
+        // Fallback: find_available for multi-cell widgets or if packing failed
+        auto pos = grid.find_available(colspan, rowspan);
+        if (pos && grid.place({slot.widget_id, pos->first, pos->second, colspan, rowspan})) {
+            placed.push_back({slot_idx, pos->first, pos->second, colspan, rowspan});
+        } else {
+            spdlog::warn("[PanelWidgetManager] No grid space for widget '{}'", slot.widget_id);
         }
+    }
 
-        placed.push_back({i, col, row, colspan, rowspan});
+    // Write computed positions back to config entries (in-memory only).
+    // This keeps config entries in sync with the actual grid layout so that
+    // edit mode operations (drag/drop/resize) work correctly.  Positions are
+    // only persisted to disk when the user enters edit mode or explicitly saves.
+    {
+        auto& mut_entries = widget_config.mutable_entries();
+        for (const auto& p : placed) {
+            auto& slot = enabled_widgets[p.slot_index];
+            auto entry_it =
+                std::find_if(mut_entries.begin(), mut_entries.end(),
+                             [&](const PanelWidgetEntry& e) { return e.id == slot.widget_id; });
+            if (entry_it != mut_entries.end()) {
+                entry_it->col = p.col;
+                entry_it->row = p.row;
+                entry_it->colspan = p.colspan;
+                entry_it->rowspan = p.rowspan;
+            }
+        }
     }
 
     // Compute the actual number of rows used (not the full breakpoint row count)

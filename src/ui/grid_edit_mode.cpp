@@ -47,6 +47,15 @@ void GridEditMode::enter(lv_obj_t* container, PanelWidgetConfig* config) {
     config_ = config;
     lv_subject_set_int(&get_home_edit_mode_subject(), 1);
     create_dots_overlay();
+
+    // Persist the current dynamically-computed grid positions to disk.
+    // By the time the user enters edit mode, hardware discovery has
+    // typically stabilized, so this snapshots a good layout.
+    if (config_) {
+        config_->save();
+        spdlog::debug("[GridEditMode] Saved grid positions on edit mode entry");
+    }
+
     spdlog::info("[GridEditMode] Entered edit mode");
 }
 
