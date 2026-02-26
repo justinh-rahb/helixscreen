@@ -60,6 +60,9 @@ class WizardInputShaperStepTestFixture {
             display_created_ = true;
         }
 
+        // Initialize UpdateQueue so async set_hardware() updates are accepted
+        helix::ui::UpdateQueue::instance().init();
+
         // Initialize PrinterState subjects for testing
         PrinterStateTestAccess::reset(state());
         state().init_subjects(true); // Need XML registration to lookup by name
