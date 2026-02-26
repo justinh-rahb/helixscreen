@@ -40,25 +40,25 @@ The easiest solution is to delete your config file and let the wizard create a n
 
 **MainsailOS (Pi):**
 ```bash
-sudo rm /opt/helixscreen/helixconfig.json
+sudo rm /opt/helixscreen/config/helixconfig.json
 sudo systemctl restart helixscreen
 ```
 
 **Adventurer 5M (Forge-X):**
 ```bash
-rm /opt/helixscreen/helixconfig.json
+rm /opt/helixscreen/config/helixconfig.json
 /etc/init.d/S90helixscreen restart
 ```
 
 **Adventurer 5M (Klipper Mod):**
 ```bash
-rm /root/printer_software/helixscreen/helixconfig.json
+rm /root/printer_software/helixscreen/config/helixconfig.json
 /etc/init.d/S80helixscreen restart
 ```
 
 **Creality K1 (Simple AF):**
 ```bash
-rm /usr/data/helixscreen/helixconfig.json
+rm /usr/data/helixscreen/config/helixconfig.json
 /etc/init.d/S99helixscreen restart
 ```
 

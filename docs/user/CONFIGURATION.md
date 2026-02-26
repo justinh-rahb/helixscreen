@@ -1181,6 +1181,13 @@ HelixScreen accepts command-line options for overriding configuration and debugg
 | `--log-dest <dest>` | Log destination: `auto`, `journal`, `syslog`, `file`, `console` |
 | `--log-file <path>` | Log file path (when `--log-dest=file`) |
 
+### Debugging Options
+
+| Option | Description |
+|--------|-------------|
+| `--debug-touches` | Draw ripple effects at each touch point for diagnosing touch accuracy |
+| `--calibrate-touch` | Force touch calibration on startup |
+
 ### Utility Options
 
 | Option | Description |

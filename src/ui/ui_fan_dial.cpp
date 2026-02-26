@@ -410,6 +410,55 @@ void FanDial::handle_on_clicked() {
 // Fan Icon Spin Animation
 // ============================================================================
 
+void FanDial::set_read_only(bool read_only) {
+    if (!arc_)
+        return;
+
+    if (read_only) {
+        // Disable arc interaction
+        lv_obj_remove_flag(arc_, LV_OBJ_FLAG_CLICKABLE);
+
+        // Hide the knob
+        lv_obj_set_style_bg_opa(arc_, LV_OPA_TRANSP, LV_PART_KNOB);
+        lv_obj_set_style_shadow_opa(arc_, LV_OPA_TRANSP, LV_PART_KNOB);
+
+        // Muted indicator color (matches fan_status_card.xml)
+        lv_color_t muted = theme_manager_get_color("text_muted");
+        lv_obj_set_style_arc_color(arc_, muted, LV_PART_INDICATOR);
+
+        // Hide Off/On buttons, show "Auto" label instead
+        if (btn_off_)
+            lv_obj_add_flag(btn_off_, LV_OBJ_FLAG_HIDDEN);
+        if (btn_on_)
+            lv_obj_add_flag(btn_on_, LV_OBJ_FLAG_HIDDEN);
+
+        // Add "Auto" indicator in the button row
+        lv_obj_t* btn_row = lv_obj_find_by_name(root_, "button_row");
+        if (btn_row) {
+            lv_obj_t* auto_label = lv_label_create(btn_row);
+            lv_label_set_text(auto_label, lv_tr("Auto"));
+            lv_obj_set_style_text_color(auto_label, theme_manager_get_color("text_muted"), 0);
+            const lv_font_t* font = theme_manager_get_font("font_xs");
+            if (font)
+                lv_obj_set_style_text_font(auto_label, font, 0);
+        }
+
+        // Clear the speed callback so no commands are sent
+        on_speed_changed_ = nullptr;
+    } else {
+        lv_obj_add_flag(arc_, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_set_style_bg_opa(arc_, LV_OPA_COVER, LV_PART_KNOB);
+        lv_color_t primary = theme_manager_get_color("primary");
+        lv_obj_set_style_arc_color(arc_, primary, LV_PART_INDICATOR);
+        if (btn_off_)
+            lv_obj_remove_flag(btn_off_, LV_OBJ_FLAG_HIDDEN);
+        if (btn_on_)
+            lv_obj_remove_flag(btn_on_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    spdlog::debug("[FanDial] '{}' set_read_only({})", name_, read_only);
+}
+
 void FanDial::refresh_animation() {
     update_fan_animation(current_speed_);
 }

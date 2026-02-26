@@ -86,6 +86,9 @@ static std::unique_ptr<AmsBackendMock> create_mock_with_features(int gate_count)
         spdlog::info("[AMS Backend] Mock dryer enabled via HELIX_MOCK_DRYER");
     }
 
+    // Simulate mid-print tool change progress (3rd of 5 swaps) for visual testing
+    mock->set_toolchange_progress(2, 5);
+
     return mock;
 }
 

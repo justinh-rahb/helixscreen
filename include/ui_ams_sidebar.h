@@ -58,8 +58,9 @@ class AmsOperationSidebar {
     /**
      * @brief Clear observers and widget refs
      *
-     * Does NOT reset extruder_temp_observer_ if preheat is pending
-     * (pending_load_slot_ >= 0), matching current AmsPanel behavior.
+     * Unconditionally resets ALL observers and nullifies widget pointers.
+     * Widget pointers are cleared before observers to prevent cascading
+     * observer callbacks from accessing freed LVGL objects.
      */
     void cleanup();
 

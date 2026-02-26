@@ -6,6 +6,7 @@
 #include "ui_heating_animator.h"
 #include "ui_observer_guard.h"
 #include "ui_panel_base.h"
+#include "ui_panel_print_status.h" // For RunoutGuidanceModal
 
 #include "grid_edit_mode.h"
 #include "led/led_controller.h"
@@ -74,6 +75,7 @@ class HomePanel : public PanelBase {
      * Printer image reload is handled by PrinterImageWidget.
      */
     void reload_from_config();
+    void refresh_printer_image();
 
     /**
      * @brief Trigger a deferred runout check (used after wizard completes)
@@ -104,6 +106,7 @@ class HomePanel : public PanelBase {
 
   private:
     SubjectManager subjects_;
+    lv_subject_t temp_subject_;
     TempControlPanel* temp_control_panel_ = nullptr;
 
     bool light_on_ = false;
@@ -119,6 +122,9 @@ class HomePanel : public PanelBase {
     // Light icon for dynamic brightness/color updates
     lv_obj_t* light_icon_ = nullptr;
     lv_obj_t* power_icon_ = nullptr;
+
+    char temp_buffer_[32];
+    lv_draw_buf_t* cached_printer_snapshot_ = nullptr;
 
     // Lazily-created overlay panels (owned by LVGL parent, not us)
     lv_obj_t* nozzle_temp_panel_ = nullptr;
@@ -139,6 +145,12 @@ class HomePanel : public PanelBase {
     void on_extruder_target_changed(int target);
     void on_led_state_changed(int state);
     void update_temp_icon_animation();
+    void on_print_state_changed(helix::PrintJobState state);
+    void on_print_progress_or_time_changed();
+    void on_print_thumbnail_path_changed(const char* path);
+    void update_print_card_from_state();
+    void update_print_card_label(int progress, int time_left_secs);
+    void reset_print_card_to_idle();
     void update_light_icon();
     void update_power_icon(bool is_on);
     void refresh_power_state(); // Query API to sync icon with actual device state
@@ -167,6 +179,23 @@ class HomePanel : public PanelBase {
 
     // Grid edit mode state machine (long-press to rearrange widgets)
     helix::GridEditMode grid_edit_mode_;
+
+    // Print card observers (for showing progress during active print)
+    ObserverGuard print_state_observer_;
+    ObserverGuard print_progress_observer_;
+    ObserverGuard print_time_left_observer_;
+    ObserverGuard print_thumbnail_path_observer_; // Observes shared thumbnail from PrintStatusPanel
+
+    // Filament runout observer and modal (shows when idle + runout detected)
+    ObserverGuard filament_runout_observer_;
+    ObserverGuard image_changed_observer_;
+    RunoutGuidanceModal runout_modal_;
+    bool runout_modal_shown_ = false; // Prevent repeated modals
+
+    // Print card widgets (looked up after XML creation)
+    lv_obj_t* print_card_thumb_ = nullptr;        // Idle state thumbnail
+    lv_obj_t* print_card_active_thumb_ = nullptr; // Active print thumbnail
+    lv_obj_t* print_card_label_ = nullptr;
 
     // Heating icon animator (gradient color + pulse while heating)
     HeatingIconAnimator temp_icon_animator_;

@@ -417,27 +417,34 @@ void FanStackWidget::bind_carousel_fans() {
         auto dial = std::make_unique<FanDial>(lv_scr_act(), fan.display_name, fan.object_name,
                                               fan.speed_percent);
 
-        // Wire speed change callback to send fan speed commands
-        std::string object_name = fan.object_name;
-        auto& ps = printer_state_;
-        dial->set_on_speed_changed(
-            [weak_alive, &ps, object_name](const std::string& /*fan_id*/, int speed_percent) {
-                if (weak_alive.expired())
-                    return;
-                auto* api = get_moonraker_api();
-                if (!api) {
-                    spdlog::warn("[FanStackWidget] Cannot send fan speed - no API connection");
-                    NOTIFY_WARNING("No printer connection");
-                    return;
-                }
+        // Auto-controlled fans get read-only arc (no knob, muted indicator)
+        if (!fan.is_controllable) {
+            dial->set_read_only(true);
+        }
 
-                ps.update_fan_speed(object_name, static_cast<double>(speed_percent) / 100.0);
-                api->set_fan_speed(
-                    object_name, static_cast<double>(speed_percent), []() {},
-                    [object_name](const MoonrakerError& err) {
-                        NOTIFY_ERROR("Fan control failed: {}", err.user_message());
-                    });
-            });
+        // Wire speed change callback only for controllable fans
+        if (fan.is_controllable) {
+            std::string object_name = fan.object_name;
+            auto& ps = printer_state_;
+            dial->set_on_speed_changed(
+                [weak_alive, &ps, object_name](const std::string& /*fan_id*/, int speed_percent) {
+                    if (weak_alive.expired())
+                        return;
+                    auto* api = get_moonraker_api();
+                    if (!api) {
+                        spdlog::warn("[FanStackWidget] Cannot send fan speed - no API connection");
+                        NOTIFY_WARNING("No printer connection");
+                        return;
+                    }
+
+                    ps.update_fan_speed(object_name, static_cast<double>(speed_percent) / 100.0);
+                    api->set_fan_speed(
+                        object_name, static_cast<double>(speed_percent), []() {},
+                        [object_name](const MoonrakerError& err) {
+                            NOTIFY_ERROR("Fan control failed: {}", err.user_message());
+                        });
+                });
+        }
 
         // Add to carousel with size/style overrides for compact widget slot
         lv_obj_t* root = dial->get_root();

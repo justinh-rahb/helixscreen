@@ -1024,10 +1024,17 @@ void AmsEditModal::handle_save() {
                 if (guard.expired()) {
                     return;
                 }
-                if (!success) {
-                    spdlog::error("[AmsEditModal] Spoolman save failed, saving locally");
-                }
-                fire_completion(true); // Always save locally regardless
+                // Spoolman callback arrives on a background thread — defer
+                // to the UI thread before touching LVGL subjects/widgets.
+                helix::ui::queue_update([this, guard, success]() {
+                    if (guard.expired()) {
+                        return;
+                    }
+                    if (!success) {
+                        spdlog::error("[AmsEditModal] Spoolman save failed, saving locally");
+                    }
+                    fire_completion(true);
+                });
             });
             return; // Async path - fire_completion called from callback
         }

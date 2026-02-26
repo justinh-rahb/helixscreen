@@ -44,6 +44,7 @@ LedWidget::~LedWidget() {
 void LedWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     widget_obj_ = widget_obj;
     parent_screen_ = parent_screen;
+    *alive_ = true;
 
     if (!widget_obj_) {
         return;
@@ -68,18 +69,19 @@ void LedWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
 }
 
 void LedWidget::detach() {
-    // Reset observers before nulling pointers
-    led_state_observer_.reset();
-    led_brightness_observer_.reset();
+    *alive_ = false;
 
+    // Nullify widget pointers BEFORE resetting observers
     if (widget_obj_) {
         lv_obj_set_user_data(widget_obj_, nullptr);
     }
-
     widget_obj_ = nullptr;
     parent_screen_ = nullptr;
     light_icon_ = nullptr;
     led_control_panel_ = nullptr;
+
+    led_state_observer_.reset();
+    led_brightness_observer_.reset();
 
     spdlog::debug("[LedWidget] Detached");
 }
@@ -217,15 +219,23 @@ void LedWidget::flash_light_icon() {
 void LedWidget::ensure_led_observers() {
     using helix::ui::observe_int_sync;
 
+    std::weak_ptr<bool> weak_alive = alive_;
     if (!led_state_observer_) {
         led_state_observer_ = observe_int_sync<LedWidget>(
-            printer_state_.get_led_state_subject(), this,
-            [](LedWidget* self, int state) { self->on_led_state_changed(state); });
+            printer_state_.get_led_state_subject(), this, [weak_alive](LedWidget* self, int state) {
+                if (weak_alive.expired())
+                    return;
+                self->on_led_state_changed(state);
+            });
     }
     if (!led_brightness_observer_) {
-        led_brightness_observer_ = observe_int_sync<LedWidget>(
-            printer_state_.get_led_brightness_subject(), this,
-            [](LedWidget* self, int /*brightness*/) { self->update_light_icon(); });
+        led_brightness_observer_ =
+            observe_int_sync<LedWidget>(printer_state_.get_led_brightness_subject(), this,
+                                        [weak_alive](LedWidget* self, int /*brightness*/) {
+                                            if (weak_alive.expired())
+                                                return;
+                                            self->update_light_icon();
+                                        });
     }
 }
 

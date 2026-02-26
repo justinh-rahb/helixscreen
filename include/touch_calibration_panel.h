@@ -214,9 +214,9 @@ class TouchCalibrationPanel {
      * Returns (0, 0) for out-of-range step values.
      *
      * Default target positions (for 800x480 screen):
-     *   Step 0: (120, 86)  - 15% from left, 18% from top
-     *   Step 1: (400, 408) - center X, 85% from top
-     *   Step 2: (680, 86)  - 85% from left, 18% from top
+     *   Step 0: (120, 96)  - 15% from left, 20% from top
+     *   Step 1: (400, 374) - center X, 78% from top
+     *   Step 2: (680, 96)  - 85% from left, 20% from top
      */
     Point get_target_position(int step) const;
 

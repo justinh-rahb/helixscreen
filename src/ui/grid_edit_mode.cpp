@@ -1407,7 +1407,7 @@ void GridEditMode::create_dots_overlay() {
     constexpr int DOT_HALF = DOT_SIZE / 2;
     // Use contrast text color so dots are visible on both light and dark backgrounds
     lv_color_t screen_bg = ThemeManager::instance().current_palette().screen_bg;
-    lv_color_t dot_color = theme_manager_get_contrast_text(screen_bg);
+    lv_color_t dot_color = theme_manager_get_contrast_color(screen_bg);
 
     // Place a dot at each grid intersection (ncols+1 x nrows+1 points)
     for (int r = 0; r <= nrows; ++r) {

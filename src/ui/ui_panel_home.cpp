@@ -12,8 +12,11 @@
 #include "ui_overlay_network_settings.h"
 #include "ui_panel_ams.h"
 #include "ui_panel_power.h"
+#include "ui_panel_print_status.h"
 #include "ui_panel_temp_control.h"
+#include "ui_printer_manager_overlay.h"
 #include "ui_subject_registry.h"
+#include "ui_temperature_utils.h"
 #include "ui_update_queue.h"
 #include "ui_utils.h"
 
@@ -23,6 +26,9 @@
 #include "display_settings_manager.h"
 #include "ethernet_manager.h"
 #include "favorite_macro_widget.h"
+#include "filament_sensor_manager.h"
+#include "format_utils.h"
+#include "injection_point_manager.h"
 #include "led/led_controller.h"
 #include "led/ui_led_control_overlay.h"
 #include "moonraker_api.h"
@@ -36,12 +42,17 @@
 #include "panel_widgets/printer_image_widget.h"
 #include "panel_widgets/temp_stack_widget.h"
 #include "panel_widgets/thermistor_widget.h"
+#include "prerendered_images.h"
+#include "printer_detector.h"
+#include "printer_image_manager.h"
+#include "printer_images.h"
 #include "printer_state.h"
 #include "runtime_config.h"
 #include "static_panel_registry.h"
 #include "theme_manager.h"
 #include "tool_state.h"
 #include "wifi_manager.h"
+#include "wizard_config_paths.h"
 
 #include <spdlog/spdlog.h>
 
@@ -91,6 +102,11 @@ HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
         [](HomePanel* self, int target) { self->on_extruder_target_changed(target); });
 
     spdlog::debug("[{}] Subscribed to PrinterState extruder temperature and target", get_name());
+
+    // Subscribe to printer image changes for immediate refresh
+    image_changed_observer_ = observe_int_sync<HomePanel>(
+        helix::PrinterImageManager::instance().get_image_changed_subject(), this,
+        [](HomePanel* self, int /*ver*/) { self->refresh_printer_image(); });
 
     // LED observers are set up lazily via ensure_led_observers() when strips become available.
     // At construction time, hardware discovery may not have completed yet, so
@@ -654,6 +670,9 @@ void HomePanel::ensure_led_observers() {
 }
 
 void HomePanel::on_led_state_changed(int state) {
+    if (!subjects_initialized_)
+        return;
+
     auto& led_ctrl = helix::led::LedController::instance();
     if (led_ctrl.light_state_trackable()) {
         light_on_ = (state != 0);
@@ -746,12 +765,30 @@ void HomePanel::flash_light_icon() {
 }
 
 void HomePanel::on_extruder_temp_changed(int temp_centi) {
+    // Cache the value unconditionally for when subjects/widgets are ready
     cached_extruder_temp_ = temp_centi;
+
+    if (!subjects_initialized_)
+        return;
+
+    int temp_deg = helix::ui::temperature::centi_to_degrees(temp_centi);
+
+    // Format temperature for display and update the string subject
+    helix::ui::temperature::format_temperature(temp_deg, temp_buffer_, sizeof(temp_buffer_));
+    lv_subject_copy_string(&temp_subject_, temp_buffer_);
+
+    // Update animator (expects centidegrees)
     update_temp_icon_animation();
 }
 
 void HomePanel::on_extruder_target_changed(int target_centi) {
+    // Cache the value unconditionally for when subjects/widgets are ready
     cached_extruder_target_ = target_centi;
+
+    if (!subjects_initialized_)
+        return;
+
+    // Animator expects centidegrees
     update_temp_icon_animation();
 }
 
@@ -788,6 +825,25 @@ void HomePanel::reload_from_config() {
         if (auto* piw = dynamic_cast<helix::PrinterImageWidget*>(w.get())) {
             piw->reload_from_config();
             break;
+        }
+    }
+}
+
+void HomePanel::refresh_printer_image() {
+    if (!subjects_initialized_ || !panel_)
+        return;
+
+    // Free old snapshot — image source is about to change
+    if (cached_printer_snapshot_) {
+        lv_obj_t* img = lv_obj_find_by_name(panel_, "printer_image");
+        if (img) {
+            // Clear source before destroying buffer it points to
+            // Note: must use NULL, not "" — empty string byte 0x00 gets misclassified
+            // as LV_IMAGE_SRC_VARIABLE by lv_image_src_get_type
+            lv_image_set_src(img, nullptr);
+            // Restore contain alignment so the original image scales correctly
+            // during the ~50ms gap before the new snapshot is taken
+            lv_image_set_inner_align(img, LV_IMAGE_ALIGN_CONTAIN);
         }
     }
 }
@@ -918,6 +974,102 @@ void HomePanel::light_double_click_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
+void HomePanel::on_print_thumbnail_path_changed(const char* path) {
+    if (!subjects_initialized_ || !print_card_active_thumb_) {
+        return;
+    }
+
+    // Defer the image update to avoid LVGL assertion when called during render
+    // (observer callbacks can fire during subject updates which may be mid-render)
+    std::string path_copy = path ? path : "";
+    helix::ui::async_call(
+        [](void* user_data) {
+            auto* self = static_cast<HomePanel*>(user_data);
+            // Guard against async callback firing after display destruction
+            if (!self->print_card_active_thumb_ ||
+                !lv_obj_is_valid(self->print_card_active_thumb_)) {
+                return;
+            }
+
+            const char* current_path =
+                lv_subject_get_string(self->printer_state_.get_print_thumbnail_path_subject());
+
+            if (current_path && current_path[0] != '\0') {
+                // Thumbnail available - set it on the active print card
+                lv_image_set_src(self->print_card_active_thumb_, current_path);
+                spdlog::debug("[{}] Active print thumbnail updated: {}", self->get_name(),
+                              current_path);
+            } else {
+                // No thumbnail - revert to benchy placeholder
+                lv_image_set_src(self->print_card_active_thumb_,
+                                 "A:assets/images/benchy_thumbnail_white.png");
+                spdlog::debug("[{}] Active print thumbnail cleared", self->get_name());
+            }
+        },
+        this);
+}
+
+void HomePanel::on_print_state_changed(PrintJobState state) {
+    if (!subjects_initialized_ || !print_card_thumb_ || !print_card_label_) {
+        return;
+    }
+
+    bool is_active = (state == PrintJobState::PRINTING || state == PrintJobState::PAUSED);
+
+    if (is_active) {
+        spdlog::debug("[{}] Print active - updating card progress display", get_name());
+        update_print_card_from_state(); // Update label immediately
+    } else {
+        spdlog::debug("[{}] Print not active - reverting card to idle state", get_name());
+        reset_print_card_to_idle();
+    }
+}
+
+void HomePanel::update_print_card_from_state() {
+    auto state = static_cast<PrintJobState>(
+        lv_subject_get_int(printer_state_.get_print_state_enum_subject()));
+
+    // Only update if actively printing
+    if (state != PrintJobState::PRINTING && state != PrintJobState::PAUSED) {
+        return;
+    }
+
+    int progress = lv_subject_get_int(printer_state_.get_print_progress_subject());
+    int time_left = lv_subject_get_int(printer_state_.get_print_time_left_subject());
+
+    update_print_card_label(progress, time_left);
+}
+
+void HomePanel::update_print_card_label(int progress, int time_left_secs) {
+    if (!print_card_label_) {
+        return;
+    }
+
+    char buf[64];
+    int hours = time_left_secs / 3600;
+    int minutes = (time_left_secs % 3600) / 60;
+
+    if (hours > 0) {
+        snprintf(buf, sizeof(buf), "%d%% \u2022 %dh %02dm left", progress, hours, minutes);
+    } else if (minutes > 0) {
+        snprintf(buf, sizeof(buf), "%d%% \u2022 %dm left", progress, minutes);
+    } else {
+        snprintf(buf, sizeof(buf), "%d%% \u2022 < 1m left", progress);
+    }
+
+    lv_label_set_text(print_card_label_, buf);
+}
+
+void HomePanel::reset_print_card_to_idle() {
+    // Reset idle thumbnail to benchy (active thumb is handled by observer when path clears)
+    if (print_card_thumb_) {
+        lv_image_set_src(print_card_thumb_, "A:assets/images/benchy_thumbnail_white.png");
+    }
+    if (print_card_label_) {
+        lv_label_set_text(print_card_label_, "Print Files");
+    }
+}
+
 void HomePanel::power_toggle_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[HomePanel] power_toggle_cb");
     (void)e;
@@ -1016,6 +1168,13 @@ void HomePanel::on_home_grid_clicked(lv_event_t* e) {
         panel.grid_edit_mode_.handle_click(e);
     }
     LVGL_SAFE_EVENT_CB_END();
+}
+
+void HomePanel::on_print_progress_or_time_changed() {
+    if (!subjects_initialized_)
+        return;
+
+    update_print_card_from_state();
 }
 
 void HomePanel::on_home_grid_pressing(lv_event_t* e) {

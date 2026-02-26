@@ -470,12 +470,17 @@ sudo usermod -aG input $USER
 
 If taps are landing in the wrong place on screen:
 
-1. **Recalibrate:** Go to **Settings > System > Touch Calibration**
-2. **If the option isn't visible:** Your screen may not normally need calibration. SSH in and run:
+1. **Visualize touch points:** To see exactly where the system registers your taps, enable debug touch visualization:
+   ```bash
+   helix-screen --debug-touches
+   ```
+   This draws a ripple effect at each touch point, making it easy to see if touches are offset.
+2. **Recalibrate:** Go to **Settings > System > Touch Calibration**
+3. **If the option isn't visible:** Your screen may not normally need calibration. SSH in and run:
    ```bash
    helix-screen --calibrate-touch
    ```
-3. **If the screen is too broken to navigate:** SSH in and either:
+4. **If the screen is too broken to navigate:** SSH in and either:
    - Run `helix-screen --calibrate-touch`, or
    - Edit your config file: set `"force_calibration": true` in the `input` section and restart HelixScreen
 
@@ -519,7 +524,15 @@ Restart HelixScreen after changing. Touch coordinates rotate automatically to ma
 
 > **Note:** Touch Calibration option only appears on actual touchscreen hardware, not in desktop/SDL mode.
 
-**3. If calibration doesn't help:**
+**3. Visualize touch points to diagnose:**
+
+Enable `--debug-touches` to see exactly where touches register, then compare with where you're tapping:
+```bash
+helix-screen --debug-touches
+```
+Or set `HELIX_DEBUG_TOUCHES=1` in your environment for persistent debugging.
+
+**4. If calibration doesn't help:**
 
 Try different `rotate` values (0, 90, 180, 270) until touch aligns with visuals. Or remove the rotation config entirely and restart to re-trigger automatic detection (see "Display upside down or rotated" above).
 

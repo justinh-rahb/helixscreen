@@ -14,7 +14,7 @@ This document provides a comprehensive reference for all environment variables u
 | [UI Automation](#ui-automation) | 3 | `HELIX_AUTO_*` |
 | [Calibration](#calibration-auto-start) | 2 | `*_AUTO_START` |
 | [Development](#development) | 1 | `HELIX_` |
-| [Debugging](#debugging) | 1 | `HELIX_DEBUG_*` |
+| [Debugging](#debugging) | 2 | `HELIX_DEBUG_*` |
 | [Deployment](#deployment) | 1 | `HELIX_` |
 | [Logging & Startup](#logging--startup) | 2 | `HELIX_` |
 | [Data Paths](#data-paths) | 3 | `HELIX_` / Standard Unix |
@@ -772,6 +772,34 @@ HELIX_DEBUG_SUBJECTS=1 ./build/bin/helix-screen -vv
 - Debugging XML binding issues (e.g., `bind_text` on an INT subject)
 - Finding subject initialization order problems
 - Tracing observer callbacks that fire before subjects are ready
+
+### `HELIX_DEBUG_TOUCHES`
+
+Enable touch point visualization. When enabled, a ripple effect is drawn at each touch point, showing exactly where the system registers touches. Useful for diagnosing touch accuracy issues, verifying calibration, and identifying UI elements that absorb click events.
+
+| Property | Value |
+|----------|-------|
+| **Values** | `1` (enable), unset (disable) |
+| **Default** | Disabled |
+| **CLI equivalent** | `--debug-touches` |
+| **File** | `src/system/runtime_config.cpp` |
+
+```bash
+# Enable via environment variable
+HELIX_DEBUG_TOUCHES=1 ./build/bin/helix-screen -vv
+
+# Or via command-line flag (equivalent)
+./build/bin/helix-screen --debug-touches -vv
+
+# Combine with test mode for desktop debugging
+./build/bin/helix-screen --test --debug-touches -vv
+```
+
+**Use cases:**
+- Verifying touch calibration accuracy
+- Diagnosing buttons or UI elements that don't respond to taps
+- Identifying overlapping UI elements that absorb click events
+- Confirming extended click areas are working correctly
 
 ---
 

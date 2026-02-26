@@ -356,6 +356,14 @@ int safe_exec(const std::vector<std::string>& args, bool capture_stderr = false)
             close(stderr_pipe[1]);
         }
 
+        // Ensure child has a usable PATH — tools like tar and gunzip spawn
+        // subprocesses (gzip, sh) that need PATH to work.  Systemd services
+        // may clear PATH entirely, breaking those internal lookups.
+        const char* cur_path = std::getenv("PATH");
+        if (!cur_path || cur_path[0] == '\0') {
+            setenv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", 1);
+        }
+
         // Build C-style argv array
         std::vector<char*> argv;
         argv.reserve(args.size() + 1);

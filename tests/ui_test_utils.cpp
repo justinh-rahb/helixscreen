@@ -26,9 +26,11 @@ void lv_init_safe() {
         lv_init();
         lv_xml_init(); // Must be called after lv_init() — LVGL 9.5 removed XML from core
     }
-    // UpdateQueue init is handled by LVGLTestFixture constructor per-test,
-    // NOT here. Having it here (called once via call_once) conflicts with
-    // the per-test shutdown/reinit lifecycle in the fixture destructor.
+    // Ensure UpdateQueue accepts callbacks. A prior test in this shard may
+    // have called shutdown() (e.g. LVGLTestFixture dtor), which blocks
+    // queue() until init() is called again. This is idempotent — if already
+    // initialized, init() returns immediately.
+    helix::ui::UpdateQueue::instance().init();
 }
 
 uint32_t lv_timer_handler_safe() {

@@ -967,3 +967,163 @@ TEST_CASE("TouchCalibrationPanel: median filter removes outliers",
 
     REQUIRE(panel.get_state() == helix::TouchCalibrationPanel::State::POINT_2);
 }
+
+// ============================================================================
+// ABS Capabilities Parsing Tests (parse_abs_capabilities)
+// ============================================================================
+
+TEST_CASE("TouchCalibration: parse_abs_capabilities basic cases",
+          "[touch-calibration][capabilities]") {
+    SECTION("single-touch only (ABS_X + ABS_Y)") {
+        // "3" = 0x3 → bits 0 and 1 set
+        auto caps = parse_abs_capabilities("3");
+        REQUIRE(caps.has_single_touch == true);
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("both single-touch and MT in one word") {
+        // "600003" = 0x600003 → bits 0,1 (ST) and bits 21,22 of this word
+        // But this is a SINGLE word covering bits 0-31 only.
+        // MT bits 53,54 need word index 1 (bits 32-63).
+        // So "600003" has ST but NOT MT (bits 21,22 are ABS_HAT0X/ABS_HAT0Y, not MT).
+        auto caps = parse_abs_capabilities("600003");
+        REQUIRE(caps.has_single_touch == true);
+        // 0x600000 in word[0] is NOT MT — MT needs word[1]
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("MT-only (no legacy single-touch)") {
+        // "600000 0" → word[1]=0x600000 (MT bits), word[0]=0 (no ST)
+        // After reversal: words[0]=0, words[1]=0x600000
+        auto caps = parse_abs_capabilities("600000 0");
+        REQUIRE(caps.has_single_touch == false);
+        REQUIRE(caps.has_multitouch == true);
+    }
+
+    SECTION("both MT and single-touch (two words)") {
+        // "600000 3" → word[1]=0x600000, word[0]=3
+        auto caps = parse_abs_capabilities("600000 3");
+        REQUIRE(caps.has_single_touch == true);
+        REQUIRE(caps.has_multitouch == true);
+    }
+
+    SECTION("no touch capabilities") {
+        auto caps = parse_abs_capabilities("0");
+        REQUIRE(caps.has_single_touch == false);
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("empty string") {
+        auto caps = parse_abs_capabilities("");
+        REQUIRE(caps.has_single_touch == false);
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("only ABS_X, no ABS_Y") {
+        // "1" = bit 0 only
+        auto caps = parse_abs_capabilities("1");
+        REQUIRE(caps.has_single_touch == false);
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("only ABS_Y, no ABS_X") {
+        // "2" = bit 1 only
+        auto caps = parse_abs_capabilities("2");
+        REQUIRE(caps.has_single_touch == false);
+        REQUIRE(caps.has_multitouch == false);
+    }
+}
+
+TEST_CASE("TouchCalibration: parse_abs_capabilities real-world devices",
+          "[touch-calibration][capabilities]") {
+    SECTION("AD5M sun4i_ts resistive: single-touch only") {
+        // sun4i_ts reports ABS_X + ABS_Y only (no MT)
+        auto caps = parse_abs_capabilities("3");
+        REQUIRE(caps.has_single_touch == true);
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("Goodix gt9xxnew_ts MT-only (Nebula Pad bug scenario)") {
+        // Goodix driver reports ABS_MT_POSITION_X (53) + ABS_MT_POSITION_Y (54)
+        // but NOT legacy ABS_X (0) / ABS_Y (1).
+        auto caps = parse_abs_capabilities("600000 0");
+        REQUIRE(caps.has_single_touch == false);
+        REQUIRE(caps.has_multitouch == true);
+    }
+
+    SECTION("Goodix GT911 with both ST and MT") {
+        // Many Goodix drivers report both legacy and MT axes
+        auto caps = parse_abs_capabilities("660000 3");
+        REQUIRE(caps.has_single_touch == true);
+        REQUIRE(caps.has_multitouch == true);
+    }
+
+    SECTION("BTT HDMI5 USB HID touchscreen") {
+        // USB HID typically reports ABS_X + ABS_Y (single-touch only)
+        auto caps = parse_abs_capabilities("3");
+        REQUIRE(caps.has_single_touch == true);
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("multi-word with three hex groups") {
+        // "0 600000 3" → words[0]=3, words[1]=0x600000, words[2]=0
+        auto caps = parse_abs_capabilities("0 600000 3");
+        REQUIRE(caps.has_single_touch == true);
+        REQUIRE(caps.has_multitouch == true);
+    }
+}
+
+TEST_CASE("TouchCalibration: parse_abs_capabilities edge cases",
+          "[touch-calibration][capabilities]") {
+    SECTION("leading zeros in hex") {
+        auto caps = parse_abs_capabilities("0000600000 00000003");
+        REQUIRE(caps.has_single_touch == true);
+        REQUIRE(caps.has_multitouch == true);
+    }
+
+    SECTION("extra whitespace between words") {
+        // istringstream handles multiple spaces
+        auto caps = parse_abs_capabilities("600000  3");
+        REQUIRE(caps.has_single_touch == true);
+        REQUIRE(caps.has_multitouch == true);
+    }
+
+    SECTION("invalid hex returns no capabilities") {
+        auto caps = parse_abs_capabilities("xyz");
+        REQUIRE(caps.has_single_touch == false);
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("MT bit ABS_MT_POSITION_X only (no ABS_MT_POSITION_Y)") {
+        // Only bit 53 (0x200000) set, not bit 54 — incomplete MT
+        auto caps = parse_abs_capabilities("200000 0");
+        REQUIRE(caps.has_multitouch == false);
+    }
+
+    SECTION("MT bit ABS_MT_POSITION_Y only (no ABS_MT_POSITION_X)") {
+        // Only bit 54 (0x400000) set, not bit 53 — incomplete MT
+        auto caps = parse_abs_capabilities("400000 0");
+        REQUIRE(caps.has_multitouch == false);
+    }
+}
+
+// ============================================================================
+// Calibration Decision with MT-only devices
+// ============================================================================
+
+TEST_CASE("TouchCalibration: device_needs_calibration with MT-detected devices",
+          "[touch-calibration][calibration-decision]") {
+    SECTION("Goodix gt9xxnew_ts detected via MT — capacitive, no calibration needed") {
+        // has_abs_xy is true (detected via MT fallback), but Goodix is capacitive
+        REQUIRE(device_needs_calibration("Goodix-TS gt9xxnew_ts", "", true) == false);
+    }
+
+    SECTION("Goodix GT9xx detected via MT — capacitive, no calibration needed") {
+        REQUIRE(device_needs_calibration("gt9xx_ts", "", true) == false);
+    }
+
+    SECTION("MT-only resistive (hypothetical) — would need calibration") {
+        // If a resistive touchscreen only reported MT axes, it would still need cal
+        REQUIRE(device_needs_calibration("sun4i-ts", "sun4i_ts", true) == true);
+    }
+}

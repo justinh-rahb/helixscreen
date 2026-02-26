@@ -7,6 +7,8 @@
 
 #include "panel_widget.h"
 
+#include <memory>
+
 class MoonrakerAPI;
 
 namespace helix {
@@ -35,6 +37,7 @@ class LedWidget : public PanelWidget {
     lv_obj_t* light_icon_ = nullptr;
     lv_obj_t* led_control_panel_ = nullptr;
 
+    std::shared_ptr<bool> alive_ = std::make_shared<bool>(false);
     bool light_on_ = false;
 
     ObserverGuard led_state_observer_;

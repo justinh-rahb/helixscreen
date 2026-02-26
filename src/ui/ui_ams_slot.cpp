@@ -265,7 +265,7 @@ static void apply_slot_status(AmsSlotData* data, int status_int) {
 
         // Auto-contrast text color based on badge background brightness
         if (data->slot_badge) {
-            lv_color_t text_color = theme_manager_get_contrast_text(badge_bg);
+            lv_color_t text_color = theme_manager_get_contrast_color(badge_bg);
             lv_obj_set_style_text_color(data->slot_badge, text_color, LV_PART_MAIN);
         }
     } else {
@@ -440,7 +440,7 @@ static void apply_tool_badge(AmsSlotData* data, int mapped_tool) {
         // Auto-contrast text color based on badge background
         if (data->tool_badge) {
             lv_color_t bg = lv_obj_get_style_bg_color(data->tool_badge_bg, LV_PART_MAIN);
-            lv_color_t text_color = theme_manager_get_contrast_text(bg);
+            lv_color_t text_color = theme_manager_get_contrast_color(bg);
             lv_obj_set_style_text_color(data->tool_badge, text_color, LV_PART_MAIN);
         }
         spdlog::trace("[AmsSlot] Slot {} tool badge: {}", data->slot_index, tool_text);

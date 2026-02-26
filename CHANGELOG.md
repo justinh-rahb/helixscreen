@@ -5,6 +5,43 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.4] - 2026-02-25
+
+### Added
+- BMP and GIF format support for custom printer images
+- Invalid custom printer images shown as disabled with lazy import and instant gallery refresh
+- In-process fbdev display fallback when DRM initialization fails (no restart needed)
+- Top-level exception handler prevents unhandled crashes from silently terminating the application
+
+### Fixed
+- SonicPad Goodix (gt9xxnew_ts) touchscreen now triggers calibration wizard when kernel reports zero ABS ranges
+- DRM backend no longer falls back to `/dev/dri/card0` when no suitable DRM device exists
+- Fan carousel arc thumb disabled on auto-controlled fans that don't accept manual speed changes
+- Observer cleanup ordering hardened to prevent cascading use-after-free during shutdown
+- Thread safety and crash telemetry improvements across observer guards and lifecycle management
+
+### Changed
+- Macro search resolves only active include-chain config files, improving performance on large configurations
+- Touch calibration and wizard skip decisions promoted to info-level logging for easier diagnostics
+
+## [0.13.3] - 2026-02-25
+
+### Added
+- AFC tool change progress display on print status panel with current/total tool change counter
+- AFC mock tool change progress in test mode for development
+
+### Fixed
+- MT-only touchscreens (e.g., Goodix gt9xxnew_ts on Nebula Pad) now detected correctly — previously invisible due to missing ABS_MT_POSITION_X/Y bit checks
+- ABS range queries fall back to multitouch axes when legacy ABS_X/ABS_Y are absent, enabling rotation mismatch detection on MT-only devices
+- Installer now preserves user data directories (custom_images, printer_database.d) during upgrades
+- Watchdog no longer launches external splash screen in DRM mode, preventing a crash loop
+- ObserverGuard cleanup lambda prevents use-after-free when releasing observers
+- Print status filament row decluttered by removing redundant "Filament" and "Active" labels
+- AFC mock toolchange progress default now set in constructor for consistent test behavior
+
+### Changed
+- README LVGL badge updated to 9.5, added helixscreen.org link
+
 ## [0.13.2] - 2026-02-25
 
 ### Added
@@ -1123,6 +1160,8 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.4]: https://github.com/prestonbrown/helixscreen/compare/v0.13.3...v0.13.4
+[0.13.3]: https://github.com/prestonbrown/helixscreen/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/prestonbrown/helixscreen/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/prestonbrown/helixscreen/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/prestonbrown/helixscreen/compare/v0.12.1...v0.13.0

@@ -233,6 +233,10 @@ void TempControlPanel::on_target_changed(HeaterType type, int target_centi) {
     update_display(type);
     update_status(type);
 
+    if (!subjects_initialized_) {
+        return;
+    }
+
     float target_deg = centi_to_degrees_f(target_centi);
     bool show_target = (target_centi > 0);
 
@@ -412,8 +416,10 @@ void TempControlPanel::deinit_subjects() {
     if (!subjects_initialized_) {
         return;
     }
-    subjects_.deinit_all();
+    // Set flag BEFORE deinit to prevent deferred callbacks from accessing
+    // torn-down subjects during cleanup
     subjects_initialized_ = false;
+    subjects_.deinit_all();
     spdlog::debug("[TempPanel] Subjects deinitialized");
 }
 
@@ -1060,6 +1066,10 @@ void TempControlPanel::select_extruder(const std::string& name) {
         return;
     }
 
+    if (!subjects_initialized_) {
+        return;
+    }
+
     spdlog::info("[TempPanel] Switching extruder: {} -> {}", active_extruder_name_, name);
     active_extruder_name_ = name;
 
@@ -1107,6 +1117,10 @@ void TempControlPanel::rebuild_extruder_segments() {
 }
 
 void TempControlPanel::rebuild_extruder_segments_impl() {
+    if (!subjects_initialized_) {
+        return;
+    }
+
     auto& nozzle = heaters_[idx(HeaterType::Nozzle)];
     auto* selector = lv_obj_find_by_name(nozzle.panel, "extruder_selector");
     if (!selector) {

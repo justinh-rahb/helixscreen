@@ -3,10 +3,77 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdlib>
+#include <sstream>
 #include <string>
+#include <vector>
 
 namespace helix {
+
+/**
+ * @brief Parsed ABS capabilities from sysfs capabilities/abs hex string
+ *
+ * Distinguishes between single-touch (ABS_X/ABS_Y, bits 0-1) and multitouch
+ * (ABS_MT_POSITION_X/ABS_MT_POSITION_Y, bits 53-54) capabilities.
+ * Some touchscreens (e.g., Goodix gt9xxnew_ts) only report MT axes without
+ * legacy single-touch axes.
+ */
+struct AbsCapabilities {
+    bool has_single_touch = false; ///< ABS_X (bit 0) + ABS_Y (bit 1)
+    bool has_multitouch = false;   ///< ABS_MT_POSITION_X (bit 53) + ABS_MT_POSITION_Y (bit 54)
+};
+
+/**
+ * @brief Parse the sysfs ABS capabilities hex string
+ *
+ * Reads /sys/class/input/eventN/device/capabilities/abs format:
+ * space-separated hex words, rightmost = bits 0-31, next = bits 32-63, etc.
+ *
+ * @param caps_hex Raw hex string from sysfs (e.g., "600003", "600000 3", "0")
+ * @return Parsed capabilities indicating single-touch and/or multitouch support
+ */
+inline AbsCapabilities parse_abs_capabilities(const std::string& caps_hex) {
+    AbsCapabilities result;
+
+    if (caps_hex.empty()) {
+        return result;
+    }
+
+    // Split on spaces into words (rightmost = lowest bits)
+    std::vector<unsigned long> words;
+    std::istringstream iss(caps_hex);
+    std::string token;
+    while (iss >> token) {
+        try {
+            words.push_back(std::stoul(token, nullptr, 16));
+        } catch (...) {
+            return result;
+        }
+    }
+
+    if (words.empty()) {
+        return result;
+    }
+
+    // Words are in order: highest bits first, lowest bits last
+    // Reverse so index 0 = bits 0-31, index 1 = bits 32-63, etc.
+    std::reverse(words.begin(), words.end());
+
+    // Single-touch: ABS_X=0, ABS_Y=1 → both in word[0], mask 0x3
+    if (words.size() >= 1 && (words[0] & 0x3) == 0x3) {
+        result.has_single_touch = true;
+    }
+
+    // Multitouch: ABS_MT_POSITION_X=53, ABS_MT_POSITION_Y=54
+    // Word index = 53/32 = 1 (bits 32-63)
+    // Bit positions within word: 53-32=21, 54-32=22 → mask 0x600000
+    if (words.size() >= 2 && (words[1] & 0x600000) == 0x600000) {
+        result.has_multitouch = true;
+    }
+
+    return result;
+}
 
 struct Point {
     int x = 0;

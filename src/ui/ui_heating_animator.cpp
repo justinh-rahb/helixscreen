@@ -83,12 +83,15 @@ void HeatingIconAnimator::detach() {
     }
     stop_pulse();
 
-    // Remove our delete callback to prevent re-entrant detach
+    // Remove our delete callback to prevent re-entrant detach (needs icon_ valid)
     lv_obj_remove_event_cb_with_user_data(icon_, icon_delete_cb, this);
+
+    // Nullify widget pointer BEFORE resetting observers — any cascading callback
+    // that slips through will see nullptr and bail out safely.
+    icon_ = nullptr;
 
     // ObserverGuard::reset() removes the observer from the subject
     theme_observer_.reset();
-    icon_ = nullptr;
     spdlog::debug("[HeatingIconAnimator] Detached");
 }
 
