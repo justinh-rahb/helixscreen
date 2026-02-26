@@ -5,6 +5,33 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.6] - 2026-02-26
+
+### Added
+- Fan speed overlay opens directly when tapping the fan icon in carousel mode
+- Dual-output Pi builds: single compilation produces both DRM and fbdev binaries
+
+### Fixed
+- LED light state now syncs correctly from hardware on status updates
+- Empty AMS slots are clickable with placeholder circle and context menu
+- LED widget initial state and reactive bindings fixed
+- Print details delete button is now icon-only, giving more room for the print button
+- 2D fallback disabled on print details panel; thumbnails used instead
+- AMS slot positioning fixes for hidden spool containers and LINEAR selector box sizing
+- Keyboard overlay crash when cleanup nulls alternatives mid-use (#207)
+- Use-after-free in LED and temperature widget button user data
+- Tool badge now shown on empty unassigned AMS gates
+- Printer database JSON parsing hardened against type mismatches
+- ELF architecture validation uses platform key instead of uname
+- Updated Ender 5 Max printer image
+- Installer preserves user files in `printer_database.d` during upgrades
+
+### Changed
+- XML event callbacks registered at startup instead of widget attach time
+- Panel switching and widget creation optimized for ARM
+- Spoolman vendor list fetched from dedicated endpoint instead of downloading all spools
+- AMS gate observer rebuilds coalesced to reduce startup churn
+
 ## [0.13.5] - 2026-02-26
 
 ### Added
@@ -1188,6 +1215,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.6]: https://github.com/prestonbrown/helixscreen/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/prestonbrown/helixscreen/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/prestonbrown/helixscreen/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/prestonbrown/helixscreen/compare/v0.13.2...v0.13.3
