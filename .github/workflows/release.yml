@@ -60,7 +60,7 @@ jobs:
           - platform: pi32
             display_name: "Raspberry Pi 32-bit"
           - platform: ad5m
-            display_name: "Adventurer 5M"
+            display_name: "Flashforge AD5M"
           - platform: cc1
             display_name: "Elegoo Centauri Carbon 1"
           - platform: k1
@@ -68,7 +68,7 @@ jobs:
             docker_image: k1
             build_target: mips
           - platform: ad5x
-            display_name: "FlashForge AD5X"
+            display_name: "Flashforge AD5X"
             docker_image: k1
             build_target: mips
           - platform: k2
@@ -341,7 +341,7 @@ jobs:
         ./helix-screen
         ```
 
-        ### Flashforge Adventurer 5M
+        ### Flashforge AD5M
         ```bash
         # Download and extract
         wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/helixscreen-ad5m-${{ steps.version.outputs.version }}.tar.gz
