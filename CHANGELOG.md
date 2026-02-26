@@ -5,6 +5,34 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.5] - 2026-02-26
+
+### Added
+- Touch jitter filter for noisy controllers like Goodix GT9xx with automatic breakout detection
+- Auto-detect swapped touch axes during calibration, especially for Creality SonicPad and similar devices with misreported axis orientation
+- Power Devices entry in System settings
+- AMS filament system header bar now shows system logo and name with declarative bindings
+- AMS LINEAR output path with animated slide beneath active slot
+- Update telemetry tracking: success/failure recording across update lifecycle with analysis tools
+- Seven new telemetry event types with thread-safe recording
+- `--debug-touches` flag for touch input diagnostics
+
+### Fixed
+- Header back button touch target expanded to full title width for easier navigation
+- AMS bypass spool centered on filament line with label moved beneath
+- AMS spools centered inside tray with support for variable AFC lane count
+- Happy Hare AMS now uses LINEAR topology with SELECTOR butted against prep sensors
+- Float-to-int conversion guards against NaN/Inf values (#206)
+- AD5X platform now correctly maps to K1 MIPS binary (#203)
+- Async callback use-after-free in Spoolman spool selection
+- Null guards for keyboard events and NEON blend path (#207, #208)
+- Installer no longer shows misleading 'corrupt download' message on slow CDN connections
+- Jitter filter correctly disabled after breakout for smooth scrolling
+
+### Changed
+- HomePanel refactored into self-contained widgets
+- CI build split into separate compile and test jobs
+
 ## [0.13.4] - 2026-02-25
 
 ### Added
@@ -1160,6 +1188,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.5]: https://github.com/prestonbrown/helixscreen/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/prestonbrown/helixscreen/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/prestonbrown/helixscreen/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/prestonbrown/helixscreen/compare/v0.13.1...v0.13.2
