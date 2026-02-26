@@ -458,3 +458,293 @@ TEST_CASE("auto-place entries get positions written back after placement", "[gri
         }
     }
 }
+
+// =============================================================================
+// GridLayout: can_place rejects out-of-bounds placements
+// =============================================================================
+
+TEST_CASE("GridLayout: can_place rejects out-of-bounds column", "[grid]") {
+    GridLayout grid(2); // MEDIUM = 6x4
+    REQUIRE(grid.cols() == 6);
+    REQUIRE(grid.rows() == 4);
+
+    // 1x1 widget at col=6 (one past the last column) is rejected
+    CHECK_FALSE(grid.can_place(6, 0, 1, 1));
+
+    // 1x1 widget at col=5 is the last valid column
+    CHECK(grid.can_place(5, 0, 1, 1));
+
+    // 2x1 widget starting at col=5 overflows (5+2 > 6)
+    CHECK_FALSE(grid.can_place(5, 0, 2, 1));
+
+    // 2x1 widget starting at col=4 fits (4+2 == 6)
+    CHECK(grid.can_place(4, 0, 2, 1));
+}
+
+TEST_CASE("GridLayout: can_place rejects out-of-bounds row", "[grid]") {
+    GridLayout grid(2); // MEDIUM = 6x4
+
+    // 1x1 widget at row=4 (one past the last row) is rejected
+    CHECK_FALSE(grid.can_place(0, 4, 1, 1));
+
+    // 1x1 at row=3 is the last valid row
+    CHECK(grid.can_place(0, 3, 1, 1));
+
+    // 1x2 widget starting at row=3 overflows (3+2 > 4)
+    CHECK_FALSE(grid.can_place(0, 3, 1, 2));
+
+    // 1x2 widget starting at row=2 fits (2+2 == 4)
+    CHECK(grid.can_place(0, 2, 1, 2));
+}
+
+TEST_CASE("GridLayout: can_place rejects negative coordinates and zero spans", "[grid]") {
+    GridLayout grid(2); // MEDIUM = 6x4
+
+    CHECK_FALSE(grid.can_place(-1, 0, 1, 1));
+    CHECK_FALSE(grid.can_place(0, -1, 1, 1));
+    CHECK_FALSE(grid.can_place(0, 0, 0, 1));
+    CHECK_FALSE(grid.can_place(0, 0, 1, 0));
+}
+
+// =============================================================================
+// print_status bottom-left pin: rowspan > 1 pins to grid.rows() - rowspan
+// =============================================================================
+
+TEST_CASE("print_status bottom-left pin on 6x4 grid", "[grid]") {
+    // On a 6x4 grid (MEDIUM breakpoint=2), print_status with rowspan=2
+    // should be pinned to row = 4 - 2 = 2
+    GridLayout grid(2);
+    REQUIRE(grid.cols() == 6);
+    REQUIRE(grid.rows() == 4);
+
+    int rowspan = 2;
+    int pinned_row = grid.rows() - rowspan;
+    CHECK(pinned_row == 2);
+
+    // Verify the pinned position is placeable
+    CHECK(grid.can_place(0, pinned_row, 2, rowspan));
+    REQUIRE(grid.place({"print_status", 0, pinned_row, 2, rowspan}));
+}
+
+TEST_CASE("print_status bottom-left pin on 8x5 grid", "[grid]") {
+    // On an 8x5 grid (LARGE breakpoint=3), print_status with rowspan=2
+    // should be pinned to row = 5 - 2 = 3
+    GridLayout grid(3);
+    REQUIRE(grid.cols() == 8);
+    REQUIRE(grid.rows() == 5);
+
+    int rowspan = 2;
+    int pinned_row = grid.rows() - rowspan;
+    CHECK(pinned_row == 3);
+
+    // Verify the pinned position is placeable
+    CHECK(grid.can_place(0, pinned_row, 2, rowspan));
+    REQUIRE(grid.place({"print_status", 0, pinned_row, 2, rowspan}));
+}
+
+TEST_CASE("print_status pin formula consistent across all breakpoints", "[grid]") {
+    // Verify the pin formula works for every breakpoint
+    for (int bp = 0; bp < GridLayout::NUM_BREAKPOINTS; ++bp) {
+        GridLayout grid(bp);
+        int rowspan = 2;
+        int pinned_row = grid.rows() - rowspan;
+
+        INFO("Breakpoint " << bp << ": " << grid.cols() << "x" << grid.rows()
+                           << " grid, pinned_row=" << pinned_row);
+        CHECK(pinned_row >= 0);
+        CHECK(grid.can_place(0, pinned_row, 2, rowspan));
+    }
+}
+
+// =============================================================================
+// Overflow clamping: explicit coords that exceed grid bounds get clamped
+// =============================================================================
+
+TEST_CASE("Overflow clamping pushes col to fit within grid", "[grid]") {
+    // Simulate the clamping logic from populate_widgets:
+    //   if (col + colspan > grid.cols()) col = max(0, grid.cols() - colspan);
+    GridLayout grid(2); // 6x4
+    REQUIRE(grid.cols() == 6);
+
+    // Widget at col=5 with colspan=2 overflows (5+2=7 > 6)
+    int col = 5;
+    int colspan = 2;
+    if (col + colspan > grid.cols()) {
+        col = std::max(0, grid.cols() - colspan);
+    }
+    CHECK(col == 4); // Clamped to col=4 so 4+2=6 fits exactly
+
+    // After clamping, placement should succeed
+    CHECK(grid.can_place(col, 0, colspan, 1));
+    REQUIRE(grid.place({"test_widget", col, 0, colspan, 1}));
+}
+
+TEST_CASE("Overflow clamping pushes row to fit within grid", "[grid]") {
+    GridLayout grid(2); // 6x4
+    REQUIRE(grid.rows() == 4);
+
+    // Widget at row=3 with rowspan=2 overflows (3+2=5 > 4)
+    int row = 3;
+    int rowspan = 2;
+    if (row + rowspan > grid.rows()) {
+        row = std::max(0, grid.rows() - rowspan);
+    }
+    CHECK(row == 2); // Clamped to row=2 so 2+2=4 fits exactly
+
+    CHECK(grid.can_place(0, row, 1, rowspan));
+    REQUIRE(grid.place({"test_widget", 0, row, 1, rowspan}));
+}
+
+TEST_CASE("Overflow clamping handles widget larger than grid dimension", "[grid]") {
+    GridLayout grid(2); // 6x4
+
+    // Widget with colspan=8 on a 6-column grid: max(0, 6-8) = max(0,-2) = 0
+    // The widget still won't fit (0+8 > 6), but col is clamped to 0
+    int col = 3;
+    int colspan = 8;
+    if (col + colspan > grid.cols()) {
+        col = std::max(0, grid.cols() - colspan);
+    }
+    CHECK(col == 0);
+
+    // Placement will fail because 0+8 > 6 -- the widget falls through to auto-place
+    CHECK_FALSE(grid.can_place(col, 0, colspan, 1));
+}
+
+// =============================================================================
+// Disable-on-overflow: widgets that can't be placed get disabled
+// =============================================================================
+
+TEST_CASE("Widgets disabled when grid is full and auto-place fails", "[grid]") {
+    // Simulate the disable-on-overflow logic from populate_widgets.
+    // Fill a 6x4 grid completely, then try to auto-place another widget.
+    GridLayout grid(2); // 6x4
+    REQUIRE(grid.cols() == 6);
+    REQUIRE(grid.rows() == 4);
+
+    // Fill the entire grid with 1x1 placements
+    int widget_num = 0;
+    for (int r = 0; r < grid.rows(); ++r) {
+        for (int c = 0; c < grid.cols(); ++c) {
+            std::string id = "filler_" + std::to_string(widget_num++);
+            REQUIRE(grid.place({id, c, r, 1, 1}));
+        }
+    }
+
+    // Grid is completely full -- find_available returns nullopt
+    auto pos = grid.find_available(1, 1);
+    REQUIRE_FALSE(pos.has_value());
+
+    // Simulate the disable-on-overflow logic:
+    // When a widget can't be placed, it gets disabled with col=-1, row=-1
+    PanelWidgetEntry overflow_entry{"overflow_widget", true, {}, -1, -1, 1, 1};
+    REQUIRE(overflow_entry.enabled == true);
+
+    // Replicate the populate_widgets overflow handling
+    auto place_pos = grid.find_available(overflow_entry.colspan, overflow_entry.rowspan);
+    if (!place_pos) {
+        // Grid full -- disable widget (same as populate_widgets)
+        overflow_entry.enabled = false;
+        overflow_entry.col = -1;
+        overflow_entry.row = -1;
+    }
+
+    CHECK(overflow_entry.enabled == false);
+    CHECK(overflow_entry.col == -1);
+    CHECK(overflow_entry.row == -1);
+    CHECK_FALSE(overflow_entry.has_grid_position());
+}
+
+TEST_CASE("Multiple overflow widgets all get disabled", "[grid]") {
+    // Fill grid mostly, leave only 1 free cell, try to place 3 auto-place widgets
+    GridLayout grid(2); // 6x4
+
+    // Fill all cells except (5,3) -- the bottom-right corner
+    for (int r = 0; r < grid.rows(); ++r) {
+        for (int c = 0; c < grid.cols(); ++c) {
+            if (r == 3 && c == 5)
+                continue; // Leave one cell free
+            std::string id = "filler_" + std::to_string(r * grid.cols() + c);
+            REQUIRE(grid.place({id, c, r, 1, 1}));
+        }
+    }
+
+    // Verify exactly 1 free cell remains
+    auto pos = grid.find_available(1, 1);
+    REQUIRE(pos.has_value());
+    CHECK(pos->first == 5);
+    CHECK(pos->second == 3);
+
+    // Try to auto-place 3 widgets into 1 free cell
+    std::vector<PanelWidgetEntry> overflow_entries = {
+        {"widget_a", true, {}, -1, -1, 1, 1},
+        {"widget_b", true, {}, -1, -1, 1, 1},
+        {"widget_c", true, {}, -1, -1, 1, 1},
+    };
+
+    int placed_count = 0;
+    int disabled_count = 0;
+    for (auto& entry : overflow_entries) {
+        auto avail = grid.find_available(entry.colspan, entry.rowspan);
+        if (avail &&
+            grid.place({entry.id, avail->first, avail->second, entry.colspan, entry.rowspan})) {
+            entry.col = avail->first;
+            entry.row = avail->second;
+            ++placed_count;
+        } else {
+            entry.enabled = false;
+            entry.col = -1;
+            entry.row = -1;
+            ++disabled_count;
+        }
+    }
+
+    // Exactly 1 widget placed, 2 disabled
+    CHECK(placed_count == 1);
+    CHECK(disabled_count == 2);
+
+    // First widget should have been placed in the free cell
+    CHECK(overflow_entries[0].col == 5);
+    CHECK(overflow_entries[0].row == 3);
+    CHECK(overflow_entries[0].enabled == true);
+
+    // Remaining widgets should be disabled
+    CHECK(overflow_entries[1].enabled == false);
+    CHECK_FALSE(overflow_entries[1].has_grid_position());
+    CHECK(overflow_entries[2].enabled == false);
+    CHECK_FALSE(overflow_entries[2].has_grid_position());
+}
+
+TEST_CASE("Multi-cell widget disabled when no contiguous space available", "[grid]") {
+    // Fill grid leaving only scattered 1x1 holes -- a 2x2 widget can't fit
+    GridLayout grid(2); // 6x4
+
+    // Fill rows 0-2 completely
+    for (int r = 0; r < 3; ++r) {
+        for (int c = 0; c < grid.cols(); ++c) {
+            REQUIRE(grid.place({"filler_" + std::to_string(r * 10 + c), c, r, 1, 1}));
+        }
+    }
+
+    // Fill row 3 with gaps: place at cols 0,1,3,4 -- leave 2,5 empty
+    REQUIRE(grid.place({"filler_30", 0, 3, 1, 1}));
+    REQUIRE(grid.place({"filler_31", 1, 3, 1, 1}));
+    REQUIRE(grid.place({"filler_33", 3, 3, 1, 1}));
+    REQUIRE(grid.place({"filler_34", 4, 3, 1, 1}));
+
+    // Two free cells at (2,3) and (5,3) -- not contiguous for a 2x2 widget
+    auto pos = grid.find_available(2, 2);
+    REQUIRE_FALSE(pos.has_value());
+
+    // A 2x2 widget should be disabled
+    PanelWidgetEntry big_widget{"big_widget", true, {}, -1, -1, 2, 2};
+    auto avail = grid.find_available(big_widget.colspan, big_widget.rowspan);
+    if (!avail) {
+        big_widget.enabled = false;
+        big_widget.col = -1;
+        big_widget.row = -1;
+    }
+
+    CHECK(big_widget.enabled == false);
+    CHECK_FALSE(big_widget.has_grid_position());
+}

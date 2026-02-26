@@ -4,6 +4,7 @@
 #include "panel_widget_manager.h"
 
 #include "ui_ams_mini_status.h"
+#include "ui_notification.h"
 
 #include "config.h"
 #include "grid_layout.h"
@@ -13,6 +14,7 @@
 #include "panel_widget_registry.h"
 #include "theme_manager.h"
 
+#include <spdlog/fmt/fmt.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -210,6 +212,20 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
             int colspan = entry_it->colspan;
             int rowspan = entry_it->rowspan;
 
+            // Clamp: if widget overflows the grid, push it to fit
+            if (row + rowspan > grid.rows()) {
+                row = std::max(0, grid.rows() - rowspan);
+            }
+            if (col + colspan > grid.cols()) {
+                col = std::max(0, grid.cols() - colspan);
+            }
+
+            // Pin print_status to bottom-left so 1×1 widgets pack above it
+            // consistently across all breakpoints (row 2 on 6×4, row 3 on 8×5)
+            if (slot.widget_id == "print_status" && rowspan > 1) {
+                row = grid.rows() - rowspan;
+            }
+
             if (grid.place({slot.widget_id, col, row, colspan, rowspan})) {
                 placed.push_back({i, col, row, colspan, rowspan});
             } else {
@@ -265,7 +281,22 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
         if (pos && grid.place({slot.widget_id, pos->first, pos->second, colspan, rowspan})) {
             placed.push_back({slot_idx, pos->first, pos->second, colspan, rowspan});
         } else {
-            spdlog::warn("[PanelWidgetManager] No grid space for widget '{}'", slot.widget_id);
+            // Grid is full — disable the widget so it goes back to the catalog
+            // as an available widget. User can re-add it after freeing space.
+            auto& mut_entries = widget_config.mutable_entries();
+            auto cfg_it =
+                std::find_if(mut_entries.begin(), mut_entries.end(),
+                             [&](const PanelWidgetEntry& e) { return e.id == slot.widget_id; });
+            if (cfg_it != mut_entries.end()) {
+                cfg_it->enabled = false;
+                cfg_it->col = -1;
+                cfg_it->row = -1;
+            }
+            spdlog::info("[PanelWidgetManager] Disabled widget '{}' — no grid space",
+                         slot.widget_id);
+            const auto* def = find_widget_def(slot.widget_id);
+            const char* name = def ? def->display_name : slot.widget_id.c_str();
+            ui_notification_warning(fmt::format("'{}' removed — grid full", name).c_str());
         }
     }
 
