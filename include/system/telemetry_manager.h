@@ -187,6 +187,29 @@ class TelemetryManager {
                                const std::string& platform, int http_code = -1,
                                int64_t file_size = -1, int exit_code = -1);
 
+    /**
+     * @brief Check for a successful update from a previous session
+     *
+     * Looks for update_success.json flag file. If found, enqueues an
+     * update_success event and deletes the file. Called from init().
+     */
+    void check_previous_update();
+
+    /**
+     * @brief Write update success flag file before restart
+     *
+     * Static method callable from UpdateChecker before _exit(0).
+     * The flag is read by check_previous_update() on next boot.
+     *
+     * @param config_dir Config directory path
+     * @param version Version that was installed
+     * @param from_version Version before the update
+     * @param platform Platform key
+     */
+    static void write_update_success_flag(const std::string& config_dir, const std::string& version,
+                                          const std::string& from_version,
+                                          const std::string& platform);
+
     // =========================================================================
     // CRASH REPORTING (Phase 5)
     // =========================================================================
@@ -462,6 +485,11 @@ class TelemetryManager {
     nlohmann::json build_update_failed_event(const std::string& reason, const std::string& version,
                                              const std::string& platform, int http_code,
                                              int64_t file_size, int exit_code) const;
+
+    nlohmann::json build_update_success_event(const std::string& version,
+                                              const std::string& from_version,
+                                              const std::string& platform,
+                                              const std::string& timestamp) const;
 
     /**
      * @brief Get the double-hashed device identifier

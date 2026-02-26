@@ -1218,3 +1218,110 @@ TEST_CASE_METHOD(TelemetryTestFixture, "Update failed event: from_version includ
     // from_version should be current HELIX_VERSION
     REQUIRE(event.contains("from_version"));
 }
+
+// ============================================================================
+// Update Success Event [telemetry][update]
+// ============================================================================
+
+TEST_CASE_METHOD(TelemetryTestFixture,
+                 "Update success: check_previous_update enqueues event from flag file",
+                 "[telemetry][update]") {
+    auto& tm = TelemetryManager::instance();
+    tm.set_enabled(true);
+
+    // Write a flag file simulating a successful update
+    json flag;
+    flag["version"] = "0.14.0";
+    flag["from_version"] = "0.13.4";
+    flag["platform"] = "pi";
+    flag["timestamp"] = "2026-02-26T12:00:00Z";
+    write_file("update_success.json", flag.dump());
+
+    tm.check_previous_update();
+
+    REQUIRE(tm.queue_size() == 1);
+    auto snapshot = tm.get_queue_snapshot();
+    auto event = snapshot[0];
+
+    REQUIRE(event["schema_version"] == 2);
+    REQUIRE(event["event"] == "update_success");
+    REQUIRE(event["version"] == "0.14.0");
+    REQUIRE(event["from_version"] == "0.13.4");
+    REQUIRE(event["platform"] == "pi");
+    REQUIRE(event.contains("device_id"));
+    REQUIRE(event.contains("timestamp"));
+}
+
+TEST_CASE_METHOD(TelemetryTestFixture, "Update success: flag file deleted after reading",
+                 "[telemetry][update]") {
+    auto& tm = TelemetryManager::instance();
+    tm.set_enabled(true);
+
+    json flag;
+    flag["version"] = "0.14.0";
+    flag["from_version"] = "0.13.4";
+    flag["platform"] = "pi";
+    flag["timestamp"] = "2026-02-26T12:00:00Z";
+    write_file("update_success.json", flag.dump());
+
+    tm.check_previous_update();
+
+    REQUIRE_FALSE(fs::exists(temp_dir() / "update_success.json"));
+}
+
+TEST_CASE_METHOD(TelemetryTestFixture, "Update success: no-op when no flag file exists",
+                 "[telemetry][update]") {
+    auto& tm = TelemetryManager::instance();
+    tm.set_enabled(true);
+
+    tm.check_previous_update();
+
+    REQUIRE(tm.queue_size() == 0);
+}
+
+TEST_CASE_METHOD(TelemetryTestFixture, "Update success: discarded when telemetry disabled",
+                 "[telemetry][update]") {
+    auto& tm = TelemetryManager::instance();
+    tm.set_enabled(false);
+
+    json flag;
+    flag["version"] = "0.14.0";
+    flag["from_version"] = "0.13.4";
+    flag["platform"] = "pi";
+    flag["timestamp"] = "2026-02-26T12:00:00Z";
+    write_file("update_success.json", flag.dump());
+
+    tm.check_previous_update();
+
+    REQUIRE(tm.queue_size() == 0);
+    // Flag file should still be removed even if telemetry is disabled
+    REQUIRE_FALSE(fs::exists(temp_dir() / "update_success.json"));
+}
+
+TEST_CASE_METHOD(TelemetryTestFixture, "Update success: malformed flag file handled gracefully",
+                 "[telemetry][update]") {
+    auto& tm = TelemetryManager::instance();
+    tm.set_enabled(true);
+
+    write_file("update_success.json", "not valid json {{{{");
+
+    tm.check_previous_update();
+
+    REQUIRE(tm.queue_size() == 0);
+    // Malformed file should still be cleaned up
+    REQUIRE_FALSE(fs::exists(temp_dir() / "update_success.json"));
+}
+
+TEST_CASE_METHOD(TelemetryTestFixture, "Write update success flag: creates valid JSON file",
+                 "[telemetry][update]") {
+    TelemetryManager::write_update_success_flag(temp_dir().string(), "0.14.0", "0.13.4", "pi");
+
+    REQUIRE(fs::exists(temp_dir() / "update_success.json"));
+    auto content = read_file("update_success.json");
+    auto flag = json::parse(content);
+
+    REQUIRE(flag["version"] == "0.14.0");
+    REQUIRE(flag["from_version"] == "0.13.4");
+    REQUIRE(flag["platform"] == "pi");
+    REQUIRE(flag.contains("timestamp"));
+}
