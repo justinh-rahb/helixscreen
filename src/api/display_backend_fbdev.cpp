@@ -352,10 +352,25 @@ lv_indev_t* DisplayBackendFbdev::create_input_pointer() {
     bool has_abs = (event_num >= 0) && has_touch_capabilities(event_num, &abs_caps);
 
     needs_calibration_ = helix::device_needs_calibration(dev_name, dev_phys, has_abs);
+
+    // Log classification reason for support diagnostics
+    const char* cal_reason = "unknown";
+    if (!has_abs) {
+        cal_reason = "no ABS axes (not a touchscreen)";
+    } else if (helix::is_usb_input_phys(dev_phys)) {
+        cal_reason = "USB HID (mapped coordinates)";
+    } else if (dev_name.find("virtual") != std::string::npos) {
+        cal_reason = "virtual device";
+    } else if (helix::is_resistive_touchscreen_name(dev_name)) {
+        cal_reason = "resistive controller (needs affine calibration)";
+    } else {
+        cal_reason = "capacitive/unknown (assumed factory-calibrated)";
+    }
+
     spdlog::info(
-        "[Fbdev Backend] Input device '{}' phys='{}' abs={} (st={} mt={}) → calibration {}",
+        "[Fbdev Backend] Input device '{}' phys='{}' abs={} (st={} mt={}) → calibration {} [{}]",
         dev_name, dev_phys, has_abs, abs_caps.has_single_touch, abs_caps.has_multitouch,
-        needs_calibration_ ? "needed" : "not needed");
+        needs_calibration_ ? "needed" : "not needed", cal_reason);
 
     // Read and log ABS ranges for diagnostic purposes, and check for mismatch
     // on capacitive screens that may report coordinates for a different resolution
@@ -370,7 +385,7 @@ lv_indev_t* DisplayBackendFbdev::create_input_pointer() {
             // MT-only devices (e.g., Goodix gt9xxnew_ts) don't have legacy ABS_X/ABS_Y.
             // Fall back to ABS_MT_POSITION_X/ABS_MT_POSITION_Y for range queries.
             if ((!got_x || !got_y) && abs_caps.has_multitouch) {
-                spdlog::debug("[Fbdev Backend] ABS_X/ABS_Y query failed, trying MT axes");
+                spdlog::info("[Fbdev Backend] ABS_X/ABS_Y not available, falling back to MT axes");
                 got_x = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_X), &abs_x) == 0);
                 got_y = (ioctl(fd, EVIOCGABS(ABS_MT_POSITION_Y), &abs_y) == 0);
             }
@@ -382,22 +397,32 @@ lv_indev_t* DisplayBackendFbdev::create_input_pointer() {
                     abs_x.minimum, abs_x.maximum, abs_y.minimum, abs_y.maximum, screen_width_,
                     screen_height_);
 
-                // Detect capacitive panels reporting a different resolution than the
-                // display (e.g., Goodix 800x480 on a 480x272 screen). Generic HID
-                // ranges (4096, 32767, etc.) are excluded — those are
-                // resolution-independent and LVGL maps them correctly.
-                if (!needs_calibration_ &&
-                    helix::has_abs_display_mismatch(abs_x.maximum, abs_y.maximum, screen_width_,
-                                                    screen_height_)) {
+                if (!needs_calibration_ && abs_x.maximum <= 0 && abs_y.maximum <= 0) {
+                    // Zero ABS range means the kernel driver doesn't report proper
+                    // coordinate bounds — LVGL can't map touch to screen without
+                    // calibration (e.g., SonicPad gt9xxnew_ts).
+                    needs_calibration_ = true;
+                    spdlog::warn("[Fbdev Backend] ABS range is zero — LVGL cannot map "
+                                 "coordinates to display ({}x{}), forcing calibration",
+                                 screen_width_, screen_height_);
+                } else if (!needs_calibration_ &&
+                           helix::has_abs_display_mismatch(abs_x.maximum, abs_y.maximum,
+                                                           screen_width_, screen_height_)) {
+                    // Detect capacitive panels reporting a different resolution than the
+                    // display (e.g., Goodix 800x480 on a 480x272 screen). Generic HID
+                    // ranges (4096, 32767, etc.) are excluded — those are
+                    // resolution-independent and LVGL maps them correctly.
                     needs_calibration_ = true;
                     spdlog::warn("[Fbdev Backend] ABS range ({},{}) mismatches display "
                                  "({}x{}) — forcing calibration",
                                  abs_x.maximum, abs_y.maximum, screen_width_, screen_height_);
                 }
+            } else {
+                spdlog::warn("[Fbdev Backend] ABS range query failed for both legacy and MT axes");
             }
         } else {
-            spdlog::debug("[Fbdev Backend] Could not open {} for ABS range query: {}", touch_path,
-                          strerror(errno));
+            spdlog::warn("[Fbdev Backend] Could not open {} for ABS range query: {}", touch_path,
+                         strerror(errno));
         }
     }
 
@@ -436,6 +461,8 @@ lv_indev_t* DisplayBackendFbdev::create_input_pointer() {
                      "a={:.4f} b={:.4f} c={:.4f} d={:.4f} e={:.4f} f={:.4f}",
                      calibration_.a, calibration_.b, calibration_.c, calibration_.d, calibration_.e,
                      calibration_.f);
+    } else {
+        spdlog::info("[Fbdev Backend] No stored affine calibration found");
     }
 
     // Always install the calibrated read callback — it handles both rotation
@@ -457,7 +484,7 @@ std::string DisplayBackendFbdev::auto_detect_touch_device() const {
     // Priority 1: Environment variable override
     const char* env_device = std::getenv("HELIX_TOUCH_DEVICE");
     if (env_device != nullptr && strlen(env_device) > 0) {
-        spdlog::debug("[Fbdev Backend] Using touch device from HELIX_TOUCH_DEVICE: {}", env_device);
+        spdlog::info("[Fbdev Backend] Using touch device from HELIX_TOUCH_DEVICE: {}", env_device);
         return env_device;
     }
 
