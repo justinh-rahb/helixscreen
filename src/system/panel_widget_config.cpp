@@ -134,13 +134,11 @@ void PanelWidgetConfig::save() {
         if (!entry.config.empty()) {
             item["config"] = entry.config;
         }
-        // Write grid coordinates only for entries with explicit placement
-        if (entry.has_grid_position()) {
-            item["col"] = entry.col;
-            item["row"] = entry.row;
-            item["colspan"] = entry.colspan;
-            item["rowspan"] = entry.rowspan;
-        }
+        // Always write grid coordinates so auto-placed positions survive reload
+        item["col"] = entry.col;
+        item["row"] = entry.row;
+        item["colspan"] = entry.colspan;
+        item["rowspan"] = entry.rowspan;
         widgets_array.push_back(std::move(item));
     }
     config_.set<json>("/panel_widgets/" + panel_id_, widgets_array);

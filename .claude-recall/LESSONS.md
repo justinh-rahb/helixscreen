@@ -97,7 +97,7 @@
 > Always use lv_obj_safe_delete() instead of raw lv_obj_delete() - it guards against shutdown race conditions by checking lv_is_initialized() and lv_display_get_next() before deletion, and auto-nulls the pointer to prevent use-after-free
 
 ### [L060] [***--|*****] Interactive UI testing requires user
-- **Uses**: 19 | **Velocity**: 18.009999999999998 | **Learned**: 2026-02-01 | **Last**: 2026-02-25 | **Category**: correction | **Type**: constraint
+- **Uses**: 24 | **Velocity**: 23.009999999999998 | **Learned**: 2026-02-01 | **Last**: 2026-02-26 | **Category**: correction | **Type**: constraint
 > NEVER use timed delays expecting automatic navigation. THE EXACT PATTERN THAT WORKS:
 > **Step 1** - Start app with Bash tool using `run_in_background: true`:
 > ```bash

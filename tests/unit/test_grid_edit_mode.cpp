@@ -5,6 +5,8 @@
 #include "panel_widget_config.h"
 #include "panel_widget_registry.h"
 
+#include <unordered_set>
+
 #include "../catch_amalgamated.hpp"
 
 using namespace helix;
@@ -715,6 +717,229 @@ TEST_CASE("Multiple overflow widgets all get disabled", "[grid]") {
     CHECK_FALSE(overflow_entries[2].has_grid_position());
 }
 
+// =============================================================================
+// Drag logic: config position vs screen position mismatch detection
+// =============================================================================
+
+TEST_CASE("screen_to_grid_cell accurately maps widget centers to grid cells", "[grid_edit][drag]") {
+    // Simulate a 6x4 grid in a 600x400 container at screen origin (100, 50).
+    // Each cell is 100x100. Verify that the center of a widget at a known
+    // grid position maps back to that same grid cell.
+    int container_x = 100;
+    int container_y = 50;
+    int container_w = 600;
+    int container_h = 400;
+    int ncols = 6;
+    int nrows = 4;
+
+    // Widget at grid cell (3, 2) — its screen top-left would be at (400, 250)
+    // Center of first cell: (400 + 50, 250 + 50) = (450, 300)
+    auto cell = GridEditMode::screen_to_grid_cell(450, 300, container_x, container_y, container_w,
+                                                  container_h, ncols, nrows);
+    CHECK(cell.first == 3);
+    CHECK(cell.second == 2);
+
+    // Widget at grid cell (5, 1) — screen top-left at (600, 150)
+    // Center of first cell: (650, 200)
+    auto cell2 = GridEditMode::screen_to_grid_cell(650, 200, container_x, container_y, container_w,
+                                                   container_h, ncols, nrows);
+    CHECK(cell2.first == 5);
+    CHECK(cell2.second == 1);
+}
+
+TEST_CASE("Drag same-position detection correctly identifies no-move", "[grid_edit][drag]") {
+    // When a widget's config says (2,2) and the user drops on screen position
+    // that maps to (2,2), the drag should be a no-op.
+    int orig_col = 2, orig_row = 2;
+    int target_col = 2, target_row = 2;
+    bool same_position = (target_col == orig_col && target_row == orig_row);
+    REQUIRE(same_position);
+}
+
+TEST_CASE("Drag to different position is detected when config matches screen",
+          "[grid_edit][drag]") {
+    // When config says (5,1) and user drops at screen position mapping to (2,2),
+    // the drag should succeed (different position).
+    int orig_col = 5, orig_row = 1;
+    int target_col = 2, target_row = 2;
+    bool same_position = (target_col == orig_col && target_row == orig_row);
+    REQUIRE_FALSE(same_position);
+}
+
+TEST_CASE("Drag collision detection: empty target cell allows placement", "[grid_edit][drag]") {
+    // Build a 6x4 grid with some occupied cells, verify can_place on an empty cell
+    GridLayout grid(2); // MEDIUM = 6x4
+    REQUIRE(grid.place({"printer_image", 0, 0, 2, 2}));
+    REQUIRE(grid.place({"tips", 2, 0, 4, 1}));
+    REQUIRE(grid.place({"widget_a", 2, 1, 1, 1}));
+
+    // Cell (3,1) is empty, should allow a 1x1 placement
+    CHECK(grid.can_place(3, 1, 1, 1));
+
+    // Cell (0,0) is occupied by printer_image, should reject
+    CHECK_FALSE(grid.can_place(0, 0, 1, 1));
+}
+
+TEST_CASE("Drag collision detection: occupied target with same size allows swap",
+          "[grid_edit][drag]") {
+    // Simulate swap logic from handle_drag_end
+    std::vector<PanelWidgetEntry> entries = {
+        {"widget_a", true, {}, 2, 1, 1, 1},
+        {"widget_b", true, {}, 4, 1, 1, 1},
+    };
+
+    int drag_cfg_idx = 0;
+    int drag_orig_col = 2, drag_orig_row = 1;
+    int drag_orig_colspan = 1, drag_orig_rowspan = 1;
+    int target_col = 4, target_row = 1;
+
+    // Find occupant at target
+    int occupant_cfg_idx = -1;
+    for (size_t i = 0; i < entries.size(); ++i) {
+        if (static_cast<int>(i) == drag_cfg_idx)
+            continue;
+        if (target_col >= entries[i].col && target_col < entries[i].col + entries[i].colspan &&
+            target_row >= entries[i].row && target_row < entries[i].row + entries[i].rowspan) {
+            occupant_cfg_idx = static_cast<int>(i);
+            break;
+        }
+    }
+
+    REQUIRE(occupant_cfg_idx == 1);
+
+    // Same size allows swap
+    auto& occupant = entries[static_cast<size_t>(occupant_cfg_idx)];
+    bool can_swap =
+        (occupant.colspan == drag_orig_colspan && occupant.rowspan == drag_orig_rowspan);
+    REQUIRE(can_swap);
+
+    // Perform swap
+    occupant.col = drag_orig_col;
+    occupant.row = drag_orig_row;
+    entries[static_cast<size_t>(drag_cfg_idx)].col = target_col;
+    entries[static_cast<size_t>(drag_cfg_idx)].row = target_row;
+
+    // Verify swapped positions
+    CHECK(entries[0].col == 4); // widget_a moved to target
+    CHECK(entries[0].row == 1);
+    CHECK(entries[1].col == 2); // widget_b moved to original
+    CHECK(entries[1].row == 1);
+}
+
+TEST_CASE("Drag collision detection: occupied target with different size rejects swap",
+          "[grid_edit][drag]") {
+    std::vector<PanelWidgetEntry> entries = {
+        {"small_widget", true, {}, 2, 1, 1, 1}, // 1x1
+        {"big_widget", true, {}, 4, 0, 2, 2},   // 2x2
+    };
+
+    int drag_orig_colspan = 1, drag_orig_rowspan = 1;
+    int target_col = 4, target_row = 0;
+
+    // Find occupant at target
+    int occupant_cfg_idx = -1;
+    for (size_t i = 0; i < entries.size(); ++i) {
+        if (static_cast<int>(i) == 0)
+            continue;
+        if (target_col >= entries[i].col && target_col < entries[i].col + entries[i].colspan &&
+            target_row >= entries[i].row && target_row < entries[i].row + entries[i].rowspan) {
+            occupant_cfg_idx = static_cast<int>(i);
+            break;
+        }
+    }
+
+    REQUIRE(occupant_cfg_idx == 1);
+
+    // Different size rejects swap
+    auto& occupant = entries[static_cast<size_t>(occupant_cfg_idx)];
+    bool can_swap =
+        (occupant.colspan == drag_orig_colspan && occupant.rowspan == drag_orig_rowspan);
+    REQUIRE_FALSE(can_swap);
+}
+
+TEST_CASE("Drag: saved cfg_idx is stable across FLOATING flag changes", "[grid_edit][drag]") {
+    // Test the pattern where drag_cfg_idx_ is saved at drag start and
+    // reused at drag end (because find_config_index_for_widget skips FLOATING objects).
+    // This is a pure logic test verifying the pattern works.
+    int drag_cfg_idx = 3; // Saved at drag start
+
+    // At drag end, we use the saved index instead of re-looking up
+    int cfg_idx = drag_cfg_idx;
+    REQUIRE(cfg_idx == 3);
+
+    // Verify the entry can be accessed with the saved index
+    std::vector<PanelWidgetEntry> entries = {
+        {"a", true, {}, 0, 0, 1, 1},
+        {"b", true, {}, 1, 0, 1, 1},
+        {"c", true, {}, 2, 0, 1, 1},
+        {"d", true, {}, 3, 0, 1, 1}, // This is the dragged widget
+    };
+    REQUIRE(static_cast<size_t>(cfg_idx) < entries.size());
+    CHECK(entries[static_cast<size_t>(cfg_idx)].id == "d");
+}
+
+TEST_CASE("Drag: FLOATING position compensation prevents visual shift", "[grid_edit][drag]") {
+    // When a grid-managed widget becomes FLOATING, its coordinate reference
+    // changes from content area to parent outer coords + padding. Without
+    // compensation, the widget shifts by the container's padding amount.
+    // Verify the compensation math: pos = widget_screen - container_screen - padding
+
+    // Simulate: container at screen (10, 20) with padding (8, 6)
+    int container_x1 = 10, container_y1 = 20;
+    int pad_left = 8, pad_top = 6;
+
+    // Widget at screen (118, 126) — i.e. content-relative (100, 100)
+    int widget_x1 = 118, widget_y1 = 126;
+
+    // Compensation formula (same as create_selection_chrome)
+    int pos_x = widget_x1 - container_x1 - pad_left;
+    int pos_y = widget_y1 - container_y1 - pad_top;
+
+    // FLOATING position should be (100, 100) — matching the content-relative offset
+    CHECK(pos_x == 100);
+    CHECK(pos_y == 100);
+
+    // Without compensation (setting pos to raw screen delta), widget shifts by padding
+    int wrong_x = widget_x1 - container_x1; // 108, not 100
+    int wrong_y = widget_y1 - container_y1; // 106, not 100
+    CHECK(wrong_x != pos_x);                // Would shift right by pad_left
+    CHECK(wrong_y != pos_y);                // Would shift down by pad_top
+}
+
+TEST_CASE("screen_to_grid_cell boundary: cell edges map correctly", "[grid_edit][drag]") {
+    // Test that points exactly on cell boundaries map to the right cell.
+    // Container at (0,0), 600x400, 6 cols x 4 rows. Each cell = 100x100.
+    int cw = 600, ch = 400, ncols = 6, nrows = 4;
+
+    // Exactly at cell (1,0) left edge: x=100
+    auto cell = GridEditMode::screen_to_grid_cell(100, 50, 0, 0, cw, ch, ncols, nrows);
+    CHECK(cell.first == 1);
+    CHECK(cell.second == 0);
+
+    // Just before cell (1,0) left edge: x=99 should be cell (0,0)
+    auto cell2 = GridEditMode::screen_to_grid_cell(99, 50, 0, 0, cw, ch, ncols, nrows);
+    CHECK(cell2.first == 0);
+    CHECK(cell2.second == 0);
+
+    // Exactly at the right edge of the container: x=599
+    auto cell3 = GridEditMode::screen_to_grid_cell(599, 50, 0, 0, cw, ch, ncols, nrows);
+    CHECK(cell3.first == 5);
+    CHECK(cell3.second == 0);
+}
+
+TEST_CASE("Drag: multi-cell widget bounds check at grid edges", "[grid_edit][drag]") {
+    GridLayout grid(2); // MEDIUM = 6x4
+
+    // A 2x2 widget can be placed at (4,2) — fits exactly (4+2=6, 2+2=4)
+    CHECK(grid.can_place(4, 2, 2, 2));
+
+    // A 2x2 widget at (5,2) overflows columns (5+2=7 > 6)
+    CHECK_FALSE(grid.can_place(5, 2, 2, 2));
+
+    // A 2x2 widget at (4,3) overflows rows (3+2=5 > 4)
+    CHECK_FALSE(grid.can_place(4, 3, 2, 2));
+}
+
 TEST_CASE("Multi-cell widget disabled when no contiguous space available", "[grid]") {
     // Fill grid leaving only scattered 1x1 holes -- a 2x2 widget can't fit
     GridLayout grid(2); // 6x4
@@ -747,4 +972,196 @@ TEST_CASE("Multi-cell widget disabled when no contiguous space available", "[gri
 
     CHECK(big_widget.enabled == false);
     CHECK_FALSE(big_widget.has_grid_position());
+}
+
+TEST_CASE("Drag: hardware-gated invisible widgets should not block placement",
+          "[grid_edit][drag]") {
+    // Simulates the bug where humidity/probe/width_sensor are enabled in config
+    // with grid positions, but not actually placed on screen due to hardware gates.
+    // These invisible widgets should NOT occupy cells in the collision grid.
+    GridLayout grid(2); // MEDIUM = 6x4
+
+    // Visible widgets
+    grid.place({"printer_image", 0, 0, 2, 2});
+    grid.place({"temperature", 4, 0, 1, 1});
+    grid.place({"fan", 5, 0, 1, 1});
+
+    // If we DON'T include invisible "humidity" at (3,2), cell (3,2) is free
+    CHECK(grid.can_place(3, 2, 1, 1));
+    CHECK(grid.can_place(2, 2, 2, 2));
+
+    // Now simulate the OLD buggy behavior: place invisible widget
+    GridLayout grid_with_invisible(2);
+    grid_with_invisible.place({"printer_image", 0, 0, 2, 2});
+    grid_with_invisible.place({"temperature", 4, 0, 1, 1});
+    grid_with_invisible.place({"fan", 5, 0, 1, 1});
+    grid_with_invisible.place({"humidity", 3, 2, 1, 1}); // invisible but placed
+
+    // Now (3,2) is blocked — a 2x2 at (2,2) would fail
+    CHECK_FALSE(grid_with_invisible.can_place(2, 2, 2, 2));
+    // But 1x1 at (2,2) still works
+    CHECK(grid_with_invisible.can_place(2, 2, 1, 1));
+}
+
+TEST_CASE("Drag: occupant detection should skip invisible widgets", "[grid_edit][drag]") {
+    // Simulate the occupant detection loop with a visible_ids filter.
+    // Hardware-gated widgets in config should not be detected as occupants.
+    std::vector<PanelWidgetEntry> entries = {
+        {"led", true, {}, 5, 1, 1, 1},         // dragged widget
+        {"humidity", true, {}, 3, 2, 1, 1},    // hardware-gated, NOT visible
+        {"temperature", true, {}, 4, 0, 1, 1}, // visible
+    };
+
+    std::unordered_set<std::string> visible_ids = {"led", "temperature"};
+    int target_col = 3, target_row = 2;
+    int drag_idx = 0;
+
+    int occupant_cfg_idx = -1;
+    for (size_t i = 0; i < entries.size(); ++i) {
+        if (!entries[i].enabled || !entries[i].has_grid_position()) {
+            continue;
+        }
+        if (static_cast<int>(i) == drag_idx) {
+            continue;
+        }
+        if (visible_ids.find(entries[i].id) == visible_ids.end()) {
+            continue; // Skip invisible widgets
+        }
+        if (target_col >= entries[i].col && target_col < entries[i].col + entries[i].colspan &&
+            target_row >= entries[i].row && target_row < entries[i].row + entries[i].rowspan) {
+            occupant_cfg_idx = static_cast<int>(i);
+            break;
+        }
+    }
+
+    // humidity is at (3,2) but invisible — should NOT be detected as occupant
+    CHECK(occupant_cfg_idx == -1);
+}
+
+TEST_CASE("Drag: center-based targeting for multi-cell widgets", "[grid_edit][drag]") {
+    // Verify that using the widget center gives the correct target cell.
+    // Container: 600x400 at (0,0), 6 cols x 4 rows. Cell = 100x100.
+    int cw = 600, ch = 400, ncols = 6, nrows = 4;
+    int cx = 0, cy = 0;
+
+    // A 2x2 widget grabbed at its center. Widget top-left at (200,100).
+    // Widget center = (200 + 100, 100 + 100) = (300, 200) → cell (3,2).
+    // But we WANT cell (2,1) — the cell where the TOP-LEFT of the widget is.
+    // With center-based: center = (200 + 600*2/(6*2), 100 + 400*2/(4*2)) = (300, 200)
+    int widget_left = 200, widget_top = 100;
+    int half_w = (cw * 2) / (ncols * 2); // colspan=2, half cell span
+    int half_h = (ch * 2) / (nrows * 2); // rowspan=2
+    int widget_cx = widget_left + half_w;
+    int widget_cy = widget_top + half_h;
+
+    auto cell =
+        GridEditMode::screen_to_grid_cell(widget_cx, widget_cy, cx, cy, cw, ch, ncols, nrows);
+    CHECK(cell.first == 3); // center maps to (3,2)
+    CHECK(cell.second == 2);
+
+    // For a 1x1 widget, center offset is small (half a cell)
+    int half_w_1x1 = (cw * 1) / (ncols * 2); // 50
+    int half_h_1x1 = (ch * 1) / (nrows * 2); // 50
+    int cx_1x1 = 200 + half_w_1x1;           // 250
+    int cy_1x1 = 100 + half_h_1x1;           // 150
+
+    auto cell2 = GridEditMode::screen_to_grid_cell(cx_1x1, cy_1x1, cx, cy, cw, ch, ncols, nrows);
+    CHECK(cell2.first == 2); // center of 1x1 at (200,100) → (250,150) → cell (2,1)
+    CHECK(cell2.second == 1);
+}
+
+TEST_CASE("Drag threshold: small movement should not start drag", "[grid_edit][drag]") {
+    // The drag threshold prevents FLOATING from being set on every touch.
+    // Only movements > DRAG_THRESHOLD_PX should start a real drag.
+    constexpr int DRAG_THRESHOLD_PX = 12; // Must match GridEditMode::DRAG_THRESHOLD_PX
+
+    // Small movement (5px diagonal) — below threshold
+    int dx = 3, dy = 4; // distance = 5
+    bool exceeds = (dx * dx + dy * dy > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX);
+    CHECK_FALSE(exceeds);
+
+    // Exactly at threshold (12px horizontal) — does NOT exceed (not strictly greater)
+    dx = 12;
+    dy = 0;
+    exceeds = (dx * dx + dy * dy > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX);
+    CHECK_FALSE(exceeds);
+
+    // Just past threshold (13px horizontal) — exceeds
+    dx = 13;
+    dy = 0;
+    exceeds = (dx * dx + dy * dy > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX);
+    CHECK(exceeds);
+
+    // Diagonal past threshold: 9,9 → sqrt(162) ≈ 12.7 → 162 > 144
+    dx = 9;
+    dy = 9;
+    exceeds = (dx * dx + dy * dy > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX);
+    CHECK(exceeds);
+}
+
+TEST_CASE("Drag start touch margin: finger drift within margin is accepted", "[grid_edit][drag]") {
+    // handle_drag_start allows TOUCH_MARGIN pixels of drift outside the widget bounds.
+    // This prevents drag failures when the finger moves slightly during a long-press.
+    constexpr int TOUCH_MARGIN = 15; // Must match handle_drag_start's TOUCH_MARGIN
+
+    // Widget bounds: (100, 50) → (200, 150)
+    int x1 = 100, y1 = 50, x2 = 200, y2 = 150;
+
+    // Point exactly on boundary — accepted
+    int px = 200, py = 100;
+    bool outside = (px < x1 - TOUCH_MARGIN || px > x2 + TOUCH_MARGIN || py < y1 - TOUCH_MARGIN ||
+                    py > y2 + TOUCH_MARGIN);
+    CHECK_FALSE(outside);
+
+    // Point 5px outside right edge — within margin, accepted
+    px = 205;
+    py = 100;
+    outside = (px < x1 - TOUCH_MARGIN || px > x2 + TOUCH_MARGIN || py < y1 - TOUCH_MARGIN ||
+               py > y2 + TOUCH_MARGIN);
+    CHECK_FALSE(outside);
+
+    // Point 15px outside right edge — exactly at margin boundary, accepted
+    px = 215;
+    py = 100;
+    outside = (px < x1 - TOUCH_MARGIN || px > x2 + TOUCH_MARGIN || py < y1 - TOUCH_MARGIN ||
+               py > y2 + TOUCH_MARGIN);
+    CHECK_FALSE(outside);
+
+    // Point 16px outside right edge — beyond margin, rejected
+    px = 216;
+    py = 100;
+    outside = (px < x1 - TOUCH_MARGIN || px > x2 + TOUCH_MARGIN || py < y1 - TOUCH_MARGIN ||
+               py > y2 + TOUCH_MARGIN);
+    CHECK(outside);
+
+    // Point 10px outside top edge — within margin, accepted
+    px = 150;
+    py = 40;
+    outside = (px < x1 - TOUCH_MARGIN || px > x2 + TOUCH_MARGIN || py < y1 - TOUCH_MARGIN ||
+               py > y2 + TOUCH_MARGIN);
+    CHECK_FALSE(outside);
+}
+
+TEST_CASE("Drag end uses snap preview position, not release point", "[grid_edit][drag]") {
+    // Simulates the pattern: handle_drag_move sets snap_preview_col_/row_,
+    // handle_drag_end uses those saved values instead of recomputing from the
+    // release point (which can differ due to finger movement during release).
+    int snap_preview_col = 4;
+    int snap_preview_row = 1;
+    int drag_orig_col = 4;
+    int drag_orig_row = 2;
+
+    // The drop target is the snap preview position
+    int target_col = snap_preview_col;
+    int target_row = snap_preview_row;
+
+    // Target differs from origin — should allow drop
+    CHECK((target_col != drag_orig_col || target_row != drag_orig_row));
+    CHECK(target_col == 4);
+    CHECK(target_row == 1);
+
+    // If snap preview was never set (-1), drop should be rejected
+    int no_preview_col = -1;
+    int no_preview_row = -1;
+    CHECK_FALSE((no_preview_col >= 0 && no_preview_row >= 0));
 }

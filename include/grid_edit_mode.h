@@ -60,6 +60,7 @@ class GridEditMode {
     void handle_long_press(lv_event_t* e);
     void handle_pressing(lv_event_t* e);
     void handle_released(lv_event_t* e);
+    void handle_drag_start(lv_event_t* e);
 
     /// Open the widget catalog overlay for adding a new widget.
     /// @param screen  The parent screen to host the overlay
@@ -86,8 +87,11 @@ class GridEditMode {
     /// Returns -1 if not found.
     int find_config_index_for_widget(lv_obj_t* widget) const;
 
+    /// Sync config grid positions from actual widget screen coordinates.
+    /// Called on enter() to ensure config matches the visual layout.
+    void sync_config_from_screen();
+
     // Drag helpers
-    void handle_drag_start(lv_event_t* e);
     void handle_drag_move(lv_event_t* e);
     void handle_drag_end(lv_event_t* e);
     void create_drag_ghost(int col, int row, int colspan, int rowspan);
@@ -115,8 +119,14 @@ class GridEditMode {
     SaveCallback save_cb_;
     RebuildCallback rebuild_cb_;
 
+    // Drag threshold: track press origin, only start real drag after movement
+    static constexpr int DRAG_THRESHOLD_PX = 12;
+    bool drag_pending_ = false;        // Finger is down on a widget, watching for threshold
+    lv_point_t press_origin_ = {0, 0}; // Screen point where the press started
+
     // Drag state
     bool dragging_ = false;
+    int drag_cfg_idx_ = -1; // Config index of dragged widget (saved at drag start)
     int drag_orig_col_ = -1;
     int drag_orig_row_ = -1;
     int drag_orig_colspan_ = 1;

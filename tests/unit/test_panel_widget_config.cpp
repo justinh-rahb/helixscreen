@@ -977,9 +977,12 @@ TEST_CASE_METHOD(PanelWidgetConfigFixture,
     }
     REQUIRE(power_saved != nullptr);
     REQUIRE(power_saved->contains("id"));
-    // Auto-placed entries should not have col/row in saved JSON
-    REQUIRE_FALSE(power_saved->contains("col"));
-    REQUIRE_FALSE(power_saved->contains("row"));
+    // All entries always write col/row to JSON so positions survive reload.
+    // Auto-placed entries that haven't been placed yet will have col=-1, row=-1.
+    REQUIRE(power_saved->contains("col"));
+    REQUIRE(power_saved->contains("row"));
+    CHECK(power_saved->at("col").get<int>() == -1);
+    CHECK(power_saved->at("row").get<int>() == -1);
 }
 
 TEST_CASE_METHOD(PanelWidgetConfigFixture,

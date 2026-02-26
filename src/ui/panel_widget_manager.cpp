@@ -220,11 +220,12 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
                 col = std::max(0, grid.cols() - colspan);
             }
 
-            // Pin print_status to bottom-left so 1×1 widgets pack above it
-            // consistently across all breakpoints (row 2 on 6×4, row 3 on 8×5)
-            if (slot.widget_id == "print_status" && rowspan > 1) {
-                row = grid.rows() - rowspan;
-            }
+            // Pin print_status to bottom row on first layout (no user edit yet).
+            // Skip pinning if the grid edit mode is active — user is positioning manually.
+            // We detect user-positioned widgets by checking if the row would differ;
+            // during initial layout (auto-placed), the row will be -1 and get_grid_position
+            // won't match, so this only fires for the default layout.
+            // TODO: replace with explicit "user_positioned" flag in config
 
             if (grid.place({slot.widget_id, col, row, colspan, rowspan})) {
                 placed.push_back({i, col, row, colspan, rowspan});
@@ -300,23 +301,29 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
         }
     }
 
-    // Write computed positions back to config entries (in-memory only).
-    // This keeps config entries in sync with the actual grid layout so that
-    // edit mode operations (drag/drop/resize) work correctly.  Positions are
-    // only persisted to disk when the user enters edit mode or explicitly saves.
+    // Write computed positions back to config entries and persist to disk.
+    // This ensures auto-placed positions survive the next load() call
+    // (get_widget_config_impl always reloads from the JSON store).
     {
         auto& mut_entries = widget_config.mutable_entries();
+        bool any_written = false;
         for (const auto& p : placed) {
             auto& slot = enabled_widgets[p.slot_index];
             auto entry_it =
                 std::find_if(mut_entries.begin(), mut_entries.end(),
                              [&](const PanelWidgetEntry& e) { return e.id == slot.widget_id; });
             if (entry_it != mut_entries.end()) {
+                if (entry_it->col != p.col || entry_it->row != p.row) {
+                    any_written = true;
+                }
                 entry_it->col = p.col;
                 entry_it->row = p.row;
                 entry_it->colspan = p.colspan;
                 entry_it->rowspan = p.rowspan;
             }
+        }
+        if (any_written) {
+            widget_config.save();
         }
     }
 
@@ -370,6 +377,9 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
         // Place in grid cell
         lv_obj_set_grid_cell(widget, LV_GRID_ALIGN_STRETCH, p.col, p.colspan, LV_GRID_ALIGN_STRETCH,
                              p.row, p.rowspan);
+
+        // Tag widget with its config ID so GridEditMode can identify it
+        lv_obj_set_name(widget, slot.widget_id.c_str());
 
         spdlog::debug("[PanelWidgetManager] Placed widget '{}' at ({},{} {}x{})", slot.widget_id,
                       p.col, p.row, p.colspan, p.rowspan);

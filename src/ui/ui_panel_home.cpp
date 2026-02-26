@@ -48,6 +48,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <set>
 
@@ -55,6 +56,27 @@ using namespace helix;
 
 // Signal polling interval (5 seconds)
 static constexpr uint32_t SIGNAL_POLL_INTERVAL_MS = 5000;
+
+/// Recursively set EVENT_BUBBLE on all descendants so touch events
+/// (long_press, click, etc.) propagate up to the container.
+static void set_event_bubble_recursive(lv_obj_t* obj) {
+    uint32_t count = lv_obj_get_child_count(obj);
+    for (uint32_t i = 0; i < count; ++i) {
+        lv_obj_t* child = lv_obj_get_child(obj, static_cast<int32_t>(i));
+        lv_obj_add_flag(child, LV_OBJ_FLAG_EVENT_BUBBLE);
+        set_event_bubble_recursive(child);
+    }
+}
+
+/// Recursively remove CLICKABLE flag from all descendants.
+static void disable_widget_clicks_recursive(lv_obj_t* obj) {
+    uint32_t count = lv_obj_get_child_count(obj);
+    for (uint32_t i = 0; i < count; ++i) {
+        lv_obj_t* child = lv_obj_get_child(obj, static_cast<int32_t>(i));
+        lv_obj_remove_flag(child, LV_OBJ_FLAG_CLICKABLE);
+        disable_widget_clicks_recursive(child);
+    }
+}
 
 HomePanel::HomePanel(PrinterState& printer_state, MoonrakerAPI* api)
     : PanelBase(printer_state, api) {
@@ -221,6 +243,18 @@ void HomePanel::populate_widgets() {
 
     // Delegate generic widget creation to the manager
     active_widgets_ = helix::PanelWidgetManager::instance().populate_widgets("home", container);
+
+    // Enable event bubbling on the entire widget subtree so touch events
+    // (long_press, click, etc.) propagate from deeply-nested clickable
+    // elements up to the widget_container, where the grid edit mode
+    // handlers are registered via XML.
+    set_event_bubble_recursive(container);
+
+    // If edit mode is active (e.g. rebuild triggered during editing),
+    // disable clickability so widget click handlers don't fire.
+    if (grid_edit_mode_.is_active()) {
+        disable_widget_clicks_recursive(container);
+    }
 
     // HomePanel-specific: cache references for light_icon_, power_icon_, etc.
     cache_widget_references();
@@ -937,11 +971,36 @@ void HomePanel::on_home_grid_long_press(lv_event_t* e) {
     extern HomePanel& get_global_home_panel();
     auto& panel = get_global_home_panel();
     if (!panel.grid_edit_mode_.is_active()) {
+        // Cancel the in-progress press to prevent the widget's click action
+        // from firing on release. Also clears PRESSED state from tracked objects.
+        lv_indev_t* indev = lv_indev_active();
+        if (indev) {
+            lv_indev_reset(indev, nullptr);
+        }
+        // Clear PRESSED state from all descendants — the pressed button
+        // may be deeply nested inside a widget (e.g., print_status card).
+        auto* wc = lv_obj_find_by_name(panel.panel_, "widget_container");
+        if (wc) {
+            std::function<void(lv_obj_t*)> clear_pressed = [&](lv_obj_t* obj) {
+                lv_obj_remove_state(obj, LV_STATE_PRESSED);
+                uint32_t count = lv_obj_get_child_count(obj);
+                for (uint32_t i = 0; i < count; ++i) {
+                    clear_pressed(lv_obj_get_child(obj, static_cast<int32_t>(i)));
+                }
+            };
+            clear_pressed(wc);
+        }
+
         // Enter edit mode on first long-press
         auto* container = lv_obj_find_by_name(panel.panel_, "widget_container");
         auto& config = helix::PanelWidgetManager::instance().get_widget_config("home");
         panel.grid_edit_mode_.set_rebuild_callback([&panel]() { panel.populate_widgets(); });
         panel.grid_edit_mode_.enter(container, &config);
+        // Select the widget under the finger and start dragging immediately.
+        panel.grid_edit_mode_.handle_click(e);
+        if (panel.grid_edit_mode_.selected_widget()) {
+            panel.grid_edit_mode_.handle_drag_start(e);
+        }
     } else {
         // Already in edit mode — start drag if a widget is selected
         panel.grid_edit_mode_.handle_long_press(e);
