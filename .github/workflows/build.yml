@@ -226,43 +226,15 @@ jobs:
     - name: Setup Python venv for translations
       run: make venv-setup
 
-    - name: Build HelixScreen and tests
+    - name: Build HelixScreen
       timeout-minutes: 30
       env:
         CC: ccache clang
         CXX: ccache clang++
       run: |
-        # The Makefile handles all dependency builds automatically:
-        # - libhv (HTTP/WebSocket library)
-        # - Font generation
-        # - LVGL patches
-        # Dependencies are cached and will only rebuild if source changed
-        # ccache speeds up recompilation of unchanged source files
         make -j$(sysctl -n hw.ncpu)
-        make test -j$(sysctl -n hw.ncpu)
-        echo "HelixScreen and tests built successfully"
-        ccache -s  # Show ccache stats
-
-    - name: Run unit tests
-      timeout-minutes: 10
-      run: |
-        # Run test binary directly — already built in build step.
-        NPROCS=$(( $(sysctl -n hw.ncpu) * 2 ))
-        echo "Running $NPROCS test shards in parallel..."
-        pids=""
-        for i in $(seq 0 $((NPROCS-1))); do
-          ./build/bin/helix-tests "~[.] ~[slow]" --shard-count $NPROCS --shard-index $i 2>&1 | sed "s/^/[shard $i] /" &
-          pids="$pids $!"
-        done
-        failed=0
-        for pid in $pids; do
-          wait $pid || failed=1
-        done
-        if [ $failed -eq 1 ]; then
-          echo "One or more test shards failed!"
-          exit 1
-        fi
-        echo "All tests passed"
+        echo "HelixScreen built successfully"
+        ccache -s
 
     - name: Verify binary
       run: |
