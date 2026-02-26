@@ -85,6 +85,9 @@ struct AmsSlotData {
     // Fill level for Spoolman integration (0.0 = empty, 1.0 = full)
     float fill_level = 1.0f;
 
+    // Empty slot placeholder (dashed-style circle shown when no filament assigned)
+    lv_obj_t* empty_placeholder = nullptr;
+
     // Error/health indicators (dynamic overlays on spool_container)
     lv_obj_t* error_indicator = nullptr; // Error icon badge at top-right of spool
 
@@ -275,6 +278,7 @@ static void apply_slot_status(AmsSlotData* data, int status_int) {
     // Handle spool visibility based on status and assignment
     lv_opa_t spool_opa = LV_OPA_COVER;
     bool show_spool = true;
+    bool show_empty_placeholder = false;
 
     if (status == SlotStatus::EMPTY) {
         // Check if slot is assigned (has Spoolman data or material)
@@ -289,18 +293,32 @@ static void apply_slot_status(AmsSlotData* data, int status_int) {
             // Assigned but empty: ghosted spool at 20%
             spool_opa = LV_OPA_20;
         } else {
-            // Unassigned and empty: hide spool entirely
+            // Unassigned and empty: hide spool, show empty placeholder circle
             show_spool = false;
+            show_empty_placeholder = true;
         }
     }
 
     // Apply visibility and opacity to spool elements
-    if (data->spool_container) {
-        if (show_spool) {
-            lv_obj_remove_flag(data->spool_container, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(data->spool_container, LV_OBJ_FLAG_HIDDEN);
-        }
+    // Always keep spool_container visible for click targeting
+    if (show_spool) {
+        if (data->color_swatch)
+            lv_obj_remove_flag(data->color_swatch, LV_OBJ_FLAG_HIDDEN);
+        if (data->spool_outer)
+            lv_obj_remove_flag(data->spool_outer, LV_OBJ_FLAG_HIDDEN);
+        if (data->spool_hub)
+            lv_obj_remove_flag(data->spool_hub, LV_OBJ_FLAG_HIDDEN);
+        if (data->spool_canvas)
+            lv_obj_remove_flag(data->spool_canvas, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        if (data->color_swatch)
+            lv_obj_add_flag(data->color_swatch, LV_OBJ_FLAG_HIDDEN);
+        if (data->spool_outer)
+            lv_obj_add_flag(data->spool_outer, LV_OBJ_FLAG_HIDDEN);
+        if (data->spool_hub)
+            lv_obj_add_flag(data->spool_hub, LV_OBJ_FLAG_HIDDEN);
+        if (data->spool_canvas)
+            lv_obj_add_flag(data->spool_canvas, LV_OBJ_FLAG_HIDDEN);
     }
     if (data->color_swatch)
         lv_obj_set_style_bg_opa(data->color_swatch, spool_opa, LV_PART_MAIN);
@@ -309,9 +327,20 @@ static void apply_slot_status(AmsSlotData* data, int status_int) {
     if (data->spool_canvas)
         lv_obj_set_style_opa(data->spool_canvas, spool_opa, LV_PART_MAIN);
 
+    // Show/hide empty slot placeholder
+    if (data->empty_placeholder) {
+        if (show_empty_placeholder) {
+            lv_obj_remove_flag(data->empty_placeholder, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(data->empty_placeholder, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
     spdlog::trace("[AmsSlot] Slot {} status={} badge={} spool={}", data->slot_index,
                   slot_status_to_string(status), show_badge ? "visible" : "hidden",
-                  show_spool ? (spool_opa == LV_OPA_COVER ? "full" : "ghosted") : "hidden");
+                  show_empty_placeholder ? "placeholder"
+                  : show_spool           ? (spool_opa == LV_OPA_COVER ? "full" : "ghosted")
+                                         : "hidden");
 }
 
 /**
@@ -608,6 +637,22 @@ static void create_spool_visualization(AmsSlotData* data) {
         data->spool_hub = hub;
 
         spdlog::debug("[AmsSlot] Created flat spool rings ({}x{})", spool_size, spool_size);
+    }
+
+    // Create empty slot placeholder (muted circle outline, initially hidden)
+    {
+        lv_obj_t* ph = lv_obj_create(data->spool_container);
+        lv_obj_set_size(ph, spool_size - 4, spool_size - 4);
+        lv_obj_align(ph, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_radius(ph, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(ph, LV_OPA_TRANSP, LV_PART_MAIN);
+        lv_obj_set_style_border_width(ph, 2, LV_PART_MAIN);
+        lv_obj_set_style_border_color(ph, theme_manager_get_color("text_muted"), LV_PART_MAIN);
+        lv_obj_set_style_border_opa(ph, LV_OPA_40, LV_PART_MAIN);
+        lv_obj_remove_flag(ph, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_flag(ph, LV_OBJ_FLAG_EVENT_BUBBLE);
+        lv_obj_add_flag(ph, LV_OBJ_FLAG_HIDDEN);
+        data->empty_placeholder = ph;
     }
 
     // Create error indicator dot (top-right of spool_container, initially hidden)

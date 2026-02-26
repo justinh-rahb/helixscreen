@@ -1283,6 +1283,7 @@ void AmsPanel::show_context_menu(int slot_index, lv_obj_t* near_widget, lv_point
                 break;
 
             case helix::ui::AmsContextMenu::MenuAction::EDIT:
+            case helix::ui::AmsContextMenu::MenuAction::SPOOLMAN:
                 show_edit_modal(slot);
                 break;
 
