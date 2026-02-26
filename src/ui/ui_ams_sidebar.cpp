@@ -248,7 +248,11 @@ void AmsOperationSidebar::init_observers() {
     // Extruder temp observer: checks pending preheat load
     extruder_temp_observer_ = observe_int_sync<AmsOperationSidebar>(
         printer_state_.get_active_extruder_temp_subject(), this,
-        [](AmsOperationSidebar* self, int /*temp_centi*/) { self->check_pending_load(); });
+        [](AmsOperationSidebar* self, int /*temp_centi*/) {
+            if (!self->active_)
+                return;
+            self->check_pending_load();
+        });
 }
 
 // ============================================================================
@@ -259,31 +263,33 @@ void AmsOperationSidebar::cleanup() {
     // Clear active flag FIRST to prevent observer callbacks from using freed widgets
     active_ = false;
 
-    // Reset dryer card
-    dryer_card_.reset();
-
-    // Clear observers (except extruder_temp if preheat pending)
-    action_observer_.reset();
-    current_slot_observer_.reset();
-    bypass_spool_observer_.reset();
-    color_observer_.reset();
-
-    if (pending_load_slot_ < 0) {
-        extruder_temp_observer_.reset();
-    }
-    // extruder_temp_observer_ intentionally kept if preheat pending
-
-    // Don't cancel preheat state
-    pending_bypass_enable_ = false;
-    prev_ams_action_ = AmsAction::IDLE;
-
-    // Clear widget refs
+    // Nullify widget refs BEFORE resetting observers — any cascading observer
+    // callbacks that slip through the active_ guard will see null pointers and
+    // bail out, preventing use-after-free on deleted LVGL objects.
     if (sidebar_root_) {
         lv_obj_set_user_data(sidebar_root_, nullptr);
     }
     sidebar_root_ = nullptr;
     step_progress_ = nullptr;
     step_progress_container_ = nullptr;
+
+    // Reset dryer card
+    dryer_card_.reset();
+
+    // Reset ALL observers unconditionally. Keeping extruder_temp_observer_ alive
+    // across panel switches is unsafe — the sidebar may be destroyed while the
+    // observer still holds a raw pointer to it.
+    action_observer_.reset();
+    current_slot_observer_.reset();
+    bypass_spool_observer_.reset();
+    color_observer_.reset();
+    extruder_temp_observer_.reset();
+
+    // Clear all pending state
+    pending_bypass_enable_ = false;
+    pending_load_slot_ = -1;
+    pending_load_target_temp_ = 0;
+    prev_ams_action_ = AmsAction::IDLE;
 
     spdlog::debug("[AmsSidebar] Cleaned up");
 }

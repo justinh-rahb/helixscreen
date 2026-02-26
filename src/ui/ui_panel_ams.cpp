@@ -406,23 +406,17 @@ void AmsPanel::on_deactivate() {
 }
 
 void AmsPanel::clear_panel_reference() {
+    // Mark subjects uninitialized FIRST — observer callbacks check this and bail out
+    subjects_initialized_ = false;
+
     // Reset extracted UI modules (they handle their own RAII cleanup)
     sidebar_.reset();
     context_menu_.reset();
     edit_modal_.reset();
     error_modal_.reset();
 
-    // Clear observer guards BEFORE clearing widget pointers (they reference widgets)
-    slots_version_observer_.reset();
-    action_observer_.reset();
-    current_slot_observer_.reset();
-    slot_count_observer_.reset();
-    path_segment_observer_.reset();
-    path_topology_observer_.reset();
-    backend_count_observer_.reset();
-    external_spool_observer_.reset();
-
-    // Now clear all widget references
+    // Nullify widget pointers BEFORE resetting observers — any cascading
+    // observer callbacks during teardown will see null and bail out.
     panel_ = nullptr;
     parent_screen_ = nullptr;
     slot_grid_ = nullptr;
@@ -438,8 +432,15 @@ void AmsPanel::clear_panel_reference() {
         label_widgets_[i] = nullptr;
     }
 
-    // Reset subjects_initialized_ so observers are recreated on next access
-    subjects_initialized_ = false;
+    // Now reset observer guards
+    slots_version_observer_.reset();
+    action_observer_.reset();
+    current_slot_observer_.reset();
+    slot_count_observer_.reset();
+    path_segment_observer_.reset();
+    path_topology_observer_.reset();
+    backend_count_observer_.reset();
+    external_spool_observer_.reset();
 
     spdlog::debug("[AMS Panel] Cleared all widget references");
 }

@@ -306,7 +306,14 @@ void ZOffsetCalibrationPanel::cleanup() {
     // Cancel any pending operation timeout
     operation_guard_.end();
 
-    // Reset ObserverGuards to remove observers before cleanup (applying [L020])
+    // Nullify widget pointers BEFORE resetting observers — any cascading
+    // observer callbacks during teardown will see null and bail out.
+    saved_z_offset_display_ = nullptr;
+    z_position_display_ = nullptr;
+    final_offset_label_ = nullptr;
+    error_message_ = nullptr;
+
+    // Reset ObserverGuards (applying [L020])
     manual_probe_active_observer_.reset();
     manual_probe_z_observer_.reset();
     bed_temp_observer_.reset();
@@ -319,12 +326,7 @@ void ZOffsetCalibrationPanel::cleanup() {
     // Call base class to set cleanup_called_ flag
     OverlayBase::cleanup();
 
-    // Clear references
     parent_screen_ = nullptr;
-    saved_z_offset_display_ = nullptr;
-    z_position_display_ = nullptr;
-    final_offset_label_ = nullptr;
-    error_message_ = nullptr;
 }
 
 // ============================================================================
