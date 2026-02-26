@@ -146,6 +146,11 @@ struct FilamentPathData {
     bool flow_anim_active = false;
     int32_t flow_offset = 0; // 0 → FLOW_DOT_SPACING, cycles continuously
 
+    // Output-X slide animation (LINEAR: output exits beneath active slot)
+    int32_t output_x_current = 0; // Current animated X position
+    int32_t output_x_target = 0;  // Target X position
+    bool output_x_anim_active = false;
+
     // Callbacks
     filament_path_slot_cb_t slot_callback = nullptr;
     void* slot_user_data = nullptr;
@@ -260,6 +265,7 @@ static void heat_pulse_anim_cb(void* var, int32_t value);
 static void flow_anim_cb(void* var, int32_t value);
 static void start_flow_animation(lv_obj_t* obj, FilamentPathData* data);
 static void stop_flow_animation(lv_obj_t* obj, FilamentPathData* data);
+static void output_x_anim_cb(void* var, int32_t value);
 
 // Start segment transition animation
 static void start_segment_animation(lv_obj_t* obj, FilamentPathData* data, int from_segment,
@@ -503,6 +509,52 @@ static void flow_anim_cb(void* var, int32_t value) {
     data->flow_offset = value;
     helix::ui::async_call(
         obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
+}
+
+// Output X slide animation callback (LINEAR topology)
+static void output_x_anim_cb(void* var, int32_t value) {
+    auto* obj = static_cast<lv_obj_t*>(var);
+    auto* data = get_data(obj);
+    if (!data)
+        return;
+    data->output_x_current = value;
+    lv_obj_invalidate(obj);
+}
+
+static constexpr int OUTPUT_X_ANIM_DURATION_MS = 250;
+
+static void start_output_x_animation(lv_obj_t* obj, FilamentPathData* data, int32_t from_x,
+                                     int32_t to_x) {
+    if (!obj || !data)
+        return;
+    lv_anim_delete(obj, output_x_anim_cb);
+
+    if (!DisplaySettingsManager::instance().get_animations_enabled()) {
+        data->output_x_current = to_x;
+        data->output_x_target = to_x;
+        data->output_x_anim_active = false;
+        lv_obj_invalidate(obj);
+        return;
+    }
+
+    data->output_x_anim_active = true;
+    data->output_x_target = to_x;
+
+    lv_anim_t anim;
+    lv_anim_init(&anim);
+    lv_anim_set_var(&anim, obj);
+    lv_anim_set_values(&anim, from_x, to_x);
+    lv_anim_set_duration(&anim, OUTPUT_X_ANIM_DURATION_MS);
+    lv_anim_set_exec_cb(&anim, output_x_anim_cb);
+    lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
+    lv_anim_set_completed_cb(&anim, [](lv_anim_t* a) {
+        auto* obj = static_cast<lv_obj_t*>(a->var);
+        auto* data = get_data(obj);
+        if (data) {
+            data->output_x_anim_active = false;
+        }
+    });
+    lv_anim_start(&anim);
 }
 
 // ============================================================================
@@ -1367,6 +1419,20 @@ static void filament_path_draw_cb(lv_event_t* e) {
         output_y = hub_y + hub_h / 2;
     }
 
+    // LINEAR: output exits beneath the active slot, not center
+    int32_t output_x = center_x; // default for HUB
+    if (data->topology == 0 && data->active_slot >= 0) {
+        int32_t target_x = x_off + get_slot_x(data, data->active_slot, x_off);
+        // Use animated position if available, otherwise snap
+        if (data->output_x_anim_active) {
+            output_x = data->output_x_current;
+        } else {
+            output_x = target_x;
+            data->output_x_current = target_x;
+            data->output_x_target = target_x;
+        }
+    }
+
     // Determine which segment has error (if any)
     bool has_error = data->error_segment > 0;
     PathSegment error_seg = static_cast<PathSegment>(data->error_segment);
@@ -1698,25 +1764,54 @@ static void filament_path_draw_cb(lv_event_t* e) {
             output_dot_color = error_color;
             output_dot_filled = true;
         }
-        draw_sensor_dot(layer, center_x, output_y, output_dot_color, output_dot_filled, sensor_r);
+        draw_sensor_dot(layer, output_x, output_y, output_dot_color, output_dot_filled, sensor_r);
 
         // When bypass is hidden, output connects directly to toolhead (no merge point gap)
         int32_t output_end_y = data->show_bypass ? bypass_merge_y : toolhead_y;
 
         // Segment: output sensor → merge point (or toolhead when bypass hidden)
-        // Only colored when AMS filament flows through hub (NOT during bypass)
-        if (ams_output_active) {
-            lv_color_t seg_color = active_color;
-            if (has_error && error_seg == PathSegment::OUTPUT) {
-                seg_color = error_color;
+        // LINEAR: S-curve from output_x down to center_x
+        // HUB: straight vertical at center_x
+        if (data->topology == 0 && output_x != center_x) {
+            // S-curve from (output_x, output_y+sensor_r) to (center_x, output_end_y-sensor_r)
+            int32_t oc_start_y = output_y + sensor_r;
+            int32_t oc_end_y = output_end_y - sensor_r;
+            int32_t oc_drop = oc_end_y - oc_start_y;
+            int32_t oc_cp1_x = output_x;
+            int32_t oc_cp1_y = oc_start_y + oc_drop * 2 / 5;
+            int32_t oc_cp2_x = center_x;
+            int32_t oc_cp2_y = oc_end_y - oc_drop * 2 / 5;
+            if (ams_output_active) {
+                lv_color_t seg_color = active_color;
+                if (has_error && error_seg == PathSegment::OUTPUT) {
+                    seg_color = error_color;
+                }
+                draw_glow_curve(layer, output_x, oc_start_y, oc_cp1_x, oc_cp1_y, oc_cp2_x, oc_cp2_y,
+                                center_x, oc_end_y, seg_color, line_active);
+                draw_curved_tube(layer, output_x, oc_start_y, oc_cp1_x, oc_cp1_y, oc_cp2_x,
+                                 oc_cp2_y, center_x, oc_end_y, seg_color, line_active,
+                                 /*cap_start=*/false);
+            } else {
+                draw_curved_hollow_tube(layer, output_x, oc_start_y, oc_cp1_x, oc_cp1_y, oc_cp2_x,
+                                        oc_cp2_y, center_x, oc_end_y, idle_color, bg_color,
+                                        line_active, /*cap_start=*/false);
             }
-            draw_glow_line(layer, center_x, output_y + sensor_r, center_x, output_end_y - sensor_r,
-                           seg_color, line_active);
-            draw_vertical_line(layer, center_x, output_y + sensor_r, output_end_y - sensor_r,
-                               seg_color, line_active);
         } else {
-            draw_hollow_vertical_line(layer, center_x, output_y + sensor_r, output_end_y - sensor_r,
-                                      idle_color, bg_color, line_active);
+            // HUB or LINEAR with output at center: straight vertical
+            if (ams_output_active) {
+                lv_color_t seg_color = active_color;
+                if (has_error && error_seg == PathSegment::OUTPUT) {
+                    seg_color = error_color;
+                }
+                draw_glow_line(layer, center_x, output_y + sensor_r, center_x,
+                               output_end_y - sensor_r, seg_color, line_active);
+                draw_vertical_line(layer, center_x, output_y + sensor_r, output_end_y - sensor_r,
+                                   seg_color, line_active);
+            } else {
+                draw_hollow_vertical_line(layer, center_x, output_y + sensor_r,
+                                          output_end_y - sensor_r, idle_color, bg_color,
+                                          line_active);
+            }
         }
     }
 
@@ -1799,8 +1894,29 @@ static void filament_path_draw_cb(lv_event_t* e) {
 
         // Flow dots on center path: hub → output → toolhead sensor
         int32_t hub_bottom = hub_y + hub_h / 2;
-        draw_flow_dots_line(layer, center_x, hub_bottom, center_x, toolhead_y - sensor_r,
-                            flow_color, data->flow_offset, reverse);
+        if (data->topology == 0 && output_x != center_x) {
+            // LINEAR: flow dots from hub bottom to output_x, then curve to center
+            draw_flow_dots_line(layer, output_x, hub_bottom, output_x, output_y + sensor_r,
+                                flow_color, data->flow_offset, reverse);
+            int32_t oc_start_y = output_y + sensor_r;
+            int32_t oc_end_y = (data->show_bypass ? bypass_merge_y : toolhead_y) - sensor_r;
+            int32_t oc_drop = oc_end_y - oc_start_y;
+            int32_t oc_cp1_x = output_x;
+            int32_t oc_cp1_y = oc_start_y + oc_drop * 2 / 5;
+            int32_t oc_cp2_x = center_x;
+            int32_t oc_cp2_y = oc_end_y - oc_drop * 2 / 5;
+            draw_flow_dots_curve(layer, output_x, oc_start_y, oc_cp1_x, oc_cp1_y, oc_cp2_x,
+                                 oc_cp2_y, center_x, oc_end_y, flow_color, data->flow_offset,
+                                 reverse);
+            // Continue straight from merge/bypass to toolhead if bypass shown
+            if (data->show_bypass) {
+                draw_flow_dots_line(layer, center_x, bypass_merge_y, center_x,
+                                    toolhead_y - sensor_r, flow_color, data->flow_offset, reverse);
+            }
+        } else {
+            draw_flow_dots_line(layer, center_x, hub_bottom, center_x, toolhead_y - sensor_r,
+                                flow_color, data->flow_offset, reverse);
+        }
     }
 
     // ========================================================================
@@ -1960,6 +2076,30 @@ static void filament_path_draw_cb(lv_event_t* e) {
             if (prev_seg <= PathSegment::PREP && fil_seg <= PathSegment::PREP) {
                 // Both ends on lane — stay at slot_x
                 tip_x = slot_x;
+            } else if (data->topology == 0 && output_x != center_x) {
+                // LINEAR: tip follows the output curve when crossing HUB<>OUTPUT or
+                // OUTPUT<>TOOLHEAD
+                bool on_output_curve =
+                    (prev_seg == PathSegment::HUB && fil_seg == PathSegment::OUTPUT) ||
+                    (prev_seg == PathSegment::OUTPUT && fil_seg == PathSegment::HUB) ||
+                    (prev_seg == PathSegment::OUTPUT && fil_seg == PathSegment::TOOLHEAD) ||
+                    (prev_seg == PathSegment::TOOLHEAD && fil_seg == PathSegment::OUTPUT);
+                if (on_output_curve) {
+                    int32_t oc_start_y = output_y + sensor_r;
+                    int32_t oc_end_y = (data->show_bypass ? bypass_merge_y : toolhead_y) - sensor_r;
+                    int32_t oc_drop = oc_end_y - oc_start_y;
+                    int32_t oc_cp1_x = output_x;
+                    int32_t oc_cp1_y = oc_start_y + oc_drop * 2 / 5;
+                    int32_t oc_cp2_x = center_x;
+                    int32_t oc_cp2_y = oc_end_y - oc_drop * 2 / 5;
+                    // Map tip_y to bezier t parameter (approximate via Y range)
+                    float t_approx = 0.0f;
+                    if (oc_end_y != oc_start_y) {
+                        t_approx = (float)(tip_y - oc_start_y) / (float)(oc_end_y - oc_start_y);
+                        t_approx = LV_CLAMP(t_approx, 0.0f, 1.0f);
+                    }
+                    tip_x = bezier_eval_1d(t_approx, output_x, oc_cp1_x, oc_cp2_x, center_x);
+                }
             }
         }
 
@@ -2275,7 +2415,21 @@ void ui_filament_path_canvas_set_slot_grid(lv_obj_t* obj, lv_obj_t* slot_grid) {
 void ui_filament_path_canvas_set_active_slot(lv_obj_t* obj, int slot) {
     auto* data = get_data(obj);
     if (data) {
+        int old_slot = data->active_slot;
         data->active_slot = slot;
+
+        // LINEAR topology: animate output_x sliding to new slot position
+        if (data->topology == 0 && slot >= 0 && old_slot >= 0 && old_slot != slot) {
+            lv_area_t coords;
+            lv_obj_get_coords(obj, &coords);
+            int32_t x_off = coords.x1;
+            int32_t new_x = x_off + get_slot_x(data, slot, x_off);
+            int32_t old_x = data->output_x_current;
+            if (old_x == 0)
+                old_x = x_off + get_slot_x(data, old_slot, x_off);
+            start_output_x_animation(obj, data, old_x, new_x);
+        }
+
         lv_obj_invalidate(obj);
     }
 }
