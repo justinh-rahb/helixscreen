@@ -19,7 +19,6 @@ class PrinterState;
 /// Home widget displaying part, hotend, and auxiliary fan speeds in a compact stack.
 /// Fan icons spin proportionally to fan speed when animations are enabled.
 /// Clicking opens the fan control overlay.
-/// Double-tap toggles between stack and carousel display modes.
 class FanStackWidget : public PanelWidget {
   public:
     explicit FanStackWidget(PrinterState& printer_state);
@@ -36,10 +35,6 @@ class FanStackWidget : public PanelWidget {
 
     /// XML event callback — opens fan control overlay
     static void on_fan_stack_clicked(lv_event_t* e);
-
-    // Double-click callbacks for toggling display mode
-    static void fan_stack_double_click_cb(lv_event_t* e);
-    static void fan_carousel_double_click_cb(lv_event_t* e);
 
   private:
     PrinterState& printer_state_;
@@ -92,7 +87,6 @@ class FanStackWidget : public PanelWidget {
     bool is_carousel_mode() const;
     void attach_stack(lv_obj_t* widget_obj);
     void attach_carousel(lv_obj_t* widget_obj);
-    void toggle_display_mode();
 
     void handle_clicked();
     void bind_fans();
@@ -100,8 +94,6 @@ class FanStackWidget : public PanelWidget {
     void update_label(lv_obj_t* label, int speed_pct);
     void update_fan_animation(lv_obj_t* icon, int speed_pct);
     void refresh_all_animations();
-
-    static void carousel_dial_double_click_cb(lv_event_t* e);
 
     /// Stop any running spin animation on an icon
     static void stop_spin(lv_obj_t* icon);

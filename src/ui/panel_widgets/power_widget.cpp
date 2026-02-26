@@ -5,7 +5,6 @@
 
 #include "ui_event_safety.h"
 #include "ui_icon.h"
-#include "ui_nav_manager.h"
 #include "ui_panel_power.h"
 #include "ui_update_queue.h"
 
@@ -30,7 +29,6 @@ void register_power_widget() {
 
     // Register XML event callbacks at startup (before any XML is parsed)
     lv_xml_register_event_cb(nullptr, "power_toggle_cb", PowerWidget::power_toggle_cb);
-    lv_xml_register_event_cb(nullptr, "power_long_press_cb", PowerWidget::power_long_press_cb);
 }
 
 PowerWidget::PowerWidget(MoonrakerAPI* api) : api_(api) {}
@@ -84,13 +82,6 @@ void PowerWidget::detach() {
 }
 
 void PowerWidget::handle_power_toggle() {
-    // Suppress click that follows a long-press gesture
-    if (power_long_pressed_) {
-        power_long_pressed_ = false;
-        spdlog::debug("[PowerWidget] Power click suppressed (follows long-press)");
-        return;
-    }
-
     spdlog::info("[PowerWidget] Power button clicked");
 
     if (!api_) {
@@ -126,17 +117,6 @@ void PowerWidget::handle_power_toggle() {
     // Optimistically update icon state
     power_on_ = new_state;
     update_power_icon(power_on_);
-}
-
-void PowerWidget::handle_power_long_press() {
-    spdlog::info("[PowerWidget] Power long-press: opening power panel overlay");
-
-    auto& panel = get_global_power_panel();
-    lv_obj_t* overlay = panel.get_or_create_overlay(parent_screen_);
-    if (overlay) {
-        power_long_pressed_ = true; // Suppress the click that follows long-press
-        NavigationManager::instance().push_overlay(overlay);
-    }
 }
 
 void PowerWidget::update_power_icon(bool is_on) {
@@ -205,17 +185,6 @@ void PowerWidget::power_toggle_cb(lv_event_t* e) {
         self->handle_power_toggle();
     } else {
         spdlog::warn("[PowerWidget] power_toggle_cb: could not recover widget instance");
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void PowerWidget::power_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[PowerWidget] power_long_press_cb");
-    auto* self = find_power_widget_ancestor(static_cast<lv_obj_t*>(lv_event_get_current_target(e)));
-    if (self) {
-        self->handle_power_long_press();
-    } else {
-        spdlog::warn("[PowerWidget] power_long_press_cb: could not recover widget instance");
     }
     LVGL_SAFE_EVENT_CB_END();
 }

@@ -141,9 +141,7 @@ void FavoriteMacroWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) 
 
     // Register XML event callbacks
     lv_xml_register_event_cb(nullptr, "favorite_macro_1_clicked_cb", clicked_1_cb);
-    lv_xml_register_event_cb(nullptr, "favorite_macro_1_long_press_cb", long_press_1_cb);
     lv_xml_register_event_cb(nullptr, "favorite_macro_2_clicked_cb", clicked_2_cb);
-    lv_xml_register_event_cb(nullptr, "favorite_macro_2_long_press_cb", long_press_2_cb);
     lv_xml_register_event_cb(nullptr, "fav_macro_picker_backdrop_cb", picker_backdrop_cb);
 
     // Cache label pointers from XML
@@ -184,11 +182,6 @@ void FavoriteMacroWidget::handle_clicked() {
         spdlog::info("[FavoriteMacroWidget] {} clicked - executing {}", widget_id_, macro_name_);
         fetch_and_execute();
     }
-}
-
-void FavoriteMacroWidget::handle_long_press() {
-    spdlog::info("[FavoriteMacroWidget] {} long-pressed - showing picker", widget_id_);
-    show_macro_picker();
 }
 
 MoonrakerAPI* FavoriteMacroWidget::get_api() const {
@@ -560,29 +553,11 @@ void FavoriteMacroWidget::clicked_1_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void FavoriteMacroWidget::long_press_1_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] long_press_1_cb");
-    auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
-    if (widget) {
-        widget->handle_long_press();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
 void FavoriteMacroWidget::clicked_2_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] clicked_2_cb");
     auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
     if (widget) {
         widget->handle_clicked();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void FavoriteMacroWidget::long_press_2_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] long_press_2_cb");
-    auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
-    if (widget) {
-        widget->handle_long_press();
     }
     LVGL_SAFE_EVENT_CB_END();
 }

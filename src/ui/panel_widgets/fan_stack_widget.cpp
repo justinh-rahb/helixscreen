@@ -12,12 +12,9 @@
 #include "ui_update_queue.h"
 
 #include "app_globals.h"
-#include "config.h"
 #include "display_settings_manager.h"
 #include "moonraker_api.h"
 #include "observer_factory.h"
-#include "panel_widget_config.h"
-#include "panel_widget_manager.h"
 #include "panel_widget_registry.h"
 #include "printer_fan_state.h"
 #include "printer_state.h"
@@ -28,32 +25,6 @@
 
 #include <cstdio>
 
-namespace {
-
-// Recursively add double-click handler to all descendants of an LVGL object,
-// skipping lv_arc widgets (interacting with the arc knob must not trigger mode toggle)
-static void add_double_click_recursive(lv_obj_t* obj, lv_event_cb_t cb, void* user_data) {
-    if (!obj)
-        return;
-    // Skip arc widgets — interactions on the knob are part of normal arc behavior
-    if (lv_obj_check_type(obj, &lv_arc_class)) {
-        return;
-    }
-    lv_obj_add_event_cb(obj, cb, LV_EVENT_DOUBLE_CLICKED, user_data);
-    uint32_t count = lv_obj_get_child_count(obj);
-    for (uint32_t i = 0; i < count; i++) {
-        add_double_click_recursive(lv_obj_get_child(obj, i), cb, user_data);
-    }
-}
-
-// File-local helper: get the shared PanelWidgetConfig instance for home panel
-helix::PanelWidgetConfig& get_widget_config_ref() {
-    static helix::PanelWidgetConfig config("home", *helix::Config::get_instance());
-    config.load();
-    return config;
-}
-} // namespace
-
 namespace helix {
 void register_fan_stack_widget() {
     register_widget_factory("fan_stack", []() {
@@ -63,10 +34,6 @@ void register_fan_stack_widget() {
 
     // Register XML event callbacks at startup (before any XML is parsed)
     lv_xml_register_event_cb(nullptr, "on_fan_stack_clicked", FanStackWidget::on_fan_stack_clicked);
-    lv_xml_register_event_cb(nullptr, "fan_stack_double_click_cb",
-                             FanStackWidget::fan_stack_double_click_cb);
-    lv_xml_register_event_cb(nullptr, "fan_carousel_double_click_cb",
-                             FanStackWidget::fan_carousel_double_click_cb);
 }
 } // namespace helix
 
@@ -179,25 +146,6 @@ void FanStackWidget::attach_carousel(lv_obj_t* widget_obj) {
         });
 
     spdlog::debug("[FanStackWidget] Attached carousel");
-}
-
-void FanStackWidget::toggle_display_mode() {
-    auto& wc = get_widget_config_ref();
-    nlohmann::json cfg = wc.get_widget_config("fan_stack");
-
-    if (is_carousel_mode()) {
-        cfg["display_mode"] = "stack";
-    } else {
-        cfg["display_mode"] = "carousel";
-    }
-
-    wc.set_widget_config("fan_stack", cfg);
-    spdlog::info("[FanStackWidget] Toggled display mode to '{}'",
-                 cfg["display_mode"].get<std::string>());
-
-    // Defer rebuild to avoid destroying widgets during event processing
-    helix::ui::async_call(
-        [](void*) { PanelWidgetManager::instance().notify_config_changed("home"); }, nullptr);
 }
 
 void FanStackWidget::detach() {
@@ -523,9 +471,6 @@ void FanStackWidget::bind_carousel_fans() {
             carousel_observers_.push_back(std::move(obs));
         }
 
-        // Wire double-click on all FanDial descendants so mode toggle works
-        add_double_click_recursive(root, carousel_dial_double_click_cb, this);
-
         fan_dials_.push_back(std::move(dial));
     }
 
@@ -605,49 +550,6 @@ void FanStackWidget::on_fan_stack_clicked(lv_event_t* e) {
         self->handle_clicked();
     } else {
         spdlog::warn("[FanStackWidget] on_fan_stack_clicked: could not recover widget instance");
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void FanStackWidget::fan_stack_double_click_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] fan_stack_double_click_cb");
-    auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    auto* self = static_cast<FanStackWidget*>(lv_obj_get_user_data(target));
-    if (!self) {
-        lv_obj_t* parent = lv_obj_get_parent(target);
-        while (parent && !self) {
-            self = static_cast<FanStackWidget*>(lv_obj_get_user_data(parent));
-            parent = lv_obj_get_parent(parent);
-        }
-    }
-    if (self) {
-        self->toggle_display_mode();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void FanStackWidget::fan_carousel_double_click_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] fan_carousel_double_click_cb");
-    auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    auto* self = static_cast<FanStackWidget*>(lv_obj_get_user_data(target));
-    if (!self) {
-        lv_obj_t* parent = lv_obj_get_parent(target);
-        while (parent && !self) {
-            self = static_cast<FanStackWidget*>(lv_obj_get_user_data(parent));
-            parent = lv_obj_get_parent(parent);
-        }
-    }
-    if (self) {
-        self->toggle_display_mode();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void FanStackWidget::carousel_dial_double_click_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FanStackWidget] carousel_dial_double_click_cb");
-    auto* self = static_cast<FanStackWidget*>(lv_event_get_user_data(e));
-    if (self && self->widget_obj_) {
-        self->toggle_display_mode();
     }
     LVGL_SAFE_EVENT_CB_END();
 }

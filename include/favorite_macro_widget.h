@@ -45,13 +45,10 @@ class FavoriteMacroWidget : public PanelWidget {
 
     /// Event handlers routed from static callbacks
     void handle_clicked();
-    void handle_long_press();
 
     // Static event callbacks (XML-registered)
     static void clicked_1_cb(lv_event_t* e);
-    static void long_press_1_cb(lv_event_t* e);
     static void clicked_2_cb(lv_event_t* e);
-    static void long_press_2_cb(lv_event_t* e);
     static void picker_backdrop_cb(lv_event_t* e);
 
   private:

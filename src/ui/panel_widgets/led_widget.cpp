@@ -5,13 +5,11 @@
 
 #include "ui_event_safety.h"
 #include "ui_icon.h"
-#include "ui_nav_manager.h"
 #include "ui_utils.h"
 
 #include "app_globals.h"
 #include "display_settings_manager.h"
 #include "led/led_controller.h"
-#include "led/ui_led_control_overlay.h"
 #include "moonraker_api.h"
 #include "observer_factory.h"
 #include "panel_widget_manager.h"
@@ -35,7 +33,6 @@ void register_led_widget() {
 
     // Register XML event callbacks at startup (before any XML is parsed)
     lv_xml_register_event_cb(nullptr, "light_toggle_cb", LedWidget::light_toggle_cb);
-    lv_xml_register_event_cb(nullptr, "light_double_click_cb", LedWidget::light_double_click_cb);
 }
 
 LedWidget::LedWidget(PrinterState& printer_state, MoonrakerAPI* api)
@@ -99,7 +96,6 @@ void LedWidget::detach() {
     widget_obj_ = nullptr;
     parent_screen_ = nullptr;
     light_icon_ = nullptr;
-    led_control_panel_ = nullptr;
 
     led_version_observer_.reset();
     led_state_observer_.reset();
@@ -160,34 +156,6 @@ void LedWidget::handle_light_toggle() {
         update_light_icon();
     } else {
         flash_light_icon();
-    }
-}
-
-void LedWidget::handle_light_double_click() {
-    spdlog::info("[LedWidget] Light double-click: opening LED control overlay");
-
-    // Lazy-create overlay on first access
-    if (!led_control_panel_ && parent_screen_) {
-        auto& overlay = get_led_control_overlay();
-
-        if (!overlay.are_subjects_initialized()) {
-            overlay.init_subjects();
-        }
-        overlay.register_callbacks();
-        overlay.set_api(api_);
-
-        led_control_panel_ = overlay.create(parent_screen_);
-        if (!led_control_panel_) {
-            spdlog::error("[LedWidget] Failed to load LED control overlay");
-            return;
-        }
-
-        NavigationManager::instance().register_overlay_instance(led_control_panel_, &overlay);
-    }
-
-    if (led_control_panel_) {
-        get_led_control_overlay().set_api(api_);
-        NavigationManager::instance().push_overlay(led_control_panel_);
     }
 }
 
@@ -292,18 +260,6 @@ void LedWidget::light_toggle_cb(lv_event_t* e) {
         self->handle_light_toggle();
     } else {
         spdlog::warn("[LedWidget] light_toggle_cb: could not recover widget instance");
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void LedWidget::light_double_click_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[LedWidget] light_double_click_cb");
-    auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    auto* self = static_cast<LedWidget*>(lv_obj_get_user_data(target));
-    if (self) {
-        self->handle_light_double_click();
-    } else {
-        spdlog::warn("[LedWidget] light_double_click_cb: could not recover widget instance");
     }
     LVGL_SAFE_EVENT_CB_END();
 }

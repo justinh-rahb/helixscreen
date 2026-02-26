@@ -62,7 +62,6 @@ class TempStackWidget : public PanelWidget {
     bool is_carousel_mode() const;
     void attach_stack(lv_obj_t* widget_obj);
     void attach_carousel(lv_obj_t* widget_obj);
-    void toggle_display_mode();
 
     void on_nozzle_temp_changed(int temp_centi);
     void on_nozzle_target_changed(int target_centi);
@@ -78,10 +77,6 @@ class TempStackWidget : public PanelWidget {
     static void temp_stack_nozzle_cb(lv_event_t* e);
     static void temp_stack_bed_cb(lv_event_t* e);
     static void temp_stack_chamber_cb(lv_event_t* e);
-
-    // Double-click callbacks for toggling display mode
-    static void temp_stack_double_click_cb(lv_event_t* e);
-    static void temp_carousel_double_click_cb(lv_event_t* e);
 
     // Carousel page click callback
     static void temp_carousel_page_cb(lv_event_t* e);

@@ -12,9 +12,7 @@
 #include "ui_utils.h"
 
 #include "app_globals.h"
-#include "config.h"
 #include "observer_factory.h"
-#include "panel_widget_config.h"
 #include "panel_widget_manager.h"
 #include "panel_widget_registry.h"
 #include "printer_state.h"
@@ -36,33 +34,12 @@ void register_temp_stack_widget() {
     lv_xml_register_event_cb(nullptr, "temp_stack_bed_cb", TempStackWidget::temp_stack_bed_cb);
     lv_xml_register_event_cb(nullptr, "temp_stack_chamber_cb",
                              TempStackWidget::temp_stack_chamber_cb);
-    lv_xml_register_event_cb(nullptr, "temp_stack_double_click_cb",
-                             TempStackWidget::temp_stack_double_click_cb);
-    lv_xml_register_event_cb(nullptr, "temp_carousel_double_click_cb",
-                             TempStackWidget::temp_carousel_double_click_cb);
     lv_xml_register_event_cb(nullptr, "temp_carousel_page_cb",
                              TempStackWidget::temp_carousel_page_cb);
 }
 } // namespace helix
 
 namespace {
-// File-local helper: get the shared PanelWidgetConfig instance for home panel
-helix::PanelWidgetConfig& get_widget_config_ref() {
-    static helix::PanelWidgetConfig config("home", *helix::Config::get_instance());
-    config.load();
-    return config;
-}
-// Recursively add double-click handler to all descendants of an LVGL object
-static void add_double_click_recursive(lv_obj_t* obj, lv_event_cb_t cb, void* user_data) {
-    if (!obj)
-        return;
-    lv_obj_add_event_cb(obj, cb, LV_EVENT_DOUBLE_CLICKED, user_data);
-    uint32_t count = lv_obj_get_child_count(obj);
-    for (uint32_t i = 0; i < count; i++) {
-        add_double_click_recursive(lv_obj_get_child(obj, i), cb, user_data);
-    }
-}
-
 // Make all children of a page pass events through (not clickable, bubble to parent)
 static void make_children_passthrough(lv_obj_t* parent) {
     if (!parent)
@@ -207,9 +184,8 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
         lv_obj_add_flag(page, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_name(page, page_name);
 
-        // Click callback to open temp overlay; double-click to toggle mode
+        // Click callback to open temp overlay
         lv_obj_add_event_cb(page, temp_carousel_page_cb, LV_EVENT_CLICKED, nullptr);
-        lv_obj_add_event_cb(page, temp_carousel_double_click_cb, LV_EVENT_DOUBLE_CLICKED, nullptr);
 
         // Icon
         const char* icon_attrs[] = {"src",       icon_src, "size",    "sm",   "variant",
@@ -241,8 +217,6 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
     lv_obj_add_flag(nozzle_page, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_name(nozzle_page, "nozzle");
     lv_obj_add_event_cb(nozzle_page, temp_carousel_page_cb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_add_event_cb(nozzle_page, temp_carousel_double_click_cb, LV_EVENT_DOUBLE_CLICKED,
-                        nullptr);
 
     const char* nozzle_icon_attrs[] = {
         "size", "sm", "badge_subject", "", "name", "carousel_nozzle_icon", nullptr};
@@ -327,25 +301,6 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
 
     int page_count = ui_carousel_get_page_count(carousel);
     spdlog::debug("[TempStackWidget] Attached carousel with {} pages", page_count);
-}
-
-void TempStackWidget::toggle_display_mode() {
-    auto& wc = get_widget_config_ref();
-    nlohmann::json cfg = wc.get_widget_config("temp_stack");
-
-    if (is_carousel_mode()) {
-        cfg["display_mode"] = "stack";
-    } else {
-        cfg["display_mode"] = "carousel";
-    }
-
-    wc.set_widget_config("temp_stack", cfg);
-    spdlog::info("[TempStackWidget] Toggled display mode to '{}'",
-                 cfg["display_mode"].get<std::string>());
-
-    // Defer rebuild to avoid destroying widgets during event processing
-    helix::ui::async_call(
-        [](void*) { PanelWidgetManager::instance().notify_config_changed("home"); }, nullptr);
 }
 
 void TempStackWidget::detach() {
@@ -514,24 +469,6 @@ void TempStackWidget::temp_stack_chamber_cb(lv_event_t* e) {
     (void)e;
     if (s_active_instance) {
         s_active_instance->handle_chamber_clicked();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void TempStackWidget::temp_stack_double_click_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_stack_double_click_cb");
-    (void)e;
-    if (s_active_instance) {
-        s_active_instance->toggle_display_mode();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void TempStackWidget::temp_carousel_double_click_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_carousel_double_click_cb");
-    (void)e;
-    if (s_active_instance) {
-        s_active_instance->toggle_display_mode();
     }
     LVGL_SAFE_EVENT_CB_END();
 }
