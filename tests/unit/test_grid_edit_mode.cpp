@@ -1288,3 +1288,256 @@ TEST_CASE("All registered widgets have valid sizing constraints", "[grid_edit][s
         CHECK(def.effective_min_rowspan() <= def.effective_max_rowspan());
     }
 }
+
+// ============================================================================
+// Resize edge detection
+// ============================================================================
+
+TEST_CASE("detect_resize_edge: right edge", "[grid_edit][resize]") {
+    GridEditMode em;
+    lv_area_t area = {100, 100, 300, 300}; // 200x200 widget
+
+    // Near right edge, mid height — within 36px hit zone
+    CHECK(em.detect_resize_edge(295, 200, area) == GridEditMode::ResizeEdge::Right);
+    CHECK(em.detect_resize_edge(280, 200, area) == GridEditMode::ResizeEdge::Right);
+    // Just past the right edge (4px tolerance)
+    CHECK(em.detect_resize_edge(303, 200, area) == GridEditMode::ResizeEdge::Right);
+
+    // Far from right edge — center of widget
+    CHECK(em.detect_resize_edge(200, 200, area) == GridEditMode::ResizeEdge::None);
+}
+
+TEST_CASE("detect_resize_edge: left edge", "[grid_edit][resize]") {
+    GridEditMode em;
+    lv_area_t area = {100, 100, 300, 300};
+
+    // Near left edge, mid height — within 36px hit zone
+    CHECK(em.detect_resize_edge(105, 200, area) == GridEditMode::ResizeEdge::Left);
+    CHECK(em.detect_resize_edge(120, 200, area) == GridEditMode::ResizeEdge::Left);
+    // Just past the left edge (4px tolerance)
+    CHECK(em.detect_resize_edge(97, 200, area) == GridEditMode::ResizeEdge::Left);
+
+    // Far from left edge — center of widget
+    CHECK(em.detect_resize_edge(200, 200, area) == GridEditMode::ResizeEdge::None);
+}
+
+TEST_CASE("detect_resize_edge: bottom edge", "[grid_edit][resize]") {
+    GridEditMode em;
+    lv_area_t area = {100, 100, 300, 300};
+
+    // Near bottom edge, mid width — within 36px hit zone
+    CHECK(em.detect_resize_edge(200, 295, area) == GridEditMode::ResizeEdge::Bottom);
+    CHECK(em.detect_resize_edge(200, 280, area) == GridEditMode::ResizeEdge::Bottom);
+    // Just past the bottom edge
+    CHECK(em.detect_resize_edge(200, 303, area) == GridEditMode::ResizeEdge::Bottom);
+
+    // Far from bottom edge
+    CHECK(em.detect_resize_edge(200, 200, area) == GridEditMode::ResizeEdge::None);
+}
+
+TEST_CASE("detect_resize_edge: top edge", "[grid_edit][resize]") {
+    GridEditMode em;
+    lv_area_t area = {100, 100, 300, 300};
+
+    // Near top edge, mid width — within 36px hit zone
+    CHECK(em.detect_resize_edge(200, 105, area) == GridEditMode::ResizeEdge::Top);
+    CHECK(em.detect_resize_edge(200, 120, area) == GridEditMode::ResizeEdge::Top);
+    // Just past the top edge (4px tolerance)
+    CHECK(em.detect_resize_edge(200, 97, area) == GridEditMode::ResizeEdge::Top);
+
+    // Far from top edge
+    CHECK(em.detect_resize_edge(200, 200, area) == GridEditMode::ResizeEdge::None);
+}
+
+TEST_CASE("detect_resize_edge: corner disambiguation picks closest edge", "[grid_edit][resize]") {
+    GridEditMode em;
+    lv_area_t area = {100, 100, 300, 300};
+
+    // Bottom-right corner — closer to right edge (5px from right, 10px from bottom)
+    CHECK(em.detect_resize_edge(296, 292, area) == GridEditMode::ResizeEdge::Right);
+
+    // Bottom-right corner — closer to bottom edge (10px from right, 5px from bottom)
+    CHECK(em.detect_resize_edge(292, 296, area) == GridEditMode::ResizeEdge::Bottom);
+
+    // Bottom-right corner — equidistant: right wins (arbitrary but deterministic)
+    CHECK(em.detect_resize_edge(295, 295, area) != GridEditMode::ResizeEdge::None);
+
+    // Top-left corner — closer to top edge
+    CHECK(em.detect_resize_edge(108, 102, area) == GridEditMode::ResizeEdge::Top);
+
+    // Top-left corner — closer to left edge
+    CHECK(em.detect_resize_edge(102, 108, area) == GridEditMode::ResizeEdge::Left);
+
+    // Top-right corner — closer to right edge
+    CHECK(em.detect_resize_edge(298, 105, area) == GridEditMode::ResizeEdge::Right);
+
+    // Bottom-left corner — closer to bottom edge
+    CHECK(em.detect_resize_edge(105, 298, area) == GridEditMode::ResizeEdge::Bottom);
+}
+
+TEST_CASE("detect_resize_edge: outside widget bounds", "[grid_edit][resize]") {
+    GridEditMode em;
+    lv_area_t area = {100, 100, 300, 300};
+
+    // Well outside the widget
+    CHECK(em.detect_resize_edge(50, 50, area) == GridEditMode::ResizeEdge::None);
+    CHECK(em.detect_resize_edge(350, 350, area) == GridEditMode::ResizeEdge::None);
+
+    // Outside perpendicular bounds — near right edge X but outside Y
+    CHECK(em.detect_resize_edge(295, 50, area) == GridEditMode::ResizeEdge::None);
+    CHECK(em.detect_resize_edge(295, 350, area) == GridEditMode::ResizeEdge::None);
+}
+
+TEST_CASE("detect_resize_edge: wider 36px hit zone", "[grid_edit][resize]") {
+    GridEditMode em;
+    lv_area_t area = {100, 100, 300, 300}; // widget edges at x1=100, x2=300, y1=100, y2=300
+
+    // Right edge: 36px zone = x in [264, 304]
+    CHECK(em.detect_resize_edge(265, 200, area) == GridEditMode::ResizeEdge::Right);
+    CHECK(em.detect_resize_edge(263, 200, area) == GridEditMode::ResizeEdge::None);
+
+    // Left edge: 36px zone = x in [96, 136]
+    CHECK(em.detect_resize_edge(135, 200, area) == GridEditMode::ResizeEdge::Left);
+    CHECK(em.detect_resize_edge(137, 200, area) == GridEditMode::ResizeEdge::None);
+
+    // Bottom edge: 36px zone = y in [264, 304]
+    CHECK(em.detect_resize_edge(200, 265, area) == GridEditMode::ResizeEdge::Bottom);
+    CHECK(em.detect_resize_edge(200, 263, area) == GridEditMode::ResizeEdge::None);
+
+    // Top edge: 36px zone = y in [96, 136]
+    CHECK(em.detect_resize_edge(200, 135, area) == GridEditMode::ResizeEdge::Top);
+    CHECK(em.detect_resize_edge(200, 137, area) == GridEditMode::ResizeEdge::None);
+}
+
+// ============================================================================
+// round_to_grid_cell helper
+// ============================================================================
+
+TEST_CASE("round_to_grid_cell: exact cell boundary", "[grid_edit][resize]") {
+    // 6 cells in 600px container starting at x=0
+    // Cell boundaries: 0, 100, 200, 300, 400, 500, 600
+    CHECK(GridEditMode::round_to_grid_cell(0, 0, 600, 6) == 0);
+    CHECK(GridEditMode::round_to_grid_cell(100, 0, 600, 6) == 1);
+    CHECK(GridEditMode::round_to_grid_cell(300, 0, 600, 6) == 3);
+    CHECK(GridEditMode::round_to_grid_cell(600, 0, 600, 6) == 6);
+}
+
+TEST_CASE("round_to_grid_cell: midpoint rounding", "[grid_edit][resize]") {
+    // Cell size = 100px. Midpoint of cell 0 = 50px.
+    // 49px → rounds to boundary 0 (cell 0)
+    CHECK(GridEditMode::round_to_grid_cell(49, 0, 600, 6) == 0);
+    // 50px → rounds to boundary 1 (std::round rounds 0.5 up)
+    CHECK(GridEditMode::round_to_grid_cell(50, 0, 600, 6) == 1);
+    // 51px → rounds to boundary 1
+    CHECK(GridEditMode::round_to_grid_cell(51, 0, 600, 6) == 1);
+
+    // Just past midpoint of cell 2 (250px)
+    CHECK(GridEditMode::round_to_grid_cell(249, 0, 600, 6) == 2);
+    CHECK(GridEditMode::round_to_grid_cell(251, 0, 600, 6) == 3);
+}
+
+TEST_CASE("round_to_grid_cell: with content origin offset", "[grid_edit][resize]") {
+    // Container starts at x=100, 600px wide, 6 cells
+    CHECK(GridEditMode::round_to_grid_cell(100, 100, 600, 6) == 0);
+    CHECK(GridEditMode::round_to_grid_cell(200, 100, 600, 6) == 1);
+    CHECK(GridEditMode::round_to_grid_cell(700, 100, 600, 6) == 6);
+
+    // Midpoint: 100 + 50 = 150 → rounds to 1
+    CHECK(GridEditMode::round_to_grid_cell(150, 100, 600, 6) == 1);
+    CHECK(GridEditMode::round_to_grid_cell(149, 100, 600, 6) == 0);
+}
+
+TEST_CASE("round_to_grid_cell: clamps to valid range", "[grid_edit][resize]") {
+    // Below origin → clamps to 0
+    CHECK(GridEditMode::round_to_grid_cell(-50, 0, 600, 6) == 0);
+    // Above maximum → clamps to ncells
+    CHECK(GridEditMode::round_to_grid_cell(800, 0, 600, 6) == 6);
+}
+
+// ============================================================================
+// Origin-shifting resize math
+// ============================================================================
+
+TEST_CASE("compute_resize_result: right edge grow", "[grid_edit][resize]") {
+    // Widget at (1,0) span 2x2, drag right edge to cell boundary 4
+    auto result = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Right, 1, 0, 2, 2,
+                                                      /*new_edge_cell=*/4, /*ncells=*/6);
+    CHECK(result.col == 1);
+    CHECK(result.row == 0);
+    CHECK(result.colspan == 3); // was 2, now extends to col 4 → 4-1=3
+    CHECK(result.rowspan == 2); // unchanged
+    CHECK(result.colspan >= 1); // valid result has positive spans
+}
+
+TEST_CASE("compute_resize_result: right edge shrink", "[grid_edit][resize]") {
+    // Widget at (1,0) span 3x2, drag right edge to cell boundary 3
+    auto result = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Right, 1, 0, 3, 2,
+                                                      /*new_edge_cell=*/3, /*ncells=*/6);
+    CHECK(result.col == 1);
+    CHECK(result.colspan == 2); // 3-1=2
+    CHECK(result.rowspan == 2);
+}
+
+TEST_CASE("compute_resize_result: left edge grow", "[grid_edit][resize]") {
+    // Widget at (2,0) span 2x2, drag left edge to cell boundary 1
+    auto result = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Left, 2, 0, 2, 2,
+                                                      /*new_edge_cell=*/1, /*ncells=*/6);
+    CHECK(result.col == 1); // origin shifts left
+    CHECK(result.row == 0);
+    CHECK(result.colspan == 3); // was 2, grew by 1
+    CHECK(result.rowspan == 2);
+    CHECK(result.colspan >= 1); // valid result has positive spans
+}
+
+TEST_CASE("compute_resize_result: left edge shrink", "[grid_edit][resize]") {
+    // Widget at (1,0) span 3x2, drag left edge to cell boundary 2
+    auto result = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Left, 1, 0, 3, 2,
+                                                      /*new_edge_cell=*/2, /*ncells=*/6);
+    CHECK(result.col == 2);     // origin shifts right
+    CHECK(result.colspan == 2); // was 3, shrank by 1 (right edge stays at 4)
+    CHECK(result.rowspan == 2);
+}
+
+TEST_CASE("compute_resize_result: top edge grow", "[grid_edit][resize]") {
+    // Widget at (0,2) span 2x2, drag top edge to cell boundary 1
+    auto result = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Top, 0, 2, 2, 2,
+                                                      /*new_edge_cell=*/1, /*ncells=*/4);
+    CHECK(result.col == 0);
+    CHECK(result.row == 1); // origin shifts up
+    CHECK(result.colspan == 2);
+    CHECK(result.rowspan == 3); // was 2, grew by 1
+    CHECK(result.colspan >= 1); // valid result has positive spans
+}
+
+TEST_CASE("compute_resize_result: bottom edge grow", "[grid_edit][resize]") {
+    // Widget at (0,0) span 2x2, drag bottom edge to cell boundary 3
+    auto result = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Bottom, 0, 0, 2, 2,
+                                                      /*new_edge_cell=*/3, /*ncells=*/4);
+    CHECK(result.col == 0);
+    CHECK(result.row == 0);
+    CHECK(result.colspan == 2);
+    CHECK(result.rowspan == 3); // was 2, grew by 1
+    CHECK(result.colspan >= 1); // valid result has positive spans
+}
+
+TEST_CASE("compute_resize_result: clamp to min span 1", "[grid_edit][resize]") {
+    // Widget at (2,0) span 2x2, drag left edge past right edge → clamps to min 1
+    auto result = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Left, 2, 0, 2, 2,
+                                                      /*new_edge_cell=*/5, /*ncells=*/6);
+    CHECK(result.colspan >= 1);
+    // Origin should be clamped so widget stays within right edge
+    CHECK(result.col + result.colspan <= 6);
+}
+
+TEST_CASE("compute_resize_result: clamp to grid bounds", "[grid_edit][resize]") {
+    // Widget at (4,0) span 2x2, drag right edge past grid boundary
+    auto result = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Right, 4, 0, 2, 2,
+                                                      /*new_edge_cell=*/7, /*ncells=*/6);
+    CHECK(result.col == 4);
+    CHECK(result.col + result.colspan <= 6);
+
+    // Drag top edge past grid top
+    auto result2 = GridEditMode::compute_resize_result(GridEditMode::ResizeEdge::Top, 0, 1, 2, 2,
+                                                       /*new_edge_cell=*/-1, /*ncells=*/4);
+    CHECK(result2.row >= 0);
+}

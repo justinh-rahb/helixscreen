@@ -81,6 +81,33 @@ class GridEditMode {
     static std::pair<int, int> clamp_span(const std::string& widget_id, int desired_colspan,
                                           int desired_rowspan);
 
+    /// Which edge of a widget the pointer is near (for resize detection)
+    enum class ResizeEdge { None, Top, Bottom, Left, Right };
+
+    /// Result of computing a resize operation
+    struct ResizeResult {
+        int col;
+        int row;
+        int colspan;
+        int rowspan;
+    };
+
+    /// Round a pixel position to the nearest grid cell boundary.
+    /// Returns a cell boundary index (0 to ncells inclusive).
+    static int round_to_grid_cell(int px, int content_origin, int content_size, int ncells);
+
+    /// Compute new widget position/span for a resize operation.
+    /// @param edge Which edge is being dragged
+    /// @param orig_col/row/colspan/rowspan Original widget placement
+    /// @param new_edge_cell The grid cell boundary the edge was dragged to
+    /// @param ncells Number of cells along the resize axis
+    static ResizeResult compute_resize_result(ResizeEdge edge, int orig_col, int orig_row,
+                                              int orig_colspan, int orig_rowspan, int new_edge_cell,
+                                              int ncells);
+
+    /// Detect which resize edge the pointer is near, or None if not near any edge.
+    ResizeEdge detect_resize_edge(int px, int py, const lv_area_t& widget_area) const;
+
   private:
     void create_dots_overlay();
     void destroy_dots_overlay();
@@ -106,10 +133,11 @@ class GridEditMode {
     void cleanup_drag_state();
 
     // Resize helpers
-    bool is_near_bottom_right_corner(int px, int py, const lv_area_t& widget_area) const;
     bool is_selected_widget_resizable() const;
     void handle_resize_move(lv_event_t* e);
     void handle_resize_end(lv_event_t* e);
+    void update_resize_preview_px(int x, int y, int w, int h, bool valid);
+    void commit_resize_with_snap(const ResizeResult& result);
 
     // Widget catalog placement
     void place_widget_from_catalog(const std::string& widget_id);
@@ -144,8 +172,8 @@ class GridEditMode {
 
     // Resize state
     bool resizing_ = false;
-    int resize_preview_colspan_ = -1;
-    int resize_preview_rowspan_ = -1;
+    ResizeEdge resize_edge_ = ResizeEdge::None;
+    lv_obj_t* resize_preview_ = nullptr; // Pixel-tracking preview overlay
 
     // Widget catalog placement: grid cell where the long-press originated
     int catalog_origin_col_ = -1;

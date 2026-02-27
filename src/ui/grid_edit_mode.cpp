@@ -15,6 +15,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 #include <unordered_set>
 
 namespace helix {
@@ -30,8 +31,8 @@ static constexpr lv_opa_t DRAG_SHADOW_OPA = LV_OPA_40;
 static constexpr int DRAG_SHADOW_WIDTH = 12;
 static constexpr int DRAG_SHADOW_OFS = 4;
 
-// Resize corner detection radius (pixels from the corner bracket)
-static constexpr int CORNER_HIT_RADIUS = 24;
+// Resize edge detection radius (pixels from the edge)
+static constexpr int EDGE_HIT_RADIUS = 36;
 
 /// Recursively remove CLICKABLE flag from all descendants of obj.
 
@@ -300,9 +301,35 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
     make_bar(widget_w - BAR_LEN, widget_h - BAR_THICK, BAR_LEN, BAR_THICK);
     make_bar(widget_w - BAR_THICK, widget_h - BAR_LEN, BAR_THICK, BAR_LEN);
 
-    (void)bar_count; // 8 bars created — pulse targets these, not the X button
+    // Add resize handles for scalable widgets: edge bars on all 4 sides
+    if (is_selected_widget_resizable()) {
+        constexpr int HANDLE_THICK = 4;
+        constexpr int HANDLE_INSET = BAR_LEN + 4; // Start after corner brackets
 
-    // Pulse animation on corner brackets when animations are enabled
+        // Right edge handle (vertical bar, between top-right and bottom-right brackets)
+        if (widget_h > 2 * HANDLE_INSET) {
+            make_bar(widget_w - HANDLE_THICK, HANDLE_INSET, HANDLE_THICK,
+                     widget_h - 2 * HANDLE_INSET);
+        }
+
+        // Left edge handle (vertical bar, between top-left and bottom-left brackets)
+        if (widget_h > 2 * HANDLE_INSET) {
+            make_bar(0, HANDLE_INSET, HANDLE_THICK, widget_h - 2 * HANDLE_INSET);
+        }
+
+        // Bottom edge handle (horizontal bar, between bottom-left and bottom-right brackets)
+        if (widget_w > 2 * HANDLE_INSET) {
+            make_bar(HANDLE_INSET, widget_h - HANDLE_THICK, widget_w - 2 * HANDLE_INSET,
+                     HANDLE_THICK);
+        }
+
+        // Top edge handle (horizontal bar, between top-left and top-right brackets)
+        if (widget_w > 2 * HANDLE_INSET) {
+            make_bar(HANDLE_INSET, 0, widget_w - 2 * HANDLE_INSET, HANDLE_THICK);
+        }
+    }
+
+    // Pulse animation on corner brackets + resize handles when animations are enabled
     if (DisplaySettingsManager::instance().get_animations_enabled()) {
         lv_anim_t anim;
         lv_anim_init(&anim);
@@ -313,8 +340,9 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
         lv_anim_set_playback_duration(&anim, 1000);
         lv_anim_set_exec_cb(&anim, [](void* obj, int32_t val) {
             auto* overlay = static_cast<lv_obj_t*>(obj);
-            // Pulse only the first 8 children (corner bars), not the X button
-            uint32_t count = std::min(lv_obj_get_child_count(overlay), uint32_t(8));
+            // Pulse all children EXCEPT the last one (X button)
+            uint32_t total = lv_obj_get_child_count(overlay);
+            uint32_t count = (total > 0) ? total - 1 : 0;
             for (uint32_t i = 0; i < count; ++i) {
                 lv_obj_t* child = lv_obj_get_child(overlay, static_cast<int32_t>(i));
                 lv_obj_set_style_bg_opa(child, static_cast<lv_opa_t>(val), 0);
@@ -556,12 +584,110 @@ std::pair<int, int> GridEditMode::clamp_span(const std::string& widget_id, int d
 // Resize helpers
 // ---------------------------------------------------------------------------
 
-bool GridEditMode::is_near_bottom_right_corner(int px, int py, const lv_area_t& widget_area) const {
-    int br_x = widget_area.x2;
-    int br_y = widget_area.y2;
-    int dx = px - br_x;
-    int dy = py - br_y;
-    return (dx * dx + dy * dy) <= (CORNER_HIT_RADIUS * CORNER_HIT_RADIUS);
+GridEditMode::ResizeEdge GridEditMode::detect_resize_edge(int px, int py,
+                                                          const lv_area_t& widget_area) const {
+    constexpr int TOL = 4; // Tolerance beyond the edge
+
+    // Check proximity to each edge (within EDGE_HIT_RADIUS inward, TOL outward)
+    bool near_right = (px >= widget_area.x2 - EDGE_HIT_RADIUS && px <= widget_area.x2 + TOL);
+    bool near_left = (px >= widget_area.x1 - TOL && px <= widget_area.x1 + EDGE_HIT_RADIUS);
+    bool near_bottom = (py >= widget_area.y2 - EDGE_HIT_RADIUS && py <= widget_area.y2 + TOL);
+    bool near_top = (py >= widget_area.y1 - TOL && py <= widget_area.y1 + EDGE_HIT_RADIUS);
+
+    // Must be within widget bounds on the perpendicular axis (with tolerance)
+    bool within_x = (px >= widget_area.x1 - TOL && px <= widget_area.x2 + TOL);
+    bool within_y = (py >= widget_area.y1 - TOL && py <= widget_area.y2 + TOL);
+
+    // Collect candidate edges with their perpendicular distance
+    struct Candidate {
+        ResizeEdge edge;
+        int dist; // Perpendicular distance to the edge (lower = closer)
+    };
+    Candidate candidates[4];
+    int n = 0;
+
+    if (near_right && within_y) {
+        candidates[n++] = {ResizeEdge::Right, std::abs(px - widget_area.x2)};
+    }
+    if (near_left && within_y) {
+        candidates[n++] = {ResizeEdge::Left, std::abs(px - widget_area.x1)};
+    }
+    if (near_bottom && within_x) {
+        candidates[n++] = {ResizeEdge::Bottom, std::abs(py - widget_area.y2)};
+    }
+    if (near_top && within_x) {
+        candidates[n++] = {ResizeEdge::Top, std::abs(py - widget_area.y1)};
+    }
+
+    if (n == 0) {
+        return ResizeEdge::None;
+    }
+
+    // Pick the closest edge (corner disambiguation)
+    int best = 0;
+    for (int i = 1; i < n; ++i) {
+        if (candidates[i].dist < candidates[best].dist) {
+            best = i;
+        }
+    }
+    return candidates[best].edge;
+}
+
+int GridEditMode::round_to_grid_cell(int px, int content_origin, int content_size, int ncells) {
+    float cell_size = static_cast<float>(content_size) / ncells;
+    float fractional = (px - content_origin) / cell_size;
+    return std::clamp(static_cast<int>(std::round(fractional)), 0, ncells);
+}
+
+GridEditMode::ResizeResult GridEditMode::compute_resize_result(ResizeEdge edge, int orig_col,
+                                                               int orig_row, int orig_colspan,
+                                                               int orig_rowspan, int new_edge_cell,
+                                                               int ncells) {
+    ResizeResult r;
+    r.col = orig_col;
+    r.row = orig_row;
+    r.colspan = orig_colspan;
+    r.rowspan = orig_rowspan;
+
+    // Clamp new_edge_cell to valid range
+    new_edge_cell = std::clamp(new_edge_cell, 0, ncells);
+
+    switch (edge) {
+    case ResizeEdge::Right: {
+        int new_colspan = new_edge_cell - orig_col;
+        r.colspan = std::max(new_colspan, 1);
+        r.rowspan = orig_rowspan;
+        break;
+    }
+    case ResizeEdge::Left: {
+        int right_edge = orig_col + orig_colspan;
+        int new_col = std::min(new_edge_cell, right_edge - 1);
+        new_col = std::max(new_col, 0);
+        r.col = new_col;
+        r.colspan = right_edge - new_col;
+        r.rowspan = orig_rowspan;
+        break;
+    }
+    case ResizeEdge::Bottom: {
+        int new_rowspan = new_edge_cell - orig_row;
+        r.rowspan = std::max(new_rowspan, 1);
+        r.colspan = orig_colspan;
+        break;
+    }
+    case ResizeEdge::Top: {
+        int bottom_edge = orig_row + orig_rowspan;
+        int new_row = std::min(new_edge_cell, bottom_edge - 1);
+        new_row = std::max(new_row, 0);
+        r.row = new_row;
+        r.rowspan = bottom_edge - new_row;
+        r.colspan = orig_colspan;
+        break;
+    }
+    case ResizeEdge::None:
+        break;
+    }
+
+    return r;
 }
 
 bool GridEditMode::is_selected_widget_resizable() const {
@@ -752,22 +878,35 @@ void GridEditMode::handle_drag_start(lv_event_t* /*e*/) {
     drag_orig_colspan_ = entry.colspan;
     drag_orig_rowspan_ = entry.rowspan;
 
-    // Check if pointer is near the bottom-right corner of a resizable widget
-    if (is_near_bottom_right_corner(point.x, point.y, sel_area) && is_selected_widget_resizable()) {
+    // Check if pointer is near an edge/corner of a resizable widget
+    ResizeEdge edge = detect_resize_edge(point.x, point.y, sel_area);
+    if (edge != ResizeEdge::None && is_selected_widget_resizable()) {
         // Start resize mode instead of drag
         resizing_ = true;
-        resize_preview_colspan_ = drag_orig_colspan_;
-        resize_preview_rowspan_ = drag_orig_rowspan_;
+        resize_edge_ = edge;
 
         // Hide selection chrome during resize (will rebuild after)
         destroy_selection_chrome();
 
-        // Show initial resize preview at current size
-        update_snap_preview(drag_orig_col_, drag_orig_row_, drag_orig_colspan_, drag_orig_rowspan_,
-                            true);
+        // Show initial resize preview at current widget size
+        {
+            lv_area_t content_area;
+            lv_obj_get_content_coords(container_, &content_area);
+            int cw = content_area.x2 - content_area.x1;
+            int ch = content_area.y2 - content_area.y1;
+            lv_subject_t* bp = theme_manager_get_breakpoint_subject();
+            int bp_val = bp ? lv_subject_get_int(bp) : 2;
+            float cell_w = static_cast<float>(cw) / GridLayout::get_cols(bp_val);
+            float cell_h = static_cast<float>(ch) / GridLayout::get_rows(bp_val);
+            update_resize_preview_px(static_cast<int>(drag_orig_col_ * cell_w),
+                                     static_cast<int>(drag_orig_row_ * cell_h),
+                                     static_cast<int>(drag_orig_colspan_ * cell_w),
+                                     static_cast<int>(drag_orig_rowspan_ * cell_h), true);
+        }
 
-        spdlog::info("[GridEditMode] Resize started: widget '{}' at ({},{}) span {}x{}", entry.id,
-                     drag_orig_col_, drag_orig_row_, drag_orig_colspan_, drag_orig_rowspan_);
+        spdlog::info("[GridEditMode] Resize started: widget '{}' at ({},{}) span {}x{} edge={}",
+                     entry.id, drag_orig_col_, drag_orig_row_, drag_orig_colspan_,
+                     drag_orig_rowspan_, static_cast<int>(edge));
         return;
     }
 
@@ -1092,7 +1231,7 @@ void GridEditMode::handle_resize_move(lv_event_t* /*e*/) {
     lv_point_t point;
     lv_indev_get_point(indev, &point);
 
-    // Compute which grid cell the pointer is over
+    // Get container content area for coordinate mapping
     lv_area_t content_area;
     lv_obj_get_content_coords(container_, &content_area);
     int cw = content_area.x2 - content_area.x1;
@@ -1103,35 +1242,74 @@ void GridEditMode::handle_resize_move(lv_event_t* /*e*/) {
     int ncols = GridLayout::get_cols(breakpoint);
     int nrows = GridLayout::get_rows(breakpoint);
 
-    auto [target_col, target_row] = screen_to_grid_cell(point.x, point.y, content_area.x1,
-                                                        content_area.y1, cw, ch, ncols, nrows);
+    float cell_w = static_cast<float>(cw) / ncols;
+    float cell_h = static_cast<float>(ch) / nrows;
 
-    // Desired span: from original top-left to the cell the pointer is in (inclusive)
-    int desired_colspan = target_col - drag_orig_col_ + 1;
-    int desired_rowspan = target_row - drag_orig_row_ + 1;
+    // Original widget pixel bounds (from grid config)
+    int orig_x1 = content_area.x1 + static_cast<int>(drag_orig_col_ * cell_w);
+    int orig_y1 = content_area.y1 + static_cast<int>(drag_orig_row_ * cell_h);
+    int orig_x2 =
+        content_area.x1 + static_cast<int>((drag_orig_col_ + drag_orig_colspan_) * cell_w);
+    int orig_y2 =
+        content_area.y1 + static_cast<int>((drag_orig_row_ + drag_orig_rowspan_) * cell_h);
 
-    // Clamp to min 1 before registry clamping
-    desired_colspan = std::max(desired_colspan, 1);
-    desired_rowspan = std::max(desired_rowspan, 1);
+    // Compute pixel preview bounds based on which edge is being dragged.
+    // The dragged edge follows the pointer; the opposite edge stays fixed.
+    int preview_x1 = orig_x1;
+    int preview_y1 = orig_y1;
+    int preview_x2 = orig_x2;
+    int preview_y2 = orig_y2;
 
-    // Clamp via registry min/max
+    // Minimum size in pixels (1 cell)
+    int min_w = static_cast<int>(cell_w);
+    int min_h = static_cast<int>(cell_h);
+
+    switch (resize_edge_) {
+    case ResizeEdge::Right:
+        preview_x2 = std::clamp(point.x, preview_x1 + min_w, content_area.x2);
+        break;
+    case ResizeEdge::Left:
+        preview_x1 = std::clamp(point.x, content_area.x1, preview_x2 - min_w);
+        break;
+    case ResizeEdge::Bottom:
+        preview_y2 = std::clamp(point.y, preview_y1 + min_h, content_area.y2);
+        break;
+    case ResizeEdge::Top:
+        preview_y1 = std::clamp(point.y, content_area.y1, preview_y2 - min_h);
+        break;
+    case ResizeEdge::None:
+        return;
+    }
+
+    // Round current pixel position to grid to check validity
+    int ncells_axis =
+        (resize_edge_ == ResizeEdge::Left || resize_edge_ == ResizeEdge::Right) ? ncols : nrows;
+    int edge_cell;
+    if (resize_edge_ == ResizeEdge::Right) {
+        edge_cell = round_to_grid_cell(preview_x2, content_area.x1, cw, ncols);
+    } else if (resize_edge_ == ResizeEdge::Left) {
+        edge_cell = round_to_grid_cell(preview_x1, content_area.x1, cw, ncols);
+    } else if (resize_edge_ == ResizeEdge::Bottom) {
+        edge_cell = round_to_grid_cell(preview_y2, content_area.y1, ch, nrows);
+    } else {
+        edge_cell = round_to_grid_cell(preview_y1, content_area.y1, ch, nrows);
+    }
+
+    auto result =
+        compute_resize_result(resize_edge_, drag_orig_col_, drag_orig_row_, drag_orig_colspan_,
+                              drag_orig_rowspan_, edge_cell, ncells_axis);
+
+    // Apply registry min/max clamping
     int cfg_idx = find_config_index_for_widget(selected_);
     if (cfg_idx < 0) {
         return;
     }
     const auto& entry = config_->entries()[static_cast<size_t>(cfg_idx)];
-    auto [clamped_c, clamped_r] = clamp_span(entry.id, desired_colspan, desired_rowspan);
+    auto [clamped_c, clamped_r] = clamp_span(entry.id, result.colspan, result.rowspan);
+    result.colspan = clamped_c;
+    result.rowspan = clamped_r;
 
-    // Also clamp to grid bounds
-    clamped_c = std::min(clamped_c, ncols - drag_orig_col_);
-    clamped_r = std::min(clamped_r, nrows - drag_orig_row_);
-
-    // Only update if changed
-    if (clamped_c == resize_preview_colspan_ && clamped_r == resize_preview_rowspan_) {
-        return;
-    }
-
-    // Check if the new size overlaps other widgets
+    // Check collision with other widgets
     GridLayout temp_grid(breakpoint);
     const auto& entries = config_->entries();
     for (const auto& e : entries) {
@@ -1139,18 +1317,22 @@ void GridEditMode::handle_resize_move(lv_event_t* /*e*/) {
             continue;
         }
         if (e.id == entry.id) {
-            continue; // Skip the widget being resized
+            continue;
         }
         temp_grid.place({e.id, e.col, e.row, e.colspan, e.rowspan});
     }
+    bool valid = temp_grid.can_place(result.col, result.row, result.colspan, result.rowspan);
 
-    bool valid = temp_grid.can_place(drag_orig_col_, drag_orig_row_, clamped_c, clamped_r);
+    // Convert preview coords to container-relative (content area relative)
+    int px = preview_x1 - content_area.x1;
+    int py = preview_y1 - content_area.y1;
+    int pw = preview_x2 - preview_x1;
+    int ph = preview_y2 - preview_y1;
 
-    update_snap_preview(drag_orig_col_, drag_orig_row_, clamped_c, clamped_r, valid);
-    resize_preview_colspan_ = clamped_c;
-    resize_preview_rowspan_ = clamped_r;
+    update_resize_preview_px(px, py, pw, ph, valid);
 
-    spdlog::debug("[GridEditMode] Resize preview: {}x{} valid={}", clamped_c, clamped_r, valid);
+    spdlog::debug("[GridEditMode] Resize preview: px=({},{} {}x{}) → grid ({},{} {}x{}) valid={}",
+                  px, py, pw, ph, result.col, result.row, result.colspan, result.rowspan, valid);
 }
 
 // ---------------------------------------------------------------------------
@@ -1160,25 +1342,70 @@ void GridEditMode::handle_resize_move(lv_event_t* /*e*/) {
 void GridEditMode::handle_resize_end(lv_event_t* /*e*/) {
     if (!selected_ || !container_ || !config_) {
         resizing_ = false;
-        destroy_snap_preview();
+        if (resize_preview_) {
+            lv_obj_delete(resize_preview_);
+            resize_preview_ = nullptr;
+        }
         return;
     }
 
-    bool did_resize = false;
+    // Get the pointer's final position and compute the rounded grid result
+    lv_indev_t* indev = lv_indev_active();
+    lv_point_t point = {0, 0};
+    if (indev) {
+        lv_indev_get_point(indev, &point);
+    }
+
+    lv_area_t content_area;
+    lv_obj_get_content_coords(container_, &content_area);
+    int cw = content_area.x2 - content_area.x1;
+    int ch = content_area.y2 - content_area.y1;
+
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+    int ncols = GridLayout::get_cols(breakpoint);
+    int nrows = GridLayout::get_rows(breakpoint);
+
+    // Round the dragged edge to the nearest grid cell boundary
+    int edge_cell;
+    int ncells_axis;
+    if (resize_edge_ == ResizeEdge::Right) {
+        edge_cell = round_to_grid_cell(point.x, content_area.x1, cw, ncols);
+        ncells_axis = ncols;
+    } else if (resize_edge_ == ResizeEdge::Left) {
+        edge_cell = round_to_grid_cell(point.x, content_area.x1, cw, ncols);
+        ncells_axis = ncols;
+    } else if (resize_edge_ == ResizeEdge::Bottom) {
+        edge_cell = round_to_grid_cell(point.y, content_area.y1, ch, nrows);
+        ncells_axis = nrows;
+    } else {
+        edge_cell = round_to_grid_cell(point.y, content_area.y1, ch, nrows);
+        ncells_axis = nrows;
+    }
+
+    auto result =
+        compute_resize_result(resize_edge_, drag_orig_col_, drag_orig_row_, drag_orig_colspan_,
+                              drag_orig_rowspan_, edge_cell, ncells_axis);
+
+    // Apply registry clamping
     int cfg_idx = find_config_index_for_widget(selected_);
+    bool did_resize = false;
 
-    if (cfg_idx >= 0 && resize_preview_colspan_ > 0 && resize_preview_rowspan_ > 0) {
-        // Check if size actually changed
-        auto& entries = config_->mutable_entries();
-        auto& entry = entries[static_cast<size_t>(cfg_idx)];
+    if (cfg_idx >= 0) {
+        const auto& entry = config_->entries()[static_cast<size_t>(cfg_idx)];
+        auto [clamped_c, clamped_r] = clamp_span(entry.id, result.colspan, result.rowspan);
+        result.colspan = clamped_c;
+        result.rowspan = clamped_r;
 
-        if (resize_preview_colspan_ != drag_orig_colspan_ ||
-            resize_preview_rowspan_ != drag_orig_rowspan_) {
-            // Validate the new size doesn't collide
-            lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
-            int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+        // Check if anything actually changed
+        bool changed =
+            (result.col != drag_orig_col_ || result.row != drag_orig_row_ ||
+             result.colspan != drag_orig_colspan_ || result.rowspan != drag_orig_rowspan_);
 
+        if (changed) {
+            // Validate against other widgets
             GridLayout temp_grid(breakpoint);
+            const auto& entries = config_->entries();
             for (const auto& e : entries) {
                 if (!e.enabled || !e.has_grid_position()) {
                     continue;
@@ -1189,31 +1416,117 @@ void GridEditMode::handle_resize_end(lv_event_t* /*e*/) {
                 temp_grid.place({e.id, e.col, e.row, e.colspan, e.rowspan});
             }
 
-            if (temp_grid.can_place(drag_orig_col_, drag_orig_row_, resize_preview_colspan_,
-                                    resize_preview_rowspan_)) {
-                spdlog::info("[GridEditMode] Resized '{}' from {}x{} to {}x{}", entry.id,
-                             drag_orig_colspan_, drag_orig_rowspan_, resize_preview_colspan_,
-                             resize_preview_rowspan_);
-                entry.colspan = resize_preview_colspan_;
-                entry.rowspan = resize_preview_rowspan_;
+            if (temp_grid.can_place(result.col, result.row, result.colspan, result.rowspan)) {
                 did_resize = true;
             }
         }
     }
 
-    // Clean up resize state
-    lv_obj_t* was_selected = selected_;
-    destroy_snap_preview();
+    if (did_resize) {
+        commit_resize_with_snap(result);
+    } else {
+        // Snap back: clean up preview and restore selection
+        lv_obj_t* was_selected = selected_;
+        if (resize_preview_) {
+            lv_obj_delete(resize_preview_);
+            resize_preview_ = nullptr;
+        }
+        resizing_ = false;
+        resize_edge_ = ResizeEdge::None;
+        drag_orig_col_ = -1;
+        drag_orig_row_ = -1;
+        drag_orig_colspan_ = 1;
+        drag_orig_rowspan_ = 1;
+
+        selected_ = nullptr;
+        lv_obj_update_layout(container_);
+        select_widget(was_selected);
+    }
+}
+
+void GridEditMode::update_resize_preview_px(int x, int y, int w, int h, bool valid) {
+    if (!container_) {
+        return;
+    }
+
+    if (!resize_preview_) {
+        // Create the preview overlay on first call
+        resize_preview_ = lv_obj_create(container_);
+        lv_obj_add_flag(resize_preview_, LV_OBJ_FLAG_FLOATING);
+        lv_obj_remove_flag(resize_preview_, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(resize_preview_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_border_width(resize_preview_, PREVIEW_BORDER_WIDTH, 0);
+        lv_obj_set_style_radius(resize_preview_, 8, 0);
+        lv_obj_set_style_pad_all(resize_preview_, 0, 0);
+    }
+
+    lv_obj_set_pos(resize_preview_, x, y);
+    lv_obj_set_size(resize_preview_, w, h);
+
+    if (valid) {
+        lv_obj_set_style_bg_color(resize_preview_, theme_get_accent_color(), 0);
+        lv_obj_set_style_bg_opa(resize_preview_, LV_OPA_10, 0);
+        lv_obj_set_style_border_color(resize_preview_, theme_get_accent_color(), 0);
+        lv_obj_set_style_border_opa(resize_preview_, LV_OPA_70, 0);
+    } else {
+        lv_obj_set_style_bg_color(resize_preview_, ThemeManager::instance().get_color("danger"), 0);
+        lv_obj_set_style_bg_opa(resize_preview_, LV_OPA_10, 0);
+        lv_obj_set_style_border_color(resize_preview_, ThemeManager::instance().get_color("danger"),
+                                      0);
+        lv_obj_set_style_border_opa(resize_preview_, LV_OPA_50, 0);
+    }
+}
+
+void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
+    if (!container_ || !config_) {
+        return;
+    }
+
+    int cfg_idx = find_config_index_for_widget(selected_);
+    if (cfg_idx < 0) {
+        return;
+    }
+
+    // Compute the final pixel position for the snap animation target
+    lv_area_t content_area;
+    lv_obj_get_content_coords(container_, &content_area);
+    int cw = content_area.x2 - content_area.x1;
+    int ch = content_area.y2 - content_area.y1;
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2;
+    int ncols = GridLayout::get_cols(breakpoint);
+    int nrows = GridLayout::get_rows(breakpoint);
+    float cell_w = static_cast<float>(cw) / ncols;
+    float cell_h = static_cast<float>(ch) / nrows;
+
+    int target_x = static_cast<int>(result.col * cell_w);
+    int target_y = static_cast<int>(result.row * cell_h);
+    int target_w = static_cast<int>(result.colspan * cell_w);
+    int target_h = static_cast<int>(result.rowspan * cell_h);
+
+    // Update config
+    auto& entries = config_->mutable_entries();
+    auto& entry = entries[static_cast<size_t>(cfg_idx)];
+
+    spdlog::info("[GridEditMode] Resized '{}' from ({},{} {}x{}) to ({},{} {}x{})", entry.id,
+                 drag_orig_col_, drag_orig_row_, drag_orig_colspan_, drag_orig_rowspan_, result.col,
+                 result.row, result.colspan, result.rowspan);
+
+    entry.col = result.col;
+    entry.row = result.row;
+    entry.colspan = result.colspan;
+    entry.rowspan = result.rowspan;
+
+    // Clean up resize state (before animation or rebuild)
     resizing_ = false;
-    resize_preview_colspan_ = -1;
-    resize_preview_rowspan_ = -1;
+    resize_edge_ = ResizeEdge::None;
     drag_orig_col_ = -1;
     drag_orig_row_ = -1;
     drag_orig_colspan_ = 1;
     drag_orig_rowspan_ = 1;
 
-    if (did_resize) {
-        // Null out overlay pointers before rebuild (lv_obj_clean will delete them)
+    // Prepare rebuild context for deferred execution
+    auto do_rebuild = [this]() {
         selected_ = nullptr;
         selection_overlay_ = nullptr;
         dots_overlay_ = nullptr;
@@ -1221,15 +1534,78 @@ void GridEditMode::handle_resize_end(lv_event_t* /*e*/) {
         if (rebuild_cb_) {
             rebuild_cb_();
         }
-        // Recreate dots overlay (rebuild destroyed all container children)
         if (active_) {
             create_dots_overlay();
         }
+    };
+
+    // Animate preview to final grid position, then rebuild on completion.
+    // The rebuild destroys all container children, so it MUST NOT run while
+    // the animation is still in flight (the preview is a container child).
+    if (resize_preview_ && DisplaySettingsManager::instance().get_animations_enabled()) {
+        struct SnapData {
+            lv_obj_t* preview;
+            int target_x, target_y, target_w, target_h;
+            int start_x, start_y, start_w, start_h;
+            GridEditMode* self;
+        };
+
+        auto* data = new SnapData();
+        data->preview = resize_preview_;
+        data->target_x = target_x;
+        data->target_y = target_y;
+        data->target_w = target_w;
+        data->target_h = target_h;
+        data->start_x = lv_obj_get_x(resize_preview_);
+        data->start_y = lv_obj_get_y(resize_preview_);
+        data->start_w = lv_obj_get_width(resize_preview_);
+        data->start_h = lv_obj_get_height(resize_preview_);
+        data->self = this;
+
+        lv_anim_t anim;
+        lv_anim_init(&anim);
+        lv_anim_set_var(&anim, data);
+        lv_anim_set_values(&anim, 0, 255);
+        lv_anim_set_duration(&anim, 150);
+        lv_anim_set_path_cb(&anim, lv_anim_path_ease_out);
+        lv_anim_set_exec_cb(&anim, [](void* var, int32_t val) {
+            auto* d = static_cast<SnapData*>(var);
+            int t = val; // 0..255
+            int x = d->start_x + (d->target_x - d->start_x) * t / 255;
+            int y = d->start_y + (d->target_y - d->start_y) * t / 255;
+            int w = d->start_w + (d->target_w - d->start_w) * t / 255;
+            int h = d->start_h + (d->target_h - d->start_h) * t / 255;
+            lv_obj_set_pos(d->preview, x, y);
+            lv_obj_set_size(d->preview, w, h);
+        });
+        lv_anim_set_completed_cb(&anim, [](lv_anim_t* a) {
+            auto* d = static_cast<SnapData*>(a->var);
+            auto* self = d->self;
+            // Preview will be destroyed by the rebuild (it's a container child).
+            // No need to manually delete it.
+            delete d;
+            // Now safe to rebuild — animation is complete
+            self->selected_ = nullptr;
+            self->selection_overlay_ = nullptr;
+            self->dots_overlay_ = nullptr;
+            self->config_->save();
+            if (self->rebuild_cb_) {
+                self->rebuild_cb_();
+            }
+            if (self->active_) {
+                self->create_dots_overlay();
+            }
+        });
+        lv_anim_start(&anim);
+
+        resize_preview_ = nullptr; // Ownership transferred to animation
     } else {
-        // Reselect to restore chrome
-        selected_ = nullptr;
-        lv_obj_update_layout(container_);
-        select_widget(was_selected);
+        // No animation: clean up and rebuild immediately
+        if (resize_preview_) {
+            lv_obj_delete(resize_preview_);
+            resize_preview_ = nullptr;
+        }
+        do_rebuild();
     }
 }
 
@@ -1363,8 +1739,10 @@ void GridEditMode::cleanup_drag_state() {
     drag_orig_colspan_ = 1;
     drag_orig_rowspan_ = 1;
     drag_offset_ = {0, 0};
-    resize_preview_colspan_ = -1;
-    resize_preview_rowspan_ = -1;
+    if (resize_preview_) {
+        lv_obj_delete(resize_preview_);
+        resize_preview_ = nullptr;
+    }
 }
 
 void GridEditMode::create_dots_overlay() {
