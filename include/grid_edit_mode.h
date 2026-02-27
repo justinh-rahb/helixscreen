@@ -148,6 +148,7 @@ class GridEditMode {
     lv_obj_t* dots_overlay_ = nullptr;
     lv_obj_t* selected_ = nullptr;
     lv_obj_t* selection_overlay_ = nullptr;
+    lv_obj_t* remove_btn_ = nullptr; // Trash button (container child, not overlay child)
     PanelWidgetConfig* config_ = nullptr;
     SaveCallback save_cb_;
     RebuildCallback rebuild_cb_;

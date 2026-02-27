@@ -102,7 +102,7 @@ lv_obj_t* WidgetCatalogOverlay::create_row(lv_obj_t* parent, const char* name, i
         lv_obj_t* placed_label = lv_label_create(right_group);
         lv_label_set_text(placed_label, "Placed");
         lv_obj_set_style_text_font(placed_label, &noto_sans_12, 0);
-        lv_obj_set_style_text_color(placed_label, theme_manager_get_color("text_secondary"), 0);
+        lv_obj_set_style_text_color(placed_label, theme_manager_get_color("text_muted"), 0);
     }
 
     // Size badge (e.g. "2x1")
@@ -124,7 +124,7 @@ lv_obj_t* WidgetCatalogOverlay::create_row(lv_obj_t* parent, const char* name, i
     lv_obj_t* badge_label = lv_label_create(badge);
     lv_label_set_text(badge_label, size_text);
     lv_obj_set_style_text_font(badge_label, &noto_sans_12, 0);
-    lv_obj_set_style_text_color(badge_label, theme_manager_get_color("text_secondary"), 0);
+    lv_obj_set_style_text_color(badge_label, theme_manager_get_color("text_muted"), 0);
 
     return row;
 }

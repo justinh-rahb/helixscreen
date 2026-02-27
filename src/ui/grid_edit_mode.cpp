@@ -216,9 +216,27 @@ void GridEditMode::handle_click(lv_event_t* /*e*/) {
                           static_cast<uint32_t>(lv_obj_get_state(child)));
         }
     } else {
-        spdlog::debug("[GridEditMode] handle_click: no widget at ({},{}) — {} children checked",
-                      point.x, point.y, child_count);
-        select_widget(nullptr);
+        // Before deselecting, check if the click is within the edge resize zone
+        // of the currently selected widget. If so, keep the selection — the user
+        // is clicking in the outer 18px margin to start a resize drag.
+        bool in_edge_zone = false;
+        if (selected_) {
+            lv_area_t sel_area;
+            lv_obj_get_coords(selected_, &sel_area);
+            constexpr int EDGE_MARGIN = 18;
+            if (point.x >= sel_area.x1 - EDGE_MARGIN && point.x <= sel_area.x2 + EDGE_MARGIN &&
+                point.y >= sel_area.y1 - EDGE_MARGIN && point.y <= sel_area.y2 + EDGE_MARGIN) {
+                in_edge_zone = true;
+                spdlog::debug("[GridEditMode] handle_click: no widget at ({},{}) but within "
+                              "edge zone of selected widget — keeping selection",
+                              point.x, point.y);
+            }
+        }
+        if (!in_edge_zone) {
+            spdlog::debug("[GridEditMode] handle_click: no widget at ({},{}) — {} children checked",
+                          point.x, point.y, child_count);
+            select_widget(nullptr);
+        }
     }
 }
 
@@ -269,7 +287,6 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
     lv_obj_set_style_border_width(selection_overlay_, 1, 0);
     lv_obj_set_style_radius(selection_overlay_, radius, 0);
     lv_obj_set_style_pad_all(selection_overlay_, 0, 0);
-
     // Corner bracket styling: two bars per corner forming a square L-bracket
     constexpr int BAR_LEN = 16;
     constexpr int BAR_THICK = 3;
@@ -304,7 +321,7 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
 
     // Add resize edge handles for scalable widgets: thinner, lower opacity than corners
     if (is_selected_widget_resizable()) {
-        constexpr int EDGE_THICK = 2;
+        constexpr int EDGE_THICK = 1;
         constexpr int HANDLE_INSET = BAR_LEN + 4; // Start after corner brackets
 
         auto make_edge_bar = [&](int x, int y, int w, int h) {
@@ -312,7 +329,7 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
             lv_obj_set_pos(bar, x, y);
             lv_obj_set_size(bar, w, h);
             lv_obj_set_style_bg_color(bar, accent, 0);
-            lv_obj_set_style_bg_opa(bar, LV_OPA_40, 0);
+            lv_obj_set_style_bg_opa(bar, LV_OPA_20, 0);
             lv_obj_set_style_border_width(bar, 0, 0);
             lv_obj_set_style_radius(bar, 0, 0);
             lv_obj_set_style_pad_all(bar, 0, 0);
@@ -366,25 +383,30 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
         lv_anim_start(&anim);
     }
 
-    // (X) removal button — top-right corner, slightly inset
+    // Trash removal button — positioned on the container (not the overlay) so it
+    // isn't clipped by the overlay or widget bounds. Uses FLOATING positioning
+    // relative to the container's content area.
     constexpr int BTN_SIZE = 24;
-    constexpr int BTN_INSET = 4;
-    lv_obj_t* x_btn = lv_obj_create(selection_overlay_);
-    lv_obj_set_pos(x_btn, widget_w - BTN_SIZE - BTN_INSET, BTN_INSET);
+    constexpr int BTN_OVERHANG = BTN_SIZE / 4; // 25% shift outside widget bounds
+    remove_btn_ = lv_obj_create(container_);
+    lv_obj_t* x_btn = remove_btn_;
+    lv_obj_add_flag(x_btn, LV_OBJ_FLAG_FLOATING);
+    lv_obj_set_pos(x_btn, rel_x1 + widget_w - BTN_SIZE + BTN_OVERHANG, rel_y1 - BTN_OVERHANG);
     lv_obj_set_size(x_btn, BTN_SIZE, BTN_SIZE);
     lv_obj_set_style_radius(x_btn, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(x_btn, ThemeManager::instance().get_color("danger"), 0);
-    lv_obj_set_style_bg_opa(x_btn, LV_OPA_COVER, 0);
+    lv_color_t btn_bg = theme_manager_get_color("text");
+    lv_obj_set_style_bg_color(x_btn, btn_bg, 0);
+    lv_obj_set_style_bg_opa(x_btn, LV_OPA_50, 0);
     lv_obj_set_style_border_width(x_btn, 0, 0);
     lv_obj_set_style_pad_all(x_btn, 0, 0);
     lv_obj_add_flag(x_btn, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(x_btn, LV_OBJ_FLAG_SCROLLABLE);
 
-    // X icon label inside the button
+    // Trash icon with contrast color for readability on the text-colored bg
     lv_obj_t* x_label = lv_label_create(x_btn);
-    lv_label_set_text(x_label, ICON_XMARK);
+    lv_label_set_text(x_label, ICON_TRASH);
     lv_obj_set_style_text_font(x_label, &mdi_icons_16, 0);
-    lv_obj_set_style_text_color(x_label, lv_color_white(), 0);
+    lv_obj_set_style_text_color(x_label, theme_manager_get_contrast_color(btn_bg), 0);
     lv_obj_center(x_label);
 
     // (X) button click handler — exception: dynamic overlay chrome uses lv_obj_add_event_cb
@@ -408,6 +430,10 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
 }
 
 void GridEditMode::destroy_selection_chrome() {
+    if (remove_btn_) {
+        lv_obj_delete(remove_btn_);
+        remove_btn_ = nullptr;
+    }
     if (selection_overlay_) {
         lv_obj_delete(selection_overlay_);
         selection_overlay_ = nullptr;
@@ -805,11 +831,16 @@ void GridEditMode::handle_pressing(lv_event_t* e) {
         return;
     }
 
-    // If already selected but pressing on a different widget, re-select
+    // If already selected but pressing on a different widget, re-select.
+    // Keep selection if the press is within the edge resize zone (18px margin).
     if (!drag_pending_ && selected_) {
         lv_area_t sel_area;
         lv_obj_get_coords(selected_, &sel_area);
-        if (pt.x < sel_area.x1 || pt.x > sel_area.x2 || pt.y < sel_area.y1 || pt.y > sel_area.y2) {
+        constexpr int EDGE_MARGIN = 18;
+        bool outside_edge_zone =
+            (pt.x < sel_area.x1 - EDGE_MARGIN || pt.x > sel_area.x2 + EDGE_MARGIN ||
+             pt.y < sel_area.y1 - EDGE_MARGIN || pt.y > sel_area.y2 + EDGE_MARGIN);
+        if (outside_edge_zone) {
             handle_click(e);
         }
         if (selected_) {
@@ -1209,6 +1240,10 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
 
     // Clean up visual state before rebuild
     lv_obj_t* was_selected = selected_;
+    std::string moved_id;
+    if (drag_cfg_idx_ >= 0) {
+        moved_id = config_->entries()[static_cast<size_t>(drag_cfg_idx_)].id;
+    }
     cleanup_drag_state();
 
     if (did_move) {
@@ -1217,6 +1252,7 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
         // Null them out first to prevent dangling pointer access.
         selected_ = nullptr;
         selection_overlay_ = nullptr;
+        remove_btn_ = nullptr;
         dots_overlay_ = nullptr;
         config_->save();
         spdlog::debug("[GridEditMode] Config saved, rebuilding widgets...");
@@ -1227,6 +1263,17 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
         // Recreate dots overlay (rebuild destroyed all container children)
         if (active_) {
             create_dots_overlay();
+        }
+        // Re-select the moved widget after rebuild (layout must be
+        // recalculated first so widget coords are valid for chrome placement)
+        lv_obj_update_layout(container_);
+        for (uint32_t i = 0; i < lv_obj_get_child_count(container_); ++i) {
+            lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(i));
+            const char* cname = lv_obj_get_name(child);
+            if (cname && moved_id == cname) {
+                select_widget(child);
+                break;
+            }
         }
     } else {
         // Re-select to show chrome again (widget snaps back via grid layout)
@@ -1335,6 +1382,13 @@ void GridEditMode::handle_resize_move(lv_event_t* /*e*/) {
     result.colspan = clamped_c;
     result.rowspan = clamped_r;
 
+    // Re-anchor origin for top/left edges so the opposite edge stays fixed
+    if (resize_edge_ == ResizeEdge::Top) {
+        result.row = drag_orig_row_ + drag_orig_rowspan_ - result.rowspan;
+    } else if (resize_edge_ == ResizeEdge::Left) {
+        result.col = drag_orig_col_ + drag_orig_colspan_ - result.colspan;
+    }
+
     // Detect if the dragged axis hit its max constraint
     bool at_limit = false;
     if (resize_edge_ == ResizeEdge::Right || resize_edge_ == ResizeEdge::Left) {
@@ -1435,12 +1489,22 @@ void GridEditMode::handle_resize_end(lv_event_t* /*e*/) {
         result.colspan = clamped_c;
         result.rowspan = clamped_r;
 
-        // Check if anything actually changed
-        bool changed =
-            (result.col != drag_orig_col_ || result.row != drag_orig_row_ ||
-             result.colspan != drag_orig_colspan_ || result.rowspan != drag_orig_rowspan_);
+        // Re-anchor origin for top/left edges so the opposite edge stays fixed
+        if (resize_edge_ == ResizeEdge::Top) {
+            result.row = drag_orig_row_ + drag_orig_rowspan_ - result.rowspan;
+        } else if (resize_edge_ == ResizeEdge::Left) {
+            result.col = drag_orig_col_ + drag_orig_colspan_ - result.colspan;
+        }
 
-        if (changed) {
+        // Reject if the span didn't actually change — this prevents a top/left
+        // edge drag at max size from silently moving the widget origin instead
+        // of snapping back (the user saw a red/at-limit preview and expects no change).
+        bool span_changed =
+            (result.colspan != drag_orig_colspan_ || result.rowspan != drag_orig_rowspan_);
+        bool changed =
+            (result.col != drag_orig_col_ || result.row != drag_orig_row_ || span_changed);
+
+        if (changed && span_changed) {
             // Validate against other widgets
             GridLayout temp_grid(breakpoint);
             const auto& entries = config_->entries();
@@ -1540,6 +1604,7 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
     // Update config
     auto& entries = config_->mutable_entries();
     auto& entry = entries[static_cast<size_t>(cfg_idx)];
+    std::string resized_id = entry.id;
 
     spdlog::info("[GridEditMode] Resized '{}' from ({},{} {}x{}) to ({},{} {}x{})", entry.id,
                  drag_orig_col_, drag_orig_row_, drag_orig_colspan_, drag_orig_rowspan_, result.col,
@@ -1559,9 +1624,10 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
     drag_orig_rowspan_ = 1;
 
     // Prepare rebuild context for deferred execution
-    auto do_rebuild = [this]() {
+    auto do_rebuild = [this, resized_id]() {
         selected_ = nullptr;
         selection_overlay_ = nullptr;
+        remove_btn_ = nullptr;
         dots_overlay_ = nullptr;
         snap_preview_ = nullptr;
         config_->save();
@@ -1570,6 +1636,17 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
         }
         if (active_) {
             create_dots_overlay();
+        }
+        // Re-select the resized widget after rebuild (layout must be
+        // recalculated first so widget coords are valid for chrome placement)
+        lv_obj_update_layout(container_);
+        for (uint32_t i = 0; i < lv_obj_get_child_count(container_); ++i) {
+            lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(i));
+            const char* cname = lv_obj_get_name(child);
+            if (cname && resized_id == cname) {
+                select_widget(child);
+                break;
+            }
         }
     };
 
@@ -1582,6 +1659,7 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
             int target_x, target_y, target_w, target_h;
             int start_x, start_y, start_w, start_h;
             GridEditMode* self;
+            std::string resized_id;
         };
 
         auto* data = new SnapData();
@@ -1595,6 +1673,7 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
         data->start_w = lv_obj_get_width(resize_preview_);
         data->start_h = lv_obj_get_height(resize_preview_);
         data->self = this;
+        data->resized_id = resized_id;
 
         lv_anim_t anim;
         lv_anim_init(&anim);
@@ -1615,12 +1694,14 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
         lv_anim_set_completed_cb(&anim, [](lv_anim_t* a) {
             auto* d = static_cast<SnapData*>(a->var);
             auto* self = d->self;
+            std::string rid = std::move(d->resized_id);
             // Preview will be destroyed by the rebuild (it's a container child).
             // No need to manually delete it.
             delete d;
             // Now safe to rebuild — animation is complete
             self->selected_ = nullptr;
             self->selection_overlay_ = nullptr;
+            self->remove_btn_ = nullptr;
             self->dots_overlay_ = nullptr;
             self->snap_preview_ = nullptr;
             self->config_->save();
@@ -1629,6 +1710,17 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
             }
             if (self->active_) {
                 self->create_dots_overlay();
+            }
+            // Re-select the resized widget after rebuild (layout must be
+            // recalculated first so widget coords are valid for chrome placement)
+            lv_obj_update_layout(self->container_);
+            for (uint32_t i = 0; i < lv_obj_get_child_count(self->container_); ++i) {
+                lv_obj_t* child = lv_obj_get_child(self->container_, static_cast<int32_t>(i));
+                const char* cname = lv_obj_get_name(child);
+                if (cname && rid == cname) {
+                    self->select_widget(child);
+                    break;
+                }
             }
         });
         lv_anim_start(&anim);
@@ -1680,7 +1772,7 @@ void GridEditMode::create_drag_ghost(int col, int row, int colspan, int rowspan)
     lv_obj_remove_flag(drag_ghost_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_bg_opa(drag_ghost_, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(drag_ghost_, GHOST_BORDER_WIDTH, 0);
-    lv_obj_set_style_border_color(drag_ghost_, theme_manager_get_color("text_secondary"), 0);
+    lv_obj_set_style_border_color(drag_ghost_, theme_manager_get_color("text_muted"), 0);
     lv_obj_set_style_border_opa(drag_ghost_, GHOST_BORDER_OPA, 0);
     lv_obj_set_style_radius(drag_ghost_, 8, 0);
     lv_obj_set_style_pad_all(drag_ghost_, 0, 0);
