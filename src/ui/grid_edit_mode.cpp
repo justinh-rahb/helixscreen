@@ -301,31 +301,45 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
     make_bar(widget_w - BAR_LEN, widget_h - BAR_THICK, BAR_LEN, BAR_THICK);
     make_bar(widget_w - BAR_THICK, widget_h - BAR_LEN, BAR_THICK, BAR_LEN);
 
-    // Add resize handles for scalable widgets: edge bars on all 4 sides
+    // Add resize edge handles for scalable widgets: thinner, lower opacity than corners
     if (is_selected_widget_resizable()) {
-        constexpr int HANDLE_THICK = 4;
+        constexpr int EDGE_THICK = 2;
         constexpr int HANDLE_INSET = BAR_LEN + 4; // Start after corner brackets
 
-        // Right edge handle (vertical bar, between top-right and bottom-right brackets)
+        auto make_edge_bar = [&](int x, int y, int w, int h) {
+            lv_obj_t* bar = lv_obj_create(selection_overlay_);
+            lv_obj_set_pos(bar, x, y);
+            lv_obj_set_size(bar, w, h);
+            lv_obj_set_style_bg_color(bar, accent, 0);
+            lv_obj_set_style_bg_opa(bar, LV_OPA_40, 0);
+            lv_obj_set_style_border_width(bar, 0, 0);
+            lv_obj_set_style_radius(bar, 0, 0);
+            lv_obj_set_style_pad_all(bar, 0, 0);
+            lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
+            bar_count++;
+        };
+
+        // Right edge handle
         if (widget_h > 2 * HANDLE_INSET) {
-            make_bar(widget_w - HANDLE_THICK, HANDLE_INSET, HANDLE_THICK,
-                     widget_h - 2 * HANDLE_INSET);
+            make_edge_bar(widget_w - EDGE_THICK, HANDLE_INSET, EDGE_THICK,
+                          widget_h - 2 * HANDLE_INSET);
         }
 
-        // Left edge handle (vertical bar, between top-left and bottom-left brackets)
+        // Left edge handle
         if (widget_h > 2 * HANDLE_INSET) {
-            make_bar(0, HANDLE_INSET, HANDLE_THICK, widget_h - 2 * HANDLE_INSET);
+            make_edge_bar(0, HANDLE_INSET, EDGE_THICK, widget_h - 2 * HANDLE_INSET);
         }
 
-        // Bottom edge handle (horizontal bar, between bottom-left and bottom-right brackets)
+        // Bottom edge handle
         if (widget_w > 2 * HANDLE_INSET) {
-            make_bar(HANDLE_INSET, widget_h - HANDLE_THICK, widget_w - 2 * HANDLE_INSET,
-                     HANDLE_THICK);
+            make_edge_bar(HANDLE_INSET, widget_h - EDGE_THICK, widget_w - 2 * HANDLE_INSET,
+                          EDGE_THICK);
         }
 
-        // Top edge handle (horizontal bar, between top-left and top-right brackets)
+        // Top edge handle
         if (widget_w > 2 * HANDLE_INSET) {
-            make_bar(HANDLE_INSET, 0, widget_w - 2 * HANDLE_INSET, HANDLE_THICK);
+            make_edge_bar(HANDLE_INSET, 0, widget_w - 2 * HANDLE_INSET, EDGE_THICK);
         }
     }
 
@@ -1299,15 +1313,25 @@ void GridEditMode::handle_resize_move(lv_event_t* /*e*/) {
         compute_resize_result(resize_edge_, drag_orig_col_, drag_orig_row_, drag_orig_colspan_,
                               drag_orig_rowspan_, edge_cell, ncells_axis);
 
-    // Apply registry min/max clamping
+    // Apply registry min/max clamping and detect if at limit
     int cfg_idx = find_config_index_for_widget(selected_);
     if (cfg_idx < 0) {
         return;
     }
     const auto& entry = config_->entries()[static_cast<size_t>(cfg_idx)];
+    int pre_clamp_c = result.colspan;
+    int pre_clamp_r = result.rowspan;
     auto [clamped_c, clamped_r] = clamp_span(entry.id, result.colspan, result.rowspan);
     result.colspan = clamped_c;
     result.rowspan = clamped_r;
+
+    // Detect if the dragged axis hit its max constraint
+    bool at_limit = false;
+    if (resize_edge_ == ResizeEdge::Right || resize_edge_ == ResizeEdge::Left) {
+        at_limit = (pre_clamp_c != clamped_c); // Colspan was clamped
+    } else if (resize_edge_ == ResizeEdge::Bottom || resize_edge_ == ResizeEdge::Top) {
+        at_limit = (pre_clamp_r != clamped_r); // Rowspan was clamped
+    }
 
     // Check collision with other widgets
     GridLayout temp_grid(breakpoint);
@@ -1329,7 +1353,11 @@ void GridEditMode::handle_resize_move(lv_event_t* /*e*/) {
     int pw = preview_x2 - preview_x1;
     int ph = preview_y2 - preview_y1;
 
-    update_resize_preview_px(px, py, pw, ph, valid);
+    // Pixel-following preview: danger color when at max size or invalid placement
+    update_resize_preview_px(px, py, pw, ph, valid && !at_limit);
+
+    // Grid-snapped preview (shows where widget will land on release)
+    update_snap_preview(result.col, result.row, result.colspan, result.rowspan, valid);
 
     spdlog::debug("[GridEditMode] Resize preview: px=({},{} {}x{}) → grid ({},{} {}x{}) valid={}",
                   px, py, pw, ph, result.col, result.row, result.colspan, result.rowspan, valid);
@@ -1425,12 +1453,13 @@ void GridEditMode::handle_resize_end(lv_event_t* /*e*/) {
     if (did_resize) {
         commit_resize_with_snap(result);
     } else {
-        // Snap back: clean up preview and restore selection
+        // Snap back: clean up previews and restore selection
         lv_obj_t* was_selected = selected_;
         if (resize_preview_) {
             lv_obj_delete(resize_preview_);
             resize_preview_ = nullptr;
         }
+        destroy_snap_preview();
         resizing_ = false;
         resize_edge_ = ResizeEdge::None;
         drag_orig_col_ = -1;
@@ -1450,31 +1479,25 @@ void GridEditMode::update_resize_preview_px(int x, int y, int w, int h, bool val
     }
 
     if (!resize_preview_) {
-        // Create the preview overlay on first call
+        // Pixel-following preview: thin border, no fill. The grid-snapped
+        // snap_preview_ provides the primary visual indicator of landing position.
         resize_preview_ = lv_obj_create(container_);
         lv_obj_add_flag(resize_preview_, LV_OBJ_FLAG_FLOATING);
         lv_obj_remove_flag(resize_preview_, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_remove_flag(resize_preview_, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_style_border_width(resize_preview_, PREVIEW_BORDER_WIDTH, 0);
+        lv_obj_set_style_border_width(resize_preview_, 2, 0);
         lv_obj_set_style_radius(resize_preview_, 8, 0);
         lv_obj_set_style_pad_all(resize_preview_, 0, 0);
+        lv_obj_set_style_bg_opa(resize_preview_, LV_OPA_TRANSP, 0);
     }
 
     lv_obj_set_pos(resize_preview_, x, y);
     lv_obj_set_size(resize_preview_, w, h);
 
-    if (valid) {
-        lv_obj_set_style_bg_color(resize_preview_, theme_get_accent_color(), 0);
-        lv_obj_set_style_bg_opa(resize_preview_, LV_OPA_10, 0);
-        lv_obj_set_style_border_color(resize_preview_, theme_get_accent_color(), 0);
-        lv_obj_set_style_border_opa(resize_preview_, LV_OPA_70, 0);
-    } else {
-        lv_obj_set_style_bg_color(resize_preview_, ThemeManager::instance().get_color("danger"), 0);
-        lv_obj_set_style_bg_opa(resize_preview_, LV_OPA_10, 0);
-        lv_obj_set_style_border_color(resize_preview_, ThemeManager::instance().get_color("danger"),
-                                      0);
-        lv_obj_set_style_border_opa(resize_preview_, LV_OPA_50, 0);
-    }
+    lv_color_t color =
+        valid ? theme_get_accent_color() : ThemeManager::instance().get_color("danger");
+    lv_obj_set_style_border_color(resize_preview_, color, 0);
+    lv_obj_set_style_border_opa(resize_preview_, LV_OPA_40, 0);
 }
 
 void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
@@ -1530,6 +1553,7 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
         selected_ = nullptr;
         selection_overlay_ = nullptr;
         dots_overlay_ = nullptr;
+        snap_preview_ = nullptr;
         config_->save();
         if (rebuild_cb_) {
             rebuild_cb_();
@@ -1588,6 +1612,7 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
             self->selected_ = nullptr;
             self->selection_overlay_ = nullptr;
             self->dots_overlay_ = nullptr;
+            self->snap_preview_ = nullptr;
             self->config_->save();
             if (self->rebuild_cb_) {
                 self->rebuild_cb_();
