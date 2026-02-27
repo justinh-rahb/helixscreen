@@ -1,0 +1,170 @@
+// Copyright (C) 2025-2026 356C LLC
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "bed_mesh_render_thread.h"
+
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+
+namespace helix {
+namespace mesh {
+
+BedMeshRenderThread::BedMeshRenderThread() = default;
+
+BedMeshRenderThread::~BedMeshRenderThread() {
+    stop();
+}
+
+void BedMeshRenderThread::start(int width, int height) {
+    if (running_.load()) {
+        spdlog::warn("[BedMeshRenderThread] start() called while already running");
+        return;
+    }
+
+    // Allocate double buffers
+    front_buffer_ = std::make_unique<PixelBuffer>(width, height);
+    back_buffer_ = std::make_unique<PixelBuffer>(width, height);
+    buffer_ready_.store(false);
+    render_requested_.store(false);
+    last_render_time_ms_.store(0.0f);
+
+    running_.store(true);
+    thread_ = std::thread(&BedMeshRenderThread::render_loop, this);
+
+    spdlog::info("[BedMeshRenderThread] Started ({}x{}, double-buffered)", width, height);
+}
+
+void BedMeshRenderThread::stop() {
+    if (!running_.load()) {
+        return;
+    }
+
+    spdlog::info("[BedMeshRenderThread] Stopping...");
+
+    running_.store(false);
+    cv_.notify_all();
+
+    if (thread_.joinable()) {
+        thread_.join();
+    }
+
+    spdlog::info("[BedMeshRenderThread] Stopped");
+}
+
+bool BedMeshRenderThread::is_running() const {
+    return running_.load();
+}
+
+void BedMeshRenderThread::set_renderer(bed_mesh_renderer_t* renderer) {
+    std::lock_guard<std::mutex> lock(renderer_mutex_);
+    renderer_ = renderer;
+}
+
+void BedMeshRenderThread::set_colors(const bed_mesh_render_colors_t& colors) {
+    std::lock_guard<std::mutex> lock(colors_mutex_);
+    colors_ = colors;
+}
+
+void BedMeshRenderThread::request_render() {
+    render_requested_.store(true);
+    cv_.notify_one();
+}
+
+bool BedMeshRenderThread::has_ready_buffer() const {
+    return buffer_ready_.load();
+}
+
+const PixelBuffer* BedMeshRenderThread::get_ready_buffer() const {
+    if (!buffer_ready_.load()) {
+        return nullptr;
+    }
+    // Front buffer is safe to read: render thread writes to back buffer.
+    // The swap_mutex_ protects pointer swap, but between swaps the front
+    // pointer is stable.
+    return front_buffer_.get();
+}
+
+void BedMeshRenderThread::set_frame_ready_callback(std::function<void()> cb) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    frame_ready_callback_ = std::move(cb);
+}
+
+float BedMeshRenderThread::last_render_time_ms() const {
+    return last_render_time_ms_.load();
+}
+
+void BedMeshRenderThread::render_loop() {
+    spdlog::debug("[BedMeshRenderThread] Render loop started");
+
+    while (running_.load()) {
+        // Wait for a render request or stop signal
+        {
+            std::unique_lock<std::mutex> lock(cv_mutex_);
+            cv_.wait(lock, [this]() { return render_requested_.load() || !running_.load(); });
+        }
+
+        if (!running_.load()) {
+            break;
+        }
+
+        // Consume the request (coalesces multiple requests into one render)
+        render_requested_.store(false);
+
+        // Snapshot renderer pointer under lock
+        bed_mesh_renderer_t* renderer = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(renderer_mutex_);
+            renderer = renderer_;
+        }
+
+        if (!renderer) {
+            spdlog::warn("[BedMeshRenderThread] Render requested but no renderer set");
+            continue;
+        }
+
+        // Snapshot colors under lock
+        bed_mesh_render_colors_t colors;
+        {
+            std::lock_guard<std::mutex> lock(colors_mutex_);
+            colors = colors_;
+        }
+
+        // Render into back buffer
+        auto t0 = std::chrono::steady_clock::now();
+        bool ok = bed_mesh_renderer_render_to_buffer(renderer, *back_buffer_, colors);
+        auto t1 = std::chrono::steady_clock::now();
+
+        if (!ok) {
+            spdlog::warn("[BedMeshRenderThread] render_to_buffer failed");
+            continue;
+        }
+
+        float elapsed_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
+        last_render_time_ms_.store(elapsed_ms);
+
+        // Swap front/back buffers
+        {
+            std::lock_guard<std::mutex> lock(swap_mutex_);
+            front_buffer_.swap(back_buffer_);
+        }
+        buffer_ready_.store(true);
+
+        spdlog::debug("[BedMeshRenderThread] Frame rendered in {:.1f} ms", elapsed_ms);
+
+        // Notify callback (typically queues a widget invalidation)
+        std::function<void()> cb;
+        {
+            std::lock_guard<std::mutex> lock(callback_mutex_);
+            cb = frame_ready_callback_;
+        }
+        if (cb) {
+            cb();
+        }
+    }
+
+    spdlog::debug("[BedMeshRenderThread] Render loop exiting");
+}
+
+} // namespace mesh
+} // namespace helix
