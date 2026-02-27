@@ -473,6 +473,7 @@ class PrinterDiscovery {
         has_screws_tilt_ = false;
         has_klippain_shaketune_ = false;
         has_speaker_ = false;
+        is_kalico_ = false;
         mmu_type_ = AmsType::NONE;
         detected_ams_systems_.clear();
 
@@ -611,6 +612,23 @@ class PrinterDiscovery {
 
     [[nodiscard]] bool has_speaker() const {
         return has_speaker_;
+    }
+
+    /**
+     * @brief Check if connected printer runs Kalico (Klipper fork with MPC support)
+     *
+     * Detected from printer.info "app" field returning "Kalico".
+     */
+    [[nodiscard]] bool is_kalico() const {
+        return is_kalico_;
+    }
+
+    /**
+     * @brief Set Kalico detection flag
+     * @param kalico true if printer.info reports app as "Kalico"
+     */
+    void set_is_kalico(bool kalico) {
+        is_kalico_ = kalico;
     }
 
     [[nodiscard]] bool supports_leveling() const {
@@ -994,6 +1012,7 @@ class PrinterDiscovery {
     bool has_screws_tilt_ = false;
     bool has_klippain_shaketune_ = false;
     bool has_speaker_ = false;
+    bool is_kalico_ = false;
     AmsType mmu_type_ = AmsType::NONE;
     std::vector<DetectedAmsSystem> detected_ams_systems_;
 

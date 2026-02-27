@@ -95,6 +95,22 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
                                                              {"autostart", "false"},
                                                              {"frame_rate", "24"}};
 
+                // Build extruder settings based on HELIX_MOCK_KALICO env var
+                const char* kalico_env_cfg = std::getenv("HELIX_MOCK_KALICO");
+                bool mock_kalico_cfg = kalico_env_cfg && std::string(kalico_env_cfg) == "1";
+
+                json extruder_settings = {
+                    {"min_temp", 0.0}, {"max_temp", 300.0}, {"min_extrude_temp", 170.0}};
+                if (mock_kalico_cfg) {
+                    extruder_settings["control"] = "mpc";
+                    extruder_settings["heater_power"] = 50.0;
+                } else {
+                    extruder_settings["control"] = "pid";
+                    extruder_settings["pid_kp"] = 22.865;
+                    extruder_settings["pid_ki"] = 1.292;
+                    extruder_settings["pid_kd"] = 101.178;
+                }
+
                 status_obj["configfile"] = {
                     {"settings",
                      {{"printer", {{"max_velocity", 500.0}, {"max_accel", 10000.0}}},
@@ -106,14 +122,7 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
                        {{"position_min", 0.0},
                         {"position_max", MOCK_BED_Z_MAX},
                         {"position_endstop", 235.0}}},
-                      {"extruder",
-                       {{"min_temp", 0.0},
-                        {"max_temp", 300.0},
-                        {"min_extrude_temp", 170.0},
-                        {"control", "pid"},
-                        {"pid_kp", 22.865},
-                        {"pid_ki", 1.292},
-                        {"pid_kd", 101.178}}},
+                      {"extruder", extruder_settings},
                       {"heater_bed",
                        {{"min_temp", 0.0},
                         {"max_temp", 120.0},
@@ -361,6 +370,22 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
 
             // configfile (printer configuration)
             if (objects.contains("configfile")) {
+                // Build extruder settings based on HELIX_MOCK_KALICO env var
+                const char* kalico_env_cfg2 = std::getenv("HELIX_MOCK_KALICO");
+                bool mock_kalico_cfg2 = kalico_env_cfg2 && std::string(kalico_env_cfg2) == "1";
+
+                json extruder_settings2 = {
+                    {"min_temp", 0.0}, {"max_temp", 300.0}, {"min_extrude_temp", 170.0}};
+                if (mock_kalico_cfg2) {
+                    extruder_settings2["control"] = "mpc";
+                    extruder_settings2["heater_power"] = 50.0;
+                } else {
+                    extruder_settings2["control"] = "pid";
+                    extruder_settings2["pid_kp"] = 22.865;
+                    extruder_settings2["pid_ki"] = 1.292;
+                    extruder_settings2["pid_kd"] = 101.178;
+                }
+
                 status_obj["configfile"] = {
                     {"settings",
                      {{"printer", {{"max_velocity", 500.0}, {"max_accel", 10000.0}}},
@@ -372,14 +397,7 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
                        {{"position_min", 0.0},
                         {"position_max", MOCK_BED_Z_MAX},
                         {"position_endstop", 235.0}}},
-                      {"extruder",
-                       {{"min_temp", 0.0},
-                        {"max_temp", 300.0},
-                        {"min_extrude_temp", 170.0},
-                        {"control", "pid"},
-                        {"pid_kp", 22.865},
-                        {"pid_ki", 1.292},
-                        {"pid_kd", 101.178}}},
+                      {"extruder", extruder_settings2},
                       {"heater_bed",
                        {{"min_temp", 0.0},
                         {"max_temp", 120.0},

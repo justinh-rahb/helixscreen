@@ -1879,6 +1879,65 @@ void MoonrakerAdvancedAPI::get_heater_pid_values(
         });
 }
 
+void MoonrakerAdvancedAPI::get_heater_control_type(
+    const std::string& heater, MoonrakerAdvancedAPI::HeaterControlTypeCallback on_complete,
+    MoonrakerAdvancedAPI::ErrorCallback on_error) {
+    json params = {{"objects", json::object({{"configfile", json::array({"settings"})}})}};
+
+    client_.send_jsonrpc(
+        "printer.objects.query", params,
+        [heater, on_complete, on_error](json response) {
+            try {
+                if (!response.contains("result") || !response["result"].contains("status") ||
+                    !response["result"]["status"].contains("configfile") ||
+                    !response["result"]["status"]["configfile"].contains("settings")) {
+                    spdlog::debug(
+                        "[Moonraker API] configfile.settings not available for control type query");
+                    // Default to pid when settings unavailable
+                    if (on_complete) {
+                        on_complete("pid");
+                    }
+                    return;
+                }
+
+                const json& settings = response["result"]["status"]["configfile"]["settings"];
+
+                if (!settings.contains(heater)) {
+                    if (on_error) {
+                        on_error(MoonrakerError{MoonrakerErrorType::UNKNOWN,
+                                                0,
+                                                "Heater '" + heater + "' not in config",
+                                                "get_heater_control_type",
+                                                {}});
+                    }
+                    return;
+                }
+
+                const json& h = settings[heater];
+                std::string control = h.value("control", "pid");
+                spdlog::debug("[Moonraker API] Heater '{}' control type: {}", heater, control);
+                if (on_complete) {
+                    on_complete(control);
+                }
+            } catch (const std::exception& ex) {
+                spdlog::warn("[Moonraker API] Error parsing heater control type: {}", ex.what());
+                if (on_error) {
+                    on_error(MoonrakerError{MoonrakerErrorType::UNKNOWN,
+                                            0,
+                                            std::string("Parse error: ") + ex.what(),
+                                            "get_heater_control_type",
+                                            {}});
+                }
+            }
+        },
+        [on_error](const MoonrakerError& err) {
+            spdlog::debug("[Moonraker API] Failed to fetch heater control type: {}", err.message);
+            if (on_error) {
+                on_error(err);
+            }
+        });
+}
+
 void MoonrakerAdvancedAPI::start_pid_calibrate(
     const std::string& heater, int target_temp,
     MoonrakerAdvancedAPI::PIDCalibrateCallback on_complete, ErrorCallback on_error,

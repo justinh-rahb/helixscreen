@@ -70,6 +70,9 @@ class MoonrakerAdvancedAPI {
     /// Callback for input shaper configuration query
     using InputShaperConfigCallback = std::function<void(const InputShaperConfig&)>;
 
+    /// Callback for heater control type query (returns "pid", "mpc", etc.)
+    using HeaterControlTypeCallback = std::function<void(const std::string& control_type)>;
+
     /// Callback for PID calibration progress (sample number, tolerance value; -1.0 = n/a)
     using PIDProgressCallback = std::function<void(int sample, float tolerance)>;
 
@@ -300,6 +303,20 @@ class MoonrakerAdvancedAPI {
      */
     virtual void get_heater_pid_values(const std::string& heater, PIDCalibrateCallback on_complete,
                                        ErrorCallback on_error);
+
+    /**
+     * @brief Query the control type for a heater from printer configuration
+     *
+     * Queries configfile.settings to determine if a heater uses PID or MPC control.
+     * Returns "pid" by default if the control key is missing.
+     *
+     * @param heater Heater name ("extruder", "heater_bed", etc.)
+     * @param on_complete Called with control type string ("pid", "mpc", etc.)
+     * @param on_error Called if the heater cannot be found in config
+     */
+    virtual void get_heater_control_type(const std::string& heater,
+                                         HeaterControlTypeCallback on_complete,
+                                         ErrorCallback on_error);
 
     /**
      * @brief Start PID calibration for a heater
