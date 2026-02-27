@@ -5,6 +5,27 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.8] - 2026-02-27
+
+### Added
+- Memory-aware geometry budget system for 3D G-code viewer — automatically selects detail tier based on available memory with graceful 2D fallback
+- GPU-accelerated backdrop blur for modals
+- Shutdown and reboot widget with modal confirmation dialog
+- Speed and flow rate increment buttons replace sliders for precise control (#219)
+- Lemontron, Sovol SV08 Max, and Sovol Zero added to printer database
+
+### Fixed
+- UI freeze during 3D geometry VBO upload eliminated
+- AMS panel and spool picker back button click targets enlarged for easier navigation
+- Goodix capacitive touch on Creality K1 Max and standalone builds
+- DRM plane rotation fallback for VC4 displays (90/270 unsupported)
+- Spoolman request flooding prevented with debounce and circuit breaker
+- Spoolman filament creation sends required density and diameter fields
+- Klippy readiness checked before querying printer objects during discovery
+- Android display corruption from conditional style reset reverted
+- Signed coordinate crash in LVGL draw path
+- CoalescedTimer repeat count bug
+
 ## [0.13.7] - 2026-02-27
 
 ### Added
@@ -1230,6 +1251,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.8]: https://github.com/prestonbrown/helixscreen/compare/v0.13.7...v0.13.8
 [0.13.7]: https://github.com/prestonbrown/helixscreen/compare/v0.13.6...v0.13.7
 [0.13.6]: https://github.com/prestonbrown/helixscreen/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/prestonbrown/helixscreen/compare/v0.13.4...v0.13.5
