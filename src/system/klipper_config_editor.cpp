@@ -750,6 +750,253 @@ void KlipperConfigEditor::cleanup_backups(MoonrakerAPI& api, SuccessCallback on_
         });
 }
 
+std::optional<std::string>
+KlipperConfigEditor::apply_edits(const std::string& content, const std::string& section,
+                                 const std::vector<ConfigEdit>& edits) const {
+    // Verify section exists before applying any edits
+    auto structure = parse_structure(content);
+    if (structure.sections.find(section) == structure.sections.end()) {
+        spdlog::debug("[ConfigEditor] apply_edits: section [{}] not found", section);
+        return std::nullopt;
+    }
+
+    // Empty edits = no-op success
+    if (edits.empty()) {
+        return content;
+    }
+
+    std::string current = content;
+
+    for (const auto& edit : edits) {
+        std::optional<std::string> result;
+
+        switch (edit.type) {
+        case ConfigEdit::Type::SET_VALUE:
+            result = set_value(current, section, edit.key, edit.value);
+            if (!result.has_value()) {
+                spdlog::error("[ConfigEditor] apply_edits: SET_VALUE failed for [{}] {}", section,
+                              edit.key);
+                return std::nullopt;
+            }
+            current = *result;
+            break;
+
+        case ConfigEdit::Type::ADD_KEY: {
+            // If key already exists, use set_value instead to avoid duplicates
+            auto check = parse_structure(current);
+            auto existing = check.find_key(section, edit.key);
+            if (existing.has_value()) {
+                result = set_value(current, section, edit.key, edit.value);
+            } else {
+                result = add_key(current, section, edit.key, edit.value);
+            }
+            if (!result.has_value()) {
+                spdlog::error("[ConfigEditor] apply_edits: ADD_KEY failed for [{}] {}", section,
+                              edit.key);
+                return std::nullopt;
+            }
+            current = *result;
+            break;
+        }
+
+        case ConfigEdit::Type::REMOVE_KEY:
+            result = remove_key(current, section, edit.key);
+            if (!result.has_value()) {
+                spdlog::debug("[ConfigEditor] apply_edits: REMOVE_KEY skipped (key [{}] {} not "
+                              "found)",
+                              section, edit.key);
+                // Not finding a key to remove is not fatal
+            } else {
+                current = *result;
+            }
+            break;
+        }
+    }
+
+    return current;
+}
+
+void KlipperConfigEditor::safe_multi_edit(MoonrakerAPI& api, const std::string& section,
+                                          const std::vector<ConfigEdit>& edits,
+                                          SuccessCallback on_success, ErrorCallback on_error,
+                                          int restart_timeout_ms) {
+    spdlog::info("[ConfigEditor] Starting safe multi-edit on [{}] ({} edits)", section,
+                 edits.size());
+
+    // Step 1: Load config files to populate cache and section map
+    load_config_files(
+        api,
+        [this, &api, section, edits, on_success, on_error,
+         restart_timeout_ms](std::map<std::string, SectionLocation> section_map) {
+            // Step 2: Find which file contains the section
+            auto sec_it = section_map.find(section);
+            if (sec_it == section_map.end()) {
+                spdlog::error("[ConfigEditor] Section [{}] not found in config", section);
+                if (on_error)
+                    on_error("Section [" + section + "] not found in config");
+                return;
+            }
+
+            std::string file_path = sec_it->second.file_path;
+            spdlog::debug("[ConfigEditor] Section [{}] found in {}", section, file_path);
+
+            // Step 3: Get the file content from cache
+            auto cached = get_cached_file(file_path);
+            if (!cached.has_value()) {
+                spdlog::error("[ConfigEditor] File {} not in cache", file_path);
+                if (on_error)
+                    on_error("File " + file_path + " not in cache");
+                return;
+            }
+
+            // Step 4: Apply all edits to the content
+            auto modified = apply_edits(*cached, section, edits);
+            if (!modified.has_value()) {
+                spdlog::error("[ConfigEditor] apply_edits failed for [{}]", section);
+                if (on_error)
+                    on_error("Failed to apply edits to [" + section + "]");
+                return;
+            }
+
+            // Step 5: Backup the file, then upload, then restart
+            backup_file(
+                api, file_path,
+                [this, &api, file_path, modified, on_success, on_error, restart_timeout_ms]() {
+                    // Step 6: Upload modified content
+                    api.transfers().upload_file(
+                        "config", file_path, *modified,
+                        [this, &api, file_path, modified, on_success, on_error,
+                         restart_timeout_ms]() {
+                            // Update cache
+                            {
+                                std::lock_guard<std::mutex> lock(cache_mutex_);
+                                file_cache_[file_path] = *modified;
+                            }
+
+                            // Step 7: Send FIRMWARE_RESTART
+                            spdlog::info("[ConfigEditor] Multi-edit written, sending "
+                                         "FIRMWARE_RESTART");
+                            api.restart_firmware(
+                                [this, &api, on_success, on_error, restart_timeout_ms]() {
+                                    // Step 8: Monitor reconnection (same pattern as
+                                    // safe_edit_value)
+                                    auto poll_thread = std::thread([this, &api, on_success,
+                                                                    on_error,
+                                                                    restart_timeout_ms]() {
+                                        const auto poll_interval = std::chrono::milliseconds(500);
+                                        const auto timeout =
+                                            std::chrono::milliseconds(restart_timeout_ms);
+                                        const auto start = std::chrono::steady_clock::now();
+
+                                        // Phase 1: Wait for disconnect
+                                        bool saw_disconnect = false;
+                                        while (std::chrono::steady_clock::now() - start < timeout) {
+                                            if (!api.is_connected()) {
+                                                saw_disconnect = true;
+                                                spdlog::debug("[ConfigEditor] Klipper "
+                                                              "disconnected after "
+                                                              "FIRMWARE_RESTART");
+                                                break;
+                                            }
+                                            std::this_thread::sleep_for(poll_interval);
+                                        }
+
+                                        if (!saw_disconnect) {
+                                            spdlog::info("[ConfigEditor] Klipper stayed connected "
+                                                         "after FIRMWARE_RESTART (fast restart)");
+                                            cleanup_backups(api, [on_success]() {
+                                                spdlog::info("[ConfigEditor] Safe multi-edit "
+                                                             "complete (fast restart)");
+                                                if (on_success)
+                                                    on_success();
+                                            });
+                                            return;
+                                        }
+
+                                        // Phase 2: Wait for reconnect
+                                        while (std::chrono::steady_clock::now() - start < timeout) {
+                                            if (api.is_connected()) {
+                                                auto elapsed = std::chrono::duration_cast<
+                                                    std::chrono::milliseconds>(
+                                                    std::chrono::steady_clock::now() - start);
+                                                spdlog::info("[ConfigEditor] Klipper "
+                                                             "reconnected after {}ms",
+                                                             elapsed.count());
+                                                cleanup_backups(api, [on_success]() {
+                                                    spdlog::info("[ConfigEditor] Safe multi-edit "
+                                                                 "complete, backups cleaned up");
+                                                    if (on_success)
+                                                        on_success();
+                                                });
+                                                return;
+                                            }
+                                            std::this_thread::sleep_for(poll_interval);
+                                        }
+
+                                        // Timeout: revert
+                                        auto elapsed =
+                                            std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                std::chrono::steady_clock::now() - start);
+                                        spdlog::error("[ConfigEditor] Klipper failed to reconnect "
+                                                      "within {}ms, reverting config",
+                                                      elapsed.count());
+
+                                        restore_backups(
+                                            api,
+                                            [&api, on_error]() {
+                                                spdlog::info("[ConfigEditor] Backups "
+                                                             "restored, sending recovery "
+                                                             "FIRMWARE_RESTART");
+                                                api.restart_firmware(
+                                                    [on_error]() {
+                                                        if (on_error)
+                                                            on_error("Config change caused "
+                                                                     "Klipper to fail. Original "
+                                                                     "config restored.");
+                                                    },
+                                                    [on_error](const MoonrakerError& err) {
+                                                        spdlog::error("[ConfigEditor] Recovery "
+                                                                      "FIRMWARE_RESTART failed: {}",
+                                                                      err.message);
+                                                        if (on_error)
+                                                            on_error("Config change caused "
+                                                                     "Klipper to fail. Backups "
+                                                                     "restored but restart "
+                                                                     "failed: " +
+                                                                     err.message);
+                                                    });
+                                            },
+                                            [on_error](const std::string& restore_err) {
+                                                spdlog::error("[ConfigEditor] Failed to restore "
+                                                              "backups: {}",
+                                                              restore_err);
+                                                if (on_error)
+                                                    on_error("Config change caused Klipper to "
+                                                             "fail AND backup restore failed: " +
+                                                             restore_err);
+                                            });
+                                    });
+                                    poll_thread.detach();
+                                },
+                                [on_error](const MoonrakerError& err) {
+                                    spdlog::error("[ConfigEditor] FIRMWARE_RESTART failed: {}",
+                                                  err.message);
+                                    if (on_error)
+                                        on_error("Failed to send FIRMWARE_RESTART: " + err.message);
+                                });
+                        },
+                        [file_path, on_error](const MoonrakerError& err) {
+                            spdlog::error("[ConfigEditor] Failed to upload modified {}: {}",
+                                          file_path, err.message);
+                            if (on_error)
+                                on_error("Failed to upload " + file_path + ": " + err.message);
+                        });
+                },
+                on_error);
+        },
+        on_error);
+}
+
 void KlipperConfigEditor::safe_edit_value(MoonrakerAPI& api, const std::string& section,
                                           const std::string& key, const std::string& new_value,
                                           SuccessCallback on_success, ErrorCallback on_error,
