@@ -557,6 +557,11 @@ bool ui_bed_mesh_set_data(lv_obj_t* widget, const float* const* mesh, int rows, 
         return false;
     }
 
+    // Reset adaptive quality state since new mesh may render differently
+    if (data->render_thread) {
+        data->render_thread->reset_quality();
+    }
+
     // Check if widget has valid dimensions yet
     int width = lv_obj_get_width(widget);
     int height = lv_obj_get_height(widget);

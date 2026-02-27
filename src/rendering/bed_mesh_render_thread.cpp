@@ -5,6 +5,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
 
 namespace helix {
@@ -94,6 +95,22 @@ float BedMeshRenderThread::last_render_time_ms() const {
     return last_render_time_ms_.load();
 }
 
+void BedMeshRenderThread::reset_quality() {
+    frame_count_ = 0;
+    recent_frame_times_.fill(0.0f);
+
+    if (degraded_mode_) {
+        degraded_mode_ = false;
+
+        // Restore gradient mode on the renderer
+        std::lock_guard<std::mutex> lock(renderer_mutex_);
+        if (renderer_) {
+            bed_mesh_renderer_set_dragging(renderer_, false);
+        }
+        spdlog::debug("[BedMeshRenderThread] Quality reset (gradient mode restored)");
+    }
+}
+
 void BedMeshRenderThread::render_loop() {
     spdlog::debug("[BedMeshRenderThread] Render loop started");
 
@@ -142,6 +159,30 @@ void BedMeshRenderThread::render_loop() {
 
         float elapsed_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
         last_render_time_ms_.store(elapsed_ms);
+
+        // Track frame times for adaptive quality degradation
+        recent_frame_times_[frame_count_ % kFrameHistorySize] = elapsed_ms;
+        frame_count_++;
+
+        if (frame_count_ >= 3) {
+            int count = std::min(frame_count_, kFrameHistorySize);
+            float avg = 0.0f;
+            for (int i = 0; i < count; i++) {
+                avg += recent_frame_times_[i];
+            }
+            avg /= static_cast<float>(count);
+
+            if (!degraded_mode_ && avg > kDegradeThresholdMs) {
+                degraded_mode_ = true;
+                bed_mesh_renderer_set_dragging(renderer, true);
+                spdlog::info("[BedMeshRenderThread] Degrading to solid-color mode (avg {:.0f}ms)",
+                             avg);
+            } else if (degraded_mode_ && avg < kRestoreThresholdMs) {
+                degraded_mode_ = false;
+                bed_mesh_renderer_set_dragging(renderer, false);
+                spdlog::info("[BedMeshRenderThread] Restored gradient mode (avg {:.0f}ms)", avg);
+            }
+        }
 
         // Swap front/back buffers
         {
