@@ -1295,13 +1295,13 @@ TEST_CASE("All registered widgets have valid sizing constraints", "[grid_edit][s
 
 TEST_CASE("detect_resize_edge: right edge", "[grid_edit][resize]") {
     GridEditMode em;
-    lv_area_t area = {100, 100, 300, 300}; // 200x200 widget
+    lv_area_t area = {100, 100, 300, 300}; // 200x200 widget, edges at 100/300
 
-    // Near right edge, mid height — within 36px hit zone
+    // 18px inside + 18px outside: zone = [282, 318]
     CHECK(em.detect_resize_edge(295, 200, area) == GridEditMode::ResizeEdge::Right);
-    CHECK(em.detect_resize_edge(280, 200, area) == GridEditMode::ResizeEdge::Right);
-    // Just past the right edge (4px tolerance)
-    CHECK(em.detect_resize_edge(303, 200, area) == GridEditMode::ResizeEdge::Right);
+    CHECK(em.detect_resize_edge(283, 200, area) == GridEditMode::ResizeEdge::Right);
+    // Outside the widget (18px outward)
+    CHECK(em.detect_resize_edge(317, 200, area) == GridEditMode::ResizeEdge::Right);
 
     // Far from right edge — center of widget
     CHECK(em.detect_resize_edge(200, 200, area) == GridEditMode::ResizeEdge::None);
@@ -1311,11 +1311,11 @@ TEST_CASE("detect_resize_edge: left edge", "[grid_edit][resize]") {
     GridEditMode em;
     lv_area_t area = {100, 100, 300, 300};
 
-    // Near left edge, mid height — within 36px hit zone
+    // 18px inside + 18px outside: zone = [82, 118]
     CHECK(em.detect_resize_edge(105, 200, area) == GridEditMode::ResizeEdge::Left);
-    CHECK(em.detect_resize_edge(120, 200, area) == GridEditMode::ResizeEdge::Left);
-    // Just past the left edge (4px tolerance)
-    CHECK(em.detect_resize_edge(97, 200, area) == GridEditMode::ResizeEdge::Left);
+    CHECK(em.detect_resize_edge(117, 200, area) == GridEditMode::ResizeEdge::Left);
+    // Outside the widget (18px outward)
+    CHECK(em.detect_resize_edge(83, 200, area) == GridEditMode::ResizeEdge::Left);
 
     // Far from left edge — center of widget
     CHECK(em.detect_resize_edge(200, 200, area) == GridEditMode::ResizeEdge::None);
@@ -1325,11 +1325,10 @@ TEST_CASE("detect_resize_edge: bottom edge", "[grid_edit][resize]") {
     GridEditMode em;
     lv_area_t area = {100, 100, 300, 300};
 
-    // Near bottom edge, mid width — within 36px hit zone
+    // 18px inside + 18px outside: zone = [282, 318]
     CHECK(em.detect_resize_edge(200, 295, area) == GridEditMode::ResizeEdge::Bottom);
-    CHECK(em.detect_resize_edge(200, 280, area) == GridEditMode::ResizeEdge::Bottom);
-    // Just past the bottom edge
-    CHECK(em.detect_resize_edge(200, 303, area) == GridEditMode::ResizeEdge::Bottom);
+    CHECK(em.detect_resize_edge(200, 283, area) == GridEditMode::ResizeEdge::Bottom);
+    CHECK(em.detect_resize_edge(200, 317, area) == GridEditMode::ResizeEdge::Bottom);
 
     // Far from bottom edge
     CHECK(em.detect_resize_edge(200, 200, area) == GridEditMode::ResizeEdge::None);
@@ -1339,11 +1338,10 @@ TEST_CASE("detect_resize_edge: top edge", "[grid_edit][resize]") {
     GridEditMode em;
     lv_area_t area = {100, 100, 300, 300};
 
-    // Near top edge, mid width — within 36px hit zone
+    // 18px inside + 18px outside: zone = [82, 118]
     CHECK(em.detect_resize_edge(200, 105, area) == GridEditMode::ResizeEdge::Top);
-    CHECK(em.detect_resize_edge(200, 120, area) == GridEditMode::ResizeEdge::Top);
-    // Just past the top edge (4px tolerance)
-    CHECK(em.detect_resize_edge(200, 97, area) == GridEditMode::ResizeEdge::Top);
+    CHECK(em.detect_resize_edge(200, 117, area) == GridEditMode::ResizeEdge::Top);
+    CHECK(em.detect_resize_edge(200, 83, area) == GridEditMode::ResizeEdge::Top);
 
     // Far from top edge
     CHECK(em.detect_resize_edge(200, 200, area) == GridEditMode::ResizeEdge::None);
@@ -1359,7 +1357,7 @@ TEST_CASE("detect_resize_edge: corner disambiguation picks closest edge", "[grid
     // Bottom-right corner — closer to bottom edge (10px from right, 5px from bottom)
     CHECK(em.detect_resize_edge(292, 296, area) == GridEditMode::ResizeEdge::Bottom);
 
-    // Bottom-right corner — equidistant: right wins (arbitrary but deterministic)
+    // Bottom-right corner — equidistant: some edge wins (deterministic)
     CHECK(em.detect_resize_edge(295, 295, area) != GridEditMode::ResizeEdge::None);
 
     // Top-left corner — closer to top edge
@@ -1379,34 +1377,42 @@ TEST_CASE("detect_resize_edge: outside widget bounds", "[grid_edit][resize]") {
     GridEditMode em;
     lv_area_t area = {100, 100, 300, 300};
 
-    // Well outside the widget
+    // Well outside the widget (beyond 18px outward tolerance)
     CHECK(em.detect_resize_edge(50, 50, area) == GridEditMode::ResizeEdge::None);
     CHECK(em.detect_resize_edge(350, 350, area) == GridEditMode::ResizeEdge::None);
 
-    // Outside perpendicular bounds — near right edge X but outside Y
+    // Outside perpendicular bounds — near right edge X but outside Y tolerance
     CHECK(em.detect_resize_edge(295, 50, area) == GridEditMode::ResizeEdge::None);
     CHECK(em.detect_resize_edge(295, 350, area) == GridEditMode::ResizeEdge::None);
 }
 
-TEST_CASE("detect_resize_edge: wider 36px hit zone", "[grid_edit][resize]") {
+TEST_CASE("detect_resize_edge: 18+18 hit zone boundaries", "[grid_edit][resize]") {
     GridEditMode em;
     lv_area_t area = {100, 100, 300, 300}; // widget edges at x1=100, x2=300, y1=100, y2=300
 
-    // Right edge: 36px zone = x in [264, 304]
-    CHECK(em.detect_resize_edge(265, 200, area) == GridEditMode::ResizeEdge::Right);
-    CHECK(em.detect_resize_edge(263, 200, area) == GridEditMode::ResizeEdge::None);
+    // Right edge: zone = [282, 318]
+    CHECK(em.detect_resize_edge(282, 200, area) == GridEditMode::ResizeEdge::Right);
+    CHECK(em.detect_resize_edge(281, 200, area) == GridEditMode::ResizeEdge::None);
+    CHECK(em.detect_resize_edge(318, 200, area) == GridEditMode::ResizeEdge::Right);
+    CHECK(em.detect_resize_edge(319, 200, area) == GridEditMode::ResizeEdge::None);
 
-    // Left edge: 36px zone = x in [96, 136]
-    CHECK(em.detect_resize_edge(135, 200, area) == GridEditMode::ResizeEdge::Left);
-    CHECK(em.detect_resize_edge(137, 200, area) == GridEditMode::ResizeEdge::None);
+    // Left edge: zone = [82, 118]
+    CHECK(em.detect_resize_edge(118, 200, area) == GridEditMode::ResizeEdge::Left);
+    CHECK(em.detect_resize_edge(119, 200, area) == GridEditMode::ResizeEdge::None);
+    CHECK(em.detect_resize_edge(82, 200, area) == GridEditMode::ResizeEdge::Left);
+    CHECK(em.detect_resize_edge(81, 200, area) == GridEditMode::ResizeEdge::None);
 
-    // Bottom edge: 36px zone = y in [264, 304]
-    CHECK(em.detect_resize_edge(200, 265, area) == GridEditMode::ResizeEdge::Bottom);
-    CHECK(em.detect_resize_edge(200, 263, area) == GridEditMode::ResizeEdge::None);
+    // Bottom edge: zone = [282, 318]
+    CHECK(em.detect_resize_edge(200, 282, area) == GridEditMode::ResizeEdge::Bottom);
+    CHECK(em.detect_resize_edge(200, 281, area) == GridEditMode::ResizeEdge::None);
+    CHECK(em.detect_resize_edge(200, 318, area) == GridEditMode::ResizeEdge::Bottom);
+    CHECK(em.detect_resize_edge(200, 319, area) == GridEditMode::ResizeEdge::None);
 
-    // Top edge: 36px zone = y in [96, 136]
-    CHECK(em.detect_resize_edge(200, 135, area) == GridEditMode::ResizeEdge::Top);
-    CHECK(em.detect_resize_edge(200, 137, area) == GridEditMode::ResizeEdge::None);
+    // Top edge: zone = [82, 118]
+    CHECK(em.detect_resize_edge(200, 118, area) == GridEditMode::ResizeEdge::Top);
+    CHECK(em.detect_resize_edge(200, 119, area) == GridEditMode::ResizeEdge::None);
+    CHECK(em.detect_resize_edge(200, 82, area) == GridEditMode::ResizeEdge::Top);
+    CHECK(em.detect_resize_edge(200, 81, area) == GridEditMode::ResizeEdge::None);
 }
 
 // ============================================================================

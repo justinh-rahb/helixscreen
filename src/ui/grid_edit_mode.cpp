@@ -31,8 +31,9 @@ static constexpr lv_opa_t DRAG_SHADOW_OPA = LV_OPA_40;
 static constexpr int DRAG_SHADOW_WIDTH = 12;
 static constexpr int DRAG_SHADOW_OFS = 4;
 
-// Resize edge detection radius (pixels from the edge)
-static constexpr int EDGE_HIT_RADIUS = 36;
+// Resize edge detection: 18px inside + 18px outside the widget edge = 36px total
+static constexpr int EDGE_HIT_INWARD = 18;
+static constexpr int EDGE_HIT_OUTWARD = 18;
 
 /// Recursively remove CLICKABLE flag from all descendants of obj.
 
@@ -600,17 +601,21 @@ std::pair<int, int> GridEditMode::clamp_span(const std::string& widget_id, int d
 
 GridEditMode::ResizeEdge GridEditMode::detect_resize_edge(int px, int py,
                                                           const lv_area_t& widget_area) const {
-    constexpr int TOL = 4; // Tolerance beyond the edge
+    // Check proximity to each edge (INWARD inside, OUTWARD outside)
+    bool near_right =
+        (px >= widget_area.x2 - EDGE_HIT_INWARD && px <= widget_area.x2 + EDGE_HIT_OUTWARD);
+    bool near_left =
+        (px >= widget_area.x1 - EDGE_HIT_OUTWARD && px <= widget_area.x1 + EDGE_HIT_INWARD);
+    bool near_bottom =
+        (py >= widget_area.y2 - EDGE_HIT_INWARD && py <= widget_area.y2 + EDGE_HIT_OUTWARD);
+    bool near_top =
+        (py >= widget_area.y1 - EDGE_HIT_OUTWARD && py <= widget_area.y1 + EDGE_HIT_INWARD);
 
-    // Check proximity to each edge (within EDGE_HIT_RADIUS inward, TOL outward)
-    bool near_right = (px >= widget_area.x2 - EDGE_HIT_RADIUS && px <= widget_area.x2 + TOL);
-    bool near_left = (px >= widget_area.x1 - TOL && px <= widget_area.x1 + EDGE_HIT_RADIUS);
-    bool near_bottom = (py >= widget_area.y2 - EDGE_HIT_RADIUS && py <= widget_area.y2 + TOL);
-    bool near_top = (py >= widget_area.y1 - TOL && py <= widget_area.y1 + EDGE_HIT_RADIUS);
-
-    // Must be within widget bounds on the perpendicular axis (with tolerance)
-    bool within_x = (px >= widget_area.x1 - TOL && px <= widget_area.x2 + TOL);
-    bool within_y = (py >= widget_area.y1 - TOL && py <= widget_area.y2 + TOL);
+    // Must be within widget bounds on the perpendicular axis (with outward tolerance)
+    bool within_x =
+        (px >= widget_area.x1 - EDGE_HIT_OUTWARD && px <= widget_area.x2 + EDGE_HIT_OUTWARD);
+    bool within_y =
+        (py >= widget_area.y1 - EDGE_HIT_OUTWARD && py <= widget_area.y2 + EDGE_HIT_OUTWARD);
 
     // Collect candidate edges with their perpendicular distance
     struct Candidate {
