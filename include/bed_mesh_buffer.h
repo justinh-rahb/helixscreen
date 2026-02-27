@@ -87,6 +87,29 @@ class PixelBuffer {
     void draw_line(int x0, int y0, int x1, int y1, uint8_t r, uint8_t g, uint8_t b, uint8_t a,
                    int thickness = 1);
 
+    /**
+     * Fill a triangle with a solid color using scanline rasterization.
+     * Vertices can be in any order. Degenerate triangles (collinear points) are safely skipped.
+     * Scanlines are clipped to buffer Y bounds; X clamping is handled by fill_hline().
+     */
+    void fill_triangle_solid(int x1, int y1, int x2, int y2, int x3, int y3, uint8_t r, uint8_t g,
+                             uint8_t b, uint8_t a);
+
+    /**
+     * Fill a triangle with per-vertex color gradient using scanline rasterization.
+     * Colors are linearly interpolated along edges, then across each scanline using
+     * adaptive segment counts based on span width:
+     *   - Width < 3px: average color (solid)
+     *   - Width < 20px: 2 segments
+     *   - Width 20-49px: 3 segments
+     *   - Width >= 50px: 4 segments
+     *
+     * Degenerate triangles are safely skipped. Clipping same as fill_triangle_solid().
+     */
+    void fill_triangle_gradient(int x1, int y1, uint8_t r1, uint8_t g1, uint8_t b1, int x2, int y2,
+                                uint8_t r2, uint8_t g2, uint8_t b2, int x3, int y3, uint8_t r3,
+                                uint8_t g3, uint8_t b3, uint8_t a);
+
   private:
     int width_;
     int height_;

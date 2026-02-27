@@ -380,3 +380,187 @@ TEST_CASE("PixelBuffer: draw_line clipped to bounds", "[bed_mesh]") {
     // Some pixel on the diagonal within bounds should be set
     CHECK(buf.pixel_at(5, 5)[2] == 255);
 }
+
+// ============================================================================
+// fill_triangle_solid()
+// ============================================================================
+
+TEST_CASE("BedMeshBuffer solid triangle fill", "[bed_mesh]") {
+    SECTION("fills interior pixels") {
+        PixelBuffer buf(30, 30);
+        buf.clear(0, 0, 0, 0);
+
+        // Draw a triangle roughly centered: (15,5), (5,25), (25,25)
+        buf.fill_triangle_solid(15, 5, 5, 25, 25, 25, 255, 0, 0, 255);
+
+        // Centroid (15, 18) must be filled
+        const uint8_t* p = buf.pixel_at(15, 18);
+        REQUIRE(p != nullptr);
+        CHECK(p[2] == 255); // R
+        CHECK(p[1] == 0);   // G
+        CHECK(p[0] == 0);   // B
+        CHECK(p[3] == 255); // A
+
+        // Bottom edge center (15, 25) should be filled
+        CHECK(buf.pixel_at(15, 25)[2] == 255);
+    }
+
+    SECTION("does not fill exterior pixels") {
+        PixelBuffer buf(30, 30);
+        buf.clear(0, 0, 0, 0);
+
+        buf.fill_triangle_solid(15, 5, 5, 25, 25, 25, 255, 0, 0, 255);
+
+        // Well outside the triangle
+        CHECK(buf.pixel_at(0, 0)[2] == 0);
+        CHECK(buf.pixel_at(29, 0)[2] == 0);
+        CHECK(buf.pixel_at(0, 29)[2] == 0);
+        CHECK(buf.pixel_at(29, 29)[2] == 0);
+
+        // Just above the apex
+        CHECK(buf.pixel_at(15, 3)[2] == 0);
+    }
+
+    SECTION("degenerate triangle (collinear points) does not crash") {
+        PixelBuffer buf(20, 20);
+        buf.clear(0, 0, 0, 0);
+
+        // All on same line -- horizontal
+        buf.fill_triangle_solid(0, 10, 10, 10, 20, 10, 255, 0, 0, 255);
+        // All on same line -- vertical
+        buf.fill_triangle_solid(10, 0, 10, 10, 10, 20, 255, 0, 0, 255);
+        // All same point
+        buf.fill_triangle_solid(5, 5, 5, 5, 5, 5, 255, 0, 0, 255);
+    }
+
+    SECTION("triangle fully off-screen does not crash") {
+        PixelBuffer buf(20, 20);
+        buf.clear(0, 0, 0, 0);
+
+        // Entirely above
+        buf.fill_triangle_solid(5, -30, 0, -20, 10, -20, 255, 0, 0, 255);
+        // Entirely below
+        buf.fill_triangle_solid(5, 50, 0, 40, 10, 40, 255, 0, 0, 255);
+        // Entirely to the right
+        buf.fill_triangle_solid(100, 5, 90, 15, 110, 15, 255, 0, 0, 255);
+
+        // Buffer should still be all zeros
+        for (int y = 0; y < 20; y++) {
+            for (int x = 0; x < 20; x++) {
+                CHECK(buf.pixel_at(x, y)[2] == 0);
+            }
+        }
+    }
+
+    SECTION("partially off-screen clips correctly") {
+        PixelBuffer buf(20, 20);
+        buf.clear(0, 0, 0, 0);
+
+        // Triangle with apex above the buffer
+        buf.fill_triangle_solid(10, -10, 0, 15, 19, 15, 255, 0, 0, 255);
+
+        // Some interior pixel near the bottom should be filled
+        CHECK(buf.pixel_at(10, 10)[2] == 255);
+
+        // Pixel at top-left corner (0,0) depends on triangle shape --
+        // just verify no crash and that clipping worked
+        // (the triangle edge at y=0 has limited x range)
+    }
+
+    SECTION("vertex order does not matter") {
+        PixelBuffer buf1(30, 30);
+        PixelBuffer buf2(30, 30);
+        buf1.clear(0, 0, 0, 0);
+        buf2.clear(0, 0, 0, 0);
+
+        // Same triangle, different vertex order
+        buf1.fill_triangle_solid(15, 5, 5, 25, 25, 25, 255, 0, 0, 255);
+        buf2.fill_triangle_solid(25, 25, 15, 5, 5, 25, 255, 0, 0, 255);
+
+        // Both should produce identical output
+        for (int y = 0; y < 30; y++) {
+            for (int x = 0; x < 30; x++) {
+                CHECK(buf1.pixel_at(x, y)[2] == buf2.pixel_at(x, y)[2]);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// fill_triangle_gradient()
+// ============================================================================
+
+TEST_CASE("BedMeshBuffer gradient triangle fill", "[bed_mesh]") {
+    SECTION("produces color interpolation near vertices") {
+        PixelBuffer buf(100, 100);
+        buf.clear(0, 0, 0, 0);
+
+        // Red at top, green at bottom-left, blue at bottom-right
+        buf.fill_triangle_gradient(50, 5, 255, 0, 0,  // v1: red
+                                   5, 90, 0, 255, 0,  // v2: green
+                                   95, 90, 0, 0, 255, // v3: blue
+                                   255);
+
+        // Near the red vertex (50, 8) -- should be mostly red
+        const uint8_t* p_red = buf.pixel_at(50, 8);
+        REQUIRE(p_red != nullptr);
+        CHECK(p_red[2] > 150); // R channel dominant
+        CHECK(p_red[1] < 80);  // G channel low
+        CHECK(p_red[0] < 80);  // B channel low
+
+        // Near the green vertex (10, 85) -- should be mostly green
+        const uint8_t* p_green = buf.pixel_at(10, 85);
+        REQUIRE(p_green != nullptr);
+        CHECK(p_green[1] > 150); // G channel dominant
+        CHECK(p_green[2] < 100); // R channel lower
+
+        // Near the blue vertex (90, 85) -- should be mostly blue
+        const uint8_t* p_blue = buf.pixel_at(90, 85);
+        REQUIRE(p_blue != nullptr);
+        CHECK(p_blue[0] > 150); // B channel dominant
+        CHECK(p_blue[2] < 100); // R channel lower
+    }
+
+    SECTION("degenerate case does not crash") {
+        PixelBuffer buf(20, 20);
+        buf.clear(0, 0, 0, 0);
+
+        // Collinear points
+        buf.fill_triangle_gradient(0, 10, 255, 0, 0, 10, 10, 0, 255, 0, 20, 10, 0, 0, 255, 255);
+        // Zero-area (all same point)
+        buf.fill_triangle_gradient(5, 5, 255, 0, 0, 5, 5, 0, 255, 0, 5, 5, 0, 0, 255, 255);
+    }
+
+    SECTION("uniform color produces solid fill") {
+        PixelBuffer buf(30, 30);
+        buf.clear(0, 0, 0, 0);
+
+        // All vertices same color -- should produce uniform fill
+        buf.fill_triangle_gradient(15, 5, 128, 128, 128, 5, 25, 128, 128, 128, 25, 25, 128, 128,
+                                   128, 255);
+
+        // Centroid should have the uniform color
+        const uint8_t* p = buf.pixel_at(15, 18);
+        REQUIRE(p != nullptr);
+        CHECK(p[2] == 128); // R
+        CHECK(p[1] == 128); // G
+        CHECK(p[0] == 128); // B
+    }
+
+    SECTION("alpha=0 produces no output") {
+        PixelBuffer buf(30, 30);
+        buf.clear(0, 0, 0, 0);
+
+        buf.fill_triangle_gradient(15, 5, 255, 0, 0, 5, 25, 0, 255, 0, 25, 25, 0, 0, 255, 0);
+
+        // Buffer should still be all zeros
+        for (int y = 0; y < 30; y++) {
+            for (int x = 0; x < 30; x++) {
+                const uint8_t* p = buf.pixel_at(x, y);
+                CHECK(p[2] == 0);
+                CHECK(p[1] == 0);
+                CHECK(p[0] == 0);
+            }
+        }
+    }
+}
