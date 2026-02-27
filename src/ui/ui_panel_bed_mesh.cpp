@@ -377,10 +377,22 @@ void BedMeshPanel::on_activate() {
     if (api) {
         update_profile_list_subjects();
     }
+
+    // Enable async rendering when panel is visible (render thread produces
+    // frames in background, DRAW_POST blits the ready buffer).
+    // Must happen AFTER mesh data is loaded so the renderer has data to work with.
+    if (canvas_) {
+        ui_bed_mesh_set_async_mode(canvas_, true);
+    }
 }
 
 void BedMeshPanel::on_deactivate() {
     spdlog::debug("[{}] on_deactivate()", get_name());
+
+    // Stop the render thread when panel is not visible to avoid wasting CPU
+    if (canvas_) {
+        ui_bed_mesh_set_async_mode(canvas_, false);
+    }
 
     // Call base class
     OverlayBase::on_deactivate();

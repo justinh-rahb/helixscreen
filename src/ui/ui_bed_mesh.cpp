@@ -639,7 +639,16 @@ void ui_bed_mesh_redraw(lv_obj_t* widget) {
         return;
     }
 
-    // Trigger DRAW_POST event by invalidating widget
+    // In async mode, request a new frame from the render thread.
+    // The thread's frame-ready callback will invalidate the widget when done.
+    bed_mesh_widget_data_t* data = (bed_mesh_widget_data_t*)lv_obj_get_user_data(widget);
+    if (data && data->async_mode && data->render_thread) {
+        data->render_thread->request_render();
+        spdlog::debug("[bed_mesh] Async redraw requested");
+        return;
+    }
+
+    // Synchronous path: trigger DRAW_POST event by invalidating widget
     lv_obj_invalidate(widget);
 
     spdlog::debug("[bed_mesh] Redraw requested");
@@ -694,7 +703,7 @@ void ui_bed_mesh_set_render_mode(lv_obj_t* widget, BedMeshRenderMode mode) {
     }
 
     bed_mesh_renderer_set_render_mode(data->renderer, mode);
-    lv_obj_invalidate(widget); // Redraw with new mode
+    ui_bed_mesh_redraw(widget); // Redraw with new mode (handles async)
 }
 
 /**
@@ -711,7 +720,7 @@ void ui_bed_mesh_set_zero_plane_visible(lv_obj_t* widget, bool visible) {
     }
 
     bed_mesh_renderer_set_zero_plane_visible(data->renderer, visible);
-    lv_obj_invalidate(widget); // Redraw with updated plane visibility
+    ui_bed_mesh_redraw(widget); // Redraw with updated plane visibility (handles async)
 }
 
 /**
