@@ -7,6 +7,7 @@
 #include "ui_update_queue.h"
 #include "ui_utils.h"
 
+#include "bed_mesh_overlays.h"
 #include "bed_mesh_render_thread.h"
 #include "bed_mesh_renderer.h"
 #include "helix-xml/src/xml/lv_xml.h"
@@ -133,8 +134,12 @@ static void bed_mesh_draw_cb(lv_event_t* e) {
 
     // Async mode: blit pre-rendered buffer from render thread
     if (data->async_mode && data->render_thread) {
-        const auto* buf = data->render_thread->get_ready_buffer();
-        if (buf) {
+        // Lock the front buffer to prevent the render thread from swapping
+        // buffers while we are reading pixel data for the blit.
+        auto locked = data->render_thread->lock_ready_buffer();
+        if (locked) {
+            const auto* buf = locked.buffer;
+
             // Wrap PixelBuffer data in a stack-local lv_draw_buf_t for blitting
             lv_draw_buf_t draw_buf;
             lv_draw_buf_init(&draw_buf, (uint32_t)buf->width(), (uint32_t)buf->height(),
@@ -159,6 +164,17 @@ static void bed_mesh_draw_cb(lv_event_t* e) {
             // No frame ready yet -- draw placeholder
             draw_async_placeholder(layer, &widget_coords, width, height);
         }
+
+        // Render axis labels and tick marks on the main thread.
+        // These require the LVGL font engine and cannot run in the background.
+        // The renderer state read here (bounds, view_state) is safe because
+        // DRAW_POST runs on the main thread between lv_timer_handler() cycles.
+        {
+            std::lock_guard<std::mutex> lock(data->render_thread->render_mutex());
+            helix::mesh::render_axis_labels(layer, data->renderer, width, height);
+            helix::mesh::render_numeric_axis_ticks(layer, data->renderer, width, height);
+        }
+
         return; // Skip synchronous render path
     }
 
@@ -210,8 +226,15 @@ static void bed_mesh_press_cb(lv_event_t* e) {
     data->is_dragging = true;
     data->last_drag_pos = point;
 
-    // Update renderer dragging state for fast solid-color rendering
-    bed_mesh_renderer_set_dragging(data->renderer, true);
+    // Update renderer dragging state for fast solid-color rendering.
+    // In async mode, lock the render mutex to prevent concurrent access
+    // with the background render thread.
+    if (data->async_mode && data->render_thread) {
+        std::lock_guard<std::mutex> lock(data->render_thread->render_mutex());
+        bed_mesh_renderer_set_dragging(data->renderer, true);
+    } else {
+        bed_mesh_renderer_set_dragging(data->renderer, true);
+    }
 
     spdlog::trace("[bed_mesh] Press at ({}, {}), switching to solid", point.x, point.y);
 }
@@ -262,7 +285,12 @@ static void bed_mesh_pressing_cb(lv_event_t* e) {
                      (int)state);
         data->is_dragging = false;
         if (data->renderer) {
-            bed_mesh_renderer_set_dragging(data->renderer, false);
+            if (data->async_mode && data->render_thread) {
+                std::lock_guard<std::mutex> lock(data->render_thread->render_mutex());
+                bed_mesh_renderer_set_dragging(data->renderer, false);
+            } else {
+                bed_mesh_renderer_set_dragging(data->renderer, false);
+            }
         }
         lv_obj_invalidate(obj); // Trigger redraw with gradient
         return;
@@ -294,9 +322,16 @@ static void bed_mesh_pressing_cb(lv_event_t* e) {
         if (data->rotation_z < 0)
             data->rotation_z += 360;
 
-        // Update renderer rotation
+        // Update renderer rotation.
+        // In async mode, lock the render mutex to prevent concurrent access
+        // with the background render thread, then request a new frame.
         if (data->renderer) {
-            bed_mesh_renderer_set_rotation(data->renderer, data->rotation_x, data->rotation_z);
+            if (data->async_mode && data->render_thread) {
+                std::lock_guard<std::mutex> lock(data->render_thread->render_mutex());
+                bed_mesh_renderer_set_rotation(data->renderer, data->rotation_x, data->rotation_z);
+            } else {
+                bed_mesh_renderer_set_rotation(data->renderer, data->rotation_x, data->rotation_z);
+            }
         }
 
         // Trigger redraw (async mode: request new frame from render thread)
@@ -333,12 +368,16 @@ static void bed_mesh_release_cb(lv_event_t* e) {
     // 3D mode: end drag gesture
     data->is_dragging = false;
 
-    // Update renderer dragging state for high-quality gradient rendering
-    bed_mesh_renderer_set_dragging(data->renderer, false);
-
-    // Request async render for the gradient frame, then invalidate
+    // Update renderer dragging state for high-quality gradient rendering.
+    // In async mode, lock the render mutex to prevent concurrent access.
     if (data->async_mode && data->render_thread) {
+        {
+            std::lock_guard<std::mutex> lock(data->render_thread->render_mutex());
+            bed_mesh_renderer_set_dragging(data->renderer, false);
+        }
         data->render_thread->request_render();
+    } else {
+        bed_mesh_renderer_set_dragging(data->renderer, false);
     }
 
     // Force immediate redraw to switch back to gradient rendering
@@ -773,7 +812,9 @@ void ui_bed_mesh_set_async_mode(lv_obj_t* widget, bool enabled) {
         data->render_thread->set_renderer(data->renderer);
         data->render_thread->set_colors(fetch_theme_colors());
 
-        // Set callback to invalidate widget when frame ready (from render thread)
+        // Set callback to invalidate widget when frame ready (from render thread).
+        // queue_widget_update() guards with lv_obj_is_valid(), so if the widget
+        // is deleted before the queued callback fires, it is silently skipped.
         data->render_thread->set_frame_ready_callback([widget]() {
             helix::ui::queue_widget_update(widget, [](lv_obj_t* w) { lv_obj_invalidate(w); });
         });

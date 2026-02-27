@@ -112,6 +112,29 @@ class BedMeshRenderThread {
      */
     void reset_quality();
 
+    /**
+     * Lock the renderer for main-thread modifications (rotation, dragging).
+     * The render thread holds this mutex during the actual render call,
+     * so the main thread must acquire it before modifying renderer state.
+     */
+    std::mutex& render_mutex() {
+        return renderer_mutex_;
+    }
+
+    /**
+     * Lock the front buffer for reading. Returns the buffer and a lock guard.
+     * The buffer is guaranteed stable while the guard is alive, preventing
+     * the render thread from swapping buffers during a blit.
+     */
+    struct LockedBuffer {
+        const PixelBuffer* buffer;
+        std::unique_lock<std::mutex> lock;
+        explicit operator bool() const {
+            return buffer != nullptr;
+        }
+    };
+    LockedBuffer lock_ready_buffer() const;
+
   private:
     void render_loop();
 
@@ -125,7 +148,7 @@ class BedMeshRenderThread {
     // Double buffer: front (read by main thread), back (written by render thread)
     std::unique_ptr<PixelBuffer> front_buffer_;
     std::unique_ptr<PixelBuffer> back_buffer_;
-    std::mutex swap_mutex_;
+    mutable std::mutex swap_mutex_;
     std::atomic<bool> buffer_ready_{false};
 
     // Renderer (not owned)

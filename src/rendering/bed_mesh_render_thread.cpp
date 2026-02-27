@@ -86,6 +86,14 @@ const PixelBuffer* BedMeshRenderThread::get_ready_buffer() const {
     return front_buffer_.get();
 }
 
+BedMeshRenderThread::LockedBuffer BedMeshRenderThread::lock_ready_buffer() const {
+    if (!buffer_ready_.load()) {
+        return {nullptr, {}};
+    }
+    std::unique_lock<std::mutex> lock(swap_mutex_);
+    return {front_buffer_.get(), std::move(lock)};
+}
+
 void BedMeshRenderThread::set_frame_ready_callback(std::function<void()> cb) {
     std::lock_guard<std::mutex> lock(callback_mutex_);
     frame_ready_callback_ = std::move(cb);
@@ -96,6 +104,11 @@ float BedMeshRenderThread::last_render_time_ms() const {
 }
 
 void BedMeshRenderThread::reset_quality() {
+    // Protect adaptive quality fields (frame_count_, recent_frame_times_,
+    // degraded_mode_) which are also read/written by the render thread
+    // under renderer_mutex_.
+    std::lock_guard<std::mutex> lock(renderer_mutex_);
+
     frame_count_ = 0;
     recent_frame_times_.fill(0.0f);
 
@@ -103,7 +116,6 @@ void BedMeshRenderThread::reset_quality() {
         degraded_mode_ = false;
 
         // Restore gradient mode on the renderer
-        std::lock_guard<std::mutex> lock(renderer_mutex_);
         if (renderer_) {
             bed_mesh_renderer_set_dragging(renderer_, false);
         }
@@ -128,18 +140,6 @@ void BedMeshRenderThread::render_loop() {
         // Consume the request (coalesces multiple requests into one render)
         render_requested_.store(false);
 
-        // Snapshot renderer pointer under lock
-        bed_mesh_renderer_t* renderer = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(renderer_mutex_);
-            renderer = renderer_;
-        }
-
-        if (!renderer) {
-            spdlog::warn("[BedMeshRenderThread] Render requested but no renderer set");
-            continue;
-        }
-
         // Snapshot colors under lock
         bed_mesh_render_colors_t colors;
         {
@@ -147,42 +147,57 @@ void BedMeshRenderThread::render_loop() {
             colors = colors_;
         }
 
-        // Render into back buffer
-        auto t0 = std::chrono::steady_clock::now();
-        bool ok = bed_mesh_renderer_render_to_buffer(renderer, *back_buffer_, colors);
-        auto t1 = std::chrono::steady_clock::now();
+        // Hold renderer_mutex_ during the render call and adaptive quality tracking.
+        // The main thread acquires this mutex before modifying renderer state
+        // (rotation, dragging), preventing concurrent access.
+        bool ok = false;
+        float elapsed_ms = 0.0f;
+        {
+            std::lock_guard<std::mutex> lock(renderer_mutex_);
 
-        if (!ok) {
-            spdlog::warn("[BedMeshRenderThread] render_to_buffer failed");
-            continue;
-        }
-
-        float elapsed_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
-        last_render_time_ms_.store(elapsed_ms);
-
-        // Track frame times for adaptive quality degradation
-        recent_frame_times_[frame_count_ % kFrameHistorySize] = elapsed_ms;
-        frame_count_++;
-
-        if (frame_count_ >= 3) {
-            int count = std::min(frame_count_, kFrameHistorySize);
-            float avg = 0.0f;
-            for (int i = 0; i < count; i++) {
-                avg += recent_frame_times_[i];
+            if (!renderer_) {
+                spdlog::warn("[BedMeshRenderThread] Render requested but no renderer set");
+                continue;
             }
-            avg /= static_cast<float>(count);
 
-            if (!degraded_mode_ && avg > kDegradeThresholdMs) {
-                degraded_mode_ = true;
-                bed_mesh_renderer_set_dragging(renderer, true);
-                spdlog::info("[BedMeshRenderThread] Degrading to solid-color mode (avg {:.0f}ms)",
-                             avg);
-            } else if (degraded_mode_ && avg < kRestoreThresholdMs) {
-                degraded_mode_ = false;
-                bed_mesh_renderer_set_dragging(renderer, false);
-                spdlog::info("[BedMeshRenderThread] Restored gradient mode (avg {:.0f}ms)", avg);
+            // Render into back buffer
+            auto t0 = std::chrono::steady_clock::now();
+            ok = bed_mesh_renderer_render_to_buffer(renderer_, *back_buffer_, colors);
+            auto t1 = std::chrono::steady_clock::now();
+
+            if (!ok) {
+                spdlog::warn("[BedMeshRenderThread] render_to_buffer failed");
+                continue;
             }
-        }
+
+            elapsed_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
+            last_render_time_ms_.store(elapsed_ms);
+
+            // Track frame times for adaptive quality degradation
+            recent_frame_times_[frame_count_ % kFrameHistorySize] = elapsed_ms;
+            frame_count_++;
+
+            if (frame_count_ >= 3) {
+                int count = std::min(frame_count_, kFrameHistorySize);
+                float avg = 0.0f;
+                for (int i = 0; i < count; i++) {
+                    avg += recent_frame_times_[i];
+                }
+                avg /= static_cast<float>(count);
+
+                if (!degraded_mode_ && avg > kDegradeThresholdMs) {
+                    degraded_mode_ = true;
+                    bed_mesh_renderer_set_dragging(renderer_, true);
+                    spdlog::info(
+                        "[BedMeshRenderThread] Degrading to solid-color mode (avg {:.0f}ms)", avg);
+                } else if (degraded_mode_ && avg < kRestoreThresholdMs) {
+                    degraded_mode_ = false;
+                    bed_mesh_renderer_set_dragging(renderer_, false);
+                    spdlog::info("[BedMeshRenderThread] Restored gradient mode (avg {:.0f}ms)",
+                                 avg);
+                }
+            }
+        } // renderer_mutex_ released
 
         // Swap front/back buffers
         {
