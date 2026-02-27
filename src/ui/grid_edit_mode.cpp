@@ -33,7 +33,7 @@ static constexpr int DRAG_SHADOW_OFS = 4;
 
 // Resize edge detection: 18px inside + 18px outside the widget edge = 36px total
 static constexpr int EDGE_HIT_INWARD = 18;
-static constexpr int EDGE_HIT_OUTWARD = 18;
+static constexpr int EDGE_HIT_MARGIN = 18;
 
 /// Recursively remove CLICKABLE flag from all descendants of obj.
 
@@ -223,9 +223,10 @@ void GridEditMode::handle_click(lv_event_t* /*e*/) {
         if (selected_) {
             lv_area_t sel_area;
             lv_obj_get_coords(selected_, &sel_area);
-            constexpr int EDGE_MARGIN = 18;
-            if (point.x >= sel_area.x1 - EDGE_MARGIN && point.x <= sel_area.x2 + EDGE_MARGIN &&
-                point.y >= sel_area.y1 - EDGE_MARGIN && point.y <= sel_area.y2 + EDGE_MARGIN) {
+            if (point.x >= sel_area.x1 - EDGE_HIT_MARGIN &&
+                point.x <= sel_area.x2 + EDGE_HIT_MARGIN &&
+                point.y >= sel_area.y1 - EDGE_HIT_MARGIN &&
+                point.y <= sel_area.y2 + EDGE_HIT_MARGIN) {
                 in_edge_zone = true;
                 spdlog::debug("[GridEditMode] handle_click: no widget at ({},{}) but within "
                               "edge zone of selected widget — keeping selection",
@@ -629,19 +630,19 @@ GridEditMode::ResizeEdge GridEditMode::detect_resize_edge(int px, int py,
                                                           const lv_area_t& widget_area) const {
     // Check proximity to each edge (INWARD inside, OUTWARD outside)
     bool near_right =
-        (px >= widget_area.x2 - EDGE_HIT_INWARD && px <= widget_area.x2 + EDGE_HIT_OUTWARD);
+        (px >= widget_area.x2 - EDGE_HIT_INWARD && px <= widget_area.x2 + EDGE_HIT_MARGIN);
     bool near_left =
-        (px >= widget_area.x1 - EDGE_HIT_OUTWARD && px <= widget_area.x1 + EDGE_HIT_INWARD);
+        (px >= widget_area.x1 - EDGE_HIT_MARGIN && px <= widget_area.x1 + EDGE_HIT_INWARD);
     bool near_bottom =
-        (py >= widget_area.y2 - EDGE_HIT_INWARD && py <= widget_area.y2 + EDGE_HIT_OUTWARD);
+        (py >= widget_area.y2 - EDGE_HIT_INWARD && py <= widget_area.y2 + EDGE_HIT_MARGIN);
     bool near_top =
-        (py >= widget_area.y1 - EDGE_HIT_OUTWARD && py <= widget_area.y1 + EDGE_HIT_INWARD);
+        (py >= widget_area.y1 - EDGE_HIT_MARGIN && py <= widget_area.y1 + EDGE_HIT_INWARD);
 
     // Must be within widget bounds on the perpendicular axis (with outward tolerance)
     bool within_x =
-        (px >= widget_area.x1 - EDGE_HIT_OUTWARD && px <= widget_area.x2 + EDGE_HIT_OUTWARD);
+        (px >= widget_area.x1 - EDGE_HIT_MARGIN && px <= widget_area.x2 + EDGE_HIT_MARGIN);
     bool within_y =
-        (py >= widget_area.y1 - EDGE_HIT_OUTWARD && py <= widget_area.y2 + EDGE_HIT_OUTWARD);
+        (py >= widget_area.y1 - EDGE_HIT_MARGIN && py <= widget_area.y2 + EDGE_HIT_MARGIN);
 
     // Collect candidate edges with their perpendicular distance
     struct Candidate {
@@ -836,10 +837,9 @@ void GridEditMode::handle_pressing(lv_event_t* e) {
     if (!drag_pending_ && selected_) {
         lv_area_t sel_area;
         lv_obj_get_coords(selected_, &sel_area);
-        constexpr int EDGE_MARGIN = 18;
         bool outside_edge_zone =
-            (pt.x < sel_area.x1 - EDGE_MARGIN || pt.x > sel_area.x2 + EDGE_MARGIN ||
-             pt.y < sel_area.y1 - EDGE_MARGIN || pt.y > sel_area.y2 + EDGE_MARGIN);
+            (pt.x < sel_area.x1 - EDGE_HIT_MARGIN || pt.x > sel_area.x2 + EDGE_HIT_MARGIN ||
+             pt.y < sel_area.y1 - EDGE_HIT_MARGIN || pt.y > sel_area.y2 + EDGE_HIT_MARGIN);
         if (outside_edge_zone) {
             handle_click(e);
         }
@@ -899,13 +899,11 @@ void GridEditMode::handle_drag_start(lv_event_t* /*e*/) {
 
     lv_area_t sel_area;
     lv_obj_get_coords(selected_, &sel_area);
-    // Allow some tolerance for finger drift during long-press
-    constexpr int TOUCH_MARGIN = 15;
     spdlog::debug("[GridEditMode] handle_drag_start: point=({},{}) sel=({},{})→({},{}) margin={}",
                   point.x, point.y, sel_area.x1, sel_area.y1, sel_area.x2, sel_area.y2,
-                  TOUCH_MARGIN);
-    if (point.x < sel_area.x1 - TOUCH_MARGIN || point.x > sel_area.x2 + TOUCH_MARGIN ||
-        point.y < sel_area.y1 - TOUCH_MARGIN || point.y > sel_area.y2 + TOUCH_MARGIN) {
+                  EDGE_HIT_MARGIN);
+    if (point.x < sel_area.x1 - EDGE_HIT_MARGIN || point.x > sel_area.x2 + EDGE_HIT_MARGIN ||
+        point.y < sel_area.y1 - EDGE_HIT_MARGIN || point.y > sel_area.y2 + EDGE_HIT_MARGIN) {
         spdlog::debug("[GridEditMode] handle_drag_start: point not on selected widget");
         return; // Long-press not on selected widget
     }
