@@ -995,9 +995,10 @@ void GridEditMode::handle_drag_move(lv_event_t* /*e*/) {
         lv_obj_set_pos(selection_overlay_, chrome_x, chrome_y);
     }
 
-    // Compute target grid cell from the widget's center position.
-    // Using raw touch point is wrong for multi-cell widgets (grab point varies).
-    // Using top-left overcorrects. The center gives the most intuitive mapping.
+    // Compute target grid cell from the widget's top-left position.
+    // The widget follows the pointer with drag_offset_ preserving the grab point,
+    // so using top-left gives natural anchored behavior — the widget stays under
+    // the finger exactly where grabbed, and the snap target reflects that.
     lv_area_t content_area;
     lv_obj_get_content_coords(container_, &content_area);
     int cw = content_area.x2 - content_area.x1;
@@ -1008,15 +1009,17 @@ void GridEditMode::handle_drag_move(lv_event_t* /*e*/) {
     int ncols = GridLayout::get_cols(breakpoint);
     int nrows = GridLayout::get_rows(breakpoint);
 
-    // Widget top-left in screen coords, then add half the span to get center
+    // Widget top-left in screen coords (pointer minus grab offset)
     int widget_left = point.x - drag_offset_.x;
     int widget_top = point.y - drag_offset_.y;
-    int half_w = (cw * drag_orig_colspan_) / (ncols * 2);
-    int half_h = (ch * drag_orig_rowspan_) / (nrows * 2);
-    int widget_cx = widget_left + half_w;
-    int widget_cy = widget_top + half_h;
-    auto [target_col, target_row] = screen_to_grid_cell(widget_cx, widget_cy, content_area.x1,
-                                                        content_area.y1, cw, ch, ncols, nrows);
+
+    // Round the top-left to the nearest grid cell for snap target
+    int target_col = round_to_grid_cell(widget_left, content_area.x1, cw, ncols);
+    int target_row = round_to_grid_cell(widget_top, content_area.y1, ch, nrows);
+
+    // Clamp so the widget span doesn't extend past the grid
+    target_col = std::min(target_col, ncols - drag_orig_colspan_);
+    target_row = std::min(target_row, nrows - drag_orig_rowspan_);
 
     // Only update preview if target cell changed
     if (target_col == snap_preview_col_ && target_row == snap_preview_row_) {
