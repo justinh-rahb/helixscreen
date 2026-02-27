@@ -892,8 +892,10 @@ void GridEditMode::handle_drag_start(lv_event_t* /*e*/) {
     drag_orig_colspan_ = entry.colspan;
     drag_orig_rowspan_ = entry.rowspan;
 
-    // Check if pointer is near an edge/corner of a resizable widget
-    ResizeEdge edge = detect_resize_edge(point.x, point.y, sel_area);
+    // Check if the INITIAL press point (not current pointer) was near an edge.
+    // By the time drag threshold is met, the pointer may have moved beyond the
+    // edge tolerance — use press_origin_ which is where the finger first touched.
+    ResizeEdge edge = detect_resize_edge(press_origin_.x, press_origin_.y, sel_area);
     if (edge != ResizeEdge::None && is_selected_widget_resizable()) {
         // Start resize mode instead of drag
         resizing_ = true;
