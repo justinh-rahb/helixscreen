@@ -18,8 +18,8 @@
                 action_button_disabled_subject="pid_cal_not_idle"/>
     <!-- Content Area -->
     <lv_obj name="overlay_content"
-            width="100%" flex_grow="1" style_pad_all="#space_lg"
-            flex_flow="column" style_pad_gap="#space_lg" scrollable="false">
+            width="100%" flex_grow="1" style_pad_all="#space_lg" flex_flow="column" style_pad_gap="#space_lg"
+            scrollable="false">
       <!-- Disable content when printer not connected or klippy not ready -->
       <bind_state_if_not_eq subject="nav_buttons_enabled" state="disabled" ref_value="1"/>
       <!-- ================================================================== -->
@@ -38,6 +38,34 @@
                       text="Optimizes temperature control for stable, consistent heating."
                       translation_tag="Optimizes temperature control for stable, consistent heating."
                       style_text_color="#text_muted" style_text_align="center"/>
+          <!-- Method Selector (Kalico only) -->
+          <lv_obj name="method_selector"
+                  width="100%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
+                  style_pad_all="#space_sm" flex_flow="row" style_pad_gap="#space_md" style_flex_cross_place="center"
+                  scrollable="false">
+            <bind_flag_if_eq subject="cal_is_kalico" flag="hidden" ref_value="0"/>
+            <text_body text="Method" translation_tag="Method"/>
+            <ui_button name="btn_method_mpc" flex_grow="1" text="MPC (Recommended)" translation_tag="MPC (Recommended)">
+              <bind_style name="pid_heater_selected" subject="cal_method_is_mpc" ref_value="1"/>
+              <bind_style name="pid_heater_unselected" subject="cal_method_is_mpc" ref_value="0"/>
+              <event_cb trigger="clicked" callback="on_cal_method_mpc"/>
+            </ui_button>
+            <ui_button name="btn_method_pid" flex_grow="1" text="PID" translation_tag="PID">
+              <bind_style name="pid_heater_selected" subject="cal_method_is_mpc" ref_value="0"/>
+              <bind_style name="pid_heater_unselected" subject="cal_method_is_mpc" ref_value="1"/>
+              <event_cb trigger="clicked" callback="on_cal_method_pid"/>
+            </ui_button>
+          </lv_obj>
+          <!-- Migration Warning -->
+          <lv_obj name="migration_warning"
+                  width="100%" height="content" style_pad_all="#space_sm" flex_flow="row"
+                  style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
+            <bind_flag_if_eq subject="cal_needs_migration" flag="hidden" ref_value="0"/>
+            <icon src="alert" size="sm" variant="warning"/>
+            <text_small text="Switching to MPC requires a config change and Klipper restart."
+                        translation_tag="Switching to MPC requires a config change and Klipper restart."
+                        style_text_color="#text_muted" flex_grow="1"/>
+          </lv_obj>
           <!-- Heater Selection (inline row) -->
           <lv_obj width="100%"
                   height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
@@ -126,6 +154,28 @@
                           width="100%" text="Select a material or adjust temperature"
                           translation_tag="Select a material or adjust temperature" style_text_color="#text_muted"
                           style_text_align="center" bind_text="pid_temp_hint"/>
+              <!-- Heater Wattage (MPC migration only) -->
+              <lv_obj name="wattage_section"
+                      width="100%" height="content" style_pad_all="0" flex_flow="column" style_pad_gap="#space_xs">
+                <bind_flag_if_eq subject="cal_show_wattage" flag="hidden" ref_value="0"/>
+                <text_body text="Heater Power (Watts)" translation_tag="Heater Power (Watts)"/>
+                <lv_obj width="100%"
+                        height="48" style_pad_all="0" flex_flow="row" style_flex_main_place="center"
+                        style_flex_cross_place="center" style_pad_gap="#space_md" scrollable="false">
+                  <ui_button name="btn_wattage_down" width="48" height="48" text="-" translation_tag="-">
+                    <event_cb trigger="clicked" callback="on_cal_wattage_down"/>
+                  </ui_button>
+                  <lv_label name="wattage_display"
+                            flex_grow="1" text="50W" style_text_font="#font_heading" style_text_align="center"
+                            bind_text="cal_wattage_display"/>
+                  <ui_button name="btn_wattage_up" width="48" height="48" text="+" translation_tag="+">
+                    <event_cb trigger="clicked" callback="on_cal_wattage_up"/>
+                  </ui_button>
+                </lv_obj>
+                <text_small text="Check your heater's rating (typically 40-60W for hotends)"
+                            translation_tag="Check your heater's rating (typically 40-60W for hotends)"
+                            style_text_color="#text_muted"/>
+              </lv_obj>
             </lv_obj>
             <!-- Vertical divider -->
             <divider_vertical/>
@@ -136,7 +186,7 @@
                       width="100%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
                       style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_sm"
                       style_flex_main_place="center">
-                <bind_flag_if_eq subject="pid_heater_is_extruder" flag="hidden" ref_value="0"/>
+                <bind_flag_if_eq subject="cal_show_pid_fan" flag="hidden" ref_value="0"/>
                 <text_body text="Part Cooling Fan" translation_tag="Part Cooling Fan"/>
                 <lv_obj width="100%"
                         height="content" style_pad_top="#space_md" style_pad_bottom="#space_md"
@@ -148,6 +198,43 @@
                 </lv_obj>
                 <text_small text="Match your typical print fan speed"
                             translation_tag="Match your typical print fan speed" style_text_color="#text_muted"/>
+              </lv_obj>
+              <!-- Fan Calibration (MPC + extruder only) -->
+              <lv_obj name="fan_calibration_section"
+                      width="100%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
+                      style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_sm">
+                <bind_flag_if_eq subject="cal_show_fan_config" flag="hidden" ref_value="0"/>
+                <text_body text="Fan Calibration" translation_tag="Fan Calibration"/>
+                <text_small text="Measures how cooling fan affects nozzle temperature."
+                            translation_tag="Measures how cooling fan affects nozzle temperature."
+                            style_text_color="#text_muted"/>
+                <lv_obj width="100%"
+                        height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_xs" scrollable="false">
+                  <ui_button name="btn_fan_quick"
+                             height="36" flex_grow="1" text="Quick" translation_tag="Quick"
+                             style_text_font="#font_small">
+                    <bind_style name="pid_heater_selected" subject="cal_fan_is_quick" ref_value="1"/>
+                    <bind_style name="pid_heater_unselected" subject="cal_fan_is_quick" ref_value="0"/>
+                    <event_cb trigger="clicked" callback="on_cal_fan_quick"/>
+                  </ui_button>
+                  <ui_button name="btn_fan_detailed"
+                             height="36" flex_grow="1" text="Detailed" translation_tag="Detailed"
+                             style_text_font="#font_small">
+                    <bind_style name="pid_heater_selected" subject="cal_fan_is_detailed" ref_value="1"/>
+                    <bind_style name="pid_heater_unselected" subject="cal_fan_is_detailed" ref_value="0"/>
+                    <event_cb trigger="clicked" callback="on_cal_fan_detailed"/>
+                  </ui_button>
+                  <ui_button name="btn_fan_thorough"
+                             height="36" flex_grow="1" text="Thorough" translation_tag="Thorough"
+                             style_text_font="#font_small">
+                    <bind_style name="pid_heater_selected" subject="cal_fan_is_thorough" ref_value="1"/>
+                    <bind_style name="pid_heater_unselected" subject="cal_fan_is_thorough" ref_value="0"/>
+                    <event_cb trigger="clicked" callback="on_cal_fan_thorough"/>
+                  </ui_button>
+                </lv_obj>
+                <text_small text="More points = more accurate, but takes longer."
+                            translation_tag="More points = more accurate, but takes longer."
+                            style_text_color="#text_muted"/>
               </lv_obj>
               <!-- Warning (always visible) -->
               <lv_obj width="100%"
@@ -225,8 +312,8 @@
         <spinner size="lg"/>
         <text_heading text="Saving Configuration..." translation_tag="Saving Configuration..." style_text_align="center"/>
         <text_small width="80%"
-                    text="Klipper will restart to apply new PID values."
-                    translation_tag="Klipper will restart to apply new PID values." style_text_align="center"/>
+                    text="Klipper will restart to apply new settings."
+                    translation_tag="Klipper will restart to apply new settings." style_text_align="center"/>
       </lv_obj>
       <!-- ================================================================== -->
       <!-- STATE: COMPLETE - Results display -->
@@ -241,10 +328,11 @@
         <text_body name="pid_result_summary"
                    width="80%" bind_text="pid_result_summary" text="Temperature control has been optimized."
                    style_text_align="center" style_text_color="#text_muted"/>
-        <!-- Technical details -->
-        <lv_obj width="70%"
-                height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
+        <!-- PID Technical details (hidden when MPC) -->
+        <lv_obj name="pid_results"
+                width="70%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
                 style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_xs">
+          <bind_flag_if_eq subject="cal_method_is_mpc" flag="hidden" ref_value="1"/>
           <lv_obj width="100%"
                   height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
                   scrollable="false">
@@ -262,6 +350,36 @@
                   scrollable="false">
             <text_small text="Damping (Kd)" translation_tag="Damping (Kd)" style_text_color="#text_muted"/>
             <text_small name="pid_kd" bind_text="pid_kd" text="0.000"/>
+          </lv_obj>
+        </lv_obj>
+        <!-- MPC Technical details (shown when MPC) -->
+        <lv_obj name="mpc_results"
+                width="70%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
+                style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_xs">
+          <bind_flag_if_eq subject="cal_method_is_mpc" flag="hidden" ref_value="0"/>
+          <lv_obj width="100%"
+                  height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
+                  scrollable="false">
+            <text_small text="Heat Capacity" translation_tag="Heat Capacity" style_text_color="#text_muted"/>
+            <text_small bind_text="mpc_block_heat_capacity" text="0.0000 J/K"/>
+          </lv_obj>
+          <lv_obj width="100%"
+                  height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
+                  scrollable="false">
+            <text_small text="Sensor Response" translation_tag="Sensor Response" style_text_color="#text_muted"/>
+            <text_small bind_text="mpc_sensor_responsiveness" text="0.000000 K/s/K"/>
+          </lv_obj>
+          <lv_obj width="100%"
+                  height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
+                  scrollable="false">
+            <text_small text="Ambient Transfer" translation_tag="Ambient Transfer" style_text_color="#text_muted"/>
+            <text_small bind_text="mpc_ambient_transfer" text="0.000000 W/K"/>
+          </lv_obj>
+          <lv_obj width="100%"
+                  height="content" style_pad_all="0" flex_flow="row" style_flex_main_place="space_between"
+                  scrollable="false">
+            <text_small text="Fan Transfer" translation_tag="Fan Transfer" style_text_color="#text_muted"/>
+            <text_small bind_text="mpc_fan_ambient_transfer" text=""/>
           </lv_obj>
         </lv_obj>
         <text_small width="80%"
@@ -295,6 +413,22 @@
             <event_cb trigger="clicked" callback="on_pid_retry"/>
           </ui_button>
         </lv_obj>
+      </lv_obj>
+      <!-- ================================================================== -->
+      <!-- STATE: MIGRATING - Updating config for MPC -->
+      <!-- ================================================================== -->
+      <lv_obj name="state_migrating"
+              width="100%" flex_grow="1" style_pad_all="0" flex_flow="column" style_flex_main_place="center"
+              style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_lg"
+              scrollable="false">
+        <bind_flag_if_not_eq subject="pid_cal_state" flag="hidden" ref_value="5"/>
+        <spinner size="lg"/>
+        <text_heading text="Updating Configuration..."
+                      translation_tag="Updating Configuration..." style_text_align="center"/>
+        <text_small width="80%"
+                    text="Switching heater control to MPC. Klipper will restart."
+                    translation_tag="Switching heater control to MPC. Klipper will restart." style_text_align="center"
+                    style_text_color="#text_muted"/>
       </lv_obj>
     </lv_obj>
   </view>

@@ -10,7 +10,9 @@
 #include "ui_panel_temp_control.h"
 #include "ui_update_queue.h"
 
+#include "app_globals.h"
 #include "filament_database.h"
+#include "klipper_config_editor.h"
 #include "lvgl/src/others/translation/lv_translation.h"
 #include "moonraker_api.h"
 #include "static_panel_registry.h"
@@ -26,7 +28,7 @@
 // STATIC SUBJECT
 // ============================================================================
 
-// State subject (0=IDLE, 1=CALIBRATING, 2=SAVING, 3=COMPLETE, 4=ERROR)
+// State subject (0=IDLE, 1=CALIBRATING, 2=SAVING, 3=COMPLETE, 4=ERROR, 5=MIGRATING)
 static lv_subject_t s_pid_cal_state;
 static bool s_callbacks_registered = false;
 
@@ -44,6 +46,11 @@ PIDCalibrationPanel::PIDCalibrationPanel() {
     std::memset(buf_pid_kd_, 0, sizeof(buf_pid_kd_));
     std::memset(buf_error_message_, 0, sizeof(buf_error_message_));
     std::memset(buf_pid_progress_text_, 0, sizeof(buf_pid_progress_text_));
+    std::memset(buf_mpc_heat_capacity_, 0, sizeof(buf_mpc_heat_capacity_));
+    std::memset(buf_mpc_sensor_resp_, 0, sizeof(buf_mpc_sensor_resp_));
+    std::memset(buf_mpc_ambient_transfer_, 0, sizeof(buf_mpc_ambient_transfer_));
+    std::memset(buf_mpc_fan_transfer_, 0, sizeof(buf_mpc_fan_transfer_));
+    std::memset(buf_wattage_display_, 0, sizeof(buf_wattage_display_));
 
     spdlog::trace("[PIDCal] Instance created");
 }
@@ -113,6 +120,30 @@ void PIDCalibrationPanel::init_subjects() {
     UI_MANAGED_SUBJECT_STRING(subj_pid_progress_text_, buf_pid_progress_text_, "Starting...",
                               "pid_progress_text", subjects_);
 
+    // MPC-related subjects
+    UI_MANAGED_SUBJECT_INT(subj_is_kalico_, 0, "cal_is_kalico", subjects_);
+    UI_MANAGED_SUBJECT_INT(subj_method_is_mpc_, 0, "cal_method_is_mpc", subjects_);
+    UI_MANAGED_SUBJECT_INT(subj_show_wattage_, 0, "cal_show_wattage", subjects_);
+    UI_MANAGED_SUBJECT_INT(subj_needs_migration_, 0, "cal_needs_migration", subjects_);
+    UI_MANAGED_SUBJECT_INT(subj_show_fan_config_, 0, "cal_show_fan_config", subjects_);
+    UI_MANAGED_SUBJECT_INT(subj_fan_is_quick_, 1, "cal_fan_is_quick", subjects_);
+    UI_MANAGED_SUBJECT_INT(subj_fan_is_detailed_, 0, "cal_fan_is_detailed", subjects_);
+    UI_MANAGED_SUBJECT_INT(subj_fan_is_thorough_, 0, "cal_fan_is_thorough", subjects_);
+    UI_MANAGED_SUBJECT_INT(subj_show_pid_fan_, 1, "cal_show_pid_fan", subjects_);
+
+    UI_MANAGED_SUBJECT_STRING(subj_wattage_display_, buf_wattage_display_, "50W",
+                              "cal_wattage_display", subjects_);
+
+    // MPC result subjects
+    UI_MANAGED_SUBJECT_STRING(subj_mpc_heat_capacity_, buf_mpc_heat_capacity_, "",
+                              "mpc_block_heat_capacity", subjects_);
+    UI_MANAGED_SUBJECT_STRING(subj_mpc_sensor_resp_, buf_mpc_sensor_resp_, "",
+                              "mpc_sensor_responsiveness", subjects_);
+    UI_MANAGED_SUBJECT_STRING(subj_mpc_ambient_transfer_, buf_mpc_ambient_transfer_, "",
+                              "mpc_ambient_transfer", subjects_);
+    UI_MANAGED_SUBJECT_STRING(subj_mpc_fan_transfer_, buf_mpc_fan_transfer_, "",
+                              "mpc_fan_ambient_transfer", subjects_);
+
     subjects_initialized_ = true;
 
     // Register XML event callbacks (once globally)
@@ -135,6 +166,14 @@ void PIDCalibrationPanel::init_subjects() {
             {"on_pid_preset_bed_pla", on_pid_preset_bed_pla},
             {"on_pid_preset_bed_petg", on_pid_preset_bed_petg},
             {"on_pid_preset_bed_abs", on_pid_preset_bed_abs},
+            // MPC method/config callbacks
+            {"on_cal_method_pid", on_method_pid_clicked},
+            {"on_cal_method_mpc", on_method_mpc_clicked},
+            {"on_cal_wattage_up", on_wattage_up},
+            {"on_cal_wattage_down", on_wattage_down},
+            {"on_cal_fan_quick", on_fan_quick_clicked},
+            {"on_cal_fan_detailed", on_fan_detailed_clicked},
+            {"on_cal_fan_thorough", on_fan_thorough_clicked},
         });
         s_callbacks_registered = true;
     }
@@ -253,8 +292,37 @@ void PIDCalibrationPanel::on_activate() {
     update_temp_display();
     update_temp_hint();
 
+    // Reset MPC state
+    selected_method_ = CalibMethod::PID;
+    lv_subject_set_int(&subj_method_is_mpc_, 0);
+    lv_subject_set_int(&subj_show_wattage_, 0);
+    lv_subject_set_int(&subj_needs_migration_, 0);
+    lv_subject_set_int(&subj_show_fan_config_, 0);
+    lv_subject_set_int(&subj_is_kalico_, 0);
+    fan_breakpoints_ = FAN_BP_QUICK;
+    lv_subject_set_int(&subj_fan_is_quick_, 1);
+    lv_subject_set_int(&subj_fan_is_detailed_, 0);
+    lv_subject_set_int(&subj_fan_is_thorough_, 0);
+    heater_wattage_ = WATTAGE_DEFAULT_EXTRUDER;
+    lv_subject_copy_string(&subj_wattage_display_, "50W");
+    needs_migration_ = false;
+    is_kalico_ = false;
+
+    update_pid_fan_visibility();
+
     // Fetch current PID values now (while no gcode traffic) for delta display later
     fetch_old_pid_values();
+
+    // Check PrinterDiscovery for Kalico detection (primary source)
+    if (get_printer_state().get_capability_overrides().is_kalico()) {
+        is_kalico_ = true;
+        lv_subject_set_int(&subj_is_kalico_, 1);
+    }
+
+    // Detect heater control type (also infers Kalico as fallback)
+    if (api_) {
+        detect_heater_control_type();
+    }
 
     // Demo mode: inject results after on_activate() finishes its reset
     if (demo_inject_pending_) {
@@ -278,6 +346,7 @@ void PIDCalibrationPanel::on_deactivate() {
     // If calibration is in progress, abort it
     if (state_ == State::CALIBRATING) {
         spdlog::info("[PIDCal] Aborting calibration on deactivate");
+        EmergencyStopOverlay::instance().suppress_recovery_dialog(15000);
         if (api_) {
             api_->execute_gcode("TURN_OFF_HEATERS", nullptr, nullptr);
         }
@@ -339,7 +408,7 @@ void PIDCalibrationPanel::set_state(State new_state) {
     state_ = new_state;
 
     // Update subjects - XML bindings handle visibility automatically
-    // State mapping: 0=IDLE, 1=CALIBRATING, 2=SAVING, 3=COMPLETE, 4=ERROR
+    // State mapping: 0=IDLE, 1=CALIBRATING, 2=SAVING, 3=COMPLETE, 4=ERROR, 5=MIGRATING
     lv_subject_set_int(&s_pid_cal_state, static_cast<int>(new_state));
     // Disable Start button in header when not idle
     lv_subject_set_int(&subj_cal_not_idle_, new_state != State::IDLE ? 1 : 0);
@@ -370,6 +439,11 @@ void PIDCalibrationPanel::update_fan_slider(int speed) {
         snprintf(buf, sizeof(buf), "%d%%", speed);
         lv_label_set_text(fan_speed_label_, buf);
     }
+}
+
+void PIDCalibrationPanel::update_pid_fan_visibility() {
+    bool show = (selected_heater_ == Heater::EXTRUDER) && (selected_method_ == CalibMethod::PID);
+    lv_subject_set_int(&subj_show_pid_fan_, show ? 1 : 0);
 }
 
 void PIDCalibrationPanel::update_temp_display() {
@@ -593,11 +667,16 @@ void PIDCalibrationPanel::fetch_old_pid_values() {
     api_->advanced().get_heater_pid_values(
         heater_name,
         [this](float kp, float ki, float kd) {
-            old_kp_ = kp;
-            old_ki_ = ki;
-            old_kd_ = kd;
-            has_old_values_ = true;
-            spdlog::debug("[PIDCal] Got old PID values: Kp={:.3f} Ki={:.3f} Kd={:.3f}", kp, ki, kd);
+            helix::ui::queue_update([this, kp, ki, kd]() {
+                if (cleanup_called())
+                    return;
+                old_kp_ = kp;
+                old_ki_ = ki;
+                old_kd_ = kd;
+                has_old_values_ = true;
+                spdlog::debug("[PIDCal] Got old PID values: Kp={:.3f} Ki={:.3f} Kd={:.3f}", kp, ki,
+                              kd);
+            });
         },
         [heater_name](const MoonrakerError& err) {
             spdlog::warn("[PIDCal] Failed to fetch old PID for '{}': {}", heater_name, err.message);
@@ -619,7 +698,17 @@ void PIDCalibrationPanel::handle_heater_extruder_clicked() {
     lv_subject_set_int(&subj_heater_is_extruder_, 1);
     update_temp_display();
     update_temp_hint();
+    update_pid_fan_visibility();
     fetch_old_pid_values();
+
+    // Update MPC defaults for extruder
+    if (is_kalico_) {
+        heater_wattage_ = WATTAGE_DEFAULT_EXTRUDER;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
+        lv_subject_copy_string(&subj_wattage_display_, buf);
+        detect_heater_control_type();
+    }
 }
 
 void PIDCalibrationPanel::handle_heater_bed_clicked() {
@@ -635,7 +724,18 @@ void PIDCalibrationPanel::handle_heater_bed_clicked() {
     lv_subject_set_int(&subj_heater_is_extruder_, 0);
     update_temp_display();
     update_temp_hint();
+    update_pid_fan_visibility();
     fetch_old_pid_values();
+
+    // Update MPC defaults for bed (higher wattage, no fan config)
+    if (is_kalico_) {
+        heater_wattage_ = WATTAGE_DEFAULT_BED;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
+        lv_subject_copy_string(&subj_wattage_display_, buf);
+        lv_subject_set_int(&subj_show_fan_config_, 0);
+        detect_heater_control_type();
+    }
 }
 
 void PIDCalibrationPanel::handle_temp_up() {
@@ -667,9 +767,20 @@ void PIDCalibrationPanel::handle_temp_down() {
 }
 
 void PIDCalibrationPanel::handle_start_clicked() {
-    spdlog::debug("[PIDCal] Start clicked");
-    set_state(State::CALIBRATING);
-    send_pid_calibrate();
+    spdlog::debug("[PIDCal] Start clicked (method={})",
+                  selected_method_ == CalibMethod::MPC ? "MPC" : "PID");
+    if (selected_method_ == CalibMethod::MPC) {
+        if (needs_migration_) {
+            set_state(State::MIGRATING);
+            start_migration();
+        } else {
+            set_state(State::CALIBRATING);
+            send_mpc_calibrate();
+        }
+    } else {
+        set_state(State::CALIBRATING);
+        send_pid_calibrate();
+    }
 }
 
 void PIDCalibrationPanel::handle_abort_clicked() {
@@ -930,6 +1041,283 @@ void PIDCalibrationPanel::on_fallback_progress_tick(lv_timer_t* timer) {
 }
 
 // ============================================================================
+// MPC: DETECTION, MIGRATION, CALIBRATION
+// ============================================================================
+
+void PIDCalibrationPanel::detect_heater_control_type() {
+    if (!api_)
+        return;
+
+    const char* heater = (selected_heater_ == Heater::EXTRUDER) ? "extruder" : "heater_bed";
+    spdlog::debug("[PIDCal] Querying heater control type for '{}'", heater);
+
+    api_->advanced().get_heater_control_type(
+        heater,
+        [this](const std::string& type) {
+            helix::ui::queue_update([this, type]() {
+                if (cleanup_called())
+                    return;
+                // Query succeeded, firmware supports control type query (Kalico)
+                is_kalico_ = true;
+                lv_subject_set_int(&subj_is_kalico_, 1);
+
+                if (type == "mpc") {
+                    // Already MPC, no migration needed
+                    selected_method_ = CalibMethod::MPC;
+                    needs_migration_ = false;
+                    lv_subject_set_int(&subj_method_is_mpc_, 1);
+                    lv_subject_set_int(&subj_needs_migration_, 0);
+                    lv_subject_set_int(&subj_show_wattage_, 0);
+                    bool show_fan = (selected_heater_ == Heater::EXTRUDER);
+                    lv_subject_set_int(&subj_show_fan_config_, show_fan ? 1 : 0);
+                    spdlog::info("[PIDCal] Heater already using MPC control");
+                } else {
+                    // PID mode — MPC needs migration, pre-select MPC (recommended)
+                    selected_method_ = CalibMethod::MPC;
+                    needs_migration_ = true;
+                    lv_subject_set_int(&subj_method_is_mpc_, 1);
+                    lv_subject_set_int(&subj_needs_migration_, 1);
+                    lv_subject_set_int(&subj_show_wattage_, 1);
+                    bool show_fan = (selected_heater_ == Heater::EXTRUDER);
+                    lv_subject_set_int(&subj_show_fan_config_, show_fan ? 1 : 0);
+                    spdlog::info("[PIDCal] Heater using '{}' control, MPC migration available",
+                                 type);
+                }
+            });
+        },
+        [this](const MoonrakerError&) {
+            // Can't determine control type, not Kalico — default to PID
+            helix::ui::queue_update([this]() {
+                if (cleanup_called())
+                    return;
+                is_kalico_ = false;
+                lv_subject_set_int(&subj_is_kalico_, 0);
+                spdlog::debug("[PIDCal] Heater control type query failed, defaulting to PID");
+            });
+        });
+}
+
+void PIDCalibrationPanel::start_migration() {
+    if (!api_)
+        return;
+
+    const char* section = (selected_heater_ == Heater::EXTRUDER) ? "extruder" : "heater_bed";
+    std::vector<helix::system::ConfigEdit> edits = {
+        {helix::system::ConfigEdit::Type::SET_VALUE, "control", "mpc"},
+        {helix::system::ConfigEdit::Type::ADD_KEY, "heater_power", std::to_string(heater_wattage_)},
+    };
+
+    spdlog::info("[PIDCal] Starting PID->MPC migration for '{}' with heater_power={}W", section,
+                 heater_wattage_);
+
+    EmergencyStopOverlay::instance().suppress_recovery_dialog(30000);
+
+    config_editor_.safe_multi_edit(
+        *api_, section, edits,
+        [this]() {
+            helix::ui::queue_update([this]() {
+                if (cleanup_called())
+                    return;
+                needs_migration_ = false;
+                lv_subject_set_int(&subj_needs_migration_, 0);
+                spdlog::info("[PIDCal] Migration complete, starting MPC calibration");
+                set_state(State::CALIBRATING);
+                send_mpc_calibrate();
+            });
+        },
+        [this](const std::string& err) {
+            helix::ui::queue_update([this, err]() {
+                if (cleanup_called())
+                    return;
+                spdlog::error("[PIDCal] Migration failed: {}", err);
+                lv_subject_copy_string(&subj_error_message_, err.c_str());
+                set_state(State::ERROR);
+            });
+        },
+        30000);
+}
+
+void PIDCalibrationPanel::send_mpc_calibrate() {
+    if (!api_) {
+        spdlog::error("[PIDCal] No MoonrakerAPI for MPC calibration");
+        lv_subject_copy_string(&subj_error_message_, "No printer connection");
+        set_state(State::ERROR);
+        return;
+    }
+
+    const char* heater = (selected_heater_ == Heater::EXTRUDER) ? "extruder" : "heater_bed";
+    const char* label = (selected_heater_ == Heater::EXTRUDER) ? "Extruder MPC Calibration"
+                                                               : "Heated Bed MPC Calibration";
+    lv_subject_copy_string(&subj_calibrating_heater_, label);
+
+    spdlog::info("[PIDCal] Starting MPC calibration: {} at {}°C, fan_breakpoints={}", heater,
+                 target_temp_, fan_breakpoints_);
+
+    api_->advanced().start_mpc_calibrate(
+        heater, target_temp_, fan_breakpoints_,
+        [this](const MoonrakerAdvancedAPI::MPCResult& result) {
+            helix::ui::queue_update([this, result]() {
+                if (cleanup_called())
+                    return;
+                if (state_ != State::CALIBRATING)
+                    return;
+                on_mpc_result(result);
+            });
+        },
+        [this](const MoonrakerError& err) {
+            std::string msg = err.message;
+            helix::ui::queue_update([this, msg]() {
+                if (cleanup_called())
+                    return;
+                if (state_ != State::CALIBRATING)
+                    return;
+                spdlog::error("[PIDCal] MPC calibration failed: {}", msg);
+                lv_subject_copy_string(&subj_error_message_, msg.c_str());
+                set_state(State::ERROR);
+            });
+        },
+        [this](int phase, int total, const std::string& desc) {
+            helix::ui::queue_update([this, phase, total, desc]() {
+                if (cleanup_called())
+                    return;
+                on_mpc_progress(phase, total, desc);
+            });
+        });
+}
+
+void PIDCalibrationPanel::on_mpc_result(const MoonrakerAdvancedAPI::MPCResult& result) {
+    mpc_result_ = result;
+    lv_subject_set_int(&subj_pid_progress_, 100);
+    lv_subject_copy_string(&subj_pid_progress_text_, lv_tr("Complete!"));
+
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%.4f J/K", result.block_heat_capacity);
+    lv_subject_copy_string(&subj_mpc_heat_capacity_, buf);
+    snprintf(buf, sizeof(buf), "%.6f K/s/K", result.sensor_responsiveness);
+    lv_subject_copy_string(&subj_mpc_sensor_resp_, buf);
+    snprintf(buf, sizeof(buf), "%.6f W/K", result.ambient_transfer);
+    lv_subject_copy_string(&subj_mpc_ambient_transfer_, buf);
+    lv_subject_copy_string(&subj_mpc_fan_transfer_, result.fan_ambient_transfer.c_str());
+
+    const char* heater_label = (selected_heater_ == Heater::EXTRUDER) ? "extruder" : "heated bed";
+    char summary[128];
+    snprintf(summary, sizeof(summary),
+             "MPC thermal model calibrated for %s at %d\xC2\xB0"
+             "C.",
+             heater_label, target_temp_);
+    lv_subject_copy_string(&subj_result_summary_, summary);
+
+    spdlog::info("[PIDCal] MPC result: heat_cap={:.4f} sensor_resp={:.6f} ambient={:.6f} fan='{}'",
+                 result.block_heat_capacity, result.sensor_responsiveness, result.ambient_transfer,
+                 result.fan_ambient_transfer);
+
+    set_state(State::SAVING);
+    send_save_config();
+}
+
+void PIDCalibrationPanel::on_mpc_progress(int phase, int total_phases, const std::string& desc) {
+    if (!has_kalico_progress_) {
+        has_kalico_progress_ = true;
+        stop_fallback_progress_timer();
+        spdlog::info("[PIDCal] MPC phase progress detected");
+    }
+
+    int progress = 0;
+    if (total_phases > 0) {
+        progress = (phase * 100) / total_phases;
+    }
+    if (progress > 95)
+        progress = 95;
+    lv_subject_set_int(&subj_pid_progress_, progress);
+    lv_subject_copy_string(&subj_pid_progress_text_, desc.c_str());
+
+    spdlog::debug("[PIDCal] MPC progress: phase={}/{} desc='{}' bar={}%", phase, total_phases, desc,
+                  progress);
+}
+
+// ============================================================================
+// MPC: METHOD / WATTAGE / FAN HANDLERS
+// ============================================================================
+
+void PIDCalibrationPanel::handle_method_pid_clicked() {
+    if (state_ != State::IDLE)
+        return;
+    spdlog::debug("[PIDCal] PID method selected");
+    selected_method_ = CalibMethod::PID;
+    needs_migration_ = false;
+    lv_subject_set_int(&subj_method_is_mpc_, 0);
+    lv_subject_set_int(&subj_show_wattage_, 0);
+    lv_subject_set_int(&subj_show_fan_config_, 0);
+    lv_subject_set_int(&subj_needs_migration_, 0);
+    update_pid_fan_visibility();
+}
+
+void PIDCalibrationPanel::handle_method_mpc_clicked() {
+    if (state_ != State::IDLE)
+        return;
+    spdlog::debug("[PIDCal] MPC method selected");
+    selected_method_ = CalibMethod::MPC;
+    lv_subject_set_int(&subj_method_is_mpc_, 1);
+    update_pid_fan_visibility();
+    // Re-detect to determine migration needs
+    detect_heater_control_type();
+}
+
+void PIDCalibrationPanel::handle_wattage_up() {
+    if (state_ != State::IDLE)
+        return;
+    if (heater_wattage_ < WATTAGE_MAX) {
+        heater_wattage_ += WATTAGE_STEP;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
+        lv_subject_copy_string(&subj_wattage_display_, buf);
+        spdlog::debug("[PIDCal] Wattage: {}W", heater_wattage_);
+    }
+}
+
+void PIDCalibrationPanel::handle_wattage_down() {
+    if (state_ != State::IDLE)
+        return;
+    if (heater_wattage_ > WATTAGE_MIN) {
+        heater_wattage_ -= WATTAGE_STEP;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
+        lv_subject_copy_string(&subj_wattage_display_, buf);
+        spdlog::debug("[PIDCal] Wattage: {}W", heater_wattage_);
+    }
+}
+
+void PIDCalibrationPanel::handle_fan_quick_clicked() {
+    if (state_ != State::IDLE)
+        return;
+    fan_breakpoints_ = FAN_BP_QUICK;
+    lv_subject_set_int(&subj_fan_is_quick_, 1);
+    lv_subject_set_int(&subj_fan_is_detailed_, 0);
+    lv_subject_set_int(&subj_fan_is_thorough_, 0);
+    spdlog::debug("[PIDCal] Fan breakpoints: {} (Quick)", fan_breakpoints_);
+}
+
+void PIDCalibrationPanel::handle_fan_detailed_clicked() {
+    if (state_ != State::IDLE)
+        return;
+    fan_breakpoints_ = FAN_BP_DETAILED;
+    lv_subject_set_int(&subj_fan_is_quick_, 0);
+    lv_subject_set_int(&subj_fan_is_detailed_, 1);
+    lv_subject_set_int(&subj_fan_is_thorough_, 0);
+    spdlog::debug("[PIDCal] Fan breakpoints: {} (Detailed)", fan_breakpoints_);
+}
+
+void PIDCalibrationPanel::handle_fan_thorough_clicked() {
+    if (state_ != State::IDLE)
+        return;
+    fan_breakpoints_ = FAN_BP_THOROUGH;
+    lv_subject_set_int(&subj_fan_is_quick_, 0);
+    lv_subject_set_int(&subj_fan_is_detailed_, 0);
+    lv_subject_set_int(&subj_fan_is_thorough_, 1);
+    spdlog::debug("[PIDCal] Fan breakpoints: {} (Thorough)", fan_breakpoints_);
+}
+
+// ============================================================================
 // STATIC TRAMPOLINES (for XML event_cb)
 // ============================================================================
 
@@ -1066,6 +1454,56 @@ void PIDCalibrationPanel::on_pid_preset_bed_abs(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_pid_preset_bed_abs");
     (void)e;
     get_global_pid_cal_panel().handle_preset_clicked(get_material_bed_temp("ABS"), "ABS");
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+// MPC method/config trampolines
+void PIDCalibrationPanel::on_method_pid_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_method_pid_clicked");
+    (void)e;
+    get_global_pid_cal_panel().handle_method_pid_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_method_mpc_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_method_mpc_clicked");
+    (void)e;
+    get_global_pid_cal_panel().handle_method_mpc_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_wattage_up(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_wattage_up");
+    (void)e;
+    get_global_pid_cal_panel().handle_wattage_up();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_wattage_down(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_wattage_down");
+    (void)e;
+    get_global_pid_cal_panel().handle_wattage_down();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_fan_quick_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_fan_quick_clicked");
+    (void)e;
+    get_global_pid_cal_panel().handle_fan_quick_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_fan_detailed_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_fan_detailed_clicked");
+    (void)e;
+    get_global_pid_cal_panel().handle_fan_detailed_clicked();
+    LVGL_SAFE_EVENT_CB_END();
+}
+
+void PIDCalibrationPanel::on_fan_thorough_clicked(lv_event_t* e) {
+    LVGL_SAFE_EVENT_CB_BEGIN("[PIDCal] on_fan_thorough_clicked");
+    (void)e;
+    get_global_pid_cal_panel().handle_fan_thorough_clicked();
     LVGL_SAFE_EVENT_CB_END();
 }
 

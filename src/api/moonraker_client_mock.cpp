@@ -1501,6 +1501,73 @@ int MoonrakerClientMock::gcode_script(const std::string& gcode) {
         return 0; // Success - results come asynchronously via gcode_response
     }
 
+    // MPC Calibration simulation
+    if (gcode.find("MPC_CALIBRATE") != std::string::npos) {
+        std::string heater = "extruder";
+        auto heater_pos = gcode.find("HEATER=");
+        if (heater_pos != std::string::npos) {
+            size_t start = heater_pos + 7;
+            size_t end = gcode.find(' ', start);
+            heater =
+                gcode.substr(start, end == std::string::npos ? std::string::npos : end - start);
+        }
+
+        int fan_breakpoints = 3;
+        auto fb_pos = gcode.find("FAN_BREAKPOINTS=");
+        if (fb_pos != std::string::npos) {
+            fan_breakpoints = std::stoi(gcode.substr(fb_pos + 16));
+        }
+
+        spdlog::info("[MoonrakerClientMock] MPC_CALIBRATE: heater={} fan_breakpoints={}", heater,
+                     fan_breakpoints);
+
+        struct MPCSimState {
+            MoonrakerClientMock* mock;
+            std::string heater;
+            int fan_breakpoints;
+            int phase;
+            int total_phases;
+        };
+
+        int total_phases = 3 + fan_breakpoints; // settle + heatup + fan phases
+        auto* sim = new MPCSimState{this, heater, fan_breakpoints, 0, total_phases};
+
+        lv_timer_t* timer = lv_timer_create(
+            [](lv_timer_t* t) {
+                auto* s = static_cast<MPCSimState*>(lv_timer_get_user_data(t));
+                s->phase++;
+
+                if (s->phase == 1) {
+                    s->mock->dispatch_gcode_response("Waiting for heater to settle near ambient");
+                } else if (s->phase == 2) {
+                    s->mock->dispatch_gcode_response("Performing heatup test");
+                } else if (s->phase <= 2 + s->fan_breakpoints) {
+                    int fan_pct = ((s->phase - 2) * 100) / s->fan_breakpoints;
+                    char buf[128];
+                    snprintf(buf, sizeof(buf), "measuring power usage with %d%% fan", fan_pct);
+                    s->mock->dispatch_gcode_response(buf);
+                } else {
+                    // Final result
+                    s->mock->dispatch_gcode_response("Finished MPC calibration");
+                    s->mock->dispatch_gcode_response("block_heat_capacity=18.4321 [J/K]");
+                    s->mock->dispatch_gcode_response("sensor_responsiveness=0.123456 [K/s/K]");
+                    s->mock->dispatch_gcode_response("ambient_transfer=0.045678 [W/K]");
+                    if (s->fan_breakpoints > 0) {
+                        s->mock->dispatch_gcode_response(
+                            "fan_ambient_transfer=0.12, 0.18, 0.25 [W/K]");
+                    }
+
+                    delete s;
+                    lv_timer_delete(t);
+                    return;
+                }
+            },
+            500, sim);
+        lv_timer_set_repeat_count(timer, total_phases + 1);
+
+        return 0; // Success - results come asynchronously via gcode_response
+    }
+
     // SAVE_CONFIG simulation
     if (gcode.find("SAVE_CONFIG") != std::string::npos) {
         spdlog::info("[MoonrakerClientMock] SAVE_CONFIG - simulating config save + restart");
