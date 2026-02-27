@@ -28,7 +28,7 @@ class FanStackWidget : public PanelWidget {
     std::string get_component_name() const override;
     void attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) override;
     void detach() override;
-    void set_row_density(size_t widgets_in_row) override;
+    void on_size_changed(int colspan, int rowspan, int width_px, int height_px) override;
     const char* id() const override {
         return "fan_stack";
     }

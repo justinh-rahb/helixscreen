@@ -1182,3 +1182,109 @@ TEST_CASE("GridEditMode: catalog_open flag not affected by enter/exit", "[grid_e
     em.exit();
     REQUIRE_FALSE(em.is_catalog_open());
 }
+
+// ============================================================================
+// Widget sizing constraints
+// ============================================================================
+
+TEST_CASE("PanelWidgetDef: effective min/max accessors", "[grid_edit][sizing]") {
+    // Widget with explicit min/max
+    PanelWidgetDef def{};
+    def.colspan = 2;
+    def.rowspan = 2;
+    def.min_colspan = 1;
+    def.min_rowspan = 1;
+    def.max_colspan = 4;
+    def.max_rowspan = 3;
+
+    CHECK(def.effective_min_colspan() == 1);
+    CHECK(def.effective_min_rowspan() == 1);
+    CHECK(def.effective_max_colspan() == 4);
+    CHECK(def.effective_max_rowspan() == 3);
+    CHECK(def.is_scalable());
+}
+
+TEST_CASE("PanelWidgetDef: zero min/max defaults to colspan/rowspan", "[grid_edit][sizing]") {
+    PanelWidgetDef def{};
+    def.colspan = 1;
+    def.rowspan = 1;
+    def.min_colspan = 0;
+    def.min_rowspan = 0;
+    def.max_colspan = 0;
+    def.max_rowspan = 0;
+
+    CHECK(def.effective_min_colspan() == 1);
+    CHECK(def.effective_min_rowspan() == 1);
+    CHECK(def.effective_max_colspan() == 1);
+    CHECK(def.effective_max_rowspan() == 1);
+    CHECK_FALSE(def.is_scalable());
+}
+
+TEST_CASE("PanelWidgetDef: partially scalable (one axis)", "[grid_edit][sizing]") {
+    PanelWidgetDef def{};
+    def.colspan = 1;
+    def.rowspan = 1;
+    def.min_colspan = 1;
+    def.min_rowspan = 1;
+    def.max_colspan = 2;
+    def.max_rowspan = 1; // Can't grow vertically
+
+    CHECK(def.is_scalable()); // Scalable on col axis
+    CHECK(def.effective_max_colspan() == 2);
+    CHECK(def.effective_max_rowspan() == 1);
+}
+
+TEST_CASE("clamp_span: clamps to widget min/max", "[grid_edit][sizing]") {
+    // Register a test widget definition with known constraints
+    // Use an existing scalable widget: "temperature" (min 1x1, max 2x2)
+    auto [c1, r1] = GridEditMode::clamp_span("temperature", 0, 0);
+    CHECK(c1 == 1); // Clamped to min
+    CHECK(r1 == 1);
+
+    auto [c2, r2] = GridEditMode::clamp_span("temperature", 5, 5);
+    CHECK(c2 == 2); // Clamped to max
+    CHECK(r2 == 2);
+
+    auto [c3, r3] = GridEditMode::clamp_span("temperature", 1, 1);
+    CHECK(c3 == 1); // Within range
+    CHECK(r3 == 1);
+
+    auto [c4, r4] = GridEditMode::clamp_span("temperature", 2, 2);
+    CHECK(c4 == 2); // At max
+    CHECK(r4 == 2);
+}
+
+TEST_CASE("clamp_span: non-scalable widget stays fixed", "[grid_edit][sizing]") {
+    // "power" is 1x1, min 1x1, max 1x1
+    auto [c1, r1] = GridEditMode::clamp_span("power", 3, 3);
+    CHECK(c1 == 1);
+    CHECK(r1 == 1);
+}
+
+TEST_CASE("clamp_span: asymmetric constraints", "[grid_edit][sizing]") {
+    // "tips" is 3x1, min 2x1, max 6x1 — wide but not tall
+    auto [c1, r1] = GridEditMode::clamp_span("tips", 1, 1);
+    CHECK(c1 == 2); // Clamped to min_colspan
+    CHECK(r1 == 1); // rowspan stays 1
+
+    auto [c2, r2] = GridEditMode::clamp_span("tips", 6, 3);
+    CHECK(c2 == 6); // At max_colspan
+    CHECK(r2 == 1); // Clamped to max_rowspan
+}
+
+TEST_CASE("All registered widgets have valid sizing constraints", "[grid_edit][sizing]") {
+    const auto& defs = get_all_widget_defs();
+    REQUIRE(defs.size() > 0);
+
+    for (const auto& def : defs) {
+        INFO("Widget: " << def.id);
+        // Default span must be within min/max range
+        CHECK(def.effective_min_colspan() <= def.colspan);
+        CHECK(def.colspan <= def.effective_max_colspan());
+        CHECK(def.effective_min_rowspan() <= def.rowspan);
+        CHECK(def.rowspan <= def.effective_max_rowspan());
+        // Min must not exceed max
+        CHECK(def.effective_min_colspan() <= def.effective_max_colspan());
+        CHECK(def.effective_min_rowspan() <= def.effective_max_rowspan());
+    }
+}

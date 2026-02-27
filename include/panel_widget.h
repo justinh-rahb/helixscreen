@@ -48,11 +48,17 @@ class PanelWidget {
     /// Called when the owning panel goes offscreen.
     virtual void on_deactivate() {}
 
-    /// Called after attach() with the number of widgets sharing this row.
-    /// Widgets can use this to adjust font sizes or layout density.
-    /// Default is no-op.
-    virtual void set_row_density(size_t widgets_in_row) {
-        (void)widgets_in_row;
+    /// Called after grid cell placement and whenever the widget is resized.
+    /// Widgets can adapt their content layout based on available space.
+    /// @param colspan  Grid columns spanned
+    /// @param rowspan  Grid rows spanned
+    /// @param width_px  Actual pixel width of the widget
+    /// @param height_px  Actual pixel height of the widget
+    virtual void on_size_changed(int colspan, int rowspan, int width_px, int height_px) {
+        (void)colspan;
+        (void)rowspan;
+        (void)width_px;
+        (void)height_px;
     }
 
     /// Stable identifier matching PanelWidgetDef::id

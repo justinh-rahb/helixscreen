@@ -184,13 +184,15 @@ void FanStackWidget::detach() {
     spdlog::debug("[FanStackWidget] Detached");
 }
 
-void FanStackWidget::set_row_density(size_t widgets_in_row) {
-    // Row density only applies to stack mode
+void FanStackWidget::on_size_changed(int /*colspan*/, int /*rowspan*/, int width_px,
+                                     int /*height_px*/) {
+    // Size adaptation only applies to stack mode
     if (!widget_obj_ || is_carousel_mode())
         return;
 
-    // Use larger font when row has more space (≤4 widgets)
-    const char* font_token = (widgets_in_row <= 4) ? "font_small" : "font_xs";
+    // Use larger font when widget has more horizontal space (>=200px)
+    bool spacious = (width_px >= 200);
+    const char* font_token = spacious ? "font_small" : "font_xs";
     const lv_font_t* font = theme_manager_get_font(font_token);
     if (!font)
         return;
@@ -202,11 +204,10 @@ void FanStackWidget::set_row_density(size_t widgets_in_row) {
     }
 
     // Name labels — use fuller abbreviations when space allows
-    bool spacious = (widgets_in_row <= 4);
     struct NameMapping {
         const char* obj_name;
-        const char* compact_key;  // translation key for 5+ widgets per row
-        const char* spacious_key; // translation key for ≤4 widgets per row
+        const char* compact_key;  // translation key for narrow widgets
+        const char* spacious_key; // translation key for wide widgets (>=200px)
     };
     static constexpr NameMapping name_map[] = {
         {"fan_stack_part_name", "P", "Part"},
@@ -221,7 +222,7 @@ void FanStackWidget::set_row_density(size_t widgets_in_row) {
         }
     }
 
-    spdlog::debug("[FanStackWidget] Row density {} -> font {}", widgets_in_row, font_token);
+    spdlog::debug("[FanStackWidget] on_size_changed width_px={} -> font {}", width_px, font_token);
 }
 
 void FanStackWidget::bind_fans() {

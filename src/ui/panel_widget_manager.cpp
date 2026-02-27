@@ -387,17 +387,28 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
         // Attach the pre-created PanelWidget instance if present
         if (slot.instance) {
             slot.instance->attach(widget, lv_scr_act());
-            // Row density: approximate as widgets per row in the grid
+
+            // Notify widget of its grid allocation and approximate pixel size
             int cols = GridLayout::get_cols(breakpoint);
-            slot.instance->set_row_density(static_cast<size_t>(cols));
+            int rows = GridLayout::get_rows(breakpoint);
+            int container_w = lv_obj_get_content_width(container);
+            int container_h = lv_obj_get_content_height(container);
+            int cell_w = (cols > 0) ? container_w / cols : 0;
+            int cell_h = (rows > 0) ? container_h / rows : 0;
+            slot.instance->on_size_changed(p.colspan, p.rowspan, cell_w * p.colspan,
+                                           cell_h * p.rowspan);
+
             result.push_back(std::move(slot.instance));
         }
 
-        // Propagate row density to AMS mini status (pure XML widget, no PanelWidget)
+        // Propagate width to AMS mini status (pure XML widget, no PanelWidget)
         if (slot.widget_id == "ams") {
             lv_obj_t* ams_child = lv_obj_get_child(widget, 0);
             if (ams_child && ui_ams_mini_status_is_valid(ams_child)) {
-                ui_ams_mini_status_set_row_density(ams_child, GridLayout::get_cols(breakpoint));
+                int ams_w = lv_obj_get_content_width(container);
+                int cols = GridLayout::get_cols(breakpoint);
+                int cell_w = (cols > 0) ? ams_w / cols : 0;
+                ui_ams_mini_status_set_width(ams_child, cell_w * p.colspan);
             }
         }
     }

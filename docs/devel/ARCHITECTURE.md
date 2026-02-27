@@ -447,7 +447,7 @@ public:
     virtual void detach() = 0;            // Reset observers, clear pointers
     virtual void on_activate() {}         // Panel became visible
     virtual void on_deactivate() {}       // Panel went offscreen
-    virtual void set_row_density(size_t widgets_in_row) {}    // Adjust for layout density
+    virtual void on_size_changed(int colspan, int rowspan, int width_px, int height_px) {}  // Adapt to cell size
     virtual const char* id() const = 0;  // Stable widget ID string
 };
 ```
