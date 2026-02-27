@@ -574,8 +574,8 @@ void PrintSelectDetailView::update_history_status(FileHistoryStatus status, int 
         ui_icon_set_variant(history_status_icon_, "success");
         // Format: "Printed N time(s)"
         char buf[64];
-        snprintf(buf, sizeof(buf), "Printed %d time%s", success_count,
-                 success_count == 1 ? "" : "s");
+        snprintf(buf, sizeof(buf),
+                 lv_tr(success_count == 1 ? "Printed %d time" : "Printed %d times"), success_count);
         lv_label_set_text(history_status_label_, buf);
         break;
     }
