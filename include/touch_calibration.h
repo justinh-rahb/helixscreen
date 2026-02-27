@@ -4,6 +4,7 @@
 #pragma once
 
 #include <algorithm>
+#include <climits>
 #include <cstdlib>
 #include <sstream>
 #include <string>
@@ -28,9 +29,15 @@ struct AbsCapabilities {
  * @brief Parse the sysfs ABS capabilities hex string
  *
  * Reads /sys/class/input/eventN/device/capabilities/abs format:
- * space-separated hex words, rightmost = bits 0-31, next = bits 32-63, etc.
+ * space-separated hex words, rightmost = lowest bits, leftmost = highest bits.
  *
- * @param caps_hex Raw hex string from sysfs (e.g., "600003", "600000 3", "0")
+ * The kernel prints words using `%lx`, which is 32-bit on armhf (AD5M) and
+ * 64-bit on aarch64 (Pi).  Rather than relying on sizeof(unsigned long) at
+ * compile time, the parser infers the word width from the longest hex token
+ * in the input so it correctly handles sysfs strings from any platform.
+ *
+ * @param caps_hex Raw hex string from sysfs (e.g., "265000000000000",
+ *                 "600003", "600000 3", "0")
  * @return Parsed capabilities indicating single-touch and/or multitouch support
  */
 inline AbsCapabilities parse_abs_capabilities(const std::string& caps_hex) {
@@ -40,13 +47,13 @@ inline AbsCapabilities parse_abs_capabilities(const std::string& caps_hex) {
         return result;
     }
 
-    // Split on spaces into words (rightmost = lowest bits)
-    std::vector<unsigned long> words;
+    // Split on spaces into tokens and parse hex values
+    std::vector<unsigned long long> words;
     std::istringstream iss(caps_hex);
     std::string token;
     while (iss >> token) {
         try {
-            words.push_back(std::stoul(token, nullptr, 16));
+            words.push_back(std::stoull(token, nullptr, 16));
         } catch (...) {
             return result;
         }
@@ -56,21 +63,35 @@ inline AbsCapabilities parse_abs_capabilities(const std::string& caps_hex) {
         return result;
     }
 
-    // Words are in order: highest bits first, lowest bits last
-    // Reverse so index 0 = bits 0-31, index 1 = bits 32-63, etc.
+    // Determine bits-per-word from the values themselves.
+    // The kernel prints with %lx: 32-bit words on armhf, 64-bit on aarch64.
+    // If any value exceeds what fits in 32 bits, it must be a 64-bit word.
+    bool is_64bit = false;
+    for (auto v : words) {
+        if (v > 0xFFFFFFFFULL) {
+            is_64bit = true;
+            break;
+        }
+    }
+    int bits_per_word = is_64bit ? 64 : 32;
+
+    // Words are in order: highest bits first, lowest bits last.
+    // Reverse so index 0 = lowest bits, matching ABS code numbering.
     std::reverse(words.begin(), words.end());
 
-    // Single-touch: ABS_X=0, ABS_Y=1 → both in word[0], mask 0x3
-    if (words.size() >= 1 && (words[0] & 0x3) == 0x3) {
-        result.has_single_touch = true;
-    }
+    // Test a specific ABS bit across the word array.
+    auto test_bit = [&](int bit) -> bool {
+        int word_idx = bit / bits_per_word;
+        int bit_pos = bit % bits_per_word;
+        return word_idx < static_cast<int>(words.size()) &&
+               (words[word_idx] & (1ULL << bit_pos)) != 0;
+    };
 
-    // Multitouch: ABS_MT_POSITION_X=53, ABS_MT_POSITION_Y=54
-    // Word index = 53/32 = 1 (bits 32-63)
-    // Bit positions within word: 53-32=21, 54-32=22 → mask 0x600000
-    if (words.size() >= 2 && (words[1] & 0x600000) == 0x600000) {
-        result.has_multitouch = true;
-    }
+    // ABS_X=0, ABS_Y=1
+    result.has_single_touch = test_bit(0) && test_bit(1);
+
+    // ABS_MT_POSITION_X=0x35(53), ABS_MT_POSITION_Y=0x36(54)
+    result.has_multitouch = test_bit(53) && test_bit(54);
 
     return result;
 }
