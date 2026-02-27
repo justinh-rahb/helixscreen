@@ -223,20 +223,6 @@
         {
           "type": "sensor_match",
           "field": "sensors",
-          "pattern": "tvocValue",
-          "confidence": 95,
-          "reason": "TVOC air quality sensor (FlashForge signature)"
-        },
-        {
-          "type": "sensor_match",
-          "field": "sensors",
-          "pattern": "tvoc",
-          "confidence": 95,
-          "reason": "TVOC sensor detected (FlashForge signature)"
-        },
-        {
-          "type": "sensor_match",
-          "field": "sensors",
           "pattern": "weightValue",
           "confidence": 80,
           "reason": "Spool weight sensor (FlashForge signature)"
