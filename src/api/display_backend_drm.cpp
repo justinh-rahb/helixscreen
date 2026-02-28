@@ -184,10 +184,6 @@ DisplayBackendDRM::DisplayBackendDRM() : drm_device_(auto_detect_drm_device()) {
 DisplayBackendDRM::DisplayBackendDRM(const std::string& drm_device) : drm_device_(drm_device) {}
 
 DisplayBackendDRM::~DisplayBackendDRM() {
-    if (rotated_buf_) {
-        lv_free(rotated_buf_);
-        rotated_buf_ = nullptr;
-    }
     for (auto& buf : shadow_bufs_) {
         if (buf) {
             free(buf);
@@ -218,16 +214,20 @@ void DisplayBackendDRM::rotation_flush_cb(lv_display_t* disp, const lv_area_t* a
         const int32_t hor_res = lv_display_get_horizontal_resolution(disp);
         const int32_t ver_res = lv_display_get_vertical_resolution(disp);
 
-        // For 180°, physical dimensions == logical dimensions
-        int32_t phys_w = hor_res;
-        int32_t phys_h = ver_res;
-        if (rotation == LV_DISPLAY_ROTATION_90 || rotation == LV_DISPLAY_ROTATION_270) {
-            phys_w = ver_res;
-            phys_h = hor_res;
-        }
+        // Source dimensions = what LVGL rendered (logical/rotated coordinates).
+        // lv_draw_sw_rotate uses these to compute destination positions.
+        // For 180°: src and dest have the same dimensions.
+        // For 90/270°: lv_draw_sw_rotate swaps dimensions internally, so
+        //   src_w/src_h must be the LVGL logical resolution (hor_res x ver_res).
+        const int32_t src_w = hor_res;
+        const int32_t src_h = ver_res;
 
-        const uint32_t src_stride = lv_draw_buf_width_to_stride(phys_w, cf);
-        const uint32_t dest_stride = lv_linux_drm_get_buf_stride(disp);
+        const uint32_t drm_stride = lv_linux_drm_get_buf_stride(disp);
+
+        // Source stride matches shadow buffer (allocated with drm_stride).
+        // Dest stride matches DRM dumb buffer (same physical pitch).
+        const uint32_t src_stride = drm_stride;
+        const uint32_t dest_stride = drm_stride;
 
         // Get the back DRM buffer to write into
         uint8_t* drm_buf = lv_linux_drm_get_buf_map(disp, self->back_drm_buf_idx_);
@@ -240,7 +240,7 @@ void DisplayBackendDRM::rotation_flush_cb(lv_display_t* disp, const lv_area_t* a
 
         // Rotate: cached shadow (fast read) → DRM buffer (one uncached write pass)
         uint32_t t0 = lv_tick_get();
-        lv_draw_sw_rotate(px_map, drm_buf, phys_w, phys_h, src_stride, dest_stride, rotation, cf);
+        lv_draw_sw_rotate(px_map, drm_buf, src_w, src_h, src_stride, dest_stride, rotation, cf);
         uint32_t t1 = lv_tick_get();
 
         // Performance sampling every 120 frames
@@ -501,15 +501,24 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
         break;
     }
 
-    // Query hardware capabilities and choose strategy
+    // Query hardware capabilities and choose strategy.
+    // On EGL builds, lv_linux_drm_get_plane_rotation_mask() and
+    // lv_linux_drm_set_rotation() do not exist (only in the dumb-buffer
+    // driver), so force SOFTWARE fallback.
+#ifdef HELIX_ENABLE_OPENGLES
+    uint64_t supported_mask = 0;
+#else
     uint64_t supported_mask = lv_linux_drm_get_plane_rotation_mask(display_);
+#endif
     auto strategy = choose_drm_rotation_strategy(drm_rot, supported_mask);
 
     switch (strategy) {
     case DrmRotationStrategy::HARDWARE:
+#ifndef HELIX_ENABLE_OPENGLES
         lv_linux_drm_set_rotation(display_, drm_rot);
         spdlog::info("[DRM Backend] Hardware plane rotation set to {}°",
                      static_cast<int>(rot) * 90);
+#endif
         break;
 
     case DrmRotationStrategy::SOFTWARE: {
@@ -527,10 +536,13 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
         }
         size_t buf_size = static_cast<size_t>(drm_stride) * drm_h;
 
-        // Allocate cached shadow buffers (page-aligned for potential future DMA)
+        // Allocate cached shadow buffers (page-aligned for potential future DMA).
+        // aligned_alloc requires size to be a multiple of alignment (C11/C++17).
+        constexpr size_t kAlignment = 4096;
+        size_t alloc_size = (buf_size + kAlignment - 1) & ~(kAlignment - 1);
         for (int i = 0; i < 2; i++) {
             if (!shadow_bufs_[i]) {
-                shadow_bufs_[i] = static_cast<uint8_t*>(aligned_alloc(4096, buf_size));
+                shadow_bufs_[i] = static_cast<uint8_t*>(aligned_alloc(kAlignment, alloc_size));
                 if (!shadow_bufs_[i]) {
                     spdlog::error("[DRM Backend] Failed to allocate shadow buffer {} ({} bytes)", i,
                                   buf_size);
@@ -563,8 +575,13 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
     }
 
     case DrmRotationStrategy::NONE:
+#ifndef HELIX_ENABLE_OPENGLES
         // Explicitly reset in case a previous call set a non-zero rotation
         lv_linux_drm_set_rotation(display_, DRM_MODE_ROTATE_0);
+#endif
+
+        // Reset LVGL coordinate system to no rotation
+        lv_display_set_rotation(display_, LV_DISPLAY_ROTATION_0);
 
         // Restore original flush callback if we installed our wrapper
         if (original_flush_cb_) {
@@ -572,7 +589,19 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
             lv_display_set_user_data(display_, nullptr);
             original_flush_cb_ = nullptr;
         }
-        // Clean up shadow buffers if reverting from shadow rotation
+        // Restore DRM buffers before freeing shadow buffers (LVGL's buf_1/buf_2
+        // still point to the shadow memory — must redirect first to avoid
+        // use-after-free on next render).
+        if (shadow_bufs_[0]) {
+            uint8_t* drm_buf0 = lv_linux_drm_get_buf_map(display_, 0);
+            uint8_t* drm_buf1 = lv_linux_drm_get_buf_map(display_, 1);
+            uint32_t drm_stride = lv_linux_drm_get_buf_stride(display_);
+            uint32_t drm_h = lv_display_get_vertical_resolution(display_);
+            size_t drm_buf_size = static_cast<size_t>(drm_stride) * drm_h;
+            lv_display_set_buffers_with_stride(display_, drm_buf0, drm_buf1, drm_buf_size,
+                                               drm_stride, LV_DISPLAY_RENDER_MODE_DIRECT);
+        }
+        // Now safe to free shadow buffers
         for (auto& buf : shadow_bufs_) {
             if (buf) {
                 free(buf);
@@ -580,7 +609,6 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
             }
         }
         shadow_buf_size_ = 0;
-        lv_display_set_render_mode(display_, LV_DISPLAY_RENDER_MODE_DIRECT);
         spdlog::debug("[DRM Backend] No rotation needed");
         break;
     }

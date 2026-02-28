@@ -97,8 +97,6 @@ class DisplayBackendDRM : public DisplayBackend {
     // Software rotation state — the LVGL DRM driver has no rotation support,
     // so we rotate pixels manually in the flush callback (like fbdev does).
     lv_display_flush_cb_t original_flush_cb_ = nullptr;
-    uint8_t* rotated_buf_ = nullptr;
-    size_t rotated_buf_size_ = 0;
     uint32_t rotation_frame_count_ = 0;
     uint32_t rotation_time_accum_ms_ = 0;
 

@@ -238,6 +238,17 @@ $(PATCHES_STAMP): $(PATCH_FILES) $(LVGL_HEAD) $(LIBHV_HEAD)
 	else \
 		echo "$(GREEN)✓ LVGL DRM EGL getters patch already applied$(RESET)"; \
 	fi
+	$(Q)if ! grep -q 'lv_linux_drm_get_buf_map' $(LVGL_DIR)/src/drivers/display/drm/lv_linux_drm.c 2>/dev/null; then \
+		echo "$(YELLOW)→ Applying LVGL DRM shadow buffer API patch...$(RESET)"; \
+		if git -C $(LVGL_DIR) apply --check ../../patches/lvgl-drm-shadow-buffer-api.patch 2>/dev/null; then \
+			git -C $(LVGL_DIR) apply ../../patches/lvgl-drm-shadow-buffer-api.patch && \
+			echo "$(GREEN)✓ DRM shadow buffer API patch applied$(RESET)"; \
+		else \
+			echo "$(YELLOW)⚠ Cannot apply patch (already applied or conflicts)$(RESET)"; \
+		fi \
+	else \
+		echo "$(GREEN)✓ LVGL DRM shadow buffer API patch already applied$(RESET)"; \
+	fi
 	$(ECHO) "$(CYAN)Checking libhv patches...$(RESET)"
 	$(Q)if git -C $(LIBHV_DIR) diff --quiet http/client/requests.h 2>/dev/null; then \
 		echo "$(YELLOW)→ Applying libhv streaming upload patch...$(RESET)"; \

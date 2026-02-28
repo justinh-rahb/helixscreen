@@ -23,7 +23,6 @@
 #include "environment_config.h"
 #include "hardware_validator.h"
 #include "helix_version.h"
-#include "job_queue_state.h"
 #include "keyboard_shortcuts.h"
 #include "layout_manager.h"
 #include "led/led_controller.h"
@@ -1167,11 +1166,6 @@ bool Application::init_moonraker() {
         std::make_unique<PrintHistoryManager>(m_moonraker->api(), get_moonraker_client());
     set_print_history_manager(m_history_manager.get());
     spdlog::debug("[Application] PrintHistoryManager created");
-
-    // Wire job queue state manager (shared cache for queue widget)
-    helix::JobQueueState::instance().set_api(m_moonraker->api(), get_moonraker_client());
-    helix::JobQueueState::instance().fetch();
-    spdlog::debug("[Application] JobQueueState wired");
 
     // Initialize macro modification manager (for PRINT_START wizard)
     m_moonraker->init_macro_analysis(m_config);
