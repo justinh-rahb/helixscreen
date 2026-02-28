@@ -383,6 +383,11 @@ void BedMeshPanel::on_activate() {
     // Must happen AFTER mesh data is loaded so the renderer has data to work with.
     if (canvas_) {
         ui_bed_mesh_set_async_mode(canvas_, true);
+        // Force an initial paint so the widget is not blank on re-entry.
+        // The render thread's frame-ready callback will trigger a full redraw,
+        // but we need at least a placeholder visible immediately.
+        lv_obj_invalidate(canvas_);
+        ui_bed_mesh_request_async_render(canvas_);
     }
 }
 
