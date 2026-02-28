@@ -1951,3 +1951,25 @@ void bed_mesh_renderer_set_z_display_offset(bed_mesh_renderer_t* renderer, doubl
     renderer->z_display_offset = offset_mm;
     spdlog::debug("[Bed Mesh Renderer] Z display offset set to {:.4f}mm", offset_mm);
 }
+
+void bed_mesh_renderer_set_layer_offset(bed_mesh_renderer_t* renderer, int offset_x, int offset_y) {
+    if (!renderer)
+        return;
+    renderer->view_state.layer_offset_x = offset_x;
+    renderer->view_state.layer_offset_y = offset_y;
+}
+
+void bed_mesh_renderer_get_layer_offset(const bed_mesh_renderer_t* renderer, int* offset_x,
+                                        int* offset_y) {
+    if (!renderer) {
+        if (offset_x)
+            *offset_x = 0;
+        if (offset_y)
+            *offset_y = 0;
+        return;
+    }
+    if (offset_x)
+        *offset_x = renderer->view_state.layer_offset_x;
+    if (offset_y)
+        *offset_y = renderer->view_state.layer_offset_y;
+}
