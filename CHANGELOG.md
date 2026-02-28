@@ -5,6 +5,20 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.9] - 2026-02-27
+
+### Added
+- Asynchronous bed mesh rendering with double-buffered worker thread and adaptive quality degradation
+- Off-screen pixel buffer rasterizer for bed mesh visualization
+- Animated connector tube through LINEAR selector box in filament path view
+
+### Fixed
+- Backdrop blur re-enabled with NULL guards across all color formats and NEON paths
+- Bed mesh panel forces initial paint on re-entry
+- G-code viewer forces refresh after first 3D GPU render
+- Home All sends bare G28 instead of G28 X Y Z
+- Global extruder subjects sync correctly on tool selection in temperature panel
+
 ## [0.13.8] - 2026-02-27
 
 ### Added
@@ -1252,6 +1266,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.9]: https://github.com/prestonbrown/helixscreen/compare/v0.13.8...v0.13.9
 [0.13.8]: https://github.com/prestonbrown/helixscreen/compare/v0.13.7...v0.13.8
 [0.13.7]: https://github.com/prestonbrown/helixscreen/compare/v0.13.6...v0.13.7
 [0.13.6]: https://github.com/prestonbrown/helixscreen/compare/v0.13.5...v0.13.6

@@ -807,7 +807,7 @@ void Application::run_rotation_probe_and_layout() {
             should_probe = true;
             spdlog::info("[Application] Rotation probe forced via HELIX_FORCE_ROTATION_PROBE");
         }
-#ifdef HELIX_DISPLAY_FBDEV
+#if defined(HELIX_DISPLAY_FBDEV) || defined(HELIX_DISPLAY_DRM)
         else if (m_args.rotation == 0 && !std::getenv("HELIX_DISPLAY_ROTATION")) {
             bool probed = m_config->get<bool>("/display/rotation_probed", false);
             bool has_rotate_key = m_config->exists("/display/rotate");
@@ -823,7 +823,7 @@ void Application::run_rotation_probe_and_layout() {
                                                       : "unset");
         }
 #else
-        spdlog::debug("[Application] Rotation probe skipped: not fbdev build");
+        spdlog::debug("[Application] Rotation probe skipped: not embedded build");
 #endif
 
         if (should_probe) {
