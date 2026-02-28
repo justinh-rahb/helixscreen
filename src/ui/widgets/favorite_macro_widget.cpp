@@ -4,6 +4,7 @@
 #include "favorite_macro_widget.h"
 
 #include "ui_event_safety.h"
+#include "ui_fonts.h"
 #include "ui_icon.h"
 #include "ui_icon_codepoints.h"
 #include "ui_update_queue.h"
@@ -16,6 +17,7 @@
 #include "moonraker_api.h"
 #include "panel_widget_config.h"
 #include "panel_widget_registry.h"
+#include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -169,6 +171,29 @@ void FavoriteMacroWidget::detach() {
     name_label_ = nullptr;
 
     spdlog::debug("[FavoriteMacroWidget] Detached");
+}
+
+void FavoriteMacroWidget::on_size_changed(int colspan, int rowspan, int /*width_px*/,
+                                          int /*height_px*/) {
+    if (!widget_obj_)
+        return;
+
+    bool tall = (rowspan >= 2);
+    bool wide = (colspan >= 2);
+
+    // Scale icon: md (32px) at 1×1, lg (48px) when tall or 2×2
+    if (icon_label_) {
+        const lv_font_t* icon_font = tall ? &mdi_icons_48 : &mdi_icons_32;
+        lv_obj_set_style_text_font(icon_label_, icon_font, 0);
+    }
+
+    // Scale text: font_xs at 1×1, font_small when tall or wide
+    if (name_label_) {
+        const char* font_token = (tall || wide) ? "font_small" : "font_xs";
+        const lv_font_t* text_font = theme_manager_get_font(font_token);
+        if (text_font)
+            lv_obj_set_style_text_font(name_label_, text_font, 0);
+    }
 }
 
 void FavoriteMacroWidget::handle_clicked() {

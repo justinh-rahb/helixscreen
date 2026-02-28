@@ -27,6 +27,7 @@ class TempStackWidget : public PanelWidget {
     const char* id() const override {
         return "temp_stack";
     }
+    void on_size_changed(int colspan, int rowspan, int width_px, int height_px) override;
 
   private:
     PrinterState& printer_state_;

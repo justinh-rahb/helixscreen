@@ -20,6 +20,8 @@ void register_led_widget();
 void register_thermistor_widget();
 void register_favorite_macro_widgets();
 void register_tips_widget();
+void register_humidity_widget();
+void register_width_sensor_widget();
 void register_printer_image_widget();
 void register_print_status_widget();
 
@@ -38,9 +40,8 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     {"temperature",      "Nozzle Temperature","thermometer",      "Monitor and set nozzle temperature",           "Nozzle Temperature", nullptr,            true,  1, 1, 1, 1, 2, 2},
     {"temp_stack",       "Temperatures",      "thermometer",      "Nozzle, bed, and chamber temps stacked",       "Temperatures",     nullptr,              false, 1, 1, 1, 1, 3, 2},
     {"led",              "LED Light",         "lightbulb_outline","Quick toggle for LED light",                   "LED Light",        "printer_has_led",    true,  1, 1, 1, 1, 2, 1},
-    {"humidity",         "Humidity",          "water",            "Enclosure humidity sensor readings",           "Humidity",         "humidity_sensor_count", true, 1, 1, 1, 1, 2, 1},
-    {"width_sensor",     "Width Sensor",      "ruler",            "Filament width sensor readings",               "Width Sensor",     "width_sensor_count", true,  1, 1, 1, 1, 2, 1},
-    {"probe",            "Probe",             "target",           "Z probe status and offset",                    "Probe",            "probe_count",        true,  1, 1, 1, 1, 2, 1},
+    {"humidity",         "Humidity",          "water",            "Enclosure humidity sensor readings",           "Humidity",         "humidity_sensor_count", true, 1, 1, 1, 1, 2, 2},
+    {"width_sensor",     "Width Sensor",      "ruler",            "Filament width sensor readings",               "Width Sensor",     "width_sensor_count", true,  1, 1, 1, 1, 2, 2},
     {"filament",         "Filament Sensor",   "filament_alert",   "Filament runout detection status",             "Filament Sensor",  "filament_sensor_count", true, 1, 1, 1, 1, 2, 1},
     {"fan_stack",        "Fan Speeds",        "fan",              "Part, hotend, and auxiliary fan speeds",        "Fan Speeds",       nullptr,              true,  2, 1, 1, 1, 3, 2},
     {"thermistor",       "Thermistor",        "thermometer",      "Monitor a custom temperature sensor",          "Thermistor",       "temp_sensor_count",  false, 1, 1, 1, 1, 2, 1},
@@ -48,7 +49,7 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     {"favorite_macro_2", "Macro Button 2",    "play",             "Run a configured macro with one tap",          "Macro Button 2",   nullptr,              false, 1, 1, 1, 1, 2, 1},
     {"notifications",    "Notifications",     "notifications",    "Pending alerts and system messages",           "Notifications",    nullptr,              true,  1, 1, 1, 1, 2, 1},
     //                                                                                                                                          en  col row min_c min_r max_c max_r
-    {"tips",             "Tips",              "help_circle",      "Rotating tips and helpful information",        "Tips",             nullptr,              true,  3, 1, 2, 1, 6, 1},
+    {"tips",             "Tips",              "help_circle",      "Rotating tips and helpful information",        "Tips",             nullptr,              true,  3, 1, 2, 1, 6, 2},
 };
 // clang-format on
 
@@ -104,6 +105,8 @@ void init_widget_registrations() {
     register_thermistor_widget();
     register_favorite_macro_widgets();
     register_tips_widget();
+    register_humidity_widget();
+    register_width_sensor_widget();
 
     spdlog::debug("[PanelWidgetRegistry] All widget factories registered");
 }

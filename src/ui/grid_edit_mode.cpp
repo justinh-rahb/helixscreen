@@ -283,14 +283,9 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
     // The X button child is independently clickable.
     lv_obj_remove_flag(selection_overlay_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_opa(selection_overlay_, LV_OPA_TRANSP, 0);
-    // Only show connecting border on resizable widgets — non-resizable get just corner brackets
-    if (is_selected_widget_resizable()) {
-        lv_obj_set_style_border_color(selection_overlay_, accent, 0);
-        lv_obj_set_style_border_opa(selection_overlay_, LV_OPA_30, 0);
-        lv_obj_set_style_border_width(selection_overlay_, 1, 0);
-    } else {
-        lv_obj_set_style_border_width(selection_overlay_, 0, 0);
-    }
+    // No overlay border — edge bars provide the visual for resizable widgets,
+    // non-resizable get just corner brackets with no connecting lines.
+    lv_obj_set_style_border_width(selection_overlay_, 0, 0);
     lv_obj_set_style_radius(selection_overlay_, radius, 0);
     lv_obj_set_style_pad_all(selection_overlay_, 0, 0);
     // Corner bracket styling: two bars per corner forming a square L-bracket
@@ -367,7 +362,9 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
         }
     }
 
-    // Pulse animation on corner brackets + resize handles when animations are enabled
+    // Pulse animation on corner brackets ONLY (not edge bars) when animations enabled.
+    // Corner brackets are the first 8 children (2 bars x 4 corners).
+    int corner_bar_count = 8; // Always 8 corner bracket bars
     if (DisplaySettingsManager::instance().get_animations_enabled()) {
         lv_anim_t anim;
         lv_anim_init(&anim);
@@ -378,9 +375,8 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
         lv_anim_set_playback_duration(&anim, 1000);
         lv_anim_set_exec_cb(&anim, [](void* obj, int32_t val) {
             auto* overlay = static_cast<lv_obj_t*>(obj);
-            // Pulse all children EXCEPT the last one (X button)
-            uint32_t total = lv_obj_get_child_count(overlay);
-            uint32_t count = (total > 0) ? total - 1 : 0;
+            // Only pulse the first 8 children (corner brackets), skip edge bars
+            uint32_t count = std::min(lv_obj_get_child_count(overlay), 8u);
             for (uint32_t i = 0; i < count; ++i) {
                 lv_obj_t* child = lv_obj_get_child(overlay, static_cast<int32_t>(i));
                 lv_obj_set_style_bg_opa(child, static_cast<lv_opa_t>(val), 0);

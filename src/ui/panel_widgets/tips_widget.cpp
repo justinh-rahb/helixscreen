@@ -4,12 +4,14 @@
 #include "tips_widget.h"
 
 #include "ui_event_safety.h"
+#include "ui_fonts.h"
 #include "ui_modal.h"
 
 #include "display_settings_manager.h"
 #include "panel_widget_registry.h"
 #include "static_subject_registry.h"
 #include "subject_debug_registry.h"
+#include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -128,6 +130,43 @@ void TipsWidget::detach() {
     parent_screen_ = nullptr;
 
     spdlog::debug("[TipsWidget] Detached");
+}
+
+void TipsWidget::on_size_changed(int colspan, int /*rowspan*/, int /*width_px*/,
+                                 int /*height_px*/) {
+    if (!widget_obj_)
+        return;
+
+    // At 2x width or smaller, use smaller text and icon
+    bool compact = (colspan <= 2);
+    const char* font_token = compact ? "font_body" : "font_heading";
+    const lv_font_t* text_font = theme_manager_get_font(font_token);
+    if (!text_font)
+        return;
+
+    const lv_font_t* icon_font = compact ? &mdi_icons_32 : &mdi_icons_48;
+
+    // Update text labels: "Tip:" prefix and bound tip text
+    auto* tip_container = lv_obj_find_by_name(widget_obj_, "tip_container");
+    if (!tip_container)
+        return;
+
+    // The tip text label (named)
+    if (tip_label_)
+        lv_obj_set_style_text_font(tip_label_, text_font, 0);
+
+    // The "Tip:" prefix label is the first child of tip_container (unnamed text_heading)
+    lv_obj_t* prefix = lv_obj_get_child(tip_container, 0);
+    if (prefix)
+        lv_obj_set_style_text_font(prefix, text_font, 0);
+
+    // The help_circle icon is the last child (icon component = lv_label with MDI font)
+    uint32_t count = lv_obj_get_child_count(tip_container);
+    if (count > 0) {
+        lv_obj_t* icon = lv_obj_get_child(tip_container, static_cast<int32_t>(count - 1));
+        if (icon)
+            lv_obj_set_style_text_font(icon, icon_font, 0);
+    }
 }
 
 void TipsWidget::update_tip_of_day() {

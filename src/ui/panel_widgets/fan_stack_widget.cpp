@@ -8,6 +8,7 @@
 #include "ui_event_safety.h"
 #include "ui_fan_control_overlay.h"
 #include "ui_fan_dial.h"
+#include "ui_fonts.h"
 #include "ui_nav_manager.h"
 #include "ui_update_queue.h"
 
@@ -184,45 +185,109 @@ void FanStackWidget::detach() {
     spdlog::debug("[FanStackWidget] Detached");
 }
 
-void FanStackWidget::on_size_changed(int /*colspan*/, int /*rowspan*/, int width_px,
+void FanStackWidget::on_size_changed(int colspan, int rowspan, int /*width_px*/,
                                      int /*height_px*/) {
     // Size adaptation only applies to stack mode
     if (!widget_obj_ || is_carousel_mode())
         return;
 
-    // Use larger font when widget has more horizontal space (>=200px)
-    bool spacious = (width_px >= 200);
-    const char* font_token = spacious ? "font_small" : "font_xs";
-    const lv_font_t* font = theme_manager_get_font(font_token);
-    if (!font)
+    // Size tiers:
+    //   1x1 (compact):  xs fonts, single-letter labels (P, H, C)
+    //   wider or taller: sm fonts, short labels (Part, HE, Chm)
+    bool bigger = (colspan >= 2 || rowspan >= 2);
+
+    const char* font_token = bigger ? "font_small" : "font_xs";
+    const lv_font_t* text_font = theme_manager_get_font(font_token);
+    if (!text_font)
         return;
 
-    // Apply to all speed labels
+    // Icon font: xs=16px, sm=24px
+    const lv_font_t* icon_font = bigger ? &mdi_icons_24 : &mdi_icons_16;
+
+    // Apply text font to all speed labels
     for (auto* label : {part_label_, hotend_label_, aux_label_}) {
         if (label)
-            lv_obj_set_style_text_font(label, font, 0);
+            lv_obj_set_style_text_font(label, text_font, 0);
     }
 
-    // Name labels — use fuller abbreviations when space allows
+    // Apply icon font to fan icons
+    for (auto* icon : {part_icon_, hotend_icon_, aux_icon_}) {
+        if (icon) {
+            lv_obj_t* glyph = lv_obj_get_child(icon, 0);
+            if (glyph)
+                lv_obj_set_style_text_font(glyph, icon_font, 0);
+        }
+    }
+
+    // Name labels — three tiers of text:
+    //   1x1 or 1x2: single letter (P, H, C)
+    //   2x1 (wide but short): abbreviations (Part, HE, Chm)
+    //   2x2+ (wide AND tall): full words (Part, Hotend, Chamber)
+    bool wide = (colspan >= 2);
+    bool roomy = (colspan >= 2 && rowspan >= 2);
     struct NameMapping {
         const char* obj_name;
-        const char* compact_key;  // translation key for narrow widgets
-        const char* spacious_key; // translation key for wide widgets (>=200px)
+        const char* compact; // narrow: single letter
+        const char* abbrev;  // wide: short abbreviation
+        const char* full;    // wide+tall: full word
     };
     static constexpr NameMapping name_map[] = {
-        {"fan_stack_part_name", "P", "Part"},
-        {"fan_stack_hotend_name", "H", "HE"},
-        {"fan_stack_aux_name", "C", "Chm"},
+        {"fan_stack_part_name", "P", "Part", "Part"},
+        {"fan_stack_hotend_name", "H", "HE", "Hotend"},
+        {"fan_stack_aux_name", "C", "Chm", "Chamber"},
     };
     for (const auto& m : name_map) {
         lv_obj_t* lbl = lv_obj_find_by_name(widget_obj_, m.obj_name);
         if (lbl) {
-            lv_obj_set_style_text_font(lbl, font, 0);
-            lv_label_set_text(lbl, lv_tr(spacious ? m.spacious_key : m.compact_key));
+            lv_obj_set_style_text_font(lbl, text_font, 0);
+            const char* text = roomy ? m.full : (wide ? m.abbrev : m.compact);
+            lv_label_set_text(lbl, lv_tr(text));
         }
     }
 
-    spdlog::debug("[FanStackWidget] on_size_changed width_px={} -> font {}", width_px, font_token);
+    // Center the content block when the widget is wider than 1x.
+    // Each row is LV_SIZE_CONTENT so it shrink-wraps its text.
+    // Setting cross_place to CENTER on the flex-column parent centers
+    // the rows horizontally, but that causes ragged left edges.
+    // Instead: keep rows at SIZE_CONTENT and set the parent's
+    // cross_place to CENTER — but use a uniform min_width on all rows
+    // so they share the same left edge.
+    const char* row_names[] = {"fan_stack_part_row", "fan_stack_hotend_row", "fan_stack_aux_row"};
+    if (bigger) {
+        // First pass: set rows to content width and measure the widest
+        for (const char* rn : row_names) {
+            lv_obj_t* row = lv_obj_find_by_name(widget_obj_, rn);
+            if (row)
+                lv_obj_set_width(row, LV_SIZE_CONTENT);
+        }
+        lv_obj_update_layout(widget_obj_);
+
+        int max_w = 0;
+        for (const char* rn : row_names) {
+            lv_obj_t* row = lv_obj_find_by_name(widget_obj_, rn);
+            if (row && !lv_obj_has_flag(row, LV_OBJ_FLAG_HIDDEN)) {
+                int w = lv_obj_get_width(row);
+                if (w > max_w)
+                    max_w = w;
+            }
+        }
+
+        // Second pass: set all rows to the same width (widest row)
+        for (const char* rn : row_names) {
+            lv_obj_t* row = lv_obj_find_by_name(widget_obj_, rn);
+            if (row)
+                lv_obj_set_width(row, max_w);
+        }
+    } else {
+        for (const char* rn : row_names) {
+            lv_obj_t* row = lv_obj_find_by_name(widget_obj_, rn);
+            if (row)
+                lv_obj_set_width(row, LV_PCT(100));
+        }
+    }
+
+    spdlog::debug("[FanStackWidget] on_size_changed {}x{} -> font {}", colspan, rowspan,
+                  font_token);
 }
 
 void FanStackWidget::bind_fans() {

@@ -6,8 +6,10 @@
 #include "ui_carousel.h"
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
+#include "ui_fonts.h"
 #include "ui_nav_manager.h"
 #include "ui_panel_temp_control.h"
+#include "ui_temp_display.h"
 #include "ui_update_queue.h"
 #include "ui_utils.h"
 
@@ -301,6 +303,63 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
 
     int page_count = ui_carousel_get_page_count(carousel);
     spdlog::debug("[TempStackWidget] Attached carousel with {} pages", page_count);
+}
+
+void TempStackWidget::on_size_changed(int /*colspan*/, int rowspan, int /*width_px*/,
+                                      int /*height_px*/) {
+    if (!widget_obj_ || is_carousel_mode())
+        return;
+
+    // Determine size tier based on vertical space
+    const char* size = (rowspan >= 2) ? "sm" : "xs";
+
+    // Get text font for this size tier
+    const char* font_token = theme_manager_size_to_font_token(size, "xs");
+    const lv_font_t* text_font = theme_manager_get_font(font_token);
+    if (!text_font)
+        return;
+
+    // Icon font: xs=16px, sm=24px
+    const lv_font_t* icon_font = (rowspan >= 2) ? &mdi_icons_24 : &mdi_icons_16;
+
+    // Update nozzle icon glyph
+    lv_obj_t* nozzle_glyph = lv_obj_find_by_name(widget_obj_, "nozzle_icon_glyph");
+    if (nozzle_glyph)
+        lv_obj_set_style_text_font(nozzle_glyph, icon_font, 0);
+
+    // Update bed icon — the <icon> component wraps a label child
+    lv_obj_t* bed_icon = lv_obj_find_by_name(widget_obj_, "temp_stack_bed_icon_glyph");
+    if (bed_icon) {
+        lv_obj_t* glyph = lv_obj_get_child(bed_icon, 0);
+        if (glyph)
+            lv_obj_set_style_text_font(glyph, icon_font, 0);
+    }
+
+    // Update temp_display fonts and icon fonts in all rows
+    const char* row_names[] = {"temp_stack_nozzle_row", "temp_stack_bed_row",
+                               "temp_stack_chamber_row"};
+    for (const char* row_name : row_names) {
+        lv_obj_t* row = lv_obj_find_by_name(widget_obj_, row_name);
+        if (!row)
+            continue;
+        for (uint32_t i = 0; i < lv_obj_get_child_count(row); i++) {
+            lv_obj_t* child = lv_obj_get_child(row, static_cast<int32_t>(i));
+            if (ui_temp_display_is_valid(child)) {
+                // Update all labels inside the temp_display container
+                for (uint32_t j = 0; j < lv_obj_get_child_count(child); j++) {
+                    lv_obj_t* label = lv_obj_get_child(child, static_cast<int32_t>(j));
+                    lv_obj_set_style_text_font(label, text_font, 0);
+                }
+            } else if (lv_obj_get_child_count(child) > 0) {
+                // Icon component — update first child glyph (chamber row icon)
+                lv_obj_t* glyph = lv_obj_get_child(child, 0);
+                if (glyph)
+                    lv_obj_set_style_text_font(glyph, icon_font, 0);
+            }
+        }
+    }
+
+    spdlog::debug("[TempStackWidget] on_size_changed rowspan={} -> size {}", rowspan, size);
 }
 
 void TempStackWidget::detach() {

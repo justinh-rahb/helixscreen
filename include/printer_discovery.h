@@ -260,6 +260,13 @@ class PrinterDiscovery {
                 }
             }
             // ================================================================
+            // Width sensors (filament diameter measurement)
+            // ================================================================
+            else if (name == "hall_filament_width_sensor" ||
+                     name == "tsl1401cl_filament_width_sensor") {
+                width_sensor_objects_.push_back(name);
+            }
+            // ================================================================
             // Filament sensors
             // ================================================================
             else if (name.rfind("filament_switch_sensor ", 0) == 0 ||
@@ -440,6 +447,7 @@ class PrinterDiscovery {
         afc_buffer_names_.clear();
         tool_names_.clear();
         filament_sensor_names_.clear();
+        width_sensor_objects_.clear();
         mmu_encoder_names_.clear();
         mmu_servo_names_.clear();
 
@@ -681,6 +689,14 @@ class PrinterDiscovery {
     /// @brief Alias for filament_sensor_names() - compatibility with PrinterCapabilities API
     [[nodiscard]] const std::vector<std::string>& get_filament_sensor_names() const {
         return filament_sensor_names_;
+    }
+
+    [[nodiscard]] const std::vector<std::string>& width_sensor_objects() const {
+        return width_sensor_objects_;
+    }
+
+    [[nodiscard]] bool has_width_sensors() const {
+        return !width_sensor_objects_.empty();
     }
 
     [[nodiscard]] const std::vector<std::string>& mmu_encoder_names() const {
@@ -938,6 +954,7 @@ class PrinterDiscovery {
     std::vector<std::string> afc_buffer_names_; // Buffer suffixes: "TN", "TN1", etc.
     std::vector<std::string> tool_names_;
     std::vector<std::string> filament_sensor_names_;
+    std::vector<std::string> width_sensor_objects_;
     std::vector<std::string> mmu_encoder_names_;
     std::vector<std::string> mmu_servo_names_;
 
