@@ -2,6 +2,7 @@
 
 #include "ui_widget_catalog_overlay.h"
 
+#include "ui_effects.h"
 #include "ui_fonts.h"
 #include "ui_nav_manager.h"
 
@@ -25,6 +26,7 @@ namespace {
 
 struct CatalogState {
     lv_obj_t* overlay_root = nullptr;
+    lv_obj_t* backdrop = nullptr; // Semi-transparent dark backdrop behind the catalog
     WidgetSelectedCallback on_select;
     CatalogClosedCallback on_close;
 };
@@ -35,6 +37,11 @@ void close_catalog() {
     if (g_catalog_state.overlay_root) {
         auto on_close = std::move(g_catalog_state.on_close);
         NavigationManager::instance().go_back();
+        // Delete backdrop after nav pop (overlay is deleted by NavigationManager)
+        if (g_catalog_state.backdrop) {
+            lv_obj_delete(g_catalog_state.backdrop);
+            g_catalog_state.backdrop = nullptr;
+        }
         g_catalog_state.overlay_root = nullptr;
         g_catalog_state.on_select = nullptr;
         g_catalog_state.on_close = nullptr;
@@ -183,6 +190,22 @@ void WidgetCatalogOverlay::show(lv_obj_t* parent_screen, const PanelWidgetConfig
         return;
     }
 
+    // Create a semi-transparent dark backdrop so the home panel shows through.
+    // Uses the same modal_backdrop_opacity constant as Modal dialogs (DRY).
+    lv_opa_t backdrop_opa = 100; // fallback
+    const char* opa_str = lv_xml_get_const(nullptr, "modal_backdrop_opacity");
+    if (opa_str) {
+        int val = atoi(opa_str);
+        if (val >= 0 && val <= 255)
+            backdrop_opa = static_cast<lv_opa_t>(val);
+    }
+    auto* backdrop = helix::ui::create_fullscreen_backdrop(parent_screen, backdrop_opa);
+    if (backdrop) {
+        // Don't block clicks — let taps on the backdrop close the catalog
+        lv_obj_remove_flag(backdrop, LV_OBJ_FLAG_CLICKABLE);
+    }
+    g_catalog_state.backdrop = backdrop;
+
     // Create overlay from XML
     auto* overlay =
         static_cast<lv_obj_t*>(lv_xml_create(parent_screen, "widget_catalog_overlay", nullptr));
@@ -204,6 +227,11 @@ void WidgetCatalogOverlay::show(lv_obj_t* parent_screen, const PanelWidgetConfig
     lv_obj_add_event_cb(
         overlay,
         [](lv_event_t* /*e*/) {
+            // Clean up backdrop if still present
+            if (g_catalog_state.backdrop) {
+                lv_obj_delete(g_catalog_state.backdrop);
+                g_catalog_state.backdrop = nullptr;
+            }
             auto on_close_cb = std::move(g_catalog_state.on_close);
             g_catalog_state.overlay_root = nullptr;
             g_catalog_state.on_select = nullptr;
@@ -226,8 +254,8 @@ void WidgetCatalogOverlay::show(lv_obj_t* parent_screen, const PanelWidgetConfig
 
     populate_rows(scroll, config, g_catalog_state.on_select);
 
-    // Push onto navigation stack
-    NavigationManager::instance().push_overlay(overlay);
+    // Push onto navigation stack — keep the home panel visible behind the catalog
+    NavigationManager::instance().push_overlay(overlay, /*hide_previous=*/false);
 
     spdlog::info("[WidgetCatalog] Overlay shown with {} widget definitions",
                  get_all_widget_defs().size());
