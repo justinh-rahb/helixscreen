@@ -23,6 +23,7 @@
 #include "environment_config.h"
 #include "hardware_validator.h"
 #include "helix_version.h"
+#include "job_queue_state.h"
 #include "keyboard_shortcuts.h"
 #include "layout_manager.h"
 #include "led/led_controller.h"
@@ -153,10 +154,13 @@
 #endif
 
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -172,6 +176,9 @@ extern std::string g_log_file_cli;
 extern std::string g_log_level_cli;
 
 namespace {
+
+// Crash loop detection marker file path
+constexpr const char* CRASH_MARKER_PATH = "config/.crash_restart_count";
 
 /**
  * @brief Recursively invalidate all widgets in the tree
@@ -250,6 +257,41 @@ int Application::run(int argc, char** argv) {
     // Phase 2: Initialize config system
     if (!init_config()) {
         return 1;
+    }
+
+    // Crash loop detection: track rapid restarts via marker file
+    {
+        constexpr size_t MAX_CRASH_RESTARTS = 3;
+        constexpr long long CRASH_WINDOW_SEC = 120;
+        auto now_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+                             std::chrono::system_clock::now().time_since_epoch())
+                             .count();
+
+        // Read existing timestamps and filter to recent window
+        std::vector<long long> recent_timestamps;
+        {
+            std::ifstream in(CRASH_MARKER_PATH);
+            long long ts;
+            while (in >> ts) {
+                if (now_epoch - ts < CRASH_WINDOW_SEC) {
+                    recent_timestamps.push_back(ts);
+                }
+            }
+        }
+
+        if (recent_timestamps.size() >= MAX_CRASH_RESTARTS) {
+            spdlog::warn("[Application] Crash loop detected: {} restarts within {}s, "
+                         "resetting counter",
+                         recent_timestamps.size(), CRASH_WINDOW_SEC);
+            std::filesystem::remove(CRASH_MARKER_PATH);
+        } else {
+            // Write filtered timestamps plus current restart
+            std::ofstream out(CRASH_MARKER_PATH, std::ios::trunc);
+            for (auto ts : recent_timestamps) {
+                out << ts << "\n";
+            }
+            out << now_epoch << "\n";
+        }
     }
 
     // Phase 3: Initialize logging
@@ -1125,6 +1167,11 @@ bool Application::init_moonraker() {
         std::make_unique<PrintHistoryManager>(m_moonraker->api(), get_moonraker_client());
     set_print_history_manager(m_history_manager.get());
     spdlog::debug("[Application] PrintHistoryManager created");
+
+    // Wire job queue state manager (shared cache for queue widget)
+    helix::JobQueueState::instance().set_api(m_moonraker->api(), get_moonraker_client());
+    helix::JobQueueState::instance().fetch();
+    spdlog::debug("[Application] JobQueueState wired");
 
     // Initialize macro modification manager (for PRINT_START wizard)
     m_moonraker->init_macro_analysis(m_config);
@@ -2372,6 +2419,9 @@ void Application::shutdown() {
 
     // Uninstall crash handler (clean shutdown is not a crash)
     crash_handler::uninstall();
+
+    // Clean shutdown means no crash loop -- remove the marker file
+    std::filesystem::remove(CRASH_MARKER_PATH);
 
     // Stop hot reloader thread before anything else
     if (m_hot_reloader) {
