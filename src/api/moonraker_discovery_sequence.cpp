@@ -679,7 +679,6 @@ void MoonrakerDiscoverySequence::complete_discovery_subscription() {
                         spdlog::warn("[Moonraker Client] INITIAL status has NO print_stats!");
                     }
 
-                    client_.dispatch_status_update(status);
                 }
             } else if (sub_response.contains("error")) {
                 spdlog::error("[Moonraker Client] Subscription failed: {}",
@@ -693,9 +692,15 @@ void MoonrakerDiscoverySequence::complete_discovery_subscription() {
                     false); // Warning, not error - discovery still completes
             }
 
-            // Discovery complete - notify observers
+            // Discovery complete - notify observers.
+            // on_discovery_complete_ fires first so fans/sensors are initialized
+            // before dispatch_status_update processes the initial state.
             if (on_discovery_complete_) {
                 on_discovery_complete_(hardware_);
+            }
+            if (sub_response.contains("result")) {
+                const auto& status = sub_response["result"]["status"];
+                client_.dispatch_status_update(status);
             }
             if (on_complete_discovery_) {
                 auto cb = std::move(on_complete_discovery_);

@@ -252,6 +252,10 @@ void PrinterFanState::update_fan_speed(const std::string& object_name, double sp
                     lv_subject_set_int(it->second.get(), speed_pct);
                     spdlog::trace("[PrinterFanState] Fan {} speed updated to {}%", object_name,
                                   speed_pct);
+                } else {
+                    spdlog::debug("[PrinterFanState] Dropping speed update for '{}' — subject "
+                                  "not initialized",
+                                  object_name);
                 }
             }
             return;
