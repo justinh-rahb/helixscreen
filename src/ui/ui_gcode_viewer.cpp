@@ -2099,12 +2099,17 @@ void ui_gcode_viewer_set_print_progress(lv_obj_t* obj, int current_layer) {
     // Store the print progress layer for use by render callback
     st->print_progress_layer_ = current_layer;
 
+    // Skip renderer updates and invalidation when paused —
+    // the stored value above will be picked up on resume.
+    if (st->rendering_paused_) {
+        return;
+    }
+
     // Update 3D renderer
     st->renderer_->set_print_progress_layer(current_layer);
 
     // Note: 2D renderer's current_layer is set in the render callback
-    // using print_progress_layer_, so we just need to invalidate
-
+    // using print_progress_layer_, so we just need to invalidate.
     lv_obj_invalidate(obj);
 }
 

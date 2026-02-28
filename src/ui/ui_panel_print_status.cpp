@@ -573,6 +573,20 @@ void PrintStatusPanel::on_activate() {
     // Restore G-code viewer state based on current print conditions
     // This ensures the viewer is properly restored when returning from overlays like Tune panel
     show_gcode_viewer(lifecycle_.want_viewer() && gcode_loaded_);
+
+    // Sync gcode viewer to current print layer (may have advanced while panel was hidden)
+    if (gcode_viewer_ && gcode_loaded_ && !lv_obj_has_flag(gcode_viewer_, LV_OBJ_FLAG_HIDDEN)) {
+        int current_layer =
+            lv_subject_get_int(printer_state_.get_print_layer_current_subject());
+        int total_layers =
+            lv_subject_get_int(printer_state_.get_print_layer_total_subject());
+        int viewer_max_layer = ui_gcode_viewer_get_max_layer(gcode_viewer_);
+        int viewer_layer = current_layer;
+        if (total_layers > 0 && viewer_max_layer > 0) {
+            viewer_layer = (current_layer * viewer_max_layer) / total_layers;
+        }
+        ui_gcode_viewer_set_print_progress(gcode_viewer_, viewer_layer);
+    }
 }
 
 void PrintStatusPanel::on_deactivate() {
@@ -1468,8 +1482,8 @@ void PrintStatusPanel::on_print_layer_changed(int current_layer) {
                   lifecycle_.total_layers());
     lv_subject_copy_string(&layer_text_subject_, layer_text_buf_);
 
-    // Update G-code viewer ghost layer if viewer is active and visible
-    if (gcode_viewer_ && !lv_obj_has_flag(gcode_viewer_, LV_OBJ_FLAG_HIDDEN)) {
+    // Update G-code viewer ghost layer if panel is active and viewer is visible
+    if (is_active_ && gcode_viewer_ && !lv_obj_has_flag(gcode_viewer_, LV_OBJ_FLAG_HIDDEN)) {
         // Map from Moonraker layer count (e.g., 240) to viewer layer count (e.g., 2912)
         // The slicer metadata and parsed G-code often have different layer counts
         int viewer_max_layer = ui_gcode_viewer_get_max_layer(gcode_viewer_);
