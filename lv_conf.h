@@ -111,11 +111,13 @@
  * RENDERING CONFIGURATION
  *========================*/
 
-/*Align the stride of all layers and images to this bytes*/
-#define LV_DRAW_BUF_STRIDE_ALIGN                1
+/*Align the stride of all layers and images to this bytes.
+ *16-byte alignment required for ARM NEON vld1q/vst1q SIMD operations.
+ *RGB888 (3 bytes/pixel) with stride_align=1 causes unaligned access crashes.*/
+#define LV_DRAW_BUF_STRIDE_ALIGN                16
 
 /*Align the start address of draw_buf addresses to this bytes*/
-#define LV_DRAW_BUF_ALIGN                       4
+#define LV_DRAW_BUF_ALIGN                       16
 
 /*Using matrix for transformations.
  *Requirements:
