@@ -30,12 +30,13 @@ namespace helix::ui {
 // Circuit Breaker
 // ============================================================================
 
-static bool s_blur_disabled = false;
+static bool s_blur_disabled = true;
 
 namespace detail {
 
 void reset_circuit_breaker() {
-    s_blur_disabled = false;
+    // Backdrop blur disabled pending stability testing
+    s_blur_disabled = true;
 }
 
 bool is_blur_disabled() {
@@ -677,8 +678,9 @@ void backdrop_blur_cleanup() {
 #ifdef BACKDROP_BLUR_GPU
     destroy_gpu_blur();
 #endif
-    s_blur_disabled = false;
-    spdlog::debug("[Backdrop Blur] Cleanup complete, circuit breaker reset");
+    // Backdrop blur disabled pending stability testing
+    s_blur_disabled = true;
+    spdlog::debug("[Backdrop Blur] Cleanup complete");
 }
 
 } // namespace helix::ui
