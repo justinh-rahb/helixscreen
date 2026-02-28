@@ -377,11 +377,23 @@ sudo systemctl restart helixscreen
 - Content displayed at wrong angle
 - Touch offset from visual
 
-**Automatic detection (first boot):**
+**Automatic detection:**
 
-On first boot, HelixScreen automatically detects your display orientation. It cycles through 0°, 90°, 180°, and 270° — tap the screen when the text appears right-side up, then tap again to confirm. The rotation is saved automatically and touch coordinates adjust to match.
+HelixScreen automatically detects display orientation on first boot using the kernel's panel orientation setting. If your display is physically mounted upside down and the kernel knows about it (via `panel_orientation=upside_down` in the kernel command line), HelixScreen detects this and applies the correct rotation automatically — both the splash screen and the main UI will appear right-side up.
 
-If the automatic detection didn't run (e.g., you upgraded from an older version), you can trigger it by removing the rotation settings from your config file — see "Manual rotation" below.
+On framebuffer displays only (e.g., AD5M, Allwinner-based devices — **not** Raspberry Pi), an interactive rotation wizard runs on first boot: it cycles through 0°, 90°, 180°, and 270° — tap the screen when the text appears right-side up, then tap again to confirm. This wizard is not available on Raspberry Pi or other DRM-based displays — use the kernel `panel_orientation` parameter or manual config instead.
+
+The detected rotation is saved to the config file and applied on all subsequent boots.
+
+**Setting panel orientation in the kernel (Raspberry Pi):**
+
+Edit `/boot/firmware/cmdline.txt` and add a `video=` parameter for your display connector:
+
+```
+video=DSI-1:panel_orientation=upside_down
+```
+
+Valid orientations: `normal`, `upside_down`, `left_side_up`, `right_side_up`. HelixScreen reads this on startup and applies the corresponding rotation.
 
 **Manual rotation:**
 
@@ -409,10 +421,7 @@ Remove the `rotate` and `rotation_probed` keys from your config file's `display`
 }
 ```
 
-**For DSI displays on Pi, you may also need `/boot/config.txt`:**
-```ini
-lcd_rotate=2
-```
+> **Note:** On Raspberry Pi (DRM displays), rotation uses a full-screen software approach that adds minimal overhead (<1ms per frame on Pi 5). On framebuffer displays, rotation uses a more efficient partial-update method. Both are transparent to the user.
 
 > **Note:** Old configs may have `"display_rotate": 180` at the root level. This is automatically migrated to the new format on startup.
 

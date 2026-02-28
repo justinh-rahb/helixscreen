@@ -242,12 +242,16 @@ Located in the `display` section:
 **Type:** integer
 **Default:** `0`
 **Values:** `0`, `90`, `180`, `270`
-**Description:** Rotate the entire display by the specified degrees. Touch coordinates are automatically adjusted to match. On first boot, HelixScreen detects the correct rotation automatically — this setting is saved by the detection wizard and can be changed manually if needed.
+**Description:** Rotate the entire display by the specified degrees. Touch coordinates are automatically adjusted to match.
+
+**Automatic detection:** On first boot, HelixScreen checks the kernel for panel orientation (e.g., `panel_orientation=upside_down` in the kernel command line). If detected, the rotation is applied immediately and saved here — no manual configuration needed. On framebuffer displays only (e.g., AD5M — **not** Raspberry Pi), an interactive rotation wizard runs instead if no kernel hint is found.
+
+**Performance note (Raspberry Pi / DRM displays):** When rotation is active on DRM-based displays (Pi 4, Pi 5), HelixScreen uses a software rotation approach that redraws the full screen on every frame update instead of only the changed regions. This adds a small overhead (typically <1ms per frame on Pi 5) but is necessary because the LVGL DRM driver does not support hardware rotation. Framebuffer displays (e.g., AD5M) use a more efficient partial-update rotation with no meaningful performance impact.
 
 ### `rotation_probed`
 **Type:** boolean
 **Default:** `false`
-**Description:** Set to `true` after the automatic rotation detection wizard runs. Remove this key (along with `rotate`) to re-trigger automatic detection on next startup.
+**Description:** Set to `true` after automatic rotation detection runs. Remove this key (along with `rotate`) to re-trigger automatic detection on next startup.
 
 ### `sleep_sec`
 **Type:** integer
