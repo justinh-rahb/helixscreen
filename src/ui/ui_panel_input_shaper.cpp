@@ -1595,5 +1595,6 @@ void InputShaperPanel::handle_help_clicked() {
 
         "Lower vibration % is better. Lower smoothing preserves detail.";
 
-    helix::ui::modal_show_alert("Input Shaper Help", help_message, ModalSeverity::Info, "Got It");
+    helix::ui::modal_show_alert(lv_tr("Input Shaper Help"), help_message, ModalSeverity::Info,
+                                lv_tr("Got it"));
 }

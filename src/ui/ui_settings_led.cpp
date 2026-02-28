@@ -230,8 +230,8 @@ void LedSettingsOverlay::populate_macro_devices_impl() {
         if (discovered.empty()) {
             // Warn that no macros were detected on the printer
             auto* note = lv_label_create(container);
-            lv_label_set_text(note, "No LED macros detected on your printer. "
-                                    "Add Klipper macros for LED control first.");
+            lv_label_set_text(note, lv_tr("No LED macros detected on your printer. "
+                                          "Add Klipper macros for LED control first."));
             lv_obj_set_width(note, lv_pct(100));
             lv_label_set_long_mode(note, LV_LABEL_LONG_WRAP);
             lv_obj_set_style_text_color(note, theme_manager_get_color("text_subtle"), 0);
