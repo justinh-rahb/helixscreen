@@ -1497,6 +1497,39 @@ TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU num_gates as array",
     REQUIRE(info.units[0].slot_count == 8);
 }
 
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU gate_color_rgb as float arrays",
+                 "[ams][happy_hare][emu]") {
+    initialize_test_gates(4);
+    nlohmann::json mmu_data = {{"gate_color_rgb",
+                                {
+                                    {1.0, 0.0, 0.0},     // Red
+                                    {0.0, 1.0, 0.0},     // Green
+                                    {0.0, 0.0, 1.0},     // Blue
+                                    {0.976, 0.976, 0.4}, // Yellowish
+                                }}};
+    test_parse_mmu_state(mmu_data);
+
+    auto info = get_system_info();
+    REQUIRE(info.units[0].slots[0].color_rgb == 0xFF0000);
+    REQUIRE(info.units[0].slots[1].color_rgb == 0x00FF00);
+    REQUIRE(info.units[0].slots[2].color_rgb == 0x0000FF);
+    // 0.976*255 = 248.88 -> round -> 249 = 0xF9, 0.4*255 = 102 -> 0x66
+    REQUIRE(info.units[0].slots[3].color_rgb == 0xF9F966);
+}
+
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "gate_color hex string fallback",
+                 "[ams][happy_hare][emu]") {
+    initialize_test_gates(3);
+    // gate_color_rgb absent, fall back to gate_color hex strings
+    nlohmann::json mmu_data = {{"gate_color", {"ffffff", "000000", "042f56"}}};
+    test_parse_mmu_state(mmu_data);
+
+    auto info = get_system_info();
+    REQUIRE(info.units[0].slots[0].color_rgb == 0xFFFFFF);
+    REQUIRE(info.units[0].slots[1].color_rgb == 0x000000);
+    REQUIRE(info.units[0].slots[2].color_rgb == 0x042F56);
+}
+
 TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU num_gates array multi-unit dissimilar",
                  "[ams][happy_hare][emu]") {
     // Multi-unit setup with array format [6, 4]

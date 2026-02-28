@@ -464,15 +464,47 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         }
     }
 
-    // Parse gate_color_rgb array: printer.mmu.gate_color_rgb
-    // Values are RGB integers like 0xFF0000 for red
+    // Parse gate_color_rgb: integer array [0xRRGGBB, ...] or float array [[R,G,B], ...]
+    bool colors_parsed = false;
     if (mmu_data.contains("gate_color_rgb") && mmu_data["gate_color_rgb"].is_array()) {
         const auto& colors = mmu_data["gate_color_rgb"];
         for (size_t i = 0; i < colors.size(); ++i) {
+            auto* entry = slots_.get_mut(static_cast<int>(i));
+            if (!entry)
+                continue;
+
             if (colors[i].is_number_integer()) {
+                // Traditional format: 0xRRGGBB integer
+                entry->info.color_rgb = static_cast<uint32_t>(colors[i].get<int>());
+                colors_parsed = true;
+            } else if (colors[i].is_array() && colors[i].size() >= 3) {
+                // EMU format: [R, G, B] floats 0.0-1.0
+                auto r = static_cast<uint8_t>(
+                    std::clamp(colors[i][0].get<double>(), 0.0, 1.0) * 255.0 + 0.5);
+                auto g = static_cast<uint8_t>(
+                    std::clamp(colors[i][1].get<double>(), 0.0, 1.0) * 255.0 + 0.5);
+                auto b = static_cast<uint8_t>(
+                    std::clamp(colors[i][2].get<double>(), 0.0, 1.0) * 255.0 + 0.5);
+                entry->info.color_rgb = (static_cast<uint32_t>(r) << 16) |
+                                        (static_cast<uint32_t>(g) << 8) | static_cast<uint32_t>(b);
+                colors_parsed = true;
+            }
+        }
+    }
+
+    // Fallback: parse gate_color hex strings ["ffffff", "000000", ...]
+    if (!colors_parsed && mmu_data.contains("gate_color") && mmu_data["gate_color"].is_array()) {
+        const auto& colors = mmu_data["gate_color"];
+        for (size_t i = 0; i < colors.size(); ++i) {
+            if (colors[i].is_string()) {
                 auto* entry = slots_.get_mut(static_cast<int>(i));
                 if (entry) {
-                    entry->info.color_rgb = static_cast<uint32_t>(colors[i].get<int>());
+                    try {
+                        entry->info.color_rgb = static_cast<uint32_t>(
+                            std::stoul(colors[i].get<std::string>(), nullptr, 16));
+                    } catch (...) {
+                        // Invalid hex string, leave default color
+                    }
                 }
             }
         }
