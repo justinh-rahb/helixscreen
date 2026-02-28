@@ -569,7 +569,8 @@ void TemperatureSensorManager::update_subjects() {
 
         // Convert temperature to centidegrees (×10 for 0.1°C resolution)
         int centidegrees = helix::units::to_centidegrees(state_it->second.temperature);
-        lv_subject_set_int(&subj_it->second->subject, centidegrees);
+        if (lv_subject_get_int(&subj_it->second->subject) != centidegrees)
+            lv_subject_set_int(&subj_it->second->subject, centidegrees);
     }
 
     spdlog::trace("[TemperatureSensorManager] Subjects updated: {} sensors", sensors_.size());

@@ -58,8 +58,6 @@ PIDCalibrationPanel::PIDCalibrationPanel() {
 }
 
 PIDCalibrationPanel::~PIDCalibrationPanel() {
-    // Applying [L011]: No mutex in destructors
-    // Applying [L041]: deinit_subjects() as first line in destructor
     deinit_subjects();
 
     // Clear widget pointers (owned by LVGL)
@@ -195,7 +193,6 @@ void PIDCalibrationPanel::deinit_subjects() {
         return;
     }
 
-    // Deinitialize all subjects via SubjectManager (Applying [L041])
     subjects_.deinit_all();
 
     subjects_initialized_ = false;
@@ -312,7 +309,7 @@ void PIDCalibrationPanel::on_activate() {
     lv_subject_set_int(&subj_fan_is_detailed_, 0);
     lv_subject_set_int(&subj_fan_is_thorough_, 0);
     heater_wattage_ = WATTAGE_DEFAULT_EXTRUDER;
-    lv_subject_copy_string(&subj_wattage_display_, "50W");
+    update_wattage_display();
     needs_migration_ = false;
     is_kalico_ = false;
 
@@ -450,6 +447,22 @@ void PIDCalibrationPanel::update_fan_slider(int speed) {
     lv_subject_copy_string(&subj_fan_speed_text_, buf);
 }
 
+void PIDCalibrationPanel::format_pid_value(char* buf, size_t buf_size, float new_val,
+                                            float old_val) {
+    if (has_old_values_ && old_val > 0.001f) {
+        float pct = ((new_val - old_val) / old_val) * 100.0f;
+        snprintf(buf, buf_size, "%.3f (%+.0f%%)", new_val, pct);
+    } else {
+        snprintf(buf, buf_size, "%.3f", new_val);
+    }
+}
+
+void PIDCalibrationPanel::update_wattage_display() {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
+    lv_subject_copy_string(&subj_wattage_display_, buf);
+}
+
 void PIDCalibrationPanel::update_fan_section_visibility() {
     bool is_extruder = (selected_heater_ == Heater::EXTRUDER);
     bool is_mpc = (selected_method_ == CalibMethod::MPC);
@@ -483,8 +496,7 @@ void PIDCalibrationPanel::update_temp_hint() {
             return;
         }
     }
-    const char* hint = "Select a material or adjust temperature";
-    lv_subject_copy_string(&subj_temp_hint_, hint);
+    lv_subject_copy_string(&subj_temp_hint_, "Select a material or adjust temperature");
 }
 
 // ============================================================================
@@ -715,9 +727,7 @@ void PIDCalibrationPanel::handle_heater_extruder_clicked() {
     // Update MPC defaults for extruder
     if (is_kalico_) {
         heater_wattage_ = WATTAGE_DEFAULT_EXTRUDER;
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
-        lv_subject_copy_string(&subj_wattage_display_, buf);
+        update_wattage_display();
         detect_heater_control_type();
     }
 }
@@ -741,9 +751,7 @@ void PIDCalibrationPanel::handle_heater_bed_clicked() {
     // Update MPC defaults for bed (higher wattage, no fan config)
     if (is_kalico_) {
         heater_wattage_ = WATTAGE_DEFAULT_BED;
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
-        lv_subject_copy_string(&subj_wattage_display_, buf);
+        update_wattage_display();
         update_fan_section_visibility();
         detect_heater_control_type();
     }
@@ -860,19 +868,10 @@ void PIDCalibrationPanel::on_calibration_result(bool success, float kp, float ki
         result_ki_ = ki;
         result_kd_ = kd;
 
-        // Format values with delta if old values are available
-        auto format_pid_value = [this](char* buf, size_t buf_size, float new_val, float old_val) {
-            if (has_old_values_ && old_val > 0.001f) {
-                float pct = ((new_val - old_val) / old_val) * 100.0f;
-                snprintf(buf, buf_size, "%.3f (%+.0f%%)", new_val, pct);
-            } else {
-                snprintf(buf, buf_size, "%.3f", new_val);
-            }
-        };
-
         spdlog::debug("[PIDCal] on_calibration_result: has_old_values_={} old_kp_={:.3f}",
                       has_old_values_, old_kp_);
 
+        // Format values with delta if old values are available
         char val_buf[32];
         format_pid_value(val_buf, sizeof(val_buf), kp, old_kp_);
         lv_subject_copy_string(&subj_pid_kp_, val_buf);
@@ -927,16 +926,7 @@ void PIDCalibrationPanel::inject_demo_results() {
     result_ki_ = ki;
     result_kd_ = kd;
 
-    // Format values with delta percentages (same pattern as on_calibration_result)
-    auto format_pid_value = [this](char* buf, size_t buf_size, float new_val, float old_val) {
-        if (has_old_values_ && old_val > 0.001f) {
-            float pct = ((new_val - old_val) / old_val) * 100.0f;
-            snprintf(buf, buf_size, "%.3f (%+.0f%%)", new_val, pct);
-        } else {
-            snprintf(buf, buf_size, "%.3f", new_val);
-        }
-    };
-
+    // Format values with delta percentages
     char val_buf[32];
     format_pid_value(val_buf, sizeof(val_buf), kp, old_kp_);
     lv_subject_copy_string(&subj_pid_kp_, val_buf);
@@ -1280,9 +1270,7 @@ void PIDCalibrationPanel::handle_wattage_up() {
         return;
     if (heater_wattage_ < WATTAGE_MAX) {
         heater_wattage_ += WATTAGE_STEP;
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
-        lv_subject_copy_string(&subj_wattage_display_, buf);
+        update_wattage_display();
         spdlog::debug("[PIDCal] Wattage: {}W", heater_wattage_);
     }
 }
@@ -1292,9 +1280,7 @@ void PIDCalibrationPanel::handle_wattage_down() {
         return;
     if (heater_wattage_ > WATTAGE_MIN) {
         heater_wattage_ -= WATTAGE_STEP;
-        char buf[16];
-        snprintf(buf, sizeof(buf), "%dW", heater_wattage_);
-        lv_subject_copy_string(&subj_wattage_display_, buf);
+        update_wattage_display();
         spdlog::debug("[PIDCal] Wattage: {}W", heater_wattage_);
     }
 }

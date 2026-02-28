@@ -363,6 +363,12 @@ class PIDCalibrationPanel : public OverlayBase {
     void on_mpc_result(const MoonrakerAdvancedAPI::MPCResult& result);
     void on_mpc_progress(int phase, int total_phases, const std::string& desc);
 
+    // Format a PID value with optional delta percentage against old value
+    void format_pid_value(char* buf, size_t buf_size, float new_val, float old_val);
+
+    // Update the wattage display subject from heater_wattage_
+    void update_wattage_display();
+
     // Fan section visibility — single source of truth for both subjects
     void update_fan_section_visibility();
 
