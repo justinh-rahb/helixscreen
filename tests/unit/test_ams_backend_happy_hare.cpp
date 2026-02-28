@@ -1467,6 +1467,49 @@ TEST_CASE("Happy Hare manages_active_spool=true when spoolman enabled",
 }
 
 // ============================================================================
+// EMU drying_state array format
+// ============================================================================
+
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU drying_state as array",
+                 "[ams][happy_hare][emu]") {
+    initialize_test_gates(4);
+
+    SECTION("all empty strings means supported but not active") {
+        nlohmann::json mmu_data = {{"drying_state", {"", "", "", ""}}};
+        test_parse_mmu_state(mmu_data);
+
+        auto dryer = get_dryer_info();
+        REQUIRE(dryer.supported == true);
+        REQUIRE(dryer.active == false);
+    }
+
+    SECTION("existing object format still works") {
+        nlohmann::json mmu_data = {{"drying_state",
+                                    {{"active", true},
+                                     {"current_temp", 55.0},
+                                     {"target_temp", 60.0},
+                                     {"remaining_min", 30},
+                                     {"duration_min", 240},
+                                     {"fan_pct", 75}}}};
+        test_parse_mmu_state(mmu_data);
+
+        auto dryer = get_dryer_info();
+        REQUIRE(dryer.supported == true);
+        REQUIRE(dryer.active == true);
+        REQUIRE(dryer.current_temp_c == Catch::Approx(55.0));
+    }
+
+    SECTION("array with non-empty entry means active") {
+        nlohmann::json mmu_data = {{"drying_state", {"", "drying", "", ""}}};
+        test_parse_mmu_state(mmu_data);
+
+        auto dryer = get_dryer_info();
+        REQUIRE(dryer.supported == true);
+        REQUIRE(dryer.active == true);
+    }
+}
+
+// ============================================================================
 // tracks_weight_locally() — Happy Hare does NOT track weight (no extruder
 // position-based weight decrement like AFC). Spoolman is source of truth.
 // ============================================================================

@@ -726,33 +726,46 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         }
     }
 
-    // Parse drying_state: printer.mmu.drying_state (v4 - KMS/EMU hardware)
-    if (mmu_data.contains("drying_state") && mmu_data["drying_state"].is_object()) {
+    // Parse drying_state: object (KMS/traditional) or array of strings (EMU per-gate)
+    if (mmu_data.contains("drying_state")) {
         const auto& drying = mmu_data["drying_state"];
-        dryer_info_.supported = true;
-
-        if (drying.contains("active") && drying["active"].is_boolean()) {
-            dryer_info_.active = drying["active"].get<bool>();
+        if (drying.is_object()) {
+            // Traditional object format: {active, current_temp, target_temp, ...}
+            dryer_info_.supported = true;
+            if (drying.contains("active") && drying["active"].is_boolean()) {
+                dryer_info_.active = drying["active"].get<bool>();
+            }
+            if (drying.contains("current_temp") && drying["current_temp"].is_number()) {
+                dryer_info_.current_temp_c = drying["current_temp"].get<float>();
+            }
+            if (drying.contains("target_temp") && drying["target_temp"].is_number()) {
+                dryer_info_.target_temp_c = drying["target_temp"].get<float>();
+            }
+            if (drying.contains("remaining_min") && drying["remaining_min"].is_number_integer()) {
+                dryer_info_.remaining_min = drying["remaining_min"].get<int>();
+            }
+            if (drying.contains("duration_min") && drying["duration_min"].is_number_integer()) {
+                dryer_info_.duration_min = drying["duration_min"].get<int>();
+            }
+            if (drying.contains("fan_pct") && drying["fan_pct"].is_number_integer()) {
+                dryer_info_.fan_pct = drying["fan_pct"].get<int>();
+            }
+            spdlog::trace("[AMS HappyHare] Dryer state (object): active={}, temp={:.1f}°C",
+                          dryer_info_.active, dryer_info_.current_temp_c);
+        } else if (drying.is_array()) {
+            // EMU per-gate array format: ["", "", ...] (empty = inactive)
+            dryer_info_.supported = true;
+            bool any_active = false;
+            for (const auto& entry : drying) {
+                if (entry.is_string() && !entry.get<std::string>().empty()) {
+                    any_active = true;
+                    break;
+                }
+            }
+            dryer_info_.active = any_active;
+            spdlog::trace("[AMS HappyHare] Dryer state (array): supported=true, active={}",
+                          any_active);
         }
-        if (drying.contains("current_temp") && drying["current_temp"].is_number()) {
-            dryer_info_.current_temp_c = drying["current_temp"].get<float>();
-        }
-        if (drying.contains("target_temp") && drying["target_temp"].is_number()) {
-            dryer_info_.target_temp_c = drying["target_temp"].get<float>();
-        }
-        if (drying.contains("remaining_min") && drying["remaining_min"].is_number_integer()) {
-            dryer_info_.remaining_min = drying["remaining_min"].get<int>();
-        }
-        if (drying.contains("duration_min") && drying["duration_min"].is_number_integer()) {
-            dryer_info_.duration_min = drying["duration_min"].get<int>();
-        }
-        if (drying.contains("fan_pct") && drying["fan_pct"].is_number_integer()) {
-            dryer_info_.fan_pct = drying["fan_pct"].get<int>();
-        }
-
-        spdlog::trace("[AMS HappyHare] Dryer state: active={}, temp={:.1f}→{:.1f}°C, {}min left",
-                      dryer_info_.active, dryer_info_.current_temp_c, dryer_info_.target_temp_c,
-                      dryer_info_.remaining_min);
     }
 
     // Parse endless_spool_groups if available
