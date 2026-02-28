@@ -1640,3 +1640,42 @@ TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU aggregate sensor format",
         REQUIRE(slot2->sensors.pre_gate_triggered == false);
     }
 }
+
+// ============================================================================
+// EMU gate_filament_name parsing — EMU sends filament names via
+// gate_filament_name instead of gate_name
+// ============================================================================
+
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU gate_filament_name parsing",
+                 "[ams][happy_hare][emu]") {
+    initialize_test_gates(3);
+
+    SECTION("gate_filament_name used when gate_name is null") {
+        nlohmann::json mmu_data = {{"gate_name", nullptr},
+                                   {"gate_filament_name",
+                                    {"Matte White", "Matte Black", "Matte Yellow"}}};
+        test_parse_mmu_state(mmu_data);
+
+        auto info = get_system_info();
+        REQUIRE(info.units[0].slots[0].color_name == "Matte White");
+        REQUIRE(info.units[0].slots[1].color_name == "Matte Black");
+        REQUIRE(info.units[0].slots[2].color_name == "Matte Yellow");
+    }
+
+    SECTION("gate_name takes priority over gate_filament_name") {
+        nlohmann::json mmu_data = {{"gate_name", {"Priority Name", "Other", "Third"}},
+                                   {"gate_filament_name", {"Fallback", "Fallback", "Fallback"}}};
+        test_parse_mmu_state(mmu_data);
+
+        auto info = get_system_info();
+        REQUIRE(info.units[0].slots[0].color_name == "Priority Name");
+    }
+
+    SECTION("gate_filament_name used when gate_name absent") {
+        nlohmann::json mmu_data = {{"gate_filament_name", {"Name A", "Name B", "Name C"}}};
+        test_parse_mmu_state(mmu_data);
+
+        auto info = get_system_info();
+        REQUIRE(info.units[0].slots[0].color_name == "Name A");
+    }
+}

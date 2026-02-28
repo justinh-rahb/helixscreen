@@ -637,6 +637,20 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         spdlog::trace("[AMS HappyHare] Parsed gate_name for {} gates", gate_names.size());
     }
 
+    // Fallback: parse gate_filament_name (EMU uses this instead of gate_name)
+    if (mmu_data.contains("gate_filament_name") && mmu_data["gate_filament_name"].is_array()) {
+        const auto& names = mmu_data["gate_filament_name"];
+        for (size_t i = 0; i < names.size(); ++i) {
+            if (names[i].is_string()) {
+                auto* entry = slots_.get_mut(static_cast<int>(i));
+                if (entry && entry->info.color_name.empty()) {
+                    entry->info.color_name = names[i].get<std::string>();
+                }
+            }
+        }
+        spdlog::trace("[AMS HappyHare] Parsed gate_filament_name for {} gates", names.size());
+    }
+
     // Parse ttg_map (tool-to-gate mapping) if available
     if (mmu_data.contains("ttg_map") && mmu_data["ttg_map"].is_array()) {
         const auto& ttg_map = mmu_data["ttg_map"];
