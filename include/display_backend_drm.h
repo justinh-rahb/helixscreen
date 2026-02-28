@@ -102,6 +102,12 @@ class DisplayBackendDRM : public DisplayBackend {
     uint32_t rotation_frame_count_ = 0;
     uint32_t rotation_time_accum_ms_ = 0;
 
+    // Shadow buffer rotation state — LVGL renders into cached shadow buffers
+    // in DIRECT mode; on flush we rotate into the DRM buffer for page-flip.
+    uint8_t* shadow_bufs_[2] = {nullptr, nullptr};
+    size_t shadow_buf_size_ = 0;
+    int back_drm_buf_idx_ = 0; ///< Which DRM buffer to write into next (alternates 0/1)
+
     static void rotation_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
 };
 
