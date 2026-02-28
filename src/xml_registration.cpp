@@ -10,6 +10,7 @@
 #include "ui_carousel.h"
 #include "ui_confetti.h"
 #include "ui_fan_dial.h"
+#include "ui_overlay_temp_graph.h"
 #include "ui_fonts.h"
 #include "ui_gcode_viewer.h"
 #include "ui_hsv_picker.h"
@@ -286,6 +287,11 @@ void register_xml_components() {
     register_xml("bed_temp_panel.xml");
     register_xml("chamber_temp_panel.xml");
     register_xml("temp_graph_overlay.xml");
+    // Register TempGraphOverlay event callbacks at startup (before XML is parsed)
+    lv_xml_register_event_cb(nullptr, "on_temp_graph_preset_clicked",
+                             TempGraphOverlay::on_temp_graph_preset_clicked);
+    lv_xml_register_event_cb(nullptr, "on_temp_graph_custom_clicked",
+                             TempGraphOverlay::on_temp_graph_custom_clicked);
     register_xml("fan_dial.xml");
     register_fan_dial_callbacks(); // Register FanDial event callbacks
     register_xml("fan_status_card.xml");

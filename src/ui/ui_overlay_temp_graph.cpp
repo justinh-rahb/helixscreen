@@ -30,6 +30,7 @@
 
 using helix::ui::observe_int_sync;
 using helix::ui::temperature::centi_to_degrees;
+using helix::ui::temperature::centi_to_degrees_f;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Color palette: nozzle=red, bed=cyan, chamber=green, then 5 more
@@ -202,7 +203,6 @@ void TempGraphOverlay::open(Mode mode, lv_obj_t* parent_screen) {
         if (!are_subjects_initialized()) {
             init_subjects();
         }
-        register_callbacks();
 
         cached_overlay_ = create(parent_screen);
         if (!cached_overlay_) {
@@ -493,14 +493,14 @@ void TempGraphOverlay::replay_history() {
         if (samples.empty()) continue;
 
         for (const auto& sample : samples) {
-            float temp_deg = static_cast<float>(sample.temp_centi) / 10.0f;
+            float temp_deg = centi_to_degrees_f(sample.temp_centi);
             ui_temp_graph_update_series_with_time(graph_, s.series_id,
                                                   temp_deg, sample.timestamp_ms);
         }
 
         // Set initial target if available
         if (s.has_target && !samples.empty()) {
-            float target_deg = static_cast<float>(samples.back().target_centi) / 10.0f;
+            float target_deg = centi_to_degrees_f(samples.back().target_centi);
             if (target_deg > 0.0f) {
                 ui_temp_graph_set_series_target(graph_, s.series_id, target_deg, true);
             }
@@ -519,7 +519,7 @@ void TempGraphOverlay::on_series_temp_changed(size_t series_idx, int temp_centi)
     auto& s = series_[series_idx];
 
     if (graph_ && s.series_id >= 0) {
-        float temp_deg = static_cast<float>(temp_centi) / 10.0f;
+        float temp_deg = centi_to_degrees_f(temp_centi);
         auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                           std::chrono::system_clock::now().time_since_epoch())
                           .count();
@@ -536,7 +536,7 @@ void TempGraphOverlay::on_series_target_changed(size_t series_idx, int target_ce
     auto& s = series_[series_idx];
 
     if (graph_ && s.series_id >= 0) {
-        float target_deg = static_cast<float>(target_centi) / 10.0f;
+        float target_deg = centi_to_degrees_f(target_centi);
         bool show = target_deg > 0.0f;
         ui_temp_graph_set_series_target(graph_, s.series_id, target_deg, show);
     }
@@ -682,7 +682,7 @@ void TempGraphOverlay::update_control_temp_display() {
     int current_deg = centi_to_degrees(current_centi);
     int target_deg = centi_to_degrees(target_centi);
 
-    static char buf[64];
+    char buf[64];
     if (target_deg > 0) {
         snprintf(buf, sizeof(buf), "%d°C → %d°C", current_deg, target_deg);
     } else {
@@ -741,8 +741,7 @@ void TempGraphOverlay::on_temp_graph_preset_clicked(lv_event_t* e) {
 }
 
 void TempGraphOverlay::on_temp_graph_custom_clicked(lv_event_t* e) {
-    auto* btn = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-    // Walk up to find overlay
+    (void)e;
     auto* overlay_ptr = &get_global_temp_graph_overlay();
     if (!overlay_ptr || !overlay_ptr->temp_control_panel_) return;
 
@@ -763,12 +762,14 @@ void TempGraphOverlay::on_temp_graph_custom_clicked(lv_event_t* e) {
 
     auto& heater = overlay_ptr->temp_control_panel_->heater(type);
 
-    // Store context for keypad callback
+    // Store context for keypad callback (static because keypad outlives this scope)
+    // alive_guard protects against overlay destruction while keypad is open
     static struct {
         TempGraphOverlay* overlay;
         helix::HeaterType type;
+        std::weak_ptr<bool> alive_guard;
     } s_keypad_ctx;
-    s_keypad_ctx = {overlay_ptr, type};
+    s_keypad_ctx = {overlay_ptr, type, overlay_ptr->alive_};
 
     ui_keypad_config_t keypad_config = {
         .initial_value = static_cast<float>(heater.target / 10),
@@ -783,16 +784,16 @@ void TempGraphOverlay::on_temp_graph_custom_clicked(lv_event_t* e) {
     };
 
     ui_keypad_show(&keypad_config);
-    (void)btn;
 }
 
 void TempGraphOverlay::keypad_value_cb(float value, void* user_data) {
     struct KeypadCtx {
         TempGraphOverlay* overlay;
         helix::HeaterType type;
+        std::weak_ptr<bool> alive_guard;
     };
     auto* ctx = static_cast<KeypadCtx*>(user_data);
-    if (!ctx || !ctx->overlay || !ctx->overlay->api_) return;
+    if (!ctx || !ctx->overlay || ctx->alive_guard.expired() || !ctx->overlay->api_) return;
 
     int temp = static_cast<int>(value);
     auto& heater = ctx->overlay->temp_control_panel_->heater(ctx->type);
