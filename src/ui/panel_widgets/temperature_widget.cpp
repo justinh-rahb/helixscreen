@@ -6,6 +6,7 @@
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav_manager.h"
+#include "ui_overlay_temp_graph.h"
 #include "ui_panel_temp_control.h"
 #include "ui_temperature_utils.h"
 #include "ui_utils.h"
@@ -93,12 +94,6 @@ void TemperatureWidget::detach() {
     extruder_temp_observer_.reset();
     extruder_target_observer_.reset();
 
-    // Clean up lazily-created overlay (child of parent_screen_, not widget container)
-    if (nozzle_temp_panel_) {
-        NavigationManager::instance().unregister_overlay_instance(nozzle_temp_panel_);
-        helix::ui::safe_delete(nozzle_temp_panel_);
-    }
-
     if (temp_btn_) {
         lv_obj_set_user_data(temp_btn_, nullptr);
         temp_btn_ = nullptr;
@@ -128,36 +123,8 @@ void TemperatureWidget::update_temp_icon_animation() {
 }
 
 void TemperatureWidget::handle_temp_clicked() {
-    spdlog::info("[TemperatureWidget] Temperature icon clicked - opening nozzle temp panel");
-
-    if (!temp_control_panel_) {
-        spdlog::error("[TemperatureWidget] TempControlPanel not initialized");
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    // Create nozzle temp panel on first access (lazy initialization)
-    if (!nozzle_temp_panel_ && parent_screen_) {
-        spdlog::debug("[TemperatureWidget] Creating nozzle temperature panel...");
-
-        nozzle_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "nozzle_temp_panel", nullptr));
-        if (nozzle_temp_panel_) {
-            temp_control_panel_->setup_nozzle_panel(nozzle_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                nozzle_temp_panel_, temp_control_panel_->get_nozzle_lifecycle());
-            lv_obj_add_flag(nozzle_temp_panel_, LV_OBJ_FLAG_HIDDEN);
-            spdlog::info("[TemperatureWidget] Nozzle temp panel created and initialized");
-        } else {
-            spdlog::error("[TemperatureWidget] Failed to create nozzle temp panel from XML");
-            NOTIFY_ERROR("Failed to load temperature panel");
-            return;
-        }
-    }
-
-    if (nozzle_temp_panel_) {
-        NavigationManager::instance().push_overlay(nozzle_temp_panel_);
-    }
+    spdlog::info("[TemperatureWidget] Temperature icon clicked - opening temp graph overlay");
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Nozzle, parent_screen_);
 }
 
 void TemperatureWidget::temp_clicked_cb(lv_event_t* e) {

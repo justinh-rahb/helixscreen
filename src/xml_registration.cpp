@@ -285,6 +285,7 @@ void register_xml_components() {
     register_xml("nozzle_temp_panel.xml");
     register_xml("bed_temp_panel.xml");
     register_xml("chamber_temp_panel.xml");
+    register_xml("temp_graph_overlay.xml");
     register_xml("fan_dial.xml");
     register_fan_dial_callbacks(); // Register FanDial event callbacks
     register_xml("fan_status_card.xml");
