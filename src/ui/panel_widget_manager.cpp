@@ -429,7 +429,12 @@ void PanelWidgetManager::setup_gate_observers(const std::string& panel_id,
     gate_observers_.erase(panel_id);
     rebuild_timers_.erase(panel_id);
     auto& observers = gate_observers_[panel_id];
-    auto& timer = rebuild_timers_.emplace(panel_id, ui::CoalescedTimer(1)).first->second;
+    // 200ms coalesce window: during startup, multiple gate subjects fire in rapid
+    // succession as hardware is discovered (power, LED, filament, humidity, etc.).
+    // A 1ms window only coalesces within a single LVGL tick, but discovery events
+    // arrive across multiple ticks (~30ms spread in mock, potentially wider on real
+    // hardware with WebSocket latency). 200ms batches all discovery into one rebuild.
+    auto& timer = rebuild_timers_.emplace(panel_id, ui::CoalescedTimer(300)).first->second;
 
     // Collect unique gate subject names from the widget registry
     std::vector<const char*> gate_names;
