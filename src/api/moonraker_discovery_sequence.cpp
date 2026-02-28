@@ -293,6 +293,13 @@ void MoonrakerDiscoverySequence::continue_discovery_objects() {
                         std::string state = result.value("state", "");
                         std::string state_message = result.value("state_message", "");
 
+                        // Detect Kalico (Klipper fork with MPC support)
+                        auto app = result.value("app", "");
+                        if (app == "Kalico") {
+                            hardware_.set_is_kalico(true);
+                            spdlog::info("[Moonraker Client] Kalico firmware detected");
+                        }
+
                         spdlog::debug("[Moonraker Client] Printer hostname: {}", hostname);
                         spdlog::debug("[Moonraker Client] Klipper software version: {}",
                                       software_version);
