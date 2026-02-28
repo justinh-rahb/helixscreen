@@ -5,6 +5,11 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.10] - 2026-02-28
+
+### Added
+- Automatic display orientation detection and software rotation for DRM displays
+
 ## [0.13.9] - 2026-02-27
 
 ### Added
@@ -1266,6 +1271,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.10]: https://github.com/prestonbrown/helixscreen/compare/v0.13.9...v0.13.10
 [0.13.9]: https://github.com/prestonbrown/helixscreen/compare/v0.13.8...v0.13.9
 [0.13.8]: https://github.com/prestonbrown/helixscreen/compare/v0.13.7...v0.13.8
 [0.13.7]: https://github.com/prestonbrown/helixscreen/compare/v0.13.6...v0.13.7
