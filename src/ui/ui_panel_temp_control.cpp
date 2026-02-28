@@ -1074,6 +1074,10 @@ void TempControlPanel::select_extruder(const std::string& name) {
     spdlog::info("[TempPanel] Switching extruder: {} -> {}", active_extruder_name_, name);
     active_extruder_name_ = name;
 
+    // Sync the global active extruder subjects (extruder_temp/extruder_target)
+    // so XML-bound elements (temp_display, nozzle_icon) update to the selected tool
+    printer_state_.set_active_extruder(name);
+
     auto& nozzle = heaters_[idx(HeaterType::Nozzle)];
 
     // Rebind nozzle observers to the selected extruder's subjects
