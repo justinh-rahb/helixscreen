@@ -283,9 +283,14 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
     // The X button child is independently clickable.
     lv_obj_remove_flag(selection_overlay_, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_style_bg_opa(selection_overlay_, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_color(selection_overlay_, accent, 0);
-    lv_obj_set_style_border_opa(selection_overlay_, LV_OPA_30, 0);
-    lv_obj_set_style_border_width(selection_overlay_, 1, 0);
+    // Only show connecting border on resizable widgets — non-resizable get just corner brackets
+    if (is_selected_widget_resizable()) {
+        lv_obj_set_style_border_color(selection_overlay_, accent, 0);
+        lv_obj_set_style_border_opa(selection_overlay_, LV_OPA_30, 0);
+        lv_obj_set_style_border_width(selection_overlay_, 1, 0);
+    } else {
+        lv_obj_set_style_border_width(selection_overlay_, 0, 0);
+    }
     lv_obj_set_style_radius(selection_overlay_, radius, 0);
     lv_obj_set_style_pad_all(selection_overlay_, 0, 0);
     // Corner bracket styling: two bars per corner forming a square L-bracket
