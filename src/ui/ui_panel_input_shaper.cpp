@@ -610,8 +610,13 @@ void InputShaperPanel::start_calibration(char axis) {
                 snprintf(is_measuring_step_label_buf_, sizeof(is_measuring_step_label_buf_),
                          "Analyzing data... %d%%", percent);
             } else {
-                snprintf(is_measuring_step_label_buf_, sizeof(is_measuring_step_label_buf_),
-                         "Complete");
+                if (calibrate_all_mode_ && current_axis_ == 'X') {
+                    snprintf(is_measuring_step_label_buf_, sizeof(is_measuring_step_label_buf_),
+                             "X axis done, starting Y...");
+                } else {
+                    snprintf(is_measuring_step_label_buf_, sizeof(is_measuring_step_label_buf_),
+                             "Complete");
+                }
             }
             lv_subject_copy_string(&is_measuring_step_label_, is_measuring_step_label_buf_);
         },
