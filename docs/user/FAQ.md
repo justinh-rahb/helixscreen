@@ -38,6 +38,7 @@ HelixScreen is a touchscreen interface for Klipper 3D printers. It connects to y
 - Snapmaker U1 — cross-compile target with 480x320 display support exists but has not been tested on hardware
 
 **Active testing underway:**
+- FlashForge Adventurer 5X — dedicated build target (`ad5x`); requires [ZMOD](https://github.com/ghzserg/zmod) firmware modification
 - SOVOL SV06 — uses Klipper on a Raspberry Pi; install with the [MainsailOS instructions](#raspberry-pi--mainsailos-installation)
 - SOVOL SV08 — uses Klipper on a Raspberry Pi; install with the [MainsailOS instructions](#raspberry-pi--mainsailos-installation)
 - Elegoo Centauri Carbon 1 — dedicated build target (`cc1`); prebuilt binaries included in releases but no installer support yet (manual deployment only)
@@ -57,6 +58,9 @@ If you test on a printer not listed above, please let us know your results!
 - BTT 5" HDMI/DSI touchscreen
 - BTT 7" HDMI/DSI touchscreen
 - FlashForge AD5M built-in 4.3" display (800x480)
+
+**Active testing underway:**
+- FlashForge AD5X built-in 4.3" display (800x480)
 
 **Should work but not yet tested:**
 - Official Raspberry Pi 7" DSI touchscreen
