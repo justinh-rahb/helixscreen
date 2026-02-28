@@ -193,8 +193,6 @@ void AmsOverviewPanel::on_activate() {
     if (detail_unit_index_ >= 0) {
         // Re-entering while in detail mode — refresh the detail slots
         show_unit_detail(detail_unit_index_);
-    } else {
-        refresh_units();
     }
 }
 

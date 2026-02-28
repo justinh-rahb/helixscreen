@@ -719,6 +719,17 @@ class AmsState {
     void sync_current_loaded_from_backend();
 
     /**
+     * @brief Update "Currently Loaded" display subjects using pre-fetched system info
+     *
+     * Avoids redundant get_system_info() call when the caller already has the info
+     * (e.g., from sync_from_backend()). The provided info is used for the primary
+     * backend (index 0); secondary backends are queried as needed.
+     *
+     * @param primary_info Pre-fetched system info from the primary backend
+     */
+    void sync_current_loaded_from_backend(const AmsSystemInfo& primary_info);
+
+    /**
      * @brief Set action detail text directly (for UI-managed states)
      *
      * Used when UI is managing a process (like preheat) that the backend

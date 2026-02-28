@@ -295,9 +295,6 @@ void AmsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
     sidebar_->setup(panel_);
     sidebar_->init_observers();
 
-    // Initial UI sync from backend state
-    refresh_slots();
-
     spdlog::debug("[{}] Setup complete!", get_name());
 }
 
@@ -356,7 +353,7 @@ void AmsPanel::on_activate() {
         // dryer_card visibility managed by bind_flag_if_eq on dryer_supported subject
     }
 
-    refresh_slots();
+    update_endless_arrows_from_backend();
 
     // Ensure filament path canvas redraws after being stopped on deactivate
     if (path_canvas_) {
@@ -892,12 +889,8 @@ void AmsPanel::refresh_slots() {
 
     update_slot_colors();
 
-    // Update current slot highlight
     int current_slot = lv_subject_get_int(AmsState::instance().get_current_slot_subject());
     update_current_slot_highlight(current_slot);
-
-    // Update endless spool arrows (config may have changed)
-    update_endless_arrows_from_backend();
 }
 
 // ============================================================================
@@ -1320,7 +1313,6 @@ void AmsPanel::show_context_menu(int slot_index, lv_obj_t* near_widget, lv_point
                     auto error = backend->set_slot_info(slot, cleared);
                     if (error.success()) {
                         AmsState::instance().sync_from_backend();
-                        refresh_slots();
                         NOTIFY_INFO("Slot {} spool cleared", slot + 1);
                     } else {
                         NOTIFY_ERROR("Clear failed: {}", error.user_msg);
@@ -1397,9 +1389,7 @@ void AmsPanel::show_edit_modal(int slot_index) {
             if (backend) {
                 backend->set_slot_info(result.slot_index, result.slot_info);
 
-                // Update the slot display
                 AmsState::instance().sync_from_backend();
-                refresh_slots();
 
                 NOTIFY_INFO("Slot {} updated", result.slot_index + 1);
             }

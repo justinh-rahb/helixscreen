@@ -353,8 +353,7 @@ void AmsOperationSidebar::update_current_loaded_display() {
         return;
     }
 
-    // Sync subjects for reactive XML binding (color observer handles swatch update)
-    AmsState::instance().sync_current_loaded_from_backend();
+    // Subjects updated reactively by sync_from_backend(); color swatch driven by color_observer_
 }
 
 // ============================================================================

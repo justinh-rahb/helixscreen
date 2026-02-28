@@ -696,13 +696,12 @@ void AmsState::sync_from_backend() {
 
     // Set system logo path for declarative image binding (pointer subject for bind_src)
     const char* logo_path = get_logo_path(sys_name);
-    if (logo_path) {
-        strncpy(system_logo_buf_, logo_path, sizeof(system_logo_buf_) - 1);
+    const char* new_logo = logo_path ? logo_path : "";
+    if (strcmp(system_logo_buf_, new_logo) != 0) {
+        strncpy(system_logo_buf_, new_logo, sizeof(system_logo_buf_) - 1);
         system_logo_buf_[sizeof(system_logo_buf_) - 1] = '\0';
-    } else {
-        system_logo_buf_[0] = '\0';
+        lv_subject_set_pointer(&ams_system_logo_, system_logo_buf_);
     }
-    lv_subject_set_pointer(&ams_system_logo_, system_logo_buf_);
     lv_subject_set_int(&current_slot_, info.current_slot);
     lv_subject_set_int(&pending_target_slot_, info.pending_target_slot);
     lv_subject_set_int(&ams_current_tool_, info.current_tool);
@@ -757,12 +756,21 @@ void AmsState::sync_from_backend() {
         lv_subject_set_int(&path_anim_progress_, bowden_progress);
     }
 
-    // Update per-slot subjects
+    // Update per-slot subjects, only firing when values actually change
+    bool any_slot_changed = false;
     for (int i = 0; i < std::min(info.total_slots, MAX_SLOTS); ++i) {
         const SlotInfo* slot = info.get_slot_global(i);
         if (slot) {
-            lv_subject_set_int(&slot_colors_[i], static_cast<int>(slot->color_rgb));
-            lv_subject_set_int(&slot_statuses_[i], static_cast<int>(slot->status));
+            int new_color = static_cast<int>(slot->color_rgb);
+            if (lv_subject_get_int(&slot_colors_[i]) != new_color) {
+                lv_subject_set_int(&slot_colors_[i], new_color);
+                any_slot_changed = true;
+            }
+            int new_status = static_cast<int>(slot->status);
+            if (lv_subject_get_int(&slot_statuses_[i]) != new_status) {
+                lv_subject_set_int(&slot_statuses_[i], new_status);
+                any_slot_changed = true;
+            }
         }
     }
 
@@ -781,28 +789,35 @@ void AmsState::sync_from_backend() {
         ToolState::instance().save_spool_assignments_if_dirty(get_moonraker_api());
     }
 
-    // Clear remaining slot subjects
+    // Clear remaining slot subjects, only firing when values actually change
     for (int i = info.total_slots; i < MAX_SLOTS; ++i) {
-        lv_subject_set_int(&slot_colors_[i], static_cast<int>(AMS_DEFAULT_SLOT_COLOR));
-        lv_subject_set_int(&slot_statuses_[i], static_cast<int>(SlotStatus::UNKNOWN));
+        int default_color = static_cast<int>(AMS_DEFAULT_SLOT_COLOR);
+        if (lv_subject_get_int(&slot_colors_[i]) != default_color) {
+            lv_subject_set_int(&slot_colors_[i], default_color);
+            any_slot_changed = true;
+        }
+        int default_status = static_cast<int>(SlotStatus::UNKNOWN);
+        if (lv_subject_get_int(&slot_statuses_[i]) != default_status) {
+            lv_subject_set_int(&slot_statuses_[i], default_status);
+            any_slot_changed = true;
+        }
     }
 
-    bump_slots_version();
+    if (any_slot_changed) {
+        spdlog::trace("[AmsState] Slot data changed, bumping version");
+        bump_slots_version();
+    }
 
     // Sync dryer state (for systems with integrated drying like ValgACE)
     sync_dryer_from_backend();
 
-    // Sync "Currently Loaded" display subjects
-    sync_current_loaded_from_backend();
+    // Sync "Currently Loaded" display subjects (pass info to avoid re-fetching)
+    sync_current_loaded_from_backend(info);
 
     spdlog::debug("[AMS State] Synced from backend - type={}, slots={}, action={}, segment={}",
                   ams_type_to_string(info.type), info.total_slots,
                   ams_action_to_string(info.action),
                   path_segment_to_string(backend->get_filament_segment()));
-
-    // Refresh Spoolman weights now that slot data is available
-    // (this catches initial load and any re-syncs)
-    refresh_spoolman_weights();
 }
 
 void AmsState::update_slot(int slot_index) {
@@ -815,9 +830,20 @@ void AmsState::update_slot(int slot_index) {
 
     SlotInfo slot = backend->get_slot_info(slot_index);
     if (slot.slot_index >= 0) {
-        lv_subject_set_int(&slot_colors_[slot_index], static_cast<int>(slot.color_rgb));
-        lv_subject_set_int(&slot_statuses_[slot_index], static_cast<int>(slot.status));
-        bump_slots_version();
+        bool changed = false;
+        int new_color = static_cast<int>(slot.color_rgb);
+        if (lv_subject_get_int(&slot_colors_[slot_index]) != new_color) {
+            lv_subject_set_int(&slot_colors_[slot_index], new_color);
+            changed = true;
+        }
+        int new_status = static_cast<int>(slot.status);
+        if (lv_subject_get_int(&slot_statuses_[slot_index]) != new_status) {
+            lv_subject_set_int(&slot_statuses_[slot_index], new_status);
+            changed = true;
+        }
+        if (changed) {
+            bump_slots_version();
+        }
 
         // Sync spool to ToolState if this slot maps to a tool
         if (slot.mapped_tool >= 0 && slot.spoolman_id > 0) {
@@ -985,7 +1011,24 @@ void AmsState::sync_current_loaded_from_backend() {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
 
     if (backends_.empty()) {
-        // No backend - show empty state
+        lv_subject_copy_string(&current_material_text_, "---");
+        lv_subject_copy_string(&current_slot_text_, lv_tr("Currently Loaded"));
+        lv_subject_copy_string(&current_weight_text_, "");
+        lv_subject_set_int(&current_has_weight_, 0);
+        lv_subject_set_int(&current_color_, 0x505050);
+        return;
+    }
+
+    auto* backend = get_backend(0);
+    if (backend) {
+        sync_current_loaded_from_backend(backend->get_system_info());
+    }
+}
+
+void AmsState::sync_current_loaded_from_backend(const AmsSystemInfo& primary_info) {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+
+    if (backends_.empty()) {
         lv_subject_copy_string(&current_material_text_, "---");
         lv_subject_copy_string(&current_slot_text_, lv_tr("Currently Loaded"));
         lv_subject_copy_string(&current_weight_text_, "");
@@ -997,14 +1040,19 @@ void AmsState::sync_current_loaded_from_backend() {
     // Search ALL backends to find the one with filament loaded.
     // In multi-backend setups (e.g., AMS_1 + AMS_2), only one backend
     // will have filament actively loaded at a time.
+    // Use pre-fetched primary_info for backend 0 to avoid redundant get_system_info().
     AmsBackend* loaded_backend = nullptr;
     int slot_index = -1;
     bool filament_loaded = false;
 
-    for (auto& b : backends_) {
+    for (size_t idx = 0; idx < backends_.size(); ++idx) {
+        auto& b = backends_[idx];
         if (!b)
             continue;
-        AmsSystemInfo info = b->get_system_info();
+        AmsSystemInfo secondary_info;
+        if (idx != 0)
+            secondary_info = b->get_system_info();
+        const AmsSystemInfo& info = (idx == 0) ? primary_info : secondary_info;
         if (info.filament_loaded) {
             loaded_backend = b.get();
             slot_index = info.current_slot;
@@ -1023,9 +1071,8 @@ void AmsState::sync_current_loaded_from_backend() {
     if (!loaded_backend) {
         loaded_backend = backends_[0].get();
         if (loaded_backend) {
-            AmsSystemInfo info = loaded_backend->get_system_info();
-            slot_index = info.current_slot;
-            filament_loaded = info.filament_loaded;
+            slot_index = primary_info.current_slot;
+            filament_loaded = primary_info.filament_loaded;
         }
     }
 

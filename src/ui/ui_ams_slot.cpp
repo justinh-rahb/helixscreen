@@ -997,36 +997,16 @@ void ui_ams_slot_refresh(lv_obj_t* obj) {
         return;
     }
 
-    AmsState& state = AmsState::instance();
-    int backend_idx = state.active_backend_index();
-
-    // Trigger updates with current values (using helper functions instead of callbacks)
-    lv_subject_t* color_subject = state.get_slot_color_subject(backend_idx, data->slot_index);
-    if (color_subject) {
-        apply_slot_color(data, lv_subject_get_int(color_subject));
-    }
-
-    lv_subject_t* status_subject = state.get_slot_status_subject(backend_idx, data->slot_index);
-    if (status_subject) {
-        apply_slot_status(data, lv_subject_get_int(status_subject));
-    }
-
-    lv_subject_t* current_slot_subject = state.get_current_slot_subject();
-    if (current_slot_subject && data->current_slot_observer) {
-        apply_current_slot_highlight(data, lv_subject_get_int(current_slot_subject));
-    }
-
-    // Update material, tool badge, error indicator from backend
-    AmsBackend* backend = state.get_backend();
+    // Only update non-observer properties here.
+    // Color, status, and current-slot highlight are driven by observers.
+    AmsBackend* backend = AmsState::instance().get_backend();
     if (backend) {
         SlotInfo slot = backend->get_slot_info(data->slot_index);
         if (data->material_label) {
             lv_label_set_text(data->material_label,
                               slot.material.empty() ? "--" : slot.material.c_str());
         }
-        // Update tool badge based on slot's mapped_tool
         apply_tool_badge(data, slot.mapped_tool);
-        // Update error indicator from slot data
         apply_slot_error(data, slot);
     }
 

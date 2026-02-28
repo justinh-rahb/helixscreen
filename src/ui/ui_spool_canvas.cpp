@@ -417,6 +417,9 @@ lv_obj_t* ui_spool_canvas_create(lv_obj_t* parent, int32_t size) {
 void ui_spool_canvas_set_color(lv_obj_t* canvas, lv_color_t color) {
     auto* data = get_data(canvas);
     if (data) {
+        if (lv_color_eq(data->color, color)) {
+            return;
+        }
         data->color = color;
         redraw_spool(data);
     }
@@ -425,7 +428,11 @@ void ui_spool_canvas_set_color(lv_obj_t* canvas, lv_color_t color) {
 void ui_spool_canvas_set_fill_level(lv_obj_t* canvas, float fill_level) {
     auto* data = get_data(canvas);
     if (data) {
-        data->fill_level = LV_CLAMP(fill_level, 0.0f, 1.0f);
+        float clamped = LV_CLAMP(fill_level, 0.0f, 1.0f);
+        if (fabsf(data->fill_level - clamped) < 0.001f) {
+            return;
+        }
+        data->fill_level = clamped;
         redraw_spool(data);
     }
 }
