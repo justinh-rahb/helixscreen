@@ -477,7 +477,9 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
                 // Traditional format: 0xRRGGBB integer
                 entry->info.color_rgb = static_cast<uint32_t>(colors[i].get<int>());
                 colors_parsed = true;
-            } else if (colors[i].is_array() && colors[i].size() >= 3) {
+            } else if (colors[i].is_array() && colors[i].size() >= 3 &&
+                       colors[i][0].is_number() && colors[i][1].is_number() &&
+                       colors[i][2].is_number()) {
                 // EMU format: [R, G, B] floats 0.0-1.0
                 auto r = static_cast<uint8_t>(
                     std::clamp(colors[i][0].get<double>(), 0.0, 1.0) * 255.0 + 0.5);
@@ -713,16 +715,20 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         if (!any_sensor && sensors.contains("mmu_pre_gate")) {
             bool pre_gate_val =
                 sensors["mmu_pre_gate"].is_boolean() && sensors["mmu_pre_gate"].get<bool>();
+            // Note: mmu_gear sensor reading is available but not stored — UI only
+            // displays pre-gate sensor status. Add to SlotSensors if needed later.
 
-            // Mark all gates as having pre-gate sensors (EMU has them on every gate)
+            // Mark all gates as having sensors, clear stale trigger readings
+            // (we only know the current gate's state from aggregate format)
             for (int i = 0; i < slots_.slot_count(); ++i) {
                 auto* entry = slots_.get_mut(i);
                 if (entry) {
                     entry->sensors.has_pre_gate_sensor = true;
+                    entry->sensors.pre_gate_triggered = false;
                 }
             }
 
-            // Update the current gate's sensor reading
+            // Set the current gate's actual reading
             if (system_info_.current_slot >= 0) {
                 auto* entry = slots_.get_mut(system_info_.current_slot);
                 if (entry) {
