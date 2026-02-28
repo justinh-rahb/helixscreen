@@ -182,6 +182,23 @@ Trust debug output. Impossible values = bug is UPSTREAM. Ask "what ELSE?" not "d
 
 ---
 
+## Display Rotation
+
+**fbdev** (AD5M, Allwinner): Rotation is handled natively in LVGL's fbdev flush callback using `lv_draw_sw_rotate()` with PARTIAL render mode. Only dirty regions are rotated. No performance concern.
+
+**DRM** (Pi 5, modern Linux): LVGL's DRM driver has **NO rotation support** ([lvgl/lvgl#6598](https://github.com/lvgl/lvgl/issues/6598)). We implement it ourselves in `DisplayBackendDRM::rotation_flush_cb()`:
+- Switches to **FULL render mode** (entire screen redrawn every frame, not just dirty regions)
+- Rotates pixels via `lv_draw_sw_rotate()` → temp buffer → `memcpy` back to DRM buffer
+- Then original flush does the page flip
+
+**Performance impact (DRM only):** FULL mode redraws the entire 800x480 screen on every change instead of just dirty areas. Plus ~4.5MB/frame extra bandwidth for rotate+copy. On Pi 5 this is negligible (<1ms). Use `-vvv` (TRACE) to see per-frame rotation overhead logged every 120 frames.
+
+**Auto-detection:** Panel orientation detected from kernel cmdline (`panel_orientation=upside_down`) or DRM connector properties. Applied pre-splash so both splash and app render correctly from first frame. Interactive rotation probe is **disabled on DRM** (crashes due to render mode switching mid-frame).
+
+**Key files:** `src/api/display_backend_drm.cpp` (flush callback), `src/api/display_backend.cpp` (detection), `src/application/application.cpp` (early application)
+
+---
+
 ## Critical Paths (always MAJOR work)
 
 PrinterState, WebSocket/threading, shutdown, DisplayManager, XML processing
