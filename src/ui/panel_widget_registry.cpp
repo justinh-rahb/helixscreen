@@ -24,6 +24,7 @@ void register_humidity_widget();
 void register_width_sensor_widget();
 void register_printer_image_widget();
 void register_print_status_widget();
+void register_shutdown_widget();
 
 // Vector order defines the default display order on the home panel.
 // NOTE: Factories are registered at runtime via init_widget_registrations(),
@@ -33,13 +34,14 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     //                                                                                                                                          en  col row min_c min_r max_c max_r
     {"printer_image",    "Printer Image",    "printer_3d_nozzle","3D printer visualization",                     "Printer Image",    nullptr,              true,  2, 2, 1, 1, 4, 3},
     {"print_status",     "Print Status",     "printer_3d",       "Print progress and file selection",            "Print Status",     nullptr,              true,  2, 2, 2, 1, 4, 3},
+    {"shutdown",         "Shutdown/Reboot",   "power",            "Shutdown or reboot the printer host",          "Shutdown/Reboot",  nullptr,              false, 1, 1, 1, 1, 1, 1},
     {"power",            "Power",            "power_cycle",      "Moonraker power device controls",              "Power",            "power_device_count", true,  1, 1, 1, 1, 1, 1},
     {"network",          "Network",          "wifi_strength_4",  "Wi-Fi and ethernet connection status",         "Network",          nullptr,              false, 1, 1, 1, 1, 2, 1},
     {"firmware_restart", "Firmware Restart",  "refresh",          "Restart Klipper firmware",                     "Firmware Restart", nullptr,              false, 1, 1, 1, 1, 1, 1},
     {"ams",              "AMS Status",        "filament",         "Multi-material spool status and control",      "AMS Status",       "ams_slot_count",     true,  1, 1, 1, 1, 2, 2},
     {"temperature",      "Nozzle Temperature","thermometer",      "Monitor and set nozzle temperature",           "Nozzle Temperature", nullptr,            true,  1, 1, 1, 1, 2, 2},
     {"temp_stack",       "Temperatures",      "thermometer",      "Nozzle, bed, and chamber temps stacked",       "Temperatures",     nullptr,              false, 1, 1, 1, 1, 3, 2},
-    {"led",              "LED Light",         "lightbulb_outline","Quick toggle for LED light",                   "LED Light",        "printer_has_led",    true,  1, 1, 1, 1, 2, 1},
+    {"led",              "LED Light",         "lightbulb_outline","Quick toggle, long press for full control",    "LED Light",        "printer_has_led",    true,  1, 1, 1, 1, 2, 1},
     {"humidity",         "Humidity",          "water",            "Enclosure humidity sensor readings",           "Humidity",         "humidity_sensor_count", true, 1, 1, 1, 1, 2, 2},
     {"width_sensor",     "Width Sensor",      "ruler",            "Filament width sensor readings",               "Width Sensor",     "width_sensor_count", true,  1, 1, 1, 1, 2, 2},
     {"filament",         "Filament Sensor",   "filament_alert",   "Filament runout detection status",             "Filament Sensor",  "filament_sensor_count", true, 1, 1, 1, 1, 2, 1},
@@ -107,6 +109,7 @@ void init_widget_registrations() {
     register_tips_widget();
     register_humidity_widget();
     register_width_sensor_widget();
+    register_shutdown_widget();
 
     spdlog::debug("[PanelWidgetRegistry] All widget factories registered");
 }

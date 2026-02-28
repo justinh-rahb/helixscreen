@@ -5,6 +5,70 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.8] - 2026-02-27
+
+### Added
+- Memory-aware geometry budget system for 3D G-code viewer — automatically selects detail tier based on available memory with graceful 2D fallback
+- GPU-accelerated backdrop blur for modals
+- Shutdown and reboot widget with modal confirmation dialog
+- Speed and flow rate increment buttons replace sliders for precise control (#219)
+- Lemontron, Sovol SV08 Max, and Sovol Zero added to printer database
+- FlashForge Adventurer 5X support with independent platform toolchain (#203)
+
+### Fixed
+- UI freeze during 3D geometry VBO upload eliminated
+- AMS panel and spool picker back button click targets enlarged for easier navigation
+- Goodix capacitive touch on Creality K1 Max and standalone builds
+- DRM plane rotation fallback for VC4 displays (90/270 unsupported)
+- Spoolman request flooding prevented with debounce and circuit breaker
+- Spoolman filament creation sends required density and diameter fields
+- Klippy readiness checked before querying printer objects during discovery
+- Android display corruption from conditional style reset reverted
+- Signed coordinate crash in LVGL draw path
+- CoalescedTimer repeat count bug
+
+## [0.13.7] - 2026-02-27
+
+### Added
+- Dropdown options now support translation via `options_tag` attribute
+- Broad internationalization pass across C++ UI code with `lv_tr()` calls
+- Touch calibration can be forced on startup with `HELIX_TOUCH_CALIBRATE` environment variable
+- Thumbnail Only option for G-code render mode in display settings
+
+### Fixed
+- AMS tray height reduced for better proportions in slot grid
+- G-code metadata parser rejects percentage values in extrusion width fields
+- Cancel button now appears immediately when starting a print
+- AFC multi-unit bugs: nozzle navigation, lane sorting, and current tool derivation
+
+## [0.13.6] - 2026-02-26
+
+### Added
+- Fan speed overlay opens directly when tapping the fan icon in carousel mode
+- Dual-output Pi builds: single compilation produces both DRM and fbdev binaries
+
+### Fixed
+- LED light state now syncs correctly from hardware on status updates
+- Empty AMS slots are clickable with placeholder circle and context menu
+- LED widget initial state and reactive bindings fixed
+- Print details delete button is now icon-only, giving more room for the print button
+- 2D fallback disabled on print details panel; thumbnails used instead
+- AMS slot positioning fixes for hidden spool containers and LINEAR selector box sizing
+- Keyboard overlay crash when cleanup nulls alternatives mid-use (#207)
+- Use-after-free in LED and temperature widget button user data
+- Tool badge now shown on empty unassigned AMS gates
+- Printer database JSON parsing hardened against type mismatches
+- ELF architecture validation uses platform key instead of uname
+- Updated Ender 5 Max printer image
+- Installer preserves user files in `printer_database.d` during upgrades
+- AMS flow animation no longer runs infinitely, fixing 50%+ CPU usage on AMS panel
+
+### Changed
+- XML event callbacks registered at startup instead of widget attach time
+- Panel switching and widget creation optimized for ARM
+- Spoolman vendor list fetched from dedicated endpoint instead of downloading all spools
+- AMS gate observer rebuilds coalesced to reduce startup churn
+
 ## [0.13.5] - 2026-02-26
 
 ### Added
@@ -1188,6 +1252,9 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.8]: https://github.com/prestonbrown/helixscreen/compare/v0.13.7...v0.13.8
+[0.13.7]: https://github.com/prestonbrown/helixscreen/compare/v0.13.6...v0.13.7
+[0.13.6]: https://github.com/prestonbrown/helixscreen/compare/v0.13.5...v0.13.6
 [0.13.5]: https://github.com/prestonbrown/helixscreen/compare/v0.13.4...v0.13.5
 [0.13.4]: https://github.com/prestonbrown/helixscreen/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/prestonbrown/helixscreen/compare/v0.13.2...v0.13.3

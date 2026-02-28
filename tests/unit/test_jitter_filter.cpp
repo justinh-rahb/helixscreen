@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2025-2026 356C LLC
 
-// Tests for TouchJitterFilter — the shared jitter filter used by
-// calibrated_read_cb in display_backend_fbdev.cpp. Tests exercise the
+// Tests for TouchJitterFilter — the jitter filter applied generically in
+// lvgl_init.cpp to all backends (DRM, FBDEV, SDL). Tests exercise the
 // exact same apply() method used in production, preventing divergence.
 //
 // Key behavior: the filter suppresses jitter until the first intentional
 // movement exceeds the threshold ("breakout"). After breakout, all
 // coordinates pass through unfiltered for smooth scrolling/dragging.
+//
+// The "Goodix scenario" tests validate the core theory: noisy touch
+// controllers report coordinate jitter during stationary taps that
+// exceeds LVGL's scroll_limit, causing taps to be classified as drags.
+// These tests simulate realistic Goodix noise and prove the filter
+// prevents scroll detection from triggering.
 
 #include "touch_jitter_filter.h"
 
@@ -278,4 +284,208 @@ TEST_CASE("Jitter filter: release without prior press is no-op", "[jitter-filter
     REQUIRE(x == 300);
     REQUIRE(y == 400);
     REQUIRE(f.tracking == false);
+}
+
+// ---------------------------------------------------------------------------
+// Goodix scenario tests — validate the core theory
+//
+// LVGL scroll detection works by accumulating coordinate deltas into
+// scroll_sum.  When |scroll_sum.x| or |scroll_sum.y| exceeds scroll_limit
+// (default 10px), the touch transitions from "click candidate" to "scroll"
+// and click events are never fired.
+//
+// Goodix GT9xx controllers report noisy coordinates during stationary taps,
+// easily producing ±5-12px of jitter.  Without filtering, this noise
+// accumulates in scroll_sum and exceeds scroll_limit, making it impossible
+// to click anything.
+//
+// These tests replay realistic noise sequences through the actual
+// TouchJitterFilter::apply() and verify that LVGL's scroll detection
+// would NOT trigger.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Simulate LVGL's scroll_sum accumulation logic.
+/// LVGL computes vect = current_pos - prev_pos each tick, then accumulates
+/// scroll_sum += vect.  Returns max(|scroll_sum.x|, |scroll_sum.y|).
+struct ScrollSimulator {
+    int32_t prev_x = 0;
+    int32_t prev_y = 0;
+    int32_t scroll_sum_x = 0;
+    int32_t scroll_sum_y = 0;
+    bool started = false;
+
+    /// Feed a filtered coordinate and accumulate the delta
+    void feed(int32_t x, int32_t y) {
+        if (started) {
+            scroll_sum_x += (x - prev_x);
+            scroll_sum_y += (y - prev_y);
+        }
+        prev_x = x;
+        prev_y = y;
+        started = true;
+    }
+
+    int32_t max_scroll_sum() const {
+        return std::max(std::abs(scroll_sum_x), std::abs(scroll_sum_y));
+    }
+};
+
+} // namespace
+
+TEST_CASE("Goodix scenario: unfiltered tap noise exceeds scroll_limit", "[jitter-filter][goodix]") {
+    // Prove the problem: WITHOUT jitter filter, realistic Goodix noise during
+    // a stationary tap causes scroll_sum to exceed scroll_limit.
+    //
+    // Goodix GT9xx noise jitters ±5-12px around the true position.  While
+    // the absolute position stays near the anchor, the tick-to-tick deltas
+    // (what LVGL calls "vect") can be large.  When the noise has any bias
+    // (common in capacitive controllers), scroll_sum accumulates past
+    // scroll_limit even though the finger never moves.
+    struct Sample {
+        int32_t x, y;
+    };
+    // Realistic Goodix noise: finger at ~(400,300), oscillating with a
+    // slight Y-axis bias (each cycle drifts ~2px downward).
+    // All coordinates stay within ±12px of center — well within the
+    // 15px jitter threshold — but the cumulative Y scroll_sum exceeds 10.
+    const Sample noise[] = {
+        {400, 300}, {405, 303}, {396, 306}, {404, 309}, {397, 312},
+        {406, 308}, {394, 311}, {403, 307}, {398, 313}, {405, 310},
+    };
+
+    constexpr int scroll_limit = 10; // LVGL default
+
+    ScrollSimulator sim;
+    for (const auto& s : noise) {
+        sim.feed(s.x, s.y);
+    }
+
+    INFO("Unfiltered scroll_sum: x=" << sim.scroll_sum_x << " y=" << sim.scroll_sum_y);
+    // Without filtering, the biased Y noise accumulates past scroll_limit.
+    // LVGL triggers scroll when |scroll_sum| >= scroll_limit (see
+    // lv_indev_scroll.c line 392-414).
+    REQUIRE(sim.max_scroll_sum() >= scroll_limit);
+}
+
+TEST_CASE("Goodix scenario: filtered tap noise stays below scroll_limit",
+          "[jitter-filter][goodix]") {
+    // Prove the fix: WITH jitter filter (15px dead zone), the same Goodix
+    // noise sequence results in zero scroll_sum because all coordinates
+    // are snapped to the initial press position.
+    struct Sample {
+        int32_t x, y;
+    };
+    // Same noise sequence as above
+    const Sample noise[] = {
+        {400, 300}, {405, 303}, {396, 306}, {404, 309}, {397, 312},
+        {406, 308}, {394, 311}, {403, 307}, {398, 313}, {405, 310},
+    };
+
+    TouchJitterFilter f{.threshold_sq = 15 * 15}; // Production default
+    ScrollSimulator sim;
+
+    for (const auto& s : noise) {
+        int32_t x = s.x, y = s.y;
+        f.apply(LV_INDEV_STATE_PRESSED, x, y);
+        sim.feed(x, y);
+    }
+
+    INFO("Filtered max scroll_sum: " << sim.max_scroll_sum());
+    // With filtering, scroll_sum stays at ZERO — all coords snapped to anchor
+    REQUIRE(sim.max_scroll_sum() == 0);
+    REQUIRE_FALSE(f.broken_out);
+
+    // Release also snaps to anchor
+    int32_t rx = 402, ry = 301;
+    f.apply(LV_INDEV_STATE_RELEASED, rx, ry);
+    REQUIRE(rx == 400);
+    REQUIRE(ry == 300);
+}
+
+TEST_CASE("Goodix scenario: intentional drag breaks through filter", "[jitter-filter][goodix]") {
+    // The filter must NOT prevent real drags/scrolls.  When the user
+    // intentionally moves their finger beyond the dead zone, coordinates
+    // should pass through and scrolling should work normally.
+    TouchJitterFilter f{.threshold_sq = 15 * 15};
+    ScrollSimulator sim;
+
+    constexpr int scroll_limit = 10; // LVGL default
+
+    // Initial press
+    int32_t x = 400, y = 300;
+    f.apply(LV_INDEV_STATE_PRESSED, x, y);
+    sim.feed(x, y);
+
+    // Small jitter (suppressed)
+    x = 405;
+    y = 302;
+    f.apply(LV_INDEV_STATE_PRESSED, x, y);
+    sim.feed(x, y);
+    REQUIRE(sim.max_scroll_sum() == 0);
+
+    // Intentional drag: finger moves 25px down (well past 15px threshold)
+    x = 400;
+    y = 325;
+    f.apply(LV_INDEV_STATE_PRESSED, x, y);
+    sim.feed(x, y);
+    REQUIRE(f.broken_out);
+
+    // Continue dragging
+    x = 400;
+    y = 350;
+    f.apply(LV_INDEV_STATE_PRESSED, x, y);
+    sim.feed(x, y);
+
+    INFO("Drag scroll_sum: " << sim.max_scroll_sum());
+    // scroll_sum should now exceed scroll_limit — scroll detection triggers
+    REQUIRE(sim.max_scroll_sum() > scroll_limit);
+}
+
+TEST_CASE("Goodix scenario: rapid noisy taps produce clean clicks", "[jitter-filter][goodix]") {
+    // Simulate multiple rapid taps with noise — each should produce clean
+    // coordinates with zero accumulated scroll.
+    TouchJitterFilter f{.threshold_sq = 15 * 15};
+
+    struct Tap {
+        int32_t press_x, press_y;
+        // Noise offsets applied during the tap
+        int32_t noise_dx[3], noise_dy[3];
+    };
+
+    const Tap taps[] = {
+        {100, 200, {4, -3, 7}, {-2, 5, -4}},
+        {300, 150, {-6, 8, -3}, {3, -5, 7}},
+        {500, 400, {9, -7, 5}, {-6, 4, -8}},
+    };
+
+    for (const auto& tap : taps) {
+        ScrollSimulator sim;
+
+        // Press
+        int32_t x = tap.press_x, y = tap.press_y;
+        f.apply(LV_INDEV_STATE_PRESSED, x, y);
+        sim.feed(x, y);
+
+        // Noisy samples during press
+        for (int i = 0; i < 3; i++) {
+            x = tap.press_x + tap.noise_dx[i];
+            y = tap.press_y + tap.noise_dy[i];
+            f.apply(LV_INDEV_STATE_PRESSED, x, y);
+            sim.feed(x, y);
+        }
+
+        REQUIRE(sim.max_scroll_sum() == 0);
+        REQUIRE_FALSE(f.broken_out);
+
+        // Release
+        x = tap.press_x + 2;
+        y = tap.press_y - 1;
+        f.apply(LV_INDEV_STATE_RELEASED, x, y);
+
+        // Release coordinates snapped to original press
+        REQUIRE(x == tap.press_x);
+        REQUIRE(y == tap.press_y);
+    }
 }

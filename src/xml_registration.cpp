@@ -248,6 +248,7 @@ void register_xml_components() {
     register_xml("modal_dialog.xml");
     register_xml("numeric_keypad_panel.xml");
     register_xml("runout_guidance_modal.xml");
+    register_xml("shutdown_modal.xml");
     register_xml("plugin_install_modal.xml");
     register_xml("macro_enhance_modal.xml");
     register_xml("action_prompt_modal.xml");
@@ -279,6 +280,7 @@ void register_xml_components() {
     register_xml("components/panel_widget_favorite_macro_2.xml");
     register_xml("components/panel_widget_tips.xml");
     register_xml("components/panel_widget_print_status.xml");
+    register_xml("components/panel_widget_shutdown.xml");
     register_xml("thermistor_sensor_picker.xml");
     register_xml("favorite_macro_picker.xml");
     register_xml("macro_param_modal.xml");

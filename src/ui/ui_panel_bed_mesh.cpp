@@ -377,10 +377,22 @@ void BedMeshPanel::on_activate() {
     if (api) {
         update_profile_list_subjects();
     }
+
+    // Enable async rendering when panel is visible (render thread produces
+    // frames in background, DRAW_POST blits the ready buffer).
+    // Must happen AFTER mesh data is loaded so the renderer has data to work with.
+    if (canvas_) {
+        ui_bed_mesh_set_async_mode(canvas_, true);
+    }
 }
 
 void BedMeshPanel::on_deactivate() {
     spdlog::debug("[{}] on_deactivate()", get_name());
+
+    // Stop the render thread when panel is not visible to avoid wasting CPU
+    if (canvas_) {
+        ui_bed_mesh_set_async_mode(canvas_, false);
+    }
 
     // Call base class
     OverlayBase::on_deactivate();
@@ -605,10 +617,10 @@ void BedMeshPanel::on_mesh_update_internal(const BedMeshProfile& mesh) {
 
     if (mesh.probed_matrix.empty()) {
         lv_subject_set_int(&bed_mesh_available_, 0);
-        lv_subject_copy_string(&bed_mesh_dimensions_, "No mesh data");
-        lv_subject_copy_string(&bed_mesh_max_label_, "Max");
+        lv_subject_copy_string(&bed_mesh_dimensions_, lv_tr("No mesh data"));
+        lv_subject_copy_string(&bed_mesh_max_label_, lv_tr("Max"));
         lv_subject_copy_string(&bed_mesh_max_value_, "--");
-        lv_subject_copy_string(&bed_mesh_min_label_, "Min");
+        lv_subject_copy_string(&bed_mesh_min_label_, lv_tr("Min"));
         lv_subject_copy_string(&bed_mesh_min_value_, "--");
         lv_subject_copy_string(&bed_mesh_variance_, "");
         spdlog::warn("[{}] No mesh data available", get_name());
@@ -821,7 +833,7 @@ void BedMeshPanel::start_calibration() {
     lv_subject_set_int(&bed_mesh_calibrate_state_,
                        static_cast<int>(BedMeshCalibrationState::PROBING));
     lv_subject_set_int(&bed_mesh_probe_progress_, 0);
-    lv_subject_copy_string(&bed_mesh_probe_text_, "Preparing...");
+    lv_subject_copy_string(&bed_mesh_probe_text_, lv_tr("Preparing..."));
 
     // Show modal immediately
     calibrate_modal_widget_ = helix::ui::modal_show("bed_mesh_calibrate_modal");

@@ -13,9 +13,9 @@
 #   make PLATFORM_TARGET=pi32-both  # Pi 32-bit: compile once, link DRM + fbdev
 #   make PLATFORM_TARGET=ad5m  # Cross-compile for Adventurer 5M (armv7-a)
 #   make PLATFORM_TARGET=cc1   # Cross-compile for Centauri Carbon 1 (armv7-a)
-#   make PLATFORM_TARGET=mips  # Cross-compile for MIPS32 devices (K1, AD5X)
+#   make PLATFORM_TARGET=mips  # Cross-compile for MIPS32 devices (K1)
 #   make PLATFORM_TARGET=k1    # Alias for mips (Creality K1 series)
-#   make PLATFORM_TARGET=ad5x  # Alias for mips (FlashForge AD5X)
+#   make PLATFORM_TARGET=ad5x  # Cross-compile for FlashForge AD5X (mips)
 #   make PLATFORM_TARGET=k2    # Cross-compile for Creality K2 series (ARM)
 #   make PLATFORM_TARGET=snapmaker-u1 # Cross-compile for Snapmaker U1 (aarch64)
 #   make pi-docker             # Docker-based Pi build (64-bit, DRM+GLES)
@@ -27,7 +27,7 @@
 #   make ad5m-docker           # Docker-based AD5M build
 #   make cc1-docker            # Docker-based CC1 build
 #   make k1-docker             # Docker-based K1/MIPS build
-#   make ad5x-docker           # Docker-based AD5X/MIPS build (same toolchain as K1)
+#   make ad5x-docker           # Docker-based AD5X/MIPS build
 #   make k2-docker             # Docker-based K2 build
 #   make snapmaker-u1-docker   # Docker-based Snapmaker U1 build
 
@@ -216,6 +216,43 @@ else ifeq ($(PLATFORM_TARGET),ad5m)
     # Strip binary for size on memory-constrained device
     STRIP_BINARY := yes
 
+else ifeq ($(PLATFORM_TARGET),ad5x)
+    # -------------------------------------------------------------------------
+    # AD5X: Ingenic X2600, 800x480, multi-color IFS
+    # Specs: 800x480 display
+    # -------------------------------------------------------------------------
+    # FULLY STATIC BUILD
+    CROSS_COMPILE ?= mipsel-buildroot-linux-gnu-
+    TARGET_ARCH := mips32r5
+    TARGET_TRIPLE := mipsel-buildroot-linux-gnu
+    # Memory-optimized build flags:
+    # -Os: Optimize for size (vs -O2 for speed)
+    # -flto: Link-Time Optimization for dead code elimination
+    # -ffunction-sections/-fdata-sections: Allow linker to remove unused sections
+    # -Wno-error=conversion: LVGL headers have int32_t->float conversions that GCC flags
+    # -DHELIX_RELEASE_BUILD: Disables debug features like LV_USE_ASSERT_STYLE
+    # NOTE: ad5x framebuffer is 32bpp (ARGB8888), as is lv_conf.h (LV_COLOR_DEPTH=32)
+    TARGET_CFLAGS := -march=mips32r5 -mtune=mips32r5 -mabi=32 -mnan=2008 -mfp64 \
+        -Os -flto -ffunction-sections -fdata-sections \
+        -Wno-error=conversion -Wno-error=sign-conversion -DHELIX_RELEASE_BUILD -DHELIX_PLATFORM_AD5X
+    # -Wl,--gc-sections: Remove unused sections during linking (works with -ffunction-sections)
+    # -flto: Must match compiler flag for LTO to work
+    # -static: Fully static binary - no runtime dependencies on system libs
+    # Toolchain glibc 2.40 vs device glibc — static avoids any version mismatch
+    TARGET_LDFLAGS := -Wl,--gc-sections -flto -static
+    # SSL enabled for HTTPS/WSS support with Moonraker
+    ENABLE_SSL := yes
+    DISPLAY_BACKEND := fbdev
+    ENABLE_SDL := no
+    ENABLE_GLES_3D := no
+    # Disable TinyGL for ad5x - CPU too weak for software 3D (3-4 FPS)
+    # Uses 2D layer preview fallback instead
+    ENABLE_TINYGL_3D := no
+    ENABLE_EVDEV := yes
+    BUILD_SUBDIR := ad5x
+    # Strip binary for size on memory-constrained device
+    STRIP_BINARY := yes
+
 else ifeq ($(PLATFORM_TARGET),cc1)
     # -------------------------------------------------------------------------
     # Elegoo Centauri Carbon 1 - Allwinner R528 (armv7-a Cortex-A7)
@@ -254,13 +291,11 @@ else ifeq ($(PLATFORM_TARGET),cc1)
     # Strip binary for size on memory-constrained device
     STRIP_BINARY := yes
 
-else ifneq ($(filter mips k1 ad5x,$(PLATFORM_TARGET)),)
+else ifneq ($(filter mips k1,$(PLATFORM_TARGET)),)
     # -------------------------------------------------------------------------
-    # MIPS32 Devices (Creality K1, FlashForge AD5X) - Ingenic XBurst2
+    # MIPS32 Devices (Creality K1) - Ingenic XBurst2
     # K1: Ingenic X2000E, 480x400, 256MB RAM
-    # AD5X: Ingenic X2600, 800x480, multi-color IFS
-    # Both: MIPS32r2, musl libc, fbdev display, evdev touch
-    # Aliases: k1, ad5x → same binary, different release packages
+    # MIPS32r2, musl libc, fbdev display, evdev touch
     # -------------------------------------------------------------------------
     # FULLY STATIC BUILD with musl: Cleaner than glibc static linking.
     # No getaddrinfo warnings, smaller binaries, guaranteed portability.
@@ -569,17 +604,19 @@ ad5m:
 	@echo "$(CYAN)$(BOLD)Cross-compiling for Adventurer 5M (armv7-a)...$(RESET)"
 	$(Q)$(MAKE) PLATFORM_TARGET=ad5m -j$(NPROC) all
 
+ad5x:
+	@echo "$(CYAN)$(BOLD)Cross-compiling for Adventurer 5X (mips)...$(RESET)"
+	$(Q)$(MAKE) PLATFORM_TARGET=ad5x -j$(NPROC) all
+
 cc1:
 	@echo "$(CYAN)$(BOLD)Cross-compiling for Centauri Carbon 1 (armv7-a)...$(RESET)"
 	$(Q)$(MAKE) PLATFORM_TARGET=cc1 -j$(NPROC) all
 
 mips:
-	@echo "$(CYAN)$(BOLD)Cross-compiling for MIPS32 devices (K1, AD5X)...$(RESET)"
+	@echo "$(CYAN)$(BOLD)Cross-compiling for MIPS32 devices K1...$(RESET)"
 	$(Q)$(MAKE) PLATFORM_TARGET=mips -j$(NPROC) all
 
 k1: mips
-ad5x: mips
-
 k1-dynamic:
 	@echo "$(CYAN)$(BOLD)Cross-compiling for Creality K1 series (MIPS32, dynamic linking)...$(RESET)"
 	$(Q)$(MAKE) PLATFORM_TARGET=k1-dynamic -j$(NPROC) all
@@ -752,6 +789,22 @@ ad5m-docker: ensure-docker
 		|| echo "$(YELLOW)⚠ Could not extract CA certificates (HTTPS may rely on device certs)$(RESET)"
 	@$(MAKE) --no-print-directory maybe-stop-colima
 
+ad5x-docker: ensure-docker
+	@echo "$(CYAN)$(BOLD)Cross-compiling for Adventurer 5X via Docker...$(RESET)"
+	@if ! docker image inspect helixscreen/toolchain-ad5x >/dev/null 2>&1; then \
+		echo "$(YELLOW)Docker image not found. Building toolchain first...$(RESET)"; \
+		$(MAKE) docker-toolchain-ad5x; \
+	fi
+	$(call ensure-ccache-dir,ad5x)
+	$(Q)docker run --rm --user $$(id -u):$$(id -g) -v "$(PWD)":/src -w /src $(call docker-ccache-args,ad5x) helixscreen/toolchain-ad5x \
+		make PLATFORM_TARGET=ad5x SKIP_OPTIONAL_DEPS=1 -j$$(nproc)
+	@# Extract CA certificates from Docker image for HTTPS verification on device
+	@mkdir -p build/ad5x/certs
+	@docker run --rm helixscreen/toolchain-ad5x cat /etc/ssl/certs/ca-certificates.crt > build/ad5x/certs/ca-certificates.crt 2>/dev/null \
+		&& echo "$(GREEN)✓ CA certificates extracted$(RESET)" \
+		|| echo "$(YELLOW)⚠ Could not extract CA certificates (HTTPS may rely on device certs)$(RESET)"
+	@$(MAKE) --no-print-directory maybe-stop-colima
+
 cc1-docker: ensure-docker
 	@echo "$(CYAN)$(BOLD)Cross-compiling for Centauri Carbon 1 via Docker...$(RESET)"
 	@if ! docker image inspect helixscreen/toolchain-cc1 >/dev/null 2>&1; then \
@@ -780,7 +833,7 @@ mips-docker: ensure-docker
 	@$(MAKE) --no-print-directory maybe-stop-colima
 
 k1-docker: mips-docker
-ad5x-docker: mips-docker
+
 
 k1-dynamic-docker: ensure-docker
 	@echo "$(CYAN)$(BOLD)Cross-compiling for Creality K1 series (dynamic) via Docker...$(RESET)"
@@ -832,7 +885,7 @@ maybe-stop-colima:
 	fi
 
 # Build Docker toolchain images
-docker-toolchains: docker-toolchain-pi docker-toolchain-pi32 docker-toolchain-ad5m docker-toolchain-cc1 docker-toolchain-k1 docker-toolchain-k1-dynamic docker-toolchain-k2 docker-toolchain-snapmaker-u1
+docker-toolchains: docker-toolchain-pi docker-toolchain-pi32 docker-toolchain-ad5m docker-toolchain-ad5x docker-toolchain-cc1 docker-toolchain-k1 docker-toolchain-k1-dynamic docker-toolchain-k2 docker-toolchain-snapmaker-u1
 	@echo "$(GREEN)$(BOLD)All Docker toolchains built successfully$(RESET)"
 
 docker-toolchain-pi: ensure-buildx
@@ -847,12 +900,16 @@ docker-toolchain-ad5m: ensure-buildx
 	@echo "$(CYAN)Building Adventurer 5M toolchain Docker image...$(RESET)"
 	$(Q)docker buildx build -t helixscreen/toolchain-ad5m -f docker/Dockerfile.ad5m docker/
 
+docker-toolchain-ad5x: ensure-buildx
+	@echo "$(CYAN)Building Adventurer 5X toolchain Docker image...$(RESET)"
+	$(Q)docker buildx build -t helixscreen/toolchain-ad5x -f docker/Dockerfile.ad5x docker/
+
 docker-toolchain-cc1: ensure-buildx
 	@echo "$(CYAN)Building Centauri Carbon 1 toolchain Docker image...$(RESET)"
 	$(Q)docker buildx build -t helixscreen/toolchain-cc1 -f docker/Dockerfile.cc1 docker/
 
 docker-toolchain-k1: ensure-buildx
-	@echo "$(CYAN)Building MIPS32 (K1/AD5X) toolchain Docker image...$(RESET)"
+	@echo "$(CYAN)Building MIPS32 K1 toolchain Docker image...$(RESET)"
 	$(Q)docker buildx build -t helixscreen/toolchain-k1 -f docker/Dockerfile.k1 docker/
 
 docker-toolchain-k1-dynamic: ensure-buildx
@@ -1003,10 +1060,10 @@ DEPLOY_ASSET_DIRS := ui_xml assets config moonraker-plugin
 # Usage: $(call deploy-common,$(PI_SSH_TARGET),$(PI_DEPLOY_DIR),build/pi/bin)
 define deploy-common
 	@echo "$(CYAN)Deploying HelixScreen to $(1):$(2)...$(RESET)"
-	@# Generate pre-rendered images if missing
+	@# Generate pre-rendered splash images if missing (all small-display platforms use the same files)
 	@if [ ! -f build/assets/images/prerendered/splash-logo-small.bin ]; then \
 		echo "$(DIM)Generating pre-rendered splash images...$(RESET)"; \
-		$(MAKE) gen-images-ad5m; \
+		$(MAKE) gen-images; \
 	fi
 	@if [ ! -d build/assets/images/printers/prerendered ] || [ -z "$$(ls -A build/assets/images/printers/prerendered/*.bin 2>/dev/null)" ]; then \
 		echo "$(DIM)Generating pre-rendered printer images...$(RESET)"; \
@@ -1931,6 +1988,49 @@ release-ad5m: | build/ad5m/bin/helix-screen build/ad5m/bin/helix-splash
 	@echo "$(GREEN)✓ Created $(RELEASE_DIR)/helixscreen-ad5m-$(RELEASE_VERSION).tar.gz + helixscreen-ad5m.zip$(RESET)"
 	@ls -lh $(RELEASE_DIR)/helixscreen-ad5m-$(RELEASE_VERSION).tar.gz $(RELEASE_DIR)/helixscreen-ad5m.zip
 
+# Package AD5X release
+release-ad5x: | build/ad5x/bin/helix-screen build/ad5x/bin/helix-splash
+	@echo "$(CYAN)$(BOLD)Packaging AD5X release v$(VERSION)...$(RESET)"
+	@mkdir -p $(RELEASE_DIR)/helixscreen/bin
+	@cp build/ad5x/bin/helix-screen build/ad5x/bin/helix-splash $(RELEASE_DIR)/helixscreen/bin/
+	@if [ -f build/ad5x/bin/helix-watchdog ]; then cp build/ad5x/bin/helix-watchdog $(RELEASE_DIR)/helixscreen/bin/; fi
+	@cp scripts/helix-launcher.sh $(RELEASE_DIR)/helixscreen/bin/
+	@cp -r ui_xml config $(RELEASE_DIR)/helixscreen/
+	@# Remove any personal config — release ships template only (installer copies it on first run)
+	@rm -f $(RELEASE_DIR)/helixscreen/config/helixconfig.json $(RELEASE_DIR)/helixscreen/config/helixconfig-test.json
+	@cp scripts/$(INSTALLER_FILENAME) $(RELEASE_DIR)/helixscreen/
+	@chmod +x $(RELEASE_DIR)/helixscreen/$(INSTALLER_FILENAME)
+	@mkdir -p $(RELEASE_DIR)/helixscreen/scripts
+	@cp scripts/uninstall.sh $(RELEASE_DIR)/helixscreen/scripts/
+	@mkdir -p $(RELEASE_DIR)/helixscreen/assets
+	@for asset in $(RELEASE_ASSETS); do \
+		if [ -d "$$asset" ]; then cp -r "$$asset" $(RELEASE_DIR)/helixscreen/assets/; fi; \
+	done
+	@# Copy pre-rendered images from build directory (splash + printer images)
+	@if [ -d "build/assets/images/prerendered" ]; then \
+		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/prerendered; \
+		cp -r build/assets/images/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/prerendered/; \
+	fi
+	@if [ -d "build/assets/images/printers/prerendered" ]; then \
+		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/printers/prerendered; \
+		cp -r build/assets/images/printers/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/printers/prerendered/; \
+	fi
+	@# Bundle CA certificates for HTTPS verification (fallback if device lacks system certs)
+	@if [ -f "build/ad5x/certs/ca-certificates.crt" ]; then \
+		mkdir -p $(RELEASE_DIR)/helixscreen/certs; \
+		cp build/ad5x/certs/ca-certificates.crt $(RELEASE_DIR)/helixscreen/certs/; \
+		echo "  $(DIM)Included CA certificates for HTTPS$(RESET)"; \
+	fi
+	@find $(RELEASE_DIR)/helixscreen -name '.DS_Store' -delete 2>/dev/null || true
+	$(call release-clean-assets,$(RELEASE_DIR)/helixscreen)
+	@xattr -cr $(RELEASE_DIR)/helixscreen 2>/dev/null || true
+	@echo '{"project_name":"helixscreen","project_owner":"prestonbrown","version":"$(RELEASE_VERSION)","asset_name":"helixscreen-ad5x.zip"}' > $(RELEASE_DIR)/helixscreen/release_info.json
+	@cd $(RELEASE_DIR)/helixscreen && zip -qr ../helixscreen-ad5x.zip .
+	@cd $(RELEASE_DIR) && COPYFILE_DISABLE=1 tar -czvf helixscreen-ad5x-$(RELEASE_VERSION).tar.gz helixscreen
+	@rm -rf $(RELEASE_DIR)/helixscreen
+	@echo "$(GREEN)✓ Created $(RELEASE_DIR)/helixscreen-ad5x-$(RELEASE_VERSION).tar.gz + helixscreen-ad5x.zip$(RESET)"
+	@ls -lh $(RELEASE_DIR)/helixscreen-ad5x-$(RELEASE_VERSION).tar.gz $(RELEASE_DIR)/helixscreen-ad5x.zip
+
 # Package CC1 release
 release-cc1: | build/cc1/bin/helix-screen build/cc1/bin/helix-splash
 	@echo "$(CYAN)$(BOLD)Packaging CC1 release v$(VERSION)...$(RESET)"
@@ -1992,6 +2092,7 @@ release-k1: | build/mips/bin/helix-screen build/mips/bin/helix-splash
 	@for asset in $(RELEASE_ASSETS); do \
 		if [ -d "$$asset" ]; then cp -r "$$asset" $(RELEASE_DIR)/helixscreen/assets/; fi; \
 	done
+	@# Copy pre-rendered images from build directory (splash + printer images)
 	@if [ -d "build/assets/images/prerendered" ]; then \
 		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/prerendered; \
 		cp -r build/assets/images/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/prerendered/; \
@@ -2009,41 +2110,6 @@ release-k1: | build/mips/bin/helix-screen build/mips/bin/helix-splash
 	@rm -rf $(RELEASE_DIR)/helixscreen
 	@echo "$(GREEN)✓ Created $(RELEASE_DIR)/helixscreen-k1-$(RELEASE_VERSION).tar.gz + helixscreen-k1.zip$(RESET)"
 	@ls -lh $(RELEASE_DIR)/helixscreen-k1-$(RELEASE_VERSION).tar.gz $(RELEASE_DIR)/helixscreen-k1.zip
-
-# Package AD5X release (same MIPS binary, different release_info.json for Moonraker update manager)
-release-ad5x: | build/mips/bin/helix-screen build/mips/bin/helix-splash
-	@echo "$(CYAN)$(BOLD)Packaging AD5X release v$(VERSION)...$(RESET)"
-	@mkdir -p $(RELEASE_DIR)/helixscreen/bin
-	@cp build/mips/bin/helix-screen build/mips/bin/helix-splash $(RELEASE_DIR)/helixscreen/bin/
-	@if [ -f build/mips/bin/helix-watchdog ]; then cp build/mips/bin/helix-watchdog $(RELEASE_DIR)/helixscreen/bin/; fi
-	@cp scripts/helix-launcher.sh $(RELEASE_DIR)/helixscreen/bin/
-	@cp -r ui_xml config $(RELEASE_DIR)/helixscreen/
-	@rm -f $(RELEASE_DIR)/helixscreen/config/helixconfig.json $(RELEASE_DIR)/helixscreen/config/helixconfig-test.json
-	@cp scripts/$(INSTALLER_FILENAME) $(RELEASE_DIR)/helixscreen/
-	@chmod +x $(RELEASE_DIR)/helixscreen/$(INSTALLER_FILENAME)
-	@mkdir -p $(RELEASE_DIR)/helixscreen/scripts
-	@cp scripts/uninstall.sh $(RELEASE_DIR)/helixscreen/scripts/
-	@mkdir -p $(RELEASE_DIR)/helixscreen/assets
-	@for asset in $(RELEASE_ASSETS); do \
-		if [ -d "$$asset" ]; then cp -r "$$asset" $(RELEASE_DIR)/helixscreen/assets/; fi; \
-	done
-	@if [ -d "build/assets/images/prerendered" ]; then \
-		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/prerendered; \
-		cp -r build/assets/images/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/prerendered/; \
-	fi
-	@if [ -d "build/assets/images/printers/prerendered" ]; then \
-		mkdir -p $(RELEASE_DIR)/helixscreen/assets/images/printers/prerendered; \
-		cp -r build/assets/images/printers/prerendered/* $(RELEASE_DIR)/helixscreen/assets/images/printers/prerendered/; \
-	fi
-	@find $(RELEASE_DIR)/helixscreen -name '.DS_Store' -delete 2>/dev/null || true
-	$(call release-clean-assets,$(RELEASE_DIR)/helixscreen)
-	@xattr -cr $(RELEASE_DIR)/helixscreen 2>/dev/null || true
-	@echo '{"project_name":"helixscreen","project_owner":"prestonbrown","version":"$(RELEASE_VERSION)","asset_name":"helixscreen-ad5x.zip"}' > $(RELEASE_DIR)/helixscreen/release_info.json
-	@cd $(RELEASE_DIR)/helixscreen && zip -qr ../helixscreen-ad5x.zip .
-	@cd $(RELEASE_DIR) && COPYFILE_DISABLE=1 tar -czvf helixscreen-ad5x-$(RELEASE_VERSION).tar.gz helixscreen
-	@rm -rf $(RELEASE_DIR)/helixscreen
-	@echo "$(GREEN)✓ Created $(RELEASE_DIR)/helixscreen-ad5x-$(RELEASE_VERSION).tar.gz + helixscreen-ad5x.zip$(RESET)"
-	@ls -lh $(RELEASE_DIR)/helixscreen-ad5x-$(RELEASE_VERSION).tar.gz $(RELEASE_DIR)/helixscreen-ad5x.zip
 
 # Package K1 Dynamic release
 release-k1-dynamic: | build/k1-dynamic/bin/helix-screen build/k1-dynamic/bin/helix-splash

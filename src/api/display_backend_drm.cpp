@@ -8,6 +8,7 @@
 #include "display_backend_drm.h"
 
 #include "config.h"
+#include "drm_rotation_strategy.h"
 
 #include <spdlog/spdlog.h>
 
@@ -416,8 +417,32 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
         break;
     }
 
-    lv_linux_drm_set_rotation(display_, drm_rot);
-    spdlog::info("[DRM Backend] DRM plane rotation set to {}°", static_cast<int>(rot) * 90);
+    // Query hardware capabilities and choose strategy
+    uint64_t supported_mask = lv_linux_drm_get_plane_rotation_mask(display_);
+    auto strategy = choose_drm_rotation_strategy(drm_rot, supported_mask);
+
+    switch (strategy) {
+    case DrmRotationStrategy::HARDWARE:
+        lv_linux_drm_set_rotation(display_, drm_rot);
+        spdlog::info("[DRM Backend] Hardware plane rotation set to {}°",
+                     static_cast<int>(rot) * 90);
+        break;
+
+    case DrmRotationStrategy::SOFTWARE:
+        // Tell LVGL the logical rotation so touch coordinates and resolution
+        // reporting are correct, then enable matrix rotation for pixel transforms
+        lv_display_set_rotation(display_, rot);
+        lv_display_set_matrix_rotation(display_, true);
+        spdlog::info("[DRM Backend] Software matrix rotation set to {}° (plane supports 0x{:X})",
+                     static_cast<int>(rot) * 90, supported_mask);
+        break;
+
+    case DrmRotationStrategy::NONE:
+        // Explicitly reset in case a previous call set a non-zero rotation
+        lv_linux_drm_set_rotation(display_, DRM_MODE_ROTATE_0);
+        spdlog::debug("[DRM Backend] No rotation needed");
+        break;
+    }
 }
 
 bool DisplayBackendDRM::clear_framebuffer(uint32_t color) {

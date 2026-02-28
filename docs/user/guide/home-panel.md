@@ -138,20 +138,78 @@ Custom macro devices you've configured in [LED Settings](settings.md#led-setting
 
 ## Printer Manager
 
-**Tap the printer image** on the Home Panel to open the Printer Manager overlay. This is your central place to view and customize your printer's identity.
+**Tap the printer image** on the Home Panel to open the Printer Manager overlay. This is your central place to view and customize your printer's identity, check software versions, and see detected hardware capabilities.
 
-### Printer Identity Card
+### Changing the Printer Name
 
-The top of the overlay displays an identity card with your printer image, name, and model. From here you can:
+Your printer name appears on the Home Panel and at the top of the Printer Manager. To change it:
 
-- **Change the printer image**: Tap the printer image (marked with a pencil badge) to open the Printer Image picker overlay. You can choose from:
-  - **Auto-Detect** (default) — HelixScreen selects an image based on your printer type reported by Klipper
-  - **Shipped Images** — Over 25 pre-rendered images covering Voron, Creality, FlashForge, Anycubic, RatRig, FLSUN, and more
-  - **Custom Images** — Your own PNG or JPEG files (see below)
+1. Tap the **printer image** on the Home Panel to open the Printer Manager
+2. Tap the **printer name** (shown with a pencil icon) — it switches to an editable text field
+3. Type your new name (e.g., "Workshop Voron", "Printer #2")
+4. Press **Enter** to save, or **Escape** to cancel
 
-  The picker shows a list on the left and a live preview on the right. Your selection persists across restarts.
+The name defaults to "My Printer" if left empty. It is saved to your config file and persists across restarts.
 
-- **Edit the printer name**: Tap the printer name (shown with a pencil icon) to enable inline editing. Type the new name, press **Enter** to save, or **Escape** to cancel.
+> **Tip:** You can also set the name directly in the config file under the `printer.name` key — see [Configuration Reference](../CONFIGURATION.md#name).
+
+### Changing the Printer Image
+
+The printer image appears on the Home Panel and in the Printer Manager. To change it:
+
+1. Tap the **printer image** on the Home Panel to open the Printer Manager
+2. Tap the **printer image** again (marked with a pencil badge) to open the Printer Image picker
+3. The picker shows a scrollable list on the left and a live preview on the right
+4. Choose from one of three sources:
+   - **Auto-Detect** (default) — HelixScreen selects an image based on your printer type reported by Klipper
+   - **Shipped Images** — Over 25 pre-rendered images covering Voron, Creality, FlashForge, Anycubic, RatRig, FLSUN, and more
+   - **Custom Images** — Your own images (see below)
+5. Tap an image to select it — your choice takes effect immediately and persists across restarts
+
+### Using Custom Printer Images
+
+You can use your own printer photo or rendering. There are two ways to import custom images:
+
+#### Option A: Copy to the Custom Images Folder
+
+1. Copy a PNG, JPEG, BMP, or GIF file into the `custom_images/` directory inside your HelixScreen config folder:
+
+   | Platform | Custom images directory |
+   |----------|----------------------|
+   | MainsailOS (Pi) | `~/helixscreen/config/custom_images/` |
+   | AD5M Forge-X | `/opt/helixscreen/config/custom_images/` |
+   | AD5M Klipper Mod | `/root/printer_software/helixscreen/config/custom_images/` |
+   | K1 Simple AF | `/usr/data/helixscreen/config/custom_images/` |
+
+2. Open the Printer Image picker (tap printer image → tap image again)
+3. Your image appears under the **Custom Images** section — HelixScreen automatically converts it to an optimized format on first load
+
+#### Option B: Import from a USB Drive
+
+1. Insert a USB drive containing image files (PNG, JPEG, BMP, or GIF) into your printer's host
+2. Open the Printer Image picker (tap printer image → tap image again)
+3. A **USB Import** section appears at the bottom of the list showing images found on the drive
+4. Tap an image to import it — HelixScreen copies and converts it automatically
+5. Once imported, the image appears under Custom Images and the USB drive can be removed
+
+#### Custom Image Requirements
+
+- **Formats:** PNG, JPEG, BMP, or GIF
+- **Maximum file size:** 5 MB
+- **Maximum dimensions:** 2048×2048 pixels — images exceeding this limit will not be imported (resize before importing)
+- HelixScreen automatically generates optimized 300px and 150px display variants
+
+#### Removing Custom Images
+
+To remove a custom image, delete its files from the `custom_images/` directory via SSH:
+
+```bash
+# Example: remove an image called "my-printer"
+cd ~/helixscreen/config/custom_images/   # adjust path for your platform
+rm my-printer.png my-printer-300.bin my-printer-150.bin
+```
+
+If the deleted image was active, HelixScreen falls back to auto-detect the next time the image is loaded.
 
 ### Software Versions
 
@@ -160,18 +218,6 @@ Below the identity card, the overlay displays current software versions for Klip
 ### Hardware Capabilities
 
 A row of chips shows detected hardware capabilities: Probe, Bed Mesh, Heated Bed, LEDs, ADXL, QGL, Z-Tilt, and others depending on your Klipper configuration.
-
-### Adding Custom Printer Images
-
-To use your own printer image:
-
-1. Place an image file into `config/custom_images/` in your HelixScreen installation directory
-2. Open the Printer Image picker from the Printer Manager
-3. Your custom images appear automatically — HelixScreen converts them to optimized LVGL binary format on first load
-
-**Custom image requirements:** PNG, JPEG, BMP, or GIF format, maximum 5MB file size. HelixScreen generates optimized 300px and 150px variants automatically.
-
-> **Note:** Maximum image dimensions are **2048×2048 pixels**. Images exceeding this limit will not be imported. Resize your image before placing it in the `custom_images/` directory.
 
 ---
 

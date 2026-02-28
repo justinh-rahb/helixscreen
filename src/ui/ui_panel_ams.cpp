@@ -358,6 +358,11 @@ void AmsPanel::on_activate() {
 
     refresh_slots();
 
+    // Ensure filament path canvas redraws after being stopped on deactivate
+    if (path_canvas_) {
+        ui_filament_path_canvas_refresh(path_canvas_);
+    }
+
     // Sync sidebar step progress and preheat feedback from current state
     if (sidebar_) {
         sidebar_->sync_from_state();
@@ -399,6 +404,11 @@ void AmsPanel::sync_spoolman_active_spool() {
 
 void AmsPanel::on_deactivate() {
     AmsState::instance().stop_spoolman_polling();
+
+    // Stop filament path animations to avoid burning CPU in the background
+    if (path_canvas_) {
+        ui_filament_path_canvas_stop_animations(path_canvas_);
+    }
 
     spdlog::debug("[{}] Deactivated", get_name());
     // Note: UI destruction is handled by NavigationManager close callback
@@ -630,6 +640,9 @@ void AmsPanel::create_slots(int count) {
 
     // Labels overlay for 5+ slots
     ams_detail_update_labels(detail_widgets_, slot_widgets_, result.slot_count, result.layout);
+
+    // Move badges to overlay layer (in front of tray)
+    ams_detail_update_badges(detail_widgets_, slot_widgets_, result.slot_count, result.layout);
 
     // Update path canvas sizing
     if (path_canvas_) {

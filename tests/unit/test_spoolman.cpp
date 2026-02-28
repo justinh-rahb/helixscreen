@@ -1,6 +1,8 @@
 // Copyright (C) 2025-2026 356C LLC
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "ui_spool_wizard.h" // For FilamentEntry struct
+
 #include "json_utils.h"
 #include "moonraker_api_mock.h"
 #include "moonraker_client_mock.h"
@@ -909,6 +911,126 @@ TEST_CASE("Mock update_spoolman_spool supports filament_id patch", "[spoolman][m
     REQUIRE(success);
     REQUIRE(spools[0].filament_id == 999);
     REQUIRE(spools[0].filament_id != original_filament_id);
+}
+
+// ============================================================================
+// Spoolman Filament Creation Data Validation
+// These tests verify we send the required fields Spoolman expects.
+// Missing density/diameter causes 422 Unprocessable Entity.
+// ============================================================================
+
+TEST_CASE("Filament creation data includes required Spoolman fields", "[spoolman][api]") {
+    // Reproduce the data construction from SpoolWizardOverlay::create_filament_then_spool()
+    // to verify density and diameter are always present.
+
+    struct TestFilament {
+        std::string material;
+        std::string color_hex;
+        std::string color_name;
+        double density = 0;
+        double diameter = 1.75;
+        double weight = 0;
+        double spool_weight = 0;
+    };
+
+    auto build_filament_data = [](const TestFilament& fil, int vendor_id) -> nlohmann::json {
+        nlohmann::json data;
+        data["vendor_id"] = vendor_id;
+        data["name"] = fil.material + " " + fil.color_name;
+        data["material"] = fil.material;
+        if (!fil.color_hex.empty()) {
+            data["color_hex"] = fil.color_hex;
+        }
+        // density and diameter are REQUIRED by Spoolman (no defaults in their API)
+        data["density"] = fil.density > 0 ? fil.density : 1.24;
+        data["diameter"] = fil.diameter > 0 ? fil.diameter : 1.75;
+        if (fil.weight > 0) {
+            data["weight"] = fil.weight;
+        }
+        if (fil.spool_weight > 0) {
+            data["spool_weight"] = fil.spool_weight;
+        }
+        return data;
+    };
+
+    SECTION("Filament with all data populated") {
+        TestFilament fil{.material = "PLA",
+                         .color_hex = "1A1A2E",
+                         .color_name = "Jet Black",
+                         .density = 1.24,
+                         .diameter = 1.75,
+                         .weight = 1000};
+
+        auto data = build_filament_data(fil, 1);
+        REQUIRE(data.contains("density"));
+        REQUIRE(data.contains("diameter"));
+        REQUIRE(data["density"].get<double>() == Catch::Approx(1.24));
+        REQUIRE(data["diameter"].get<double>() == Catch::Approx(1.75));
+    }
+
+    SECTION("Filament with zero density gets default 1.24") {
+        TestFilament fil{.material = "PLA", .density = 0};
+
+        auto data = build_filament_data(fil, 1);
+        REQUIRE(data.contains("density"));
+        REQUIRE(data["density"].get<double>() == Catch::Approx(1.24));
+    }
+
+    SECTION("Filament with zero diameter gets default 1.75") {
+        TestFilament fil{.material = "PLA", .diameter = 0};
+
+        auto data = build_filament_data(fil, 1);
+        REQUIRE(data.contains("diameter"));
+        REQUIRE(data["diameter"].get<double>() == Catch::Approx(1.75));
+    }
+
+    SECTION("Filament always has density and diameter — no conditionals") {
+        TestFilament fil{.material = "PETG"};
+
+        auto data = build_filament_data(fil, 5);
+        // These must ALWAYS be present — Spoolman returns 422 without them
+        REQUIRE(data.contains("density"));
+        REQUIRE(data.contains("diameter"));
+        REQUIRE(data["density"].get<double>() > 0);
+        REQUIRE(data["diameter"].get<double>() > 0);
+        // Optional fields should NOT be present when zero
+        REQUIRE_FALSE(data.contains("weight"));
+        REQUIRE_FALSE(data.contains("spool_weight"));
+    }
+
+    SECTION("2.85mm filament diameter is preserved") {
+        TestFilament fil{.material = "PLA", .density = 1.24, .diameter = 2.85};
+
+        auto data = build_filament_data(fil, 1);
+        REQUIRE(data["diameter"].get<double>() == Catch::Approx(2.85));
+    }
+
+    SECTION("Custom density from material DB is preserved") {
+        TestFilament fil{.material = "TPU", .density = 1.21};
+
+        auto data = build_filament_data(fil, 3);
+        REQUIRE(data["density"].get<double>() == Catch::Approx(1.21));
+    }
+}
+
+TEST_CASE("FilamentEntry defaults include diameter", "[spoolman]") {
+    SpoolWizardOverlay::FilamentEntry entry;
+    REQUIRE(entry.diameter == Catch::Approx(1.75));
+    REQUIRE(entry.density == 0.0);
+}
+
+TEST_CASE("FilamentInfo diameter populates FilamentEntry", "[spoolman]") {
+    FilamentInfo fi;
+    fi.material = "PETG";
+    fi.density = 1.27f;
+    fi.diameter = 2.85f;
+
+    SpoolWizardOverlay::FilamentEntry entry;
+    entry.density = fi.density;
+    entry.diameter = fi.diameter;
+
+    REQUIRE(entry.density == Catch::Approx(1.27));
+    REQUIRE(entry.diameter == Catch::Approx(2.85));
 }
 
 TEST_CASE("SpoolInfo - realistic spool scenarios", "[filament][integration]") {

@@ -72,9 +72,9 @@ jobs:
             build_dir: mips
           - platform: ad5x
             display_name: "Flashforge AD5X"
-            docker_image: k1
-            build_target: mips
-            build_dir: mips
+            docker_image: ad5x
+            build_target: ad5x
+            build_dir: ad5x
           - platform: k2
             display_name: "Creality K2 Series"
 

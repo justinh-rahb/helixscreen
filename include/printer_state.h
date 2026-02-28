@@ -297,6 +297,10 @@ class PrinterState {
         return temperature_state_.active_extruder_name();
     }
 
+    void set_active_extruder(const std::string& name) {
+        temperature_state_.set_active_extruder(name);
+    }
+
     lv_subject_t* get_extruder_version_subject() {
         return temperature_state_.get_extruder_version_subject();
     }

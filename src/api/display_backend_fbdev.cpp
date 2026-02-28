@@ -204,10 +204,8 @@ void calibrated_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
         data->point.y = transformed.y;
     }
 
-    // Jitter filter: suppress small coordinate changes while finger is pressed.
-    // Prevents noisy touch controllers (e.g., Goodix GT9xx) from generating
-    // enough movement to trigger LVGL's scroll detection on stationary taps.
-    ctx->jitter.apply(data->state, data->point.x, data->point.y);
+    // Note: jitter filtering is now applied generically in lvgl_init.cpp
+    // AFTER this backend-specific callback, so it works on all backends.
 }
 
 } // anonymous namespace
@@ -475,29 +473,14 @@ lv_indev_t* DisplayBackendFbdev::create_input_pointer() {
         spdlog::info("[Fbdev Backend] No stored affine calibration found");
     }
 
-    // Load jitter filter threshold from config (pixels, default 15 for noisy
-    // touch controllers like Goodix GT9xx). Set to 0 to disable.
-    int jitter_threshold = 15;
-    if (auto* cfg = helix::Config::get_instance()) {
-        jitter_threshold = cfg->get<int>("/input/jitter_threshold", 15);
-    }
-    const char* env_jitter = std::getenv("HELIX_TOUCH_JITTER");
-    if (env_jitter) {
-        jitter_threshold = std::atoi(env_jitter);
-    }
-    jitter_threshold = std::clamp(jitter_threshold, 0, 200);
-    if (jitter_threshold > 0) {
-        spdlog::info("[Fbdev Backend] Touch jitter filter: {}px dead zone", jitter_threshold);
-    }
-
     // Always install the calibrated read callback — it handles both rotation
     // transform and affine calibration independently. Without this, rotation
     // transform wouldn't be applied on devices that don't need affine cal.
+    // Note: jitter filtering is applied generically in lvgl_init.cpp after this.
     calibration_context_.calibration = calibration_;
     calibration_context_.original_read_cb = lv_indev_get_read_cb(touch_);
     calibration_context_.screen_width = screen_width_;
     calibration_context_.screen_height = screen_height_;
-    calibration_context_.jitter.threshold_sq = jitter_threshold * jitter_threshold;
 
     lv_indev_set_user_data(touch_, &calibration_context_);
     lv_indev_set_read_cb(touch_, calibrated_read_cb);
@@ -843,7 +826,17 @@ bool DisplayBackendFbdev::set_calibration(const helix::TouchCalibration& cal) {
                          "a={:.4f} b={:.4f} c={:.4f} d={:.4f} e={:.4f} f={:.4f}",
                          cal.a, cal.b, cal.c, cal.d, cal.e, cal.f);
         } else {
-            // Need to install the callback wrapper for the first time
+            // Need to install the callback wrapper for the first time.
+            // The current read_cb may be the jitter wrapper (from lvgl_init.cpp)
+            // which chains to the real backend callback.  We need to insert
+            // ourselves between the jitter wrapper and the backend callback so
+            // the chain is: jitter → calibrated → evdev.
+            //
+            // In practice this branch is unreachable because create_input_pointer()
+            // always installs the calibrated callback, but we handle it defensively.
+            spdlog::warn("[Fbdev Backend] Calibrated callback was not pre-installed — "
+                         "installing at runtime (unexpected code path)");
+
             calibration_context_.calibration = cal;
             calibration_context_.original_read_cb = lv_indev_get_read_cb(touch_);
             calibration_context_.screen_width = screen_width_;

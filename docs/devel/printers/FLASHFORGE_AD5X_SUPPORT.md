@@ -2,9 +2,9 @@
 
 # FlashForge Adventurer 5X (AD5X) Support
 
-HelixScreen has a cross-compilation target for the FlashForge Adventurer 5X. The AD5X is a multi-color 3D printer with a 4-channel IFS (Intelligent Filament System). It shares the same MIPS binary as the Creality K1 series — both use `PLATFORM_TARGET=mips` (with `k1` and `ad5x` as aliases). Runtime detection distinguishes between the two platforms.
+HelixScreen has a dedicated cross-compilation target for the FlashForge Adventurer 5X. The AD5X is a multi-color 3D printer with a 4-channel IFS (Intelligent Filament System). It has its own toolchain and Docker image (`Dockerfile.ad5x`), separate from the Creality K1 series.
 
-**Status: Untested** — binary compatibility is expected but needs community validation. See [issue #203](https://github.com/prestonbrown/helixscreen/issues/203).
+**Status: Active testing** — prebuilt binaries are included in releases. See [issue #203](https://github.com/prestonbrown/helixscreen/issues/203).
 
 ## Hardware
 
@@ -38,19 +38,16 @@ The presence of `/usr/prog/` is used for runtime platform detection (K1 vs AD5X)
 
 ## Build Target
 
-The AD5X shares a binary with the Creality K1 series:
+The AD5X has a dedicated build target and toolchain, separate from the Creality K1:
 
 ```bash
-make mips-docker          # Build MIPS binary (works for both K1 and AD5X)
-make ad5x-docker          # Alias for mips-docker
-make k1-docker            # Alias for mips-docker
+make ad5x-docker          # Build AD5X binary (dedicated MIPS32r5 glibc toolchain)
 make release-ad5x         # Package as helixscreen-ad5x.zip (AD5X release_info.json)
-make release-k1           # Package as helixscreen-k1.zip (K1 release_info.json)
 ```
 
-**Toolchain**: Bootlin `mipsel-buildroot-linux-musl` (stable-2024.02), same Docker image as K1 (`Dockerfile.k1`).
+**Toolchain**: Dedicated Docker image (`Dockerfile.ad5x`) with MIPS32r5 glibc cross-compiler, distinct from the K1's musl-based toolchain.
 
-**Platform define**: `-DHELIX_PLATFORM_MIPS` (shared). Runtime detection via `/usr/prog` presence determines platform key (`ad5x` vs `k1`) for update manager asset selection.
+**Platform define**: `-DHELIX_PLATFORM_MIPS`. Runtime detection via `/usr/prog` presence determines platform key (`ad5x` vs `k1`) for update manager asset selection.
 
 ## ZMOD Integration
 
@@ -119,13 +116,11 @@ The ZMOD ecosystem exposes IFS through Klipper macros and a custom color selecti
 | Backlight | `/dev/disp` ioctl (Allwinner sunxi) | `FBIOBLANK` (standard Linux) |
 | Config path | `/opt/helixscreen/` | `/usr/data/helixscreen/` |
 | Multi-material | No (single extruder) | IFS (4 spools) |
-| Build target | `PLATFORM_TARGET=ad5m` | `PLATFORM_TARGET=mips` (alias: `ad5x`) |
-| Binary | ARM static (glibc sysroot) | MIPS static (musl) |
+| Build target | `PLATFORM_TARGET=ad5m` | `PLATFORM_TARGET=ad5x` |
+| Binary | ARM static (glibc sysroot) | MIPS static (glibc) |
 
 ## Known Limitations
 
-- **Untested**: No real hardware validation yet
 - **No IFS UI**: Multi-color filament management not implemented
-- **No SSL**: MIPS build has `ENABLE_SSL=no` — all Moonraker communication must be local/plaintext
 - **No inotify**: AD5X kernel may lack inotify support (same as AD5M) — XML hot reload may not work
 - **No WiFi management**: wpa_supplicant present but may not have usable interfaces

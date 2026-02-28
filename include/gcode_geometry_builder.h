@@ -225,6 +225,23 @@ struct RibbonGeometry {
                layer_bboxes.size() * sizeof(AABB);
     }
 
+    /// Pre-computed interleaved vertex buffers for GPU upload (position+normal+color floats).
+    /// Prepared on background thread to avoid blocking UI during VBO upload.
+    struct PreparedLayerBuffer {
+        std::vector<float> data;
+        size_t vertex_count{0};
+    };
+    std::vector<PreparedLayerBuffer> prepared_buffers;
+
+    /**
+     * @brief Pre-compute interleaved vertex buffers for GPU upload.
+     *
+     * Call from background thread after build(). Expands strips into
+     * position(3f)+normal(3f)+color(3f) interleaved format per layer.
+     * The renderer can then upload directly to VBOs without CPU work.
+     */
+    void prepare_interleaved_buffers();
+
     /**
      * @brief Clear all geometry data
      */
@@ -404,6 +421,21 @@ class GeometryBuilder {
         debug_face_colors_ = enable;
     }
 
+    /// Set tube_sides override from budget manager (0 = use config default)
+    void set_budget_tube_sides(int sides) {
+        budget_tube_sides_ = sides;
+    }
+
+    /// Set memory ceiling for progressive budget checking (0 = unlimited)
+    void set_budget_limit(size_t bytes) {
+        budget_limit_bytes_ = bytes;
+    }
+
+    /// Whether the last build was aborted due to budget exceeded
+    bool was_budget_exceeded() const {
+        return budget_exceeded_;
+    }
+
     /**
      * @brief Set tool color palette for multi-color prints
      * @param palette Vector of hex color strings (e.g., ["#ED1C24", "#00C1AE"])
@@ -478,6 +510,10 @@ class GeometryBuilder {
     bool debug_face_colors_ = false;              ///< Enable per-face debug coloring
     std::vector<std::string> tool_color_palette_; ///< Hex colors per tool (multi-color prints)
     int tube_sides_ = 16;                         ///< Tube cross-section sides (valid: 4, 8, 16)
+
+    int budget_tube_sides_ = 0;     ///< Override tube_sides from budget (0 = use config)
+    size_t budget_limit_bytes_ = 0; ///< Memory ceiling (0 = unlimited)
+    bool budget_exceeded_ = false;  ///< Set to true if build aborted due to budget
 
     // Build statistics
     BuildStats stats_;

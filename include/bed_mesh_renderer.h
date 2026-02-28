@@ -464,4 +464,40 @@ void bed_mesh_renderer_set_z_display_offset(bed_mesh_renderer_t* renderer, doubl
 
 #ifdef __cplusplus
 }
+
+// C++ only: buffer-based rendering for background thread
+namespace helix::mesh {
+class PixelBuffer;
+}
+
+/**
+ * @brief Colors needed for off-screen buffer rendering
+ *
+ * Must be populated on the main thread (where theme_manager_get_color is safe)
+ * and passed to render_to_buffer which runs on a background thread.
+ */
+struct bed_mesh_render_colors_t {
+    uint8_t bg_r, bg_g, bg_b;       ///< Background clear color (graph_bg)
+    uint8_t grid_r, grid_g, grid_b; ///< Grid/wireframe line color (elevated_bg)
+};
+
+/**
+ * @brief Render full mesh into an off-screen pixel buffer
+ *
+ * Thread-safe: does NOT call any lv_* functions. Runs the full 3D rendering
+ * pipeline (projection, sorting, rasterization, overlays) into a PixelBuffer.
+ * The buffer should already be allocated at the correct size.
+ *
+ * Does NOT handle 2D heatmap fallback (stays on main thread).
+ * Does NOT call lv_obj_invalidate() or any LVGL function.
+ *
+ * @param renderer Renderer instance with valid mesh data
+ * @param buffer   Target pixel buffer (must be allocated at canvas dimensions)
+ * @param colors   Pre-fetched theme colors (from main thread)
+ * @return true if rendering succeeded, false on error
+ */
+bool bed_mesh_renderer_render_to_buffer(bed_mesh_renderer_t* renderer,
+                                        helix::mesh::PixelBuffer& buffer,
+                                        const bed_mesh_render_colors_t& colors);
+
 #endif

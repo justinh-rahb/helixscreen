@@ -1,5 +1,5 @@
 diff --git a/src/drivers/display/drm/lv_linux_drm.c b/src/drivers/display/drm/lv_linux_drm.c
-index 2a6ca6ed0..1d31bfaeb 100644
+index 2a6ca6e..089b34b 100644
 --- a/src/drivers/display/drm/lv_linux_drm.c
 +++ b/src/drivers/display/drm/lv_linux_drm.c
 @@ -78,6 +78,7 @@ typedef struct {
@@ -10,10 +10,35 @@ index 2a6ca6ed0..1d31bfaeb 100644
  #if LV_USE_LINUX_DRM_GBM_BUFFERS
      struct gbm_device * gbm_device;
  #endif
-@@ -256,6 +257,18 @@ void lv_linux_drm_set_mode_cb(lv_display_t * disp, lv_linux_drm_select_mode_cb_t
+@@ -256,6 +257,43 @@ void lv_linux_drm_set_mode_cb(lv_display_t * disp, lv_linux_drm_select_mode_cb_t
      LV_UNUSED(callback);
      LV_LOG_WARN("DRM without EGL support doesn't currently support setting a mode selection callback");
  }
++
++uint64_t lv_linux_drm_get_plane_rotation_mask(lv_display_t * disp)
++{
++    drm_dev_t * drm_dev = lv_display_get_driver_data(disp);
++    if(drm_dev == NULL) {
++        return 0;
++    }
++
++    uint32_t i;
++    for(i = 0; i < drm_dev->count_plane_props; ++i) {
++        if(lv_strcmp(drm_dev->plane_props[i]->name, "rotation") == 0) {
++            drmModePropertyPtr prop = drm_dev->plane_props[i];
++            uint64_t mask = 0;
++            int e;
++            for(e = 0; e < prop->count_enums; ++e) {
++                mask |= (1ULL << prop->enums[e].value);
++            }
++            LV_LOG_INFO("DRM plane rotation mask: 0x%x (%d enums)", (unsigned)mask, prop->count_enums);
++            return mask;
++        }
++    }
++
++    LV_LOG_INFO("DRM plane has no rotation property");
++    return 0;
++}
 +
 +void lv_linux_drm_set_rotation(lv_display_t * disp, uint64_t rotation)
 +{
@@ -29,7 +54,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
  /**********************
   *   STATIC FUNCTIONS
   **********************/
-@@ -482,6 +495,10 @@ static int drm_dmabuf_set_plane(drm_dev_t * drm_dev, drm_buffer_t * buf)
+@@ -482,6 +520,10 @@ static int drm_dmabuf_set_plane(drm_dev_t * drm_dev, drm_buffer_t * buf)
      drm_add_plane_property(drm_dev, "CRTC_W", drm_dev->width);
      drm_add_plane_property(drm_dev, "CRTC_H", drm_dev->height);
  
@@ -40,7 +65,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
      ret = drmModeAtomicCommit(drm_dev->fd, drm_dev->req, flags, drm_dev);
      if(ret) {
          LV_LOG_ERROR("drmModeAtomicCommit failed: %s (%d)", strerror(errno), errno);
-@@ -508,7 +525,10 @@ static int find_plane(drm_dev_t * drm_dev, unsigned int fourcc, uint32_t * plane
+@@ -508,7 +550,10 @@ static int find_plane(drm_dev_t * drm_dev, unsigned int fourcc, uint32_t * plane
          return -1;
      }
  
@@ -52,7 +77,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
  
      for(i = 0; i < planes->count_planes; ++i) {
          plane = drmModeGetPlane(drm_dev->fd, planes->planes[i]);
-@@ -519,6 +539,8 @@ static int find_plane(drm_dev_t * drm_dev, unsigned int fourcc, uint32_t * plane
+@@ -519,6 +564,8 @@ static int find_plane(drm_dev_t * drm_dev, unsigned int fourcc, uint32_t * plane
          }
  
          if(!(plane->possible_crtcs & (1 << crtc_idx))) {
@@ -61,7 +86,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
              drmModeFreePlane(plane);
              continue;
          }
-@@ -529,6 +551,8 @@ static int find_plane(drm_dev_t * drm_dev, unsigned int fourcc, uint32_t * plane
+@@ -529,6 +576,8 @@ static int find_plane(drm_dev_t * drm_dev, unsigned int fourcc, uint32_t * plane
          }
  
          if(j == plane->count_formats) {
@@ -70,7 +95,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
              drmModeFreePlane(plane);
              continue;
          }
-@@ -536,7 +560,7 @@ static int find_plane(drm_dev_t * drm_dev, unsigned int fourcc, uint32_t * plane
+@@ -536,7 +585,7 @@ static int find_plane(drm_dev_t * drm_dev, unsigned int fourcc, uint32_t * plane
          *plane_id = plane->plane_id;
          drmModeFreePlane(plane);
  
@@ -79,7 +104,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
  
          /* Success */
          goto out;
-@@ -579,16 +603,16 @@ static int drm_find_connector(drm_dev_t * drm_dev, int64_t connector_id)
+@@ -579,16 +628,16 @@ static int drm_find_connector(drm_dev_t * drm_dev, int64_t connector_id)
          }
  
          if(conn->connection == DRM_MODE_CONNECTED) {
@@ -100,7 +125,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
          }
  
          if(conn->connection == DRM_MODE_CONNECTED && conn->count_modes > 0)
-@@ -604,7 +628,7 @@ static int drm_find_connector(drm_dev_t * drm_dev, int64_t connector_id)
+@@ -604,7 +653,7 @@ static int drm_find_connector(drm_dev_t * drm_dev, int64_t connector_id)
      }
  
      drm_dev->conn_id = conn->connector_id;
@@ -109,7 +134,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
      drm_dev->mmWidth = conn->mmWidth;
      drm_dev->mmHeight = conn->mmHeight;
  
-@@ -635,9 +659,8 @@ static int drm_find_connector(drm_dev_t * drm_dev, int64_t connector_id)
+@@ -635,9 +684,8 @@ static int drm_find_connector(drm_dev_t * drm_dev, int64_t connector_id)
  
      if(enc) {
          drm_dev->enc_id = enc->encoder_id;
@@ -120,7 +145,7 @@ index 2a6ca6ed0..1d31bfaeb 100644
          drmModeFreeEncoder(enc);
          enc = NULL;
      }
-@@ -698,7 +721,7 @@ static int drm_find_connector(drm_dev_t * drm_dev, int64_t connector_id)
+@@ -698,7 +746,7 @@ static int drm_find_connector(drm_dev_t * drm_dev, int64_t connector_id)
          goto free_res;
      }
  
@@ -130,13 +155,24 @@ index 2a6ca6ed0..1d31bfaeb 100644
  
  free_res:
 diff --git a/src/drivers/display/drm/lv_linux_drm.h b/src/drivers/display/drm/lv_linux_drm.h
-index 5afede049..08b30a906 100644
+index 5afede0..291b211 100644
 --- a/src/drivers/display/drm/lv_linux_drm.h
 +++ b/src/drivers/display/drm/lv_linux_drm.h
-@@ -90,6 +90,19 @@ char * lv_linux_drm_find_device_path(void);
+@@ -90,6 +90,30 @@ char * lv_linux_drm_find_device_path(void);
   */
  void lv_linux_drm_set_mode_cb(lv_display_t * disp, lv_linux_drm_select_mode_cb_t callback);
  
++/**
++ * @brief Query the DRM plane's supported rotation bitmask
++ *
++ * Iterates the plane properties to find the "rotation" property and builds
++ * a bitmask from its enum values. Returns 0 if no rotation property exists.
++ *
++ * @param disp      Pointer to the display object created with lv_linux_drm_create()
++ * @return Bitmask of supported DRM_MODE_ROTATE_* values, or 0
++ */
++uint64_t lv_linux_drm_get_plane_rotation_mask(lv_display_t * disp);
++
 +/**
 + * @brief Set the DRM plane rotation property
 + *
