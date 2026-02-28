@@ -38,50 +38,43 @@
                       text="Optimizes temperature control for stable, consistent heating."
                       translation_tag="Optimizes temperature control for stable, consistent heating."
                       style_text_color="#text_muted" style_text_align="center"/>
-          <!-- Method Selector (Kalico only) -->
-          <lv_obj name="method_selector"
-                  width="100%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
-                  style_pad_all="#space_sm" flex_flow="row" style_pad_gap="#space_md" style_flex_cross_place="center"
-                  scrollable="false">
-            <bind_flag_if_eq subject="cal_is_kalico" flag="hidden" ref_value="0"/>
-            <text_body text="Method" translation_tag="Method"/>
-            <ui_button name="btn_method_mpc" flex_grow="1" text="MPC (Recommended)" translation_tag="MPC (Recommended)">
-              <bind_style name="pid_heater_selected" subject="cal_method_is_mpc" ref_value="1"/>
-              <bind_style name="pid_heater_unselected" subject="cal_method_is_mpc" ref_value="0"/>
-              <event_cb trigger="clicked" callback="on_cal_method_mpc"/>
-            </ui_button>
-            <ui_button name="btn_method_pid" flex_grow="1" text="PID" translation_tag="PID">
-              <bind_style name="pid_heater_selected" subject="cal_method_is_mpc" ref_value="0"/>
-              <bind_style name="pid_heater_unselected" subject="cal_method_is_mpc" ref_value="1"/>
-              <event_cb trigger="clicked" callback="on_cal_method_pid"/>
-            </ui_button>
-          </lv_obj>
-          <!-- Migration Warning -->
-          <lv_obj name="migration_warning"
-                  width="100%" height="content" style_pad_all="#space_sm" flex_flow="row"
-                  style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
-            <bind_flag_if_eq subject="cal_needs_migration" flag="hidden" ref_value="0"/>
-            <icon src="alert" size="sm" variant="warning"/>
-            <text_small text="Switching to MPC requires a config change and Klipper restart."
-                        translation_tag="Switching to MPC requires a config change and Klipper restart."
-                        style_text_color="#text_muted" flex_grow="1"/>
-          </lv_obj>
-          <!-- Heater Selection (inline row) -->
+          <!-- Method + Heater Selection (combined row) -->
           <lv_obj width="100%"
                   height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
                   style_pad_all="#space_sm" flex_flow="row" style_pad_gap="#space_md" style_flex_cross_place="center"
                   scrollable="false">
-            <text_body text="Heater" translation_tag="Heater"/>
-            <ui_button name="btn_heater_extruder" flex_grow="1" text="Extruder" translation_tag="Extruder">
-              <bind_style name="pid_heater_selected" subject="pid_heater_is_extruder" ref_value="1"/>
-              <bind_style name="pid_heater_unselected" subject="pid_heater_is_extruder" ref_value="0"/>
-              <event_cb trigger="clicked" callback="on_pid_heater_extruder"/>
-            </ui_button>
-            <ui_button name="btn_heater_bed" flex_grow="1" text="Heated Bed" translation_tag="Heated Bed">
-              <bind_style name="pid_heater_selected" subject="pid_heater_is_extruder" ref_value="0"/>
-              <bind_style name="pid_heater_unselected" subject="pid_heater_is_extruder" ref_value="1"/>
-              <event_cb trigger="clicked" callback="on_pid_heater_bed"/>
-            </ui_button>
+            <!-- Method selector (Kalico only) -->
+            <lv_obj name="method_selector" width="1" flex_grow="1" height="content" style_pad_all="0"
+                    flex_flow="row" style_pad_gap="#space_xs" style_flex_cross_place="center" scrollable="false">
+              <bind_flag_if_eq subject="cal_is_kalico" flag="hidden" ref_value="0"/>
+              <text_body text="Method" translation_tag="Method"/>
+              <ui_button name="btn_method_mpc" flex_grow="1" text="MPC">
+                <bind_style name="pid_heater_selected" subject="cal_method_is_mpc" ref_value="1"/>
+                <bind_style name="pid_heater_unselected" subject="cal_method_is_mpc" ref_value="0"/>
+                <event_cb trigger="clicked" callback="on_cal_method_mpc"/>
+              </ui_button>
+              <ui_button name="btn_method_pid" flex_grow="1" text="PID">
+                <bind_style name="pid_heater_selected" subject="cal_method_is_mpc" ref_value="0"/>
+                <bind_style name="pid_heater_unselected" subject="cal_method_is_mpc" ref_value="1"/>
+                <event_cb trigger="clicked" callback="on_cal_method_pid"/>
+              </ui_button>
+              <divider_vertical/>
+            </lv_obj>
+            <!-- Heater selector -->
+            <lv_obj width="1" flex_grow="1" height="content" style_pad_all="0"
+                    flex_flow="row" style_pad_gap="#space_xs" style_flex_cross_place="center" scrollable="false">
+              <text_body text="Heater" translation_tag="Heater"/>
+              <ui_button name="btn_heater_extruder" flex_grow="1" text="Extruder" translation_tag="Extruder">
+                <bind_style name="pid_heater_selected" subject="pid_heater_is_extruder" ref_value="1"/>
+                <bind_style name="pid_heater_unselected" subject="pid_heater_is_extruder" ref_value="0"/>
+                <event_cb trigger="clicked" callback="on_pid_heater_extruder"/>
+              </ui_button>
+              <ui_button name="btn_heater_bed" flex_grow="1" text="Heated Bed" translation_tag="Heated Bed">
+                <bind_style name="pid_heater_selected" subject="pid_heater_is_extruder" ref_value="0"/>
+                <bind_style name="pid_heater_unselected" subject="pid_heater_is_extruder" ref_value="1"/>
+                <event_cb trigger="clicked" callback="on_pid_heater_bed"/>
+              </ui_button>
+            </lv_obj>
           </lv_obj>
           <!-- Two-column row: Temperature (left) + Fan slider (right) -->
           <lv_obj width="100%"
@@ -91,33 +84,24 @@
                     flex_grow="1" style_bg_color="#section_bg_color" style_radius="#border_radius"
                     style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_sm">
               <text_body text="Target Temperature" translation_tag="Target Temperature"/>
-              <text_small width="100%"
-                          text="Tune at the temperature you print most often."
-                          translation_tag="Tune at the temperature you print most often." style_text_color="#text_muted"/>
-              <!-- Material Presets (Extruder) - row 1 -->
+              <!-- Material Presets (Extruder) -->
               <lv_obj name="extruder_presets"
                       width="100%" height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_xs"
                       style_flex_main_place="start" scrollable="false">
                 <bind_flag_if_eq subject="pid_heater_is_extruder" flag="hidden" ref_value="0"/>
-                <ui_button name="btn_preset_pla" width="56" height="32" text="PLA" style_text_font="#font_small">
+                <ui_button name="btn_preset_pla" flex_grow="1" height="#button_height_sm" text="PLA" style_text_font="#font_small">
                   <event_cb trigger="clicked" callback="on_pid_preset_pla"/>
                 </ui_button>
-                <ui_button name="btn_preset_petg" width="56" height="32" text="PETG" style_text_font="#font_small">
+                <ui_button name="btn_preset_petg" flex_grow="1" height="#button_height_sm" text="PETG" style_text_font="#font_small">
                   <event_cb trigger="clicked" callback="on_pid_preset_petg"/>
                 </ui_button>
-                <ui_button name="btn_preset_abs" width="56" height="32" text="ABS" style_text_font="#font_small">
+                <ui_button name="btn_preset_abs" flex_grow="1" height="#button_height_sm" text="ABS" style_text_font="#font_small">
                   <event_cb trigger="clicked" callback="on_pid_preset_abs"/>
                 </ui_button>
-              </lv_obj>
-              <!-- Material Presets (Extruder) - row 2 -->
-              <lv_obj name="extruder_presets_2"
-                      width="100%" height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_xs"
-                      style_flex_main_place="start" scrollable="false">
-                <bind_flag_if_eq subject="pid_heater_is_extruder" flag="hidden" ref_value="0"/>
-                <ui_button name="btn_preset_pa" width="56" height="32" text="PA" style_text_font="#font_small">
+                <ui_button name="btn_preset_pa" flex_grow="1" height="#button_height_sm" text="PA" style_text_font="#font_small">
                   <event_cb trigger="clicked" callback="on_pid_preset_pa"/>
                 </ui_button>
-                <ui_button name="btn_preset_tpu" width="56" height="32" text="TPU" style_text_font="#font_small">
+                <ui_button name="btn_preset_tpu" flex_grow="1" height="#button_height_sm" text="TPU" style_text_font="#font_small">
                   <event_cb trigger="clicked" callback="on_pid_preset_tpu"/>
                 </ui_button>
               </lv_obj>
@@ -126,62 +110,36 @@
                       width="100%" height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_xs"
                       style_flex_main_place="start" scrollable="false">
                 <bind_flag_if_not_eq subject="pid_heater_is_extruder" flag="hidden" ref_value="0"/>
-                <ui_button name="btn_preset_bed_pla" width="56" height="32" text="PLA" style_text_font="#font_small">
+                <ui_button name="btn_preset_bed_pla" flex_grow="1" height="#button_height_sm" text="PLA" style_text_font="#font_small">
                   <event_cb trigger="clicked" callback="on_pid_preset_bed_pla"/>
                 </ui_button>
-                <ui_button name="btn_preset_bed_petg" width="56" height="32" text="PETG" style_text_font="#font_small">
+                <ui_button name="btn_preset_bed_petg" flex_grow="1" height="#button_height_sm" text="PETG" style_text_font="#font_small">
                   <event_cb trigger="clicked" callback="on_pid_preset_bed_petg"/>
                 </ui_button>
-                <ui_button name="btn_preset_bed_abs" width="56" height="32" text="ABS" style_text_font="#font_small">
+                <ui_button name="btn_preset_bed_abs" flex_grow="1" height="#button_height_sm" text="ABS" style_text_font="#font_small">
                   <event_cb trigger="clicked" callback="on_pid_preset_bed_abs"/>
                 </ui_button>
               </lv_obj>
               <!-- Temperature: [-] 200°C [+] -->
               <lv_obj width="100%"
-                      height="48" style_pad_all="0" flex_flow="row" style_flex_main_place="center"
+                      height="#button_height" style_pad_all="0" flex_flow="row" style_flex_main_place="center"
                       style_flex_cross_place="center" style_pad_gap="#space_md" scrollable="false">
-                <ui_button name="btn_temp_down" width="48" height="48" text="-" translation_tag="-">
+                <ui_button name="btn_temp_down" width="#button_height" height="#button_height" text="-" translation_tag="-">
                   <event_cb trigger="clicked" callback="on_pid_temp_down"/>
                 </ui_button>
                 <lv_label name="temp_display"
                           flex_grow="1" text="200°C" translation_tag="200°C" style_text_font="#font_heading"
                           style_text_align="center" bind_text="pid_temp_display"/>
-                <ui_button name="btn_temp_up" width="48" height="48" text="+" translation_tag="+">
+                <ui_button name="btn_temp_up" width="#button_height" height="#button_height" text="+" translation_tag="+">
                   <event_cb trigger="clicked" callback="on_pid_temp_up"/>
                 </ui_button>
-              </lv_obj>
-              <text_small name="temp_hint"
-                          width="100%" text="Select a material or adjust temperature"
-                          translation_tag="Select a material or adjust temperature" style_text_color="#text_muted"
-                          style_text_align="center" bind_text="pid_temp_hint"/>
-              <!-- Heater Wattage (MPC migration only) -->
-              <lv_obj name="wattage_section"
-                      width="100%" height="content" style_pad_all="0" flex_flow="column" style_pad_gap="#space_xs">
-                <bind_flag_if_eq subject="cal_show_wattage" flag="hidden" ref_value="0"/>
-                <text_body text="Heater Power (Watts)" translation_tag="Heater Power (Watts)"/>
-                <lv_obj width="100%"
-                        height="48" style_pad_all="0" flex_flow="row" style_flex_main_place="center"
-                        style_flex_cross_place="center" style_pad_gap="#space_md" scrollable="false">
-                  <ui_button name="btn_wattage_down" width="48" height="48" text="-" translation_tag="-">
-                    <event_cb trigger="clicked" callback="on_cal_wattage_down"/>
-                  </ui_button>
-                  <lv_label name="wattage_display"
-                            flex_grow="1" text="50W" style_text_font="#font_heading" style_text_align="center"
-                            bind_text="cal_wattage_display"/>
-                  <ui_button name="btn_wattage_up" width="48" height="48" text="+" translation_tag="+">
-                    <event_cb trigger="clicked" callback="on_cal_wattage_up"/>
-                  </ui_button>
-                </lv_obj>
-                <text_small text="Check your heater's rating (typically 40-60W for hotends)"
-                            translation_tag="Check your heater's rating (typically 40-60W for hotends)"
-                            style_text_color="#text_muted"/>
               </lv_obj>
             </lv_obj>
             <!-- Vertical divider -->
             <divider_vertical/>
             <!-- Right column: Fan + Warning (always visible) -->
             <lv_obj height="content" flex_grow="1" style_pad_all="0" flex_flow="column" style_pad_gap="#space_sm">
-              <!-- Part Cooling Fan (extruder only) -->
+              <!-- Part Cooling Fan (PID + extruder only) -->
               <lv_obj name="fan_speed_section"
                       width="100%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
                       style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_sm"
@@ -189,12 +147,13 @@
                 <bind_flag_if_eq subject="cal_show_pid_fan" flag="hidden" ref_value="0"/>
                 <text_body text="Part Cooling Fan" translation_tag="Part Cooling Fan"/>
                 <lv_obj width="100%"
-                        height="content" style_pad_top="#space_md" style_pad_bottom="#space_md"
+                        height="content" style_pad_top="#space_xs" style_pad_bottom="#space_xs"
                         style_pad_left="#space_lg" style_pad_right="#space_md" flex_flow="row"
                         style_flex_cross_place="center" style_pad_gap="#space_md" scrollable="false">
                   <lv_slider name="fan_speed_slider" flex_grow="1" min_value="0" max_value="100" value="0"/>
                   <lv_label name="fan_speed_label"
-                            width="40" text="0%" style_text_font="#font_small" style_text_align="right"/>
+                            width="40" text="0%" style_text_font="#font_small" style_text_align="right"
+                            bind_text="cal_fan_speed_text"/>
                 </lv_obj>
                 <text_small text="Match your typical print fan speed"
                             translation_tag="Match your typical print fan speed" style_text_color="#text_muted"/>
@@ -205,47 +164,80 @@
                       style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_sm">
                 <bind_flag_if_eq subject="cal_show_fan_config" flag="hidden" ref_value="0"/>
                 <text_body text="Fan Calibration" translation_tag="Fan Calibration"/>
-                <text_small text="Measures how cooling fan affects nozzle temperature."
-                            translation_tag="Measures how cooling fan affects nozzle temperature."
-                            style_text_color="#text_muted"/>
                 <lv_obj width="100%"
                         height="content" style_pad_all="0" flex_flow="row" style_pad_gap="#space_xs" scrollable="false">
                   <ui_button name="btn_fan_quick"
-                             height="36" flex_grow="1" text="Quick" translation_tag="Quick"
+                             height="#button_height_sm" flex_grow="1" text="Quick" translation_tag="Quick"
                              style_text_font="#font_small">
                     <bind_style name="pid_heater_selected" subject="cal_fan_is_quick" ref_value="1"/>
                     <bind_style name="pid_heater_unselected" subject="cal_fan_is_quick" ref_value="0"/>
                     <event_cb trigger="clicked" callback="on_cal_fan_quick"/>
                   </ui_button>
                   <ui_button name="btn_fan_detailed"
-                             height="36" flex_grow="1" text="Detailed" translation_tag="Detailed"
+                             height="#button_height_sm" flex_grow="1" text="Detailed" translation_tag="Detailed"
                              style_text_font="#font_small">
                     <bind_style name="pid_heater_selected" subject="cal_fan_is_detailed" ref_value="1"/>
                     <bind_style name="pid_heater_unselected" subject="cal_fan_is_detailed" ref_value="0"/>
                     <event_cb trigger="clicked" callback="on_cal_fan_detailed"/>
                   </ui_button>
                   <ui_button name="btn_fan_thorough"
-                             height="36" flex_grow="1" text="Thorough" translation_tag="Thorough"
+                             height="#button_height_sm" flex_grow="1" text="Thorough" translation_tag="Thorough"
                              style_text_font="#font_small">
                     <bind_style name="pid_heater_selected" subject="cal_fan_is_thorough" ref_value="1"/>
                     <bind_style name="pid_heater_unselected" subject="cal_fan_is_thorough" ref_value="0"/>
                     <event_cb trigger="clicked" callback="on_cal_fan_thorough"/>
                   </ui_button>
                 </lv_obj>
-                <text_small text="More points = more accurate, but takes longer."
+                <text_small width="100%" text="More points = more accurate, but takes longer."
                             translation_tag="More points = more accurate, but takes longer."
+                            style_text_color="#text_muted" long_mode="wrap"/>
+              </lv_obj>
+              <!-- Heater Wattage (MPC migration only) -->
+              <lv_obj name="wattage_section"
+                      width="100%" height="content" style_bg_color="#section_bg_color" style_radius="#border_radius"
+                      style_pad_all="#space_md" flex_flow="column" style_pad_gap="#space_sm">
+                <bind_flag_if_eq subject="cal_show_wattage" flag="hidden" ref_value="0"/>
+                <text_body text="Heater Power" translation_tag="Heater Power"/>
+                <lv_obj width="100%"
+                        height="#button_height" style_pad_all="0" flex_flow="row" style_flex_main_place="center"
+                        style_flex_cross_place="center" style_pad_gap="#space_md" scrollable="false">
+                  <ui_button name="btn_wattage_down" width="#button_height" height="#button_height" text="-" translation_tag="-">
+                    <event_cb trigger="clicked" callback="on_cal_wattage_down"/>
+                  </ui_button>
+                  <lv_label name="wattage_display"
+                            flex_grow="1" text="50W" style_text_font="#font_heading" style_text_align="center"
+                            bind_text="cal_wattage_display"/>
+                  <ui_button name="btn_wattage_up" width="#button_height" height="#button_height" text="+" translation_tag="+">
+                    <event_cb trigger="clicked" callback="on_cal_wattage_up"/>
+                  </ui_button>
+                </lv_obj>
+                <text_small text="Check your heater's rating (typically 40-60W for hotends)"
+                            translation_tag="Check your heater's rating (typically 40-60W for hotends)"
                             style_text_color="#text_muted"/>
               </lv_obj>
-              <!-- Warning (always visible) -->
-              <lv_obj width="100%"
-                      height="content" style_pad_all="0" flex_flow="row" style_flex_cross_place="center"
-                      style_pad_gap="#space_sm" scrollable="false">
-                <icon src="alert" size="sm" variant="warning"/>
-                <text_small text="Takes 3-5 min. Do not interrupt."
-                            translation_tag="Takes 3-5 min. Do not interrupt." style_text_color="#text_muted"
-                            flex_grow="1"/>
-              </lv_obj>
             </lv_obj>
+          </lv_obj>
+        </lv_obj>
+        <!-- Footer warnings (outside scroll, always at bottom) -->
+        <lv_obj width="100%" height="content" style_pad_all="0" flex_flow="column"
+                style_pad_gap="#space_xs" scrollable="false">
+          <!-- Migration warning (MPC needs config change) -->
+          <lv_obj name="migration_warning"
+                  width="100%" height="content" style_pad_all="#space_xs" flex_flow="row"
+                  style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
+            <bind_flag_if_eq subject="cal_needs_migration" flag="hidden" ref_value="0"/>
+            <icon src="alert" size="sm" variant="warning"/>
+            <text_small text="Switching to MPC requires a config change and Klipper restart."
+                        translation_tag="Switching to MPC requires a config change and Klipper restart."
+                        style_text_color="#text_muted" flex_grow="1"/>
+          </lv_obj>
+          <!-- Duration warning (always visible) -->
+          <lv_obj width="100%" height="content" style_pad_all="#space_xs" flex_flow="row"
+                  style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
+            <icon src="alert" size="sm" variant="warning"/>
+            <text_small text="Takes 3-5 min. Do not interrupt."
+                        translation_tag="Takes 3-5 min. Do not interrupt." style_text_color="#text_muted"
+                        flex_grow="1"/>
           </lv_obj>
         </lv_obj>
       </lv_obj>
@@ -320,11 +312,15 @@
       <!-- ================================================================== -->
       <lv_obj name="state_complete"
               width="100%" flex_grow="1" style_pad_all="0" flex_flow="column" style_flex_main_place="center"
-              style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_lg"
+              style_flex_cross_place="center" style_flex_track_place="center" style_pad_gap="#space_md"
               scrollable="false">
         <bind_flag_if_not_eq subject="pid_cal_state" flag="hidden" ref_value="3"/>
-        <icon src="check_circle" size="lg" variant="success"/>
-        <text_heading text="Calibration Complete!" translation_tag="Calibration Complete!" style_text_align="center"/>
+        <!-- Title row: icon + heading inline -->
+        <lv_obj width="content" height="content" style_pad_all="0" flex_flow="row"
+                style_flex_cross_place="center" style_pad_gap="#space_sm" scrollable="false">
+          <icon src="check_circle" size="md" variant="success"/>
+          <text_heading text="Calibration Complete!" translation_tag="Calibration Complete!"/>
+        </lv_obj>
         <text_body name="pid_result_summary"
                    width="80%" bind_text="pid_result_summary" text="Temperature control has been optimized."
                    style_text_align="center" style_text_color="#text_muted"/>
@@ -385,6 +381,8 @@
         <text_small width="80%"
                     text="Saved to printer configuration." translation_tag="Saved to printer configuration."
                     style_text_align="center" style_text_color="#text_muted"/>
+        <!-- Spacer pushes Done button to bottom -->
+        <lv_obj width="0" flex_grow="1" style_pad_all="0" scrollable="false"/>
         <ui_button name="btn_done" width="140" height="#button_height" text="Done" translation_tag="Done">
           <event_cb trigger="clicked" callback="on_pid_done"/>
         </ui_button>
@@ -404,12 +402,12 @@
                     translation_tag="An error occurred during calibration." style_text_align="center" long_mode="wrap"
                     bind_text="pid_error_message"/>
         <lv_obj width="100%"
-                height="56" style_pad_all="0" flex_flow="row" style_flex_main_place="center" style_pad_gap="#space_md"
+                height="#button_height" style_pad_all="0" flex_flow="row" style_flex_main_place="center" style_pad_gap="#space_md"
                 scrollable="false">
-          <ui_button name="btn_close_error" width="140" height="56" text="Close" translation_tag="Close">
+          <ui_button name="btn_close_error" width="140" text="Close" translation_tag="Close">
             <event_cb trigger="clicked" callback="on_pid_done"/>
           </ui_button>
-          <ui_button name="btn_retry" width="140" height="56" text="Retry" translation_tag="Retry" variant="primary">
+          <ui_button name="btn_retry" width="140" text="Retry" translation_tag="Retry" variant="primary">
             <event_cb trigger="clicked" callback="on_pid_retry"/>
           </ui_button>
         </lv_obj>

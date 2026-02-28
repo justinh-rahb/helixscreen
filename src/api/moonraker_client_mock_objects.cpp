@@ -9,6 +9,11 @@
 
 namespace mock_internal {
 
+static bool is_mock_kalico() {
+    const char* env = std::getenv("HELIX_MOCK_KALICO");
+    return env && std::string(env) == "1";
+}
+
 void register_object_handlers(std::unordered_map<std::string, MethodHandler>& registry) {
     // printer.objects.list - List available printer objects
     // When Klippy is in STARTUP or ERROR state, Klipper returns JSON-RPC error -32601
@@ -135,12 +140,9 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
                                                              {"frame_rate", "24"}};
 
                 // Build extruder settings based on HELIX_MOCK_KALICO env var
-                const char* kalico_env_cfg = std::getenv("HELIX_MOCK_KALICO");
-                bool mock_kalico_cfg = kalico_env_cfg && std::string(kalico_env_cfg) == "1";
-
                 json extruder_settings = {
                     {"min_temp", 0.0}, {"max_temp", 300.0}, {"min_extrude_temp", 170.0}};
-                if (mock_kalico_cfg) {
+                if (is_mock_kalico()) {
                     extruder_settings["control"] = "mpc";
                     extruder_settings["heater_power"] = 50.0;
                 } else {
@@ -410,12 +412,9 @@ void register_object_handlers(std::unordered_map<std::string, MethodHandler>& re
             // configfile (printer configuration)
             if (objects.contains("configfile")) {
                 // Build extruder settings based on HELIX_MOCK_KALICO env var
-                const char* kalico_env_cfg2 = std::getenv("HELIX_MOCK_KALICO");
-                bool mock_kalico_cfg2 = kalico_env_cfg2 && std::string(kalico_env_cfg2) == "1";
-
                 json extruder_settings2 = {
                     {"min_temp", 0.0}, {"max_temp", 300.0}, {"min_extrude_temp", 170.0}};
-                if (mock_kalico_cfg2) {
+                if (is_mock_kalico()) {
                     extruder_settings2["control"] = "mpc";
                     extruder_settings2["heater_power"] = 50.0;
                 } else {

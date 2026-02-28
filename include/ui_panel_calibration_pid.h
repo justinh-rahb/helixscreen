@@ -286,6 +286,10 @@ class PIDCalibrationPanel : public OverlayBase {
     lv_subject_t subj_mpc_fan_transfer_;
     char buf_mpc_fan_transfer_[64];
 
+    // Fan speed display subject and buffer
+    lv_subject_t subj_fan_speed_text_;
+    char buf_fan_speed_text_[8];
+
     // Wattage display subject and buffer
     lv_subject_t subj_wattage_display_;
     char buf_wattage_display_[16];
@@ -323,7 +327,6 @@ class PIDCalibrationPanel : public OverlayBase {
 
     // Widget references
     lv_obj_t* fan_slider_ = nullptr;
-    lv_obj_t* fan_speed_label_ = nullptr;
 
     // Temperature graph for calibrating state
     TempControlPanel* temp_control_panel_ = nullptr;
@@ -360,8 +363,8 @@ class PIDCalibrationPanel : public OverlayBase {
     void on_mpc_result(const MoonrakerAdvancedAPI::MPCResult& result);
     void on_mpc_progress(int phase, int total_phases, const std::string& desc);
 
-    // PID fan visibility helper
-    void update_pid_fan_visibility();
+    // Fan section visibility — single source of truth for both subjects
+    void update_fan_section_visibility();
 
     // Event handlers
     void handle_heater_extruder_clicked();

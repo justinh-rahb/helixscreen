@@ -32,12 +32,12 @@
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2025-12-14 | **Last**: 2025-12-31 | **Category**: pattern | **Type**: informational
 > Use centidegrees (int) for temperature subjects to preserve 0.1C resolution. Float subjects lose precision in LVGL binding
 
-### [L025] [**---|***--] Button content centering
-- **Uses**: 9 | **Velocity**: 1 | **Learned**: 2025-12-21 | **Last**: 2026-02-27 | **Category**: pattern | **Type**: constraint
+### [L025] [**---|-----] Button content centering
+- **Uses**: 8 | **Velocity**: 0 | **Learned**: 2025-12-21 | **Last**: 2026-01-30 | **Category**: pattern | **Type**: constraint
 > Text-only buttons: use `align="center"` on child. Icon+text buttons with flex_flow="row": need ALL THREE flex properties - style_flex_main_place="center" (horizontal), style_flex_cross_place="center" (vertical align items), style_flex_track_place="center" (vertical position of row). Missing track_place causes content to sit at top.
 
 ### [L031] [****-|*****] XML no recompile
-- **Uses**: 71 | **Velocity**: 51.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-28 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 65 | **Velocity**: 45.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-28 | **Category**: gotcha | **Type**: constraint
 > XML files are loaded at RUNTIME - never rebuild after XML-only changes. Just relaunch the app. This includes layout changes, styling, bindings, event callbacks - anything in ui_xml/*.xml. Only rebuild when C++ code changes.
 
 ### [L039] [*----|***--] Unique XML callback names
@@ -56,8 +56,8 @@
 - **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-06 | **Last**: 2026-01-23 | **Category**: gotcha | **Type**: constraint
 > LVGL dropdown options in XML use &#10; (newline entity) as separator: options="Auto&#10;3D View&#10;2D Heatmap". NEVER expand &#10; to literal newlines — XML parsers normalize literal newlines in attributes to SPACES (per XML spec), silently breaking all dropdown options into one entry. The format-xml.py correctly round-trips &#10; through lxml, but any tool that writes literal newlines into XML attributes will destroy them.
 
-### [L046] [*----|***--] XML subject shadows C++ subject
-- **Uses**: 2 | **Velocity**: 1 | **Learned**: 2026-01-06 | **Last**: 2026-02-27 | **Category**: correction | **Type**: constraint
+### [L046] [*----|-----] XML subject shadows C++ subject
+- **Uses**: 1 | **Velocity**: 0 | **Learned**: 2026-01-06 | **Last**: 2026-01-30 | **Category**: correction | **Type**: constraint
 > When XML <subjects> declares a subject with the same name as a C++-registered subject (UI_SUBJECT_INIT_AND_REGISTER_*), the XML component-local subject shadows the global C++ one. XML bindings will find the local subject (stuck at default value) instead of the C++ one. Solution: Don't declare XML subjects for values managed entirely by C++.
 
 ### [L048] [*----|-----] Async tests need queue drain
@@ -97,7 +97,7 @@
 > Always use lv_obj_safe_delete() instead of raw lv_obj_delete() - it guards against shutdown race conditions by checking lv_is_initialized() and lv_display_get_next() before deletion, and auto-nulls the pointer to prevent use-after-free
 
 ### [L060] [***--|*****] Interactive UI testing requires user
-- **Uses**: 34 | **Velocity**: 33.01 | **Learned**: 2026-02-01 | **Last**: 2026-02-28 | **Category**: correction | **Type**: constraint
+- **Uses**: 31 | **Velocity**: 30.009999999999998 | **Learned**: 2026-02-01 | **Last**: 2026-02-28 | **Category**: correction | **Type**: constraint
 > NEVER use timed delays expecting automatic navigation. THE EXACT PATTERN THAT WORKS:
 > **Step 1** - Start app with Bash tool using `run_in_background: true`:
 > ```bash
@@ -117,16 +117,16 @@
 - **Uses**: 5 | **Velocity**: 5 | **Learned**: 2026-02-07 | **Last**: 2026-02-25 | **Category**: build
 > AD5M cross-compilation uses 'make ad5m-docker' (Docker-based ARM cross-compile), NOT 'make pi-test' (which targets Raspberry Pi). Deploy with 'AD5M_HOST=192.168.1.67 make ad5m-deploy'. The pi-test target is for a different device entirely.
 
-### [L064] [*----|*****] Commit generated translation artifacts
-- **Uses**: 4 | **Velocity**: 4 | **Learned**: 2026-02-10 | **Last**: 2026-02-28 | **Category**: i18n
+### [L064] [*----|****-] Commit generated translation artifacts
+- **Uses**: 3 | **Velocity**: 3 | **Learned**: 2026-02-10 | **Last**: 2026-02-24 | **Category**: i18n
 > After syncing translation YAML files, must also regenerate and commit the compiled artifacts: src/generated/lv_i18n_translations.c, src/generated/lv_i18n_translations.h, and ui_xml/translations/translations.xml. These are tracked in git (not gitignored) for cross-compilation support. The build regenerates them automatically, but they won't be staged unless you explicitly add them.
 
 ### [L065] [-----|-----] No test-only methods on production classes
 - **Uses**: 0 | **Velocity**: 0 | **Learned**: 2026-02-11 | **Last**: 2026-02-11 | **Category**: patterns
 > WRONG: Adding public methods like reset_for_testing(), clear_startup_grace_period_for_testing() on production classes. Pollutes API, ships test code to users, creates coupling. FOUND: 40+ instances across AbortManager (15 callback simulators), sensor managers, printer state classes. RIGHT: Use friend class pattern — add 'friend class FooTestAccess;' in private section, define FooTestAccess in the test .cpp file with static methods that access private members. Example: FilamentSensorManagerTestAccess::reset(mgr) instead of mgr.reset_for_testing(). For state machine callbacks (like AbortManager), consider a testable interface/mock instead of exposing every internal transition.
 
-### [L066] [*----|*****] LVGL flex_grow row_wrap trick
-- **Uses**: 4 | **Velocity**: 4 | **Learned**: 2026-02-11 | **Last**: 2026-02-24 | **Category**: lvgl
+### [L066] [**---|*****] LVGL flex_grow row_wrap trick
+- **Uses**: 5 | **Velocity**: 5 | **Learned**: 2026-02-11 | **Last**: 2026-02-28 | **Category**: lvgl
 > When using flex_grow on a container with flex_flow=row_wrap, LVGL calculates wrap points based on the container's natural (content) width, NOT the flex-allocated width. Fix: set width="1" + flex_grow="1" — forces LVGL to use the grown width for wrapping. Without this, children overflow instead of wrapping.
 
 ### [L067] [*----|****-] Wrap C++ UI strings in lv_tr()
@@ -138,15 +138,15 @@
 > When deleting LVGL objects that have animations with completion callbacks, ALWAYS cancel animations FIRST (lv_anim_delete) before lv_obj_delete/lv_obj_safe_delete. The completion callback may fire synchronously during lv_anim_delete, causing use-after-free if the object is already freed. Pattern: (1) nullify member pointer, (2) clear state flags, (3) lv_anim_delete, (4) lv_obj_delete. For animations using 'this' as var: set guard flags to false BEFORE lv_anim_delete so callbacks become no-ops.
 
 ### [L069] [**---|*****] Never assume lv_obj user_data ownership — it may already be set
-- **Uses**: 7 | **Velocity**: 7 | **Learned**: 2026-02-15 | **Last**: 2026-02-27 | **Category**: architecture
+- **Uses**: 6 | **Velocity**: 6 | **Learned**: 2026-02-15 | **Last**: 2026-02-24 | **Category**: architecture
 > LVGL's lv_obj_set_user_data() is a single shared slot per object. Custom XML widgets, component handlers, and LVGL internals may set user_data during object creation (e.g., ui_button stores button_data_t*, severity_card stores a severity string). NEVER call delete/free on lv_obj_get_user_data() unless you are 100% certain you set it yourself on that specific object. NEVER use user_data as general-purpose storage on objects you didn't fully create — XML components and custom widgets may have claimed it already. **CRITICAL: NEVER walk parent chain checking any non-null user_data to find an instance pointer** — ui_button and other widgets set their own user_data, so the traversal will find the WRONG data and miscast it (caused SEGFAULT in AmsOperationSidebar/AmsDryerCard). Instead, walk parents checking `lv_obj_get_name()` for a specific known name, THEN read user_data from that named object. For per-item data, prefer: (1) event callback user_data (separate per-callback), (2) a C++ side container (map/vector indexed by object pointer), or (3) lv_obj_find_by_name to stash data in a hidden child label.
 
-### [L071] [***--|*****] XML child click passthrough
-- **Uses**: 13 | **Velocity**: 12 | **Learned**: 2026-02-21 | **Last**: 2026-02-27 | **Category**: ui | **Type**: constraint
+### [L071] [**---|*****] XML child click passthrough
+- **Uses**: 9 | **Velocity**: 8 | **Learned**: 2026-02-21 | **Last**: 2026-02-26 | **Category**: ui | **Type**: constraint
 > When a parent view has an event_cb for "clicked", all child objects (lv_obj, icon, text_body, text_tiny, etc.) must have `clickable="false" event_bubble="true"` or they absorb the click before it reaches the parent's callback. LVGL objects are clickable by default.
 
-### [L070] [**---|*****] Don't lv_tr() non-translatable strings
-- **Uses**: 6 | **Velocity**: 6 | **Learned**: 2026-02-17 | **Last**: 2026-02-28 | **Category**: i18n
+### [L070] [*----|****-] Don't lv_tr() non-translatable strings
+- **Uses**: 3 | **Velocity**: 3 | **Learned**: 2026-02-17 | **Last**: 2026-02-24 | **Category**: i18n
 > Never wrap product names (Spoolman, Klipper, Moonraker, HelixScreen), URLs/domains, technical abbreviations used as standalone labels (AMS, QGL, ADXL), or universal terms (OK, WiFi) in lv_tr(). Add '// i18n: do not translate' comment explaining why. Sentences CONTAINING product names ARE translatable — 'Restarting HelixScreen...' is fine because 'Restarting' translates. Material names (PLA, PETG, ABS, TPU, PA) also don't get translated or translation_tag in XML.
 
 ### [L072] [**---|*****] Never capture bare this in async/WebSocket callbacks
