@@ -81,6 +81,15 @@ class AmsBackendHappyHareTestHelper : public AmsBackendHappyHare {
         return entry ? &entry->info : nullptr;
     }
 
+    /**
+     * @brief Get const SlotEntry pointer for test assertions (includes sensors)
+     * @param slot_index Global slot index
+     * @return Pointer to SlotEntry or nullptr
+     */
+    const helix::printer::SlotEntry* get_slot_entry(int slot_index) const {
+        return slots_.get(slot_index);
+    }
+
     // G-code capture for persistence tests
     std::vector<std::string> captured_gcodes;
 
@@ -1545,4 +1554,46 @@ TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU num_gates array multi-unit 
     REQUIRE(info.units.size() == 2);
     REQUIRE(info.units[0].slot_count == 6);
     REQUIRE(info.units[1].slot_count == 4);
+}
+
+// ============================================================================
+// EMU aggregate sensor format
+// ============================================================================
+
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU aggregate sensor format",
+                 "[ams][happy_hare][emu]") {
+    initialize_test_gates(4);
+
+    SECTION("aggregate sensors with active gate") {
+        nlohmann::json mmu_data = {
+            {"gate", 0},
+            {"sensors",
+             {{"mmu_pre_gate", true}, {"mmu_gear", true}, {"extruder", true}, {"toolhead", true}}}};
+        test_parse_mmu_state(mmu_data);
+
+        auto info = get_system_info();
+        REQUIRE(info.units[0].has_slot_sensors == true);
+
+        // All gates should report having pre-gate sensors
+        auto slot0 = get_slot_entry(0);
+        REQUIRE(slot0 != nullptr);
+        REQUIRE(slot0->sensors.has_pre_gate_sensor == true);
+        REQUIRE(slot0->sensors.pre_gate_triggered == true);
+
+        // Other gates have sensor hardware but we only know current gate's reading
+        auto slot1 = get_slot_entry(1);
+        REQUIRE(slot1 != nullptr);
+        REQUIRE(slot1->sensors.has_pre_gate_sensor == true);
+    }
+
+    SECTION("aggregate sensors with different active gate") {
+        nlohmann::json mmu_data = {{"gate", 2},
+                                   {"sensors", {{"mmu_pre_gate", false}, {"mmu_gear", true}}}};
+        test_parse_mmu_state(mmu_data);
+
+        auto slot2 = get_slot_entry(2);
+        REQUIRE(slot2 != nullptr);
+        REQUIRE(slot2->sensors.has_pre_gate_sensor == true);
+        REQUIRE(slot2->sensors.pre_gate_triggered == false);
+    }
 }

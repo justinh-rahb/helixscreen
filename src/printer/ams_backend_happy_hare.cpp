@@ -694,6 +694,32 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
                           gate_idx, entry->sensors.pre_gate_triggered);
         }
 
+        // If no per-gate sensors found, check for aggregate format (EMU)
+        // EMU reports "mmu_pre_gate" (bool) and "mmu_gear" (bool) for the active gate
+        if (!any_sensor && sensors.contains("mmu_pre_gate")) {
+            bool pre_gate_val =
+                sensors["mmu_pre_gate"].is_boolean() && sensors["mmu_pre_gate"].get<bool>();
+
+            // Mark all gates as having pre-gate sensors (EMU has them on every gate)
+            for (int i = 0; i < slots_.slot_count(); ++i) {
+                auto* entry = slots_.get_mut(i);
+                if (entry) {
+                    entry->sensors.has_pre_gate_sensor = true;
+                }
+            }
+
+            // Update the current gate's sensor reading
+            if (system_info_.current_slot >= 0) {
+                auto* entry = slots_.get_mut(system_info_.current_slot);
+                if (entry) {
+                    entry->sensors.pre_gate_triggered = pre_gate_val;
+                }
+            }
+
+            any_sensor = true;
+            spdlog::trace("[AMS HappyHare] Aggregate sensors: pre_gate={}", pre_gate_val);
+        }
+
         // Update has_slot_sensors flag on units based on actual sensor data
         for (auto& unit : system_info_.units) {
             unit.has_slot_sensors = any_sensor;
