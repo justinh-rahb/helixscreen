@@ -43,9 +43,9 @@ detect_platform() {
     fi
 
     # Check for FlashForge AD5X (MIPS with /usr/data and FlashForge indicators)
-    # AD5X uses Ingenic X2600 (MIPS), has /usr/prog/ and /usr/data/ layout
+    # AD5X uses Ingenic X2600 (MIPS); identified by /usr/prog/ dir or /ZMOD file alongside /usr/data/
     if [ "$arch" = "mips" ]; then
-        if [ -d "/usr/data" ] && [ -d "/usr/prog" ]; then
+        if [ -d "/usr/data" ] && { [ -d "/usr/prog" ] || [ -f "/ZMOD" ]; }; then
             echo "ad5x"
             return
         fi
@@ -376,9 +376,9 @@ set_install_paths() {
         esac
     elif [ "$platform" = "ad5x" ]; then
         # FlashForge AD5X - uses ZMOD, /usr/data structure
-        INSTALL_DIR="/usr/data/helixscreen"
+        INSTALL_DIR="/srv/helixscreen"
         INIT_SCRIPT_DEST="/etc/init.d/S80helixscreen"
-        PREVIOUS_UI_SCRIPT="/etc/init.d/S80guppyscreen"
+        PREVIOUS_UI_SCRIPT=""
         log_info "Platform: FlashForge AD5X (ZMOD)"
         log_info "Install directory: ${INSTALL_DIR}"
     elif [ "$platform" = "k1" ]; then

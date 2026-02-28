@@ -1051,6 +1051,17 @@ TEST_CASE("TouchCalibration: parse_abs_capabilities real-world devices",
         REQUIRE(caps.has_multitouch == true);
     }
 
+    SECTION("Goodix gt9xx_ts on 64-bit Allwinner (real user device)") {
+        // From /proc/bus/input/devices on Allwinner H616 (aarch64):
+        //   B: ABS=265000000000000
+        // Single 64-bit word (>8 hex digits). Bits set:
+        //   48 (MT_TOUCH_MAJOR), 50 (MT_WIDTH_MAJOR),
+        //   53 (MT_POSITION_X), 54 (MT_POSITION_Y), 57 (MT_TRACKING_ID)
+        auto caps = parse_abs_capabilities("265000000000000");
+        REQUIRE(caps.has_single_touch == false);
+        REQUIRE(caps.has_multitouch == true);
+    }
+
     SECTION("Goodix GT911 with both ST and MT") {
         // Many Goodix drivers report both legacy and MT axes
         auto caps = parse_abs_capabilities("660000 3");

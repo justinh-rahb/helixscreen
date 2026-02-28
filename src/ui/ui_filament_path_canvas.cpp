@@ -1132,11 +1132,13 @@ static void draw_curved_hollow_tube(lv_layer_t* layer, int32_t x0, int32_t y0, i
 
 static void draw_hub_box(lv_layer_t* layer, int32_t cx, int32_t cy, int32_t width, int32_t height,
                          lv_color_t bg_color, lv_color_t border_color, lv_color_t text_color,
-                         const lv_font_t* font, int32_t radius, const char* label) {
+                         const lv_font_t* font, int32_t radius, const char* label,
+                         lv_opa_t bg_opa = LV_OPA_COVER) {
     // Background
     lv_draw_fill_dsc_t fill_dsc;
     lv_draw_fill_dsc_init(&fill_dsc);
     fill_dsc.color = bg_color;
+    fill_dsc.opa = bg_opa;
     fill_dsc.radius = radius;
 
     lv_area_t box_area = {cx - width / 2, cy - height / 2, cx + width / 2, cy + height / 2};
@@ -1766,8 +1768,29 @@ static void filament_path_draw_cb(lv_event_t* e) {
             hub_w = (last_slot_x - first_slot_x) + slot_pad;
         }
 
+        lv_opa_t hub_opa = (data->topology == 0) ? LV_OPA_60 : LV_OPA_COVER;
         draw_hub_box(layer, center_x, hub_y, hub_w, hub_h, hub_bg_tinted, hub_border_final,
-                     data->color_text, data->label_font, data->border_radius, hub_label);
+                     data->color_text, data->label_font, data->border_radius, hub_label, hub_opa);
+
+        // Draw filament tube through SELECTOR (LINEAR topology only)
+        if (data->topology == 0 && data->active_slot >= 0) {
+            int32_t sel_top = hub_y - hub_h / 2;
+            int32_t sel_bot = hub_y + hub_h / 2;
+            bool hub_active = is_segment_active(PathSegment::HUB, fil_seg);
+
+            if (hub_active) {
+                lv_color_t tube_color = active_color;
+                if (has_error && error_seg == PathSegment::HUB) {
+                    tube_color = error_color;
+                }
+                draw_glow_line(layer, output_x, sel_top, output_x, sel_bot, tube_color,
+                               line_active);
+                draw_vertical_line(layer, output_x, sel_top, sel_bot, tube_color, line_active);
+            } else {
+                draw_hollow_vertical_line(layer, output_x, sel_top, sel_bot, idle_color, bg_color,
+                                          line_active);
+            }
+        }
     }
 
     // ========================================================================

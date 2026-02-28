@@ -491,7 +491,7 @@ void AmsBackendAfc::handle_status_update(const nlohmann::json& notification) {
             }
         }
 
-        // Parse unit-level Klipper objects (AFC_BoxTurtle, AFC_OpenAMS)
+        // Parse unit-level Klipper objects (AFC_BoxTurtle, AFC_OpenAMS, AFC_vivid)
         for (auto& unit_info : unit_infos_) {
             if (params.contains(unit_info.klipper_key) &&
                 params[unit_info.klipper_key].is_object()) {
@@ -691,11 +691,17 @@ void AmsBackendAfc::parse_afc_state(const nlohmann::json& afc_data,
                     info.name = unit_str.substr(space_pos + 1);
                     // AFC convention: Klipper object prefix is "AFC_" + type with underscores
                     // removed. Known mappings: "Box_Turtle" → "AFC_BoxTurtle", "OpenAMS" →
-                    // "AFC_OpenAMS" If this convention breaks for future types, use an explicit
-                    // mapping table.
-                    std::string klipper_type = info.type;
-                    klipper_type.erase(std::remove(klipper_type.begin(), klipper_type.end(), '_'),
-                                       klipper_type.end());
+                    // "AFC_OpenAMS". Exception: "ViViD" → "AFC_vivid" (Klipper filename is
+                    // lowercase, doesn't follow the strip-underscore convention).
+                    std::string klipper_type;
+                    if (info.type == "ViViD") {
+                        klipper_type = "vivid";
+                    } else {
+                        klipper_type = info.type;
+                        klipper_type.erase(
+                            std::remove(klipper_type.begin(), klipper_type.end(), '_'),
+                            klipper_type.end());
+                    }
                     info.klipper_key = "AFC_" + klipper_type + " " + info.name;
                     unit_infos_.push_back(std::move(info));
                     spdlog::debug("[AMS AFC] Parsed string unit: type='{}' name='{}' key='{}'",
@@ -1347,8 +1353,9 @@ void AmsBackendAfc::detect_afc_version() {
                             helix::ui::async_call(
                                 [](void* data) {
                                     auto* m = static_cast<std::string*>(data);
-                                    helix::ui::modal_show_alert("AFC Version Warning", m->c_str(),
-                                                                ModalSeverity::Warning, "OK");
+                                    helix::ui::modal_show_alert(lv_tr("AFC Version Warning"),
+                                                                m->c_str(), ModalSeverity::Warning,
+                                                                lv_tr("OK"));
                                     delete m;
                                 },
                                 msg);
@@ -1450,7 +1457,7 @@ void AmsBackendAfc::query_initial_state() {
         objects_to_query["AFC_extruder extruder"] = nullptr;
     }
 
-    // Add unit-level Klipper objects (AFC_BoxTurtle, AFC_OpenAMS)
+    // Add unit-level Klipper objects (AFC_BoxTurtle, AFC_OpenAMS, AFC_vivid)
     for (const auto& unit_info : unit_infos_) {
         objects_to_query[unit_info.klipper_key] = nullptr;
     }

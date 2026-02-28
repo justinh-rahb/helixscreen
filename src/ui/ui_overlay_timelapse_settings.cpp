@@ -13,6 +13,7 @@
 #include "ui_update_queue.h"
 
 #include "helix-xml/src/xml/lv_xml.h"
+#include "lvgl/src/others/translation/lv_translation.h"
 #include "runtime_config.h"
 #include "static_panel_registry.h"
 #include "theme_manager.h"
@@ -467,7 +468,7 @@ void TimelapseSettingsOverlay::populate_video_list(const std::vector<FileInfo>& 
 
                 g_timelapse_settings->delete_confirmation_dialog_ =
                     helix::ui::modal_show_confirmation(
-                        "Delete Video?", filename, ModalSeverity::Warning, "Delete",
+                        lv_tr("Delete Video?"), filename, ModalSeverity::Warning, lv_tr("Delete"),
                         on_delete_video_confirmed, on_delete_video_cancelled, nullptr);
             },
             LV_EVENT_CLICKED, nullptr);

@@ -1030,7 +1030,7 @@ void ControlsPanel::handle_home_all() {
         operation_guard_.begin(300000, [] { NOTIFY_WARNING("Homing timed out"); });
         NOTIFY_INFO("Homing all axes...");
         api_->motion().home_axes(
-            "XYZ",
+            "",
             [this]() {
                 helix::ui::async_call(
                     [](void* ud) { static_cast<ControlsPanel*>(ud)->operation_guard_.end(); },

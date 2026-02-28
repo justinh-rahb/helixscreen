@@ -12,6 +12,7 @@
 #include "gcode_parser.h"
 #include "gcode_streaming_config.h"
 #include "gcode_streaming_controller.h"
+#include "geometry_budget_manager.h"
 #include "lvgl/src/others/translation/lv_translation.h"
 #include "memory_utils.h"
 #include "theme_manager.h"
@@ -214,6 +215,7 @@ class GCodeViewerState {
     lv_color_t external_color_override{};       ///< Stored override color for lazy-init renderers
     std::vector<uint32_t> tool_color_overrides; ///< Per-tool AMS colors for lazy-init renderers
     bool first_render{true};
+    bool needs_3d_refresh_{false}; ///< Force one extra frame after first GPU render
     bool rendering_paused_{
         false}; ///< When true, draw_cb skips rendering (for visibility optimization)
 
@@ -248,11 +250,17 @@ class GCodeViewerState {
     /// Render mode setting - configurable via HELIX_GCODE_MODE env var
     GcodeViewerRenderMode render_mode_{GcodeViewerRenderMode::Layer2D};
 
+    /// Budget system forced 2D for current file (reset on each new load)
+    bool budget_forced_2d_{false};
+
+    /// Disable streaming mode (detail panel uses full-load + budget instead)
+    bool streaming_disabled_{false};
+
     /// Helper to check if currently using 2D layer renderer
     bool is_using_2d_mode() const {
 #ifdef ENABLE_3D_RENDERER
         // With GPU-accelerated GLES: Auto defaults to 3D, only Layer2D forces 2D
-        return render_mode_ == GcodeViewerRenderMode::Layer2D;
+        return render_mode_ == GcodeViewerRenderMode::Layer2D || budget_forced_2d_;
 #else
         // Without 3D renderer: only explicit Render3D would use 3D (but it's not available)
         return render_mode_ != GcodeViewerRenderMode::Render3D;
@@ -500,6 +508,19 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
     } else {
         // 3D GLES Renderer (isometric ribbon view)
         st->renderer_->render(layer, *st->gcode_file, *st->camera_, &widget_coords);
+
+#ifdef ENABLE_3D_RENDERER
+        // During chunked VBO upload, renderer returns early without drawing.
+        // After the first real GPU render, force one extra frame so the
+        // cached-buffer path (no GL context switch) blits cleanly.
+        if (st->renderer_->is_uploading() || st->needs_3d_refresh_) {
+            if (!st->renderer_->is_uploading()) {
+                st->needs_3d_refresh_ = false;
+            }
+            helix::ui::async_call(
+                obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
+        }
+#endif
     }
 
     auto render_end = std::chrono::high_resolution_clock::now();
@@ -997,6 +1018,7 @@ struct AsyncBuildResult {
 #endif
     std::string error_msg;
     bool success{true};
+    bool force_2d = false; ///< Budget system forced 2D fallback
 };
 
 /**
@@ -1014,7 +1036,8 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
 
     spdlog::info("[GCode Viewer] Loading file async: {}", file_path);
     st->viewer_state = GcodeViewerState::Loading;
-    st->first_render = true; // Reset for new file
+    st->first_render = true;       // Reset for new file
+    st->budget_forced_2d_ = false; // Reset budget 2D override for new file
 
     // Bump generation so any in-flight async callbacks from a prior load are rejected
     const uint64_t gen = st->bump_generation();
@@ -1036,7 +1059,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
         file_size = 0; // Fall through to full-load mode
     }
 
-    bool use_streaming = helix::should_use_gcode_streaming(file_size);
+    bool use_streaming = !st->streaming_disabled_ && helix::should_use_gcode_streaming(file_size);
     spdlog::info("[GCode Viewer] File size: {}KB, streaming mode: {}", file_size / 1024,
                  use_streaming ? "ON" : "OFF");
 
@@ -1254,53 +1277,86 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                               result->gcode_file->total_segments);
 
 #ifdef ENABLE_3D_RENDERER
-                // PHASE 2: Build 3D geometry (slow, 1-5s for large files)
-                // This is thread-safe - no OpenGL calls, just CPU work
-                // SKIP entirely for 2D mode - 2D renderer uses ParsedGCodeFile directly
+                // PHASE 2: Budget-aware 3D geometry build
                 if (!st->is_using_2d_mode()) {
-                    // Helper lambda to configure a builder with common settings
-                    auto configure_builder = [&](helix::gcode::GeometryBuilder& builder) {
-                        if (!result->gcode_file->tool_color_palette.empty()) {
-                            builder.set_tool_color_palette(result->gcode_file->tool_color_palette);
+                    // Assess system memory and calculate budget
+                    helix::gcode::GeometryBudgetManager budget_mgr;
+                    size_t available_kb = budget_mgr.read_system_available_kb();
+                    size_t budget = budget_mgr.calculate_budget(available_kb);
+
+                    auto budget_config =
+                        budget_mgr.select_tier(result->gcode_file->total_segments, budget);
+
+                    spdlog::info("[GCode Viewer] Memory: {}MB available, {}MB budget, "
+                                 "{} segments -> tier {}",
+                                 available_kb / 1024, budget / (1024 * 1024),
+                                 result->gcode_file->total_segments, budget_config.tier);
+
+                    if (budget_config.tier <= 3) {
+                        // Tier 1-3: Build 3D geometry with budget constraints
+                        auto configure_builder = [&](helix::gcode::GeometryBuilder& builder) {
+                            if (!result->gcode_file->tool_color_palette.empty()) {
+                                builder.set_tool_color_palette(
+                                    result->gcode_file->tool_color_palette);
+                            }
+                            if (result->gcode_file->perimeter_extrusion_width_mm > 0.0f) {
+                                builder.set_extrusion_width(
+                                    result->gcode_file->perimeter_extrusion_width_mm);
+                            } else if (result->gcode_file->extrusion_width_mm > 0.0f) {
+                                builder.set_extrusion_width(result->gcode_file->extrusion_width_mm);
+                            }
+                            builder.set_layer_height(result->gcode_file->layer_height_mm);
+                            builder.set_budget_tube_sides(budget_config.tube_sides);
+                            builder.set_budget_limit(budget_config.budget_bytes);
+                        };
+
+                        {
+                            helix::gcode::GeometryBuilder builder;
+                            configure_builder(builder);
+
+                            helix::gcode::SimplificationOptions opts{
+                                .tolerance_mm = budget_config.simplification_tolerance,
+                                .min_segment_length_mm = 0.05f,
+                                .max_direction_change_deg = budget_config.tier >= 3   ? 45.0f
+                                                            : budget_config.tier == 2 ? 30.0f
+                                                                                      : 15.0f};
+
+                            result->geometry = std::make_unique<helix::gcode::RibbonGeometry>(
+                                builder.build(*result->gcode_file, opts));
+
+                            if (builder.was_budget_exceeded()) {
+                                spdlog::warn("[GCode Viewer] Budget exceeded — falling back to 2D");
+                                result->geometry.reset();
+                                result->force_2d = true;
+                            } else {
+                                spdlog::info("[GCode Viewer] Built geometry: "
+                                             "{} vertices, {} triangles (tier {})",
+                                             result->geometry->vertices.size(),
+                                             result->geometry->extrusion_triangle_count +
+                                                 result->geometry->travel_triangle_count,
+                                             budget_config.tier);
+                                // Pre-compute interleaved vertex buffers on background thread
+                                // so UI thread only does fast GL upload (no
+                                // dequantization/expansion)
+                                result->geometry->prepare_interleaved_buffers();
+                            }
                         }
-                        if (result->gcode_file->perimeter_extrusion_width_mm > 0.0f) {
-                            builder.set_extrusion_width(
-                                result->gcode_file->perimeter_extrusion_width_mm);
-                        } else if (result->gcode_file->extrusion_width_mm > 0.0f) {
-                            builder.set_extrusion_width(result->gcode_file->extrusion_width_mm);
+
+                        if (!result->force_2d) {
+                            size_t freed = result->gcode_file->clear_segments();
+                            spdlog::info("[GCode Viewer] Freed {} MB of parsed segment data",
+                                         freed / (1024 * 1024));
                         }
-                        builder.set_layer_height(result->gcode_file->layer_height_mm);
-                    };
-
-                    {
-                        helix::gcode::GeometryBuilder builder;
-                        configure_builder(builder);
-
-                        helix::gcode::SimplificationOptions opts{.tolerance_mm = 0.5f,
-                                                                 .min_segment_length_mm = 0.05f};
-
-                        result->geometry = std::make_unique<helix::gcode::RibbonGeometry>(
-                            builder.build(*result->gcode_file, opts));
-
-                        spdlog::info("[GCode Viewer] Built geometry: {} vertices, {} triangles",
-                                     result->geometry->vertices.size(),
-                                     result->geometry->extrusion_triangle_count +
-                                         result->geometry->travel_triangle_count);
+                    } else {
+                        // Tier 4-5: Skip geometry build entirely
+                        spdlog::info("[GCode Viewer] Tier {} — skipping 3D geometry build",
+                                     budget_config.tier);
+                        result->force_2d = true;
                     }
-
-                    // Free parsed segment data - 3D mode doesn't need raw segments
-                    // This releases 40-160MB on large files while preserving metadata
-                    size_t freed = result->gcode_file->clear_segments();
-                    spdlog::info("[GCode Viewer] Freed {} MB of parsed segment data",
-                                 freed / (1024 * 1024));
                 } else {
-                    // 2D mode: Skip geometry building entirely
-                    // Preserve segments for 2D renderer (uses ParsedGCodeFile directly)
                     spdlog::debug("[GCode Viewer] 2D mode - skipping 3D geometry build");
                 }
 #else
-                // 2D renderer: No geometry building needed
-                // The renderer uses ParsedGCodeFile directly for 2D line drawing
                 spdlog::debug("[GCode Viewer] 2D renderer - skipping geometry build");
 #endif
             }
@@ -1357,6 +1413,34 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
                         st->layer_renderer_2d_->auto_fit();
                     }
 
+                    if (r->force_2d) {
+                        // Budget-forced 2D fallback for this file only
+                        spdlog::info("[GCode Viewer] Using 2D renderer (budget fallback)");
+                        st->budget_forced_2d_ = true;
+                        if (!st->layer_renderer_2d_) {
+                            st->layer_renderer_2d_ =
+                                std::make_unique<helix::gcode::GCodeLayerRenderer>();
+                        }
+                        st->layer_renderer_2d_->set_gcode(st->gcode_file.get());
+                        if (!st->gcode_file->tool_color_palette.empty()) {
+                            st->layer_renderer_2d_->set_tool_color_palette(
+                                st->gcode_file->tool_color_palette);
+                        }
+
+                        // Apply color: external override takes priority
+                        if (st->has_external_color_override) {
+                            st->layer_renderer_2d_->set_extrusion_color(
+                                st->external_color_override);
+                        } else if (!st->gcode_file->filament_color_hex.empty()) {
+                            lv_color_t color = lv_color_hex(static_cast<uint32_t>(std::strtol(
+                                st->gcode_file->filament_color_hex.c_str() + 1, nullptr, 16)));
+                            st->layer_renderer_2d_->set_extrusion_color(color);
+                        }
+
+                        st->layer_renderer_2d_->auto_fit();
+                        lv_obj_invalidate(obj);
+                    }
+
                 // Set pre-built geometry on renderer
 #ifdef ENABLE_3D_RENDERER
                     if (r->geometry) {
@@ -1393,6 +1477,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
 
                     // Clear first_render flag to allow actual rendering on next draw
                     st->first_render = false;
+                    st->needs_3d_refresh_ = true;
 
                     // Trigger redraw (will render geometry now that first_render is false)
                     lv_obj_invalidate(obj);
@@ -1583,6 +1668,13 @@ void ui_gcode_viewer_evaluate_render_mode(lv_obj_t* obj) {
 bool ui_gcode_viewer_is_using_2d_mode(lv_obj_t* obj) {
     gcode_viewer_state_t* st = get_state(obj);
     return st ? st->is_using_2d_mode() : false;
+}
+
+void ui_gcode_viewer_disable_streaming(lv_obj_t* obj) {
+    gcode_viewer_state_t* st = get_state(obj);
+    if (st) {
+        st->streaming_disabled_ = true;
+    }
 }
 
 void ui_gcode_viewer_set_show_supports(lv_obj_t* obj, bool show) {

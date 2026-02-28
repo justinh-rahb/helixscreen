@@ -195,37 +195,46 @@ PanelWidgetManager::populate_widgets(const std::string& panel_id, lv_obj_t* cont
 
         bool first = true;
         for (size_t i = start; i < start + count && i < enabled_widgets.size(); ++i) {
-            // Add divider between widgets (not before first)
-            if (!first) {
-                const char* div_attrs[] = {"height", "80%", nullptr, nullptr};
-                lv_xml_create(row, "divider_vertical", div_attrs);
-            }
+            try {
+                auto& slot = enabled_widgets[i];
 
-            auto& slot = enabled_widgets[i];
-            auto* widget =
-                static_cast<lv_obj_t*>(lv_xml_create(row, slot.component_name.c_str(), nullptr));
-            if (widget) {
-                first = false;
-                spdlog::debug("[PanelWidgetManager] Created widget: {} (component: {})",
-                              slot.widget_id, slot.component_name);
-
-                // Attach the pre-created PanelWidget instance if present
-                if (slot.instance) {
-                    slot.instance->attach(widget, lv_scr_act());
-                    slot.instance->set_row_density(count);
-                    result.push_back(std::move(slot.instance));
+                // Add divider between widgets (inside try so it's cleaned up on failure)
+                lv_obj_t* div = nullptr;
+                if (!first) {
+                    const char* div_attrs[] = {"height", "80%", nullptr, nullptr};
+                    div = static_cast<lv_obj_t*>(lv_xml_create(row, "divider_vertical", div_attrs));
                 }
 
-                // Propagate row density to AMS mini status (pure XML widget, no PanelWidget)
-                if (slot.widget_id == "ams") {
-                    lv_obj_t* ams_child = lv_obj_get_child(widget, 0);
-                    if (ams_child && ui_ams_mini_status_is_valid(ams_child)) {
-                        ui_ams_mini_status_set_row_density(ams_child, static_cast<int>(count));
+                auto* widget = static_cast<lv_obj_t*>(
+                    lv_xml_create(row, slot.component_name.c_str(), nullptr));
+                if (widget) {
+                    first = false;
+                    spdlog::debug("[PanelWidgetManager] Created widget: {} (component: {})",
+                                  slot.widget_id, slot.component_name);
+
+                    // Attach the pre-created PanelWidget instance if present
+                    if (slot.instance) {
+                        slot.instance->attach(widget, lv_scr_act());
+                        slot.instance->set_row_density(count);
+                        result.push_back(std::move(slot.instance));
                     }
+
+                    // Propagate row density to AMS mini status (pure XML widget, no PanelWidget)
+                    if (slot.widget_id == "ams") {
+                        lv_obj_t* ams_child = lv_obj_get_child(widget, 0);
+                        if (ams_child && ui_ams_mini_status_is_valid(ams_child)) {
+                            ui_ams_mini_status_set_row_density(ams_child, static_cast<int>(count));
+                        }
+                    }
+                } else {
+                    if (div)
+                        lv_obj_delete(div);
+                    spdlog::warn("[PanelWidgetManager] Failed to create widget: {} (component: {})",
+                                 slot.widget_id, slot.component_name);
                 }
-            } else {
-                spdlog::warn("[PanelWidgetManager] Failed to create widget: {} (component: {})",
-                             slot.widget_id, slot.component_name);
+            } catch (const std::exception& e) {
+                spdlog::error("[PanelWidgetManager] Widget '{}' creation failed: {}",
+                              enabled_widgets[i].widget_id, e.what());
             }
         }
     };

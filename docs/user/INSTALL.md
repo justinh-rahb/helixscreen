@@ -14,6 +14,7 @@ This guide walks you through installing HelixScreen on your 3D printer's touchsc
 - [Flashforge Adventurer 5M Installation](#flashforge-adventurer-5m-installation)
 - [Creality K1 Installation](#creality-k1-series-simple-af)
 - [Creality K2 Series (Untested)](#creality-k2-series-untested)
+- [FlashForge Adventurer 5X (Testing)](#flashforge-adventurer-5x-testing)
 - [Elegoo Centauri Carbon 1 (Testing)](#elegoo-centauri-carbon-1-testing)
 - [First Boot & Setup Wizard](#first-boot--setup-wizard)
 - [Display Configuration](#display-configuration)
@@ -38,6 +39,8 @@ curl -sSL https://raw.githubusercontent.com/prestonbrown/helixscreen/main/script
 The installer automatically detects your platform and downloads the correct release.
 
 **Flashforge Adventurer 5M:** The easiest option is our [ready-made firmware image](https://github.com/prestonbrown/ff5m) — just flash from a USB drive. For manual installation on existing Forge-X or Klipper Mod setups, see [Flashforge Adventurer 5M Installation](#flashforge-adventurer-5m-installation).
+
+**Flashforge Adventurer 5X:** Install [ZMOD](https://github.com/ghzserg/zmod), which manages HelixScreen installation and updates. See [FlashForge Adventurer 5X (Testing)](#flashforge-adventurer-5x-testing).
 
 > **Note:** Both `bash` and `sh` work. The installer is POSIX-compatible for BusyBox environments.
 
@@ -174,6 +177,27 @@ On uninstall, GuppyScreen is restored.
 - See `docs/printer-research/CREALITY_K2_PLUS_RESEARCH.md` for full research and open questions
 
 **If you want to help test**, run the diagnostic commands in the research doc (Section 13) and report back via [GitHub Issues](https://github.com/prestonbrown/helixscreen/issues).
+
+### FlashForge Adventurer 5X (Testing)
+
+> **Active testing is underway on this platform.** Prebuilt binaries are included in releases. Installation is handled through the ZMOD firmware modification.
+
+- **Hardware:**
+  - FlashForge Adventurer 5X
+  - Built-in 4.3" touchscreen (800x480)
+  - Network connection
+
+- **Software:**
+  - [ZMOD](https://github.com/ghzserg/zmod) firmware modification installed
+  - ZMOD provides Klipper, Moonraker, and SSH access
+
+**Current status:**
+- Dedicated build target: `ad5x` with its own toolchain and release binary
+- Prebuilt `ad5x` binaries are included in GitHub releases
+- ZMOD manages installation and updates via Moonraker update manager
+- IFS (4-channel filament system) support is not yet implemented
+
+**If you're testing on this printer**, please report your results via [GitHub Issues](https://github.com/prestonbrown/helixscreen/issues) or [Discord](https://discord.gg/RZCT2StKhr).
 
 ### Elegoo Centauri Carbon 1 (Testing)
 

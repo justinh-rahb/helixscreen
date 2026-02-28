@@ -14,6 +14,7 @@
 #include "ams_state.h"
 
 #include "ui_color_picker.h"
+#include "ui_toast_manager.h"
 #include "ui_update_queue.h"
 
 #include "ams_backend_mock.h"
@@ -89,17 +90,16 @@ const char* AmsState::get_logo_path(const std::string& type_name) {
     // Map system names to logo paths
     // Note: All logos are 64x64 white-on-transparent PNGs
     static const std::unordered_map<std::string, const char*> logo_map = {
-        // AFC/Box Turtle (AFC firmware only runs on Box Turtle hardware)
-        {"afc", "A:assets/images/ams/box_turtle_64.png"},
+        // AFC (Armored Turtle) - has its own logo
+        {"afc", "A:assets/images/ams/afc_64.png"},
         {"box turtle", "A:assets/images/ams/box_turtle_64.png"},
         {"box_turtle", "A:assets/images/ams/box_turtle_64.png"},
         {"boxturtle", "A:assets/images/ams/box_turtle_64.png"},
 
-        // Happy Hare - generic firmware, defaults to ERCF logo
-        // (most common hardware running Happy Hare)
-        {"happy hare", "A:assets/images/ams/ercf_64.png"},
-        {"happy_hare", "A:assets/images/ams/ercf_64.png"},
-        {"happyhare", "A:assets/images/ams/ercf_64.png"},
+        // Happy Hare - generic firmware, has its own logo
+        {"happy hare", "A:assets/images/ams/happy_hare_64.png"},
+        {"happy_hare", "A:assets/images/ams/happy_hare_64.png"},
+        {"happyhare", "A:assets/images/ams/happy_hare_64.png"},
 
         // Specific hardware types (when detected or configured)
         {"ercf", "A:assets/images/ams/ercf_64.png"},
@@ -1266,6 +1266,31 @@ void AmsState::refresh_spoolman_weights() {
         return;
     }
 
+    uint32_t now = lv_tick_get();
+
+    // Circuit breaker: if open, check if backoff period has elapsed
+    if (spoolman_cb_open_) {
+        uint32_t elapsed = now - spoolman_cb_tripped_at_ms_;
+        if (elapsed < SPOOLMAN_CB_BACKOFF_MS) {
+            spdlog::trace("[AmsState] Spoolman circuit breaker open, {}ms remaining",
+                          SPOOLMAN_CB_BACKOFF_MS - elapsed);
+            return;
+        }
+        // Backoff elapsed — half-open: allow one probe request through
+        spdlog::info("[AmsState] Spoolman circuit breaker half-open, probing...");
+        spoolman_cb_open_ = false;
+    }
+
+    // Debounce: skip if called too recently
+    if (spoolman_last_refresh_ms_ > 0) {
+        uint32_t since_last = now - spoolman_last_refresh_ms_;
+        if (since_last < SPOOLMAN_DEBOUNCE_MS) {
+            spdlog::trace("[AmsState] Spoolman refresh debounced ({}ms since last)", since_last);
+            return;
+        }
+    }
+    spoolman_last_refresh_ms_ = now;
+
     // When the backend tracks weight locally (e.g., AFC decrements weight
     // via extruder position), we still need total_weight_g (initial weight)
     // from Spoolman — the backend only provides remaining weight.
@@ -1313,6 +1338,14 @@ void AmsState::refresh_spoolman_weights() {
 
                         AmsState& state = AmsState::instance();
                         std::lock_guard<std::recursive_mutex> lock(state.mutex_);
+
+                        // Success response — reset circuit breaker (on UI thread)
+                        if (state.spoolman_consecutive_failures_ > 0) {
+                            spdlog::info("[AmsState] Spoolman recovered after {} failures",
+                                         state.spoolman_consecutive_failures_);
+                        }
+                        state.spoolman_consecutive_failures_ = 0;
+                        state.spoolman_unavailable_notified_ = false;
 
                         auto* primary = state.get_backend(0);
                         if (!primary) {
@@ -1367,6 +1400,39 @@ void AmsState::refresh_spoolman_weights() {
                 [spoolman_id](const MoonrakerError& err) {
                     spdlog::warn("[AmsState] Failed to fetch Spoolman spool {}: {}", spoolman_id,
                                  err.message);
+
+                    // Track failure for circuit breaker (post to UI thread for
+                    // thread-safe access to AmsState and ToastManager)
+                    helix::ui::queue_update([]() {
+                        if (s_shutdown_flag.load(std::memory_order_acquire)) {
+                            return;
+                        }
+
+                        AmsState& state = AmsState::instance();
+                        std::lock_guard<std::recursive_mutex> lock(state.mutex_);
+
+                        state.spoolman_consecutive_failures_++;
+
+                        if (state.spoolman_consecutive_failures_ >= SPOOLMAN_CB_FAILURE_THRESHOLD) {
+                            state.spoolman_cb_open_ = true;
+                            state.spoolman_cb_tripped_at_ms_ = lv_tick_get();
+                            spdlog::warn(
+                                "[AmsState] Spoolman circuit breaker OPEN after {} failures, "
+                                "backing off {}s",
+                                state.spoolman_consecutive_failures_,
+                                SPOOLMAN_CB_BACKOFF_MS / 1000);
+
+                            // Notify user once per outage
+                            if (!state.spoolman_unavailable_notified_) {
+                                state.spoolman_unavailable_notified_ = true;
+                                // i18n: Spoolman is a product name, do not translate
+                                ToastManager::instance().show(
+                                    ToastSeverity::WARNING,
+                                    lv_tr("Spoolman unavailable — filament weights may be stale"),
+                                    6000);
+                            }
+                        }
+                    });
                 });
         }
     }
@@ -1374,6 +1440,15 @@ void AmsState::refresh_spoolman_weights() {
     if (linked_count > 0) {
         spdlog::trace("[AmsState] Refreshing Spoolman weights for {} linked slots", linked_count);
     }
+}
+
+void AmsState::reset_spoolman_circuit_breaker() {
+    std::lock_guard<std::recursive_mutex> lock(mutex_);
+    spoolman_last_refresh_ms_ = 0;
+    spoolman_consecutive_failures_ = 0;
+    spoolman_cb_tripped_at_ms_ = 0;
+    spoolman_cb_open_ = false;
+    spoolman_unavailable_notified_ = false;
 }
 
 void AmsState::start_spoolman_polling() {

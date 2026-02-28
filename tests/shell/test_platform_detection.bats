@@ -272,7 +272,7 @@ _detect_platform_with_mocks() {
         local mock_root="$BATS_TEST_TMPDIR"
 
         if [ "$arch" = "mips" ]; then
-            if [ -d "$mock_root/usr/data" ] && [ -d "$mock_root/usr/prog" ]; then
+            if [ -d "$mock_root/usr/data" ] && { [ -d "$mock_root/usr/prog" ] || [ -f "$mock_root/ZMOD" ]; }; then
                 echo "ad5x"
                 return
             fi
@@ -286,12 +286,39 @@ _detect_platform_with_mocks() {
     [ "$output" = "ad5x" ]
 }
 
-@test "AD5X: MIPS arch + /usr/data but NO /usr/prog does NOT return ad5x" {
+@test "AD5X: MIPS arch + /usr/data + /ZMOD file returns ad5x" {
+    mkdir -p "$BATS_TEST_TMPDIR/usr/data"
+    touch "$BATS_TEST_TMPDIR/ZMOD"
+
     detect_platform() {
         local arch="mips"
+        local mock_root="$BATS_TEST_TMPDIR"
 
         if [ "$arch" = "mips" ]; then
-            if [ -d "/usr/data" ] && [ -d "/usr/prog" ]; then
+            if [ -d "$mock_root/usr/data" ] && { [ -d "$mock_root/usr/prog" ] || [ -f "$mock_root/ZMOD" ]; }; then
+                echo "ad5x"
+                return
+            fi
+        fi
+
+        echo "unsupported"
+    }
+
+    run detect_platform
+    [ "$status" -eq 0 ]
+    [ "$output" = "ad5x" ]
+}
+
+@test "AD5X: MIPS arch + /usr/data but NO /usr/prog and NO /ZMOD does NOT return ad5x" {
+    mkdir -p "$BATS_TEST_TMPDIR/usr/data"
+    # Deliberately NOT creating usr/prog or ZMOD
+
+    detect_platform() {
+        local arch="mips"
+        local mock_root="$BATS_TEST_TMPDIR"
+
+        if [ "$arch" = "mips" ]; then
+            if [ -d "$mock_root/usr/data" ] && { [ -d "$mock_root/usr/prog" ] || [ -f "$mock_root/ZMOD" ]; }; then
                 echo "ad5x"
                 return
             fi
@@ -310,7 +337,7 @@ _detect_platform_with_mocks() {
         local arch="armv7l"
 
         if [ "$arch" = "mips" ]; then
-            if [ -d "/usr/data" ] && [ -d "/usr/prog" ]; then
+            if [ -d "/usr/data" ] && { [ -d "/usr/prog" ] || [ -f "/ZMOD" ]; }; then
                 echo "ad5x"
                 return
             fi
@@ -331,9 +358,9 @@ _detect_platform_with_mocks() {
 
     set_install_paths "ad5x"
 
-    [ "$INSTALL_DIR" = "/usr/data/helixscreen" ]
+    [ "$INSTALL_DIR" = "/srv/helixscreen" ]
     [ "$INIT_SCRIPT_DEST" = "/etc/init.d/S80helixscreen" ]
-    [ "$PREVIOUS_UI_SCRIPT" = "/etc/init.d/S80guppyscreen" ]
+    [ "$PREVIOUS_UI_SCRIPT" = "" ]
 }
 
 @test "AD5X: detect_platform checks AD5X before K1 (ordering)" {

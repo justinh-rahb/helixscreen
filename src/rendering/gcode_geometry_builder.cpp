@@ -8,6 +8,7 @@
 #include "ui_utils.h"
 
 #include "config.h"
+#include "geometry_budget_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -136,6 +137,69 @@ RibbonGeometry& RibbonGeometry::operator=(RibbonGeometry&& other) noexcept {
         quantization = other.quantization;
     }
     return *this;
+}
+
+void RibbonGeometry::prepare_interleaved_buffers() {
+    if (strips.empty() || vertices.empty()) {
+        return;
+    }
+
+    size_t num_layers = layer_strip_ranges.empty() ? 1 : layer_strip_ranges.size();
+    prepared_buffers.resize(num_layers);
+
+    // Interleaved vertex format: position(3f) + normal(3f) + color(3f) = 9 floats
+    constexpr size_t kFloatsPerVertex = 9;
+
+    for (size_t layer = 0; layer < num_layers; ++layer) {
+        size_t first_strip = 0;
+        size_t strip_count = strips.size();
+
+        if (!layer_strip_ranges.empty()) {
+            auto [fs, sc] = layer_strip_ranges[layer];
+            first_strip = fs;
+            strip_count = sc;
+        }
+
+        auto& prepared = prepared_buffers[layer];
+        if (strip_count == 0) {
+            prepared.vertex_count = 0;
+            continue;
+        }
+
+        size_t total_verts = strip_count * 6; // 2 triangles per strip
+        prepared.vertex_count = total_verts;
+        prepared.data.resize(total_verts * kFloatsPerVertex);
+
+        static constexpr int kTriIndices[6] = {0, 1, 2, 1, 3, 2};
+        size_t out_idx = 0;
+
+        for (size_t s = 0; s < strip_count; ++s) {
+            const auto& strip = strips[first_strip + s];
+
+            for (int ti = 0; ti < 6; ++ti) {
+                const auto& vert = vertices[strip[static_cast<size_t>(kTriIndices[ti])]];
+                glm::vec3 pos = quantization.dequantize_vec3(vert.position);
+                const glm::vec3& normal = normal_palette[vert.normal_index];
+
+                prepared.data[out_idx++] = pos.x;
+                prepared.data[out_idx++] = pos.y;
+                prepared.data[out_idx++] = pos.z;
+                prepared.data[out_idx++] = normal.x;
+                prepared.data[out_idx++] = normal.y;
+                prepared.data[out_idx++] = normal.z;
+
+                uint32_t rgb = 0x26A69A; // Default teal
+                if (vert.color_index < color_palette.size()) {
+                    rgb = color_palette[vert.color_index];
+                }
+                prepared.data[out_idx++] = ((rgb >> 16) & 0xFF) / 255.0f;
+                prepared.data[out_idx++] = ((rgb >> 8) & 0xFF) / 255.0f;
+                prepared.data[out_idx++] = (rgb & 0xFF) / 255.0f;
+            }
+        }
+    }
+
+    spdlog::debug("[GCode Geometry] Prepared {} layer buffers for GPU upload", num_layers);
 }
 
 void RibbonGeometry::clear() {
@@ -366,6 +430,13 @@ RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
 
     RibbonGeometry geometry;
     stats_ = {}; // Reset statistics
+    budget_exceeded_ = false;
+
+    // Apply budget tube_sides override if set
+    if (budget_tube_sides_ > 0) {
+        tube_sides_ = budget_tube_sides_;
+        spdlog::info("[GCode::Builder] Budget override: tube_sides={}", tube_sides_);
+    }
 
     // Validate and apply options
     SimplificationOptions validated_opts = options;
@@ -454,6 +525,8 @@ RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
     // Initialize per-layer bounding boxes for frustum culling
     geometry.layer_bboxes.resize(gcode.layers.size());
 
+    size_t segments_since_budget_check = 0;
+
     for (size_t i = 0; i < simplified.size(); ++i) {
         const auto& segment = simplified[i];
 
@@ -463,6 +536,34 @@ RibbonGeometry GeometryBuilder::build(const ParsedGCodeFile& gcode,
         // TODO: Make this configurable if we want to visualize travel paths
         if (!segment.is_extrusion) {
             continue;
+        }
+
+        // Progressive budget check
+        if (budget_limit_bytes_ > 0) {
+            segments_since_budget_check++;
+            if (segments_since_budget_check >= GeometryBudgetManager::CHECK_INTERVAL_SEGMENTS) {
+                segments_since_budget_check = 0;
+                size_t current_mem = geometry.memory_usage();
+                float threshold = static_cast<float>(budget_limit_bytes_) *
+                                  GeometryBudgetManager::BUDGET_THRESHOLD;
+                if (static_cast<float>(current_mem) > threshold) {
+                    spdlog::warn("[GCode::Builder] Budget exceeded: {}MB / {}MB at segment {}/{}",
+                                 current_mem / (1024 * 1024), budget_limit_bytes_ / (1024 * 1024),
+                                 i, simplified.size());
+                    budget_exceeded_ = true;
+                    break;
+                }
+
+                // System memory check (less frequent, only at CHECK_INTERVAL boundaries)
+                if (i > 0 && i % GeometryBudgetManager::SYSTEM_CHECK_INTERVAL_SEGMENTS == 0) {
+                    GeometryBudgetManager budget_mgr;
+                    if (budget_mgr.is_system_memory_critical()) {
+                        spdlog::error("[GCode::Builder] System memory critical — aborting build");
+                        budget_exceeded_ = true;
+                        break;
+                    }
+                }
+            }
         }
 
         // Use source layer index stamped during segment collection

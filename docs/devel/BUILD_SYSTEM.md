@@ -23,8 +23,11 @@ make ad5m-docker
 # Build for Elegoo Centauri Carbon 1 (armv7-a/ARM32)
 make cc1-docker
 
-# Build for MIPS targets — K1 and AD5X (MIPS32, static/musl)
-make mips-docker          # Or: make k1-docker / make ad5x-docker (aliases)
+# Build for Creality K1 (MIPS32, static/musl)
+make mips-docker          # Or: make k1-docker (alias)
+
+# Build for FlashForge AD5X (MIPS32r5, glibc)
+make ad5x-docker
 
 # Build for Creality K1 series (MIPS32, dynamic/glibc)
 make k1-dynamic-docker
@@ -38,6 +41,7 @@ file build/pi32/bin/helix-screen   # ELF 32-bit LSB, ARM, EABI5
 file build/ad5m/bin/helix-screen   # ELF 32-bit LSB, ARM, EABI5
 file build/cc1/bin/helix-screen    # ELF 32-bit LSB, ARM, EABI5
 file build/mips/bin/helix-screen   # ELF 32-bit LSB, MIPS32 (static)
+file build/ad5x/bin/helix-screen  # ELF 32-bit LSB, MIPS32r5 (dynamic)
 file build/k1-dynamic/bin/helix-screen  # ELF 32-bit LSB, MIPS32 (dynamic)
 file build/k2/bin/helix-screen     # ELF 32-bit LSB, ARM, EABI5
 ```
@@ -52,7 +56,8 @@ Docker images are **automatically built** on first use - no manual setup require
 | **Raspberry Pi (32-bit)** | `make pi32-docker` | armv7-a (armhf) | DRM/fbdev | `build/pi32/` |
 | **Adventurer 5M** | `make ad5m-docker` | armv7-a (hard-float) | fbdev | `build/ad5m/` |
 | **Centauri Carbon 1** | `make cc1-docker` | armv7-a (hard-float) | fbdev | `build/cc1/` |
-| **MIPS (K1/AD5X)** | `make mips-docker` | MIPS32r2 (musl) | fbdev | `build/mips/` |
+| **Creality K1** | `make mips-docker` | MIPS32r2 (musl) | fbdev | `build/mips/` |
+| **FlashForge AD5X** | `make ad5x-docker` | MIPS32r5 (glibc) | fbdev | `build/ad5x/` |
 | **Creality K1 (dynamic)** | `make k1-dynamic-docker` | MIPS32r2 (glibc) | fbdev | `build/k1-dynamic/` |
 | **Creality K2** | `make k2-docker` | armv7-a (musl) | fbdev | `build/k2/` |
 | **Native (SDL)** | `make` | Host architecture | SDL2 | `build/` |

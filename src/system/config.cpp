@@ -63,13 +63,8 @@ json get_default_printer_config(const std::string& moonraker_host) {
 /// Default display configuration section
 /// Used for both new configs and ensuring display section exists with defaults
 json get_default_display_config() {
-    return {{"rotate", 0},
-            {"sleep_sec", 600},
-            {"dim_sec", 300},
-            {"dim_brightness", 30},
-            {"drm_device", ""},
-            {"gcode_render_mode", 0},
-            {"gcode_3d_enabled", true},
+    return {{"sleep_sec", 600},         {"dim_sec", 300},         {"dim_brightness", 30},
+            {"drm_device", ""},         {"gcode_render_mode", 0}, {"gcode_3d_enabled", true},
             {"bed_mesh_render_mode", 0}};
 }
 
@@ -264,6 +259,17 @@ static void migrate_v1_to_v2(json& config) {
     }
 }
 
+/// Migration v2→v3: Reset jitter_threshold from 15 to 0 (disabled by default).
+/// The jitter filter competed with LVGL's scroll_limit, adding perceptible drag delay.
+/// Users with genuinely noisy panels can re-enable via config or HELIX_TOUCH_JITTER env.
+static void migrate_v2_to_v3(json& config) {
+    json::json_pointer ptr("/input/jitter_threshold");
+    if (config.contains(ptr) && config[ptr].is_number_integer() && config[ptr].get<int>() == 15) {
+        config[ptr] = 5;
+        spdlog::info("[Config] Migration v3: reset jitter_threshold 15 -> 5");
+    }
+}
+
 /// Run all versioned migrations in sequence from current version to CURRENT_CONFIG_VERSION
 static void run_versioned_migrations(json& config) {
     int version = 0;
@@ -275,6 +281,8 @@ static void run_versioned_migrations(json& config) {
         migrate_v0_to_v1(config);
     if (version < 2)
         migrate_v1_to_v2(config);
+    if (version < 3)
+        migrate_v2_to_v3(config);
 
     config["config_version"] = CURRENT_CONFIG_VERSION;
 }
@@ -293,7 +301,7 @@ json get_default_config(const std::string& moonraker_host, bool include_user_pre
                    {"input",
                     {{"scroll_throw", 25},
                      {"scroll_limit", 10},
-                     {"jitter_threshold", 15},
+                     {"jitter_threshold", 5},
                      {"touch_device", ""},
                      {"calibration",
                       {{"valid", false},
@@ -562,7 +570,7 @@ void Config::init(const std::string& config_path) {
     if (!data.contains("input")) {
         data["input"] = {{"scroll_throw", 25},
                          {"scroll_limit", 10},
-                         {"jitter_threshold", 15},
+                         {"jitter_threshold", 5},
                          {"touch_device", ""},
                          {"calibration",
                           {{"valid", false},
@@ -591,7 +599,7 @@ void Config::init(const std::string& config_path) {
             config_modified = true;
         }
         if (!input.contains("jitter_threshold")) {
-            input["jitter_threshold"] = 15;
+            input["jitter_threshold"] = 5;
             config_modified = true;
         }
 

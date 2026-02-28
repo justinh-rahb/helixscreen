@@ -39,7 +39,6 @@ class TemperatureWidget : public PanelWidget {
     lv_obj_t* widget_obj_ = nullptr;
     lv_obj_t* temp_btn_ = nullptr;
     lv_obj_t* parent_screen_ = nullptr;
-    lv_obj_t* nozzle_temp_panel_ = nullptr;
 
     HeatingIconAnimator temp_icon_animator_;
     int cached_extruder_temp_ = 25;

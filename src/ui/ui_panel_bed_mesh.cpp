@@ -377,10 +377,34 @@ void BedMeshPanel::on_activate() {
     if (api) {
         update_profile_list_subjects();
     }
+
+    // Enable async rendering when panel is visible (render thread produces
+    // frames in background, DRAW_POST blits the ready buffer).
+    // Must happen AFTER mesh data is loaded so the renderer has data to work with.
+    if (canvas_) {
+        // Force layout computation so the canvas has valid dimensions.
+        // on_activate() is called from push_overlay() right after removing HIDDEN,
+        // but LVGL may not have computed the flex layout yet, leaving the canvas
+        // at 0x0. Without valid dimensions, the render thread won't start and
+        // the initial frame will never be produced.
+        lv_obj_update_layout(canvas_);
+
+        ui_bed_mesh_set_async_mode(canvas_, true);
+        // Force an initial paint so the widget is not blank on re-entry.
+        // The render thread's frame-ready callback will trigger a full redraw,
+        // but we need at least a placeholder visible immediately.
+        lv_obj_invalidate(canvas_);
+        ui_bed_mesh_request_async_render(canvas_);
+    }
 }
 
 void BedMeshPanel::on_deactivate() {
     spdlog::debug("[{}] on_deactivate()", get_name());
+
+    // Stop the render thread when panel is not visible to avoid wasting CPU
+    if (canvas_) {
+        ui_bed_mesh_set_async_mode(canvas_, false);
+    }
 
     // Call base class
     OverlayBase::on_deactivate();
