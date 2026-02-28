@@ -217,15 +217,15 @@ $(PATCHES_STAMP): $(PATCH_FILES) $(LVGL_HEAD) $(LIBHV_HEAD)
 		echo "$(GREEN)✓ LVGL label draw NULL font guard patch already applied$(RESET)"; \
 	fi
 	$(Q)if git -C $(LVGL_DIR) diff --quiet src/drivers/display/drm/lv_linux_drm.c 2>/dev/null; then \
-		echo "$(YELLOW)→ Applying LVGL DRM plane rotation patch...$(RESET)"; \
-		if git -C $(LVGL_DIR) apply --check ../../patches/lvgl-drm-plane-rotation.patch 2>/dev/null; then \
-			git -C $(LVGL_DIR) apply ../../patches/lvgl-drm-plane-rotation.patch && \
-			echo "$(GREEN)✓ DRM plane rotation patch applied$(RESET)"; \
+		echo "$(YELLOW)→ Applying LVGL DRM flush rotation patch...$(RESET)"; \
+		if git -C $(LVGL_DIR) apply --check ../../patches/lvgl-drm-flush-rotation.patch 2>/dev/null; then \
+			git -C $(LVGL_DIR) apply ../../patches/lvgl-drm-flush-rotation.patch && \
+			echo "$(GREEN)✓ DRM flush rotation patch applied$(RESET)"; \
 		else \
 			echo "$(YELLOW)⚠ Cannot apply patch (already applied or conflicts)$(RESET)"; \
 		fi \
 	else \
-		echo "$(GREEN)✓ LVGL DRM plane rotation patch already applied$(RESET)"; \
+		echo "$(GREEN)✓ LVGL DRM flush rotation patch already applied$(RESET)"; \
 	fi
 	$(Q)if git -C $(LVGL_DIR) diff --quiet src/drivers/display/drm/lv_linux_drm_egl.c 2>/dev/null; then \
 		echo "$(YELLOW)→ Applying LVGL DRM EGL getters patch...$(RESET)"; \
@@ -237,17 +237,6 @@ $(PATCHES_STAMP): $(PATCH_FILES) $(LVGL_HEAD) $(LIBHV_HEAD)
 		fi \
 	else \
 		echo "$(GREEN)✓ LVGL DRM EGL getters patch already applied$(RESET)"; \
-	fi
-	$(Q)if ! grep -q 'lv_linux_drm_get_buf_map' $(LVGL_DIR)/src/drivers/display/drm/lv_linux_drm.c 2>/dev/null; then \
-		echo "$(YELLOW)→ Applying LVGL DRM shadow buffer API patch...$(RESET)"; \
-		if git -C $(LVGL_DIR) apply --check ../../patches/lvgl-drm-shadow-buffer-api.patch 2>/dev/null; then \
-			git -C $(LVGL_DIR) apply ../../patches/lvgl-drm-shadow-buffer-api.patch && \
-			echo "$(GREEN)✓ DRM shadow buffer API patch applied$(RESET)"; \
-		else \
-			echo "$(YELLOW)⚠ Cannot apply patch (already applied or conflicts)$(RESET)"; \
-		fi \
-	else \
-		echo "$(GREEN)✓ LVGL DRM shadow buffer API patch already applied$(RESET)"; \
 	fi
 	$(Q)if git -C $(LVGL_DIR) diff --quiet src/core/lv_refr.c 2>/dev/null; then \
 		echo "$(YELLOW)→ Applying LVGL refr reshape NULL guard patch...$(RESET)"; \

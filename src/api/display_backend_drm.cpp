@@ -8,8 +8,6 @@
 #include "display_backend_drm.h"
 
 #include "config.h"
-#include "display/lv_display_private.h"
-#include "draw/sw/lv_draw_sw_utils.h"
 #include "drm_rotation_strategy.h"
 
 #include <spdlog/spdlog.h>
@@ -183,86 +181,7 @@ DisplayBackendDRM::DisplayBackendDRM() : drm_device_(auto_detect_drm_device()) {
 
 DisplayBackendDRM::DisplayBackendDRM(const std::string& drm_device) : drm_device_(drm_device) {}
 
-DisplayBackendDRM::~DisplayBackendDRM() {
-    for (auto& buf : shadow_bufs_) {
-        if (buf) {
-            free(buf);
-            buf = nullptr;
-        }
-    }
-}
-
-// Rotation-aware flush callback using shadow buffers.
-// LVGL renders into cached system-memory shadow buffers (DIRECT mode).
-// On the last flush, we rotate the full shadow buffer into the DRM dumb
-// buffer (one uncached write pass) and page-flip.
-void DisplayBackendDRM::rotation_flush_cb(lv_display_t* disp, const lv_area_t* area,
-                                          uint8_t* px_map) {
-    auto* self = static_cast<DisplayBackendDRM*>(lv_display_get_user_data(disp));
-    if (!self || !self->original_flush_cb_) {
-        lv_display_flush_ready(disp);
-        return;
-    }
-
-    const lv_display_rotation_t rotation = lv_display_get_rotation(disp);
-
-    if (rotation != LV_DISPLAY_ROTATION_0 && lv_display_flush_is_last(disp) &&
-        self->shadow_bufs_[0] != nullptr) {
-        // Shadow buffer path: px_map is our cached shadow buffer.
-        // Rotate the full frame into the DRM dumb buffer, then page-flip.
-        const lv_color_format_t cf = lv_display_get_color_format(disp);
-        const int32_t hor_res = lv_display_get_horizontal_resolution(disp);
-        const int32_t ver_res = lv_display_get_vertical_resolution(disp);
-
-        // Source dimensions = what LVGL rendered (logical/rotated coordinates).
-        // lv_draw_sw_rotate uses these to compute destination positions.
-        // For 180°: src and dest have the same dimensions.
-        // For 90/270°: lv_draw_sw_rotate swaps dimensions internally, so
-        //   src_w/src_h must be the LVGL logical resolution (hor_res x ver_res).
-        const int32_t src_w = hor_res;
-        const int32_t src_h = ver_res;
-
-        const uint32_t drm_stride = lv_linux_drm_get_buf_stride(disp);
-
-        // Source stride matches shadow buffer (allocated with drm_stride).
-        // Dest stride matches DRM dumb buffer (same physical pitch).
-        const uint32_t src_stride = drm_stride;
-        const uint32_t dest_stride = drm_stride;
-
-        // Get the back DRM buffer to write into
-        uint8_t* drm_buf = lv_linux_drm_get_buf_map(disp, self->back_drm_buf_idx_);
-        if (!drm_buf) {
-            spdlog::error("[DRM Backend] Failed to get DRM buffer map for index {}",
-                          self->back_drm_buf_idx_);
-            lv_display_flush_ready(disp);
-            return;
-        }
-
-        // Rotate: cached shadow (fast read) → DRM buffer (one uncached write pass)
-        uint32_t t0 = lv_tick_get();
-        lv_draw_sw_rotate(px_map, drm_buf, src_w, src_h, src_stride, dest_stride, rotation, cf);
-        uint32_t t1 = lv_tick_get();
-
-        // Performance sampling every 120 frames
-        self->rotation_frame_count_++;
-        self->rotation_time_accum_ms_ += (t1 - t0);
-        if (self->rotation_frame_count_ >= 120) {
-            spdlog::trace("[DRM Backend] Shadow rotation: {:.1f}ms avg over {} frames",
-                          static_cast<float>(self->rotation_time_accum_ms_) /
-                              static_cast<float>(self->rotation_frame_count_),
-                          self->rotation_frame_count_);
-            self->rotation_frame_count_ = 0;
-            self->rotation_time_accum_ms_ = 0;
-        }
-
-        // Tell DRM driver to page-flip this buffer
-        lv_linux_drm_set_active_buf(disp, self->back_drm_buf_idx_);
-        self->back_drm_buf_idx_ ^= 1; // Alternate for next frame
-    }
-
-    // Call original DRM flush (page flip)
-    self->original_flush_cb_(disp, area, px_map);
-}
+DisplayBackendDRM::~DisplayBackendDRM() = default;
 
 bool DisplayBackendDRM::is_available() const {
     if (drm_device_.empty()) {
@@ -521,94 +440,22 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
 #endif
         break;
 
-    case DrmRotationStrategy::SOFTWARE: {
-        // Shadow buffer rotation: LVGL renders into cached system memory,
-        // flush callback rotates into DRM buffer for page-flip.
-        // This avoids FULL render mode (which re-renders the entire screen
-        // on every UI change) and halves DRM uncached memory access.
-
-        // Get DRM buffer info for shadow buffer sizing
-        uint32_t drm_stride = lv_linux_drm_get_buf_stride(display_);
-        uint32_t drm_h = lv_display_get_vertical_resolution(display_);
-        // For 180°, physical resolution == logical resolution (no swap)
-        if (rot == LV_DISPLAY_ROTATION_90 || rot == LV_DISPLAY_ROTATION_270) {
-            drm_h = lv_display_get_horizontal_resolution(display_);
-        }
-        size_t buf_size = static_cast<size_t>(drm_stride) * drm_h;
-
-        // Allocate cached shadow buffers (page-aligned for potential future DMA).
-        // aligned_alloc requires size to be a multiple of alignment (C11/C++17).
-        constexpr size_t kAlignment = 4096;
-        size_t alloc_size = (buf_size + kAlignment - 1) & ~(kAlignment - 1);
-        for (int i = 0; i < 2; i++) {
-            if (!shadow_bufs_[i]) {
-                shadow_bufs_[i] = static_cast<uint8_t*>(aligned_alloc(kAlignment, alloc_size));
-                if (!shadow_bufs_[i]) {
-                    spdlog::error("[DRM Backend] Failed to allocate shadow buffer {} ({} bytes)", i,
-                                  buf_size);
-                    return;
-                }
-                memset(shadow_bufs_[i], 0, buf_size);
-            }
-        }
-        shadow_buf_size_ = buf_size;
-        back_drm_buf_idx_ = 0;
-
-        // Tell LVGL to render into our cached shadow buffers (DIRECT mode)
-        lv_display_set_buffers_with_stride(display_, shadow_bufs_[0], shadow_bufs_[1], buf_size,
-                                           drm_stride, LV_DISPLAY_RENDER_MODE_DIRECT);
-
-        // Set rotation so LVGL adjusts its coordinate system
+    case DrmRotationStrategy::SOFTWARE:
+        // CPU in-place 180° pixel reversal in drm_flush (lv_linux_drm.c patch).
+        // The dumb-buffer flush callback checks lv_display_get_rotation() and
+        // reverses the pixel array before the page flip. FULL render mode
+        // ensures the entire buffer is redrawn each frame.
+        lv_display_set_render_mode(display_, LV_DISPLAY_RENDER_MODE_FULL);
         lv_display_set_rotation(display_, rot);
 
-        // Install rotation-aware flush wrapper (only once)
-        if (!original_flush_cb_) {
-            original_flush_cb_ = display_->flush_cb;
-            lv_display_set_user_data(display_, this);
-            lv_display_set_flush_cb(display_, rotation_flush_cb);
-        }
-
-        spdlog::info("[DRM Backend] Shadow buffer rotation set to {}° "
-                     "(cached shadow + DIRECT mode, plane supports 0x{:X})",
+        spdlog::info("[DRM Backend] Software rotation set to {}° "
+                     "(CPU in-place reversal, plane supports 0x{:X})",
                      static_cast<int>(rot) * 90, supported_mask);
         break;
-    }
 
     case DrmRotationStrategy::NONE:
-#ifndef HELIX_ENABLE_OPENGLES
-        // Explicitly reset in case a previous call set a non-zero rotation
-        lv_linux_drm_set_rotation(display_, DRM_MODE_ROTATE_0);
-#endif
-
-        // Reset LVGL coordinate system to no rotation
         lv_display_set_rotation(display_, LV_DISPLAY_ROTATION_0);
-
-        // Restore original flush callback if we installed our wrapper
-        if (original_flush_cb_) {
-            lv_display_set_flush_cb(display_, original_flush_cb_);
-            lv_display_set_user_data(display_, nullptr);
-            original_flush_cb_ = nullptr;
-        }
-        // Restore DRM buffers before freeing shadow buffers (LVGL's buf_1/buf_2
-        // still point to the shadow memory — must redirect first to avoid
-        // use-after-free on next render).
-        if (shadow_bufs_[0]) {
-            uint8_t* drm_buf0 = lv_linux_drm_get_buf_map(display_, 0);
-            uint8_t* drm_buf1 = lv_linux_drm_get_buf_map(display_, 1);
-            uint32_t drm_stride = lv_linux_drm_get_buf_stride(display_);
-            uint32_t drm_h = lv_display_get_vertical_resolution(display_);
-            size_t drm_buf_size = static_cast<size_t>(drm_stride) * drm_h;
-            lv_display_set_buffers_with_stride(display_, drm_buf0, drm_buf1, drm_buf_size,
-                                               drm_stride, LV_DISPLAY_RENDER_MODE_DIRECT);
-        }
-        // Now safe to free shadow buffers
-        for (auto& buf : shadow_bufs_) {
-            if (buf) {
-                free(buf);
-                buf = nullptr;
-            }
-        }
-        shadow_buf_size_ = 0;
+        lv_display_set_matrix_rotation(display_, false);
         spdlog::debug("[DRM Backend] No rotation needed");
         break;
     }
