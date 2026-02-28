@@ -376,8 +376,6 @@ class PrintStatusPanel : public OverlayBase {
     //
 
     TempControlPanel* temp_control_panel_ = nullptr;
-    lv_obj_t* nozzle_temp_panel_ = nullptr;
-    lv_obj_t* bed_temp_panel_ = nullptr;
 
     // Light/timelapse controls (extracted Phase 2 functionality)
     PrintLightTimelapseControls light_timelapse_controls_;

@@ -283,6 +283,9 @@ void register_xml_components() {
     register_xml("home_panel.xml");
     register_xml("controls_panel.xml");
     register_xml("motion_panel.xml");
+    // TODO: Remove these old per-heater overlays once application.cpp's
+    // --overlays command-line paths and TempControlPanel::xml_component_name()
+    // are updated to use the unified TempGraphOverlay instead.
     register_xml("nozzle_temp_panel.xml");
     register_xml("bed_temp_panel.xml");
     register_xml("chamber_temp_panel.xml");

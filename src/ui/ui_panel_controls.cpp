@@ -16,7 +16,7 @@
 #include "ui_panel_calibration_zoffset.h"
 #include "ui_panel_motion.h"
 #include "ui_panel_screws_tilt.h"
-#include "ui_panel_temp_control.h"
+#include "ui_overlay_temp_graph.h"
 #include "ui_position_utils.h"
 #include "ui_settings_sensors.h"
 #include "ui_subject_registry.h"
@@ -78,8 +78,6 @@ ControlsPanel::~ControlsPanel() {
     // Note: safe_delete_obj handles shutdown guards (lv_is_initialized, is_destroying_all, etc.)
     using helix::ui::safe_delete_obj;
     safe_delete_obj(motion_panel_);
-    safe_delete_obj(nozzle_temp_panel_);
-    safe_delete_obj(bed_temp_panel_);
     safe_delete_obj(fan_control_panel_);
     safe_delete_obj(bed_mesh_panel_);
     safe_delete_obj(zoffset_panel_);
@@ -871,109 +869,23 @@ void ControlsPanel::handle_quick_actions_clicked() {
 }
 
 void ControlsPanel::handle_temperatures_clicked() {
-    spdlog::debug("[{}] Temperatures card clicked - opening nozzle temp panel", get_name());
-
-    if (!temp_control_panel_) {
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    // For combined temps card, open nozzle panel (user can switch to bed from there)
-    if (!nozzle_temp_panel_ && parent_screen_) {
-        nozzle_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "nozzle_temp_panel", nullptr));
-        if (nozzle_temp_panel_) {
-            temp_control_panel_->setup_nozzle_panel(nozzle_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                nozzle_temp_panel_, temp_control_panel_->get_nozzle_lifecycle());
-            // Panel starts hidden via XML hidden="true" attribute
-        } else {
-            NOTIFY_ERROR("Failed to load temperature panel");
-            return;
-        }
-    }
-
-    if (nozzle_temp_panel_) {
-        NavigationManager::instance().push_overlay(nozzle_temp_panel_);
-    }
+    spdlog::debug("[{}] Temperatures card clicked - opening temperature graph", get_name());
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Nozzle, parent_screen_);
 }
 
 void ControlsPanel::handle_nozzle_temp_clicked() {
-    spdlog::debug("[{}] Nozzle temp clicked - opening nozzle temp panel", get_name());
-
-    if (!temp_control_panel_) {
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    if (!nozzle_temp_panel_ && parent_screen_) {
-        nozzle_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "nozzle_temp_panel", nullptr));
-        if (nozzle_temp_panel_) {
-            temp_control_panel_->setup_nozzle_panel(nozzle_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                nozzle_temp_panel_, temp_control_panel_->get_nozzle_lifecycle());
-        } else {
-            NOTIFY_ERROR("Failed to load nozzle temperature panel");
-            return;
-        }
-    }
-
-    if (nozzle_temp_panel_) {
-        NavigationManager::instance().push_overlay(nozzle_temp_panel_);
-    }
+    spdlog::debug("[{}] Nozzle temp clicked - opening temperature graph", get_name());
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Nozzle, parent_screen_);
 }
 
 void ControlsPanel::handle_bed_temp_clicked() {
-    spdlog::debug("[{}] Bed temp clicked - opening bed temp panel", get_name());
-
-    if (!temp_control_panel_) {
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    if (!bed_temp_panel_ && parent_screen_) {
-        bed_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "bed_temp_panel", nullptr));
-        if (bed_temp_panel_) {
-            temp_control_panel_->setup_bed_panel(bed_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                bed_temp_panel_, temp_control_panel_->get_bed_lifecycle());
-        } else {
-            NOTIFY_ERROR("Failed to load bed temperature panel");
-            return;
-        }
-    }
-
-    if (bed_temp_panel_) {
-        NavigationManager::instance().push_overlay(bed_temp_panel_);
-    }
+    spdlog::debug("[{}] Bed temp clicked - opening temperature graph", get_name());
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Bed, parent_screen_);
 }
 
 void ControlsPanel::handle_chamber_temp_clicked() {
-    spdlog::debug("[{}] Chamber temp clicked - opening chamber temp panel", get_name());
-
-    if (!temp_control_panel_) {
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    if (!chamber_temp_panel_ && parent_screen_) {
-        chamber_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "chamber_temp_panel", nullptr));
-        if (chamber_temp_panel_) {
-            temp_control_panel_->setup_chamber_panel(chamber_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                chamber_temp_panel_, temp_control_panel_->get_chamber_lifecycle());
-        } else {
-            NOTIFY_ERROR("Failed to load chamber temperature panel");
-            return;
-        }
-    }
-
-    if (chamber_temp_panel_) {
-        NavigationManager::instance().push_overlay(chamber_temp_panel_);
-    }
+    spdlog::debug("[{}] Chamber temp clicked - opening temperature graph", get_name());
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Chamber, parent_screen_);
 }
 
 void ControlsPanel::handle_cooling_clicked() {

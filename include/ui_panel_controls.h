@@ -204,9 +204,6 @@ class ControlsPanel : public PanelBase {
     //
 
     lv_obj_t* motion_panel_ = nullptr;
-    lv_obj_t* nozzle_temp_panel_ = nullptr;
-    lv_obj_t* bed_temp_panel_ = nullptr;
-    lv_obj_t* chamber_temp_panel_ = nullptr;
     lv_obj_t* fan_control_panel_ = nullptr;
     lv_obj_t* bed_mesh_panel_ = nullptr;
     lv_obj_t* zoffset_panel_ = nullptr;

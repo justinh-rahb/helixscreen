@@ -14,7 +14,7 @@
 #include "ui_modal.h"
 #include "ui_nav_manager.h"
 #include "ui_panel_common.h"
-#include "ui_panel_temp_control.h"
+#include "ui_overlay_temp_graph.h"
 #include "ui_subject_registry.h"
 #include "ui_temperature_utils.h"
 #include "ui_toast_manager.h"
@@ -871,69 +871,13 @@ void PrintStatusPanel::update_all_displays() {
 // ============================================================================
 
 void PrintStatusPanel::handle_nozzle_card_click() {
-    spdlog::info("[{}] Nozzle temp card clicked - opening nozzle temp panel", get_name());
-
-    if (!temp_control_panel_) {
-        spdlog::error("[{}] TempControlPanel not initialized", get_name());
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    // Create nozzle temp panel on first access (lazy initialization)
-    if (!nozzle_temp_panel_ && parent_screen_) {
-        spdlog::debug("[{}] Creating nozzle temperature panel...", get_name());
-
-        nozzle_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "nozzle_temp_panel", nullptr));
-        if (nozzle_temp_panel_) {
-            temp_control_panel_->setup_nozzle_panel(nozzle_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                nozzle_temp_panel_, temp_control_panel_->get_nozzle_lifecycle());
-            lv_obj_add_flag(nozzle_temp_panel_, LV_OBJ_FLAG_HIDDEN);
-            spdlog::info("[{}] Nozzle temp panel created and initialized", get_name());
-        } else {
-            spdlog::error("[{}] Failed to create nozzle temp panel from XML", get_name());
-            NOTIFY_ERROR("Failed to load temperature panel");
-            return;
-        }
-    }
-
-    if (nozzle_temp_panel_) {
-        NavigationManager::instance().push_overlay(nozzle_temp_panel_);
-    }
+    spdlog::debug("[{}] Nozzle temp card clicked - opening temperature graph", get_name());
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Nozzle, parent_screen_);
 }
 
 void PrintStatusPanel::handle_bed_card_click() {
-    spdlog::info("[{}] Bed temp card clicked - opening bed temp panel", get_name());
-
-    if (!temp_control_panel_) {
-        spdlog::error("[{}] TempControlPanel not initialized", get_name());
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    // Create bed temp panel on first access (lazy initialization)
-    if (!bed_temp_panel_ && parent_screen_) {
-        spdlog::debug("[{}] Creating bed temperature panel...", get_name());
-
-        bed_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "bed_temp_panel", nullptr));
-        if (bed_temp_panel_) {
-            temp_control_panel_->setup_bed_panel(bed_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                bed_temp_panel_, temp_control_panel_->get_bed_lifecycle());
-            lv_obj_add_flag(bed_temp_panel_, LV_OBJ_FLAG_HIDDEN);
-            spdlog::info("[{}] Bed temp panel created and initialized", get_name());
-        } else {
-            spdlog::error("[{}] Failed to create bed temp panel from XML", get_name());
-            NOTIFY_ERROR("Failed to load temperature panel");
-            return;
-        }
-    }
-
-    if (bed_temp_panel_) {
-        NavigationManager::instance().push_overlay(bed_temp_panel_);
-    }
+    spdlog::debug("[{}] Bed temp card clicked - opening temperature graph", get_name());
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Bed, parent_screen_);
 }
 
 void PrintStatusPanel::handle_pause_button() {

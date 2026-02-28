@@ -89,6 +89,7 @@ class TempGraphOverlay : public OverlayBase {
 
     // Series management
     void discover_series();
+    void apply_default_visibility();
     void create_chips();
     void setup_observers();
     void teardown_observers();
@@ -106,7 +107,6 @@ class TempGraphOverlay : public OverlayBase {
 
     // Control strip
     void configure_control_strip();
-    void update_control_temp_display();
 
     // Keypad callback
     static void keypad_value_cb(float value, void* user_data);
@@ -128,9 +128,10 @@ class TempGraphOverlay : public OverlayBase {
     ui_temp_graph_t* graph_ = nullptr;
     lv_obj_t* chip_row_ = nullptr;
     lv_obj_t* graph_container_ = nullptr;
-    lv_obj_t* control_strip_ = nullptr;
-    lv_obj_t* control_temp_label_ = nullptr;
-    lv_obj_t* preset_grid_ = nullptr;
+    lv_obj_t* graph_outer_ = nullptr;
+    lv_obj_t* nozzle_strip_ = nullptr;
+    lv_obj_t* bed_strip_ = nullptr;
+    lv_obj_t* chamber_strip_ = nullptr;
     lv_obj_t* extruder_selector_row_ = nullptr;
     std::vector<SeriesInfo> series_;
 
