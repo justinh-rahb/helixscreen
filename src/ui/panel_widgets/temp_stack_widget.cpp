@@ -7,6 +7,7 @@
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
 #include "ui_nav_manager.h"
+#include "ui_overlay_temp_graph.h"
 #include "ui_panel_temp_control.h"
 #include "ui_update_queue.h"
 #include "ui_utils.h"
@@ -356,20 +357,6 @@ void TempStackWidget::detach() {
     bed_temp_observer_.reset();
     bed_target_observer_.reset();
 
-    // Clean up lazily-created overlays (children of parent_screen_, not widget container)
-    if (nozzle_temp_panel_) {
-        NavigationManager::instance().unregister_overlay_instance(nozzle_temp_panel_);
-        helix::ui::safe_delete(nozzle_temp_panel_);
-    }
-    if (bed_temp_panel_) {
-        NavigationManager::instance().unregister_overlay_instance(bed_temp_panel_);
-        helix::ui::safe_delete(bed_temp_panel_);
-    }
-    if (chamber_temp_panel_) {
-        NavigationManager::instance().unregister_overlay_instance(chamber_temp_panel_);
-        helix::ui::safe_delete(chamber_temp_panel_);
-    }
-
     if (s_active_instance == this) {
         s_active_instance = nullptr;
     }
@@ -407,33 +394,8 @@ void TempStackWidget::handle_nozzle_clicked() {
         return;
     }
 
-    spdlog::info("[TempStackWidget] Nozzle clicked - opening nozzle temp panel");
-
-    if (!temp_control_panel_) {
-        spdlog::error("[TempStackWidget] TempControlPanel not initialized");
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    if (!nozzle_temp_panel_ && parent_screen_) {
-        nozzle_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "nozzle_temp_panel", nullptr));
-        if (nozzle_temp_panel_) {
-            temp_control_panel_->setup_nozzle_panel(nozzle_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                nozzle_temp_panel_, temp_control_panel_->get_nozzle_lifecycle());
-            lv_obj_add_flag(nozzle_temp_panel_, LV_OBJ_FLAG_HIDDEN);
-            spdlog::info("[TempStackWidget] Nozzle temp panel created");
-        } else {
-            spdlog::error("[TempStackWidget] Failed to create nozzle temp panel");
-            NOTIFY_ERROR("Failed to load temperature panel");
-            return;
-        }
-    }
-
-    if (nozzle_temp_panel_) {
-        NavigationManager::instance().push_overlay(nozzle_temp_panel_);
-    }
+    spdlog::info("[TempStackWidget] Nozzle clicked - opening temp graph overlay");
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Nozzle, parent_screen_);
 }
 
 void TempStackWidget::handle_bed_clicked() {
@@ -443,33 +405,8 @@ void TempStackWidget::handle_bed_clicked() {
         return;
     }
 
-    spdlog::info("[TempStackWidget] Bed clicked - opening bed temp panel");
-
-    if (!temp_control_panel_) {
-        spdlog::error("[TempStackWidget] TempControlPanel not initialized");
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    if (!bed_temp_panel_ && parent_screen_) {
-        bed_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "bed_temp_panel", nullptr));
-        if (bed_temp_panel_) {
-            temp_control_panel_->setup_bed_panel(bed_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                bed_temp_panel_, temp_control_panel_->get_bed_lifecycle());
-            lv_obj_add_flag(bed_temp_panel_, LV_OBJ_FLAG_HIDDEN);
-            spdlog::info("[TempStackWidget] Bed temp panel created");
-        } else {
-            spdlog::error("[TempStackWidget] Failed to create bed temp panel");
-            NOTIFY_ERROR("Failed to load temperature panel");
-            return;
-        }
-    }
-
-    if (bed_temp_panel_) {
-        NavigationManager::instance().push_overlay(bed_temp_panel_);
-    }
+    spdlog::info("[TempStackWidget] Bed clicked - opening temp graph overlay");
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Bed, parent_screen_);
 }
 
 void TempStackWidget::handle_chamber_clicked() {
@@ -479,33 +416,8 @@ void TempStackWidget::handle_chamber_clicked() {
         return;
     }
 
-    spdlog::info("[TempStackWidget] Chamber clicked - opening chamber temp panel");
-
-    if (!temp_control_panel_) {
-        spdlog::error("[TempStackWidget] TempControlPanel not initialized");
-        NOTIFY_ERROR("Temperature panel not available");
-        return;
-    }
-
-    if (!chamber_temp_panel_ && parent_screen_) {
-        chamber_temp_panel_ =
-            static_cast<lv_obj_t*>(lv_xml_create(parent_screen_, "chamber_temp_panel", nullptr));
-        if (chamber_temp_panel_) {
-            temp_control_panel_->setup_chamber_panel(chamber_temp_panel_, parent_screen_);
-            NavigationManager::instance().register_overlay_instance(
-                chamber_temp_panel_, temp_control_panel_->get_chamber_lifecycle());
-            lv_obj_add_flag(chamber_temp_panel_, LV_OBJ_FLAG_HIDDEN);
-            spdlog::info("[TempStackWidget] Chamber temp panel created");
-        } else {
-            spdlog::error("[TempStackWidget] Failed to create chamber temp panel");
-            NOTIFY_ERROR("Failed to load temperature panel");
-            return;
-        }
-    }
-
-    if (chamber_temp_panel_) {
-        NavigationManager::instance().push_overlay(chamber_temp_panel_);
-    }
+    spdlog::info("[TempStackWidget] Chamber clicked - opening temp graph overlay");
+    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::Chamber, parent_screen_);
 }
 
 void TempStackWidget::temp_stack_nozzle_cb(lv_event_t* e) {

@@ -36,11 +36,6 @@ class TempStackWidget : public PanelWidget {
     lv_obj_t* widget_obj_ = nullptr;
     lv_obj_t* parent_screen_ = nullptr;
 
-    // Lazy overlay panels
-    lv_obj_t* nozzle_temp_panel_ = nullptr;
-    lv_obj_t* bed_temp_panel_ = nullptr;
-    lv_obj_t* chamber_temp_panel_ = nullptr;
-
     // Heating icon animators
     HeatingIconAnimator nozzle_animator_;
     HeatingIconAnimator bed_animator_;

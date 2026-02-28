@@ -10,6 +10,7 @@
 #include "ui_event_safety.h"
 #include "ui_icon.h"
 #include "ui_nav_manager.h"
+#include "ui_overlay_temp_graph.h"
 #include "ui_panel_ams.h"
 #include "ui_panel_ams_overview.h"
 #include "ui_panel_temp_control.h"
@@ -329,6 +330,21 @@ void FilamentPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
         } else {
             spdlog::warn("[{}] temp_graph_container not found in XML", get_name());
         }
+    }
+
+    // Make the graph card clickable to open the unified temp graph overlay
+    if (temp_graph_card_) {
+        lv_obj_add_flag(temp_graph_card_, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_add_event_cb(
+            temp_graph_card_,
+            [](lv_event_t* e) {
+                auto* self = static_cast<FilamentPanel*>(lv_event_get_user_data(e));
+                if (self) {
+                    get_global_temp_graph_overlay().open(TempGraphOverlay::Mode::GraphOnly,
+                                                         self->parent_screen_);
+                }
+            },
+            LV_EVENT_CLICKED, this);
     }
 
     // AMS mini status widget is now created declaratively via XML <ams_mini_status/>
