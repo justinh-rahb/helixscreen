@@ -268,7 +268,7 @@ detect_platform() {
     # Check for FlashForge AD5X (MIPS with /usr/data and FlashForge indicators)
     # AD5X uses Ingenic X2600 (MIPS), has /usr/prog/ and /usr/data/ layout
     if [ "$arch" = "mips" ]; then
-        if [ -d "/usr/data" ] && [ -d "/usr/prog" ]; then
+        if [ -d "/usr/data" ] && { [ -d "/usr/prog" ] || [ -f "/ZMOD" ]; }; then
             echo "ad5x"
             return
         fi

@@ -1653,10 +1653,11 @@ std::string UpdateChecker::get_platform_key() {
     return "cc1";
 #elif defined(HELIX_PLATFORM_MIPS)
     // Same binary runs on K1 and AD5X — detect at runtime.
-    // AD5X has /usr/prog (FlashForge layout), K1 does not.
+    // AD5X has /usr/prog dir (FlashForge layout) or /ZMOD file; K1 has neither.
     {
         struct stat st;
-        if (stat("/usr/prog", &st) == 0 && S_ISDIR(st.st_mode)) {
+        if ((stat("/usr/prog", &st) == 0 && S_ISDIR(st.st_mode)) ||
+            (stat("/ZMOD", &st) == 0 && S_ISREG(st.st_mode))) {
             return "ad5x";
         }
         return "k1";
