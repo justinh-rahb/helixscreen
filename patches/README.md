@@ -24,6 +24,7 @@ Applied in order. The fbdev patches have a dependency: `stride_bpp` must be appl
 | `lvgl-drm-plane-rotation.patch` | `lv_linux_drm.c`, `.h` | DRM plane rotation query/set API |
 | `lvgl-drm-egl-getters.patch` | `lv_linux_drm.h`, `lv_linux_drm_egl.c` | EGL display/context/config getters |
 | `lvgl-drm-shadow-buffer-api.patch` | `lv_linux_drm.c`, `.h` | Shadow buffer API: buf_map, buf_stride, set_active_buf + flush NULL guards |
+| `lvgl_refr_reshape_null_guard.patch` | `lv_refr.c` | NULL guard on draw_buf reshape failure to prevent buffer overrun (#229) |
 
 ## Dropped Patches (v9.5.0)
 
