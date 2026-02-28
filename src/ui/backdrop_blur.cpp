@@ -30,13 +30,12 @@ namespace helix::ui {
 // Circuit Breaker
 // ============================================================================
 
-static bool s_blur_disabled = true;
+static bool s_blur_disabled = false;
 
 namespace detail {
 
 void reset_circuit_breaker() {
-    // Backdrop blur disabled pending stability testing
-    s_blur_disabled = true;
+    s_blur_disabled = false;
 }
 
 bool is_blur_disabled() {
