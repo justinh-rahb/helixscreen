@@ -1679,3 +1679,103 @@ TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU gate_filament_name parsing"
         REQUIRE(info.units[0].slots[0].color_name == "Name A");
     }
 }
+
+// ============================================================================
+// Full EMU integration test — validates all EMU parsing fixes together
+// using real data from an EMU user's Moonraker dump
+// ============================================================================
+
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "Full EMU status integration",
+                 "[ams][happy_hare][emu]") {
+    // Real data from EMU user's Moonraker dump (simplified)
+    nlohmann::json mmu_data = {
+        {"gate", 0},
+        {"tool", 0},
+        {"filament", "Loaded"},
+        {"action", "Idle"},
+        {"num_gates", 8},
+        {"filament_pos", 10},
+        {"has_bypass", true},
+        {"gate_status", {2, 2, 2, 2, 2, 2, 1, 1}},
+        {"gate_color_rgb", {
+            {1.0, 1.0, 1.0},
+            {0.0, 0.0, 0.0},
+            {0.976, 0.976, 0.4},
+            {0.016, 0.184, 0.337},
+            {0.553, 0.784, 0.588},
+            {0.0, 0.0, 0.0},
+            {1.0, 1.0, 1.0},
+            {0.0, 0.0, 0.0}
+        }},
+        {"gate_material", {"PLA", "PLA", "PLA", "PLA", "PLA", "ABS", "ABS", "ASA CF"}},
+        {"gate_filament_name", {"Matte White", "Matte Black", "Matte Yellow", "Matte Navy",
+                                "Matte Green", "Black", "White", "Black"}},
+        {"gate_temperature", {230, 230, 230, 230, 230, 260, 260, 265}},
+        {"gate_name", nullptr},
+        {"ttg_map", {0, 1, 2, 3, 4, 5, 6, 7}},
+        {"endless_spool_groups", {0, 1, 2, 3, 4, 5, 6, 7}},
+        {"bowden_progress", -1},
+        {"encoder", nullptr},
+        {"unit_gate_counts", nullptr},
+        {"sync_drive", true},
+        {"sync_feedback_state", "neutral"},
+        {"clog_detection_enabled", 0},
+        {"espooler_active", ""},
+        {"spoolman_support", "push"},
+        {"drying_state", {"", "", "", "", "", "", "", ""}},
+        {"sensors", {
+            {"mmu_pre_gate", true},
+            {"mmu_gear", true},
+            {"filament_proportional", false},
+            {"extruder", true},
+            {"toolhead", true}
+        }}
+    };
+    test_parse_mmu_state(mmu_data);
+
+    auto info = get_system_info();
+
+    // Structure
+    REQUIRE(info.total_slots == 8);
+    REQUIRE(info.units.size() == 1);
+    REQUIRE(info.units[0].slot_count == 8);
+
+    // Current state
+    REQUIRE(info.current_slot == 0);
+    REQUIRE(info.current_tool == 0);
+    REQUIRE(info.filament_loaded == true);
+    REQUIRE(info.action == AmsAction::IDLE);
+    REQUIRE(info.supports_bypass == true);
+
+    // Colors (float arrays converted to 0xRRGGBB)
+    REQUIRE(info.units[0].slots[0].color_rgb == 0xFFFFFF);  // White
+    REQUIRE(info.units[0].slots[1].color_rgb == 0x000000);  // Black
+    REQUIRE(info.units[0].slots[3].color_rgb == 0x042F56);  // Navy
+
+    // Materials
+    REQUIRE(info.units[0].slots[0].material == "PLA");
+    REQUIRE(info.units[0].slots[5].material == "ABS");
+    REQUIRE(info.units[0].slots[7].material == "ASA CF");
+
+    // Filament names (from gate_filament_name since gate_name is null)
+    REQUIRE(info.units[0].slots[0].color_name == "Matte White");
+    REQUIRE(info.units[0].slots[3].color_name == "Matte Navy");
+
+    // Temperatures
+    REQUIRE(info.units[0].slots[0].nozzle_temp_min == 230);
+    REQUIRE(info.units[0].slots[5].nozzle_temp_min == 260);
+
+    // Sensors (aggregate format)
+    REQUIRE(info.units[0].has_slot_sensors == true);
+
+    // Dryer (array format = supported but inactive)
+    auto dryer = get_dryer_info();
+    REQUIRE(dryer.supported == true);
+    REQUIRE(dryer.active == false);
+
+    // v4 fields
+    REQUIRE(info.sync_drive == true);
+    REQUIRE(info.sync_feedback_state == "neutral");
+    REQUIRE(info.spoolman_mode == SpoolmanMode::PUSH);
+    REQUIRE(info.encoder_flow_rate == -1);  // null encoder
+}
