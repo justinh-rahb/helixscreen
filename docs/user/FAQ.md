@@ -277,13 +277,13 @@ For layout customization, you can edit XML files in `ui_xml/` (no recompilation 
 
 - **Auto-Detect** (default) — HelixScreen picks an image based on your printer type from Klipper
 - **Shipped Images** — Choose from 25+ pre-rendered images (Voron, Creality, FlashForge, Anycubic, RatRig, etc.)
-- **Custom Images** — Drop a PNG or JPEG file into `config/custom_images/` and it appears automatically the next time you open the picker. Files must be under 5MB and 2048x2048 pixels max.
+- **Custom Images** — Drop a PNG or JPEG file into `config/custom_images/` and it appears automatically the next time you open the picker. You can also import images directly from a USB drive. Files must be under 5MB and 2048x2048 pixels max.
 
-Your selection is saved to the `display.printer_image` config key and persists across restarts.
+Your selection is saved to the `display.printer_image` config key and persists across restarts. See the [Printer Manager guide](guide/home-panel.md#changing-the-printer-image) for step-by-step instructions.
 
 ### Can I rename my printer?
 
-**Yes.** Tap the printer image on the Home Panel to open the Printer Manager. Then tap the printer name (shown with a pencil icon) to enable inline editing. Type the new name and press **Enter** to save, or **Escape** to cancel. The name is stored in the `printer.name` config key.
+**Yes.** Tap the printer image on the Home Panel to open the Printer Manager. Then tap the printer name (shown with a pencil icon) to enable inline editing. Type the new name and press **Enter** to save, or **Escape** to cancel. The name is stored in the `printer.name` config key. See the [Printer Manager guide](guide/home-panel.md#changing-the-printer-name) for details.
 
 ---
 
