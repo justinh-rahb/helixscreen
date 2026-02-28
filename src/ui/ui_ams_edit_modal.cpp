@@ -114,6 +114,7 @@ bool AmsEditModal::show_for_slot(lv_obj_t* parent, int slot_index, const SlotInf
     api_ = api;
     remaining_pre_edit_pct_ = 0;
     cached_spools_.clear();
+    vendors_loaded_ = false;
 
     // Reset remaining mode subject before showing (0 = view mode)
     lv_subject_set_int(&remaining_mode_subject_, 0);
