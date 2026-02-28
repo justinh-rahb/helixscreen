@@ -1466,3 +1466,50 @@ TEST_CASE("Happy Hare does not track weight locally", "[ams][happy_hare][spoolma
     AmsBackendHappyHareTestHelper helper;
     REQUIRE(helper.tracks_weight_locally() == false);
 }
+
+// ============================================================================
+// EMU compatibility — num_gates as integer or array
+// EMU sends num_gates as plain integer (e.g. 8), not comma-separated string.
+// Config format may also send it as a JSON array (e.g. [8]).
+// ============================================================================
+
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU num_gates as integer",
+                 "[ams][happy_hare][emu]") {
+    // EMU sends num_gates as plain integer, not string
+    nlohmann::json mmu_data = {{"gate_status", {1, 1, 1, 1, 1, 1, 1, 1}}, {"num_gates", 8}};
+    test_parse_mmu_state(mmu_data);
+
+    auto info = get_system_info();
+    REQUIRE(info.total_slots == 8);
+    REQUIRE(info.units.size() == 1);
+    REQUIRE(info.units[0].slot_count == 8);
+}
+
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU num_gates as array",
+                 "[ams][happy_hare][emu]") {
+    // Config format sends num_gates as [8] array
+    nlohmann::json mmu_data = {{"gate_status", {1, 1, 1, 1, 1, 1, 1, 1}}, {"num_gates", {8}}};
+    test_parse_mmu_state(mmu_data);
+
+    auto info = get_system_info();
+    REQUIRE(info.total_slots == 8);
+    REQUIRE(info.units.size() == 1);
+    REQUIRE(info.units[0].slot_count == 8);
+}
+
+TEST_CASE_METHOD(AmsBackendHappyHareTestHelper, "EMU num_gates array multi-unit dissimilar",
+                 "[ams][happy_hare][emu]") {
+    // Multi-unit setup with array format [6, 4]
+    nlohmann::json setup = {{"num_units", 2}};
+    test_parse_mmu_state(setup);
+
+    nlohmann::json mmu_data = {{"gate_status", {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}},
+                               {"num_gates", {6, 4}}};
+    test_parse_mmu_state(mmu_data);
+
+    auto info = get_system_info();
+    REQUIRE(info.total_slots == 10);
+    REQUIRE(info.units.size() == 2);
+    REQUIRE(info.units[0].slot_count == 6);
+    REQUIRE(info.units[1].slot_count == 4);
+}

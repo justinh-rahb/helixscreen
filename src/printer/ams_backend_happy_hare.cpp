@@ -387,6 +387,28 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
                 spdlog::debug("[AMS HappyHare] Per-unit gate counts from num_gates string: {}",
                               ng_str);
             }
+        } else if (ng.is_number_integer()) {
+            // EMU sends plain integer (single unit)
+            int count = ng.get<int>();
+            if (count > 0) {
+                per_unit_gate_counts_ = {count};
+                spdlog::debug("[AMS HappyHare] Single-unit gate count from num_gates int: {}",
+                              count);
+            }
+        } else if (ng.is_array()) {
+            // Config format: [8] or [6, 4]
+            std::vector<int> counts;
+            for (const auto& c : ng) {
+                if (c.is_number_integer()) {
+                    int count = c.get<int>();
+                    if (count > 0)
+                        counts.push_back(count);
+                }
+            }
+            if (!counts.empty()) {
+                per_unit_gate_counts_ = counts;
+                spdlog::debug("[AMS HappyHare] Per-unit gate counts from num_gates array");
+            }
         }
     }
 
