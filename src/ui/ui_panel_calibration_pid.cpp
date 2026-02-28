@@ -324,7 +324,11 @@ void PIDCalibrationPanel::on_activate() {
     // Check PrinterDiscovery for Kalico detection (primary source)
     if (get_printer_state().get_capability_overrides().is_kalico()) {
         is_kalico_ = true;
-        lv_subject_set_int(&subj_is_kalico_, 1);
+        // Only expose MPC UI to beta users
+        lv_subject_t* beta = lv_xml_get_subject(nullptr, "show_beta_features");
+        if (beta && lv_subject_get_int(beta) == 1) {
+            lv_subject_set_int(&subj_is_kalico_, 1);
+        }
     }
 
     // Detect heater control type (also infers Kalico as fallback)
@@ -1066,7 +1070,11 @@ void PIDCalibrationPanel::detect_heater_control_type() {
                     return;
                 // Query succeeded, firmware supports control type query (Kalico)
                 is_kalico_ = true;
-                lv_subject_set_int(&subj_is_kalico_, 1);
+                // Only expose MPC UI to beta users
+                lv_subject_t* beta = lv_xml_get_subject(nullptr, "show_beta_features");
+                if (beta && lv_subject_get_int(beta) == 1) {
+                    lv_subject_set_int(&subj_is_kalico_, 1);
+                }
 
                 if (type == "mpc") {
                     // Already MPC, no migration needed
