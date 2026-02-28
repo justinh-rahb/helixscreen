@@ -99,6 +99,8 @@ class DisplayBackendDRM : public DisplayBackend {
     lv_display_flush_cb_t original_flush_cb_ = nullptr;
     uint8_t* rotated_buf_ = nullptr;
     size_t rotated_buf_size_ = 0;
+    uint32_t rotation_frame_count_ = 0;
+    uint32_t rotation_time_accum_ms_ = 0;
 
     static void rotation_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
 };

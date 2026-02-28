@@ -224,12 +224,28 @@ void DisplayBackendDRM::rotation_flush_cb(lv_display_t* disp, const lv_area_t* a
             spdlog::debug("[DRM Backend] Allocated rotation buffer: {} bytes", buf_size);
         }
 
-        // Rotate from DRM buffer → temp buffer
+        // Rotate from DRM buffer → temp buffer, then copy back
+        // Log timing at TRACE level for performance analysis
+        uint32_t t0 = lv_tick_get();
         lv_draw_sw_rotate(px_map, self->rotated_buf_, src_w, src_h, src_stride, dest_stride,
                           rotation, cf);
-
-        // Copy rotated pixels back to DRM buffer for page flip
+        uint32_t t1 = lv_tick_get();
         lv_memcpy(px_map, self->rotated_buf_, buf_size);
+        uint32_t t2 = lv_tick_get();
+
+        // Sample every 120 frames (~2s at 60fps) to avoid log spam
+        self->rotation_frame_count_++;
+        self->rotation_time_accum_ms_ += (t2 - t0);
+        if (self->rotation_frame_count_ >= 120) {
+            spdlog::trace("[DRM Backend] Rotation overhead: {:.1f}ms avg (rotate {:.1f}ms + "
+                          "copy {:.1f}ms) over {} frames",
+                          static_cast<float>(self->rotation_time_accum_ms_) /
+                              static_cast<float>(self->rotation_frame_count_),
+                          static_cast<float>(t1 - t0), static_cast<float>(t2 - t1),
+                          self->rotation_frame_count_);
+            self->rotation_frame_count_ = 0;
+            self->rotation_time_accum_ms_ = 0;
+        }
     }
 
     // Call original DRM flush (page flip)
