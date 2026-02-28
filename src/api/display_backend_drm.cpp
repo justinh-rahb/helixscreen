@@ -8,6 +8,8 @@
 #include "display_backend_drm.h"
 
 #include "config.h"
+#include "display/lv_display_private.h"
+#include "draw/sw/lv_draw_sw_utils.h"
 #include "drm_rotation_strategy.h"
 
 #include <spdlog/spdlog.h>
@@ -179,6 +181,60 @@ std::string auto_detect_drm_device() {
 DisplayBackendDRM::DisplayBackendDRM() : drm_device_(auto_detect_drm_device()) {}
 
 DisplayBackendDRM::DisplayBackendDRM(const std::string& drm_device) : drm_device_(drm_device) {}
+
+DisplayBackendDRM::~DisplayBackendDRM() {
+    if (rotated_buf_) {
+        lv_free(rotated_buf_);
+        rotated_buf_ = nullptr;
+    }
+}
+
+// Rotation-aware flush callback — mirrors fbdev's approach.
+// LVGL's DRM driver has NO rotation support (GitHub lvgl/lvgl#6598).
+// We rotate pixels manually before the original flush does a page flip.
+void DisplayBackendDRM::rotation_flush_cb(lv_display_t* disp, const lv_area_t* area,
+                                          uint8_t* px_map) {
+    auto* self = static_cast<DisplayBackendDRM*>(lv_display_get_user_data(disp));
+    if (!self || !self->original_flush_cb_) {
+        lv_display_flush_ready(disp);
+        return;
+    }
+
+    const lv_display_rotation_t rotation = lv_display_get_rotation(disp);
+
+    if (rotation != LV_DISPLAY_ROTATION_0 && lv_display_flush_is_last(disp)) {
+        const lv_color_format_t cf = lv_display_get_color_format(disp);
+        const int32_t src_w = lv_area_get_width(area);
+        const int32_t src_h = lv_area_get_height(area);
+        const uint32_t src_stride = lv_draw_buf_width_to_stride(src_w, cf);
+
+        // Calculate rotated area coordinates
+        lv_area_t rotated_area = *area;
+        lv_display_rotate_area(disp, &rotated_area);
+        const uint32_t dest_stride =
+            lv_draw_buf_width_to_stride(lv_area_get_width(&rotated_area), cf);
+        const size_t buf_size = dest_stride * lv_area_get_height(&rotated_area);
+
+        // Ensure temp buffer is large enough
+        if (!self->rotated_buf_ || self->rotated_buf_size_ < buf_size) {
+            if (self->rotated_buf_)
+                lv_free(self->rotated_buf_);
+            self->rotated_buf_ = static_cast<uint8_t*>(lv_malloc(buf_size));
+            self->rotated_buf_size_ = buf_size;
+            spdlog::debug("[DRM Backend] Allocated rotation buffer: {} bytes", buf_size);
+        }
+
+        // Rotate from DRM buffer → temp buffer
+        lv_draw_sw_rotate(px_map, self->rotated_buf_, src_w, src_h, src_stride, dest_stride,
+                          rotation, cf);
+
+        // Copy rotated pixels back to DRM buffer for page flip
+        lv_memcpy(px_map, self->rotated_buf_, buf_size);
+    }
+
+    // Call original DRM flush (page flip)
+    self->original_flush_cb_(disp, area, px_map);
+}
 
 bool DisplayBackendDRM::is_available() const {
     if (drm_device_.empty()) {
@@ -429,17 +485,38 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
         break;
 
     case DrmRotationStrategy::SOFTWARE:
-        // Tell LVGL the logical rotation so touch coordinates and resolution
-        // reporting are correct, then enable matrix rotation for pixel transforms
+        // LVGL's DRM driver has NO rotation support — flush just page-flips.
+        // We implement rotation the same way fbdev does: rotate pixels in the
+        // flush callback using lv_draw_sw_rotate().
+        //
+        // FULL render mode is required so we get the entire frame in each
+        // flush call (can't rotate a partial dirty region in-place).
+        lv_display_set_render_mode(display_, LV_DISPLAY_RENDER_MODE_FULL);
         lv_display_set_rotation(display_, rot);
-        lv_display_set_matrix_rotation(display_, true);
-        spdlog::info("[DRM Backend] Software matrix rotation set to {}° (plane supports 0x{:X})",
-                     static_cast<int>(rot) * 90, supported_mask);
+
+        // Install rotation-aware flush wrapper (only once)
+        if (!original_flush_cb_) {
+            original_flush_cb_ = display_->flush_cb;
+            lv_display_set_user_data(display_, this);
+            lv_display_set_flush_cb(display_, rotation_flush_cb);
+        }
+
+        spdlog::info(
+            "[DRM Backend] Software rotation set to {}° (flush callback, plane supports 0x{:X})",
+            static_cast<int>(rot) * 90, supported_mask);
         break;
 
     case DrmRotationStrategy::NONE:
         // Explicitly reset in case a previous call set a non-zero rotation
         lv_linux_drm_set_rotation(display_, DRM_MODE_ROTATE_0);
+
+        // Restore original flush callback if we installed our wrapper
+        if (original_flush_cb_) {
+            lv_display_set_flush_cb(display_, original_flush_cb_);
+            lv_display_set_user_data(display_, nullptr);
+            original_flush_cb_ = nullptr;
+        }
+        lv_display_set_render_mode(display_, LV_DISPLAY_RENDER_MODE_DIRECT);
         spdlog::debug("[DRM Backend] No rotation needed");
         break;
     }

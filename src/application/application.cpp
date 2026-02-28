@@ -684,9 +684,33 @@ bool Application::init_display() {
     m_screen_width = m_display->width();
     m_screen_height = m_display->height();
 
-    // Rotation probe and layout manager init are deferred to after
-    // init_translations() (Phase 8b) so that lv_tr() is available for
-    // the probe's user-facing strings. See run_rotation_probe_and_layout().
+    // The interactive rotation probe is deferred to after init_translations()
+    // (Phase 8b) so that lv_tr() is available for its user-facing strings.
+    // However, kernel-detected orientation (panel_orientation=upside_down) can
+    // be applied immediately — no UI needed. This ensures the splash screen
+    // renders right-side up.
+    {
+        int config_rotation = m_config->get<int>("/display/rotate", 0);
+        if (config_rotation == 0 && m_args.rotation == 0) {
+            int kernel_orientation = DisplayBackend::detect_panel_orientation();
+            if (kernel_orientation > 0) {
+                spdlog::info("[Application] Applying kernel panel orientation: {}° (pre-splash)",
+                             kernel_orientation);
+                m_config->set("/display/rotate", kernel_orientation);
+                m_config->set("/display/rotation_probed", true);
+                m_config->save();
+                m_display->apply_rotation(kernel_orientation);
+                m_screen_width = m_display->width();
+                m_screen_height = m_display->height();
+            }
+        } else if (config_rotation > 0) {
+            spdlog::info("[Application] Applying config rotation: {}° (pre-splash)",
+                         config_rotation);
+            m_display->apply_rotation(config_rotation);
+            m_screen_width = m_display->width();
+            m_screen_height = m_display->height();
+        }
+    }
 
     // Register LVGL log handler AFTER lv_init() (called inside display->init())
     // Must be after lv_init() because it resets global state and clears callbacks
@@ -827,9 +851,27 @@ void Application::run_rotation_probe_and_layout() {
 #endif
 
         if (should_probe) {
-            m_display->run_rotation_probe();
-            m_screen_width = m_display->width();
-            m_screen_height = m_display->height();
+            // Try auto-detecting panel orientation from kernel first.
+            // panel_orientation is informational — the kernel does NOT rotate
+            // the framebuffer for us. We must apply the rotation ourselves.
+            int kernel_orientation = DisplayBackend::detect_panel_orientation();
+            if (kernel_orientation > 0) {
+                spdlog::info("[Application] Auto-detected panel orientation: {}° — "
+                             "applying now and saving to config",
+                             kernel_orientation);
+                m_config->set("/display/rotate", kernel_orientation);
+                m_config->set("/display/rotation_probed", true);
+                m_config->save();
+
+                // Apply rotation immediately — init() already ran without it.
+                m_display->apply_rotation(kernel_orientation);
+                m_screen_width = m_display->width();
+                m_screen_height = m_display->height();
+            } else {
+                m_display->run_rotation_probe();
+                m_screen_width = m_display->width();
+                m_screen_height = m_display->height();
+            }
         }
     }
 

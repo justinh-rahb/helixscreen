@@ -54,7 +54,7 @@ class DisplayBackendDRM : public DisplayBackend {
      */
     explicit DisplayBackendDRM(const std::string& drm_device);
 
-    ~DisplayBackendDRM() override = default;
+    ~DisplayBackendDRM() override;
 
     // Display creation
     lv_display_t* create_display(int width, int height) override;
@@ -93,6 +93,14 @@ class DisplayBackendDRM : public DisplayBackend {
     lv_display_t* display_ = nullptr;
     lv_indev_t* pointer_ = nullptr;
     bool using_egl_ = false; ///< Track if GPU-accelerated path is active
+
+    // Software rotation state — the LVGL DRM driver has no rotation support,
+    // so we rotate pixels manually in the flush callback (like fbdev does).
+    lv_display_flush_cb_t original_flush_cb_ = nullptr;
+    uint8_t* rotated_buf_ = nullptr;
+    size_t rotated_buf_size_ = 0;
+
+    static void rotation_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px_map);
 };
 
 #endif // HELIX_DISPLAY_DRM

@@ -421,6 +421,16 @@ int main(int argc, char** argv) {
     if (rotation == 0) {
         rotation = read_config_rotation(0);
     }
+    // Auto-detect from kernel if no config/CLI rotation (first boot).
+    // panel_orientation is informational — kernel does NOT rotate the
+    // framebuffer, we must do it ourselves.
+    if (rotation == 0) {
+        int kernel_rot = detect_panel_orientation_from_cmdline();
+        if (kernel_rot > 0) {
+            rotation = kernel_rot;
+            fprintf(stderr, "helix-splash: Auto-detected panel orientation: %d°\n", rotation);
+        }
+    }
     if (rotation != 0) {
         lv_display_set_rotation(display, degrees_to_lv_rotation(rotation));
         // Update dimensions to match rotated resolution for splash layout

@@ -875,10 +875,48 @@ void DisplayManager::install_sleep_aware_input_wrapper() {
 // Rotation Probe (first-boot auto-detect)
 // ============================================================================
 
+void DisplayManager::apply_rotation(int degrees) {
+    if (!m_display || !m_backend) {
+        spdlog::warn("[DisplayManager] Cannot apply rotation — display not initialized");
+        return;
+    }
+    if (degrees == 0)
+        return;
+
+#ifdef HELIX_DISPLAY_SDL
+    spdlog::warn("[DisplayManager] Rotation {}° not supported on SDL backend", degrees);
+#else
+    int phys_w = m_width;
+    int phys_h = m_height;
+
+    lv_display_rotation_t lv_rot = degrees_to_lv_rotation(degrees);
+    lv_display_set_rotation(m_display, lv_rot);
+
+    m_width = lv_display_get_horizontal_resolution(m_display);
+    m_height = lv_display_get_vertical_resolution(m_display);
+
+    m_backend->set_display_rotation(lv_rot, phys_w, phys_h);
+
+    spdlog::info("[DisplayManager] Display rotated {}° — effective resolution: {}x{}", degrees,
+                 m_width, m_height);
+#endif
+}
+
 void DisplayManager::run_rotation_probe() {
     if (!m_display || !m_pointer) {
         spdlog::info("[DisplayManager] Rotation probe skipped: display={}, pointer={}",
                      m_display ? "ok" : "null", m_pointer ? "ok" : "null");
+        return;
+    }
+
+    // DRM backend: interactive rotation probe crashes because switching between
+    // DIRECT and FULL render modes during probe triggers LVGL assertion in
+    // layer_reshape_draw_buf(). DRM rotation is handled via kernel
+    // panel_orientation auto-detection instead.
+    bool is_drm = (m_backend && m_backend->type() == DisplayBackendType::DRM);
+    if (is_drm) {
+        spdlog::info("[DisplayManager] Rotation probe skipped on DRM backend — "
+                     "use panel_orientation kernel parameter for auto-detection");
         return;
     }
 
@@ -1017,7 +1055,8 @@ void DisplayManager::run_rotation_probe() {
         for (int i = 0; i < num_rotations; i++) {
             // Apply rotation (skip on SDL — DIRECT render mode can't rotate)
             if (!is_sdl) {
-                lv_display_set_rotation(m_display, rotations[i]);
+                // Let the backend handle rotation (hardware or software fallback).
+                // The backend manages matrix_rotation internally.
                 m_backend->set_display_rotation(rotations[i], phys_w, phys_h);
                 m_width = lv_display_get_horizontal_resolution(m_display);
                 m_height = lv_display_get_vertical_resolution(m_display);
@@ -1084,7 +1123,6 @@ void DisplayManager::run_rotation_probe() {
     // Ensure display is at the confirmed rotation
     if (!is_sdl) {
         lv_display_rotation_t confirmed_lv_rot = degrees_to_lv_rotation(confirmed_rotation);
-        lv_display_set_rotation(m_display, confirmed_lv_rot);
         m_backend->set_display_rotation(confirmed_lv_rot, phys_w, phys_h);
         m_width = lv_display_get_horizontal_resolution(m_display);
         m_height = lv_display_get_vertical_resolution(m_display);
