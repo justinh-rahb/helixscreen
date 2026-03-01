@@ -250,9 +250,6 @@ else ifeq ($(PLATFORM_TARGET),ad5x)
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
     ENABLE_SCREENSAVER := no
-    # Disable TinyGL for ad5x - CPU too weak for software 3D (3-4 FPS)
-    # Uses 2D layer preview fallback instead
-    ENABLE_TINYGL_3D := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := ad5x
     # Strip binary for size on memory-constrained device
