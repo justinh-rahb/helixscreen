@@ -17,6 +17,7 @@
 #include "spoolman_slot_saver.h"
 #include "spoolman_types.h"
 #include "tool_state.h"
+#include "ui_toast_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -141,6 +142,33 @@ bool AmsEditModal::show_for_slot(lv_obj_t* parent, int slot_index, const SlotInf
         switch_to_picker();
     } else {
         switch_to_form();
+    }
+
+    // If linked to Spoolman but missing filament_id, fetch it now so edits can save
+    if (working_info_.spoolman_id > 0 && working_info_.spoolman_filament_id == 0 && api_) {
+        const int spool_id = working_info_.spoolman_id;
+        std::weak_ptr<bool> guard = callback_guard_;
+        api_->spoolman().get_spoolman_spool(
+            spool_id,
+            [this, guard, spool_id](const std::optional<SpoolInfo>& spool) {
+                int fetched_id = (spool && spool->filament_id > 0) ? spool->filament_id : 0;
+                helix::ui::queue_update([this, guard, spool_id, fetched_id]() {
+                    if (guard.expired())
+                        return;
+                    if (fetched_id > 0) {
+                        original_info_.spoolman_filament_id = fetched_id;
+                        working_info_.spoolman_filament_id = fetched_id;
+                        spdlog::debug("[AmsEditModal] Fetched filament_id={} for spool {}",
+                                      fetched_id, spool_id);
+                    } else {
+                        spdlog::warn("[AmsEditModal] Could not resolve filament_id for spool {}",
+                                     spool_id);
+                    }
+                });
+            },
+            [spool_id](const MoonrakerError& err) {
+                spdlog::warn("[AmsEditModal] Failed to fetch spool {}: {}", spool_id, err.message);
+            });
     }
 
     spdlog::info("[AmsEditModal] Shown for slot {} (spoolman_id={}, brand={}, material={})",
@@ -1036,6 +1064,9 @@ void AmsEditModal::handle_save() {
                     }
                     if (!success) {
                         spdlog::error("[AmsEditModal] Spoolman save failed, saving locally");
+                        ToastManager::instance().show(
+                            ToastSeverity::ERROR,
+                            lv_tr("Failed to save changes to Spoolman"), 3000);
                     }
                     fire_completion(true);
                 });
