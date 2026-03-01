@@ -395,9 +395,15 @@ void TempGraphOverlay::create_chips() {
         lv_obj_remove_flag(dot, static_cast<lv_obj_flag_t>(LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE));
         lv_obj_add_flag(dot, LV_OBJ_FLAG_EVENT_BUBBLE);
 
-        // Label
+        // Label — strip redundant " Temperature" suffix for chip brevity
+        std::string chip_label = s.display_name;
+        const std::string suffix = " Temperature";
+        if (chip_label.size() > suffix.size() &&
+            chip_label.compare(chip_label.size() - suffix.size(), suffix.size(), suffix) == 0) {
+            chip_label.erase(chip_label.size() - suffix.size());
+        }
         lv_obj_t* label = lv_label_create(chip);
-        lv_label_set_text(label, s.display_name.c_str());
+        lv_label_set_text(label, chip_label.c_str());
         lv_obj_set_style_text_font(label, theme_manager_get_font("font_small"), 0);
         lv_obj_set_style_text_color(label, theme_manager_get_color("text_primary"), 0);
         lv_obj_remove_flag(label, LV_OBJ_FLAG_CLICKABLE);
