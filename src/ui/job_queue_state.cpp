@@ -91,15 +91,22 @@ void JobQueueState::fetch() {
         },
         [this, guard](const MoonrakerError& err) {
             if (!*guard) return;
-            is_fetching_ = false;
-            spdlog::warn("[JobQueueState] Fetch failed: {}", err.message);
+            helix::ui::queue_update([this, guard, msg = err.message]() {
+                if (!*guard) return;
+                is_fetching_ = false;
+                spdlog::warn("[JobQueueState] Fetch failed: {}", msg);
+            });
         });
 }
 
 void JobQueueState::on_queue_fetched(const JobQueueStatus& status) {
     // Thread safety: API callbacks may fire on background thread.
     // Use queue_update to marshal onto the LVGL main thread.
-    helix::ui::queue_update([this, status]() {
+    // Guard must be captured into the lambda to prevent use-after-free
+    // if JobQueueState is destroyed before the queued update executes.
+    auto guard = callback_guard_;
+    helix::ui::queue_update([this, guard, status]() {
+        if (!*guard) return;
         cached_jobs_ = status.queued_jobs;
         queue_state_ = status.queue_state;
         is_loaded_ = true;
