@@ -422,10 +422,11 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
         LV_EVENT_CLICKED, this);
 
     // Configure button — upper-left corner, mirroring trash in upper-right.
-    // Only shown for widgets that have a PanelWidget with user_data set.
+    // Only shown for widgets that advertise has_edit_configure().
     {
         auto* raw = lv_obj_get_user_data(widget);
-        if (raw) {
+        auto* pw = raw ? static_cast<PanelWidget*>(raw) : nullptr;
+        if (pw && pw->has_edit_configure()) {
             configure_btn_ = lv_obj_create(container_);
             lv_obj_t* cfg_btn = configure_btn_;
             lv_obj_add_flag(cfg_btn, LV_OBJ_FLAG_FLOATING);

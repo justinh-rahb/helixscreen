@@ -61,9 +61,15 @@ class PanelWidget {
         (void)height_px;
     }
 
+    /// Whether this widget supports configuration in edit mode.
+    /// Override to return true to show the configure (gear) button.
+    virtual bool has_edit_configure() const {
+        return false;
+    }
+
     /// Called when the configure button is pressed in edit mode. Return true
     /// if handled (triggers rebuild). Widgets can toggle display modes, open
-    /// config modals, etc. Returning false means no configure action available.
+    /// config modals, etc.
     virtual bool on_edit_configure() {
         return false;
     }
