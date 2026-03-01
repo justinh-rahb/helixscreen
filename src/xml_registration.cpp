@@ -283,6 +283,7 @@ void register_xml_components() {
     register_xml("components/panel_widget_print_status.xml");
     register_xml("components/panel_widget_shutdown.xml");
     register_xml("components/panel_widget_job_queue.xml");
+    register_xml("job_queue_modal.xml");
     register_xml("thermistor_sensor_picker.xml");
     register_xml("favorite_macro_picker.xml");
     register_xml("macro_param_modal.xml");

@@ -48,6 +48,20 @@ namespace helix {
 void register_job_queue_widget() {
     register_widget_factory("job_queue", []() { return std::make_unique<JobQueueWidget>(); });
     register_widget_subjects("job_queue", job_queue_widget_init_subjects);
+
+    // Register click callback for opening the modal (L039: unique name)
+    lv_xml_register_event_cb(nullptr, "on_job_queue_widget_clicked", [](lv_event_t* e) {
+        auto* obj = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+        // Walk up to find the widget root with user_data
+        while (obj && !lv_obj_get_user_data(obj)) {
+            obj = lv_obj_get_parent(obj);
+        }
+        if (!obj) return;
+        auto* widget = static_cast<JobQueueWidget*>(lv_obj_get_user_data(obj));
+        if (widget) {
+            widget->open_modal();
+        }
+    });
 }
 } // namespace helix
 
@@ -209,4 +223,9 @@ void JobQueueWidget::rebuild_job_list() {
             lv_obj_set_style_text_color(time_label, theme_manager_get_color("text_muted"), 0);
         }
     }
+}
+
+void JobQueueWidget::open_modal() {
+    if (!parent_screen_) return;
+    job_queue_modal_.show(parent_screen_);
 }

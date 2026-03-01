@@ -4,6 +4,7 @@
 #pragma once
 
 #include "panel_widget.h"
+#include "ui_job_queue_modal.h"
 #include "ui_observer_guard.h"
 
 namespace helix {
@@ -20,6 +21,9 @@ class JobQueueWidget : public PanelWidget {
     void on_size_changed(int colspan, int rowspan, int width_px, int height_px) override;
     const char* id() const override { return "job_queue"; }
 
+    /// Open the job queue modal (called from XML event callback)
+    void open_modal();
+
   private:
     lv_obj_t* widget_obj_ = nullptr;
     lv_obj_t* parent_screen_ = nullptr;
@@ -29,6 +33,8 @@ class JobQueueWidget : public PanelWidget {
     int current_size_mode_ = 1; // 0=compact, 1=normal, 2=expanded
 
     void rebuild_job_list();
+
+    helix::JobQueueModal job_queue_modal_;
 };
 
 } // namespace helix
