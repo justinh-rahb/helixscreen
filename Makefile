@@ -280,6 +280,9 @@ else
     ENABLE_GLES_3D ?= yes
 endif
 
+# Screensaver default (enabled on desktop/Pi, disabled on constrained targets)
+ENABLE_SCREENSAVER ?= yes
+
 # Application C sources
 APP_C_SRCS := $(wildcard $(SRC_DIR)/*.c)
 APP_C_OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(APP_C_SRCS))
@@ -292,6 +295,10 @@ APP_SRCS := $(filter-out $(wildcard $(SRC_DIR)/tools/*.cpp),$(APP_SRCS))
 # Exclude GLES renderer when not enabled
 ifneq ($(ENABLE_GLES_3D),yes)
     APP_SRCS := $(filter-out $(SRC_DIR)/rendering/gcode_gles_renderer.cpp,$(APP_SRCS))
+endif
+# Exclude screensaver when not enabled
+ifneq ($(ENABLE_SCREENSAVER),yes)
+    APP_SRCS := $(filter-out $(SRC_DIR)/ui/ui_screensaver.cpp,$(APP_SRCS))
 endif
 APP_OBJS := $(patsubst $(SRC_DIR)/%.cpp,$(OBJ_DIR)/%.o,$(APP_SRCS))
 
@@ -441,6 +448,13 @@ else
     GLES3D_DEFINES :=
 endif
 
+# Flying Toasters screensaver (desktop/Pi only)
+ifeq ($(ENABLE_SCREENSAVER),yes)
+    SCREENSAVER_DEFINES := -DHELIX_ENABLE_SCREENSAVER
+else
+    SCREENSAVER_DEFINES :=
+endif
+
 # wpa_supplicant (WiFi control via wpa_ctrl interface)
 WPA_DIR := lib/wpa_supplicant
 # Output to $(BUILD_DIR)/lib/ for architecture isolation (native/pi/ad5m)
@@ -459,7 +473,7 @@ PCH_FLAGS := -include $(PCH_HEADER)
 # This allows `make strict` to catch issues in project code while ignoring third-party header warnings
 # stb_image headers (used for thumbnail processing)
 STB_INC := -isystem lib/tinygl/include-demo
-INCLUDES := -I. -I$(INC_DIR) -Isrc/generated -isystem lib -isystem lib/glm $(LVGL_INC) $(LIBHV_INC) $(SPDLOG_INC) $(STB_INC) $(LV_MARKDOWN_INC) $(WPA_INC) $(SDL2_INC)
+INCLUDES := -I. -I$(INC_DIR) -Isrc/generated -I$(BUILD_DIR)/generated -isystem lib -isystem lib/glm $(LVGL_INC) $(LIBHV_INC) $(SPDLOG_INC) $(STB_INC) $(LV_MARKDOWN_INC) $(WPA_INC) $(SDL2_INC)
 
 # Common linker flags (used by both macOS and Linux)
 LDFLAGS_COMMON := $(SDL2_LIBS) $(LIBHV_LIBS) $(FMT_LIBS) -lz -lm -lpthread
@@ -556,6 +570,10 @@ endif
 # Add 3D renderer defines to compiler flags
 CFLAGS += $(GLES3D_DEFINES)
 CXXFLAGS += $(GLES3D_DEFINES)
+
+# Add screensaver defines to compiler flags
+CFLAGS += $(SCREENSAVER_DEFINES)
+CXXFLAGS += $(SCREENSAVER_DEFINES)
 
 # Add systemd defines to C++ compiler flags (for logging_init.cpp)
 CXXFLAGS += $(SYSTEMD_CXXFLAGS)
@@ -729,6 +747,12 @@ strict:
 quality:
 	@echo "$(CYAN)$(BOLD)Running quality checks...$(RESET)"
 	$(Q)./scripts/quality-checks.sh
+
+# Generated contributors header (from git log)
+CONTRIBUTORS_H := $(BUILD_DIR)/generated/contributors.h
+
+$(CONTRIBUTORS_H):
+	$(Q)./scripts/gen-contributors.sh
 
 # Include modular makefiles
 include mk/deps.mk

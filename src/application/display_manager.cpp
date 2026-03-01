@@ -33,6 +33,9 @@
 #include "lvgl_log_handler.h"
 #include "printer_state.h"
 #include "runtime_config.h"
+#ifdef HELIX_ENABLE_SCREENSAVER
+#include "ui_screensaver.h"
+#endif
 
 #include <spdlog/spdlog.h>
 
@@ -535,6 +538,13 @@ void DisplayManager::delay(uint32_t ms) {
 // ============================================================================
 
 void DisplayManager::enter_sleep(int timeout_sec) {
+#ifdef HELIX_ENABLE_SCREENSAVER
+    // Stop screensaver before entering full sleep
+    if (m_screensaver_active) {
+        FlyingToasterScreensaver::instance().stop();
+        m_screensaver_active = false;
+    }
+#endif
     m_display_sleeping = true;
     if (m_use_hardware_blank) {
         if (m_backend) {
@@ -585,6 +595,22 @@ void DisplayManager::destroy_sleep_overlay() {
 // ============================================================================
 
 void DisplayManager::check_display_sleep() {
+#ifdef HELIX_ENABLE_SCREENSAVER
+    // HELIX_SCREENSAVER_NOW=1 — force-start screensaver immediately (for testing)
+    static bool screensaver_force_checked = false;
+    if (!screensaver_force_checked) {
+        screensaver_force_checked = true;
+        const char* env = std::getenv("HELIX_SCREENSAVER_NOW");
+        if (env && std::string(env) == "1") {
+            spdlog::info("[DisplayManager] HELIX_SCREENSAVER_NOW=1, forcing screensaver");
+            m_display_dimmed = true;
+            FlyingToasterScreensaver::instance().start();
+            m_screensaver_active = true;
+            return;
+        }
+    }
+#endif
+
     // If sleep-while-printing is disabled, inhibit sleep/dim during active prints
     if (!DisplaySettingsManager::instance().get_sleep_while_printing()) {
         PrintJobState job_state = get_printer_state().get_print_job_state();
@@ -644,11 +670,28 @@ void DisplayManager::check_display_sleep() {
         } else if (m_dim_timeout_sec > 0 && inactive_ms >= dim_timeout_ms) {
             // Dim the display
             m_display_dimmed = true;
-            if (m_backlight) {
-                m_backlight->set_brightness(m_dim_brightness_percent);
+#ifdef HELIX_ENABLE_SCREENSAVER
+            // Start screensaver instead of just dimming (if enabled)
+            if (!m_screensaver_active &&
+                helix::DisplaySettingsManager::instance().get_screensaver_enabled()) {
+                FlyingToasterScreensaver::instance().start();
+                m_screensaver_active = true;
+                if (m_backlight) {
+                    // Screensaver needs enough brightness to see the toasters,
+                    // but respect user's dim setting if it's higher
+                    m_backlight->set_brightness(std::max(m_dim_brightness_percent, 50));
+                }
+                spdlog::info("[DisplayManager] Screensaver started after {}s inactivity",
+                             m_dim_timeout_sec);
+            } else
+#endif
+            {
+                if (m_backlight) {
+                    m_backlight->set_brightness(m_dim_brightness_percent);
+                }
+                spdlog::info("[DisplayManager] Display dimmed to {}% after {}s inactivity",
+                             m_dim_brightness_percent, m_dim_timeout_sec);
             }
-            spdlog::info("[DisplayManager] Display dimmed to {}% after {}s inactivity",
-                         m_dim_brightness_percent, m_dim_timeout_sec);
         }
     }
 }
@@ -665,6 +708,14 @@ void DisplayManager::wake_display() {
     bool was_sleeping = m_display_sleeping;
     m_display_sleeping = false;
     m_display_dimmed = false;
+
+#ifdef HELIX_ENABLE_SCREENSAVER
+    // Stop screensaver on wake
+    if (m_screensaver_active) {
+        FlyingToasterScreensaver::instance().stop();
+        m_screensaver_active = false;
+    }
+#endif
 
     // Gate input if waking from full sleep (not dim)
     // This prevents the wake touch from triggering UI actions

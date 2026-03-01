@@ -155,6 +155,18 @@ class DisplaySettingsManager {
     static const char* get_time_format_options();
 
     // =========================================================================
+    // SCREENSAVER
+    // =========================================================================
+
+#ifdef HELIX_ENABLE_SCREENSAVER
+    /** @brief Get screensaver enabled state */
+    bool get_screensaver_enabled() const;
+
+    /** @brief Set screensaver enabled state (updates subject + persists) */
+    void set_screensaver_enabled(bool enabled);
+#endif
+
+    // =========================================================================
     // CONFIG-ONLY SETTINGS (no subjects)
     // =========================================================================
 
@@ -262,6 +274,13 @@ class DisplaySettingsManager {
         return &time_format_subject_;
     }
 
+#ifdef HELIX_ENABLE_SCREENSAVER
+    /** @brief Screensaver enabled subject (integer: 0=off, 1=on) */
+    lv_subject_t* subject_screensaver_enabled() {
+        return &screensaver_enabled_subject_;
+    }
+#endif
+
   private:
     DisplaySettingsManager();
     ~DisplaySettingsManager() = default;
@@ -281,6 +300,10 @@ class DisplaySettingsManager {
     lv_subject_t bed_mesh_render_mode_subject_;
     lv_subject_t gcode_render_mode_subject_;
     lv_subject_t time_format_subject_;
+
+#ifdef HELIX_ENABLE_SCREENSAVER
+    lv_subject_t screensaver_enabled_subject_;
+#endif
 
     bool subjects_initialized_ = false;
 };

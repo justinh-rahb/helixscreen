@@ -369,6 +369,9 @@ class DisplayManager {
     // Display sleep state
     bool m_display_sleeping = false;
     bool m_display_dimmed = false;
+#ifdef HELIX_ENABLE_SCREENSAVER
+    bool m_screensaver_active = false;
+#endif
     bool m_wake_requested = false; // Set by input wrapper when touch detected while sleeping
     int m_dim_timeout_sec = 300;
     int m_dim_brightness_percent = 30;

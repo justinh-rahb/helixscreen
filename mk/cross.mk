@@ -57,6 +57,7 @@ ifeq ($(PLATFORM_TARGET),pi)
     ENABLE_OPENGLES := yes
     ENABLE_SDL := no
     ENABLE_GLES_3D := yes
+    ENABLE_SCREENSAVER := yes
     ENABLE_EVDEV := yes
     # SSL enabled for HTTPS/WSS support
     ENABLE_SSL := yes
@@ -81,6 +82,7 @@ else ifeq ($(PLATFORM_TARGET),pi-fbdev)
     ENABLE_OPENGLES := no
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := yes
     ENABLE_EVDEV := yes
     ENABLE_SSL := yes
     HELIX_HAS_SYSTEMD := yes
@@ -101,6 +103,7 @@ else ifeq ($(PLATFORM_TARGET),pi-both)
     ENABLE_OPENGLES := yes
     ENABLE_SDL := no
     ENABLE_GLES_3D := yes
+    ENABLE_SCREENSAVER := yes
     ENABLE_EVDEV := yes
     ENABLE_SSL := yes
     HELIX_HAS_SYSTEMD := yes
@@ -127,6 +130,7 @@ else ifeq ($(PLATFORM_TARGET),pi32)
     ENABLE_OPENGLES := yes
     ENABLE_SDL := no
     ENABLE_GLES_3D := yes
+    ENABLE_SCREENSAVER := yes
     ENABLE_EVDEV := yes
     ENABLE_SSL := yes
     HELIX_HAS_SYSTEMD := yes
@@ -149,6 +153,7 @@ else ifeq ($(PLATFORM_TARGET),pi32-fbdev)
     ENABLE_OPENGLES := no
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := yes
     ENABLE_EVDEV := yes
     ENABLE_SSL := yes
     HELIX_HAS_SYSTEMD := yes
@@ -171,6 +176,7 @@ else ifeq ($(PLATFORM_TARGET),pi32-both)
     ENABLE_OPENGLES := yes
     ENABLE_SDL := no
     ENABLE_GLES_3D := yes
+    ENABLE_SCREENSAVER := yes
     ENABLE_EVDEV := yes
     ENABLE_SSL := yes
     HELIX_HAS_SYSTEMD := yes
@@ -211,6 +217,7 @@ else ifeq ($(PLATFORM_TARGET),ad5m)
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := ad5m
     # Strip binary for size on memory-constrained device
@@ -245,6 +252,7 @@ else ifeq ($(PLATFORM_TARGET),ad5x)
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := no
     # Disable TinyGL for ad5x - CPU too weak for software 3D (3-4 FPS)
     # Uses 2D layer preview fallback instead
     ENABLE_TINYGL_3D := no
@@ -286,6 +294,7 @@ else ifeq ($(PLATFORM_TARGET),cc1)
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := cc1
     # Strip binary for size on memory-constrained device
@@ -340,6 +349,7 @@ else ifneq ($(filter mips k1,$(PLATFORM_TARGET)),)
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := mips
     # Strip binary for size on memory-constrained device
@@ -374,6 +384,7 @@ else ifeq ($(PLATFORM_TARGET),k1-dynamic)
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := k1-dynamic
     STRIP_BINARY := yes
@@ -405,6 +416,7 @@ else ifeq ($(PLATFORM_TARGET),k2)
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := k2
     STRIP_BINARY := yes
@@ -426,6 +438,7 @@ else ifeq ($(PLATFORM_TARGET),snapmaker-u1)
     DISPLAY_BACKEND := fbdev
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
+    ENABLE_SCREENSAVER := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := snapmaker-u1
     STRIP_BINARY := yes
