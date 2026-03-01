@@ -450,6 +450,15 @@ TEST_CASE("PrinterDiscovery detects new AFC object types", "[printer_discovery][
         REQUIRE(units[1] == "AFC_OpenAMS AMS_2");
     }
 
+    SECTION("AFC_vivid detected in afc_unit_object_names") {
+        json objects = {"AFC", "AFC_vivid vivid_1"};
+        hw.parse_objects(objects);
+
+        auto units = hw.afc_unit_object_names();
+        REQUIRE(units.size() == 1);
+        REQUIRE(units[0] == "AFC_vivid vivid_1"); // Full Klipper object name (lowercase)
+    }
+
     SECTION("AFC_buffer detected in afc_buffer_names") {
         json objects = {"AFC", "AFC_buffer TN", "AFC_buffer TN1", "AFC_buffer TN2",
                         "AFC_buffer TN3"};

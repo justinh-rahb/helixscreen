@@ -1798,6 +1798,25 @@ TEST_CASE("AFC backend handles flat string units array", "[ams][afc][mixed]") {
     REQUIRE(info.type == AmsType::AFC);
 }
 
+TEST_CASE("AFC backend ViViD unit klipper_key uses lowercase", "[ams][afc][vivid]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_zero_based(4);
+    helper.initialize_slots_from_discovery();
+
+    // ViViD reports as "ViViD vivid_1" but Klipper object is AFC_vivid (lowercase)
+    nlohmann::json afc_state;
+    afc_state["units"] = nlohmann::json::array({"ViViD vivid_1"});
+    afc_state["lanes"] = nlohmann::json::array({"lane0", "lane1", "lane2", "lane3"});
+    afc_state["extruders"] = nlohmann::json::array({"extruder"});
+    helper.feed_afc_state(afc_state);
+
+    const auto& unit_infos = helper.get_unit_infos();
+    REQUIRE(unit_infos.size() == 1);
+    REQUIRE(unit_infos[0].type == "ViViD");
+    REQUIRE(unit_infos[0].name == "vivid_1");
+    REQUIRE(unit_infos[0].klipper_key == "AFC_vivid vivid_1"); // lowercase, not AFC_ViViD
+}
+
 TEST_CASE("AFC backend flat string units: single word name still parses", "[ams][afc][mixed]") {
     AmsBackendAfcTestHelper helper;
     helper.initialize_test_lanes_zero_based(4);

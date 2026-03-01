@@ -54,7 +54,7 @@ class DisplayBackendDRM : public DisplayBackend {
      */
     explicit DisplayBackendDRM(const std::string& drm_device);
 
-    ~DisplayBackendDRM() override = default;
+    ~DisplayBackendDRM() override;
 
     // Display creation
     lv_display_t* create_display(int width, int height) override;
@@ -93,6 +93,7 @@ class DisplayBackendDRM : public DisplayBackend {
     lv_display_t* display_ = nullptr;
     lv_indev_t* pointer_ = nullptr;
     bool using_egl_ = false; ///< Track if GPU-accelerated path is active
+
 };
 
 #endif // HELIX_DISPLAY_DRM

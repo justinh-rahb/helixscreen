@@ -237,8 +237,9 @@ class PrinterDiscovery {
                     afc_lane_names_.push_back(lane_name); // Same vector as AFC_stepper lanes
                 }
             }
-            // AFC unit-level objects (BoxTurtle, OpenAMS)
-            else if (name.rfind("AFC_BoxTurtle ", 0) == 0 || name.rfind("AFC_OpenAMS ", 0) == 0) {
+            // AFC unit-level objects (BoxTurtle, OpenAMS, ViViD)
+            else if (name.rfind("AFC_BoxTurtle ", 0) == 0 || name.rfind("AFC_OpenAMS ", 0) == 0 ||
+                     name.rfind("AFC_vivid ", 0) == 0) {
                 afc_unit_object_names_.push_back(name); // Store FULL name for Klipper queries
             }
             // AFC buffer objects

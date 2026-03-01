@@ -152,6 +152,22 @@ std::optional<std::pair<int, int>> GridLayout::find_available(int colspan, int r
     return std::nullopt;
 }
 
+std::optional<std::pair<int, int>> GridLayout::find_available_bottom(int colspan,
+                                                                     int rowspan) const {
+    int ncols = cols();
+    int nrows = rows();
+
+    // Scan bottom-to-top, right-to-left
+    for (int r = nrows - rowspan; r >= 0; --r) {
+        for (int c = ncols - colspan; c >= 0; --c) {
+            if (can_place(c, r, colspan, rowspan)) {
+                return std::make_pair(c, r);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 std::pair<std::vector<GridPlacement>, std::vector<GridPlacement>>
 GridLayout::filter_for_breakpoint(int breakpoint, const std::vector<GridPlacement>& placements) {
     auto dims = get_dimensions(breakpoint);

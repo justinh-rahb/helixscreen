@@ -294,6 +294,31 @@ void bed_mesh_renderer_set_color_range(bed_mesh_renderer_t* renderer, double min
 void bed_mesh_renderer_auto_color_range(bed_mesh_renderer_t* renderer);
 
 /**
+ * @brief Set the layer offset used for screen-space positioning
+ *
+ * In async (buffer) rendering the mesh is rendered at (0,0).  Overlay
+ * elements drawn on the LVGL layer (axis labels, tick marks) need the
+ * widget's actual screen position.  Call this before rendering overlays
+ * in async mode so projected 3D→2D coordinates land at the correct
+ * screen location.
+ *
+ * @param renderer Renderer instance
+ * @param offset_x Widget's absolute screen X position
+ * @param offset_y Widget's absolute screen Y position
+ */
+void bed_mesh_renderer_set_layer_offset(bed_mesh_renderer_t* renderer, int offset_x, int offset_y);
+
+/**
+ * @brief Get the current layer offset
+ *
+ * @param renderer Renderer instance
+ * @param[out] offset_x Current X offset (NULL-safe)
+ * @param[out] offset_y Current Y offset (NULL-safe)
+ */
+void bed_mesh_renderer_get_layer_offset(const bed_mesh_renderer_t* renderer, int* offset_x,
+                                        int* offset_y);
+
+/**
  * @brief Main rendering function
  *
  * Renders the 3D bed mesh to the provided LVGL layer (DRAW_POST pattern).

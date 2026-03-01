@@ -16,6 +16,7 @@
 
 // System includes for device access checks and DRM capability detection
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <dirent.h>
 #include <fcntl.h>
@@ -179,6 +180,8 @@ std::string auto_detect_drm_device() {
 DisplayBackendDRM::DisplayBackendDRM() : drm_device_(auto_detect_drm_device()) {}
 
 DisplayBackendDRM::DisplayBackendDRM(const std::string& drm_device) : drm_device_(drm_device) {}
+
+DisplayBackendDRM::~DisplayBackendDRM() = default;
 
 bool DisplayBackendDRM::is_available() const {
     if (drm_device_.empty()) {
@@ -417,29 +420,42 @@ void DisplayBackendDRM::set_display_rotation(lv_display_rotation_t rot, int phys
         break;
     }
 
-    // Query hardware capabilities and choose strategy
+    // Query hardware capabilities and choose strategy.
+    // On EGL builds, lv_linux_drm_get_plane_rotation_mask() and
+    // lv_linux_drm_set_rotation() do not exist (only in the dumb-buffer
+    // driver), so force SOFTWARE fallback.
+#ifdef HELIX_ENABLE_OPENGLES
+    uint64_t supported_mask = 0;
+#else
     uint64_t supported_mask = lv_linux_drm_get_plane_rotation_mask(display_);
+#endif
     auto strategy = choose_drm_rotation_strategy(drm_rot, supported_mask);
 
     switch (strategy) {
     case DrmRotationStrategy::HARDWARE:
+#ifndef HELIX_ENABLE_OPENGLES
         lv_linux_drm_set_rotation(display_, drm_rot);
         spdlog::info("[DRM Backend] Hardware plane rotation set to {}°",
                      static_cast<int>(rot) * 90);
+#endif
         break;
 
     case DrmRotationStrategy::SOFTWARE:
-        // Tell LVGL the logical rotation so touch coordinates and resolution
-        // reporting are correct, then enable matrix rotation for pixel transforms
+        // CPU in-place 180° pixel reversal in drm_flush (lv_linux_drm.c patch).
+        // The dumb-buffer flush callback checks lv_display_get_rotation() and
+        // reverses the pixel array before the page flip. FULL render mode
+        // ensures the entire buffer is redrawn each frame.
+        lv_display_set_render_mode(display_, LV_DISPLAY_RENDER_MODE_FULL);
         lv_display_set_rotation(display_, rot);
-        lv_display_set_matrix_rotation(display_, true);
-        spdlog::info("[DRM Backend] Software matrix rotation set to {}° (plane supports 0x{:X})",
+
+        spdlog::info("[DRM Backend] Software rotation set to {}° "
+                     "(CPU in-place reversal, plane supports 0x{:X})",
                      static_cast<int>(rot) * 90, supported_mask);
         break;
 
     case DrmRotationStrategy::NONE:
-        // Explicitly reset in case a previous call set a non-zero rotation
-        lv_linux_drm_set_rotation(display_, DRM_MODE_ROTATE_0);
+        lv_display_set_rotation(display_, LV_DISPLAY_ROTATION_0);
+        lv_display_set_matrix_rotation(display_, false);
         spdlog::debug("[DRM Backend] No rotation needed");
         break;
     }

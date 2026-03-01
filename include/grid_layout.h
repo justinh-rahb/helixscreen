@@ -80,6 +80,10 @@ class GridLayout {
     /// Scans top-to-bottom, left-to-right (row-major order).
     std::optional<std::pair<int, int>> find_available(int colspan, int rowspan) const;
 
+    /// Find first available position scanning bottom-to-top, right-to-left.
+    /// Used by auto-placement to pack widgets toward the bottom of the grid.
+    std::optional<std::pair<int, int>> find_available_bottom(int colspan, int rowspan) const;
+
     /// Get all current placements
     const std::vector<GridPlacement>& placements() const {
         return placements_;

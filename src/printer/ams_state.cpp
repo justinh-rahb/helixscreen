@@ -90,17 +90,16 @@ const char* AmsState::get_logo_path(const std::string& type_name) {
     // Map system names to logo paths
     // Note: All logos are 64x64 white-on-transparent PNGs
     static const std::unordered_map<std::string, const char*> logo_map = {
-        // AFC/Box Turtle (AFC firmware only runs on Box Turtle hardware)
-        {"afc", "A:assets/images/ams/box_turtle_64.png"},
+        // AFC (Armored Turtle) - has its own logo
+        {"afc", "A:assets/images/ams/afc_64.png"},
         {"box turtle", "A:assets/images/ams/box_turtle_64.png"},
         {"box_turtle", "A:assets/images/ams/box_turtle_64.png"},
         {"boxturtle", "A:assets/images/ams/box_turtle_64.png"},
 
-        // Happy Hare - generic firmware, defaults to ERCF logo
-        // (most common hardware running Happy Hare)
-        {"happy hare", "A:assets/images/ams/ercf_64.png"},
-        {"happy_hare", "A:assets/images/ams/ercf_64.png"},
-        {"happyhare", "A:assets/images/ams/ercf_64.png"},
+        // Happy Hare - generic firmware, has its own logo
+        {"happy hare", "A:assets/images/ams/happy_hare_64.png"},
+        {"happy_hare", "A:assets/images/ams/happy_hare_64.png"},
+        {"happyhare", "A:assets/images/ams/happy_hare_64.png"},
 
         // Specific hardware types (when detected or configured)
         {"ercf", "A:assets/images/ams/ercf_64.png"},

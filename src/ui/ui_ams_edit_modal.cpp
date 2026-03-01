@@ -114,6 +114,7 @@ bool AmsEditModal::show_for_slot(lv_obj_t* parent, int slot_index, const SlotInf
     api_ = api;
     remaining_pre_edit_pct_ = 0;
     cached_spools_.clear();
+    vendors_loaded_ = false;
 
     // Reset remaining mode subject before showing (0 = view mode)
     lv_subject_set_int(&remaining_mode_subject_, 0);
@@ -539,6 +540,7 @@ void AmsEditModal::handle_spool_selected(int spool_id) {
         if (spool.id == spool_id) {
             // Auto-fill working_info_ from the selected spool
             working_info_.spoolman_id = spool.id;
+            working_info_.spoolman_filament_id = spool.filament_id;
             working_info_.color_name = spool.color_name;
             working_info_.material = spool.material;
             working_info_.brand = spool.vendor;

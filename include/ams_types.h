@@ -564,6 +564,7 @@ struct SlotInfo {
 
     // Spoolman integration
     int spoolman_id = 0;           ///< Spoolman spool ID (0=not tracked)
+    int spoolman_filament_id = 0;  ///< Spoolman filament definition ID (0=unknown)
     std::string spool_name;        ///< Spool name from Spoolman
     float remaining_weight_g = -1; ///< Remaining filament weight in grams (-1=unknown)
     float total_weight_g = -1;     ///< Total spool weight in grams (-1=unknown)

@@ -286,19 +286,19 @@
     <string name="icon_font_sm_large" value="mdi_icons_24"/>
     <!-- NO BASE icon_font_sm - registered at runtime -->
     <!-- icon_font_md: Standard UI icons (buttons, status, notifications) -->
-    <string name="icon_font_md_tiny" value="mdi_icons_24"/>
+    <string name="icon_font_md_tiny" value="mdi_icons_32"/>
     <string name="icon_font_md_small" value="mdi_icons_32"/>
     <string name="icon_font_md_medium" value="mdi_icons_32"/>
     <string name="icon_font_md_large" value="mdi_icons_32"/>
     <!-- NO BASE icon_font_md - registered at runtime -->
     <!-- icon_font_lg: Large icons (cards, status panels, emphasis) -->
-    <string name="icon_font_lg_tiny" value="mdi_icons_24"/>
+    <string name="icon_font_lg_tiny" value="mdi_icons_32"/>
     <string name="icon_font_lg_small" value="mdi_icons_48"/>
     <string name="icon_font_lg_medium" value="mdi_icons_48"/>
     <string name="icon_font_lg_large" value="mdi_icons_48"/>
     <!-- NO BASE icon_font_lg - registered at runtime -->
     <!-- icon_font_xl: Navigation/hero icons (nav bar, large displays) -->
-    <string name="icon_font_xl_tiny" value="mdi_icons_32"/>
+    <string name="icon_font_xl_tiny" value="mdi_icons_48"/>
     <string name="icon_font_xl_small" value="mdi_icons_64"/>
     <string name="icon_font_xl_medium" value="mdi_icons_64"/>
     <string name="icon_font_xl_large" value="mdi_icons_64"/>

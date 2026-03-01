@@ -153,10 +153,13 @@
 #endif
 
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <filesystem>
+#include <fstream>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -172,6 +175,9 @@ extern std::string g_log_file_cli;
 extern std::string g_log_level_cli;
 
 namespace {
+
+// Crash loop detection marker file path
+constexpr const char* CRASH_MARKER_PATH = "config/.crash_restart_count";
 
 /**
  * @brief Recursively invalidate all widgets in the tree
@@ -250,6 +256,41 @@ int Application::run(int argc, char** argv) {
     // Phase 2: Initialize config system
     if (!init_config()) {
         return 1;
+    }
+
+    // Crash loop detection: track rapid restarts via marker file
+    {
+        constexpr size_t MAX_CRASH_RESTARTS = 3;
+        constexpr long long CRASH_WINDOW_SEC = 120;
+        auto now_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+                             std::chrono::system_clock::now().time_since_epoch())
+                             .count();
+
+        // Read existing timestamps and filter to recent window
+        std::vector<long long> recent_timestamps;
+        {
+            std::ifstream in(CRASH_MARKER_PATH);
+            long long ts;
+            while (in >> ts) {
+                if (now_epoch - ts < CRASH_WINDOW_SEC) {
+                    recent_timestamps.push_back(ts);
+                }
+            }
+        }
+
+        if (recent_timestamps.size() >= MAX_CRASH_RESTARTS) {
+            spdlog::warn("[Application] Crash loop detected: {} restarts within {}s, "
+                         "resetting counter",
+                         recent_timestamps.size(), CRASH_WINDOW_SEC);
+            std::filesystem::remove(CRASH_MARKER_PATH);
+        } else {
+            // Write filtered timestamps plus current restart
+            std::ofstream out(CRASH_MARKER_PATH, std::ios::trunc);
+            for (auto ts : recent_timestamps) {
+                out << ts << "\n";
+            }
+            out << now_epoch << "\n";
+        }
     }
 
     // Phase 3: Initialize logging
@@ -684,9 +725,33 @@ bool Application::init_display() {
     m_screen_width = m_display->width();
     m_screen_height = m_display->height();
 
-    // Rotation probe and layout manager init are deferred to after
-    // init_translations() (Phase 8b) so that lv_tr() is available for
-    // the probe's user-facing strings. See run_rotation_probe_and_layout().
+    // The interactive rotation probe is deferred to after init_translations()
+    // (Phase 8b) so that lv_tr() is available for its user-facing strings.
+    // However, kernel-detected orientation (panel_orientation=upside_down) can
+    // be applied immediately — no UI needed. This ensures the splash screen
+    // renders right-side up.
+    {
+        int config_rotation = m_config->get<int>("/display/rotate", 0);
+        if (config_rotation == 0 && m_args.rotation == 0) {
+            int kernel_orientation = DisplayBackend::detect_panel_orientation();
+            if (kernel_orientation > 0) {
+                spdlog::info("[Application] Applying kernel panel orientation: {}° (pre-splash)",
+                             kernel_orientation);
+                m_config->set("/display/rotate", kernel_orientation);
+                m_config->set("/display/rotation_probed", true);
+                m_config->save();
+                m_display->apply_rotation(kernel_orientation);
+                m_screen_width = m_display->width();
+                m_screen_height = m_display->height();
+            }
+        } else if (config_rotation > 0) {
+            spdlog::info("[Application] Applying config rotation: {}° (pre-splash)",
+                         config_rotation);
+            m_display->apply_rotation(config_rotation);
+            m_screen_width = m_display->width();
+            m_screen_height = m_display->height();
+        }
+    }
 
     // Register LVGL log handler AFTER lv_init() (called inside display->init())
     // Must be after lv_init() because it resets global state and clears callbacks
@@ -807,7 +872,7 @@ void Application::run_rotation_probe_and_layout() {
             should_probe = true;
             spdlog::info("[Application] Rotation probe forced via HELIX_FORCE_ROTATION_PROBE");
         }
-#ifdef HELIX_DISPLAY_FBDEV
+#if defined(HELIX_DISPLAY_FBDEV) || defined(HELIX_DISPLAY_DRM)
         else if (m_args.rotation == 0 && !std::getenv("HELIX_DISPLAY_ROTATION")) {
             bool probed = m_config->get<bool>("/display/rotation_probed", false);
             bool has_rotate_key = m_config->exists("/display/rotate");
@@ -823,13 +888,31 @@ void Application::run_rotation_probe_and_layout() {
                                                       : "unset");
         }
 #else
-        spdlog::debug("[Application] Rotation probe skipped: not fbdev build");
+        spdlog::debug("[Application] Rotation probe skipped: not embedded build");
 #endif
 
         if (should_probe) {
-            m_display->run_rotation_probe();
-            m_screen_width = m_display->width();
-            m_screen_height = m_display->height();
+            // Try auto-detecting panel orientation from kernel first.
+            // panel_orientation is informational — the kernel does NOT rotate
+            // the framebuffer for us. We must apply the rotation ourselves.
+            int kernel_orientation = DisplayBackend::detect_panel_orientation();
+            if (kernel_orientation > 0) {
+                spdlog::info("[Application] Auto-detected panel orientation: {}° — "
+                             "applying now and saving to config",
+                             kernel_orientation);
+                m_config->set("/display/rotate", kernel_orientation);
+                m_config->set("/display/rotation_probed", true);
+                m_config->save();
+
+                // Apply rotation immediately — init() already ran without it.
+                m_display->apply_rotation(kernel_orientation);
+                m_screen_width = m_display->width();
+                m_screen_height = m_display->height();
+            } else {
+                m_display->run_rotation_probe();
+                m_screen_width = m_display->width();
+                m_screen_height = m_display->height();
+            }
         }
     }
 
@@ -2330,6 +2413,9 @@ void Application::shutdown() {
 
     // Uninstall crash handler (clean shutdown is not a crash)
     crash_handler::uninstall();
+
+    // Clean shutdown means no crash loop -- remove the marker file
+    std::filesystem::remove(CRASH_MARKER_PATH);
 
     // Stop hot reloader thread before anything else
     if (m_hot_reloader) {

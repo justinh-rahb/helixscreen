@@ -227,7 +227,7 @@ std::vector<PanelWidgetEntry> PanelWidgetConfig::build_default_grid() {
     const FixedPlacement fixed[] = {
         {"printer_image", 0, 0, 2, 2},
         {"print_status", 0, 2, 2, 2},
-        {"tips", 2, 0, 4, 1},
+        {"tips", 2, 0, 4, 2},
     };
 
     std::vector<PanelWidgetEntry> result;

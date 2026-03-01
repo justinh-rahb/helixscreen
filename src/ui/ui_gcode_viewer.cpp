@@ -215,6 +215,7 @@ class GCodeViewerState {
     lv_color_t external_color_override{};       ///< Stored override color for lazy-init renderers
     std::vector<uint32_t> tool_color_overrides; ///< Per-tool AMS colors for lazy-init renderers
     bool first_render{true};
+    bool needs_3d_refresh_{false}; ///< Force one extra frame after first GPU render
     bool rendering_paused_{
         false}; ///< When true, draw_cb skips rendering (for visibility optimization)
 
@@ -510,8 +511,12 @@ static void gcode_viewer_draw_cb(lv_event_t* e) {
 
 #ifdef ENABLE_3D_RENDERER
         // During chunked VBO upload, renderer returns early without drawing.
-        // Schedule widget invalidation so LVGL calls us again next frame.
-        if (st->renderer_->is_uploading()) {
+        // After the first real GPU render, force one extra frame so the
+        // cached-buffer path (no GL context switch) blits cleanly.
+        if (st->renderer_->is_uploading() || st->needs_3d_refresh_) {
+            if (!st->renderer_->is_uploading()) {
+                st->needs_3d_refresh_ = false;
+            }
             helix::ui::async_call(
                 obj, [](void* data) { lv_obj_invalidate(static_cast<lv_obj_t*>(data)); }, obj);
         }
@@ -1472,6 +1477,7 @@ static void ui_gcode_viewer_load_file_async(lv_obj_t* obj, const char* file_path
 
                     // Clear first_render flag to allow actual rendering on next draw
                     st->first_render = false;
+                    st->needs_3d_refresh_ = true;
 
                     // Trigger redraw (will render geometry now that first_render is false)
                     lv_obj_invalidate(obj);

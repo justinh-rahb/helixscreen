@@ -5,6 +5,49 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.11] - 2026-02-28
+
+### Added
+- ViViD filament system support in AFC backend with unit discovery and key mapping
+- Dedicated logos for Happy Hare and AFC filament systems
+- Improved 5GHz Wi-Fi band detection across all backends
+
+### Fixed
+- DRM display rotation reworked to eliminate flickering on inverted panels
+- EMU filament system compatibility: color formats, gate counts, dryer state, filament names, and sensor readings
+- Printer setup wizard no longer loses printer type list when navigating between steps (#231)
+- Backlight now fully turns off during sleep mode on sysfs-based displays
+- Bed mesh rendering blit failure and axis label offset corrected
+- AD5X platform detection improved with secondary /ZMOD indicator (#225)
+- Input shaper calibrate-all mode shows progress text instead of premature "Complete" (#225)
+- Spoolman spool picker no longer shows empty vendor list on reopen (#225)
+- DRM NEON blend buffer overrun prevented on reshape failure (#229)
+- Crash loop detection and defensive widget creation for improved stability
+- Missing translation tags on header bar action buttons
+- Spoolman uses PATCH to update existing filaments correctly
+
+### Known Issues
+- Inverted/upside-down panels in DRM mode may exhibit minor flickering during heavy rendering
+
+## [0.13.10] - 2026-02-28
+
+### Added
+- Automatic display orientation detection and software rotation for DRM displays
+
+## [0.13.9] - 2026-02-27
+
+### Added
+- Asynchronous bed mesh rendering with double-buffered worker thread and adaptive quality degradation
+- Off-screen pixel buffer rasterizer for bed mesh visualization
+- Animated connector tube through LINEAR selector box in filament path view
+
+### Fixed
+- Backdrop blur re-enabled with NULL guards across all color formats and NEON paths
+- Bed mesh panel forces initial paint on re-entry
+- G-code viewer forces refresh after first 3D GPU render
+- Home All sends bare G28 instead of G28 X Y Z
+- Global extruder subjects sync correctly on tool selection in temperature panel
+
 ## [0.13.8] - 2026-02-27
 
 ### Added
@@ -1252,6 +1295,9 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.11]: https://github.com/prestonbrown/helixscreen/compare/v0.13.10...v0.13.11
+[0.13.10]: https://github.com/prestonbrown/helixscreen/compare/v0.13.9...v0.13.10
+[0.13.9]: https://github.com/prestonbrown/helixscreen/compare/v0.13.8...v0.13.9
 [0.13.8]: https://github.com/prestonbrown/helixscreen/compare/v0.13.7...v0.13.8
 [0.13.7]: https://github.com/prestonbrown/helixscreen/compare/v0.13.6...v0.13.7
 [0.13.6]: https://github.com/prestonbrown/helixscreen/compare/v0.13.5...v0.13.6
