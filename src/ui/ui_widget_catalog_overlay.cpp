@@ -299,6 +299,9 @@ void WidgetCatalogOverlay::show(lv_obj_t* parent_screen, const PanelWidgetConfig
 
     populate_rows(scroll, config, g_catalog_state.on_select);
 
+    // Register with nullptr lifecycle — this overlay is function-based, not class-based
+    NavigationManager::instance().register_overlay_instance(overlay, nullptr);
+
     // Push onto navigation stack — keep the home panel visible behind the catalog
     NavigationManager::instance().push_overlay(overlay, /*hide_previous=*/false);
 

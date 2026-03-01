@@ -1060,6 +1060,9 @@ void HistoryListPanel::show_detail_overlay(const PrintHistoryJob& job) {
         }
     }
 
+    // Register detail sub-overlay with nullptr lifecycle — managed by HistoryListPanel
+    NavigationManager::instance().register_overlay_instance(detail_overlay_, nullptr);
+
     // Push the overlay
     NavigationManager::instance().push_overlay(detail_overlay_);
     spdlog::info("[{}] Showing detail overlay for: {}", get_name(), job.filename);
