@@ -1241,17 +1241,18 @@ void AmsBackendAfc::parse_afc_unit_object(AfcUnitInfo& unit_info, const nlohmann
                   unit_info.hubs.size(), unit_info.buffers.size(),
                   path_topology_to_string(unit_info.topology));
 
-    // Only reorganize when ALL unit_infos_ have received their lane data.
-    // Unit objects may arrive in separate status updates; reorganizing on partial
-    // data creates transient incorrect unit structures visible in the UI.
-    bool all_have_lanes = !unit_infos_.empty();
+    // Reorganize when we have enough unit data. Don't block all units
+    // if one unit's Klipper object data hasn't arrived yet.
+    int units_with_lanes = 0;
     for (const auto& ui : unit_infos_) {
-        if (ui.lanes.empty()) {
-            all_have_lanes = false;
-            break;
+        if (!ui.lanes.empty()) {
+            units_with_lanes++;
         }
     }
-    if (all_have_lanes) {
+    // Reorganize when at least 2 units have data (multi-unit partial),
+    // or when all units have data (single unit case or complete arrival)
+    if (units_with_lanes >= 2 ||
+        units_with_lanes == static_cast<int>(unit_infos_.size())) {
         rebuild_unit_map_from_klipper();
     }
 }

@@ -1687,6 +1687,202 @@ bool AmsBackendMock::is_mixed_topology_mode() const {
     return mixed_topology_mode_;
 }
 
+void AmsBackendMock::set_vivid_mixed_mode(bool enabled) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    vivid_mixed_mode_ = enabled;
+
+    if (enabled) {
+        // Disable conflicting modes
+        tool_changer_mode_ = false;
+        multi_unit_mode_ = false;
+        mixed_topology_mode_ = false;
+
+        // Configure as AFC system
+        system_info_.type = AmsType::AFC;
+        system_info_.type_name = "AFC (Mock ViViD Mixed)";
+        system_info_.version = "1.0.32-mock";
+        system_info_.total_slots = 12;
+
+        auto afc_caps = helix::printer::afc_default_capabilities();
+        system_info_.supports_endless_spool = afc_caps.supports_endless_spool;
+        system_info_.supports_tool_mapping = afc_caps.supports_tool_mapping;
+        system_info_.supports_bypass = afc_caps.supports_bypass;
+        system_info_.supports_purge = afc_caps.supports_purge;
+        system_info_.tip_method = afc_caps.tip_method;
+        system_info_.has_hardware_bypass_sensor = false;
+
+        topology_ = PathTopology::HUB;
+
+        // Per-unit topologies: all HUB (BoxTurtles share hub, ViViD has its own hub)
+        unit_topologies_.clear();
+        unit_topologies_.push_back(PathTopology::HUB);
+        unit_topologies_.push_back(PathTopology::HUB);
+        unit_topologies_.push_back(PathTopology::HUB);
+
+        // Reinitialize registry with 3 units (4+4+4=12 slots)
+        // Turtle_1 lanes 1-4, Turtle_2 lanes 5-8, vivid_1 lanes 13-16
+        slots_.clear();
+        slots_.initialize_units({
+            {"Turtle_1", {"lane1", "lane2", "lane3", "lane4"}},
+            {"Turtle_2", {"lane5", "lane6", "lane7", "lane8"}},
+            {"vivid_1", {"lane13", "lane14", "lane15", "lane16"}},
+        });
+
+        // Helper to populate a slot
+        auto populate_slot = [this](int gi, int si, const char* material, const char* brand,
+                                    uint32_t color, const char* color_name, SlotStatus status,
+                                    int spoolman_id, float remaining) {
+            auto* entry = slots_.get_mut(gi);
+            if (!entry)
+                return;
+            entry->info.slot_index = si;
+            entry->info.global_index = gi;
+            entry->info.material = material;
+            entry->info.brand = brand;
+            entry->info.color_rgb = color;
+            entry->info.color_name = color_name;
+            entry->info.status = status;
+            entry->info.spoolman_id = spoolman_id;
+            entry->info.total_weight_g = 1000.0f;
+            entry->info.remaining_weight_g = remaining;
+            auto mat_info = filament::find_material(material);
+            if (mat_info) {
+                entry->info.nozzle_temp_min = mat_info->nozzle_min;
+                entry->info.nozzle_temp_max = mat_info->nozzle_max;
+                entry->info.bed_temp = mat_info->bed_temp;
+            }
+        };
+
+        // Unit 0: Turtle_1 (Box Turtle) — lanes 1-4, HUB
+        populate_slot(0, 0, "ASA", "Bambu Lab", 0x000000, "Black", SlotStatus::LOADED, 400,
+                      1000.0f);
+        populate_slot(1, 1, "PLA", "Polymaker", 0xFF0000, "Red", SlotStatus::AVAILABLE, 401,
+                      800.0f);
+        populate_slot(2, 2, "PETG", "eSUN", 0x00FF00, "Green", SlotStatus::AVAILABLE, 402, 600.0f);
+        populate_slot(3, 3, "PLA", "Overture", 0xFFFFFF, "White", SlotStatus::AVAILABLE, 403,
+                      400.0f);
+
+        // Unit 1: Turtle_2 (Box Turtle) — lanes 5-8, HUB (shared hub with Turtle_1)
+        populate_slot(4, 0, "ABS", "Hatchbox", 0x0000FF, "Blue", SlotStatus::AVAILABLE, 410,
+                      900.0f);
+        populate_slot(5, 1, "PLA", "Prusament", 0xFDD835, "Yellow", SlotStatus::AVAILABLE, 411,
+                      750.0f);
+        populate_slot(6, 2, "PETG", "Overture", 0x8E24AA, "Purple", SlotStatus::AVAILABLE, 412,
+                      500.0f);
+        populate_slot(7, 3, "ASA", "KVP", 0xFF6F00, "Orange", SlotStatus::AVAILABLE, 413, 650.0f);
+
+        // Unit 2: vivid_1 (ViViD) — lanes 13-16, HUB (own hub)
+        populate_slot(8, 0, "PLA", "Bambu Lab", 0xE53935, "Red", SlotStatus::AVAILABLE, 420,
+                      1000.0f);
+        populate_slot(9, 1, "PLA-CF", "Polymaker", 0x424242, "Carbon", SlotStatus::AVAILABLE, 421,
+                      900.0f);
+        populate_slot(10, 2, "PETG", "eSUN", 0x90CAF9, "Sky Blue", SlotStatus::AVAILABLE, 422,
+                      800.0f);
+        populate_slot(11, 3, "TPU", "NinjaTek", 0x00E676, "Neon Green", SlotStatus::AVAILABLE, 423,
+                      700.0f);
+
+        // Tool mapping: single toolhead, T0 maps to currently loaded slot
+        slots_.set_tool_map({0});
+
+        // Unit-level metadata — single toolhead (T0), all units share one extruder
+        system_info_.units.clear();
+        {
+            AmsUnit u;
+            u.unit_index = 0;
+            u.name = "Turtle_1";
+            u.slot_count = 4;
+            u.first_slot_global_index = 0;
+            u.connected = true;
+            u.firmware_version = "1.0.32-mock";
+            u.has_encoder = false;
+            u.has_toolhead_sensor = true;
+            u.has_slot_sensors = true;
+            u.has_hub_sensor = true;
+            u.hub_sensor_triggered = true;
+            u.topology = PathTopology::HUB;
+            u.hub_tool_label = 0; // All units feed into T0
+            system_info_.units.push_back(u);
+        }
+        {
+            AmsUnit u;
+            u.unit_index = 1;
+            u.name = "Turtle_2";
+            u.slot_count = 4;
+            u.first_slot_global_index = 4;
+            u.connected = true;
+            u.firmware_version = "1.0.32-mock";
+            u.has_encoder = false;
+            u.has_toolhead_sensor = true;
+            u.has_slot_sensors = true;
+            u.has_hub_sensor = true;
+            u.hub_sensor_triggered = false;
+            u.topology = PathTopology::HUB;
+            u.hub_tool_label = 0; // All units feed into T0
+            system_info_.units.push_back(u);
+        }
+        {
+            AmsUnit u;
+            u.unit_index = 2;
+            u.name = "vivid_1";
+            u.slot_count = 4;
+            u.first_slot_global_index = 8;
+            u.connected = true;
+            u.firmware_version = "1.0.0-mock";
+            u.has_encoder = false;
+            u.has_toolhead_sensor = true;
+            u.has_slot_sensors = true;
+            u.has_hub_sensor = true;
+            u.hub_sensor_triggered = false;
+            u.topology = PathTopology::HUB;
+            u.hub_tool_label = 0; // All units feed into T0
+            system_info_.units.push_back(u);
+        }
+
+        // Start with slot 0 loaded
+        system_info_.current_slot = 0;
+        system_info_.current_tool = 0;
+        system_info_.filament_loaded = true;
+        filament_segment_ = PathSegment::NOZZLE;
+
+        // AFC device sections and actions
+        mock_device_sections_ = helix::printer::afc_default_sections();
+        mock_device_actions_ = helix::printer::afc_default_actions();
+        for (auto& action : mock_device_actions_) {
+            if (action.id == "save_restart") {
+                action.enabled = false;
+                action.disable_reason = "Not available in mock mode";
+            }
+        }
+
+        spdlog::info("[AmsBackendMock] ViViD mixed mode: Turtle_1 (4) + Turtle_2 (4) + vivid_1 "
+                     "(4) = 12 slots");
+    } else {
+        vivid_mixed_mode_ = false;
+        unit_topologies_.clear();
+
+        // Revert to Happy Hare defaults
+        system_info_.type = AmsType::HAPPY_HARE;
+        system_info_.type_name = "Happy Hare (Mock)";
+        system_info_.version = "2.7.0-mock";
+        system_info_.supports_bypass = true;
+        topology_ = PathTopology::LINEAR;
+
+        if (!system_info_.units.empty()) {
+            system_info_.units[0].name = "Mock MMU";
+        }
+
+        mock_device_sections_ = helix::printer::hh_default_sections();
+        mock_device_actions_ = helix::printer::hh_default_actions();
+
+        spdlog::info("[AmsBackendMock] ViViD mixed mode disabled");
+    }
+}
+
+bool AmsBackendMock::is_vivid_mixed_mode() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return vivid_mixed_mode_;
+}
+
 PathTopology AmsBackendMock::get_unit_topology(int unit_index) const {
     std::lock_guard<std::mutex> lock(mutex_);
     if (unit_index >= 0 && unit_index < static_cast<int>(unit_topologies_.size())) {

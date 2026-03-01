@@ -2748,3 +2748,222 @@ TEST_CASE("AFC unload_filament sends TOOL_UNLOAD in single-extruder mode",
     REQUIRE(helper.has_gcode("TOOL_UNLOAD"));
     REQUIRE_FALSE(helper.has_gcode("AFC_UNSELECT_TOOL"));
 }
+
+// ============================================================================
+// Multi-unit AFC scenarios (mixed topologies)
+// ============================================================================
+
+TEST_CASE("Mixed BoxTurtle + ViViD units with string format", "[ams][afc][mixed]") {
+    AmsBackendAfcTestHelper helper;
+
+    // Pre-initialize 12 lanes (non-contiguous: lane1-lane8 + lane13-lane16)
+    std::vector<std::string> all_lanes = {"lane1", "lane2",  "lane3",  "lane4",
+                                          "lane5", "lane6",  "lane7",  "lane8",
+                                          "lane13", "lane14", "lane15", "lane16"};
+    helper.set_discovered_lanes(all_lanes, {"Turtle_2"});
+    helper.initialize_slots_from_discovery();
+
+    // Feed AFC state with 3 string-format units
+    nlohmann::json afc_state;
+    afc_state["units"] = nlohmann::json::array(
+        {"Box_Turtle Turtle_1", "Box_Turtle Turtle_2", "ViViD vivid_1"});
+    afc_state["lanes"] = nlohmann::json::array(
+        {"lane1", "lane2", "lane3", "lane4", "lane5", "lane6", "lane7", "lane8",
+         "lane13", "lane14", "lane15", "lane16"});
+    afc_state["extruders"] = nlohmann::json::array({"extruder"});
+    helper.feed_afc_state(afc_state);
+
+    // Verify unit_infos_ parsed correctly
+    const auto& unit_infos = helper.get_unit_infos();
+    REQUIRE(unit_infos.size() == 3);
+    CHECK(unit_infos[0].type == "Box_Turtle");
+    CHECK(unit_infos[0].name == "Turtle_1");
+    CHECK(unit_infos[0].klipper_key == "AFC_BoxTurtle Turtle_1");
+    CHECK(unit_infos[1].type == "Box_Turtle");
+    CHECK(unit_infos[1].name == "Turtle_2");
+    CHECK(unit_infos[1].klipper_key == "AFC_BoxTurtle Turtle_2");
+    CHECK(unit_infos[2].type == "ViViD");
+    CHECK(unit_infos[2].name == "vivid_1");
+    CHECK(unit_infos[2].klipper_key == "AFC_vivid vivid_1");
+
+    // Feed BoxTurtle 1 unit object (lanes 1-4, parallel topology)
+    nlohmann::json bt1_data;
+    bt1_data["lanes"] = nlohmann::json::array({"lane1", "lane2", "lane3", "lane4"});
+    bt1_data["extruders"] =
+        nlohmann::json::array({"extruder", "extruder1", "extruder2", "extruder3"});
+    bt1_data["hubs"] = nlohmann::json::array();
+    bt1_data["buffers"] = nlohmann::json::array();
+
+    // Feed BoxTurtle 2 unit object (lanes 5-8, parallel topology)
+    nlohmann::json bt2_data;
+    bt2_data["lanes"] = nlohmann::json::array({"lane5", "lane6", "lane7", "lane8"});
+    bt2_data["extruders"] =
+        nlohmann::json::array({"extruder4", "extruder5", "extruder6", "extruder7"});
+    bt2_data["hubs"] = nlohmann::json::array();
+    bt2_data["buffers"] = nlohmann::json::array();
+
+    // Feed ViViD unit object (lanes 13-16, hub topology)
+    nlohmann::json vivid_data;
+    vivid_data["lanes"] = nlohmann::json::array({"lane13", "lane14", "lane15", "lane16"});
+    vivid_data["extruders"] = nlohmann::json::array({"extruder"});
+    vivid_data["hubs"] = nlohmann::json::array({"vivid_hub"});
+    vivid_data["buffers"] = nlohmann::json::array();
+
+    nlohmann::json params;
+    params["AFC_BoxTurtle Turtle_1"] = bt1_data;
+    params["AFC_BoxTurtle Turtle_2"] = bt2_data;
+    params["AFC_vivid vivid_1"] = vivid_data;
+    helper.feed_status_update(params);
+
+    // After all 3 units have lanes, reorganization should have happened
+    auto& sys_info = helper.get_system_info_mutable();
+    REQUIRE(sys_info.units.size() == 3);
+
+    // Check per-unit and total slot counts
+    int total_slots = 0;
+    for (const auto& unit : sys_info.units) {
+        CHECK(unit.slots.size() == 4);
+        total_slots += static_cast<int>(unit.slots.size());
+    }
+    CHECK(total_slots == 12);
+
+    // Verify topologies are correct per unit
+    for (const auto& ui : unit_infos) {
+        if (ui.type == "Box_Turtle") {
+            // Box Turtle: empty hubs + multiple extruders = PARALLEL
+            CHECK(ui.topology == PathTopology::PARALLEL);
+        }
+        if (ui.type == "ViViD") {
+            // ViViD: hubs present + single extruder = HUB
+            CHECK(ui.topology == PathTopology::HUB);
+        }
+    }
+}
+
+TEST_CASE("Partial unit data triggers reorganization for available units",
+          "[ams][afc][mixed]") {
+    AmsBackendAfcTestHelper helper;
+    helper.initialize_test_lanes_zero_based(12);
+    helper.initialize_slots_from_discovery();
+
+    // Feed 3 string units
+    nlohmann::json afc_state;
+    afc_state["units"] = nlohmann::json::array(
+        {"Box_Turtle Turtle_1", "OpenAMS AMS_1", "OpenAMS AMS_2"});
+    afc_state["lanes"] = nlohmann::json::array(
+        {"lane0", "lane1", "lane2", "lane3", "lane4", "lane5", "lane6", "lane7",
+         "lane8", "lane9", "lane10", "lane11"});
+    afc_state["extruders"] = nlohmann::json::array({"extruder"});
+    helper.feed_afc_state(afc_state);
+
+    REQUIRE(helper.get_unit_infos().size() == 3);
+
+    // Feed unit objects for only 2 of 3 units
+    nlohmann::json bt_data;
+    bt_data["lanes"] = nlohmann::json::array({"lane0", "lane1", "lane2", "lane3"});
+    bt_data["extruders"] =
+        nlohmann::json::array({"extruder", "extruder1", "extruder2", "extruder3"});
+    bt_data["hubs"] = nlohmann::json::array();
+    bt_data["buffers"] = nlohmann::json::array();
+
+    nlohmann::json ams1_data;
+    ams1_data["lanes"] = nlohmann::json::array({"lane4", "lane5", "lane6", "lane7"});
+    ams1_data["extruders"] = nlohmann::json::array({"extruder4"});
+    ams1_data["hubs"] = nlohmann::json::array({"Hub_1"});
+    ams1_data["buffers"] = nlohmann::json::array();
+
+    nlohmann::json params;
+    params["AFC_BoxTurtle Turtle_1"] = bt_data;
+    params["AFC_OpenAMS AMS_1"] = ams1_data;
+    helper.feed_status_update(params);
+
+    // With 2 of 3 units having data, reorganization should happen (>=2 threshold)
+    auto info = helper.get_system_info();
+    REQUIRE(info.units.size() == 2);
+    // The 2 known units should have 8 lanes total
+    int partial_slots = 0;
+    for (const auto& unit : info.units) {
+        partial_slots += static_cast<int>(unit.slots.size());
+    }
+    CHECK(partial_slots == 8);
+
+    // Now feed 3rd unit → re-reorganization to 3 units
+    nlohmann::json ams2_data;
+    ams2_data["lanes"] = nlohmann::json::array({"lane8", "lane9", "lane10", "lane11"});
+    ams2_data["extruders"] = nlohmann::json::array({"extruder5"});
+    ams2_data["hubs"] = nlohmann::json::array({"Hub_2"});
+    ams2_data["buffers"] = nlohmann::json::array();
+
+    nlohmann::json params2;
+    params2["AFC_OpenAMS AMS_2"] = ams2_data;
+    helper.feed_status_update(params2);
+
+    // Now all 3 units should be present
+    info = helper.get_system_info();
+    REQUIRE(info.units.size() == 3);
+    int total_slots = 0;
+    for (const auto& unit : info.units) {
+        total_slots += static_cast<int>(unit.slots.size());
+    }
+    CHECK(total_slots == 12);
+}
+
+TEST_CASE("Non-contiguous lane numbering assigns sequential global indices",
+          "[ams][afc][mixed]") {
+    AmsBackendAfcTestHelper helper;
+
+    // Lanes 1-8 and 13-16 (gap at 9-12)
+    std::vector<std::string> all_lanes = {"lane1", "lane2",  "lane3",  "lane4",
+                                          "lane5", "lane6",  "lane7",  "lane8",
+                                          "lane13", "lane14", "lane15", "lane16"};
+    helper.set_discovered_lanes(all_lanes, {});
+    helper.initialize_slots_from_discovery();
+
+    // Verify all 12 lanes are initialized with sequential indices
+    REQUIRE(helper.get_slot_count() == 12);
+
+    // The slot registry maps sequential indices 0-11 to the non-contiguous lane names
+    CHECK(helper.get_slot_name(0) == "lane1");
+    CHECK(helper.get_slot_name(7) == "lane8");
+    CHECK(helper.get_slot_name(8) == "lane13");   // Index 8 → lane13 (no gap)
+    CHECK(helper.get_slot_name(11) == "lane16");
+
+    // Feed units to trigger reorganization
+    nlohmann::json afc_state;
+    afc_state["units"] = nlohmann::json::array(
+        {"Box_Turtle Turtle_1", "Box_Turtle Turtle_2", "ViViD vivid_1"});
+    helper.feed_afc_state(afc_state);
+
+    // Feed unit objects with lane assignments
+    nlohmann::json params;
+    params["AFC_BoxTurtle Turtle_1"] = {
+        {"lanes", {"lane1", "lane2", "lane3", "lane4"}},
+        {"extruders", {"extruder", "extruder1", "extruder2", "extruder3"}},
+        {"hubs", nlohmann::json::array()},
+        {"buffers", nlohmann::json::array()}};
+    params["AFC_BoxTurtle Turtle_2"] = {
+        {"lanes", {"lane5", "lane6", "lane7", "lane8"}},
+        {"extruders", {"extruder4", "extruder5", "extruder6", "extruder7"}},
+        {"hubs", nlohmann::json::array()},
+        {"buffers", nlohmann::json::array()}};
+    params["AFC_vivid vivid_1"] = {
+        {"lanes", {"lane13", "lane14", "lane15", "lane16"}},
+        {"extruders", {"extruder"}},
+        {"hubs", {"vivid_hub"}},
+        {"buffers", nlohmann::json::array()}};
+    helper.feed_status_update(params);
+
+    // After reorganization, global indices should still be sequential 0-11
+    auto info = helper.get_system_info();
+    REQUIRE(info.units.size() == 3);
+
+    // Verify each unit's slots have correct global indices
+    int expected_global = 0;
+    for (const auto& unit : info.units) {
+        for (const auto& slot : unit.slots) {
+            CHECK(slot.global_index == expected_global);
+            expected_global++;
+        }
+    }
+    CHECK(expected_global == 12);
+}

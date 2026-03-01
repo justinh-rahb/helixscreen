@@ -1020,3 +1020,26 @@ TEST_CASE("PrinterDiscovery detects screws_tilt_adjust from config when missing 
     hw.parse_config_keys(config);
     REQUIRE(hw.has_screws_tilt());
 }
+
+TEST_CASE("AFC unknown unit types detected generically", "[printer_discovery][afc]") {
+    PrinterDiscovery hw;
+    json objects = json::array({
+        "AFC",
+        "AFC_stepper lane1",
+        "AFC_NightOwl Owl_1",
+        "AFC_buffer TN"
+    });
+    hw.parse_objects(objects);
+
+    REQUIRE(hw.has_mmu());
+    REQUIRE(hw.mmu_type() == AmsType::AFC);
+
+    // NightOwl is not a known component prefix, so it appears as a unit object
+    auto& unit_names = hw.afc_unit_object_names();
+    REQUIRE(unit_names.size() == 1);
+    CHECK(unit_names[0] == "AFC_NightOwl Owl_1");
+
+    // Known component types should NOT appear as unit objects
+    CHECK(hw.afc_lane_names().size() == 1);   // lane1 from AFC_stepper
+    CHECK(hw.afc_buffer_names().size() == 1);  // TN from AFC_buffer
+}

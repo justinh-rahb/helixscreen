@@ -291,6 +291,23 @@ class AmsBackendMock : public AmsBackend {
     [[nodiscard]] bool is_mixed_topology_mode() const;
 
     /**
+     * @brief Enable ViViD mixed mode for testing 2x BoxTurtle + 1x ViViD
+     *
+     * Simulates the user's real hardware:
+     * - Unit 0: "Turtle_1" (Box Turtle) - lanes 1-4, HUB topology
+     * - Unit 1: "Turtle_2" (Box Turtle) - lanes 5-8, HUB topology (shared hub)
+     * - Unit 2: "vivid_1" (ViViD) - lanes 13-16, HUB topology
+     *
+     * @param enabled true to enable ViViD mixed mode
+     */
+    void set_vivid_mixed_mode(bool enabled);
+
+    /**
+     * @brief Check if ViViD mixed mode is active
+     */
+    [[nodiscard]] bool is_vivid_mixed_mode() const;
+
+    /**
      * @brief Set whether endless spool is supported
      * @param supported true to enable endless spool support
      *
@@ -490,6 +507,7 @@ class AmsBackendMock : public AmsBackend {
     bool afc_mode_ = false;                     ///< Simulate AFC Box Turtle instead of Happy Hare
     bool multi_unit_mode_ = false;              ///< Simulate multi-unit AFC (2x Box Turtle)
     bool mixed_topology_mode_ = false;          ///< Simulate mixed topology (BT + 2x OpenAMS)
+    bool vivid_mixed_mode_ = false;             ///< Simulate 2x BoxTurtle + 1x ViViD
     std::vector<PathTopology> unit_topologies_; ///< Per-unit topology storage
 
     // Endless spool simulation state

@@ -791,13 +791,10 @@ void MoonrakerDiscoverySequence::parse_objects(const json& objects) {
                  name.rfind("dotstar ", 0) == 0) {
             leds_.push_back(name);
         }
-        // AFC MMU objects (AFC_stepper, AFC_hub, AFC_extruder, AFC, AFC_lane, AFC_BoxTurtle,
-        // AFC_OpenAMS, AFC_buffer) These need subscription for lane state, sensor data, and
-        // filament info
-        else if (name == "AFC" || name.rfind("AFC_stepper ", 0) == 0 ||
-                 name.rfind("AFC_hub ", 0) == 0 || name.rfind("AFC_extruder ", 0) == 0 ||
-                 name.rfind("AFC_lane ", 0) == 0 || name.rfind("AFC_BoxTurtle ", 0) == 0 ||
-                 name.rfind("AFC_OpenAMS ", 0) == 0 || name.rfind("AFC_buffer ", 0) == 0) {
+        // AFC MMU objects — all AFC objects share the "AFC_" namespace prefix in Klipper.
+        // Subscribe to all of them for lane state, sensor data, filament info, and
+        // unit-level data (BoxTurtle, OpenAMS, ViViD, NightOwl, etc.)
+        else if (name == "AFC" || name.rfind("AFC_", 0) == 0) {
             afc_objects_.push_back(name);
         }
         // Filament sensors (switch or motion type)
