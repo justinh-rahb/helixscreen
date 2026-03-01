@@ -13,6 +13,7 @@
 #include "panel_widget_registry.h"
 #include "theme_manager.h"
 #include "ui_toast_manager.h"
+#include "ui_update_queue.h"
 
 #include <spdlog/spdlog.h>
 
@@ -478,6 +479,11 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
 }
 
 void GridEditMode::destroy_selection_chrome() {
+    if (!configure_btn_ && !remove_btn_ && !selection_overlay_) {
+        return;
+    }
+    auto freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
+    helix::ui::UpdateQueue::instance().drain();
     if (configure_btn_) {
         lv_obj_delete(configure_btn_);
         configure_btn_ = nullptr;
@@ -1963,6 +1969,8 @@ void GridEditMode::create_drag_ghost(int col, int row, int colspan, int rowspan)
 
 void GridEditMode::destroy_drag_ghost() {
     if (drag_ghost_) {
+        auto freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
+        helix::ui::UpdateQueue::instance().drain();
         lv_obj_delete(drag_ghost_);
         drag_ghost_ = nullptr;
     }
@@ -2018,6 +2026,8 @@ void GridEditMode::update_snap_preview(int col, int row, int colspan, int rowspa
 
 void GridEditMode::destroy_snap_preview() {
     if (snap_preview_) {
+        auto freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
+        helix::ui::UpdateQueue::instance().drain();
         lv_obj_delete(snap_preview_);
         snap_preview_ = nullptr;
     }
@@ -2119,6 +2129,8 @@ void GridEditMode::create_dots_overlay() {
 
 void GridEditMode::destroy_dots_overlay() {
     if (dots_overlay_) {
+        auto freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
+        helix::ui::UpdateQueue::instance().drain();
         lv_obj_delete(dots_overlay_);
         dots_overlay_ = nullptr;
     }
