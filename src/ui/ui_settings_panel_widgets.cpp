@@ -48,6 +48,10 @@ PanelWidgetsOverlay::PanelWidgetsOverlay() {
 }
 
 PanelWidgetsOverlay::~PanelWidgetsOverlay() {
+    if (drag_scroll_timer_) {
+        lv_timer_delete(drag_scroll_timer_);
+        drag_scroll_timer_ = nullptr;
+    }
     spdlog::trace("[{}] Destroyed", get_name());
 }
 
