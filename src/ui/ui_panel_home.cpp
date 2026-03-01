@@ -146,6 +146,7 @@ void HomePanel::populate_widgets() {
     // may already be queued with a `self` pointer to a widget we're about to
     // destroy.  Draining now ensures they run while the C++ objects still exist
     // (detach() cleared widget_obj_ so the guards will skip the work).
+    auto freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
     helix::ui::UpdateQueue::instance().drain();
 
     // Destroy LVGL children BEFORE destroying C++ widget instances.

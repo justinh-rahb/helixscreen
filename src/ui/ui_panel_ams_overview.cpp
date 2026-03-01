@@ -932,6 +932,7 @@ void destroy_ams_overview_panel_ui() {
         // panel/sidebar pointers. If subject changes fired observers between
         // the last timer tick and now, those lambdas are pending. Processing
         // them here prevents use-after-free when the panel is destroyed below.
+        auto freeze = helix::ui::UpdateQueue::instance().scoped_freeze();
         helix::ui::UpdateQueue::instance().drain();
 
         NavigationManager::instance().unregister_overlay_close_callback(s_ams_overview_panel_obj);
