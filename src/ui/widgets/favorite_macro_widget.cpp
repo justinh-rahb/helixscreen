@@ -147,6 +147,13 @@ void FavoriteMacroWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) 
 
     if (widget_obj_) {
         lv_obj_set_user_data(widget_obj_, this);
+
+        // Apply pressed feedback — show a translucent overlay on press.
+        // Scale transform doesn't work on flex_grow children (layout fights it).
+        lv_obj_set_style_bg_color(widget_obj_, theme_manager_get_color("text_muted"),
+                                  LV_PART_MAIN | LV_STATE_PRESSED);
+        lv_obj_set_style_bg_opa(widget_obj_, LV_OPA_20,
+                                LV_PART_MAIN | LV_STATE_PRESSED);
     }
 
     // Cache label pointers from XML
