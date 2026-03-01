@@ -86,6 +86,10 @@ void AssetManager::register_images() {
 
     spdlog::trace("[AssetManager] Registering images...");
 
+    // Branding
+    lv_xml_register_image(nullptr, "A:assets/images/helixscreen-logo.png",
+                          "A:assets/images/helixscreen-logo.png");
+
     // Printer and UI images
     lv_xml_register_image(nullptr, "A:assets/images/printer_400.png",
                           "A:assets/images/printer_400.png");

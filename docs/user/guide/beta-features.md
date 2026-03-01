@@ -8,7 +8,7 @@ HelixScreen includes several features that are functional but still being refine
 
 **Method 1: Secret tap (recommended)**
 
-1. Go to **Settings > About**
+1. Go to **Settings** → tap the **About** row to open the About overlay
 2. Tap the **Current Version** button **7 times** (like enabling Android Developer Mode)
 3. A countdown appears after 4 taps ("3 more taps...", "2 more taps...", etc.)
 4. A toast confirms "Beta features: ON"
@@ -52,7 +52,7 @@ When beta features are enabled, the following appear in the UI with an orange "B
 
 ## Update Channel Selection
 
-When beta features are enabled, a channel selector appears in **Settings > About**:
+When beta features are enabled, a channel selector appears in **Settings** → **About**:
 
 | Channel | Description |
 |---------|-------------|

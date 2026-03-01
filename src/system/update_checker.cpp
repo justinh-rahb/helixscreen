@@ -19,6 +19,7 @@
 #include "ui_modal.h"
 #include "ui_notification.h"
 #include "ui_panel_settings.h"
+#include "ui_settings_about.h"
 #include "ui_update_queue.h"
 
 #include "app_constants.h"
@@ -1832,7 +1833,7 @@ static void on_update_notify_install(lv_event_t* /*e*/) {
     LVGL_SAFE_EVENT_CB_BEGIN("[UpdateChecker] on_update_notify_install");
     spdlog::info("[UpdateChecker] User chose to install update");
     UpdateChecker::instance().hide_update_notification();
-    get_global_settings_panel().show_update_download_modal();
+    helix::settings::get_about_settings_overlay().show_update_download_modal();
     LVGL_SAFE_EVENT_CB_END();
 }
 

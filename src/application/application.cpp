@@ -76,6 +76,7 @@
 #include "ui_panel_print_status.h"
 #include "ui_panel_screws_tilt.h"
 #include "ui_panel_settings.h"
+#include "ui_settings_about.h"
 #include "ui_panel_spoolman.h"
 #include "ui_panel_step_test.h"
 #include "ui_panel_temp_control.h"
@@ -1775,12 +1776,12 @@ void Application::setup_discovery_callbacks() {
             get_global_settings_panel().populate_led_chips();
 
             // Fetch print hours now that connection is live, and refresh on job changes
-            get_global_settings_panel().fetch_print_hours();
-            c->client->register_method_callback("notify_history_changed",
-                                                "SettingsPanel_print_hours",
-                                                [](const nlohmann::json& /*data*/) {
-                                                    get_global_settings_panel().fetch_print_hours();
-                                                });
+            helix::settings::get_about_settings_overlay().fetch_print_hours();
+            c->client->register_method_callback(
+                "notify_history_changed", "AboutOverlay_print_hours",
+                [](const nlohmann::json& /*data*/) {
+                    helix::settings::get_about_settings_overlay().fetch_print_hours();
+                });
 
             // Register for timelapse events when timelapse is detected
             c->client->register_method_callback(
