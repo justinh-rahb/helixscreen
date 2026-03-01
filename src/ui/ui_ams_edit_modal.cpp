@@ -23,6 +23,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <set>
 
 namespace helix::ui {
@@ -151,20 +152,31 @@ bool AmsEditModal::show_for_slot(lv_obj_t* parent, int slot_index, const SlotInf
         api_->spoolman().get_spoolman_spool(
             spool_id,
             [this, guard, spool_id](const std::optional<SpoolInfo>& spool) {
-                int fetched_id = (spool && spool->filament_id > 0) ? spool->filament_id : 0;
-                helix::ui::queue_update([this, guard, spool_id, fetched_id]() {
-                    if (guard.expired())
-                        return;
-                    if (fetched_id > 0) {
-                        original_info_.spoolman_filament_id = fetched_id;
-                        working_info_.spoolman_filament_id = fetched_id;
-                        spdlog::debug("[AmsEditModal] Fetched filament_id={} for spool {}",
-                                      fetched_id, spool_id);
-                    } else {
-                        spdlog::warn("[AmsEditModal] Could not resolve filament_id for spool {}",
-                                     spool_id);
-                    }
-                });
+                int fetched_filament_id =
+                    (spool && spool->filament_id > 0) ? spool->filament_id : 0;
+                int fetched_vendor_id =
+                    (spool && spool->vendor_id > 0) ? spool->vendor_id : 0;
+                helix::ui::queue_update(
+                    [this, guard, spool_id, fetched_filament_id, fetched_vendor_id]() {
+                        if (guard.expired())
+                            return;
+                        if (fetched_filament_id > 0) {
+                            original_info_.spoolman_filament_id = fetched_filament_id;
+                            working_info_.spoolman_filament_id = fetched_filament_id;
+                            spdlog::debug("[AmsEditModal] Fetched filament_id={} for spool {}",
+                                          fetched_filament_id, spool_id);
+                        } else {
+                            spdlog::warn(
+                                "[AmsEditModal] Could not resolve filament_id for spool {}",
+                                spool_id);
+                        }
+                        if (fetched_vendor_id > 0) {
+                            original_info_.spoolman_vendor_id = fetched_vendor_id;
+                            working_info_.spoolman_vendor_id = fetched_vendor_id;
+                            spdlog::debug("[AmsEditModal] Fetched vendor_id={} for spool {}",
+                                          fetched_vendor_id, spool_id);
+                        }
+                    });
             },
             [spool_id](const MoonrakerError& err) {
                 spdlog::warn("[AmsEditModal] Failed to fetch spool {}: {}", spool_id, err.message);
@@ -365,15 +377,27 @@ void AmsEditModal::fetch_vendors_from_spoolman() {
                 }
             }
 
-            // Build vendor list and options string (local copies, no member access)
-            std::vector<std::string> vendors;
+            // Build vendor list with IDs and options string (local copies, no member access)
+            // Build a name→id map for lookup
+            std::map<std::string, int> vendor_id_map;
+            for (const auto& vendor : vendors_result) {
+                if (!vendor.name.empty()) {
+                    vendor_id_map[vendor.name] = vendor.id;
+                }
+            }
+
+            std::vector<VendorInfo> vendors;
             std::string options;
             for (const auto& name : unique_vendors) {
                 if (!options.empty()) {
                     options += '\n';
                 }
                 options += name;
-                vendors.push_back(name);
+                VendorInfo vi;
+                vi.name = name;
+                auto it = vendor_id_map.find(name);
+                vi.id = (it != vendor_id_map.end()) ? it->second : 0;
+                vendors.push_back(std::move(vi));
             }
 
             // Marshal member writes to main thread
@@ -411,7 +435,7 @@ void AmsEditModal::update_vendor_dropdown() {
     // Set selection based on working_info_.brand
     int vendor_idx = 0; // Default to first (Generic)
     for (size_t i = 0; i < vendor_list_.size(); i++) {
-        if (working_info_.brand == vendor_list_[i]) {
+        if (working_info_.brand == vendor_list_[i].name) {
             vendor_idx = static_cast<int>(i);
             break;
         }
@@ -569,6 +593,7 @@ void AmsEditModal::handle_spool_selected(int spool_id) {
             // Auto-fill working_info_ from the selected spool
             working_info_.spoolman_id = spool.id;
             working_info_.spoolman_filament_id = spool.filament_id;
+            working_info_.spoolman_vendor_id = spool.vendor_id;
             working_info_.color_name = spool.color_name;
             working_info_.material = spool.material;
             working_info_.brand = spool.vendor;
@@ -712,17 +737,21 @@ void AmsEditModal::update_ui() {
                 "Generic\nPolymaker\nBambu\neSUN\nOverture\nPrusa\nHatchbox";
             lv_dropdown_set_options(vendor_dropdown, fallback_vendors);
 
-            // Build fallback vendor_list_ for index lookup
+            // Build fallback vendor_list_ for index lookup (id=0 for static entries)
             if (vendor_list_.empty()) {
-                vendor_list_ = {"Generic",  "Polymaker", "Bambu",   "eSUN",
-                                "Overture", "Prusa",     "Hatchbox"};
+                for (const auto& name :
+                     {"Generic", "Polymaker", "Bambu", "eSUN", "Overture", "Prusa", "Hatchbox"}) {
+                    VendorInfo vi;
+                    vi.name = name;
+                    vendor_list_.push_back(std::move(vi));
+                }
             }
         }
 
         // Set initial selection based on working_info_.brand
         int vendor_idx = 0; // Default to first
         for (size_t i = 0; i < vendor_list_.size(); i++) {
-            if (working_info_.brand == vendor_list_[i]) {
+            if (working_info_.brand == vendor_list_[i].name) {
                 vendor_idx = static_cast<int>(i);
                 break;
             }
@@ -922,8 +951,10 @@ void AmsEditModal::handle_close() {
 
 void AmsEditModal::handle_vendor_changed(int index) {
     if (index >= 0 && index < static_cast<int>(vendor_list_.size())) {
-        working_info_.brand = vendor_list_[index];
-        spdlog::debug("[AmsEditModal] Vendor changed to: {}", working_info_.brand);
+        working_info_.brand = vendor_list_[index].name;
+        working_info_.spoolman_vendor_id = vendor_list_[index].id;
+        spdlog::debug("[AmsEditModal] Vendor changed to: {} (vendor_id={})",
+                      working_info_.brand, working_info_.spoolman_vendor_id);
         update_sync_button_state();
     }
 }
