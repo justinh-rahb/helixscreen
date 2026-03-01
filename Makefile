@@ -752,7 +752,7 @@ quality:
 CONTRIBUTORS_H := $(BUILD_DIR)/generated/contributors.h
 
 $(CONTRIBUTORS_H):
-	$(Q)./scripts/gen-contributors.sh
+	$(Q)BUILD_DIR=$(BUILD_DIR) ./scripts/gen-contributors.sh
 
 # Include modular makefiles
 include mk/deps.mk

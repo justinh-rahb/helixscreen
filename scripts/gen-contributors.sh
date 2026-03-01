@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-OUTDIR="build/generated"
+OUTDIR="${BUILD_DIR:-build}/generated"
 OUTFILE="$OUTDIR/contributors.h"
 TMPFILE="$(mktemp)"
 
@@ -13,9 +13,22 @@ trap 'rm -f "$TMPFILE"' EXIT
 mkdir -p "$OUTDIR"
 
 # Get unique contributor names, excluding bots and invalid entries
-contributors=$(git log --format='%aN' | sort -u \
-    | grep -ivE 'bot\b|\[bot\]|dependabot|github-actions|claude' \
-    | awk 'length >= 2' || true)
+# In Docker cross-compile environments, git may not be available — use
+# the existing generated file from build/generated/ as a fallback.
+if command -v git >/dev/null 2>&1 && git rev-parse --git-dir >/dev/null 2>&1; then
+    contributors=$(git log --format='%aN' | sort -u \
+        | grep -ivE 'bot\b|\[bot\]|dependabot|github-actions|claude' \
+        | awk 'length >= 2' || true)
+elif [ -f "build/generated/contributors.h" ] && [ "$OUTDIR" != "build/generated" ]; then
+    # No git — copy from host-generated file if available
+    mkdir -p "$OUTDIR"
+    cp "build/generated/contributors.h" "$OUTFILE"
+    echo "Copied $OUTFILE from build/generated/"
+    exit 0
+else
+    # No git and no fallback — generate empty list
+    contributors=""
+fi
 
 # Generate the header into a temp file
 {
