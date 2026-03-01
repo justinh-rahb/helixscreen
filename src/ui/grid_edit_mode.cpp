@@ -172,8 +172,8 @@ void GridEditMode::handle_click(lv_event_t* /*e*/) {
         if (lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
             continue;
         }
-        // Skip non-clickable decoration objects (merged card backgrounds)
-        if (!lv_obj_has_flag(child, LV_OBJ_FLAG_CLICKABLE)) {
+        // Skip decoration objects (merged card backgrounds have no name)
+        if (!lv_obj_get_name(child)) {
             continue;
         }
 
