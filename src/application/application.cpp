@@ -734,15 +734,22 @@ bool Application::init_display() {
         int config_rotation = m_config->get<int>("/display/rotate", 0);
         if (config_rotation == 0 && m_args.rotation == 0) {
             int kernel_orientation = DisplayBackend::detect_panel_orientation();
-            if (kernel_orientation > 0) {
-                spdlog::info("[Application] Applying kernel panel orientation: {}° (pre-splash)",
-                             kernel_orientation);
+            if (kernel_orientation >= 0) {
+                // Orientation detected (0=Normal, 90, 180, 270).
+                // 0 means Normal — no rotation needed, but mark as probed.
+                if (kernel_orientation > 0) {
+                    spdlog::info(
+                        "[Application] Applying kernel panel orientation: {}° (pre-splash)",
+                        kernel_orientation);
+                    m_display->apply_rotation(kernel_orientation);
+                    m_screen_width = m_display->width();
+                    m_screen_height = m_display->height();
+                } else {
+                    spdlog::info("[Application] Kernel panel orientation: Normal (0°, pre-splash)");
+                }
                 m_config->set("/display/rotate", kernel_orientation);
                 m_config->set("/display/rotation_probed", true);
                 m_config->save();
-                m_display->apply_rotation(kernel_orientation);
-                m_screen_width = m_display->width();
-                m_screen_height = m_display->height();
             }
         } else if (config_rotation > 0) {
             spdlog::info("[Application] Applying config rotation: {}° (pre-splash)",
@@ -896,19 +903,24 @@ void Application::run_rotation_probe_and_layout() {
             // panel_orientation is informational — the kernel does NOT rotate
             // the framebuffer for us. We must apply the rotation ourselves.
             int kernel_orientation = DisplayBackend::detect_panel_orientation();
-            if (kernel_orientation > 0) {
-                spdlog::info("[Application] Auto-detected panel orientation: {}° — "
-                             "applying now and saving to config",
-                             kernel_orientation);
+            if (kernel_orientation >= 0) {
+                // Orientation detected (0=Normal, 90, 180, 270).
+                if (kernel_orientation > 0) {
+                    spdlog::info("[Application] Auto-detected panel orientation: {}° — "
+                                 "applying now and saving to config",
+                                 kernel_orientation);
+                    m_display->apply_rotation(kernel_orientation);
+                    m_screen_width = m_display->width();
+                    m_screen_height = m_display->height();
+                } else {
+                    spdlog::info("[Application] Auto-detected panel orientation: Normal (0°) — "
+                                 "no rotation needed, saving to config");
+                }
                 m_config->set("/display/rotate", kernel_orientation);
                 m_config->set("/display/rotation_probed", true);
                 m_config->save();
-
-                // Apply rotation immediately — init() already ran without it.
-                m_display->apply_rotation(kernel_orientation);
-                m_screen_width = m_display->width();
-                m_screen_height = m_display->height();
             } else {
+                // kernel_orientation == -1: not detected, run interactive probe
                 m_display->run_rotation_probe();
                 m_screen_width = m_display->width();
                 m_screen_height = m_display->height();

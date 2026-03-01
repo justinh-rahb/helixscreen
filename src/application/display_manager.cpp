@@ -913,12 +913,20 @@ void DisplayManager::run_rotation_probe() {
     // DIRECT and FULL render modes during probe triggers LVGL assertion in
     // layer_reshape_draw_buf(). DRM rotation is handled via kernel
     // panel_orientation auto-detection instead.
-    bool is_drm = (m_backend && m_backend->type() == DisplayBackendType::DRM);
-    if (is_drm) {
-        spdlog::info("[DisplayManager] Rotation probe skipped on DRM backend — "
+    // Guard at compile time: DRM builds link LVGL's DRM driver which uses
+    // render modes incompatible with the probe, even if DRM init failed and
+    // we fell back to fbdev.
+#ifdef HELIX_DISPLAY_DRM
+    spdlog::info("[DisplayManager] Rotation probe skipped — "
+                 "use panel_orientation kernel parameter for auto-detection");
+    return;
+#else
+    if (m_backend && m_backend->type() == DisplayBackendType::DRM) {
+        spdlog::info("[DisplayManager] Rotation probe skipped — "
                      "use panel_orientation kernel parameter for auto-detection");
         return;
     }
+#endif
 
     // On SDL, rotation doesn't visually rotate (DIRECT render mode limitation),
     // but the probe UI and tap detection still work for testing the flow.
