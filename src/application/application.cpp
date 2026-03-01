@@ -456,6 +456,11 @@ int Application::run(int argc, char** argv) {
     if (!connect_moonraker()) {
         // Non-fatal - app can still run without connection
         spdlog::warn("[Application] Running without printer connection");
+    } else {
+        // Fetch job queue now that WebSocket is connected
+        if (m_job_queue_state) {
+            m_job_queue_state->fetch();
+        }
     }
 
     // Phase 16: Start memory monitoring (logs at TRACE level, -vvv)
@@ -1187,7 +1192,6 @@ bool Application::init_moonraker() {
         std::make_unique<JobQueueState>(m_moonraker->api(), get_moonraker_client());
     m_job_queue_state->init_subjects();
     set_job_queue_state(m_job_queue_state.get());
-    m_job_queue_state->fetch();
     spdlog::debug("[Application] JobQueueState created");
 
     // Initialize macro modification manager (for PRINT_START wizard)
