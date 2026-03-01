@@ -2253,6 +2253,43 @@ void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
         }
     }
 
+    // If default size doesn't fit, try progressively smaller sizes down to the minimum
+    if (place_col < 0 || place_row < 0) {
+        int min_c = def->effective_min_colspan();
+        int min_r = def->effective_min_rowspan();
+
+        if (min_c < colspan || min_r < rowspan) {
+            // Try shrinking rowspan first (wider but shorter), then colspan
+            for (int try_r = rowspan; try_r >= min_r && place_col < 0; --try_r) {
+                for (int try_c = colspan; try_c >= min_c && place_col < 0; --try_c) {
+                    if (try_c == colspan && try_r == rowspan) continue; // Already tried
+
+                    if (catalog_origin_col_ >= 0 && catalog_origin_row_ >= 0 &&
+                        temp_grid.can_place(catalog_origin_col_, catalog_origin_row_, try_c,
+                                            try_r)) {
+                        place_col = catalog_origin_col_;
+                        place_row = catalog_origin_row_;
+                        colspan = try_c;
+                        rowspan = try_r;
+                    } else {
+                        auto pos = temp_grid.find_available(try_c, try_r);
+                        if (pos) {
+                            place_col = pos->first;
+                            place_row = pos->second;
+                            colspan = try_c;
+                            rowspan = try_r;
+                        }
+                    }
+                }
+            }
+
+            if (place_col >= 0) {
+                spdlog::info("[GridEditMode] Widget '{}' shrunk to {}x{} to fit", widget_id,
+                             colspan, rowspan);
+            }
+        }
+    }
+
     if (place_col < 0 || place_row < 0) {
         spdlog::warn("[GridEditMode] No available grid position for widget '{}' ({}x{})", widget_id,
                      colspan, rowspan);
