@@ -378,9 +378,7 @@ void register_xml_components() {
 
     // Settings overlay panels
     register_xml("display_settings_overlay.xml");
-    register_xml("panel_widget_row.xml");
-    register_xml("panel_widgets_overlay.xml");
-    register_xml("sound_settings_overlay.xml");
+register_xml("sound_settings_overlay.xml");
     register_xml("led_settings_overlay.xml");
     register_xml("theme_editor_overlay.xml");
     register_xml("theme_preview_overlay.xml");

@@ -35,7 +35,7 @@ void register_job_queue_widget();
 // clang-format off
 static std::vector<PanelWidgetDef> s_widget_defs = {
     //                                                                                                                                          en  col row min_c min_r max_c max_r
-    {"printer_image",    "Printer Image",    "printer_3d_nozzle","3D printer visualization",                     "Printer Image",    nullptr,              true,  2, 2, 1, 1, 4, 3},
+    {"printer_image",    "Printer Image",    "rotate_3d",        "3D printer visualization",                     "Printer Image",    nullptr,              true,  2, 2, 1, 1, 4, 3},
     {"print_status",     "Print Status",     "printer_3d",       "Print progress and file selection",            "Print Status",     nullptr,              true,  2, 2, 2, 1, 4, 3},
     {"shutdown",         "Shutdown/Reboot",   "power",            "Shutdown or reboot the printer host",          "Shutdown/Reboot",  nullptr,              false, 1, 1, 1, 1, 1, 1},
     {"power",            "Power",            "power_cycle",      "Moonraker power device controls",              "Power",            "power_device_count", false, 1, 1, 1, 1, 1, 1},
