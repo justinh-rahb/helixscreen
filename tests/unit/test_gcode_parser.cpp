@@ -434,7 +434,8 @@ TEST_CASE("GCodeParser - Extrusion move characteristics", "[gcode][parser]") {
 
         // Width should be calculated (implementation-specific formula)
         // Just verify it's set to a reasonable value if calculated
-        auto& seg = file.layers[0].segments[1];
+        REQUIRE(file.layers[0].segments.size() >= 1);
+        auto& seg = file.layers[0].segments.back();
         if (seg.width > 0) {
             REQUIRE(seg.width > 0.1f); // Minimum reasonable width
             REQUIRE(seg.width < 2.0f); // Maximum reasonable width

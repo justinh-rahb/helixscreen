@@ -5,6 +5,31 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.12] - 2026-02-28
+
+This release adds MPC calibration support for Kalico/Danger Klipper firmware, a unified temperature graph overlay, and significant performance and stability improvements.
+
+### Added
+- MPC (Model Predictive Control) calibration UI with Kalico detection, config migration flow, and mock support
+- Unified temperature graph overlay replacing three separate per-sensor overlays with side-by-side layout and per-mode controls
+- Clickable mini temperature graph on filament panel opens full overlay
+- Friendly status screen displayed before restart during updates
+- Klipper config editor: `ConfigEdit` and `safe_multi_edit` for safe multi-key config changes
+
+### Fixed
+- Fan speeds stuck at 0% due to race condition in fan state updates
+- G-code viewer continues rendering when print status panel is hidden, wasting CPU
+- NEON alignment and NULL guard crashes in LVGL software rendering path
+- Blend area clipped to buffer bounds to prevent NEON SEGV (#242)
+- Black screen on SysV self-update due to unnecessary stop/start cycle
+- User config files now preserved across installer updates
+- Redundant 'Temperature' suffix stripped from temp graph chip labels
+
+### Changed
+- Subject notifications skip redundant updates when values unchanged, reducing UI redraws
+- AMS backend eliminates redundant subject fires and cascading redraws
+- Theme lookups cached and canvas dirty guards added for improved render performance
+
 ## [0.13.11] - 2026-02-28
 
 ### Added
@@ -1295,6 +1320,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.13.12]: https://github.com/prestonbrown/helixscreen/compare/v0.13.11...v0.13.12
 [0.13.11]: https://github.com/prestonbrown/helixscreen/compare/v0.13.10...v0.13.11
 [0.13.10]: https://github.com/prestonbrown/helixscreen/compare/v0.13.9...v0.13.10
 [0.13.9]: https://github.com/prestonbrown/helixscreen/compare/v0.13.8...v0.13.9
