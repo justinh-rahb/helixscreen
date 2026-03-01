@@ -766,6 +766,13 @@ TemperatureHistoryManager* get_temperature_history_manager() {
     return nullptr;
 }
 
+// Stub for get_job_queue_state (tests don't have state manager)
+class JobQueueState;
+JobQueueState* get_job_queue_state() {
+    return nullptr;
+}
+void set_job_queue_state(JobQueueState*) {}
+
 // Stub for MoonrakerManager::macro_analysis (never called since get_moonraker_manager returns null)
 #include "moonraker_manager.h"
 namespace helix {
