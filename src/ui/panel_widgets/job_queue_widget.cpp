@@ -137,16 +137,28 @@ void JobQueueWidget::rebuild_job_list() {
     lv_obj_clean(job_list_container_);
 
     auto* jqs = get_job_queue_state();
-    if (!jqs || !jqs->is_loaded()) return;
+
+    // Update empty state visibility
+    auto* empty_label = widget_obj_ ? lv_obj_find_by_name(widget_obj_, "jq_empty_state") : nullptr;
+
+    bool has_jobs = jqs && jqs->is_loaded() && !jqs->get_jobs().empty();
+    bool show_list = (current_size_mode_ > 0);
+
+    if (empty_label) {
+        // Show empty state only when: no jobs, not compact mode, and data is loaded
+        bool show_empty = !has_jobs && show_list && jqs && jqs->is_loaded();
+        if (show_empty) {
+            lv_obj_remove_flag(empty_label, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(empty_label, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+
+    if (!has_jobs || !show_list) return;
 
     const auto& jobs = jqs->get_jobs();
-    if (jobs.empty()) return;
-
-    // Don't show list in compact mode
-    if (current_size_mode_ == 0) return;
-
     const lv_font_t* item_font = theme_manager_get_font("font_small");
-    lv_color_t text_color = theme_manager_get_color("text_secondary");
+    lv_color_t text_color = theme_manager_get_color("text");
 
     for (const auto& job : jobs) {
         // Extract just the filename (strip path)

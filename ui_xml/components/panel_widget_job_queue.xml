@@ -30,11 +30,9 @@
       <bind_flag_if_eq subject="jq_size_mode" flag="hidden" ref_value="0"/>
     </lv_obj>
 
-    <!-- Empty state (shown when count == 0 and not compact) -->
+    <!-- Empty state (visibility controlled by rebuild_job_list) -->
     <text_small name="jq_empty_state" text="No jobs in queue" variant="muted"
-                style_text_align="center" width="100%" translation_tag="No jobs in queue">
-      <bind_flag_if_not_eq subject="job_queue_count" flag="hidden" ref_value="0"/>
-      <bind_flag_if_eq subject="jq_size_mode" flag="hidden" ref_value="0"/>
-    </text_small>
+                style_text_align="center" width="100%" translation_tag="No jobs in queue"
+                hidden="true"/>
   </view>
 </component>
