@@ -1,5 +1,5 @@
 diff --git a/src/drivers/display/drm/lv_linux_drm.c b/src/drivers/display/drm/lv_linux_drm.c
-index 2a6ca6ed0..cfc3a6cdf 100644
+index 2a6ca6ed0..3c986c8ee 100644
 --- a/src/drivers/display/drm/lv_linux_drm.c
 +++ b/src/drivers/display/drm/lv_linux_drm.c
 @@ -78,6 +78,7 @@ typedef struct {
@@ -154,17 +154,18 @@ index 2a6ca6ed0..cfc3a6cdf 100644
      ret = 0;
  
  free_res:
-@@ -1074,6 +1122,30 @@ static void drm_flush(lv_display_t * disp, const lv_area_t * area, uint8_t * px_
+@@ -1074,6 +1122,36 @@ static void drm_flush(lv_display_t * disp, const lv_area_t * area, uint8_t * px_
  
      LV_ASSERT(drm_dev->act_buf != NULL);
  
 +    /* Software 180° rotation via shadow buffer.
 +     * Copy pixels in reverse order to a temp buffer, then bulk-copy back.
 +     * The single memcpy back prevents tearing (in-place swap is visible
-+     * to the DRM scanout as it progresses through the buffer). */
++     * to the DRM scanout as it progresses through the buffer).
++     * When rotation is inactive, free the shadow buffer to save ~1.5 MB. */
++    static uint32_t * rot_buf = NULL;
++    static uint32_t rot_buf_size = 0;
 +    if(lv_display_get_rotation(disp) == LV_DISPLAY_ROTATION_180) {
-+        static uint32_t * rot_buf = NULL;
-+        static uint32_t rot_buf_size = 0;
 +        uint32_t total = drm_dev->width * drm_dev->height;
 +        uint32_t needed = total * sizeof(uint32_t);
 +        if(rot_buf == NULL || rot_buf_size < needed) {
@@ -180,6 +181,11 @@ index 2a6ca6ed0..cfc3a6cdf 100644
 +            }
 +            lv_memcpy(drm_dev->act_buf->map, rot_buf, needed);
 +        }
++    }
++    else if(rot_buf != NULL) {
++        lv_free(rot_buf);
++        rot_buf = NULL;
++        rot_buf_size = 0;
 +    }
 +
      if(drm_dmabuf_set_plane(drm_dev, drm_dev->act_buf)) {

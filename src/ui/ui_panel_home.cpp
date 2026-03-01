@@ -659,7 +659,10 @@ void HomePanel::take_printer_image_snapshot() {
         return;
     }
 
-    lv_draw_buf_t* snapshot = lv_snapshot_take(img, LV_COLOR_FORMAT_ARGB8888);
+    // Use RGB565 instead of ARGB8888 — halves memory (2 vs 4 bytes/pixel).
+    // Alpha is not needed: the snapshot captures the fully composited image
+    // against its background, and is only used as a static placeholder.
+    lv_draw_buf_t* snapshot = lv_snapshot_take(img, LV_COLOR_FORMAT_RGB565);
     if (!snapshot) {
         spdlog::warn("[{}] Failed to take printer image snapshot", get_name());
         return;
@@ -671,20 +674,18 @@ void HomePanel::take_printer_image_snapshot() {
     }
     cached_printer_snapshot_ = snapshot;
 
-    // Diagnostic: verify snapshot header before setting as source
     uint32_t snap_w = snapshot->header.w;
     uint32_t snap_h = snapshot->header.h;
-    uint32_t snap_magic = snapshot->header.magic;
-    uint32_t snap_cf = snapshot->header.cf;
-    spdlog::debug("[{}] Snapshot header: magic=0x{:02x} cf={} {}x{} data={}", get_name(),
-                  snap_magic, snap_cf, snap_w, snap_h, fmt::ptr(snapshot->data));
+    spdlog::debug("[{}] Snapshot header: cf={} {}x{} data={}", get_name(),
+                  static_cast<uint32_t>(snapshot->header.cf), snap_w, snap_h,
+                  fmt::ptr(snapshot->data));
 
     // Swap image source to the pre-scaled snapshot buffer — LVGL blits 1:1, no scaling
     lv_image_set_src(img, cached_printer_snapshot_);
     lv_image_set_inner_align(img, LV_IMAGE_ALIGN_CENTER);
 
-    spdlog::debug("[{}] Printer image snapshot cached ({}x{}, {} bytes)", get_name(), snap_w,
-                  snap_h, snap_w * snap_h * 4);
+    spdlog::debug("[{}] Printer image snapshot cached ({}x{}, {} bytes, RGB565)", get_name(), snap_w,
+                  snap_h, snap_w * snap_h * 2);
 }
 
 void HomePanel::print_card_clicked_cb(lv_event_t* e) {
