@@ -107,6 +107,30 @@ void HumiditySensorManager::discover(const std::vector<std::string>& klipper_obj
 
     spdlog::info("[HumiditySensorManager] Discovered {} humidity sensors", sensors_.size());
 
+    // Auto-assign roles based on sensor name when no roles are configured yet.
+    // If a sensor name contains "chamber", assign CHAMBER role; "dryer" gets DRYER role.
+    // Only auto-assigns if no sensor already holds that role (respects saved config).
+    if (!sensors_.empty()) {
+        bool has_chamber_role = find_config_by_role(HumiditySensorRole::CHAMBER) != nullptr;
+        bool has_dryer_role = find_config_by_role(HumiditySensorRole::DRYER) != nullptr;
+
+        for (auto& sensor : sensors_) {
+            if (!has_chamber_role && sensor.role == HumiditySensorRole::NONE &&
+                sensor.sensor_name.find("chamber") != std::string::npos) {
+                sensor.role = HumiditySensorRole::CHAMBER;
+                has_chamber_role = true;
+                spdlog::info("[HumiditySensorManager] Auto-assigned CHAMBER role to {}",
+                             sensor.sensor_name);
+            } else if (!has_dryer_role && sensor.role == HumiditySensorRole::NONE &&
+                       sensor.sensor_name.find("dryer") != std::string::npos) {
+                sensor.role = HumiditySensorRole::DRYER;
+                has_dryer_role = true;
+                spdlog::info("[HumiditySensorManager] Auto-assigned DRYER role to {}",
+                             sensor.sensor_name);
+            }
+        }
+    }
+
     // Update subjects to reflect new state
     update_subjects();
 }

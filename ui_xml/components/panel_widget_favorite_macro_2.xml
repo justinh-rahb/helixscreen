@@ -9,7 +9,6 @@
         clickable="true">
     <bind_state_if_not_eq subject="printer_connection_state" state="disabled" ref_value="2"/>
     <event_cb trigger="clicked" callback="favorite_macro_2_clicked_cb"/>
-    <event_cb trigger="long_pressed" callback="favorite_macro_2_long_press_cb"/>
     <!-- Icon -->
     <icon name="fav_macro_icon" src="play" size="md" variant="secondary"
           clickable="false" event_bubble="true"/>

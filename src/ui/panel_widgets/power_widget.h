@@ -31,7 +31,6 @@ class PowerWidget : public PanelWidget {
 
     // XML event callbacks (public for early registration in register_power_widget)
     static void power_toggle_cb(lv_event_t* e);
-    static void power_long_press_cb(lv_event_t* e);
 
   private:
     MoonrakerAPI* api_;
@@ -41,7 +40,6 @@ class PowerWidget : public PanelWidget {
     lv_obj_t* power_icon_ = nullptr;
 
     bool power_on_ = false;
-    bool power_long_pressed_ = false;
 
     // Shared flag for async callback safety — set false on detach
     std::shared_ptr<bool> alive_ = std::make_shared<bool>(false);
@@ -49,7 +47,6 @@ class PowerWidget : public PanelWidget {
     ObserverGuard power_count_observer_;
 
     void handle_power_toggle();
-    void handle_power_long_press();
     void update_power_icon(bool is_on);
 };
 

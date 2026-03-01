@@ -46,6 +46,7 @@ MoonrakerClientMock::MoonrakerClientMock(PrinterType type, double speedup_factor
     mock_internal::register_object_handlers(method_handlers_);
     mock_internal::register_history_handlers(method_handlers_);
     mock_internal::register_server_handlers(method_handlers_);
+    mock_internal::register_queue_handlers(method_handlers_);
     spdlog::debug("[MoonrakerClientMock] Registered {} RPC method handlers",
                   method_handlers_.size());
 
@@ -280,6 +281,14 @@ void MoonrakerClientMock::populate_capabilities() {
     mock_objects.push_back("gcode_macro LIGHTS_TOGGLE");
     mock_objects.push_back("gcode_macro LED_PARTY");
     mock_objects.push_back("gcode_macro LED_NIGHTLIGHT");
+
+    // Humidity sensors (BME280/HTU21D for enclosure monitoring)
+    mock_objects.push_back("bme280 chamber");
+    mock_objects.push_back("htu21d dryer");
+    spdlog::debug("[MoonrakerClientMock] Mock humidity sensors: bme280 chamber, htu21d dryer");
+
+    // Width sensor (filament diameter measurement via Hall effect sensor)
+    mock_objects.push_back("hall_filament_width_sensor");
 
     // Moonraker plugins
     mock_objects.push_back("timelapse"); // Moonraker-Timelapse plugin
@@ -2857,6 +2866,10 @@ void MoonrakerClientMock::dispatch_initial_state() {
         initial_status[sensor] = {{"filament_detected", detected}, {"enabled", true}};
     }
 
+    // Add width sensor data (Hall-effect filament diameter measurement)
+    initial_status["hall_filament_width_sensor"] = {
+        {"Diameter", 1.75}, {"Raw", 500.0}, {"is_active", true}};
+
     spdlog::debug("[MoonrakerClientMock] Dispatching initial state: extruder={}/{}°C, bed={}/{}°C, "
                   "homed_axes='{}', leds={}, filament_sensors={}",
                   ext_temp, ext_target, bed_temp_val, bed_target_val, homed, led_json.size(),
@@ -3535,6 +3548,26 @@ void MoonrakerClientMock::temperature_simulation_loop() {
                 double temp = 35.0 + 3.0 * std::sin(2.0 * M_PI * sim_time / 80.0);
                 status_obj[s] = {{"temperature", temp}, {"target", 40.0}, {"speed", 0.5}};
             }
+        }
+
+        // Humidity sensor data (BME280 has humidity, temperature, pressure; HTU21D has
+        // humidity, temperature)
+        {
+            // BME280 chamber sensor: humidity varies 40-50%, slow sinusoidal drift
+            constexpr double HUMIDITY_WAVE_PERIOD = 180.0; // 3 minute period
+            double humidity_wave = std::sin(2.0 * M_PI * sim_time / HUMIDITY_WAVE_PERIOD);
+            double chamber_humidity = 45.0 + 5.0 * humidity_wave; // 40-50%
+            double chamber_h_temp = chamber_temp_.load();         // Use chamber temperature
+            double chamber_pressure = 1013.25 + 2.0 * std::sin(2.0 * M_PI * sim_time / 300.0);
+            status_obj["bme280 chamber"] = {{"humidity", chamber_humidity},
+                                            {"temperature", chamber_h_temp},
+                                            {"pressure", chamber_pressure}};
+
+            // HTU21D dryer sensor: lower humidity (dryer enclosure), 10-20%
+            double dryer_humidity = 15.0 + 5.0 * std::sin(2.0 * M_PI * sim_time / 150.0);
+            double dryer_temp = 55.0 + 3.0 * std::sin(2.0 * M_PI * sim_time / 200.0);
+            status_obj["htu21d dryer"] = {{"humidity", dryer_humidity},
+                                          {"temperature", dryer_temp}};
         }
 
         json notification = {{"method", "notify_status_update"},

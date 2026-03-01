@@ -84,6 +84,13 @@ void NetworkWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     // Store this pointer for event callback recovery
     lv_obj_set_user_data(widget_obj_, this);
 
+    // Set user_data on the network_btn child (where event_cb is registered in XML)
+    // so the callback can recover this widget instance via lv_obj_get_user_data()
+    auto* network_btn = lv_obj_find_by_name(widget_obj_, "network_btn");
+    if (network_btn) {
+        lv_obj_set_user_data(network_btn, this);
+    }
+
     // Use module-owned subjects (initialized via network_widget_init_subjects)
     network_icon_state_ = &s_network_icon_state;
     network_label_subject_ = &s_network_label_subject;
@@ -119,6 +126,10 @@ void NetworkWidget::detach() {
     network_label_subject_ = nullptr;
 
     if (widget_obj_) {
+        auto* network_btn = lv_obj_find_by_name(widget_obj_, "network_btn");
+        if (network_btn) {
+            lv_obj_set_user_data(network_btn, nullptr);
+        }
         lv_obj_set_user_data(widget_obj_, nullptr);
         widget_obj_ = nullptr;
     }

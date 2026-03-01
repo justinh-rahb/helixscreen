@@ -121,4 +121,18 @@ void register_history_handlers(std::unordered_map<std::string, MethodHandler>& r
  */
 void register_server_handlers(std::unordered_map<std::string, MethodHandler>& registry);
 
+/**
+ * @brief Register job queue method handlers
+ *
+ * Registers handlers for:
+ * - server.job_queue.status
+ * - server.job_queue.start
+ * - server.job_queue.pause
+ * - server.job_queue.post_job
+ * - server.job_queue.delete_job
+ *
+ * @param registry Map to register handlers into
+ */
+void register_queue_handlers(std::unordered_map<std::string, MethodHandler>& registry);
+
 } // namespace mock_internal

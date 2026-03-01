@@ -12,6 +12,89 @@
 
 ---
 
+## Progress
+
+| Task | Status | Commit |
+|------|--------|--------|
+| Phase 1: Grid Infrastructure | DONE | `14da6f31` |
+| Phase 2: Widget Extraction (printer_image, print_status, tips) | DONE | `d51f0564` |
+| Task 1: GridEditMode Skeleton | DONE | `1b80edb2` |
+| Task 2: Navbar Done Button | DONE | `9e9d14a0` |
+| Task 3: Grid Dots Overlay | DONE | `ae3a7d30` |
+| Task 4: Widget Selection + Corner Brackets | DONE | `7f6e2a42` |
+| Task 5: Drag-to-Reposition | DONE | `1648d68d` |
+| Task 6: Drag-to-Resize | DONE | `49035091` |
+| Task 7: Widget Catalog Overlay | DONE | `84664673` |
+| Task 8: Double-Tap Migration | DONE | `36272c90` |
+| Task 9: Code Review Fixes | DONE | `1601228b` |
+| Dynamic bottom-right packing + config persistence | DONE | `4d50706e` |
+| Phase 5: Polish & Edge Cases | TODO | — |
+
+### Post-review architectural changes (session 2026-02-25)
+
+- **Dynamic placement**: 1×1 widgets no longer get positions at config-build time. Positions are computed dynamically at each `populate_widgets()` call using bottom-right-first packing.
+- **Config persistence**: Positions written back to config entries in-memory after each populate. Saved to disk on edit mode enter/exit only.
+- **Segfault fix**: Added `UpdateQueue::drain()` after widget detach in populate to prevent use-after-free from deferred observer callbacks.
+- **Default layout**: Only 3 anchor widgets (printer_image, print_status, tips) get fixed grid positions. All other widgets are auto-placed.
+
+### Remaining work
+
+- [ ] Settings entry "Customize Home Panel" (replaces current "Home Widgets" reorder list)
+- [ ] Breakpoint adaptation (widget clamping/hiding on smaller screens)
+- [ ] Per-widget config UIs (macro picker for macro grid, etc.)
+- [ ] New widget types (clock, camera, print stats, quick actions, print queue)
+- [ ] Animation/transition polish for edit mode enter/exit
+- [ ] Debounce timer fallback for saving positions (for users who never enter edit mode)
+- [ ] Visual polish: every widget at every breakpoint × aspect ratio (see Phase 6 below)
+
+### Phase 6: Visual Polish — Every Widget × Every Breakpoint × Every Aspect Ratio
+
+Iteratively test and fix each widget's visual appearance across all screen sizes.
+One widget at a time, reviewed together before moving to the next.
+
+**Test matrix:**
+
+| Breakpoint | Resolution | Aspect | Grid | CLI flag |
+|------------|-----------|--------|------|----------|
+| TINY       | 480×320   | 3:2    | 6×4  | `-s 480x320`  |
+| SMALL      | 480×400   | 6:5    | 6×4  | `-s 480x400`  |
+| SMALL (UW) | 1920×440  | ~4:1   | 6×4  | `-s 1920x440` |
+| MEDIUM     | 800×480   | 5:3    | 6×4  | `-s 800x480`  |
+| LARGE      | 1024×600  | ~17:10 | 8×5  | `-s 1024x600` |
+| XLARGE     | 1280×720  | 16:9   | 8×5  | `-s 1280x720` |
+
+**Widgets to polish (19 total):**
+
+1. `printer_image` — 3D printer visualization (2×2, resizable 1-4 × 1-3)
+2. `print_status` — Print progress card (2×2, resizable 2-4 × 1-3)
+3. `tips` — Rotating tips (4×1 anchor, resizable 2-6 × 1)
+4. `temperature` — Nozzle temp (1×1)
+5. `fan_stack` — Fan speeds (1×1)
+6. `notifications` — Pending alerts (1×1)
+7. `ams` — Multi-material spool status (1×1)
+8. `power` — Moonraker power controls (1×1, hardware-gated)
+9. `led` — LED light toggle (1×1, hardware-gated)
+10. `humidity` — Humidity sensor (1×1, hardware-gated)
+11. `width_sensor` — Filament width sensor (1×1, hardware-gated)
+12. `probe` — Z probe status (1×1, hardware-gated)
+13. `filament` — Filament sensor (1×1, hardware-gated)
+14. `network` — Wi-Fi/ethernet status (1×1, default disabled)
+15. `firmware_restart` — Klipper restart (1×1, default disabled)
+16. `temp_stack` — Multi-temp stacked (1×1, default disabled)
+17. `thermistor` — Custom temp sensor (1×1, default disabled)
+18. `favorite_macro_1` — Macro button (1×1, default disabled)
+19. `favorite_macro_2` — Macro button (1×1, default disabled)
+
+**Process per widget:**
+1. Launch app at each resolution: `./build/bin/helix-screen --test -vv -s WxH`
+2. Screenshot or visually inspect the widget
+3. Check: text truncation, icon alignment, padding, touch target size, overflow
+4. Fix XML/theme issues (applying [L040]: inline attrs override bind_style)
+5. Re-verify at all resolutions
+6. Move to next widget
+
+---
+
 ## Task 1: GridEditMode Skeleton — State Machine + Enter/Exit
 
 Create the `GridEditMode` class with basic state management. No visuals yet — just the state transitions and integration with HomePanel.

@@ -27,6 +27,7 @@ class TempStackWidget : public PanelWidget {
     const char* id() const override {
         return "temp_stack";
     }
+    void on_size_changed(int colspan, int rowspan, int width_px, int height_px) override;
 
   private:
     PrinterState& printer_state_;
@@ -47,8 +48,6 @@ class TempStackWidget : public PanelWidget {
     int cached_bed_target_ = 0;
 
     std::shared_ptr<bool> alive_ = std::make_shared<bool>(false);
-
-    // Long-press click suppression flag
     bool long_pressed_ = false;
 
     // Observers
@@ -60,7 +59,6 @@ class TempStackWidget : public PanelWidget {
     bool is_carousel_mode() const;
     void attach_stack(lv_obj_t* widget_obj);
     void attach_carousel(lv_obj_t* widget_obj);
-    void toggle_display_mode();
 
     void on_nozzle_temp_changed(int temp_centi);
     void on_nozzle_target_changed(int target_centi);
@@ -76,10 +74,6 @@ class TempStackWidget : public PanelWidget {
     static void temp_stack_nozzle_cb(lv_event_t* e);
     static void temp_stack_bed_cb(lv_event_t* e);
     static void temp_stack_chamber_cb(lv_event_t* e);
-
-    // Long-press callbacks for toggling display mode
-    static void temp_stack_long_press_cb(lv_event_t* e);
-    static void temp_carousel_long_press_cb(lv_event_t* e);
 
     // Carousel page click callback
     static void temp_carousel_page_cb(lv_event_t* e);

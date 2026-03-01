@@ -4,6 +4,7 @@
 #include "favorite_macro_widget.h"
 
 #include "ui_event_safety.h"
+#include "ui_fonts.h"
 #include "ui_icon.h"
 #include "ui_icon_codepoints.h"
 #include "ui_update_queue.h"
@@ -17,6 +18,7 @@
 #include "moonraker_api.h"
 #include "panel_widget_config.h"
 #include "panel_widget_registry.h"
+#include "theme_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -142,9 +144,7 @@ void FavoriteMacroWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) 
 
     // Register XML event callbacks
     lv_xml_register_event_cb(nullptr, "favorite_macro_1_clicked_cb", clicked_1_cb);
-    lv_xml_register_event_cb(nullptr, "favorite_macro_1_long_press_cb", long_press_1_cb);
     lv_xml_register_event_cb(nullptr, "favorite_macro_2_clicked_cb", clicked_2_cb);
-    lv_xml_register_event_cb(nullptr, "favorite_macro_2_long_press_cb", long_press_2_cb);
     lv_xml_register_event_cb(nullptr, "fav_macro_picker_backdrop_cb", picker_backdrop_cb);
 
     // Cache label pointers from XML
@@ -174,6 +174,29 @@ void FavoriteMacroWidget::detach() {
     spdlog::debug("[FavoriteMacroWidget] Detached");
 }
 
+void FavoriteMacroWidget::on_size_changed(int colspan, int rowspan, int /*width_px*/,
+                                          int /*height_px*/) {
+    if (!widget_obj_)
+        return;
+
+    bool tall = (rowspan >= 2);
+    bool wide = (colspan >= 2);
+
+    // Scale icon: md (32px) at 1×1, lg (48px) when tall or 2×2
+    if (icon_label_) {
+        const lv_font_t* icon_font = tall ? &mdi_icons_48 : &mdi_icons_32;
+        lv_obj_set_style_text_font(icon_label_, icon_font, 0);
+    }
+
+    // Scale text: font_xs at 1×1, font_small when tall or wide
+    if (name_label_) {
+        const char* font_token = (tall || wide) ? "font_small" : "font_xs";
+        const lv_font_t* text_font = theme_manager_get_font(font_token);
+        if (text_font)
+            lv_obj_set_style_text_font(name_label_, text_font, 0);
+    }
+}
+
 void FavoriteMacroWidget::handle_clicked() {
     if (macro_name_.empty()) {
         // No macro assigned — open picker to configure
@@ -185,11 +208,6 @@ void FavoriteMacroWidget::handle_clicked() {
         spdlog::info("[FavoriteMacroWidget] {} clicked - executing {}", widget_id_, macro_name_);
         fetch_and_execute();
     }
-}
-
-void FavoriteMacroWidget::handle_long_press() {
-    spdlog::info("[FavoriteMacroWidget] {} long-pressed - showing picker", widget_id_);
-    show_macro_picker();
 }
 
 MoonrakerAPI* FavoriteMacroWidget::get_api() const {
@@ -561,29 +579,11 @@ void FavoriteMacroWidget::clicked_1_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void FavoriteMacroWidget::long_press_1_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] long_press_1_cb");
-    auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
-    if (widget) {
-        widget->handle_long_press();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
 void FavoriteMacroWidget::clicked_2_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] clicked_2_cb");
     auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
     if (widget) {
         widget->handle_clicked();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void FavoriteMacroWidget::long_press_2_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[FavoriteMacroWidget] long_press_2_cb");
-    auto* widget = panel_widget_from_event<FavoriteMacroWidget>(e);
-    if (widget) {
-        widget->handle_long_press();
     }
     LVGL_SAFE_EVENT_CB_END();
 }

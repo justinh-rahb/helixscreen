@@ -648,8 +648,6 @@ void PrintStatusPanel::on_ui_destroyed() {
     cancel_badge_ = nullptr;
     error_badge_ = nullptr;
     overlay_header_ = nullptr;
-    nozzle_temp_panel_ = nullptr;
-    bed_temp_panel_ = nullptr;
 
     // Reset widget-dependent state
     resize_registered_ = false;

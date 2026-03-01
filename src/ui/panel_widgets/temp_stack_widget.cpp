@@ -6,16 +6,16 @@
 #include "ui_carousel.h"
 #include "ui_error_reporting.h"
 #include "ui_event_safety.h"
+#include "ui_fonts.h"
 #include "ui_nav_manager.h"
 #include "ui_overlay_temp_graph.h"
 #include "ui_panel_temp_control.h"
+#include "ui_temp_display.h"
 #include "ui_update_queue.h"
 #include "ui_utils.h"
 
 #include "app_globals.h"
-#include "config.h"
 #include "observer_factory.h"
-#include "panel_widget_config.h"
 #include "panel_widget_manager.h"
 #include "panel_widget_registry.h"
 #include "printer_state.h"
@@ -37,33 +37,12 @@ void register_temp_stack_widget() {
     lv_xml_register_event_cb(nullptr, "temp_stack_bed_cb", TempStackWidget::temp_stack_bed_cb);
     lv_xml_register_event_cb(nullptr, "temp_stack_chamber_cb",
                              TempStackWidget::temp_stack_chamber_cb);
-    lv_xml_register_event_cb(nullptr, "temp_stack_long_press_cb",
-                             TempStackWidget::temp_stack_long_press_cb);
-    lv_xml_register_event_cb(nullptr, "temp_carousel_long_press_cb",
-                             TempStackWidget::temp_carousel_long_press_cb);
     lv_xml_register_event_cb(nullptr, "temp_carousel_page_cb",
                              TempStackWidget::temp_carousel_page_cb);
 }
 } // namespace helix
 
 namespace {
-// File-local helper: get the shared PanelWidgetConfig instance for home panel
-helix::PanelWidgetConfig& get_widget_config_ref() {
-    static helix::PanelWidgetConfig config("home", *helix::Config::get_instance());
-    config.load();
-    return config;
-}
-// Recursively add long-press handler to all descendants of an LVGL object
-static void add_long_press_recursive(lv_obj_t* obj, lv_event_cb_t cb, void* user_data) {
-    if (!obj)
-        return;
-    lv_obj_add_event_cb(obj, cb, LV_EVENT_LONG_PRESSED, user_data);
-    uint32_t count = lv_obj_get_child_count(obj);
-    for (uint32_t i = 0; i < count; i++) {
-        add_long_press_recursive(lv_obj_get_child(obj, i), cb, user_data);
-    }
-}
-
 // Make all children of a page pass events through (not clickable, bubble to parent)
 static void make_children_passthrough(lv_obj_t* parent) {
     if (!parent)
@@ -208,9 +187,8 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
         lv_obj_add_flag(page, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_set_name(page, page_name);
 
-        // Click callback to open temp overlay; long-press to toggle mode
+        // Click callback to open temp overlay
         lv_obj_add_event_cb(page, temp_carousel_page_cb, LV_EVENT_CLICKED, nullptr);
-        lv_obj_add_event_cb(page, temp_carousel_long_press_cb, LV_EVENT_LONG_PRESSED, nullptr);
 
         // Icon
         const char* icon_attrs[] = {"src",       icon_src, "size",    "sm",   "variant",
@@ -242,7 +220,6 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
     lv_obj_add_flag(nozzle_page, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_name(nozzle_page, "nozzle");
     lv_obj_add_event_cb(nozzle_page, temp_carousel_page_cb, LV_EVENT_CLICKED, nullptr);
-    lv_obj_add_event_cb(nozzle_page, temp_carousel_long_press_cb, LV_EVENT_LONG_PRESSED, nullptr);
 
     const char* nozzle_icon_attrs[] = {
         "size", "sm", "badge_subject", "", "name", "carousel_nozzle_icon", nullptr};
@@ -329,23 +306,61 @@ void TempStackWidget::attach_carousel(lv_obj_t* widget_obj) {
     spdlog::debug("[TempStackWidget] Attached carousel with {} pages", page_count);
 }
 
-void TempStackWidget::toggle_display_mode() {
-    auto& wc = get_widget_config_ref();
-    nlohmann::json cfg = wc.get_widget_config("temp_stack");
+void TempStackWidget::on_size_changed(int /*colspan*/, int rowspan, int /*width_px*/,
+                                      int /*height_px*/) {
+    if (!widget_obj_ || is_carousel_mode())
+        return;
 
-    if (is_carousel_mode()) {
-        cfg["display_mode"] = "stack";
-    } else {
-        cfg["display_mode"] = "carousel";
+    // Determine size tier based on vertical space
+    const char* size = (rowspan >= 2) ? "sm" : "xs";
+
+    // Get text font for this size tier
+    const char* font_token = theme_manager_size_to_font_token(size, "xs");
+    const lv_font_t* text_font = theme_manager_get_font(font_token);
+    if (!text_font)
+        return;
+
+    // Icon font: xs=16px, sm=24px
+    const lv_font_t* icon_font = (rowspan >= 2) ? &mdi_icons_24 : &mdi_icons_16;
+
+    // Update nozzle icon glyph
+    lv_obj_t* nozzle_glyph = lv_obj_find_by_name(widget_obj_, "nozzle_icon_glyph");
+    if (nozzle_glyph)
+        lv_obj_set_style_text_font(nozzle_glyph, icon_font, 0);
+
+    // Update bed icon — the <icon> component wraps a label child
+    lv_obj_t* bed_icon = lv_obj_find_by_name(widget_obj_, "temp_stack_bed_icon_glyph");
+    if (bed_icon) {
+        lv_obj_t* glyph = lv_obj_get_child(bed_icon, 0);
+        if (glyph)
+            lv_obj_set_style_text_font(glyph, icon_font, 0);
     }
 
-    wc.set_widget_config("temp_stack", cfg);
-    spdlog::info("[TempStackWidget] Toggled display mode to '{}'",
-                 cfg["display_mode"].get<std::string>());
+    // Update temp_display fonts and icon fonts in all rows
+    const char* row_names[] = {"temp_stack_nozzle_row", "temp_stack_bed_row",
+                               "temp_stack_chamber_row"};
+    for (const char* row_name : row_names) {
+        lv_obj_t* row = lv_obj_find_by_name(widget_obj_, row_name);
+        if (!row)
+            continue;
+        for (uint32_t i = 0; i < lv_obj_get_child_count(row); i++) {
+            lv_obj_t* child = lv_obj_get_child(row, static_cast<int32_t>(i));
+            if (ui_temp_display_is_valid(child)) {
+                // Update all labels inside the temp_display container
+                for (uint32_t j = 0; j < lv_obj_get_child_count(child); j++) {
+                    lv_obj_t* label = lv_obj_get_child(child, static_cast<int32_t>(j));
+                    lv_obj_set_style_text_font(label, text_font, 0);
+                }
+            } else if (lv_obj_get_child_count(child) > 0) {
+                // Icon component — update first child glyph (chamber row icon)
+                lv_obj_t* glyph = lv_obj_get_child(child, 0);
+                if (glyph)
+                    lv_obj_set_style_text_font(glyph, icon_font, 0);
+            }
+        }
+    }
 
-    // Defer rebuild to avoid destroying widgets during event processing
-    helix::ui::async_call(
-        [](void*) { PanelWidgetManager::instance().notify_config_changed("home"); }, nullptr);
+    spdlog::debug("[TempStackWidget] on_size_changed rowspan={} -> size {}", rowspan, size);
 }
 
 void TempStackWidget::detach() {
@@ -447,43 +462,18 @@ void TempStackWidget::temp_stack_chamber_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_END();
 }
 
-void TempStackWidget::temp_stack_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_stack_long_press_cb");
-    (void)e;
-    if (s_active_instance) {
-        s_active_instance->long_pressed_ = true;
-        s_active_instance->toggle_display_mode();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
-void TempStackWidget::temp_carousel_long_press_cb(lv_event_t* e) {
-    LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_carousel_long_press_cb");
-    (void)e;
-    if (s_active_instance) {
-        s_active_instance->long_pressed_ = true;
-        s_active_instance->toggle_display_mode();
-    }
-    LVGL_SAFE_EVENT_CB_END();
-}
-
 void TempStackWidget::temp_carousel_page_cb(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[TempStackWidget] temp_carousel_page_cb");
     if (s_active_instance) {
-        if (s_active_instance->long_pressed_) {
-            s_active_instance->long_pressed_ = false;
-            spdlog::debug("[TempStackWidget] Carousel page click suppressed (follows long-press)");
-        } else {
-            auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
-            const char* page_id = lv_obj_get_name(target);
-            if (page_id) {
-                if (std::strcmp(page_id, "nozzle") == 0) {
-                    s_active_instance->handle_nozzle_clicked();
-                } else if (std::strcmp(page_id, "bed") == 0) {
-                    s_active_instance->handle_bed_clicked();
-                } else if (std::strcmp(page_id, "chamber") == 0) {
-                    s_active_instance->handle_chamber_clicked();
-                }
+        auto* target = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
+        const char* page_id = lv_obj_get_name(target);
+        if (page_id) {
+            if (std::strcmp(page_id, "nozzle") == 0) {
+                s_active_instance->handle_nozzle_clicked();
+            } else if (std::strcmp(page_id, "bed") == 0) {
+                s_active_instance->handle_bed_clicked();
+            } else if (std::strcmp(page_id, "chamber") == 0) {
+                s_active_instance->handle_chamber_clicked();
             }
         }
     }

@@ -10,7 +10,6 @@
       <bind_state_if_not_eq subject="printer_connection_state" state="disabled" ref_value="2"/>
       <icon name="power_icon" src="power_plug" size="#icon_size" align="center" variant="muted"/>
       <event_cb trigger="clicked" callback="power_toggle_cb"/>
-      <event_cb trigger="long_pressed" callback="power_long_press_cb"/>
     </ui_button>
   </view>
 </component>
