@@ -36,6 +36,9 @@ CatalogState g_catalog_state;
 void close_catalog() {
     if (g_catalog_state.overlay_root) {
         auto on_close = std::move(g_catalog_state.on_close);
+        // Unregister close callback to prevent double-firing via go_back
+        NavigationManager::instance().unregister_overlay_close_callback(
+            g_catalog_state.overlay_root);
         NavigationManager::instance().go_back();
         // Delete backdrop after nav pop (overlay is deleted by NavigationManager)
         if (g_catalog_state.backdrop) {
@@ -256,6 +259,26 @@ void WidgetCatalogOverlay::show(lv_obj_t* parent_screen, const PanelWidgetConfig
 
     // Push onto navigation stack — keep the home panel visible behind the catalog
     NavigationManager::instance().push_overlay(overlay, /*hide_previous=*/false);
+
+    // Register close callback with NavigationManager so that go_back() (e.g., from
+    // the header back button) properly cleans up catalog state. NavigationManager hides
+    // overlays rather than deleting them, so LV_EVENT_DELETE alone is insufficient.
+    NavigationManager::instance().register_overlay_close_callback(overlay, [overlay]() {
+        if (g_catalog_state.overlay_root == overlay) {
+            if (g_catalog_state.backdrop) {
+                lv_obj_delete(g_catalog_state.backdrop);
+                g_catalog_state.backdrop = nullptr;
+            }
+            auto on_close_cb = std::move(g_catalog_state.on_close);
+            g_catalog_state.overlay_root = nullptr;
+            g_catalog_state.on_select = nullptr;
+            g_catalog_state.on_close = nullptr;
+            if (on_close_cb) {
+                on_close_cb();
+            }
+            spdlog::debug("[WidgetCatalog] Closed via navigation go_back");
+        }
+    });
 
     spdlog::info("[WidgetCatalog] Overlay shown with {} widget definitions",
                  get_all_widget_defs().size());

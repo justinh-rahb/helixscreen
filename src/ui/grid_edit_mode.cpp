@@ -1989,10 +1989,23 @@ void GridEditMode::open_widget_catalog(lv_obj_t* screen) {
                  catalog_origin_row_);
 
     catalog_open_ = true;
+
+    // Hide dots overlay while catalog is open — it sits on top of the screen
+    // and absorbs all touch events, preventing interaction with the catalog.
+    if (dots_overlay_) {
+        lv_obj_add_flag(dots_overlay_, LV_OBJ_FLAG_HIDDEN);
+    }
+
     WidgetCatalogOverlay::show(
         screen, *config_,
         [this](const std::string& widget_id) { place_widget_from_catalog(widget_id); },
-        [this]() { catalog_open_ = false; });
+        [this]() {
+            catalog_open_ = false;
+            // Restore dots overlay when catalog closes
+            if (dots_overlay_) {
+                lv_obj_remove_flag(dots_overlay_, LV_OBJ_FLAG_HIDDEN);
+            }
+        });
 }
 
 void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
