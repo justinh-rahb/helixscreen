@@ -37,7 +37,7 @@
 > Text-only buttons: use `align="center"` on child. Icon+text buttons with flex_flow="row": need ALL THREE flex properties - style_flex_main_place="center" (horizontal), style_flex_cross_place="center" (vertical align items), style_flex_track_place="center" (vertical position of row). Missing track_place causes content to sit at top.
 
 ### [L031] [****-|*****] XML no recompile
-- **Uses**: 65 | **Velocity**: 45.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-28 | **Category**: gotcha | **Type**: constraint
+- **Uses**: 67 | **Velocity**: 47.0075 | **Learned**: 2025-12-27 | **Last**: 2026-02-28 | **Category**: gotcha | **Type**: constraint
 > XML files are loaded at RUNTIME - never rebuild after XML-only changes. Just relaunch the app. This includes layout changes, styling, bindings, event callbacks - anything in ui_xml/*.xml. Only rebuild when C++ code changes.
 
 ### [L039] [*----|***--] Unique XML callback names
@@ -48,8 +48,8 @@
 - **Uses**: 6 | **Velocity**: 3 | **Learned**: 2025-12-30 | **Last**: 2026-02-24 | **Category**: gotcha | **Type**: constraint
 > When using bind_style for reactive visual changes, inline style attributes (style_bg_color, style_text_color, etc.) have higher priority in LVGL's style cascade. bind_style cannot override them. Solution: use TWO bind_styles (one per state) with NO inline styling for properties you want to change reactively.
 
-### [L042] [*----|***--] XML bind_flag exclusive visibility
-- **Uses**: 2 | **Velocity**: 1 | **Learned**: 2025-12-31 | **Last**: 2026-02-25 | **Category**: pattern | **Type**: informational
+### [L042] [*----|****-] XML bind_flag exclusive visibility
+- **Uses**: 3 | **Velocity**: 2 | **Learned**: 2025-12-31 | **Last**: 2026-02-28 | **Category**: pattern | **Type**: informational
 > Multiple bind_flag_if_eq on same object creates independent observers where last one wins (race condition). For 'show only when X=value' logic, use single bind_flag_if_not_eq instead. Example: bind_flag_if_not_eq ref_value="0" shows only when value IS 0.
 
 ### [L045] [*----|-----] XML dropdown options use &#10; entities
@@ -97,7 +97,7 @@
 > Always use lv_obj_safe_delete() instead of raw lv_obj_delete() - it guards against shutdown race conditions by checking lv_is_initialized() and lv_display_get_next() before deletion, and auto-nulls the pointer to prevent use-after-free
 
 ### [L060] [***--|*****] Interactive UI testing requires user
-- **Uses**: 31 | **Velocity**: 30.009999999999998 | **Learned**: 2026-02-01 | **Last**: 2026-02-28 | **Category**: correction | **Type**: constraint
+- **Uses**: 34 | **Velocity**: 33.01 | **Learned**: 2026-02-01 | **Last**: 2026-02-28 | **Category**: correction | **Type**: constraint
 > NEVER use timed delays expecting automatic navigation. THE EXACT PATTERN THAT WORKS:
 > **Step 1** - Start app with Bash tool using `run_in_background: true`:
 > ```bash
@@ -110,7 +110,7 @@
 > FAILURES: shell `&`, `timeout X cmd &`, multiple attempts, assuming automatic navigation. ONE background task, tee for logging, user does interaction, you read results.
 
 ### [L061] [*----|****-] AD5M test printer environment
-- **Uses**: 2 | **Velocity**: 2 | **Learned**: 2026-02-07 | **Last**: 2026-02-24 | **Category**: system
+- **Uses**: 3 | **Velocity**: 3 | **Learned**: 2026-02-07 | **Last**: 2026-02-28 | **Category**: system
 > AD5M (192.168.1.67, root@) runs armv7l Linux 5.4.61 (BusyBox). Key gotchas: (1) No curl, only wget - and wget has NO HTTPS support (compiled without SSL). (2) No sftp-server - use 'scp -O' (legacy protocol) instead of default scp. (3) Logging: default level is WARN, app logs to BOTH /tmp/helixscreen.log AND syslog (/var/log/messages) - syslog has the CURRENT session, /tmp/helixscreen.log may be stale from previous session. (4) No CA certificate bundle shipped - /etc/ssl/certs/ is empty, breaks ALL outbound HTTPS (libhv, wget). Must ship ca-certificates.crt with install. (5) No openssl CLI command. (6) No inotify support. (7) No WiFi (wpa_supplicant present but no interfaces). (8) OpenSSL 1.1 libs exist at /usr/lib/libssl.so.1.1. (9) Binary at /opt/helixscreen/, config at /opt/helixscreen/config/helixconfig.json. (10) ldd may return empty for statically-linked ARM binaries.
 
 ### [L062] [**---|*****] AD5M build and deploy targets
@@ -130,7 +130,7 @@
 > When using flex_grow on a container with flex_flow=row_wrap, LVGL calculates wrap points based on the container's natural (content) width, NOT the flex-allocated width. Fix: set width="1" + flex_grow="1" — forces LVGL to use the grown width for wrapping. Without this, children overflow instead of wrapping.
 
 ### [L067] [*----|****-] Wrap C++ UI strings in lv_tr()
-- **Uses**: 2 | **Velocity**: 2 | **Learned**: 2026-02-14 | **Last**: 2026-02-24 | **Category**: ui
+- **Uses**: 3 | **Velocity**: 3 | **Learned**: 2026-02-14 | **Last**: 2026-02-28 | **Category**: ui
 > All user-visible English strings in C++ code must be wrapped in lv_tr() for i18n. Dropdown options are concatenated strings so they're harder to translate - but labels, help text, toasts, etc. must use lv_tr().
 
 ### [L068] [-----|-----] Cancel LVGL animations before object deletion
@@ -138,7 +138,7 @@
 > When deleting LVGL objects that have animations with completion callbacks, ALWAYS cancel animations FIRST (lv_anim_delete) before lv_obj_delete/lv_obj_safe_delete. The completion callback may fire synchronously during lv_anim_delete, causing use-after-free if the object is already freed. Pattern: (1) nullify member pointer, (2) clear state flags, (3) lv_anim_delete, (4) lv_obj_delete. For animations using 'this' as var: set guard flags to false BEFORE lv_anim_delete so callbacks become no-ops.
 
 ### [L069] [**---|*****] Never assume lv_obj user_data ownership — it may already be set
-- **Uses**: 6 | **Velocity**: 6 | **Learned**: 2026-02-15 | **Last**: 2026-02-24 | **Category**: architecture
+- **Uses**: 7 | **Velocity**: 7 | **Learned**: 2026-02-15 | **Last**: 2026-02-28 | **Category**: architecture
 > LVGL's lv_obj_set_user_data() is a single shared slot per object. Custom XML widgets, component handlers, and LVGL internals may set user_data during object creation (e.g., ui_button stores button_data_t*, severity_card stores a severity string). NEVER call delete/free on lv_obj_get_user_data() unless you are 100% certain you set it yourself on that specific object. NEVER use user_data as general-purpose storage on objects you didn't fully create — XML components and custom widgets may have claimed it already. **CRITICAL: NEVER walk parent chain checking any non-null user_data to find an instance pointer** — ui_button and other widgets set their own user_data, so the traversal will find the WRONG data and miscast it (caused SEGFAULT in AmsOperationSidebar/AmsDryerCard). Instead, walk parents checking `lv_obj_get_name()` for a specific known name, THEN read user_data from that named object. For per-item data, prefer: (1) event callback user_data (separate per-callback), (2) a C++ side container (map/vector indexed by object pointer), or (3) lv_obj_find_by_name to stash data in a hidden child label.
 
 ### [L071] [**---|*****] XML child click passthrough
