@@ -5,6 +5,25 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.95.2] - 2026-03-01
+
+### Added
+- Clog detection arc meter on loaded AMS card for real-time filament flow monitoring
+- Starfield and 3D Pipes screensavers with selection dropdown
+- Buffer detail info modal accessible by tapping filament path coil
+- Filament buffer visualization on AMS path canvas
+- Full-screen color picker layout with tab switching for tiny screens
+
+### Fixed
+- Re-entrancy guard for fan arc resize preventing concurrent animation crashes
+- Color picker HSV sizing and bottom-pinned buttons for responsive layouts
+- G-code viewer reload after destroy-on-close cycle on print status panel
+- NEON alignment, empty vector, and stale widget crashes identified from telemetry
+- Telemetry active device count now uses separate query for correct COUNT(DISTINCT)
+
+### Changed
+- Build system: static-link libhv OpenSSL for K1/MIPS, avoid double-wrapping compilers with ccache
+
 ## [0.95.1] - 2026-03-01
 
 ### Added
@@ -1391,6 +1410,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.95.2]: https://github.com/prestonbrown/helixscreen/compare/v0.95.1...v0.95.2
 [0.95.1]: https://github.com/prestonbrown/helixscreen/compare/v0.95.0...v0.95.1
 [0.95.0]: https://github.com/prestonbrown/helixscreen/compare/v0.13.13...v0.95.0
 [0.13.13]: https://github.com/prestonbrown/helixscreen/compare/v0.13.12...v0.13.13
