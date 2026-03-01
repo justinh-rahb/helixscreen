@@ -45,6 +45,9 @@ static void disable_widget_clicks_recursive(lv_obj_t* obj) {
     uint32_t count = lv_obj_get_child_count(obj);
     for (uint32_t i = 0; i < count; ++i) {
         lv_obj_t* child = lv_obj_get_child(obj, static_cast<int32_t>(i));
+        if (!child) {
+            continue;
+        }
         lv_obj_remove_flag(child, LV_OBJ_FLAG_CLICKABLE);
         disable_widget_clicks_recursive(child);
     }
@@ -104,6 +107,12 @@ void GridEditMode::exit() {
     // absorbed all events during edit mode; rebuild creates fresh widgets).
     if (rebuild_cb_) {
         rebuild_cb_();
+    }
+    // Reset input device to clear stale object pointers held by LVGL's
+    // indev processing — the rebuild (lv_obj_clean) destroyed tracked objects.
+    lv_indev_t* indev = lv_indev_active();
+    if (indev) {
+        lv_indev_reset(indev, nullptr);
     }
     if (save_cb_) {
         save_cb_();
@@ -612,6 +621,14 @@ void GridEditMode::remove_selected_widget() {
     if (rebuild_cb_) {
         rebuild_cb_();
     }
+    // Reset input device to clear stale object pointers held by LVGL's
+    // indev processing — the rebuild (lv_obj_clean) destroyed tracked objects.
+    {
+        lv_indev_t* indev = lv_indev_active();
+        if (indev) {
+            lv_indev_reset(indev, nullptr);
+        }
+    }
     // Recreate dots overlay (rebuild destroyed all container children)
     if (active_) {
         create_dots_overlay();
@@ -648,7 +665,15 @@ void GridEditMode::configure_selected_widget() {
     if (rebuild_cb_) {
         rebuild_cb_();
     }
-    if (active_) {
+    // Reset input device to clear stale object pointers held by LVGL's
+    // indev processing — the rebuild (lv_obj_clean) destroyed tracked objects.
+    {
+        lv_indev_t* indev = lv_indev_active();
+        if (indev) {
+            lv_indev_reset(indev, nullptr);
+        }
+    }
+    if (active_ && container_) {
         disable_widget_clicks_recursive(container_);
         create_dots_overlay();
 
@@ -1164,7 +1189,7 @@ void GridEditMode::handle_drag_move(lv_event_t* /*e*/) {
     uint32_t nchildren = lv_obj_get_child_count(container_);
     for (uint32_t ci = 0; ci < nchildren; ++ci) {
         lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(ci));
-        if (lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
+        if (!child || lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
             continue;
         }
         const char* cname = lv_obj_get_name(child);
@@ -1249,7 +1274,7 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
             uint32_t nchildren = lv_obj_get_child_count(container_);
             for (uint32_t ci = 0; ci < nchildren; ++ci) {
                 lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(ci));
-                if (lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
+                if (!child || lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
                     continue;
                 }
                 const char* cname = lv_obj_get_name(child);
@@ -1345,6 +1370,14 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
         if (rebuild_cb_) {
             rebuild_cb_();
         }
+        // Reset input device to clear stale object pointers held by LVGL's
+        // indev processing — the rebuild (lv_obj_clean) destroyed tracked objects.
+        {
+            lv_indev_t* indev = lv_indev_active();
+            if (indev) {
+                lv_indev_reset(indev, nullptr);
+            }
+        }
         spdlog::debug("[GridEditMode] Rebuild complete, recreating dots overlay");
         // Recreate dots overlay (rebuild destroyed all container children)
         if (active_) {
@@ -1352,13 +1385,18 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
         }
         // Re-select the moved widget after rebuild (layout must be
         // recalculated first so widget coords are valid for chrome placement)
-        lv_obj_update_layout(container_);
-        for (uint32_t i = 0; i < lv_obj_get_child_count(container_); ++i) {
-            lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(i));
-            const char* cname = lv_obj_get_name(child);
-            if (cname && moved_id == cname) {
-                select_widget(child);
-                break;
+        if (container_) {
+            lv_obj_update_layout(container_);
+            for (uint32_t i = 0; i < lv_obj_get_child_count(container_); ++i) {
+                lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(i));
+                if (!child) {
+                    continue;
+                }
+                const char* cname = lv_obj_get_name(child);
+                if (cname && moved_id == cname) {
+                    select_widget(child);
+                    break;
+                }
             }
         }
     } else {
@@ -1366,9 +1404,23 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
         selected_ = nullptr;
         // Force LVGL to recalculate positions
         lv_obj_invalidate(container_);
-        // Reselect the widget to show chrome at snapped-back position
         lv_obj_update_layout(container_);
-        select_widget(was_selected);
+
+        // Validate was_selected is still a live child of container_ before
+        // re-selecting — a concurrent rebuild could have freed it.
+        bool still_valid = false;
+        if (was_selected && container_) {
+            uint32_t n = lv_obj_get_child_count(container_);
+            for (uint32_t i = 0; i < n; ++i) {
+                if (lv_obj_get_child(container_, static_cast<int32_t>(i)) == was_selected) {
+                    still_valid = true;
+                    break;
+                }
+            }
+        }
+        if (still_valid) {
+            select_widget(was_selected);
+        }
     }
 }
 
@@ -1628,8 +1680,24 @@ void GridEditMode::handle_resize_end(lv_event_t* /*e*/) {
         drag_orig_rowspan_ = 1;
 
         selected_ = nullptr;
-        lv_obj_update_layout(container_);
-        select_widget(was_selected);
+        if (container_) {
+            lv_obj_update_layout(container_);
+
+            // Validate was_selected is still a live child of container_
+            bool still_valid = false;
+            if (was_selected) {
+                uint32_t n = lv_obj_get_child_count(container_);
+                for (uint32_t i = 0; i < n; ++i) {
+                    if (lv_obj_get_child(container_, static_cast<int32_t>(i)) == was_selected) {
+                        still_valid = true;
+                        break;
+                    }
+                }
+            }
+            if (still_valid) {
+                select_widget(was_selected);
+            }
+        }
     }
 }
 
@@ -1721,14 +1789,26 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
         if (rebuild_cb_) {
             rebuild_cb_();
         }
-        if (active_) {
+        // Reset input device to clear stale object pointers held by LVGL's
+        // indev processing — the rebuild (lv_obj_clean) destroyed tracked objects.
+        lv_indev_t* indev = lv_indev_active();
+        if (indev) {
+            lv_indev_reset(indev, nullptr);
+        }
+        if (active_ && container_) {
             create_dots_overlay();
         }
         // Re-select the resized widget after rebuild (layout must be
         // recalculated first so widget coords are valid for chrome placement)
+        if (!container_) {
+            return;
+        }
         lv_obj_update_layout(container_);
         for (uint32_t i = 0; i < lv_obj_get_child_count(container_); ++i) {
             lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(i));
+            if (!child) {
+                continue;
+            }
             const char* cname = lv_obj_get_name(child);
             if (cname && resized_id == cname) {
                 select_widget(child);
@@ -1796,14 +1876,26 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
             if (self->rebuild_cb_) {
                 self->rebuild_cb_();
             }
-            if (self->active_) {
+            // Reset input device to clear stale object pointers held by LVGL's
+            // indev processing — the rebuild (lv_obj_clean) destroyed tracked objects.
+            lv_indev_t* indev = lv_indev_active();
+            if (indev) {
+                lv_indev_reset(indev, nullptr);
+            }
+            if (self->active_ && self->container_) {
                 self->create_dots_overlay();
             }
             // Re-select the resized widget after rebuild (layout must be
             // recalculated first so widget coords are valid for chrome placement)
+            if (!self->container_) {
+                return;
+            }
             lv_obj_update_layout(self->container_);
             for (uint32_t i = 0; i < lv_obj_get_child_count(self->container_); ++i) {
                 lv_obj_t* child = lv_obj_get_child(self->container_, static_cast<int32_t>(i));
+                if (!child) {
+                    continue;
+                }
                 const char* cname = lv_obj_get_name(child);
                 if (cname && rid == cname) {
                     self->select_widget(child);
@@ -2124,7 +2216,7 @@ void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
     uint32_t nchildren = lv_obj_get_child_count(container_);
     for (uint32_t ci = 0; ci < nchildren; ++ci) {
         lv_obj_t* child = lv_obj_get_child(container_, static_cast<int32_t>(ci));
-        if (lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
+        if (!child || lv_obj_has_flag(child, LV_OBJ_FLAG_FLOATING)) {
             continue;
         }
         const char* cname = lv_obj_get_name(child);
@@ -2196,12 +2288,21 @@ void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
 
     // Deselect, save, and rebuild
     select_widget(nullptr);
+    dots_overlay_ = nullptr;
     config_->save();
     if (rebuild_cb_) {
         rebuild_cb_();
     }
+    // Reset input device to clear stale object pointers held by LVGL's
+    // indev processing — the rebuild (lv_obj_clean) destroyed tracked objects.
+    {
+        lv_indev_t* indev = lv_indev_active();
+        if (indev) {
+            lv_indev_reset(indev, nullptr);
+        }
+    }
     // Recreate dots overlay (rebuild destroys all container children)
-    if (active_) {
+    if (active_ && container_) {
         create_dots_overlay();
     }
 }
