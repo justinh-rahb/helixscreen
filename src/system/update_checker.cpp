@@ -1345,8 +1345,18 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
     // dialog, and Config::init() recreates helixconfig.json from defaults — wiping
     // dev_url and channel settings. _exit() terminates immediately at the OS level
     // with no C++ cleanup, so exit code 0 reaches the watchdog cleanly.
-    std::thread([] {
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::thread([this, version] {
+        // Show "Complete" state for 2 seconds
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        // Transition to static "Restarting" screen — no spinner, friendly message
+        if (!shutting_down_.load()) {
+            report_download_status(DownloadStatus::Restarting, 100,
+                                   "v" + version + " installed!");
+        }
+        // 1s gives the LVGL tick loop at least one full frame (~16ms) to
+        // process the queued subject update and render the Restarting container
+        // before _exit(0) tears down the process.
+        std::this_thread::sleep_for(std::chrono::seconds(1));
         spdlog::info("[UpdateChecker] Restarting to apply update");
         spdlog::default_logger()->flush();
         ::_exit(0);

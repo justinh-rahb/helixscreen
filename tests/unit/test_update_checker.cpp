@@ -741,6 +741,20 @@ TEST_CASE("UpdateChecker download status enum values", "[update_checker]") {
     REQUIRE(static_cast<int>(UpdateChecker::DownloadStatus::Installing) == 4);
     REQUIRE(static_cast<int>(UpdateChecker::DownloadStatus::Complete) == 5);
     REQUIRE(static_cast<int>(UpdateChecker::DownloadStatus::Error) == 6);
+    REQUIRE(static_cast<int>(UpdateChecker::DownloadStatus::Restarting) == 7);
+}
+
+TEST_CASE("UpdateChecker report_download_status transitions to Restarting", "[update_checker]") {
+    auto& checker = UpdateChecker::instance();
+    checker.init();
+
+    checker.report_download_status(UpdateChecker::DownloadStatus::Restarting, 100, "v1.0.0 installed!");
+    REQUIRE(checker.get_download_status() == UpdateChecker::DownloadStatus::Restarting);
+    REQUIRE(checker.get_download_progress() == 100);
+
+    // Reset back to idle for other tests
+    checker.report_download_status(UpdateChecker::DownloadStatus::Idle, 0, "");
+    checker.shutdown();
 }
 
 TEST_CASE("UpdateChecker download state initial values", "[update_checker]") {
