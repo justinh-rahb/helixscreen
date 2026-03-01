@@ -129,15 +129,9 @@ clean-tests:
 	$(Q)rm -f $(TEST_BIN) $(TEST_MAIN_OBJ) $(CATCH2_OBJ) $(UI_TEST_UTILS_OBJ) $(LVGL_TEST_FIXTURE_OBJ) $(TEST_FIXTURES_OBJ) $(LVGL_UI_TEST_FIXTURE_OBJ) $(TEST_OBJS)
 	$(ECHO) "$(GREEN)✓ Test artifacts cleaned$(RESET)"
 
-# Build tests in parallel (auto-detects core count like main build target)
-test-build:
-	$(ECHO) "$(CYAN)$(BOLD)Building tests with parallel compilation...$(RESET)"
-	@START_TIME=$$(date +%s); \
-	NPROC=$$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); \
-	$(MAKE) -j$$NPROC $(TEST_BIN) || exit $$?; \
-	END_TIME=$$(date +%s); \
-	DURATION=$$((END_TIME - START_TIME)); \
-	echo "$(GREEN)✓ Tests built in $${DURATION}s$(RESET)"
+# Build tests — delegates to $(TEST_BIN) which handles -j detection via Phase 1
+test-build: $(TEST_BIN)
+	@true
 
 # ============================================================================
 # Main Test Targets
@@ -484,17 +478,19 @@ test-assets: test-build
 # Two-phase build for $(TEST_BIN) to handle unlimited -j detection
 # Phase 1: No deps - check for unlimited -j and re-invoke if needed
 # Phase 2: Normal deps and linking (when _PARALLEL_GUARD is set)
+#
+# IMPORTANT: Phase 1 always passes explicit -j to Phase 2. Without it,
+# `exec $(MAKE)` loses the parent's jobserver (exec replaces the process)
+# and Phase 2 falls back to -j1, compiling hundreds of files serially.
 ifndef _PARALLEL_GUARD
 $(TEST_BIN): FORCE
-	@if echo "$(MAKEFLAGS)" | grep -q 'j' && ! echo "$(MAKEFLAGS)" | grep -q 'jobserver'; then \
-		NPROC=$$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); \
+	@NPROC=$$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4); \
+	if echo "$(MAKEFLAGS)" | grep -q 'j' && ! echo "$(MAKEFLAGS)" | grep -q 'jobserver'; then \
 		echo ""; \
 		printf '\033[1;33m⚠️  make -j (unlimited) detected - auto-fixing to -j%s\033[0m\n' "$$NPROC"; \
 		echo ""; \
-		exec $(MAKE) _PARALLEL_GUARD=1 -j$$NPROC $@; \
-	else \
-		exec $(MAKE) _PARALLEL_GUARD=1 $@; \
-	fi
+	fi; \
+	exec $(MAKE) _PARALLEL_GUARD=1 --no-print-directory -j$$NPROC $@
 else
 $(TEST_BIN): $(TEST_CORE_DEPS) \
              $(TEST_LVGL_DEPS) \
