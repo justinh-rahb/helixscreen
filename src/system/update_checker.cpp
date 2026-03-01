@@ -1165,9 +1165,19 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
         return;
     }
 
-    // Write installer output to a persistent log file so it survives even if this
-    // process is killed mid-install (e.g. stop_service kills the cgroup).
-    std::string install_log = tarball_path + ".install.log";
+    // Write installer output to a persistent log in /var/log/ so it survives
+    // process restart and is available for post-update debugging.  Fall back to
+    // the tarball directory if /var/log/ isn't writable (e.g. read-only rootfs).
+    std::string install_log = "/var/log/helixscreen-install.log";
+    {
+        int test_fd = open(install_log.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0640);
+        if (test_fd >= 0) {
+            close(test_fd);
+        } else {
+            install_log = tarball_path + ".install.log";
+            flog_warn("[UpdateChecker] /var/log not writable, using fallback: {}", install_log);
+        }
+    }
 
     flog_info("[UpdateChecker] Running: {} --local {} --update", install_script, tarball_path);
     flog_info("[UpdateChecker] install_script access(X_OK)={} tarball access(R_OK)={}",
@@ -1222,6 +1232,9 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
             // `systemctl restart` that systemd completes even if install.sh is
             // killed during the stop phase (see scripts/install.sh main()).
             setsid();
+            // Tell install.sh this is an in-app self-update so it skips
+            // stop_service/start_service on SysV — the watchdog handles restart.
+            setenv("HELIX_SELF_UPDATE", "1", 1);
             const char* argv[] = {install_script.c_str(), "--local", tarball_path.c_str(),
                                   "--update", nullptr};
             execv(install_script.c_str(), const_cast<char**>(argv));
@@ -1305,7 +1318,7 @@ void UpdateChecker::do_install(const std::string& tarball_path) {
             flog_error("[UpdateChecker] Could not read install log {}: {}", install_log,
                        strerror(errno));
         }
-        std::remove(install_log.c_str());
+        // Log persists at /var/log/helixscreen-install.log for post-update debugging
     }
 
     // Clean up tarball and extracted installer regardless of result
