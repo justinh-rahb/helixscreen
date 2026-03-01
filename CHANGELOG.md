@@ -5,6 +5,33 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.95.0] - 2026-03-01
+
+The biggest release yet — HelixScreen's home panel is now a fully customizable grid dashboard. Drag widgets to reposition, resize from any edge, add new widgets from a catalog, and remove what you don't need. The layout persists per-breakpoint and survives restarts. Also includes significant memory optimizations, a new screensaver, material temperature presets, and a standalone About overlay.
+
+### Added
+- Customizable grid dashboard replaces the fixed home panel layout — drag to reposition, resize from any edge, and persist per-breakpoint
+- Widget catalog overlay for browsing and adding widgets to the dashboard
+- Digital Clock widget with responsive font scaling
+- Job Queue widget with queue management actions (start, pause, cancel)
+- Shutdown/Reboot widget with modal confirmation
+- Material temperature overrides with per-material nozzle and bed customization
+- Flying Toasters screensaver (After Dark, 1989)
+- Standalone About overlay extracted from settings panel
+- Default widget layouts defined in runtime JSON with per-breakpoint anchors
+
+### Fixed
+- Job queue filename contrast and empty state visibility
+- Clock widget centering and font scaling across breakpoints
+- Printer image snapshot transparency (ARGB8888 instead of RGB565)
+- Tips widget accent bar sizing and content centering
+- Widget click targets improved to prevent use-after-free on child elements
+
+### Changed
+- Memory optimizations: ~2.5MB savings from overlay destroy-on-close, observer suspension, and RGB565 color depth option
+- Gate observer rebuilds coalesced (300ms window) reducing startup from 4x to 2x
+- Over 1000 lines of dead HomePanel code removed after widget extraction
+
 ## [0.13.13] - 2026-02-28
 
 ### Fixed
@@ -1327,6 +1354,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.95.0]: https://github.com/prestonbrown/helixscreen/compare/v0.13.13...v0.95.0
 [0.13.13]: https://github.com/prestonbrown/helixscreen/compare/v0.13.12...v0.13.13
 [0.13.12]: https://github.com/prestonbrown/helixscreen/compare/v0.13.11...v0.13.12
 [0.13.11]: https://github.com/prestonbrown/helixscreen/compare/v0.13.10...v0.13.11
