@@ -327,6 +327,7 @@ void FanStackWidget::bind_fans() {
             }
             break;
         case FanType::CONTROLLER_FAN:
+        case FanType::TEMPERATURE_FAN:
         case FanType::GENERIC_FAN:
             if (aux_fan_name_.empty()) {
                 aux_fan_name_ = fan.object_name;

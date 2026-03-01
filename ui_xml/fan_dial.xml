@@ -34,8 +34,8 @@
               min_value="0" max_value="100" value="$initial_value"
               rotation="0" mode="normal"
               style_arc_color="#border"
-              style_arc_color:indicator="#primary"
-              style_arc_rounded="true" style_arc_rounded:indicator="true"
+              style_arc_color-indicator="#primary"
+              style_arc_rounded="true" style_arc_rounded-indicator="true"
               style_bg_opa="0" style_border_width="0">
         <event_cb trigger="value_changed" callback="on_fan_dial_value_changed"/>
       </lv_arc>
