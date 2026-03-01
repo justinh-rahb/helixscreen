@@ -29,8 +29,8 @@ struct MacroParam {
 
 /// Home panel widget for one-tap macro execution.
 /// Two instances registered: favorite_macro_1 and favorite_macro_2.
-/// Tap executes assigned macro; long-press opens macro picker.
-/// When unconfigured, tap opens picker.
+/// Tap executes assigned macro; configure button opens macro picker.
+/// When unconfigured, tap also opens picker.
 class FavoriteMacroWidget : public PanelWidget {
   public:
     /// @param widget_id "favorite_macro_1" or "favorite_macro_2"
