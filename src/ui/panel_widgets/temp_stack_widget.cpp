@@ -110,6 +110,7 @@ void TempStackWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     parent_screen_ = parent_screen;
     *alive_ = true;
     s_active_instance = this;
+    lv_obj_set_user_data(widget_obj_, this);
 
     if (is_carousel_mode()) {
         attach_carousel(widget_obj);
@@ -392,6 +393,8 @@ void TempStackWidget::detach() {
         s_active_instance = nullptr;
     }
 
+    if (widget_obj_)
+        lv_obj_set_user_data(widget_obj_, nullptr);
     widget_obj_ = nullptr;
     parent_screen_ = nullptr;
 
