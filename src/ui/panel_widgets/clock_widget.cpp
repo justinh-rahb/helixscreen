@@ -171,26 +171,38 @@ void ClockWidget::on_deactivate() {
 }
 
 void ClockWidget::on_size_changed(int colspan, int rowspan, int /*width_px*/, int /*height_px*/) {
-    // Determine size mode: 0=compact (1x1), 1=normal (2x1), 2=expanded (2x2+)
+    // Determine size mode: 0=compact (1x1), 1=normal (2x1), 2=expanded (2x2+), 3=large (3x2+)
     int mode;
     if (colspan <= 1 && rowspan <= 1) {
         mode = 0; // compact: time only
     } else if (rowspan <= 1) {
         mode = 1; // normal: time + date
+    } else if (colspan >= 3 && rowspan >= 2) {
+        mode = 3; // large: big time + date + uptime
     } else {
         mode = 2; // expanded: time + date + uptime
     }
 
     lv_subject_set_int(&s_size_mode_subject, mode);
 
-    // Apply fonts — XML text_heading/text_body/text_small handle defaults,
-    // but we override here so the time label always uses the heading font
-    // regardless of which XML text widget type is used.
+    // Apply fonts scaled to widget size
     if (!widget_obj_)
         return;
 
-    const lv_font_t* time_font = theme_manager_get_font("font_heading");
-    const lv_font_t* date_font = theme_manager_get_font("font_body");
+    const lv_font_t* time_font = nullptr;
+    const lv_font_t* date_font = nullptr;
+
+    if (mode == 3) {
+        // Large mode: use responsive XL font for time display
+        time_font = theme_manager_get_font("font_xl");
+        date_font = theme_manager_get_font("font_heading");
+    } else if (mode == 0) {
+        time_font = theme_manager_get_font("font_body");
+        date_font = theme_manager_get_font("font_body");
+    } else {
+        time_font = theme_manager_get_font("font_heading");
+        date_font = theme_manager_get_font("font_body");
+    }
 
     auto* time_label = lv_obj_find_by_name(widget_obj_, "clock_time");
     if (time_label && time_font) {
@@ -200,6 +212,16 @@ void ClockWidget::on_size_changed(int colspan, int rowspan, int /*width_px*/, in
     auto* date_label = lv_obj_find_by_name(widget_obj_, "clock_date");
     if (date_label && date_font) {
         lv_obj_set_style_text_font(date_label, date_font, 0);
+    }
+
+    // Uptime: visible only in expanded (2) and large (3) modes
+    auto* uptime_label = lv_obj_find_by_name(widget_obj_, "clock_uptime");
+    if (uptime_label) {
+        if (mode >= 2) {
+            lv_obj_remove_flag(uptime_label, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(uptime_label, LV_OBJ_FLAG_HIDDEN);
+        }
     }
 
     spdlog::trace("[ClockWidget] Size changed: {}x{} -> mode {}", colspan, rowspan, mode);

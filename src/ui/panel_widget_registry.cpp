@@ -51,7 +51,7 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     {"thermistor",       "Thermistor",        "thermometer",      "Monitor a custom temperature sensor",          "Thermistor",       "temp_sensor_count",  false, 1, 1, 1, 1, 2, 1},
     {"favorite_macro_1", "Macro Button 1",    "play",             "Run a configured macro with one tap",          "Macro Button 1",   nullptr,              false, 1, 1, 1, 1, 2, 1},
     {"favorite_macro_2", "Macro Button 2",    "play",             "Run a configured macro with one tap",          "Macro Button 2",   nullptr,              false, 1, 1, 1, 1, 2, 1},
-    {"clock",            "Digital Clock",     "clock",            "Current time and date",                       "Digital Clock",    nullptr,              false, 2, 1, 1, 1, 3, 2},
+    {"clock",            "Digital Clock",     "clock",            "Current time and date",                       "Digital Clock",    nullptr,              false, 2, 1, 1, 1, 3, 3},
     {"job_queue",        "Job Queue",         "progress_clock",   "Queued print jobs",                           "Job Queue",        nullptr,              false, 2, 2, 2, 1, 4, 3},
     //                                                                                                                                          en  col row min_c min_r max_c max_r
     {"tips",             "Tips",              "help_circle",      "Rotating tips and helpful information",        "Tips",             nullptr,              true,  4, 2, 2, 1, 6, 2},

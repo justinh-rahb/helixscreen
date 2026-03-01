@@ -252,6 +252,12 @@
     <string name="font_heading_medium" value="noto_sans_26"/>
     <string name="font_heading_large" value="noto_sans_28"/>
     <!-- NO BASE font_heading - registered at runtime -->
+    <!-- font_xl variants (extra-large display text, e.g. clock digits) - uses Bold weight -->
+    <string name="font_xl_tiny" value="noto_sans_bold_16"/>
+    <string name="font_xl_small" value="noto_sans_bold_20"/>
+    <string name="font_xl_medium" value="noto_sans_bold_28"/>
+    <string name="font_xl_large" value="noto_sans_bold_28"/>
+    <!-- NO BASE font_xl - registered at runtime -->
     <!-- font_body variants (standard body text) -->
     <string name="font_body_tiny" value="noto_sans_11"/>
     <string name="font_body_small" value="noto_sans_14"/>

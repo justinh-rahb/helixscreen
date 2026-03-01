@@ -2057,6 +2057,8 @@ const char* theme_manager_size_to_font_token(const char* size, const char* defau
         return "font_body";
     } else if (strcmp(effective_size, "lg") == 0) {
         return "font_heading";
+    } else if (strcmp(effective_size, "xl") == 0) {
+        return "font_xl";
     }
 
     // Unknown size - warn and return default
