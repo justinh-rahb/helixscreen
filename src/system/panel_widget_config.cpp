@@ -6,10 +6,13 @@
 #include "config.h"
 #include "grid_layout.h"
 #include "panel_widget_registry.h"
+#include "theme_manager.h"
 
+#include <hv/json.hpp>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <fstream>
 #include <set>
 
 namespace helix {
@@ -196,51 +199,79 @@ void PanelWidgetConfig::set_widget_config(const std::string& id, const nlohmann:
     }
 }
 
+// Breakpoint name to index mapping for default_layout.json
+static int breakpoint_name_to_index(const std::string& name) {
+    if (name == "tiny") return 0;
+    if (name == "small") return 1;
+    if (name == "medium") return 2;
+    if (name == "large") return 3;
+    if (name == "xlarge") return 4;
+    return -1;
+}
+
 std::vector<PanelWidgetEntry> PanelWidgetConfig::build_default_grid() {
     const auto& defs = get_all_widget_defs();
 
-    // Default config: only anchor widgets get fixed positions.
-    // All other widgets get -1,-1 (no position) and are placed dynamically
-    // at populate time based on what's actually visible after hardware gates.
-    //
-    // Layout anchors (6×4 MEDIUM grid):
-    //
-    //   Col 0    Col 1    Col 2    Col 3    Col 4    Col 5
-    //  +--------+--------+--------+--------+--------+--------+
-    //  | Printer Image   | Tips (4×1)                         | Row 0
-    //  |  (2×2)          |                                    |
-    //  +                 +--------+--------+--------+--------+
-    //  |                 |  (dynamically filled)              | Row 1
-    //  +--------+--------+--------+--------+--------+--------+
-    //  | Print Status    |  (dynamically filled)              | Row 2
-    //  |  (2×2)          |                                    |
-    //  +                 +--------+--------+--------+--------+
-    //  |                 |  (dynamically filled)              | Row 3
-    //  +--------+--------+--------+--------+--------+--------+
-    //
-    // At populate time, visible 1×1 widgets are packed bottom-right first.
+    // Determine current breakpoint for per-breakpoint anchor sizing
+    lv_subject_t* bp_subj = theme_manager_get_breakpoint_subject();
+    int breakpoint = bp_subj ? lv_subject_get_int(bp_subj) : 2; // Default MEDIUM
 
-    struct FixedPlacement {
-        const char* id;
+    static const char* bp_names[] = {"tiny", "small", "medium", "large", "xlarge"};
+    const char* bp_name = (breakpoint >= 0 && breakpoint <= 4) ? bp_names[breakpoint] : "medium";
+
+    // Load anchor placements from config/default_layout.json (runtime-editable).
+    // Falls back to registry defaults if file is missing or malformed.
+    struct AnchorPlacement {
+        std::string id;
         int col, row, colspan, rowspan;
     };
-    const FixedPlacement fixed[] = {
-        {"printer_image", 0, 0, 2, 2},
-        {"print_status", 0, 2, 2, 2},
-        {"tips", 2, 0, 4, 2},
-    };
+    std::vector<AnchorPlacement> anchors;
 
+    std::ifstream layout_file("config/default_layout.json");
+    if (layout_file.is_open()) {
+        try {
+            nlohmann::json layout = nlohmann::json::parse(layout_file);
+            for (const auto& anchor : layout.value("anchors", nlohmann::json::array())) {
+                std::string id = anchor.value("id", "");
+                if (id.empty() || !find_widget_def(id))
+                    continue;
+
+                auto placements = anchor.value("placements", nlohmann::json::object());
+                if (placements.contains(bp_name)) {
+                    auto& p = placements[bp_name];
+                    anchors.push_back({id, p.value("col", 0), p.value("row", 0),
+                                       p.value("colspan", 1), p.value("rowspan", 1)});
+                }
+            }
+            spdlog::debug("[PanelWidgetConfig] Loaded {} anchors from default_layout.json (bp={})",
+                          anchors.size(), bp_name);
+        } catch (const std::exception& e) {
+            spdlog::warn("[PanelWidgetConfig] Failed to parse default_layout.json: {}", e.what());
+            anchors.clear();
+        }
+    }
+
+    // Fallback: if no anchors loaded, use hardcoded defaults so the dashboard
+    // always has printer_image, print_status, and tips placed sensibly.
+    if (anchors.empty()) {
+        spdlog::debug("[PanelWidgetConfig] Using hardcoded anchor fallback (bp={})", bp_name);
+        anchors = {
+            {"printer_image", 0, 0, 2, 2},
+            {"print_status", 0, 2, 2, 2},
+            {"tips", 2, 0, 4, 2},
+        };
+    }
+
+    // Build result: anchored widgets first, then all others with auto-placement
     std::vector<PanelWidgetEntry> result;
     result.reserve(defs.size());
     std::set<std::string> fixed_ids;
 
-    // Anchor widgets with fixed positions
-    for (const auto& fp : fixed) {
-        const auto* def = find_widget_def(fp.id);
-        if (!def)
+    for (const auto& a : anchors) {
+        if (!find_widget_def(a.id))
             continue;
-        result.push_back({fp.id, true, {}, fp.col, fp.row, fp.colspan, fp.rowspan});
-        fixed_ids.insert(fp.id);
+        result.push_back({a.id, true, {}, a.col, a.row, a.colspan, a.rowspan});
+        fixed_ids.insert(a.id);
     }
 
     // All other widgets: enabled/disabled per registry, no grid position.
@@ -249,6 +280,19 @@ std::vector<PanelWidgetEntry> PanelWidgetConfig::build_default_grid() {
         if (fixed_ids.count(def.id) > 0)
             continue;
         result.push_back({def.id, def.default_enabled, {}, -1, -1, def.colspan, def.rowspan});
+    }
+
+    // Safety: ensure at least some widgets are enabled
+    bool any_enabled = std::any_of(result.begin(), result.end(),
+                                    [](const PanelWidgetEntry& e) { return e.enabled; });
+    if (!any_enabled) {
+        spdlog::warn("[PanelWidgetConfig] No widgets enabled — enabling registry defaults");
+        for (auto& entry : result) {
+            const auto* def = find_widget_def(entry.id);
+            if (def && def->default_enabled) {
+                entry.enabled = true;
+            }
+        }
     }
 
     return result;
