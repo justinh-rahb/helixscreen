@@ -2,73 +2,163 @@
 
 ![Home Panel](../../images/user/home.png)
 
-The Home Panel is your printer dashboard — showing status at a glance.
+The Home Panel is your printer dashboard — a customizable grid of widgets showing status at a glance. You control what appears, where it goes, and how big each widget is.
 
 ---
 
-## Status Area
+## The Widget Grid
 
-The top area displays:
+Your dashboard is built from **widgets** — individual cards that show printer information and controls. Widgets live on a flexible grid that you can customize:
 
-- **Printer state**: Idle, Printing, Paused, Complete, Error
-- **Print progress**: Percentage and time remaining (when printing)
-- **Current filename**: What's being printed
-- **Connection indicator**: Your link to Moonraker/Klipper
+- **Move** widgets anywhere on the grid
+- **Resize** widgets to be bigger or smaller
+- **Add** new widgets from the catalog
+- **Remove** widgets you don't need
+
+Changes are saved automatically and persist across restarts.
 
 ---
 
-## Home Widgets
+## Editing Your Dashboard
 
-Below the status area, the Home Panel displays a row of **configurable widgets** — quick-access buttons for the features you use most. You choose which widgets appear, and in what order.
+### Entering Edit Mode
 
-### Available Widgets
+**Long-press** (press and hold) anywhere on the widget grid. After about half a second, the dashboard enters **Edit Mode**:
 
-| Widget | What It Does |
-|--------|-------------|
-| **Power** | Toggle Moonraker power devices. Only appears if you have power devices configured. |
-| **Network** | Shows WiFi signal strength or Ethernet status at a glance. Disabled by default. |
-| **Firmware Restart** | Restart Klipper firmware with one tap. Always shown when Klipper is in SHUTDOWN state, even if disabled. Disabled by default. |
-| **AMS Status** | Mini view of your multi-material spool slots. Only appears if an AMS/MMU system is detected. |
-| **Temperature** | Nozzle temperature readout with animated heating icon. Tap to open the Temperature panel. |
-| **Temperatures** | Stacked view of nozzle, bed, and chamber temperatures in a single widget. Supports two display modes: **Stack** (compact rows) and **Carousel** (full-size swipeable pages with large icons). Long-press to toggle between modes. Tap any temperature to open the temperature control panel. Disabled by default. |
-| **LED Light** | Quick toggle for your LEDs. Long-press for the full LED Control Overlay (see [LED Controls](#led-controls) below). |
-| **Humidity** | Enclosure humidity sensor reading. Only appears if a humidity sensor is detected. |
-| **Width Sensor** | Filament width sensor reading. Only appears if a width sensor is detected. |
-| **Probe** | Z probe status and offset. Only appears if a probe is configured. |
-| **Filament Sensor** | Filament runout detection status. Only appears if a filament sensor is detected. |
-| **Fan Speeds** | Part cooling, hotend, and auxiliary fan speeds at a glance. Fan icons spin when the fan is running. When many widgets are active, labels switch to compact abbreviations (P/H/C). Supports two display modes: **Stack** (compact rows) and **Carousel** (swipeable fan dials with 270-degree arc sliders for direct speed control). Long-press to toggle between modes. In stack mode, tap to open the Fan Control overlay. |
-| **Thermistor** | Monitor a custom temperature sensor (e.g., chamber, enclosure heater). Only appears if extra temperature sensors are detected. Disabled by default. |
-| **Notifications** | Pending alerts with severity badge. Tap to open notification history. |
+- A toolbar appears at the top with **Done**, **Add Widget**, and **Reset** buttons
+- All widgets show a subtle border indicating they can be moved
+- Widget tap actions are disabled while editing
 
-Widgets automatically arrange into 1 or 2 rows depending on how many are active.
+### Moving a Widget
 
-### Hardware-Gated Widgets
+1. Enter Edit Mode (long-press the grid)
+2. **Tap** a widget to select it — a blue highlight appears around it
+3. **Drag** the selected widget to a new position on the grid
+4. Release to drop it — other widgets shift to make room
+5. Tap **Done** when finished
 
-Some widgets only appear when the relevant hardware is detected by Klipper. If a sensor, probe, or AMS system isn't present, that widget is automatically hidden on the Home Panel — even if enabled in settings. In the widget configuration screen, these show "(not detected)" and their toggle is disabled.
+### Resizing a Widget
 
-### Customizing Widgets
+1. Enter Edit Mode (long-press the grid)
+2. **Tap** a widget to select it
+3. **Drag the edges or corners** of the selected widget to resize it
+4. Widgets snap to grid cells as you resize
+5. Each widget has minimum and maximum sizes — you'll feel it "stop" at the limits
 
-To change which widgets appear and their order:
+### Adding a Widget
 
-1. Go to **Settings** → **Home Widgets** (in the Appearance section)
-2. **Toggle** widgets on or off with the switch on each row
-3. **Reorder** by long-pressing the drag handle (arrows icon) on a row and dragging it to a new position
-4. Changes take effect immediately — widgets appear and disappear in real time as you toggle them
+1. Enter Edit Mode (long-press the grid)
+2. Tap the **Add Widget** button in the toolbar (or the **+** icon)
+3. The **Widget Catalog** opens, showing all available widgets with descriptions
+4. Tap a widget to add it — it appears on your dashboard
+5. Widgets that depend on specific hardware (like AMS or humidity sensors) show as unavailable if that hardware isn't detected
 
-To reset to defaults, disable all widgets and re-enable the ones you want, or edit the config file directly (see [Configuration Reference](../CONFIGURATION.md#panel-widget-settings)).
+### Removing a Widget
 
-### Display Modes: Stack vs. Carousel
+1. Enter Edit Mode (long-press the grid)
+2. **Tap** the widget you want to remove to select it
+3. **Drag it to the trash icon** that appears, or tap the **delete** button
+4. The widget is removed from your grid (you can always add it back later)
 
-The **Temperatures** and **Fan Speeds** widgets support two display modes that you can switch between with a **long-press** (press and hold):
+### Resetting the Layout
 
-- **Stack mode** (default): Compact vertical rows showing all values at once. Best when you want to see everything at a glance.
-- **Carousel mode**: Full-size swipeable pages with one item per page and indicator dots at the bottom. Swipe left/right to move between pages.
+If your layout gets messy, tap the **Reset** button in the Edit Mode toolbar. This restores the default widget arrangement without changing which widgets are enabled.
 
-**Temperatures carousel** shows each sensor (nozzle, bed, chamber) as a full page with a large icon and temperature display. Tap any page to open the temperature control panel for that sensor.
+### Exiting Edit Mode
 
-**Fan Speeds carousel** shows each fan as an interactive dial with a 270-degree arc slider. Drag the arc to change fan speed directly without opening the full Fan Control overlay.
+Tap the **Done** button in the toolbar, or navigate to a different panel. If you navigated away, edit mode exits automatically.
 
-Your display mode preference is saved per widget and persists across restarts.
+---
+
+## Available Widgets
+
+### Information Widgets
+
+| Widget | Description | Default Size |
+|--------|-------------|-------------|
+| **Printer Image** | Your printer's photo. Tap to open the Printer Manager. | 2x2 |
+| **Print Status** | Print progress, filename, ETA. Tap to open full print status when printing, or file browser when idle. | 2x2 |
+| **Digital Clock** | Current time and date. Shows time only at small sizes, adds date and uptime at larger sizes. | 2x1 |
+| **Notifications** | Pending alerts with severity badge. Tap to open notification history. | 1x1 |
+| **Tips** | Helpful printing tips that rotate periodically. Tap for full details. | 2x1 |
+
+### Temperature & Sensors
+
+| Widget | Description | Default Size |
+|--------|-------------|-------------|
+| **Temperature** | Nozzle readout with animated heating icon. Tap to open the temperature graph. | 1x1 |
+| **Temperatures** | Stacked nozzle, bed, and chamber temps. Also available in carousel mode (see below). | 2x1 |
+| **Thermistor** | Extra temperature sensor monitoring. Only appears if sensors are detected. | 1x1 |
+| **Humidity** | Enclosure humidity reading. Only appears if a sensor is detected. | 1x1 |
+| **Width Sensor** | Filament width reading. Only appears if a sensor is detected. | 1x1 |
+
+### Controls
+
+| Widget | Description | Default Size |
+|--------|-------------|-------------|
+| **Fan Speeds** | Part cooling, hotend, and auxiliary fan speeds. Also available in carousel mode with arc sliders. | 2x1 |
+| **LED Light** | Quick toggle for your LEDs. Tap to open the full LED Control Overlay. | 1x1 |
+| **Power** | Toggle Moonraker power devices. Only appears if power devices are configured. | 1x1 |
+| **Shutdown** | Shutdown or restart your printer's host system. | 1x1 |
+| **Firmware Restart** | Restart Klipper firmware. Always shown in SHUTDOWN state. | 1x1 |
+| **Favorite Macro 1/2** | Quick-access buttons for your most-used macros. Configure which macro to run in Settings. | 1x1 |
+
+### Multi-Material & Print Queue
+
+| Widget | Description | Default Size |
+|--------|-------------|-------------|
+| **AMS Status** | Mini view of your spool slots. Only appears if AMS/MMU is detected. | 2x1 |
+| **Filament** | Filament sensor status. Only appears if a sensor is detected. | 1x1 |
+| **Job Queue** | Shows queued print jobs with count. Tap to open the full queue manager where you can delete jobs, start/pause the queue, and launch queued prints. | 2x2 |
+
+### System
+
+| Widget | Description | Default Size |
+|--------|-------------|-------------|
+| **Network** | WiFi signal or Ethernet status. | 1x1 |
+
+---
+
+## Hardware-Gated Widgets
+
+Some widgets only appear when the relevant hardware is detected by Klipper:
+
+- **AMS Status** — requires AMS, AFC, Happy Hare, or compatible MMU
+- **Humidity** — requires a humidity sensor in Klipper config
+- **Width Sensor** — requires a filament width sensor
+- **Thermistor** — requires extra temperature sensors beyond nozzle/bed
+- **Filament** — requires a filament sensor
+- **Power** — requires Moonraker power devices
+
+If the hardware isn't present, these widgets won't appear in the catalog. If hardware is later disconnected, the widget hides automatically.
+
+---
+
+## Display Modes: Stack vs. Carousel
+
+The **Temperatures** and **Fan Speeds** widgets each support two display modes:
+
+- **Stack mode** (default): Compact vertical rows showing all values at once. Best for seeing everything at a glance.
+- **Carousel mode**: Full-size swipeable pages with one item per page and indicator dots. Swipe left/right to browse.
+
+**Temperatures carousel** shows each sensor (nozzle, bed, chamber) as a large icon with temperature display. Tap any page to open the temperature graph.
+
+**Fan Speeds carousel** shows each fan as an interactive dial with a 270-degree arc slider. Drag the arc to change fan speed directly.
+
+To switch modes, go to **Settings > Home Widgets** and change the display mode for the widget. Your preference is saved per widget.
+
+---
+
+## Job Queue Manager
+
+Tap the **Job Queue** widget to open the queue manager modal:
+
+- **View** all queued print jobs with filenames and time queued
+- **Delete** individual jobs by tapping the trash icon
+- **Start/Pause** the queue using the toggle button
+- **Start a print** by tapping a job — if the printer is idle, the job is removed from the queue and printing begins immediately
+
+The queue syncs with Moonraker's job queue, so jobs added from other interfaces (Mainsail, Fluidd, API) appear here too.
 
 ---
 
@@ -77,8 +167,8 @@ Your display mode preference is saved per widget and persists across restarts.
 On printers with a toolchanger, the Home Panel displays an active tool badge:
 
 - Shows the current active tool (e.g. "T0", "T1")
-- Updates automatically when tools are switched during a print or via macros
-- Only visible on multi-tool printers — single-extruder printers will not see this badge
+- Updates automatically when tools are switched
+- Only visible on multi-tool printers
 
 ---
 
@@ -90,134 +180,76 @@ The **Emergency Stop** button halts all motion immediately (confirmation require
 
 ## LED Controls
 
-Long-pressing the LED button opens the LED Control Overlay — a full control panel for all your printer's lighting. What you see depends on your hardware.
+Tap the LED widget to open the LED Control Overlay — a full control panel for all your printer's lighting.
 
 ### Strip Selector
 
-If you have more than one LED strip configured, a row of chips lets you pick which strip to control. The overlay heading updates to show the selected strip name.
+If you have more than one LED strip, a row of chips lets you pick which strip to control.
 
 ### Color & Brightness (Klipper Native LEDs)
 
 For neopixel, dotstar, and other Klipper-native strips:
 
-- **Color presets**: Tap one of the 8 preset swatches (White, Warm, Orange, Blue, Red, Green, Purple, Cyan)
-- **Custom color**: Tap the custom color button to open an HSV color picker — pick any color and it automatically separates into a base color and brightness level
-- **Brightness slider**: Adjust from 0–100%, independent of color
-- **Color swatch**: Shows the actual output color (base color adjusted by brightness)
-- **Turn Off**: Stops any active effects and turns off the selected strip
+- **Color presets**: 8 preset swatches (White, Warm, Orange, Blue, Red, Green, Purple, Cyan)
+- **Custom color**: HSV color picker with automatic color/brightness separation
+- **Brightness slider**: 0-100%, independent of color
+- **Turn Off**: Stops effects and turns off the strip
 
 ### Output Pin Lights
 
-For `[output_pin]` lights (auto-detected by name — see [LED Settings](settings/led-settings.md#output-pin-lights-brightness-only)):
-
-- **Brightness slider**: 0–100% for PWM pins
-- **On/Off toggle**: For non-PWM pins
-- Color controls are hidden since output pins don't support color
+For `[output_pin]` lights: brightness slider (PWM) or on/off toggle (non-PWM).
 
 ### LED Effects
 
-If you have the [klipper-led_effect](https://github.com/julianschill/klipper-led_effect) plugin installed, an effects section appears with cards for each available effect. Effects are filtered to show only those that target the currently selected strip. The active effect is highlighted, and a **Stop All Effects** button lets you kill all running effects at once.
+If you have [klipper-led_effect](https://github.com/julianschill/klipper-led_effect) installed, effect cards appear filtered to the selected strip. Active effects are highlighted with a **Stop All** button.
 
 ### WLED Controls
 
-For WLED network strips:
-
-- **On/Off toggle**: Turn the WLED strip on or off
-- **Brightness slider**: 0–100%
-- **Presets**: Buttons for each WLED preset — fetched directly from your WLED device, with the active preset highlighted
+For WLED network strips: on/off toggle, brightness slider, and device presets.
 
 ### Macro Device Controls
 
-Custom macro devices you've configured in [LED Settings](settings.md#led-settings) appear here with controls matching their type:
-
-- **On/Off devices**: Separate "Turn On" and "Turn Off" buttons
-- **Toggle devices**: A single "Toggle" button
-- **Preset devices**: Named buttons for each preset action
+Custom macro devices configured in LED Settings appear with matching controls (on/off, toggle, or preset buttons).
 
 ---
 
 ## Printer Manager
 
-**Tap the printer image** on the Home Panel to open the Printer Manager overlay. This is your central place to view and customize your printer's identity, check software versions, and see detected hardware capabilities.
+**Tap the printer image** widget to open the Printer Manager overlay.
 
 ### Changing the Printer Name
 
-Your printer name appears on the Home Panel and at the top of the Printer Manager. To change it:
-
-1. Tap the **printer image** on the Home Panel to open the Printer Manager
-2. Tap the **printer name** (shown with a pencil icon) — it switches to an editable text field
-3. Type your new name (e.g., "Workshop Voron", "Printer #2")
-4. Press **Enter** to save, or **Escape** to cancel
-
-The name defaults to "My Printer" if left empty. It is saved to your config file and persists across restarts.
-
-> **Tip:** You can also set the name directly in the config file under the `printer.name` key — see [Configuration Reference](../CONFIGURATION.md#name).
+1. Open the Printer Manager (tap the printer image)
+2. Tap the **printer name** (pencil icon) to edit
+3. Type your new name and press **Enter**
 
 ### Changing the Printer Image
 
-The printer image appears on the Home Panel and in the Printer Manager. To change it:
-
-1. Tap the **printer image** on the Home Panel to open the Printer Manager
-2. Tap the **printer image** again (marked with a pencil badge) to open the Printer Image picker
-3. The picker shows a scrollable list on the left and a live preview on the right
-4. Choose from one of three sources:
-   - **Auto-Detect** (default) — HelixScreen selects an image based on your printer type reported by Klipper
-   - **Shipped Images** — Over 25 pre-rendered images covering Voron, Creality, FlashForge, Anycubic, RatRig, FLSUN, and more
-   - **Custom Images** — Your own images (see below)
-5. Tap an image to select it — your choice takes effect immediately and persists across restarts
+1. Open the Printer Manager (tap the printer image)
+2. Tap the **image** again to open the picker
+3. Choose from:
+   - **Auto-Detect** — matches your printer type
+   - **Shipped Images** — 25+ pre-rendered images
+   - **Custom Images** — your own photos (see below)
 
 ### Using Custom Printer Images
 
-You can use your own printer photo or rendering. There are two ways to import custom images:
+**Copy to config folder:**
 
-#### Option A: Copy to the Custom Images Folder
+| Platform | Directory |
+|----------|-----------|
+| MainsailOS (Pi) | `~/helixscreen/config/custom_images/` |
+| AD5M Forge-X | `/opt/helixscreen/config/custom_images/` |
 
-1. Copy a PNG, JPEG, BMP, or GIF file into the `custom_images/` directory inside your HelixScreen config folder:
+Supported formats: PNG, JPEG, BMP, GIF. Max 5 MB, max 2048x2048.
 
-   | Platform | Custom images directory |
-   |----------|----------------------|
-   | MainsailOS (Pi) | `~/helixscreen/config/custom_images/` |
-   | AD5M Forge-X | `/opt/helixscreen/config/custom_images/` |
-   | AD5M Klipper Mod | `/root/printer_software/helixscreen/config/custom_images/` |
-   | K1 Simple AF | `/usr/data/helixscreen/config/custom_images/` |
+**Import from USB:** Insert a USB drive with images, open the picker, and tap to import.
 
-2. Open the Printer Image picker (tap printer image → tap image again)
-3. Your image appears under the **Custom Images** section — HelixScreen automatically converts it to an optimized format on first load
+**Remove:** Delete files from the `custom_images/` directory via SSH.
 
-#### Option B: Import from a USB Drive
+### Software Versions & Hardware
 
-1. Insert a USB drive containing image files (PNG, JPEG, BMP, or GIF) into your printer's host
-2. Open the Printer Image picker (tap printer image → tap image again)
-3. A **USB Import** section appears at the bottom of the list showing images found on the drive
-4. Tap an image to import it — HelixScreen copies and converts it automatically
-5. Once imported, the image appears under Custom Images and the USB drive can be removed
-
-#### Custom Image Requirements
-
-- **Formats:** PNG, JPEG, BMP, or GIF
-- **Maximum file size:** 5 MB
-- **Maximum dimensions:** 2048×2048 pixels — images exceeding this limit will not be imported (resize before importing)
-- HelixScreen automatically generates optimized 300px and 150px display variants
-
-#### Removing Custom Images
-
-To remove a custom image, delete its files from the `custom_images/` directory via SSH:
-
-```bash
-# Example: remove an image called "my-printer"
-cd ~/helixscreen/config/custom_images/   # adjust path for your platform
-rm my-printer.png my-printer-300.bin my-printer-150.bin
-```
-
-If the deleted image was active, HelixScreen falls back to auto-detect the next time the image is loaded.
-
-### Software Versions
-
-Below the identity card, the overlay displays current software versions for Klipper, Moonraker, and HelixScreen.
-
-### Hardware Capabilities
-
-A row of chips shows detected hardware capabilities: Probe, Bed Mesh, Heated Bed, LEDs, ADXL, QGL, Z-Tilt, and others depending on your Klipper configuration.
+The overlay shows Klipper, Moonraker, and HelixScreen versions, plus detected hardware capabilities.
 
 ---
 
