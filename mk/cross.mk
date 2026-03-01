@@ -350,6 +350,8 @@ else ifneq ($(filter mips k1,$(PLATFORM_TARGET)),)
     ENABLE_SDL := no
     ENABLE_GLES_3D := no
     ENABLE_SCREENSAVER := no
+    # K1/XBurst2 performs poorly with software 3D; use 2D preview path.
+    ENABLE_TINYGL_3D := no
     ENABLE_EVDEV := yes
     BUILD_SUBDIR := mips
     # Strip binary for size on memory-constrained device
