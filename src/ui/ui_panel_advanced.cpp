@@ -135,7 +135,8 @@ void AdvancedPanel::handle_macros_clicked() {
 
 void AdvancedPanel::handle_console_clicked() {
     helix::ui::lazy_create_and_push_overlay<ConsolePanel>(get_global_console_panel, console_panel_,
-                                                          parent_screen_, "Console", get_name());
+                                                          parent_screen_, "Console", get_name(),
+                                                          true);
 }
 
 void AdvancedPanel::handle_history_clicked() {

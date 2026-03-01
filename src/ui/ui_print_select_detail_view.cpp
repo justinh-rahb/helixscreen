@@ -244,8 +244,11 @@ lv_obj_t* PrintSelectDetailView::create(lv_obj_t* parent_screen) {
     history_status_icon_ = lv_obj_find_by_name(overlay_root_, "history_status_icon");
     history_status_label_ = lv_obj_find_by_name(overlay_root_, "history_status_label");
 
-    // Initialize print preparation manager
-    prep_manager_ = std::make_unique<PrintPreparationManager>();
+    // Initialize print preparation manager (only if not already created —
+    // survives destroy-on-close so callbacks set by PrintSelectPanel persist)
+    if (!prep_manager_) {
+        prep_manager_ = std::make_unique<PrintPreparationManager>();
+    }
 
     spdlog::debug("[DetailView] Detail view created");
     return overlay_root_;
@@ -285,6 +288,19 @@ void PrintSelectDetailView::show(const std::string& filename, const std::string&
                                  const std::string& filament_type,
                                  const std::vector<std::string>& filament_colors,
                                  size_t file_size_bytes) {
+    // Lazy re-create widget tree if it was destroyed by destroy-on-close
+    if (!overlay_root_ && parent_screen_) {
+        spdlog::info("[DetailView] Re-creating widget tree (destroy-on-close recovery)");
+        if (!create(parent_screen_)) {
+            spdlog::error("[DetailView] Failed to re-create detail view");
+            return;
+        }
+        // Re-wire dependencies (subjects need re-binding to new widgets)
+        if (api_ || printer_state_) {
+            set_dependencies(api_, printer_state_);
+        }
+    }
+
     if (!overlay_root_) {
         spdlog::warn("[DetailView] Cannot show: widget not created");
         return;
@@ -302,6 +318,12 @@ void PrintSelectDetailView::show(const std::string& filename, const std::string&
 
     // Register with NavigationManager for lifecycle callbacks
     NavigationManager::instance().register_overlay_instance(overlay_root_, this);
+
+    // Register close callback to destroy widget tree when overlay closes.
+    // Frees memory when detail view is dismissed. Subjects survive;
+    // next show() call re-creates widgets via lazy creation above.
+    NavigationManager::instance().register_overlay_close_callback(
+        overlay_root_, [this]() { destroy_overlay_ui(overlay_root_); });
 
     // Push onto navigation stack - on_activate() will be called by NavigationManager
     NavigationManager::instance().push_overlay(overlay_root_);
@@ -414,6 +436,59 @@ void PrintSelectDetailView::cleanup() {
 
     // Call base class to set cleanup_called_ flag
     OverlayBase::cleanup();
+}
+
+// ============================================================================
+// Destroy-on-close support
+// ============================================================================
+
+void PrintSelectDetailView::on_ui_destroyed() {
+    spdlog::debug("[DetailView] on_ui_destroyed() - nulling widget pointers");
+
+    // Invalidate alive_ token so in-flight async callbacks (gcode download,
+    // metadata fetch, load callbacks) bail out — they captured pointers to
+    // widgets that no longer exist (e.g. gcode_viewer_).
+    alive_->store(false);
+
+    // Allocate a fresh token for the next create() cycle
+    alive_ = std::make_shared<std::atomic<bool>>(true);
+
+    // Pause and clear gcode viewer state (widget is already deleted by base)
+    gcode_loaded_ = false;
+
+    // Clean up temp gcode file so stale cached data doesn't persist
+    if (!temp_gcode_path_.empty()) {
+        std::remove(temp_gcode_path_.c_str());
+        temp_gcode_path_.clear();
+    }
+
+    // Null all child widget pointers (widget tree already deleted by base class)
+    // Note: parent_screen_ is NOT nulled — it's the parent screen (not a child
+    // widget) and is needed for lazy re-creation in show().
+    confirmation_dialog_widget_ = nullptr;
+    print_button_ = nullptr;
+    gcode_viewer_ = nullptr;
+
+    // Pre-print option checkboxes
+    bed_mesh_checkbox_ = nullptr;
+    qgl_checkbox_ = nullptr;
+    z_tilt_checkbox_ = nullptr;
+    nozzle_clean_checkbox_ = nullptr;
+    purge_line_checkbox_ = nullptr;
+    timelapse_checkbox_ = nullptr;
+
+    // Color requirements display
+    color_requirements_card_ = nullptr;
+    color_swatches_row_ = nullptr;
+
+    // History status display
+    history_status_row_ = nullptr;
+    history_status_icon_ = nullptr;
+    history_status_label_ = nullptr;
+
+    // Note: prep_manager_ is NOT reset — it holds no widget references and
+    // retains its callbacks (scan_complete, macro_analysis) set by PrintSelectPanel.
+    // It will be re-wired with dependencies in show() -> set_dependencies().
 }
 
 // ============================================================================
@@ -682,6 +757,14 @@ void PrintSelectDetailView::load_gcode_for_preview() {
     bool gcode_3d_enabled = cfg->get<bool>("/display/gcode_3d_enabled", true);
     if (!gcode_3d_enabled) {
         spdlog::info("[DetailView] G-code 3D rendering disabled via config - using thumbnail");
+        lv_subject_set_int(&detail_gcode_loading_, 0);
+        show_gcode_viewer(false);
+        return;
+    }
+
+    // Detail page only shows the 3D viewer — skip download/parse on 2D-only platforms
+    if (ui_gcode_viewer_is_using_2d_mode(gcode_viewer_)) {
+        spdlog::debug("[DetailView] 2D-only platform — skipping G-code preview (thumbnail only)");
         lv_subject_set_int(&detail_gcode_loading_, 0);
         show_gcode_viewer(false);
         return;

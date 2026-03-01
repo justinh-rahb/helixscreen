@@ -27,10 +27,17 @@
  *====================*/
 
 /*Color depth: 1 (I1), 8 (L8), 16 (RGB565), 24 (RGB888), 32 (XRGB8888)
- * Using 32-bit everywhere for consistent thumbnail/image handling.
- * Memory impact is ~750KB extra for 800x480 display - negligible on
- * embedded Linux targets with 256MB+ RAM. */
-#define LV_COLOR_DEPTH 32
+ * Constrained FBDEV devices (AD5M, CC1, K1/MIPS, AD5X, K2, Snapmaker U1)
+ * use RGB565 to halve framebuffer and draw buffer memory.
+ * Pi (DRM) and desktop (SDL) stay at 32-bit ARGB8888. */
+#if defined(HELIX_PLATFORM_AD5M) || defined(HELIX_PLATFORM_CC1) || \
+    defined(HELIX_PLATFORM_MIPS) || defined(HELIX_PLATFORM_K1) || \
+    defined(HELIX_PLATFORM_AD5X) || defined(HELIX_PLATFORM_K2) || \
+    defined(HELIX_PLATFORM_SNAPMAKER_U1)
+    #define LV_COLOR_DEPTH 16
+#else
+    #define LV_COLOR_DEPTH 32
+#endif
 
 /*=========================
    STDLIB WRAPPER SETTINGS
@@ -1226,6 +1233,22 @@
 
 /*Vector graphic demo*/
 #define LV_USE_DEMO_VECTOR_GRAPHIC  0
+
+/*====================
+   CONVENIENCE MACROS
+ *====================*/
+
+/* Native color format matching LV_COLOR_DEPTH for draw buffer allocations.
+ * Use these instead of hardcoding LV_COLOR_FORMAT_ARGB8888 in on-screen
+ * rendering buffers. Data-interchange buffers (thumbnails, .bin files,
+ * snapshots needing alpha) should stay ARGB8888 explicitly. */
+#if LV_COLOR_DEPTH == 16
+    #define UI_NATIVE_COLOR_FORMAT LV_COLOR_FORMAT_RGB565
+    #define UI_NATIVE_BPP 2
+#else
+    #define UI_NATIVE_COLOR_FORMAT LV_COLOR_FORMAT_ARGB8888
+    #define UI_NATIVE_BPP 4
+#endif
 
 /*--END OF LV_CONF_H--*/
 

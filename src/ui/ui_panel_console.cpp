@@ -286,6 +286,13 @@ void ConsolePanel::on_deactivate() {
     OverlayBase::on_deactivate();
 }
 
+void ConsolePanel::on_ui_destroyed() {
+    console_container_ = nullptr;
+    empty_state_ = nullptr;
+    status_label_ = nullptr;
+    gcode_input_ = nullptr;
+}
+
 // ============================================================================
 // Data Loading
 // ============================================================================

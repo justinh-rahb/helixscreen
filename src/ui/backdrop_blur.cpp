@@ -569,6 +569,25 @@ lv_obj_t* create_blurred_backdrop(lv_obj_t* parent, lv_opa_t dim_opacity) {
         return nullptr;
     }
 
+#if LV_COLOR_DEPTH == 16
+    // RGB565 devices: skip blur entirely — just use dark overlay to save ~1.5MB
+    {
+        lv_obj_t* overlay = lv_obj_create(parent);
+        lv_obj_set_size(overlay, LV_PCT(100), LV_PCT(100));
+        lv_obj_align(overlay, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_set_style_bg_color(overlay, lv_color_black(), LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(overlay, dim_opacity, LV_PART_MAIN);
+        lv_obj_set_style_border_width(overlay, 0, LV_PART_MAIN);
+        lv_obj_set_style_radius(overlay, 0, LV_PART_MAIN);
+        lv_obj_set_style_pad_all(overlay, 0, LV_PART_MAIN);
+        lv_obj_add_flag(overlay, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(overlay, LV_OBJ_FLAG_SCROLLABLE);
+        spdlog::debug("[Backdrop Blur] RGB565 mode — dark overlay only (dim_opacity={})",
+                      dim_opacity);
+        return overlay;
+    }
+#endif
+
     // Step 1: Snapshot current screen
     lv_obj_t* screen = lv_screen_active();
     if (!screen) {

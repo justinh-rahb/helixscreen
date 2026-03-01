@@ -467,15 +467,7 @@ void HomePanel::handle_print_card_clicked() {
         spdlog::info("[{}] Print card clicked - showing print status (print in progress)",
                      get_name());
 
-        extern PrintStatusPanel& get_global_print_status_panel();
-        lv_obj_t* status_panel = get_global_print_status_panel().get_panel();
-        if (status_panel) {
-            NavigationManager::instance().register_overlay_instance(
-                status_panel, &get_global_print_status_panel());
-            NavigationManager::instance().push_overlay(status_panel);
-        } else {
-            spdlog::error("[{}] Print status panel not available", get_name());
-        }
+        PrintStatusPanel::push_overlay(parent_screen_);
     } else {
         // No print in progress - navigate to print select panel
         spdlog::info("[{}] Print card clicked - navigating to print select panel", get_name());
@@ -671,13 +663,11 @@ void HomePanel::take_printer_image_snapshot() {
     }
     cached_printer_snapshot_ = snapshot;
 
-    // Diagnostic: verify snapshot header before setting as source
     uint32_t snap_w = snapshot->header.w;
     uint32_t snap_h = snapshot->header.h;
-    uint32_t snap_magic = snapshot->header.magic;
-    uint32_t snap_cf = snapshot->header.cf;
-    spdlog::debug("[{}] Snapshot header: magic=0x{:02x} cf={} {}x{} data={}", get_name(),
-                  snap_magic, snap_cf, snap_w, snap_h, fmt::ptr(snapshot->data));
+    spdlog::debug("[{}] Snapshot header: cf={} {}x{} data={}", get_name(),
+                  static_cast<uint32_t>(snapshot->header.cf), snap_w, snap_h,
+                  fmt::ptr(snapshot->data));
 
     // Swap image source to the pre-scaled snapshot buffer — LVGL blits 1:1, no scaling
     lv_image_set_src(img, cached_printer_snapshot_);

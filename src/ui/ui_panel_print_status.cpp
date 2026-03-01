@@ -621,6 +621,85 @@ void PrintStatusPanel::cleanup() {
     OverlayBase::cleanup(); // Sets cleanup_called_ = true
 }
 
+void PrintStatusPanel::on_ui_destroyed() {
+    spdlog::debug("[{}] on_ui_destroyed() - nulling widget pointers", get_name());
+
+    // Note: LVGL animations are already cancelled by lv_obj_delete() in the base
+    // class destroy_overlay_ui() call, so no need to cancel them here.
+
+    // Deinit exclude manager (holds gcode_viewer_ reference)
+    if (exclude_manager_) {
+        exclude_manager_->deinit();
+        exclude_manager_.reset();
+    }
+
+    // Null all child widget pointers (widget tree is already deleted by base class)
+    progress_bar_ = nullptr;
+    preparing_progress_bar_ = nullptr;
+    gcode_viewer_ = nullptr;
+    print_thumbnail_ = nullptr;
+    gradient_background_ = nullptr;
+    btn_timelapse_ = nullptr;
+    btn_pause_ = nullptr;
+    btn_tune_ = nullptr;
+    btn_cancel_ = nullptr;
+    btn_reprint_ = nullptr;
+    success_badge_ = nullptr;
+    cancel_badge_ = nullptr;
+    error_badge_ = nullptr;
+    overlay_header_ = nullptr;
+    nozzle_temp_panel_ = nullptr;
+    bed_temp_panel_ = nullptr;
+
+    // Reset widget-dependent state
+    resize_registered_ = false;
+    is_active_ = false;
+    gcode_loaded_ = false;
+}
+
+// Cached widget pointer for lazy creation (separate from overlay_root_ which
+// is managed by OverlayBase). This is the "external" reference passed to
+// destroy_overlay_ui() so it gets nulled on close.
+static lv_obj_t* s_cached_panel = nullptr;
+
+bool PrintStatusPanel::push_overlay(lv_obj_t* parent_screen) {
+    if (!parent_screen) {
+        spdlog::error("[PrintStatusPanel] push_overlay: null parent_screen");
+        return false;
+    }
+
+    // Lazy-create the widget tree if it was destroyed or never created
+    if (!s_cached_panel) {
+        auto& panel = get_global_print_status_panel();
+
+        if (!panel.are_subjects_initialized()) {
+            panel.init_subjects();
+        }
+
+        s_cached_panel = panel.create(parent_screen);
+        if (!s_cached_panel) {
+            spdlog::error("[PrintStatusPanel] Failed to create print status overlay from XML");
+            return false;
+        }
+
+        // Register with NavigationManager for lifecycle callbacks
+        NavigationManager::instance().register_overlay_instance(s_cached_panel, &panel);
+
+        // Register close callback to destroy widget tree when overlay closes.
+        // Frees ~400-800KB per close. Subjects survive; next open re-creates widgets.
+        NavigationManager::instance().register_overlay_close_callback(
+            s_cached_panel, []() {
+                auto& p = get_global_print_status_panel();
+                p.destroy_overlay_ui(s_cached_panel);
+            });
+
+        spdlog::info("[PrintStatusPanel] Print status overlay created (destroy-on-close)");
+    }
+
+    NavigationManager::instance().push_overlay(s_cached_panel);
+    return true;
+}
+
 // ============================================================================
 // PRIVATE HELPERS
 // ============================================================================

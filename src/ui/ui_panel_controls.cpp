@@ -371,17 +371,76 @@ void ControlsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 }
 
 void ControlsPanel::on_activate() {
-    // NOTE: populate_secondary_fans() and populate_secondary_temps() are NOT called here.
-    // Both are fully driven by observers (fans_version_observer_ and temp_sensor_count_observer_)
-    // set up in register_observers(). Those observers use observe_int_sync (deferred via
-    // ui_queue_update), but they fire regardless of panel visibility — so any discovery or
-    // reconnection that happened while the panel was inactive has already been processed.
+    active_ = true;
+
+    // Force-refresh all displays so UI catches up on state changes missed while hidden
+    refresh_all_displays();
+
+    // Refresh secondary fans list when panel becomes visible
+    // This handles edge cases where:
+    // 1. Fan discovery completed after initial setup
+    // 2. User switched from one printer connection to another
+    // 3. Observer callback was missed due to timing
+    populate_secondary_fans();
 
     // Refresh macro buttons — no observer exists for StandardMacros changes,
     // so this must run on each activation to pick up auto-detected macros
     refresh_macro_buttons();
 
     spdlog::trace("[{}] Panel activated, refreshed macro buttons", get_name());
+}
+
+void ControlsPanel::on_deactivate() {
+    active_ = false;
+    spdlog::trace("[{}] Panel deactivated, observer callbacks will skip UI updates", get_name());
+}
+
+void ControlsPanel::refresh_all_displays() {
+    // Re-read cached values from subjects and update all formatted displays
+    if (auto* subj = printer_state_.get_active_extruder_temp_subject()) {
+        cached_extruder_temp_ = lv_subject_get_int(subj);
+    }
+    if (auto* subj = printer_state_.get_active_extruder_target_subject()) {
+        cached_extruder_target_ = lv_subject_get_int(subj);
+    }
+    if (auto* subj = printer_state_.get_bed_temp_subject()) {
+        cached_bed_temp_ = lv_subject_get_int(subj);
+    }
+    if (auto* subj = printer_state_.get_bed_target_subject()) {
+        cached_bed_target_ = lv_subject_get_int(subj);
+    }
+    update_nozzle_temp_display();
+    update_bed_temp_display();
+    update_fan_display();
+    update_nozzle_label();
+    update_speed_display();
+
+    // Re-read position subjects
+    if (auto* subj = printer_state_.get_gcode_position_x_subject()) {
+        int centimm = lv_subject_get_int(subj);
+        format_position(centimm, controls_pos_x_buf_, sizeof(controls_pos_x_buf_));
+        lv_subject_copy_string(&controls_pos_x_subject_, controls_pos_x_buf_);
+    }
+    if (auto* subj = printer_state_.get_gcode_position_y_subject()) {
+        int centimm = lv_subject_get_int(subj);
+        format_position(centimm, controls_pos_y_buf_, sizeof(controls_pos_y_buf_));
+        lv_subject_copy_string(&controls_pos_y_subject_, controls_pos_y_buf_);
+    }
+    if (auto* subj = printer_state_.get_gcode_position_z_subject()) {
+        int centimm = lv_subject_get_int(subj);
+        format_position(centimm, controls_pos_z_buf_, sizeof(controls_pos_z_buf_));
+        lv_subject_copy_string(&controls_pos_z_subject_, controls_pos_z_buf_);
+    }
+
+    // Re-read Z-offset subjects
+    if (auto* subj = printer_state_.get_pending_z_offset_delta_subject()) {
+        update_z_offset_delta_display(lv_subject_get_int(subj));
+    }
+    if (auto* subj = printer_state_.get_gcode_z_offset_subject()) {
+        update_controls_z_offset_display(lv_subject_get_int(subj));
+    }
+
+    spdlog::trace("[{}] All displays refreshed after activation", get_name());
 }
 
 // ============================================================================
@@ -413,80 +472,107 @@ void ControlsPanel::setup_card_handlers() {
 
 void ControlsPanel::register_observers() {
     // Subscribe to temperature updates using bundle (replaces 4 individual observers)
+    // Always cache the raw value; skip expensive formatting when panel is hidden
     temp_observers_.setup_sync(
         this, printer_state_,
         [](ControlsPanel* self, int value) {
             self->cached_extruder_temp_ = value;
-            self->update_nozzle_temp_display();
+            if (self->active_)
+                self->update_nozzle_temp_display();
         },
         [](ControlsPanel* self, int value) {
             self->cached_extruder_target_ = value;
-            self->update_nozzle_temp_display();
+            if (self->active_)
+                self->update_nozzle_temp_display();
         },
         [](ControlsPanel* self, int value) {
             self->cached_bed_temp_ = value;
-            self->update_bed_temp_display();
+            if (self->active_)
+                self->update_bed_temp_display();
         },
         [](ControlsPanel* self, int value) {
             self->cached_bed_target_ = value;
-            self->update_bed_temp_display();
+            if (self->active_)
+                self->update_bed_temp_display();
         });
 
-    // Subscribe to fan updates
+    // Subscribe to fan updates (skip formatting when hidden)
     fan_observer_ = observe_int_sync<ControlsPanel>(
-        printer_state_.get_fan_speed_subject(), this,
-        [](ControlsPanel* self, int /* value */) { self->update_fan_display(); });
+        printer_state_.get_fan_speed_subject(), this, [](ControlsPanel* self, int /* value */) {
+            if (self->active_)
+                self->update_fan_display();
+        });
 
     // Subscribe to multi-fan list changes (fires when fans are discovered/updated)
+    // Skip widget rebuilds when hidden; on_activate() calls populate_secondary_fans()
     fans_version_observer_ = observe_int_sync<ControlsPanel>(
-        printer_state_.get_fans_version_subject(), this,
-        [](ControlsPanel* self, int /* version */) { self->populate_secondary_fans(); });
+        printer_state_.get_fans_version_subject(), this, [](ControlsPanel* self, int /* version */) {
+            if (self->active_)
+                self->populate_secondary_fans();
+        });
 
     // Subscribe to active tool changes for dynamic nozzle label
     active_tool_observer_ = observe_int_sync<ControlsPanel>(
         helix::ToolState::instance().get_active_tool_subject(), this,
-        [](ControlsPanel* self, int /* tool_idx */) { self->update_nozzle_label(); });
+        [](ControlsPanel* self, int /* tool_idx */) {
+            if (self->active_)
+                self->update_nozzle_label();
+        });
     update_nozzle_label(); // Set initial value
 
     // Subscribe to temperature sensor count changes
+    // Skip widget rebuilds when hidden; on_activate() calls populate_secondary_temps()
     temp_sensor_count_observer_ = observe_int_sync<ControlsPanel>(
         helix::sensors::TemperatureSensorManager::instance().get_sensor_count_subject(), this,
-        [](ControlsPanel* self, int /* count */) { self->populate_secondary_temps(); });
+        [](ControlsPanel* self, int /* count */) {
+            if (self->active_)
+                self->populate_secondary_temps();
+        });
 
     // Subscribe to pending Z-offset delta (for unsaved adjustment banner)
     pending_z_offset_observer_ =
         observe_int_sync<ControlsPanel>(printer_state_.get_pending_z_offset_delta_subject(), this,
                                         [](ControlsPanel* self, int delta_microns) {
-                                            self->update_z_offset_delta_display(delta_microns);
+                                            if (self->active_)
+                                                self->update_z_offset_delta_display(delta_microns);
                                         });
 
     // Subscribe to gcode position updates for Position card using bundle (commanded position in
-    // centimillimeters)
+    // centimillimeters). Skip formatting when hidden — positions update very frequently.
     pos_observers_.setup_sync(
         this, printer_state_,
         [](ControlsPanel* self, int centimm) {
+            if (!self->active_)
+                return;
             format_position(centimm, self->controls_pos_x_buf_, sizeof(self->controls_pos_x_buf_));
             lv_subject_copy_string(&self->controls_pos_x_subject_, self->controls_pos_x_buf_);
         },
         [](ControlsPanel* self, int centimm) {
+            if (!self->active_)
+                return;
             format_position(centimm, self->controls_pos_y_buf_, sizeof(self->controls_pos_y_buf_));
             lv_subject_copy_string(&self->controls_pos_y_subject_, self->controls_pos_y_buf_);
         },
         [](ControlsPanel* self, int centimm) {
+            if (!self->active_)
+                return;
             format_position(centimm, self->controls_pos_z_buf_, sizeof(self->controls_pos_z_buf_));
             lv_subject_copy_string(&self->controls_pos_z_subject_, self->controls_pos_z_buf_);
         });
 
-    // Subscribe to speed/flow factor updates
+    // Subscribe to speed/flow factor updates (skip formatting when hidden)
     speed_factor_observer_ = observe_int_sync<ControlsPanel>(
-        printer_state_.get_speed_factor_subject(), this,
-        [](ControlsPanel* self, int /* value */) { self->update_speed_display(); });
+        printer_state_.get_speed_factor_subject(), this, [](ControlsPanel* self, int /* value */) {
+            if (self->active_)
+                self->update_speed_display();
+        });
 
-    // Subscribe to gcode Z-offset for live tuning display
+    // Subscribe to gcode Z-offset for live tuning display (skip formatting when hidden)
     gcode_z_offset_observer_ =
         observe_int_sync<ControlsPanel>(printer_state_.get_gcode_z_offset_subject(), this,
                                         [](ControlsPanel* self, int offset_microns) {
-                                            self->update_controls_z_offset_display(offset_microns);
+                                            if (self->active_)
+                                                self->update_controls_z_offset_display(offset_microns);
                                         });
 
     spdlog::trace("[{}] Observers registered for dashboard live data", get_name());
@@ -1378,7 +1464,7 @@ void ControlsPanel::handle_motors_cancel() {
 
 void ControlsPanel::handle_calibration_bed_mesh() {
     helix::ui::lazy_create_and_push_overlay<BedMeshPanel>(
-        get_global_bed_mesh_panel, bed_mesh_panel_, parent_screen_, "Bed Mesh", get_name());
+        get_global_bed_mesh_panel, bed_mesh_panel_, parent_screen_, "Bed Mesh", get_name(), true);
 }
 
 void ControlsPanel::handle_calibration_zoffset() {
@@ -1478,6 +1564,8 @@ void ControlsPanel::subscribe_to_secondary_fan_speeds() {
                 [name = row.object_name, gen](ControlsPanel* self, int speed_pct) {
                     if (gen != self->fan_populate_gen_)
                         return; // stale callback — widgets gone
+                    if (!self->active_)
+                        return; // skip label update when hidden
                     self->update_secondary_fan_speed(name, speed_pct);
                 },
                 lifetime));
@@ -1656,6 +1744,8 @@ void ControlsPanel::subscribe_to_secondary_temp_subjects() {
                 [name = row.klipper_name, gen](ControlsPanel* self, int centidegrees) {
                     if (gen != self->temp_populate_gen_)
                         return; // stale callback — widgets gone
+                    if (!self->active_)
+                        return; // skip label update when hidden
                     self->update_secondary_temp(name, centidegrees);
                 },
                 lifetime));
