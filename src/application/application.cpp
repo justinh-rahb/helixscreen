@@ -456,11 +456,6 @@ int Application::run(int argc, char** argv) {
     if (!connect_moonraker()) {
         // Non-fatal - app can still run without connection
         spdlog::warn("[Application] Running without printer connection");
-    } else {
-        // Fetch job queue now that WebSocket is connected
-        if (m_job_queue_state) {
-            m_job_queue_state->fetch();
-        }
     }
 
     // Phase 16: Start memory monitoring (logs at TRACE level, -vvv)
@@ -1858,6 +1853,11 @@ void Application::setup_discovery_callbacks() {
                     // Silently treat errors as "plugin not installed"
                     get_printer_state().set_helix_plugin_installed(false);
                 });
+
+            // Fetch job queue now that WebSocket is actually connected
+            if (c->app->m_job_queue_state) {
+                c->app->m_job_queue_state->fetch();
+            }
 
             // Notify plugins that Moonraker is connected
             if (c->app->m_plugin_manager) {
