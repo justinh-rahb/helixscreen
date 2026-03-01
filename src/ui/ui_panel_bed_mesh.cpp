@@ -410,6 +410,18 @@ void BedMeshPanel::on_deactivate() {
     OverlayBase::on_deactivate();
 }
 
+void BedMeshPanel::on_ui_destroyed() {
+    canvas_ = nullptr;
+    profile_dropdown_ = nullptr;
+    calibrate_name_input_ = nullptr;
+    rename_name_input_ = nullptr;
+    calibrate_modal_widget_ = nullptr;
+    rename_modal_widget_ = nullptr;
+    save_config_modal_widget_ = nullptr;
+    delete_modal_widget_ = nullptr;
+    build_volume_observer_.reset();
+}
+
 // ============================================================================
 // Profile List Update
 // ============================================================================

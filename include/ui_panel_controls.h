@@ -111,8 +111,18 @@ class ControlsPanel : public PanelBase {
      * completed after initial setup or when switching between connections.
      */
     void on_activate() override;
+    void on_deactivate() override;
 
   private:
+    //
+    // === Panel Active State (observer suspension) ===
+    //
+
+    bool active_ = false; ///< True when panel is visible; observer callbacks skip work when false
+
+    /// Force-refresh all display values (called on activate to catch up on missed changes)
+    void refresh_all_displays();
+
     //
     // === Dependencies ===
     //

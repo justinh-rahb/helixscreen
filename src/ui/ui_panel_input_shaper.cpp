@@ -473,6 +473,20 @@ void InputShaperPanel::cleanup() {
     parent_screen_ = nullptr;
 }
 
+void InputShaperPanel::on_ui_destroyed() {
+    // Destroy chart widgets (native C structs, not LVGL children)
+    if (x_chart_.chart) {
+        ui_frequency_response_chart_destroy(x_chart_.chart);
+        x_chart_.chart = nullptr;
+    }
+    if (y_chart_.chart) {
+        ui_frequency_response_chart_destroy(y_chart_.chart);
+        y_chart_.chart = nullptr;
+    }
+    legend_x_shaper_dot_ = nullptr;
+    legend_y_shaper_dot_ = nullptr;
+}
+
 // ============================================================================
 // STATE MANAGEMENT
 // ============================================================================
