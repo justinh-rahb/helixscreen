@@ -228,7 +228,6 @@ else ifeq ($(PLATFORM_TARGET),ad5x)
     # AD5X: Ingenic X2600, 800x480, multi-color IFS
     # Specs: 800x480 display
     # -------------------------------------------------------------------------
-    # FULLY STATIC BUILD
     CROSS_COMPILE ?= mipsel-buildroot-linux-gnu-
     TARGET_ARCH := mips32r5
     TARGET_TRIPLE := mipsel-buildroot-linux-gnu
@@ -244,9 +243,7 @@ else ifeq ($(PLATFORM_TARGET),ad5x)
         -Wno-error=conversion -Wno-error=sign-conversion -DHELIX_RELEASE_BUILD -DHELIX_PLATFORM_AD5X
     # -Wl,--gc-sections: Remove unused sections during linking (works with -ffunction-sections)
     # -flto: Must match compiler flag for LTO to work
-    # -static: Fully static binary - no runtime dependencies on system libs
-    # Toolchain glibc 2.40 vs device glibc — static avoids any version mismatch
-    TARGET_LDFLAGS := -Wl,--gc-sections -flto -static
+    TARGET_LDFLAGS := -Wl,--gc-sections -flto
     # SSL enabled for HTTPS/WSS support with Moonraker
     ENABLE_SSL := yes
     DISPLAY_BACKEND := fbdev
