@@ -1790,7 +1790,9 @@ void Application::setup_discovery_callbacks() {
             c->client->register_method_callback(
                 "notify_history_changed", "AboutOverlay_print_hours",
                 [](const nlohmann::json& /*data*/) {
-                    helix::settings::get_about_settings_overlay().fetch_print_hours();
+                    helix::ui::queue_update([]() {
+                        helix::settings::get_about_settings_overlay().fetch_print_hours();
+                    });
                 });
 
             // Register for timelapse events when timelapse is detected
