@@ -429,8 +429,10 @@ void FavoriteMacroWidget::show_macro_picker() {
     std::vector<std::string> sorted_macros(macros.begin(), macros.end());
     std::sort(sorted_macros.begin(), sorted_macros.end());
 
-    // Populate macro rows
+    // Populate macro rows (skip internal macros prefixed with '_')
     for (const auto& macro : sorted_macros) {
+        if (!macro.empty() && macro[0] == '_')
+            continue;
         bool is_selected = (macro == macro_name_);
         std::string display = helix::get_display_name(macro, helix::DeviceType::MACRO);
 
