@@ -8,6 +8,7 @@
 #include "app_globals.h"
 #include "display_settings_manager.h"
 #include "grid_layout.h"
+#include "panel_widget.h"
 #include "panel_widget_config.h"
 #include "panel_widget_registry.h"
 #include "theme_manager.h"
@@ -420,6 +421,41 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
         },
         LV_EVENT_CLICKED, this);
 
+    // Configure button — upper-left corner, mirroring trash in upper-right.
+    // Only shown for widgets that advertise has_edit_configure().
+    {
+        auto* raw = lv_obj_get_user_data(widget);
+        auto* pw = raw ? static_cast<PanelWidget*>(raw) : nullptr;
+        if (pw && pw->has_edit_configure()) {
+            configure_btn_ = lv_obj_create(container_);
+            lv_obj_t* cfg_btn = configure_btn_;
+            lv_obj_add_flag(cfg_btn, LV_OBJ_FLAG_FLOATING);
+            lv_obj_set_pos(cfg_btn, rel_x1 - BTN_OVERHANG, rel_y1 - BTN_OVERHANG);
+            lv_obj_set_size(cfg_btn, BTN_SIZE, BTN_SIZE);
+            lv_obj_set_style_radius(cfg_btn, LV_RADIUS_CIRCLE, 0);
+            lv_obj_set_style_bg_color(cfg_btn, btn_bg, 0);
+            lv_obj_set_style_bg_opa(cfg_btn, LV_OPA_50, 0);
+            lv_obj_set_style_border_width(cfg_btn, 0, 0);
+            lv_obj_set_style_pad_all(cfg_btn, 0, 0);
+            lv_obj_add_flag(cfg_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_remove_flag(cfg_btn, LV_OBJ_FLAG_SCROLLABLE);
+
+            lv_obj_t* cfg_label = lv_label_create(cfg_btn);
+            lv_label_set_text(cfg_label, ICON_SETTINGS);
+            lv_obj_set_style_text_font(cfg_label, &mdi_icons_16, 0);
+            lv_obj_set_style_text_color(cfg_label, theme_manager_get_contrast_color(btn_bg), 0);
+            lv_obj_center(cfg_label);
+
+            lv_obj_add_event_cb(
+                cfg_btn,
+                [](lv_event_t* ev) {
+                    auto* self = static_cast<GridEditMode*>(lv_event_get_user_data(ev));
+                    self->configure_selected_widget();
+                },
+                LV_EVENT_CLICKED, this);
+        }
+    }
+
     // Verify: where did the overlay actually end up on screen?
     lv_obj_update_layout(selection_overlay_);
     lv_area_t overlay_area;
@@ -432,6 +468,10 @@ void GridEditMode::create_selection_chrome(lv_obj_t* widget) {
 }
 
 void GridEditMode::destroy_selection_chrome() {
+    if (configure_btn_) {
+        lv_obj_delete(configure_btn_);
+        configure_btn_ = nullptr;
+    }
     if (remove_btn_) {
         lv_obj_delete(remove_btn_);
         remove_btn_ = nullptr;
@@ -575,6 +615,52 @@ void GridEditMode::remove_selected_widget() {
     // Recreate dots overlay (rebuild destroyed all container children)
     if (active_) {
         create_dots_overlay();
+    }
+}
+
+void GridEditMode::configure_selected_widget() {
+    if (!selected_) {
+        return;
+    }
+
+    auto* raw = lv_obj_get_user_data(selected_);
+    if (!raw) {
+        return;
+    }
+
+    auto* widget = static_cast<PanelWidget*>(raw);
+    if (!widget->on_edit_configure()) {
+        return;
+    }
+
+    // Save widget ID so we can re-select it after rebuild
+    const char* name = lv_obj_get_name(selected_);
+    std::string widget_id = name ? name : "";
+
+    spdlog::info("[GridEditMode] Widget '{}' configured, rebuilding", widget_id);
+
+    // Deselect and rebuild
+    select_widget(nullptr);
+    dots_overlay_ = nullptr;
+    configure_btn_ = nullptr;
+    remove_btn_ = nullptr;
+
+    if (rebuild_cb_) {
+        rebuild_cb_();
+    }
+    if (active_) {
+        disable_widget_clicks_recursive(container_);
+        create_dots_overlay();
+
+        // Re-select the widget by finding it in the rebuilt container.
+        // Force layout first so the widget has valid screen coordinates.
+        if (!widget_id.empty()) {
+            lv_obj_update_layout(container_);
+            lv_obj_t* new_widget = lv_obj_find_by_name(container_, widget_id.c_str());
+            if (new_widget) {
+                select_widget(new_widget);
+            }
+        }
     }
 }
 
@@ -1252,6 +1338,7 @@ void GridEditMode::handle_drag_end(lv_event_t* /*e*/) {
         selected_ = nullptr;
         selection_overlay_ = nullptr;
         remove_btn_ = nullptr;
+        configure_btn_ = nullptr;
         dots_overlay_ = nullptr;
         config_->save();
         spdlog::debug("[GridEditMode] Config saved, rebuilding widgets...");
@@ -1627,6 +1714,7 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
         selected_ = nullptr;
         selection_overlay_ = nullptr;
         remove_btn_ = nullptr;
+        configure_btn_ = nullptr;
         dots_overlay_ = nullptr;
         snap_preview_ = nullptr;
         config_->save();
@@ -1701,6 +1789,7 @@ void GridEditMode::commit_resize_with_snap(const ResizeResult& result) {
             self->selected_ = nullptr;
             self->selection_overlay_ = nullptr;
             self->remove_btn_ = nullptr;
+            self->configure_btn_ = nullptr;
             self->dots_overlay_ = nullptr;
             self->snap_preview_ = nullptr;
             self->config_->save();

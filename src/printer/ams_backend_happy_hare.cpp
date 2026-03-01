@@ -607,6 +607,22 @@ void AmsBackendHappyHare::parse_mmu_state(const nlohmann::json& mmu_data) {
         spdlog::trace("[AMS HappyHare] Pending spool ID: {}", system_info_.pending_spool_id);
     }
 
+    // Parse gate_spool_id array: printer.mmu.gate_spool_id (v4)
+    // Per-gate Spoolman spool IDs — enables weight polling and fill gauges
+    if (mmu_data.contains("gate_spool_id") && mmu_data["gate_spool_id"].is_array()) {
+        const auto& spool_ids = mmu_data["gate_spool_id"];
+        for (size_t i = 0; i < spool_ids.size(); ++i) {
+            if (spool_ids[i].is_number_integer()) {
+                auto* entry = slots_.get_mut(static_cast<int>(i));
+                if (entry) {
+                    int id = spool_ids[i].get<int>();
+                    entry->info.spoolman_id = (id > 0) ? id : 0;
+                }
+            }
+        }
+        spdlog::trace("[AMS HappyHare] Parsed gate_spool_id for {} gates", spool_ids.size());
+    }
+
     // Parse gate_temperature array: printer.mmu.gate_temperature (v4)
     // Per-gate nozzle temperature recommendations
     if (mmu_data.contains("gate_temperature") && mmu_data["gate_temperature"].is_array()) {

@@ -35,6 +35,13 @@ void register_favorite_macro_widgets() {
     register_widget_factory("favorite_macro_2", []() {
         return std::make_unique<FavoriteMacroWidget>("favorite_macro_2");
     });
+    // Register XML callbacks early — before any XML is parsed
+    lv_xml_register_event_cb(nullptr, "favorite_macro_1_clicked_cb",
+                             FavoriteMacroWidget::clicked_1_cb);
+    lv_xml_register_event_cb(nullptr, "favorite_macro_2_clicked_cb",
+                             FavoriteMacroWidget::clicked_2_cb);
+    lv_xml_register_event_cb(nullptr, "fav_macro_picker_backdrop_cb",
+                             FavoriteMacroWidget::picker_backdrop_cb);
 }
 } // namespace helix
 
@@ -142,11 +149,6 @@ void FavoriteMacroWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) 
         lv_obj_set_user_data(widget_obj_, this);
     }
 
-    // Register XML event callbacks
-    lv_xml_register_event_cb(nullptr, "favorite_macro_1_clicked_cb", clicked_1_cb);
-    lv_xml_register_event_cb(nullptr, "favorite_macro_2_clicked_cb", clicked_2_cb);
-    lv_xml_register_event_cb(nullptr, "fav_macro_picker_backdrop_cb", picker_backdrop_cb);
-
     // Cache label pointers from XML
     icon_label_ = lv_obj_find_by_name(widget_obj_, "fav_macro_icon");
     name_label_ = lv_obj_find_by_name(widget_obj_, "fav_macro_name");
@@ -195,6 +197,12 @@ void FavoriteMacroWidget::on_size_changed(int colspan, int rowspan, int /*width_
         if (text_font)
             lv_obj_set_style_text_font(name_label_, text_font, 0);
     }
+}
+
+bool FavoriteMacroWidget::on_edit_configure() {
+    spdlog::info("[FavoriteMacroWidget] {} configure requested - showing picker", widget_id_);
+    show_macro_picker();
+    return false; // no rebuild needed — picker updates display in select_macro()
 }
 
 void FavoriteMacroWidget::handle_clicked() {

@@ -711,6 +711,78 @@ TEST_CASE("Happy Hare parses spoolman_support and pending_spool_id", "[ams][happ
     REQUIRE(info.pending_spool_id == 42);
 }
 
+// --- Phase 2C: gate_spool_id parsing ---
+
+TEST_CASE("Happy Hare parses gate_spool_id into slot spoolman_id", "[ams][happy_hare][v4]") {
+    AmsBackendHappyHareTestHelper helper;
+    helper.initialize_test_gates(4);
+
+    nlohmann::json mmu_data = {{"gate_spool_id", {5, 0, 12, 99}}};
+    helper.test_parse_mmu_state(mmu_data);
+
+    auto slot0 = helper.get_slot_info(0);
+    REQUIRE(slot0.spoolman_id == 5);
+
+    auto slot1 = helper.get_slot_info(1);
+    REQUIRE(slot1.spoolman_id == 0);
+
+    auto slot2 = helper.get_slot_info(2);
+    REQUIRE(slot2.spoolman_id == 12);
+
+    auto slot3 = helper.get_slot_info(3);
+    REQUIRE(slot3.spoolman_id == 99);
+}
+
+TEST_CASE("Happy Hare gate_spool_id skips non-integer values", "[ams][happy_hare][v4]") {
+    AmsBackendHappyHareTestHelper helper;
+    helper.initialize_test_gates(3);
+
+    // Slot 0 is string (skip), slot 1 is valid, slot 2 is null (skip)
+    nlohmann::json mmu_data = {{"gate_spool_id", {"bad", 7, nullptr}}};
+    helper.test_parse_mmu_state(mmu_data);
+
+    auto slot0 = helper.get_slot_info(0);
+    REQUIRE(slot0.spoolman_id == 0); // Unchanged default
+
+    auto slot1 = helper.get_slot_info(1);
+    REQUIRE(slot1.spoolman_id == 7);
+
+    auto slot2 = helper.get_slot_info(2);
+    REQUIRE(slot2.spoolman_id == 0); // Unchanged default
+}
+
+TEST_CASE("Happy Hare gate_spool_id with negative values clears spool link",
+          "[ams][happy_hare][v4]") {
+    AmsBackendHappyHareTestHelper helper;
+    helper.initialize_test_gates(2);
+
+    // First set valid IDs
+    nlohmann::json mmu_data = {{"gate_spool_id", {10, 20}}};
+    helper.test_parse_mmu_state(mmu_data);
+    REQUIRE(helper.get_slot_info(0).spoolman_id == 10);
+
+    // Negative means "unlinked" in Happy Hare — treat as 0
+    mmu_data = {{"gate_spool_id", {-1, 20}}};
+    helper.test_parse_mmu_state(mmu_data);
+    REQUIRE(helper.get_slot_info(0).spoolman_id == 0);
+    REQUIRE(helper.get_slot_info(1).spoolman_id == 20);
+}
+
+TEST_CASE("Happy Hare gate_spool_id partial array only updates provided slots",
+          "[ams][happy_hare][v4]") {
+    AmsBackendHappyHareTestHelper helper;
+    helper.initialize_test_gates(4);
+
+    // Only 2 elements for 4 gates — slots 2,3 should remain at default
+    nlohmann::json mmu_data = {{"gate_spool_id", {3, 8}}};
+    helper.test_parse_mmu_state(mmu_data);
+
+    REQUIRE(helper.get_slot_info(0).spoolman_id == 3);
+    REQUIRE(helper.get_slot_info(1).spoolman_id == 8);
+    REQUIRE(helper.get_slot_info(2).spoolman_id == 0);
+    REQUIRE(helper.get_slot_info(3).spoolman_id == 0);
+}
+
 // --- Phase 3: Dissimilar multi-unit ---
 
 TEST_CASE("Happy Hare dissimilar multi-unit initialization from num_gates string",

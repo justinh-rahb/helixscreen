@@ -391,6 +391,15 @@ bool DisplayManager::init(const Config& config) {
     spdlog::debug("[DisplayManager] Display dim: {}s timeout, {}% brightness", m_dim_timeout_sec,
                   m_dim_brightness_percent);
 
+    // Whether to power off the backlight during display sleep.
+    // Default true (most platforms). Set to false on platforms where backlight
+    // power-off prevents wake-on-touch (e.g. AD5X). When false, the software
+    // overlay makes the screen appear off while the backlight stays powered.
+    m_sleep_backlight_off = cfg->get<bool>("/display/sleep_backlight_off", true);
+    if (!m_sleep_backlight_off) {
+        spdlog::info("[DisplayManager] Backlight will stay on during sleep (config override)");
+    }
+
     // Debug touch visualization: draw ripple at each touch point
     if (RuntimeConfig::debug_touches() && m_pointer) {
         spdlog::info("[DisplayManager] Debug touch visualization enabled");
@@ -550,16 +559,24 @@ void DisplayManager::enter_sleep(int timeout_sec) {
         if (m_backend) {
             m_backend->blank_display();
         }
-        if (m_backlight) {
+        if (m_backlight && m_sleep_backlight_off) {
             m_backlight->set_brightness(0);
         }
-        spdlog::info("[DisplayManager] Display sleeping (hardware blank) after {}s", timeout_sec);
+        spdlog::info("[DisplayManager] Display sleeping (hardware blank{}) after {}s",
+                     m_sleep_backlight_off ? "" : ", backlight kept on", timeout_sec);
     } else {
         create_sleep_overlay();
-        if (m_backlight && m_backlight->is_available()) {
+        // Also FBIOBLANK the framebuffer if the backend supports it — provides
+        // additional blanking beyond the software overlay (useful on AD5X where
+        // the backlight stays powered during sleep).
+        if (m_backend) {
+            m_backend->blank_display();
+        }
+        if (m_backlight && m_backlight->is_available() && m_sleep_backlight_off) {
             m_backlight->set_brightness(0);
         }
-        spdlog::info("[DisplayManager] Display sleeping (software overlay) after {}s", timeout_sec);
+        spdlog::info("[DisplayManager] Display sleeping (software overlay{}) after {}s",
+                     m_sleep_backlight_off ? "" : ", backlight kept on", timeout_sec);
     }
 }
 
@@ -722,14 +739,14 @@ void DisplayManager::wake_display() {
     if (was_sleeping) {
         disable_input_briefly();
 
-        if (m_use_hardware_blank) {
-            // Unblank framebuffer when waking from full sleep (not just dim).
-            // On AD5M, the FBIOBLANK ioctl is needed to actually turn on the display.
-            if (m_backend) {
-                m_backend->unblank_display();
-            }
-        } else {
-            // Remove software sleep overlay
+        // Unblank framebuffer when waking from full sleep.
+        // Both paths call blank_display() during sleep, so both need unblank.
+        if (m_backend) {
+            m_backend->unblank_display();
+        }
+
+        if (!m_use_hardware_blank) {
+            // Also remove software sleep overlay
             destroy_sleep_overlay();
         }
 

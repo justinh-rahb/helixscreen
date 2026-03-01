@@ -234,6 +234,7 @@ MDI_ICONS+=",0xF1A54"    # lightbulb-on-70
 MDI_ICONS+=",0xF1A55"    # lightbulb-on-80
 MDI_ICONS+=",0xF1A56"    # lightbulb-on-90
 MDI_ICONS+=",0xF06E8"    # lightbulb-on (100%)
+MDI_ICONS+=",0xF07D6"    # led-strip (LED controls widget)
 
 MDI_ICONS+=",0xF0E5B"    # printer-3d-nozzle (extruder)
 MDI_ICONS+=",0xF11C0"    # printer-3d-nozzle-alert (filament sensor empty)
