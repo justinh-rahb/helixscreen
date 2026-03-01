@@ -343,6 +343,11 @@ void AmsState::deinit_subjects() {
 
     spdlog::trace("[AMS State] Deinitializing subjects");
 
+    // Reset cross-singleton observer FIRST — it observes PrinterState's
+    // print_state_enum_ subject, which lives outside our SubjectManager.
+    // Must be cleaned up while PrinterState subjects are still alive.
+    print_state_observer_.reset();
+
     // IMPORTANT: clear_backends() MUST precede subjects_.deinit_all() because
     // BackendSlotSubjects are managed outside SubjectManager for lifetime reasons
     clear_backends();
