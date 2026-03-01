@@ -43,14 +43,6 @@
     <!-- PRINTER SECTION -->
     <!-- ================================================================== -->
     <setting_section_header title="PRINTER" title_tag="PRINTER" icon="printer_3d"/>
-    <!-- Filament Sensors (hidden if no sensors detected) -->
-    <lv_obj name="container_filament_sensors" width="100%" style_pad_all="0" scrollable="false">
-      <bind_flag_if_eq subject="filament_sensor_count" flag="hidden" ref_value="0"/>
-      <setting_action_row name="row_filament_sensors"
-                          label="Filament Sensors" label_tag="Filament Sensors" icon="filament"
-                          description="Configure filament detection sensors"
-                          description_tag="Configure filament detection sensors" callback="on_filament_sensors_clicked"/>
-    </lv_obj>
     <!-- AMS Management (hidden if no AMS detected) -->
     <lv_obj name="container_ams_settings" width="100%" style_pad_all="0" scrollable="false">
       <bind_flag_if_eq subject="ams_slot_count" flag="hidden" ref_value="0"/>
@@ -59,12 +51,35 @@
                           description="Quick actions, calibration, speed"
                           description_tag="Quick actions, calibration, speed" callback="on_ams_settings_clicked"/>
     </lv_obj>
+    <!-- Filament Sensors (hidden if no sensors detected) -->
+    <lv_obj name="container_filament_sensors" width="100%" style_pad_all="0" scrollable="false">
+      <bind_flag_if_eq subject="filament_sensor_count" flag="hidden" ref_value="0"/>
+      <setting_action_row name="row_filament_sensors"
+                          label="Filament Sensors" label_tag="Filament Sensors" icon="filament"
+                          description="Configure filament detection sensors"
+                          description_tag="Configure filament detection sensors" callback="on_filament_sensors_clicked"/>
+    </lv_obj>
+    <!-- Material Temperature Overrides -->
+    <setting_action_row name="row_material_temps"
+                        label="Material Temperatures" label_tag="Material Temperatures"
+                        icon="thermometer"
+                        description="Customize preset temperatures"
+                        description_tag="Customize preset temperatures"
+                        callback="on_material_temps_clicked"/>
     <!-- Spoolman Settings (hidden if Spoolman not available) -->
     <lv_obj name="container_spoolman_settings" width="100%" style_pad_all="0" scrollable="false">
       <bind_flag_if_eq subject="printer_has_spoolman" flag="hidden" ref_value="0"/>
       <setting_action_row name="row_spoolman_settings"
                           label="Spoolman" label_tag="Spoolman" icon="database" description="Weight sync settings"
                           description_tag="Weight sync settings" callback="on_spoolman_settings_clicked"/>
+    </lv_obj>
+    <!-- Firmware Retraction Settings (hidden if no firmware_retraction capability) -->
+    <lv_obj name="container_firmware_retraction" width="100%" style_pad_all="0" scrollable="false">
+      <bind_flag_if_eq subject="printer_has_firmware_retraction" flag="hidden" ref_value="0"/>
+      <setting_action_row name="row_firmware_retraction"
+                          label="Retraction Settings" label_tag="Retraction Settings" icon="arrow_up_right"
+                          description="Configure G10/G11 firmware retraction"
+                          description_tag="Configure G10/G11 firmware retraction" callback="on_retraction_row_clicked"/>
     </lv_obj>
     <!-- LED Light Settings (hidden if no LED capability) -->
     <lv_obj name="container_led_light"
@@ -75,27 +90,12 @@
                           description="Startup, auto-control, and macro devices"
                           description_tag="Startup, auto-control, and macro devices" callback="on_led_settings_clicked"/>
     </lv_obj>
-    <!-- Firmware Retraction Settings (hidden if no firmware_retraction capability) -->
-    <lv_obj name="container_firmware_retraction" width="100%" style_pad_all="0" scrollable="false">
-      <bind_flag_if_eq subject="printer_has_firmware_retraction" flag="hidden" ref_value="0"/>
-      <setting_action_row name="row_firmware_retraction"
-                          label="Retraction Settings" label_tag="Retraction Settings" icon="arrow_up_right"
-                          description="Configure G10/G11 firmware retraction"
-                          description_tag="Configure G10/G11 firmware retraction" callback="on_retraction_row_clicked"/>
-    </lv_obj>
     <!-- Macro Buttons (opens overlay for configuring quick buttons and standard macros) -->
     <setting_action_row name="row_macro_buttons"
                         label="Macro Buttons" label_tag="Macro Buttons" icon="script_text"
                         description="Configure quick buttons and standard macros"
                         description_tag="Configure quick buttons and standard macros"
                         callback="on_macro_buttons_clicked"/>
-    <!-- Material Temperature Overrides -->
-    <setting_action_row name="row_material_temps"
-                        label="Material Temperatures" label_tag="Material Temperatures"
-                        icon="thermostat"
-                        description="Customize preset temperatures"
-                        description_tag="Customize preset temperatures"
-                        callback="on_material_temps_clicked"/>
     <!-- ================================================================== -->
     <!-- NOTIFICATIONS SECTION -->
     <!-- ================================================================== -->
