@@ -130,14 +130,8 @@ void ClockWidget::attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) {
     // Store this pointer for event callback recovery
     lv_obj_set_user_data(widget_obj_, this);
 
-    // Immediately populate clock values
+    // Populate clock values immediately for initial display
     update_clock();
-
-    // Start 1-second timer for clock updates
-    if (!clock_timer_) {
-        clock_timer_ = lv_timer_create(clock_timer_cb, CLOCK_UPDATE_INTERVAL_MS, this);
-        spdlog::debug("[ClockWidget] Started clock timer ({}ms interval)", CLOCK_UPDATE_INTERVAL_MS);
-    }
 
     spdlog::debug("[ClockWidget] Attached");
 }
@@ -159,6 +153,23 @@ void ClockWidget::detach() {
     spdlog::debug("[ClockWidget] Detached");
 }
 
+void ClockWidget::on_activate() {
+    update_clock();
+
+    if (!clock_timer_) {
+        clock_timer_ = lv_timer_create(clock_timer_cb, CLOCK_UPDATE_INTERVAL_MS, this);
+        spdlog::debug("[ClockWidget] Started clock timer ({}ms interval)", CLOCK_UPDATE_INTERVAL_MS);
+    }
+}
+
+void ClockWidget::on_deactivate() {
+    if (clock_timer_) {
+        lv_timer_delete(clock_timer_);
+        clock_timer_ = nullptr;
+        spdlog::debug("[ClockWidget] Stopped clock timer");
+    }
+}
+
 void ClockWidget::on_size_changed(int colspan, int rowspan, int /*width_px*/, int /*height_px*/) {
     // Determine size mode: 0=compact (1x1), 1=normal (2x1), 2=expanded (2x2+)
     int mode;
@@ -172,26 +183,14 @@ void ClockWidget::on_size_changed(int colspan, int rowspan, int /*width_px*/, in
 
     lv_subject_set_int(&s_size_mode_subject, mode);
 
-    // Scale time font based on available space
+    // Apply fonts — XML text_heading/text_body/text_small handle defaults,
+    // but we override here so the time label always uses the heading font
+    // regardless of which XML text widget type is used.
     if (!widget_obj_)
         return;
 
-    const char* time_font_token;
-    const char* date_font_token;
-
-    if (mode == 0) {
-        time_font_token = "font_heading";
-        date_font_token = "font_small";
-    } else if (mode == 1) {
-        time_font_token = "font_heading";
-        date_font_token = "font_body";
-    } else {
-        time_font_token = "font_heading";
-        date_font_token = "font_body";
-    }
-
-    const lv_font_t* time_font = theme_manager_get_font(time_font_token);
-    const lv_font_t* date_font = theme_manager_get_font(date_font_token);
+    const lv_font_t* time_font = theme_manager_get_font("font_heading");
+    const lv_font_t* date_font = theme_manager_get_font("font_body");
 
     auto* time_label = lv_obj_find_by_name(widget_obj_, "clock_time");
     if (time_label && time_font) {
@@ -208,7 +207,8 @@ void ClockWidget::on_size_changed(int colspan, int rowspan, int /*width_px*/, in
 
 void ClockWidget::update_clock() {
     time_t now = time(nullptr);
-    struct tm* tm_info = localtime(&now);
+    struct tm tm_buf;
+    struct tm* tm_info = localtime_r(&now, &tm_buf);
 
     if (tm_info) {
         // Time — use user's preferred format (12h/24h)
