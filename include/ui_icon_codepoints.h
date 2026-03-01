@@ -228,6 +228,7 @@ static const IconMapping ICON_MAP[] = {
     {"sync",               "\xF3\xB0\x93\xA6"},  // F04E6 sync (auto-detect)
     {"sysinfo",            "\xF3\xB0\x8B\xBC"},  // F02FC information
     {"target",             "\xF3\xB0\x93\xBE"},  // F04FE target (touch calibration)
+    {"television_classic", "\xF3\xB0\xB5\xAC"},  // F0D6C television-classic (screensaver)
 
     // Temperature
     {"thermometer",        "\xF3\xB0\x94\x8F"},  // F050F thermometer
