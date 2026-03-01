@@ -145,7 +145,7 @@ $(LIBHV_LIB):
 $(TARGET): $(SDL2_LIB) $(LIBHV_LIB) $(CONTRIBUTORS_H) $(APP_C_OBJS) $(APP_OBJS) $(APP_MODULE_OBJS) $(OBJCPP_OBJS) $(LVGL_OBJS) $(HELIX_XML_OBJS) $(THORVG_OBJS) $(LVGL_OPENGLES_OBJS) $(LV_MARKDOWN_OBJS) $(FONT_OBJS) $(TRANS_OBJS) $(WPA_DEPS)
 	$(Q)mkdir -p $(BIN_DIR)
 	$(ECHO) "$(MAGENTA)$(BOLD)[LD]$(RESET) $@"
-	$(Q)$(CXX) $(CXXFLAGS) $(filter-out %.a,$^) -o $@ $(LDFLAGS) || { \
+	$(Q)$(CXX) $(CXXFLAGS) $(filter-out %.a %.h,$^) -o $@ $(LDFLAGS) || { \
 		echo "$(RED)$(BOLD)✗ Linking failed!$(RESET)"; \
 		echo "$(YELLOW)Command:$(RESET) $(CXX) $(CXXFLAGS) [objects] -o $@ $(LDFLAGS)"; \
 		exit 1; \
