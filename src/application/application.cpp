@@ -1133,7 +1133,8 @@ bool Application::init_ui() {
         spdlog::error("[Application] Failed to create print status overlay");
         return false;
     }
-    m_overlay_panels.print_status = m_panels->print_status_panel();
+    // print_status is now lazily created via PrintStatusPanel::push_overlay()
+    m_overlay_panels.print_status = nullptr;
 
     // Initialize keypad
     m_panels->init_keypad(m_screen);
@@ -1428,8 +1429,8 @@ void Application::create_overlays() {
         }
     }
 
-    if (m_args.overlays.print_status && m_overlay_panels.print_status) {
-        NavigationManager::instance().push_overlay(m_overlay_panels.print_status);
+    if (m_args.overlays.print_status) {
+        PrintStatusPanel::push_overlay(m_screen);
     }
 
     if (m_args.overlays.bed_mesh) {

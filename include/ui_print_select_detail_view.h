@@ -272,6 +272,17 @@ class PrintSelectDetailView : public OverlayBase {
      */
     void update_history_status(FileHistoryStatus status, int success_count);
 
+  protected:
+    /**
+     * @brief Called after widget tree is destroyed by destroy_overlay_ui()
+     *
+     * Nulls all child widget pointers so that create() works correctly
+     * when re-invoked on next open. Also invalidates the alive_ token
+     * so in-flight async callbacks bail out (they may reference stale
+     * widget pointers like gcode_viewer_).
+     */
+    void on_ui_destroyed() override;
+
   private:
     // === Dependencies ===
     MoonrakerAPI* api_ = nullptr;

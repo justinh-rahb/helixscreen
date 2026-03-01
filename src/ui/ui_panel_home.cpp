@@ -467,15 +467,7 @@ void HomePanel::handle_print_card_clicked() {
         spdlog::info("[{}] Print card clicked - showing print status (print in progress)",
                      get_name());
 
-        extern PrintStatusPanel& get_global_print_status_panel();
-        lv_obj_t* status_panel = get_global_print_status_panel().get_panel();
-        if (status_panel) {
-            NavigationManager::instance().register_overlay_instance(
-                status_panel, &get_global_print_status_panel());
-            NavigationManager::instance().push_overlay(status_panel);
-        } else {
-            spdlog::error("[{}] Print status panel not available", get_name());
-        }
+        PrintStatusPanel::push_overlay(parent_screen_);
     } else {
         // No print in progress - navigate to print select panel
         spdlog::info("[{}] Print card clicked - navigating to print select panel", get_name());

@@ -68,9 +68,6 @@ using helix::ui::format_layer_count;
 using helix::ui::format_print_height;
 using helix::ui::format_print_time;
 
-// Forward declaration for class-based API
-PrintStatusPanel& get_global_print_status_panel();
-
 // ============================================================================
 // Global Instance
 // ============================================================================
@@ -1989,11 +1986,7 @@ void PrintSelectPanel::create_detail_view() {
     print_controller_->set_hide_detail_view([this]() { hide_detail_view(); });
     print_controller_->set_show_detail_view([this]() { show_detail_view(); });
     print_controller_->set_navigate_to_print_status([this]() {
-        if (print_status_panel_widget_) {
-            NavigationManager::instance().register_overlay_instance(
-                print_status_panel_widget_, &get_global_print_status_panel());
-            NavigationManager::instance().push_overlay(print_status_panel_widget_);
-        }
+        PrintStatusPanel::push_overlay(parent_screen_);
     });
 
     spdlog::debug("[{}] Detail view module initialized", get_name());

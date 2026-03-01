@@ -104,6 +104,30 @@ class PrintStatusPanel : public OverlayBase {
      */
     void cleanup() override;
 
+    /**
+     * @brief Push the print status overlay with lazy creation and destroy-on-close
+     *
+     * All call sites should use this instead of manually pushing the overlay.
+     * Handles lazy creation, NavigationManager registration, and destroy-on-close
+     * callback registration. The widget tree is destroyed when the overlay closes
+     * to free memory (~400-800KB); subjects survive for re-creation.
+     *
+     * @param parent_screen Parent screen for overlay creation
+     * @return true if overlay was pushed successfully
+     */
+    static bool push_overlay(lv_obj_t* parent_screen);
+
+  protected:
+    /**
+     * @brief Called after destroy_overlay_ui() deletes the widget tree
+     *
+     * Nulls all widget pointers, resets widget-dependent state (exclude manager,
+     * resize registration), and cancels any in-flight animations. Does NOT
+     * destroy subjects or observers on live PrinterState subjects.
+     */
+    void on_ui_destroyed() override;
+
+  public:
     //
     // === Legacy Compatibility ===
     //
