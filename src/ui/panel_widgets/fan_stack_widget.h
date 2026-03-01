@@ -29,6 +29,7 @@ class FanStackWidget : public PanelWidget {
     void attach(lv_obj_t* widget_obj, lv_obj_t* parent_screen) override;
     void detach() override;
     void on_size_changed(int colspan, int rowspan, int width_px, int height_px) override;
+    bool on_edit_configure() override;
     const char* id() const override {
         return "fan_stack";
     }

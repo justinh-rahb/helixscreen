@@ -61,6 +61,13 @@ class PanelWidget {
         (void)height_px;
     }
 
+    /// Called when the configure button is pressed in edit mode. Return true
+    /// if handled (triggers rebuild). Widgets can toggle display modes, open
+    /// config modals, etc. Returning false means no configure action available.
+    virtual bool on_edit_configure() {
+        return false;
+    }
+
     /// Stable identifier matching PanelWidgetDef::id
     virtual const char* id() const = 0;
 };

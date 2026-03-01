@@ -16,6 +16,7 @@
 
 #include "app_globals.h"
 #include "observer_factory.h"
+#include "panel_widget_config.h"
 #include "panel_widget_manager.h"
 #include "panel_widget_registry.h"
 #include "printer_state.h"
@@ -80,6 +81,21 @@ std::string TempStackWidget::get_component_name() const {
         return "panel_widget_temp_carousel";
     }
     return "panel_widget_temp_stack";
+}
+
+bool TempStackWidget::on_edit_configure() {
+    bool was_carousel = is_carousel_mode();
+    nlohmann::json new_config = config_;
+    if (was_carousel) {
+        new_config.erase("display_mode");
+    } else {
+        new_config["display_mode"] = "carousel";
+    }
+    spdlog::info("[TempStackWidget] Toggling display_mode: {} → {}",
+                 was_carousel ? "carousel" : "stack", was_carousel ? "stack" : "carousel");
+    PanelWidgetManager::instance().get_widget_config("home").set_widget_config("temp_stack",
+                                                                               new_config);
+    return true;
 }
 
 bool TempStackWidget::is_carousel_mode() const {
