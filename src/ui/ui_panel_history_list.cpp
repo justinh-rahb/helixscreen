@@ -63,8 +63,14 @@ HistoryListPanel::HistoryListPanel() : history_manager_(get_print_history_manage
 // Destructor - remove observer from history manager
 HistoryListPanel::~HistoryListPanel() {
     deinit_subjects();
-    if (history_manager_ && history_observer_) {
-        history_manager_->remove_observer(&history_observer_);
+    auto* mgr = get_print_history_manager();
+    if (mgr && history_observer_) {
+        mgr->remove_observer(&history_observer_);
+        history_observer_ = nullptr;
+    }
+    if (search_timer_) {
+        lv_timer_delete(search_timer_);
+        search_timer_ = nullptr;
     }
     // Guard against static destruction order fiasco (spdlog may be gone)
     if (!StaticPanelRegistry::is_destroyed()) {
