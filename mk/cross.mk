@@ -1124,7 +1124,7 @@ endef
 # Example: make deploy-pi PI_HOST=192.168.1.50 PI_USER=pi
 # PI_USER defaults to empty (uses SSH config or current user)
 # PI_DEPLOY_DIR defaults to ~/helixscreen (full app directory)
-PI_HOST ?= helixpi.local
+PI_HOST ?= 192.168.1.113
 PI_USER ?=
 PI_DEPLOY_DIR ?= ~/helixscreen
 
