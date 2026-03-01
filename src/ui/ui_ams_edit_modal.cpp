@@ -145,40 +145,68 @@ bool AmsEditModal::show_for_slot(lv_obj_t* parent, int slot_index, const SlotInf
         switch_to_form();
     }
 
-    // If linked to Spoolman but missing filament_id or vendor_id, fetch them now
-    if (working_info_.spoolman_id > 0 &&
-        (working_info_.spoolman_filament_id == 0 || working_info_.spoolman_vendor_id == 0) &&
-        api_) {
+    // If linked to Spoolman, fetch authoritative filament data (vendor, material, color)
+    // so the form shows current Spoolman state, not stale backend data
+    if (working_info_.spoolman_id > 0 && api_) {
         const int spool_id = working_info_.spoolman_id;
         std::weak_ptr<bool> guard = callback_guard_;
         api_->spoolman().get_spoolman_spool(
             spool_id,
             [this, guard, spool_id](const std::optional<SpoolInfo>& spool) {
-                int fetched_filament_id =
-                    (spool && spool->filament_id > 0) ? spool->filament_id : 0;
-                int fetched_vendor_id =
-                    (spool && spool->vendor_id > 0) ? spool->vendor_id : 0;
-                helix::ui::queue_update(
-                    [this, guard, spool_id, fetched_filament_id, fetched_vendor_id]() {
-                        if (guard.expired())
-                            return;
-                        if (fetched_filament_id > 0) {
-                            original_info_.spoolman_filament_id = fetched_filament_id;
-                            working_info_.spoolman_filament_id = fetched_filament_id;
-                            spdlog::debug("[AmsEditModal] Fetched filament_id={} for spool {}",
-                                          fetched_filament_id, spool_id);
-                        } else {
-                            spdlog::warn(
-                                "[AmsEditModal] Could not resolve filament_id for spool {}",
-                                spool_id);
+                if (!spool)
+                    return;
+                // Capture Spoolman's authoritative data for the spool
+                int fetched_filament_id = spool->filament_id;
+                int fetched_vendor_id = spool->vendor_id;
+                std::string fetched_vendor = spool->vendor;
+                std::string fetched_material = spool->material;
+                std::string fetched_color_hex = spool->color_hex;
+                helix::ui::queue_update([this, guard, spool_id, fetched_filament_id,
+                                         fetched_vendor_id, fetched_vendor = std::move(fetched_vendor),
+                                         fetched_material = std::move(fetched_material),
+                                         fetched_color_hex = std::move(fetched_color_hex)]() {
+                    if (guard.expired())
+                        return;
+                    if (fetched_filament_id > 0) {
+                        original_info_.spoolman_filament_id = fetched_filament_id;
+                        working_info_.spoolman_filament_id = fetched_filament_id;
+                    }
+                    if (fetched_vendor_id > 0) {
+                        original_info_.spoolman_vendor_id = fetched_vendor_id;
+                        working_info_.spoolman_vendor_id = fetched_vendor_id;
+                    }
+                    // Update brand/material from Spoolman (authoritative source)
+                    if (!fetched_vendor.empty() && working_info_.brand != fetched_vendor) {
+                        spdlog::debug(
+                            "[AmsEditModal] Updating vendor from '{}' to '{}' (Spoolman spool {})",
+                            working_info_.brand, fetched_vendor, spool_id);
+                        original_info_.brand = fetched_vendor;
+                        working_info_.brand = fetched_vendor;
+                    }
+                    if (!fetched_material.empty() && working_info_.material != fetched_material) {
+                        spdlog::debug("[AmsEditModal] Updating material from '{}' to '{}' "
+                                      "(Spoolman spool {})",
+                                      working_info_.material, fetched_material, spool_id);
+                        original_info_.material = fetched_material;
+                        working_info_.material = fetched_material;
+                    }
+                    if (!fetched_color_hex.empty()) {
+                        uint32_t rgb = 0;
+                        if (helix::parse_hex_color(fetched_color_hex.c_str(), rgb) &&
+                            working_info_.color_rgb != rgb) {
+                            spdlog::debug("[AmsEditModal] Updating color from {:#08x} to {:#08x} "
+                                          "(Spoolman spool {})",
+                                          working_info_.color_rgb, rgb, spool_id);
+                            original_info_.color_rgb = rgb;
+                            working_info_.color_rgb = rgb;
                         }
-                        if (fetched_vendor_id > 0) {
-                            original_info_.spoolman_vendor_id = fetched_vendor_id;
-                            working_info_.spoolman_vendor_id = fetched_vendor_id;
-                            spdlog::debug("[AmsEditModal] Fetched vendor_id={} for spool {}",
-                                          fetched_vendor_id, spool_id);
-                        }
-                    });
+                    }
+                    spdlog::debug("[AmsEditModal] Synced spool {} from Spoolman: vendor='{}', "
+                                  "material='{}', filament_id={}, vendor_id={}",
+                                  spool_id, working_info_.brand, working_info_.material,
+                                  fetched_filament_id, fetched_vendor_id);
+                    update_ui();
+                });
             },
             [spool_id](const MoonrakerError& err) {
                 spdlog::warn("[AmsEditModal] Failed to fetch spool {}: {}", spool_id, err.message);
