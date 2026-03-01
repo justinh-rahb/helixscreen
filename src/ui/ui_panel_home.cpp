@@ -651,10 +651,7 @@ void HomePanel::take_printer_image_snapshot() {
         return;
     }
 
-    // Use RGB565 instead of ARGB8888 — halves memory (2 vs 4 bytes/pixel).
-    // Alpha is not needed: the snapshot captures the fully composited image
-    // against its background, and is only used as a static placeholder.
-    lv_draw_buf_t* snapshot = lv_snapshot_take(img, LV_COLOR_FORMAT_RGB565);
+    lv_draw_buf_t* snapshot = lv_snapshot_take(img, LV_COLOR_FORMAT_ARGB8888);
     if (!snapshot) {
         spdlog::warn("[{}] Failed to take printer image snapshot", get_name());
         return;
@@ -676,8 +673,8 @@ void HomePanel::take_printer_image_snapshot() {
     lv_image_set_src(img, cached_printer_snapshot_);
     lv_image_set_inner_align(img, LV_IMAGE_ALIGN_CENTER);
 
-    spdlog::debug("[{}] Printer image snapshot cached ({}x{}, {} bytes, RGB565)", get_name(), snap_w,
-                  snap_h, snap_w * snap_h * 2);
+    spdlog::debug("[{}] Printer image snapshot cached ({}x{}, {} bytes)", get_name(), snap_w,
+                  snap_h, snap_w * snap_h * 4);
 }
 
 void HomePanel::print_card_clicked_cb(lv_event_t* e) {
