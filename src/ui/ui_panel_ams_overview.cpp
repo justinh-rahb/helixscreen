@@ -756,7 +756,9 @@ void AmsOverviewPanel::show_overview() {
 void AmsOverviewPanel::update_detail_header(const AmsUnit& unit, const AmsSystemInfo& info) {
     // Update logo
     lv_obj_t* logo = lv_obj_find_by_name(panel_, "detail_logo");
-    ams_draw::apply_logo(logo, unit, info);
+    if (logo) {
+        ams_draw::apply_logo(logo, unit, info);
+    }
 
     // Update name
     lv_obj_t* name = lv_obj_find_by_name(panel_, "detail_unit_name");
