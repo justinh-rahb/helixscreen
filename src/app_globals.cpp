@@ -45,6 +45,7 @@ using namespace helix;
 static MoonrakerClient* g_moonraker_client = nullptr;
 static MoonrakerAPI* g_moonraker_api = nullptr;
 static MoonrakerManager* g_moonraker_manager = nullptr;
+static JobQueueState* g_job_queue_state = nullptr;
 static PrintHistoryManager* g_print_history_manager = nullptr;
 static TemperatureHistoryManager* g_temp_history_manager = nullptr;
 
@@ -86,6 +87,14 @@ MoonrakerManager* get_moonraker_manager() {
 
 void set_moonraker_manager(MoonrakerManager* manager) {
     g_moonraker_manager = manager;
+}
+
+JobQueueState* get_job_queue_state() {
+    return g_job_queue_state;
+}
+
+void set_job_queue_state(JobQueueState* state) {
+    g_job_queue_state = state;
 }
 
 PrintHistoryManager* get_print_history_manager() {

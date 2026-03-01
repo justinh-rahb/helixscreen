@@ -32,6 +32,7 @@ class MoonrakerManager;
 namespace helix {
 class PanelFactory;
 }
+class JobQueueState;
 class PrintHistoryManager;
 class TemperatureHistoryManager;
 
@@ -115,6 +116,7 @@ class Application {
     std::unique_ptr<DisplayManager> m_display;
     std::unique_ptr<SubjectInitializer> m_subjects;
     std::unique_ptr<MoonrakerManager> m_moonraker;
+    std::unique_ptr<JobQueueState> m_job_queue_state;
     std::unique_ptr<PrintHistoryManager> m_history_manager;
     std::unique_ptr<TemperatureHistoryManager> m_temp_history_manager;
     std::unique_ptr<helix::PanelFactory> m_panels;

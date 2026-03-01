@@ -28,6 +28,7 @@
 #include "led/led_controller.h"
 #include "moonraker_manager.h"
 #include "panel_factory.h"
+#include "job_queue_state.h"
 #include "print_history_manager.h"
 #include "screenshot.h"
 #include "sound_manager.h"
@@ -1166,6 +1167,14 @@ bool Application::init_moonraker() {
         std::make_unique<PrintHistoryManager>(m_moonraker->api(), get_moonraker_client());
     set_print_history_manager(m_history_manager.get());
     spdlog::debug("[Application] PrintHistoryManager created");
+
+    // Create job queue state manager
+    m_job_queue_state =
+        std::make_unique<JobQueueState>(m_moonraker->api(), get_moonraker_client());
+    m_job_queue_state->init_subjects();
+    set_job_queue_state(m_job_queue_state.get());
+    m_job_queue_state->fetch();
+    spdlog::debug("[Application] JobQueueState created");
 
     // Initialize macro modification manager (for PRINT_START wizard)
     m_moonraker->init_macro_analysis(m_config);
@@ -2442,6 +2451,7 @@ void Application::shutdown() {
     set_moonraker_manager(nullptr);
     set_moonraker_api(nullptr);
     set_moonraker_client(nullptr);
+    set_job_queue_state(nullptr);
     set_print_history_manager(nullptr);
     set_temperature_history_manager(nullptr);
 
@@ -2469,7 +2479,8 @@ void Application::shutdown() {
     }
 
     // Reset managers in reverse order (MoonrakerManager handles print_start_collector cleanup)
-    // History manager MUST be reset before moonraker (uses client for unregistration)
+    // Job queue and history managers MUST be reset before moonraker (use client for unregistration)
+    m_job_queue_state.reset();
     m_history_manager.reset();
     m_temp_history_manager.reset();
 
