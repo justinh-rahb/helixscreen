@@ -22,9 +22,9 @@ Fast, beautiful, and built for every Klipper printer — from a Creality K1 to a
 
 ---
 
-> **Beta — v0.13**
+> **Release Candidate — v0.95**
 >
-> Core features are complete and stabilizing. We're looking for testers across different printer setups.
+> Approaching 1.0 — customizable grid dashboard, full widget system, and comprehensive printer support. Looking for testers across different printer setups.
 >
 > **Tested on:** Voron 2.4 (Raspberry Pi 5), Voron 0.2, Doron Velta, RatRig V-Core, Flashforge AD5M Pro ([Forge-X](https://github.com/DrA1ex/ff5m) firmware), QIDI Q1 Pro, Sovol SV06, Sovol SV08
 >
