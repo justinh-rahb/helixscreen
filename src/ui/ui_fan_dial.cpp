@@ -382,6 +382,7 @@ void FanDial::animate_speed_label(int from, int to) {
     // Skip animation when value unchanged or animations disabled
     if (from == to || !DisplaySettingsManager::instance().get_animations_enabled()) {
         update_speed_label(to);
+        update_button_states(to);
         if (arc_) {
             lv_arc_set_value(arc_, to);
         }
