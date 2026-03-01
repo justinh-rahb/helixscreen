@@ -25,6 +25,7 @@ void register_width_sensor_widget();
 void register_printer_image_widget();
 void register_print_status_widget();
 void register_shutdown_widget();
+void register_clock_widget();
 
 // Vector order defines the default display order on the home panel.
 // NOTE: Factories are registered at runtime via init_widget_registrations(),
@@ -49,6 +50,7 @@ static std::vector<PanelWidgetDef> s_widget_defs = {
     {"thermistor",       "Thermistor",        "thermometer",      "Monitor a custom temperature sensor",          "Thermistor",       "temp_sensor_count",  false, 1, 1, 1, 1, 2, 1},
     {"favorite_macro_1", "Macro Button 1",    "play",             "Run a configured macro with one tap",          "Macro Button 1",   nullptr,              false, 1, 1, 1, 1, 2, 1},
     {"favorite_macro_2", "Macro Button 2",    "play",             "Run a configured macro with one tap",          "Macro Button 2",   nullptr,              false, 1, 1, 1, 1, 2, 1},
+    {"clock",            "Digital Clock",     "clock",            "Current time and date",                       "Digital Clock",    nullptr,              false, 2, 1, 1, 1, 3, 2},
     //                                                                                                                                          en  col row min_c min_r max_c max_r
     {"tips",             "Tips",              "help_circle",      "Rotating tips and helpful information",        "Tips",             nullptr,              true,  4, 2, 2, 1, 6, 2},
     {"notifications",    "Notifications",     "notifications",    "Pending alerts and system messages",           "Notifications",    nullptr,              true,  1, 1, 1, 1, 2, 1},
@@ -106,6 +108,7 @@ void init_widget_registrations() {
     register_fan_stack_widget();
     register_thermistor_widget();
     register_favorite_macro_widgets();
+    register_clock_widget();
     register_tips_widget();
     register_humidity_widget();
     register_width_sensor_widget();
