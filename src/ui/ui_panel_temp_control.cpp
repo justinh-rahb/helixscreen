@@ -1267,6 +1267,9 @@ void TempControlPanel::setup_mini_combined_graph(lv_obj_t* container) {
 
     lv_obj_t* chart = ui_temp_graph_get_chart(mini_graph_);
     lv_obj_set_size(chart, lv_pct(100), lv_pct(100));
+    // Allow taps to bubble up to the parent card's click handler
+    lv_obj_remove_flag(chart, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(chart, LV_OBJ_FLAG_EVENT_BUBBLE);
     ui_temp_graph_set_temp_range(mini_graph_, 0.0f, 150.0f);
     ui_temp_graph_set_point_count(mini_graph_, MINI_GRAPH_POINTS);
     ui_temp_graph_set_y_axis(mini_graph_, 50.0f, true);

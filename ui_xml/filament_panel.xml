@@ -108,7 +108,8 @@
                  width="100%" flex_grow="1" style_pad_all="0" scrollable="false">
           <!-- Graph container - populated by C++ via TempControlPanel -->
           <lv_obj name="temp_graph_container"
-                  width="100%" height="100%" style_pad_all="0"/>
+                  width="100%" height="100%" style_pad_all="0"
+                  clickable="false" event_bubble="true"/>
         </lv_obj>
 
       <!-- BOTTOM: Multi-Filament Card (visible when AMS or multi-tool, managed by C++) -->
