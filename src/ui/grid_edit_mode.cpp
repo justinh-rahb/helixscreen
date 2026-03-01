@@ -12,6 +12,7 @@
 #include "panel_widget_config.h"
 #include "panel_widget_registry.h"
 #include "theme_manager.h"
+#include "ui_toast_manager.h"
 
 #include <spdlog/spdlog.h>
 
@@ -2255,6 +2256,9 @@ void GridEditMode::place_widget_from_catalog(const std::string& widget_id) {
     if (place_col < 0 || place_row < 0) {
         spdlog::warn("[GridEditMode] No available grid position for widget '{}' ({}x{})", widget_id,
                      colspan, rowspan);
+        ToastManager::instance().show(
+            ToastSeverity::WARNING,
+            "Not enough room for this widget. Rearrange or remove widgets to make space.");
         return;
     }
 
