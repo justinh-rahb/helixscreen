@@ -145,8 +145,10 @@ bool AmsEditModal::show_for_slot(lv_obj_t* parent, int slot_index, const SlotInf
         switch_to_form();
     }
 
-    // If linked to Spoolman but missing filament_id, fetch it now so edits can save
-    if (working_info_.spoolman_id > 0 && working_info_.spoolman_filament_id == 0 && api_) {
+    // If linked to Spoolman but missing filament_id or vendor_id, fetch them now
+    if (working_info_.spoolman_id > 0 &&
+        (working_info_.spoolman_filament_id == 0 || working_info_.spoolman_vendor_id == 0) &&
+        api_) {
         const int spool_id = working_info_.spoolman_id;
         std::weak_ptr<bool> guard = callback_guard_;
         api_->spoolman().get_spoolman_spool(
@@ -432,11 +434,16 @@ void AmsEditModal::update_vendor_dropdown() {
 
     lv_dropdown_set_options(vendor_dropdown, vendor_options_.c_str());
 
-    // Set selection based on working_info_.brand
+    // Set selection based on working_info_.brand, and populate vendor_id if missing
     int vendor_idx = 0; // Default to first (Generic)
     for (size_t i = 0; i < vendor_list_.size(); i++) {
         if (working_info_.brand == vendor_list_[i].name) {
             vendor_idx = static_cast<int>(i);
+            if (working_info_.spoolman_vendor_id == 0 && vendor_list_[i].id > 0) {
+                working_info_.spoolman_vendor_id = vendor_list_[i].id;
+                spdlog::debug("[AmsEditModal] Resolved vendor_id={} from vendor list for '{}'",
+                              vendor_list_[i].id, vendor_list_[i].name);
+            }
             break;
         }
     }
