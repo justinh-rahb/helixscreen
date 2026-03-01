@@ -489,6 +489,7 @@ void GCodeLayerRenderer::ensure_cache(int width, int height) {
     if (!cache_buf_) {
         // Create the draw buffer (no canvas widget - avoids clip area contamination
         // from overlays/toasts on lv_layer_top())
+        // Must stay ARGB8888 — blend_pixel() writes 4-byte BGRA pixels directly
         cache_buf_ = lv_draw_buf_create(width, height, LV_COLOR_FORMAT_ARGB8888, LV_STRIDE_AUTO);
         if (!cache_buf_) {
             spdlog::error("[GCodeLayerRenderer] Failed to create cache buffer {}x{}", width,

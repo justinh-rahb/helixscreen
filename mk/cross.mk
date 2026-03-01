@@ -574,8 +574,9 @@ ifeq ($(ENABLE_EVDEV),yes)
     SUBMODULE_CXXFLAGS += -DHELIX_INPUT_EVDEV
 endif
 
-# NOTE: LV_COLOR_DEPTH is now hardcoded to 32 in lv_conf.h for all platforms.
-# This simplifies thumbnail/image handling (always ARGB8888) at negligible memory cost.
+# NOTE: LV_COLOR_DEPTH is platform-conditional in lv_conf.h.
+# Constrained FBDEV devices (AD5M, CC1, K1/MIPS, AD5X, K2, U1) use 16 (RGB565).
+# Pi (DRM) and desktop (SDL) use 32 (ARGB8888).
 
 # =============================================================================
 # Cross-Compilation Build Targets
