@@ -367,6 +367,14 @@ else
     LIBHV_LIBS := $(LIBHV_LIB)
 endif
 
+# libhv generates include/hv headers during libhv-build. Track json.hpp so a
+# stale archive cannot be reused when generated headers are missing.
+ifneq ($(LIBHV_LIB),)
+    LIBHV_JSON_HEADER := $(LIBHV_DIR)/include/hv/json.hpp
+else
+    LIBHV_JSON_HEADER :=
+endif
+
 # spdlog (logging library) - Use system version if available, otherwise use submodule
 # Check for actual header file to avoid $(dir) path issues with directory paths
 SPDLOG_SYSTEM_HEADER_PATHS := /usr/include/spdlog/spdlog.h /usr/local/include/spdlog/spdlog.h /opt/homebrew/include/spdlog/spdlog.h
