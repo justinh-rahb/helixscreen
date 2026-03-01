@@ -5,6 +5,43 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.95.1] - 2026-03-01
+
+### Added
+- Widget catalog now shows icons and descriptions for each widget type
+- LED Controls widget for quick access to LED settings from the dashboard
+- Configure button in edit mode for widgets that support settings (macros, temperature stacks)
+- ZMOD firmware detection for AD5M/AD5M Pro installer (#251)
+
+### Fixed
+- Use-after-free crash during WebSocket reconnection (#255)
+- SIGSEGV from wrong-pointer lv_anim_delete on bar animations (#259)
+- Font linked-list validation to prevent SIGSEGV on corrupted font data (#244)
+- Fan button states not updating when animations are disabled (#258)
+- AD5X platform key missing from update checker (#253)
+- SIGSEGV when registering XML event callbacks after XML parsing
+- SIGSEGV from stale input device reference after grid rebuild
+- Dangling observer pointer in AMS cross-singleton cleanup during reconnection
+- Backlight stays on during sleep mode for AD5X/CC1 displays (#235)
+- Job queue fetch race condition at startup before WebSocket is connected
+- Spoolman spool editing: vendor, material, color, and filament_id now sync correctly
+- Happy Hare gate_spool_id parsing for Spoolman fill gauge display
+- AMS slot editing from overview panel context menu
+- Internal macros (underscore-prefixed) hidden from macro picker
+- Fan panel: temperature_fan classified as auto-controlled, knob hidden; primary color for arc indicator; dial clipping fixed
+- Navigation: overlays restored via go_back() now receive on_activate()
+- OpenGL ES rendering stride alignment for blit operations
+- E-stop button repositioned to top center of print status widget
+- Humidity sensor log spam reduced to display-precision changes only
+- Pressed feedback added to favorite macro widgets
+- Widget auto-shrinks to fit when default size exceeds available space
+- Toast notification when no room for widget placement
+
+### Changed
+- Translations updated: 47 new strings across all 8 languages
+- Home Widgets settings overlay removed (replaced by widget catalog)
+- Removed static linking on AD5X platform
+
 ## [0.95.0] - 2026-03-01
 
 The biggest release yet — HelixScreen's home panel is now a fully customizable grid dashboard. Drag widgets to reposition, resize from any edge, add new widgets from a catalog, and remove what you don't need. The layout persists per-breakpoint and survives restarts. Also includes significant memory optimizations, a new screensaver, material temperature presets, and a standalone About overlay.
@@ -1354,6 +1391,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.95.1]: https://github.com/prestonbrown/helixscreen/compare/v0.95.0...v0.95.1
 [0.95.0]: https://github.com/prestonbrown/helixscreen/compare/v0.13.13...v0.95.0
 [0.13.13]: https://github.com/prestonbrown/helixscreen/compare/v0.13.12...v0.13.13
 [0.13.12]: https://github.com/prestonbrown/helixscreen/compare/v0.13.11...v0.13.12
