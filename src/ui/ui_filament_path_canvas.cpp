@@ -164,7 +164,8 @@ struct FilamentPathData {
     lv_color_t color_hub_border;
     lv_color_t color_nozzle;
     lv_color_t color_text;
-    lv_color_t color_bg; // Canvas background (for hollow tube bore)
+    lv_color_t color_bg;      // Canvas background (for hollow tube bore)
+    lv_color_t color_success; // Success color (cached for draw callbacks)
 
     // Theme-derived sizes
     int32_t line_width_idle = LINE_WIDTH_IDLE_BASE;
@@ -193,6 +194,7 @@ static void load_theme_colors(FilamentPathData* data) {
     data->color_nozzle = lv_color_hex(NOZZLE_UNLOADED_COLOR);
     data->color_text = theme_manager_get_color("text");
     data->color_bg = theme_manager_get_color("card_bg");
+    data->color_success = theme_manager_get_color("success");
 
     // Get responsive sizing from theme
     int32_t space_xs = theme_manager_get_spacing("space_xs");
@@ -1366,7 +1368,7 @@ static void draw_parallel_topology(lv_event_t* e, FilamentPathData* data) {
             // Badge text
             lv_draw_label_dsc_t label_dsc;
             lv_draw_label_dsc_init(&label_dsc);
-            label_dsc.color = is_mounted ? theme_manager_get_color("success") : data->color_text;
+            label_dsc.color = is_mounted ? data->color_success : data->color_text;
             label_dsc.opa = toolhead_opa;
             label_dsc.font = data->label_font;
             label_dsc.align = LV_TEXT_ALIGN_CENTER;
@@ -2409,36 +2411,45 @@ lv_obj_t* ui_filament_path_canvas_create(lv_obj_t* parent) {
 
 void ui_filament_path_canvas_set_topology(lv_obj_t* obj, int topology) {
     auto* data = get_data(obj);
-    if (data) {
-        data->topology = topology;
-        lv_obj_invalidate(obj);
-    }
+    if (!data || data->topology == topology)
+        return;
+    data->topology = topology;
+    lv_obj_invalidate(obj);
 }
 
 void ui_filament_path_canvas_set_slot_count(lv_obj_t* obj, int count) {
     auto* data = get_data(obj);
-    if (data) {
-        data->slot_count = LV_CLAMP(count, 1, 16);
-        lv_obj_invalidate(obj);
-    }
+    if (!data)
+        return;
+    int clamped = LV_CLAMP(count, 1, 16);
+    if (data->slot_count == clamped)
+        return;
+    data->slot_count = clamped;
+    lv_obj_invalidate(obj);
 }
 
 void ui_filament_path_canvas_set_slot_overlap(lv_obj_t* obj, int32_t overlap) {
     auto* data = get_data(obj);
-    if (data) {
-        data->slot_overlap = LV_MAX(overlap, 0);
-        spdlog::trace("[FilamentPath] Slot overlap set to {}px", data->slot_overlap);
-        lv_obj_invalidate(obj);
-    }
+    if (!data)
+        return;
+    int32_t clamped = LV_MAX(overlap, 0);
+    if (data->slot_overlap == clamped)
+        return;
+    data->slot_overlap = clamped;
+    spdlog::trace("[FilamentPath] Slot overlap set to {}px", data->slot_overlap);
+    lv_obj_invalidate(obj);
 }
 
 void ui_filament_path_canvas_set_slot_width(lv_obj_t* obj, int32_t width) {
     auto* data = get_data(obj);
-    if (data) {
-        data->slot_width = LV_MAX(width, 20); // Minimum 20px
-        spdlog::trace("[FilamentPath] Slot width set to {}px", data->slot_width);
-        lv_obj_invalidate(obj);
-    }
+    if (!data)
+        return;
+    int32_t clamped = LV_MAX(width, 20); // Minimum 20px
+    if (data->slot_width == clamped)
+        return;
+    data->slot_width = clamped;
+    spdlog::trace("[FilamentPath] Slot width set to {}px", data->slot_width);
+    lv_obj_invalidate(obj);
 }
 
 void ui_filament_path_canvas_set_slot_grid(lv_obj_t* obj, lv_obj_t* slot_grid) {
@@ -2466,24 +2477,25 @@ void ui_filament_path_canvas_set_slot_grid(lv_obj_t* obj, lv_obj_t* slot_grid) {
 
 void ui_filament_path_canvas_set_active_slot(lv_obj_t* obj, int slot) {
     auto* data = get_data(obj);
-    if (data) {
-        int old_slot = data->active_slot;
-        data->active_slot = slot;
+    if (!data || data->active_slot == slot)
+        return;
 
-        // LINEAR topology: animate output_x sliding to new slot position
-        if (data->topology == 0 && slot >= 0 && old_slot >= 0 && old_slot != slot) {
-            lv_area_t coords;
-            lv_obj_get_coords(obj, &coords);
-            int32_t x_off = coords.x1;
-            int32_t new_x = x_off + get_slot_x(data, slot, x_off);
-            int32_t old_x = data->output_x_current;
-            if (old_x == 0)
-                old_x = x_off + get_slot_x(data, old_slot, x_off);
-            start_output_x_animation(obj, data, old_x, new_x);
-        }
+    int old_slot = data->active_slot;
+    data->active_slot = slot;
 
-        lv_obj_invalidate(obj);
+    // LINEAR topology: animate output_x sliding to new slot position
+    if (data->topology == 0 && slot >= 0 && old_slot >= 0) {
+        lv_area_t coords;
+        lv_obj_get_coords(obj, &coords);
+        int32_t x_off = coords.x1;
+        int32_t new_x = x_off + get_slot_x(data, slot, x_off);
+        int32_t old_x = data->output_x_current;
+        if (old_x == 0)
+            old_x = x_off + get_slot_x(data, old_slot, x_off);
+        start_output_x_animation(obj, data, old_x, new_x);
     }
+
+    lv_obj_invalidate(obj);
 }
 
 void ui_filament_path_canvas_set_filament_segment(lv_obj_t* obj, int segment) {
@@ -2494,18 +2506,19 @@ void ui_filament_path_canvas_set_filament_segment(lv_obj_t* obj, int segment) {
     int new_segment = LV_CLAMP(segment, 0, PATH_SEGMENT_COUNT - 1);
     int old_segment = data->filament_segment;
 
-    if (new_segment != old_segment) {
-        // Start animation from old to new segment
-        start_segment_animation(obj, data, old_segment, new_segment);
-        data->filament_segment = new_segment;
-        spdlog::info("[FilamentPath] Segment changed: {} -> {} (animating)", old_segment,
-                     new_segment);
-    }
+    if (new_segment == old_segment)
+        return;
+
+    // Start animation from old to new segment
+    start_segment_animation(obj, data, old_segment, new_segment);
+    data->filament_segment = new_segment;
+    spdlog::info("[FilamentPath] Segment changed: {} -> {} (animating)", old_segment,
+                 new_segment);
 
     // Stop flow animation when filament reaches a terminal position via a
-    // single-step transition (normal operation). Big jumps (e.g., 0→7 initial
-    // setup) are not real flow operations — don't stop flow for those.
-    if (data->flow_anim_active && new_segment != old_segment) {
+    // single-step transition (normal operation). Big jumps (e.g., 0->7 initial
+    // setup) are not real flow operations -- don't stop flow for those.
+    if (data->flow_anim_active) {
         int step = std::abs(new_segment - old_segment);
         bool is_terminal = (new_segment == 0 || new_segment == PATH_SEGMENT_COUNT - 1);
         if (is_terminal && step <= 2) {
@@ -2523,6 +2536,9 @@ void ui_filament_path_canvas_set_error_segment(lv_obj_t* obj, int segment) {
 
     int new_error = LV_CLAMP(segment, 0, PATH_SEGMENT_COUNT - 1);
     int old_error = data->error_segment;
+
+    if (new_error == old_error)
+        return;
 
     data->error_segment = new_error;
 
@@ -2542,18 +2558,21 @@ void ui_filament_path_canvas_set_error_segment(lv_obj_t* obj, int segment) {
 
 void ui_filament_path_canvas_set_anim_progress(lv_obj_t* obj, int progress) {
     auto* data = get_data(obj);
-    if (data) {
-        data->anim_progress = LV_CLAMP(progress, 0, 100);
-        lv_obj_invalidate(obj);
-    }
+    if (!data)
+        return;
+    int clamped = LV_CLAMP(progress, 0, 100);
+    if (data->anim_progress == clamped)
+        return;
+    data->anim_progress = clamped;
+    lv_obj_invalidate(obj);
 }
 
 void ui_filament_path_canvas_set_filament_color(lv_obj_t* obj, uint32_t color) {
     auto* data = get_data(obj);
-    if (data) {
-        data->filament_color = color;
-        lv_obj_invalidate(obj);
-    }
+    if (!data || data->filament_color == color)
+        return;
+    data->filament_color = color;
+    lv_obj_invalidate(obj);
 }
 
 void ui_filament_path_canvas_refresh(lv_obj_t* obj) {
@@ -2743,16 +2762,16 @@ void ui_filament_path_canvas_set_buffer_fault_state(lv_obj_t* obj, int state) {
 
 void ui_filament_path_canvas_set_bypass_color(lv_obj_t* obj, uint32_t color) {
     auto* data = get_data(obj);
-    if (data) {
-        data->bypass_color = color;
-        lv_obj_invalidate(obj);
-    }
+    if (!data || data->bypass_color == color)
+        return;
+    data->bypass_color = color;
+    lv_obj_invalidate(obj);
 }
 
 void ui_filament_path_canvas_set_bypass_has_spool(lv_obj_t* obj, bool has_spool) {
     auto* data = get_data(obj);
-    if (data) {
-        data->bypass_has_spool = has_spool;
-        lv_obj_invalidate(obj);
-    }
+    if (!data || data->bypass_has_spool == has_spool)
+        return;
+    data->bypass_has_spool = has_spool;
+    lv_obj_invalidate(obj);
 }

@@ -825,6 +825,9 @@ class AmsState {
   private:
     friend class AmsStateTestAccess;
 
+    /** @brief Set "Currently Loaded" subjects to default/empty state with guards */
+    void set_current_loaded_defaults();
+
     AmsState();
     ~AmsState();
 

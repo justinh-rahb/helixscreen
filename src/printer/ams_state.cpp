@@ -449,7 +449,10 @@ int AmsState::add_backend(std::unique_ptr<AmsBackend> backend) {
     }
 
     // Update backend count subject for UI binding
-    lv_subject_set_int(&backend_count_, static_cast<int>(backends_.size()));
+    int new_count = static_cast<int>(backends_.size());
+    if (lv_subject_get_int(&backend_count_) != new_count) {
+        lv_subject_set_int(&backend_count_, new_count);
+    }
 
     return index;
 }
@@ -485,8 +488,12 @@ void AmsState::clear_backends() {
     secondary_slot_subjects_.clear();
 
     // Reset backend selector subjects
-    lv_subject_set_int(&backend_count_, 0);
-    lv_subject_set_int(&active_backend_, 0);
+    if (lv_subject_get_int(&backend_count_) != 0) {
+        lv_subject_set_int(&backend_count_, 0);
+    }
+    if (lv_subject_get_int(&active_backend_) != 0) {
+        lv_subject_set_int(&active_backend_, 0);
+    }
 }
 
 AmsBackend* AmsState::get_backend() const {
@@ -500,7 +507,9 @@ int AmsState::active_backend_index() const {
 void AmsState::set_active_backend(int index) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     if (index >= 0 && index < static_cast<int>(backends_.size())) {
-        lv_subject_set_int(&active_backend_, index);
+        if (lv_subject_get_int(&active_backend_) != index) {
+            lv_subject_set_int(&active_backend_, index);
+        }
     }
 }
 
@@ -680,10 +689,16 @@ void AmsState::sync_from_backend() {
     AmsSystemInfo info = backend->get_system_info();
 
     // Update system-level subjects
-    lv_subject_set_int(&ams_type_, static_cast<int>(info.type));
+    int new_type = static_cast<int>(info.type);
+    if (lv_subject_get_int(&ams_type_) != new_type) {
+        lv_subject_set_int(&ams_type_, new_type);
+    }
     spdlog::debug("[AmsState] sync_from_backend: action={} ({})", static_cast<int>(info.action),
                   ams_action_to_string(info.action));
-    lv_subject_set_int(&ams_action_, static_cast<int>(info.action));
+    int new_action = static_cast<int>(info.action);
+    if (lv_subject_get_int(&ams_action_) != new_action) {
+        lv_subject_set_int(&ams_action_, new_action);
+    }
 
     // Set system name from backend type_name or fallback to type string
     std::string sys_name;
@@ -692,7 +707,9 @@ void AmsState::sync_from_backend() {
     } else {
         sys_name = ams_type_to_string(info.type);
     }
-    lv_subject_copy_string(&ams_system_name_, sys_name.c_str());
+    if (strcmp(lv_subject_get_string(&ams_system_name_), sys_name.c_str()) != 0) {
+        lv_subject_copy_string(&ams_system_name_, sys_name.c_str());
+    }
 
     // Set system logo path for declarative image binding (pointer subject for bind_src)
     const char* logo_path = get_logo_path(sys_name);
@@ -702,57 +719,100 @@ void AmsState::sync_from_backend() {
         system_logo_buf_[sizeof(system_logo_buf_) - 1] = '\0';
         lv_subject_set_pointer(&ams_system_logo_, system_logo_buf_);
     }
-    lv_subject_set_int(&current_slot_, info.current_slot);
-    lv_subject_set_int(&pending_target_slot_, info.pending_target_slot);
-    lv_subject_set_int(&ams_current_tool_, info.current_tool);
+    if (lv_subject_get_int(&current_slot_) != info.current_slot) {
+        lv_subject_set_int(&current_slot_, info.current_slot);
+    }
+    if (lv_subject_get_int(&pending_target_slot_) != info.pending_target_slot) {
+        lv_subject_set_int(&pending_target_slot_, info.pending_target_slot);
+    }
+    if (lv_subject_get_int(&ams_current_tool_) != info.current_tool) {
+        lv_subject_set_int(&ams_current_tool_, info.current_tool);
+    }
 
     // Update formatted tool text (e.g., "T0", "T1", or "---" when no tool active)
     if (info.current_tool >= 0) {
         snprintf(ams_current_tool_text_buf_, sizeof(ams_current_tool_text_buf_), "T%d",
                  info.current_tool);
-        lv_subject_copy_string(&ams_current_tool_text_, ams_current_tool_text_buf_);
+        if (strcmp(lv_subject_get_string(&ams_current_tool_text_),
+                  ams_current_tool_text_buf_) != 0) {
+            lv_subject_copy_string(&ams_current_tool_text_, ams_current_tool_text_buf_);
+        }
     } else {
-        lv_subject_copy_string(&ams_current_tool_text_, "---");
+        if (strcmp(lv_subject_get_string(&ams_current_tool_text_), "---") != 0) {
+            lv_subject_copy_string(&ams_current_tool_text_, "---");
+        }
     }
 
-    lv_subject_set_int(&filament_loaded_, info.filament_loaded ? 1 : 0);
-    lv_subject_set_int(&bypass_active_, info.current_slot == -2 ? 1 : 0);
-    lv_subject_set_int(&supports_bypass_, info.supports_bypass ? 1 : 0);
+    int new_loaded = info.filament_loaded ? 1 : 0;
+    if (lv_subject_get_int(&filament_loaded_) != new_loaded) {
+        lv_subject_set_int(&filament_loaded_, new_loaded);
+    }
+    int new_bypass = info.current_slot == -2 ? 1 : 0;
+    if (lv_subject_get_int(&bypass_active_) != new_bypass) {
+        lv_subject_set_int(&bypass_active_, new_bypass);
+    }
+    int new_supports_bypass = info.supports_bypass ? 1 : 0;
+    if (lv_subject_get_int(&supports_bypass_) != new_supports_bypass) {
+        lv_subject_set_int(&supports_bypass_, new_supports_bypass);
+    }
 
     // Update external spool color from persistent settings
     auto ext_spool = helix::SettingsManager::instance().get_external_spool_info();
-    lv_subject_set_int(&external_spool_color_,
-                       ext_spool.has_value() ? static_cast<int>(ext_spool->color_rgb) : 0);
-    lv_subject_set_int(&ams_slot_count_, info.total_slots);
+    int new_ext_color = ext_spool.has_value() ? static_cast<int>(ext_spool->color_rgb) : 0;
+    if (lv_subject_get_int(&external_spool_color_) != new_ext_color) {
+        lv_subject_set_int(&external_spool_color_, new_ext_color);
+    }
+    if (lv_subject_get_int(&ams_slot_count_) != info.total_slots) {
+        lv_subject_set_int(&ams_slot_count_, info.total_slots);
+    }
 
     // Update tool change progress display
     if (info.number_of_toolchanges > 0) {
-        lv_subject_set_int(&toolchange_visible_, 1);
+        if (lv_subject_get_int(&toolchange_visible_) != 1) {
+            lv_subject_set_int(&toolchange_visible_, 1);
+        }
         int display_current = std::max(0, info.current_toolchange + 1); // 1-based
         snprintf(toolchange_text_buf_, sizeof(toolchange_text_buf_), "%d / %d", display_current,
                  info.number_of_toolchanges);
-        lv_subject_copy_string(&toolchange_text_, toolchange_text_buf_);
+        if (strcmp(lv_subject_get_string(&toolchange_text_), toolchange_text_buf_) != 0) {
+            lv_subject_copy_string(&toolchange_text_, toolchange_text_buf_);
+        }
     } else {
-        lv_subject_set_int(&toolchange_visible_, 0);
-        lv_subject_copy_string(&toolchange_text_, "");
+        if (lv_subject_get_int(&toolchange_visible_) != 0) {
+            lv_subject_set_int(&toolchange_visible_, 0);
+        }
+        if (strcmp(lv_subject_get_string(&toolchange_text_), "") != 0) {
+            lv_subject_copy_string(&toolchange_text_, "");
+        }
     }
 
     // Update action detail string
-    if (!info.operation_detail.empty()) {
-        lv_subject_copy_string(&ams_action_detail_, info.operation_detail.c_str());
-    } else {
-        lv_subject_copy_string(&ams_action_detail_, ams_action_to_string(info.action));
+    const char* detail_str =
+        !info.operation_detail.empty() ? info.operation_detail.c_str() : ams_action_to_string(info.action);
+    if (strcmp(lv_subject_get_string(&ams_action_detail_), detail_str) != 0) {
+        lv_subject_copy_string(&ams_action_detail_, detail_str);
     }
 
     // Update path visualization subjects
-    lv_subject_set_int(&path_topology_, static_cast<int>(backend->get_topology()));
-    lv_subject_set_int(&path_active_slot_, info.current_slot);
-    lv_subject_set_int(&path_filament_segment_, static_cast<int>(backend->get_filament_segment()));
-    lv_subject_set_int(&path_error_segment_, static_cast<int>(backend->infer_error_segment()));
+    int new_topology = static_cast<int>(backend->get_topology());
+    if (lv_subject_get_int(&path_topology_) != new_topology) {
+        lv_subject_set_int(&path_topology_, new_topology);
+    }
+    if (lv_subject_get_int(&path_active_slot_) != info.current_slot) {
+        lv_subject_set_int(&path_active_slot_, info.current_slot);
+    }
+    int new_filament_seg = static_cast<int>(backend->get_filament_segment());
+    if (lv_subject_get_int(&path_filament_segment_) != new_filament_seg) {
+        lv_subject_set_int(&path_filament_segment_, new_filament_seg);
+    }
+    int new_error_seg = static_cast<int>(backend->infer_error_segment());
+    if (lv_subject_get_int(&path_error_segment_) != new_error_seg) {
+        lv_subject_set_int(&path_error_segment_, new_error_seg);
+    }
     // If backend provides bowden progress (v4), use it to drive animation progress.
     // Otherwise, path_anim_progress_ stays under UI animation control.
     int bowden_progress = backend->get_bowden_progress();
-    if (bowden_progress >= 0) {
+    if (bowden_progress >= 0 && lv_subject_get_int(&path_anim_progress_) != bowden_progress) {
         lv_subject_set_int(&path_anim_progress_, bowden_progress);
     }
 
@@ -926,26 +986,50 @@ void AmsState::sync_dryer_from_backend() {
     auto* backend = get_backend(0);
     if (!backend) {
         // No backend - clear dryer state
-        lv_subject_set_int(&dryer_supported_, 0);
-        lv_subject_set_int(&dryer_active_, 0);
+        if (lv_subject_get_int(&dryer_supported_) != 0) {
+            lv_subject_set_int(&dryer_supported_, 0);
+        }
+        if (lv_subject_get_int(&dryer_active_) != 0) {
+            lv_subject_set_int(&dryer_active_, 0);
+        }
         return;
     }
 
     DryerInfo dryer = backend->get_dryer_info();
 
     // Update integer subjects
-    lv_subject_set_int(&dryer_supported_, dryer.supported ? 1 : 0);
-    lv_subject_set_int(&dryer_active_, dryer.active ? 1 : 0);
-    lv_subject_set_int(&dryer_current_temp_, static_cast<int>(dryer.current_temp_c));
-    lv_subject_set_int(&dryer_target_temp_, static_cast<int>(dryer.target_temp_c));
-    lv_subject_set_int(&dryer_remaining_min_, dryer.remaining_min);
-    lv_subject_set_int(&dryer_progress_pct_, dryer.get_progress_pct());
+    int new_supported = dryer.supported ? 1 : 0;
+    if (lv_subject_get_int(&dryer_supported_) != new_supported) {
+        lv_subject_set_int(&dryer_supported_, new_supported);
+    }
+    int new_dryer_active = dryer.active ? 1 : 0;
+    if (lv_subject_get_int(&dryer_active_) != new_dryer_active) {
+        lv_subject_set_int(&dryer_active_, new_dryer_active);
+    }
+    int new_cur_temp = static_cast<int>(dryer.current_temp_c);
+    if (lv_subject_get_int(&dryer_current_temp_) != new_cur_temp) {
+        lv_subject_set_int(&dryer_current_temp_, new_cur_temp);
+    }
+    int new_tgt_temp = static_cast<int>(dryer.target_temp_c);
+    if (lv_subject_get_int(&dryer_target_temp_) != new_tgt_temp) {
+        lv_subject_set_int(&dryer_target_temp_, new_tgt_temp);
+    }
+    if (lv_subject_get_int(&dryer_remaining_min_) != dryer.remaining_min) {
+        lv_subject_set_int(&dryer_remaining_min_, dryer.remaining_min);
+    }
+    int new_progress = dryer.get_progress_pct();
+    if (lv_subject_get_int(&dryer_progress_pct_) != new_progress) {
+        lv_subject_set_int(&dryer_progress_pct_, new_progress);
+    }
 
     // Format temperature text strings
     if (dryer.supported) {
         snprintf(dryer_current_temp_text_buf_, sizeof(dryer_current_temp_text_buf_), "%d°C",
                  static_cast<int>(dryer.current_temp_c));
-        lv_subject_copy_string(&dryer_current_temp_text_, dryer_current_temp_text_buf_);
+        if (strcmp(lv_subject_get_string(&dryer_current_temp_text_),
+                  dryer_current_temp_text_buf_) != 0) {
+            lv_subject_copy_string(&dryer_current_temp_text_, dryer_current_temp_text_buf_);
+        }
 
         if (dryer.target_temp_c > 0) {
             snprintf(dryer_target_temp_text_buf_, sizeof(dryer_target_temp_text_buf_), "%d°C",
@@ -953,7 +1037,10 @@ void AmsState::sync_dryer_from_backend() {
         } else {
             snprintf(dryer_target_temp_text_buf_, sizeof(dryer_target_temp_text_buf_), "Off");
         }
-        lv_subject_copy_string(&dryer_target_temp_text_, dryer_target_temp_text_buf_);
+        if (strcmp(lv_subject_get_string(&dryer_target_temp_text_),
+                  dryer_target_temp_text_buf_) != 0) {
+            lv_subject_copy_string(&dryer_target_temp_text_, dryer_target_temp_text_buf_);
+        }
 
         // Format time remaining text
         if (dryer.active && dryer.remaining_min > 0) {
@@ -963,11 +1050,19 @@ void AmsState::sync_dryer_from_backend() {
         } else {
             dryer_time_text_buf_[0] = '\0';
         }
-        lv_subject_copy_string(&dryer_time_text_, dryer_time_text_buf_);
+        if (strcmp(lv_subject_get_string(&dryer_time_text_), dryer_time_text_buf_) != 0) {
+            lv_subject_copy_string(&dryer_time_text_, dryer_time_text_buf_);
+        }
     } else {
-        lv_subject_copy_string(&dryer_current_temp_text_, "---");
-        lv_subject_copy_string(&dryer_target_temp_text_, "---");
-        lv_subject_copy_string(&dryer_time_text_, "");
+        if (strcmp(lv_subject_get_string(&dryer_current_temp_text_), "---") != 0) {
+            lv_subject_copy_string(&dryer_current_temp_text_, "---");
+        }
+        if (strcmp(lv_subject_get_string(&dryer_target_temp_text_), "---") != 0) {
+            lv_subject_copy_string(&dryer_target_temp_text_, "---");
+        }
+        if (strcmp(lv_subject_get_string(&dryer_time_text_), "") != 0) {
+            lv_subject_copy_string(&dryer_time_text_, "");
+        }
     }
 
     spdlog::trace("[AMS State] Synced dryer - supported={}, active={}, temp={}→{}°C, {}min left",
@@ -977,18 +1072,27 @@ void AmsState::sync_dryer_from_backend() {
 
 void AmsState::set_action_detail(const std::string& detail) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
-    lv_subject_copy_string(&ams_action_detail_, detail.c_str());
-    spdlog::debug("[AMS State] Action detail set: {}", detail);
+    if (strcmp(lv_subject_get_string(&ams_action_detail_), detail.c_str()) != 0) {
+        lv_subject_copy_string(&ams_action_detail_, detail.c_str());
+        spdlog::debug("[AMS State] Action detail set: {}", detail);
+    }
 }
 
 void AmsState::set_action(AmsAction action) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
-    lv_subject_set_int(&ams_action_, static_cast<int>(action));
-    spdlog::debug("[AMS State] Action set: {}", ams_action_to_string(action));
+    int val = static_cast<int>(action);
+    if (lv_subject_get_int(&ams_action_) != val) {
+        lv_subject_set_int(&ams_action_, val);
+        spdlog::debug("[AMS State] Action set: {}", ams_action_to_string(action));
+    }
 }
 
 void AmsState::set_pending_target_slot(int slot) {
-    helix::ui::queue_update([this, slot]() { lv_subject_set_int(&pending_target_slot_, slot); });
+    helix::ui::queue_update([this, slot]() {
+        if (lv_subject_get_int(&pending_target_slot_) != slot) {
+            lv_subject_set_int(&pending_target_slot_, slot);
+        }
+    });
 }
 
 bool AmsState::is_filament_operation_active() {
@@ -1007,15 +1111,30 @@ bool AmsState::is_filament_operation_active() {
     }
 }
 
+void AmsState::set_current_loaded_defaults() {
+    if (strcmp(lv_subject_get_string(&current_material_text_), "---") != 0) {
+        lv_subject_copy_string(&current_material_text_, "---");
+    }
+    const char* default_slot = lv_tr("Currently Loaded");
+    if (strcmp(lv_subject_get_string(&current_slot_text_), default_slot) != 0) {
+        lv_subject_copy_string(&current_slot_text_, default_slot);
+    }
+    if (strcmp(lv_subject_get_string(&current_weight_text_), "") != 0) {
+        lv_subject_copy_string(&current_weight_text_, "");
+    }
+    if (lv_subject_get_int(&current_has_weight_) != 0) {
+        lv_subject_set_int(&current_has_weight_, 0);
+    }
+    if (lv_subject_get_int(&current_color_) != 0x505050) {
+        lv_subject_set_int(&current_color_, 0x505050);
+    }
+}
+
 void AmsState::sync_current_loaded_from_backend() {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
 
     if (backends_.empty()) {
-        lv_subject_copy_string(&current_material_text_, "---");
-        lv_subject_copy_string(&current_slot_text_, lv_tr("Currently Loaded"));
-        lv_subject_copy_string(&current_weight_text_, "");
-        lv_subject_set_int(&current_has_weight_, 0);
-        lv_subject_set_int(&current_color_, 0x505050);
+        set_current_loaded_defaults();
         return;
     }
 
@@ -1029,11 +1148,7 @@ void AmsState::sync_current_loaded_from_backend(const AmsSystemInfo& primary_inf
     std::lock_guard<std::recursive_mutex> lock(mutex_);
 
     if (backends_.empty()) {
-        lv_subject_copy_string(&current_material_text_, "---");
-        lv_subject_copy_string(&current_slot_text_, lv_tr("Currently Loaded"));
-        lv_subject_copy_string(&current_weight_text_, "");
-        lv_subject_set_int(&current_has_weight_, 0);
-        lv_subject_set_int(&current_color_, 0x505050);
+        set_current_loaded_defaults();
         return;
     }
 
@@ -1077,23 +1192,26 @@ void AmsState::sync_current_loaded_from_backend(const AmsSystemInfo& primary_inf
     }
 
     if (!loaded_backend) {
-        lv_subject_copy_string(&current_material_text_, "---");
-        lv_subject_copy_string(&current_slot_text_, lv_tr("Currently Loaded"));
-        lv_subject_copy_string(&current_weight_text_, "");
-        lv_subject_set_int(&current_has_weight_, 0);
+        set_current_loaded_defaults();
         lv_subject_set_int(&current_color_, 0x505050);
         return;
     }
 
     // Check for bypass mode (slot_index == -2)
     if (slot_index == -2 && loaded_backend->is_bypass_active()) {
-        lv_subject_copy_string(&current_slot_text_, lv_tr("Current: Bypass"));
+        const char* bypass_text = lv_tr("Current: Bypass");
+        if (strcmp(lv_subject_get_string(&current_slot_text_), bypass_text) != 0) {
+            lv_subject_copy_string(&current_slot_text_, bypass_text);
+        }
 
         // Show actual spool info if external spool is assigned
         auto ext_spool = get_external_spool_info();
         if (ext_spool.has_value()) {
             const auto& ext = ext_spool.value();
-            lv_subject_set_int(&current_color_, static_cast<int>(ext.color_rgb));
+            int ext_color = static_cast<int>(ext.color_rgb);
+            if (lv_subject_get_int(&current_color_) != ext_color) {
+                lv_subject_set_int(&current_color_, ext_color);
+            }
 
             // Build label from spool info
             std::string color_label;
@@ -1112,22 +1230,42 @@ void AmsState::sync_current_loaded_from_backend(const AmsSystemInfo& primary_inf
             } else {
                 label = lv_tr("External");
             }
-            lv_subject_copy_string(&current_material_text_, label.c_str());
+            if (strcmp(lv_subject_get_string(&current_material_text_), label.c_str()) != 0) {
+                lv_subject_copy_string(&current_material_text_, label.c_str());
+            }
 
             if (ext.total_weight_g > 0.0f && ext.remaining_weight_g >= 0.0f) {
                 snprintf(current_weight_text_buf_, sizeof(current_weight_text_buf_), "%.0fg",
                          ext.remaining_weight_g);
-                lv_subject_copy_string(&current_weight_text_, current_weight_text_buf_);
-                lv_subject_set_int(&current_has_weight_, 1);
+                if (strcmp(lv_subject_get_string(&current_weight_text_),
+                          current_weight_text_buf_) != 0) {
+                    lv_subject_copy_string(&current_weight_text_, current_weight_text_buf_);
+                }
+                if (lv_subject_get_int(&current_has_weight_) != 1) {
+                    lv_subject_set_int(&current_has_weight_, 1);
+                }
             } else {
-                lv_subject_copy_string(&current_weight_text_, "");
-                lv_subject_set_int(&current_has_weight_, 0);
+                if (strcmp(lv_subject_get_string(&current_weight_text_), "") != 0) {
+                    lv_subject_copy_string(&current_weight_text_, "");
+                }
+                if (lv_subject_get_int(&current_has_weight_) != 0) {
+                    lv_subject_set_int(&current_has_weight_, 0);
+                }
             }
         } else {
-            lv_subject_copy_string(&current_material_text_, lv_tr("External"));
-            lv_subject_copy_string(&current_weight_text_, "");
-            lv_subject_set_int(&current_has_weight_, 0);
-            lv_subject_set_int(&current_color_, 0x888888);
+            const char* ext_text = lv_tr("External");
+            if (strcmp(lv_subject_get_string(&current_material_text_), ext_text) != 0) {
+                lv_subject_copy_string(&current_material_text_, ext_text);
+            }
+            if (strcmp(lv_subject_get_string(&current_weight_text_), "") != 0) {
+                lv_subject_copy_string(&current_weight_text_, "");
+            }
+            if (lv_subject_get_int(&current_has_weight_) != 0) {
+                lv_subject_set_int(&current_has_weight_, 0);
+            }
+            if (lv_subject_get_int(&current_color_) != 0x888888) {
+                lv_subject_set_int(&current_color_, 0x888888);
+            }
         }
     } else if (slot_index >= 0 && filament_loaded) {
         // Filament is loaded - show slot info from the backend that has it loaded
@@ -1147,7 +1285,10 @@ void AmsState::sync_current_loaded_from_backend(const AmsSystemInfo& primary_inf
         }
 
         // Set color
-        lv_subject_set_int(&current_color_, static_cast<int>(slot_info.color_rgb));
+        int slot_color = static_cast<int>(slot_info.color_rgb);
+        if (lv_subject_get_int(&current_color_) != slot_color) {
+            lv_subject_set_int(&current_color_, slot_color);
+        }
 
         // Build material label - color name + material (e.g., "Red PLA")
         // Use Spoolman color name if available, otherwise identify from hex
@@ -1169,7 +1310,9 @@ void AmsState::sync_current_loaded_from_backend(const AmsSystemInfo& primary_inf
             } else {
                 label = "Filament";
             }
-            lv_subject_copy_string(&current_material_text_, label.c_str());
+            if (strcmp(lv_subject_get_string(&current_material_text_), label.c_str()) != 0) {
+                lv_subject_copy_string(&current_material_text_, label.c_str());
+            }
         }
 
         // Set slot label with unit name
@@ -1201,26 +1344,34 @@ void AmsState::sync_current_loaded_from_backend(const AmsSystemInfo& primary_inf
                              lv_tr("Current: Slot %d"), display_slot);
                 }
             }
-            lv_subject_copy_string(&current_slot_text_, current_slot_text_buf_);
+            if (strcmp(lv_subject_get_string(&current_slot_text_),
+                      current_slot_text_buf_) != 0) {
+                lv_subject_copy_string(&current_slot_text_, current_slot_text_buf_);
+            }
         }
 
         // Show remaining weight if available (from Spoolman or backend)
         if (slot_info.total_weight_g > 0.0f && slot_info.remaining_weight_g >= 0.0f) {
             snprintf(current_weight_text_buf_, sizeof(current_weight_text_buf_), "%.0fg",
                      slot_info.remaining_weight_g);
-            lv_subject_copy_string(&current_weight_text_, current_weight_text_buf_);
-            lv_subject_set_int(&current_has_weight_, 1);
+            if (strcmp(lv_subject_get_string(&current_weight_text_),
+                      current_weight_text_buf_) != 0) {
+                lv_subject_copy_string(&current_weight_text_, current_weight_text_buf_);
+            }
+            if (lv_subject_get_int(&current_has_weight_) != 1) {
+                lv_subject_set_int(&current_has_weight_, 1);
+            }
         } else {
-            lv_subject_copy_string(&current_weight_text_, "");
-            lv_subject_set_int(&current_has_weight_, 0);
+            if (strcmp(lv_subject_get_string(&current_weight_text_), "") != 0) {
+                lv_subject_copy_string(&current_weight_text_, "");
+            }
+            if (lv_subject_get_int(&current_has_weight_) != 0) {
+                lv_subject_set_int(&current_has_weight_, 0);
+            }
         }
     } else {
         // No filament loaded - show empty state
-        lv_subject_copy_string(&current_material_text_, "---");
-        lv_subject_copy_string(&current_slot_text_, lv_tr("Currently Loaded"));
-        lv_subject_copy_string(&current_weight_text_, "");
-        lv_subject_set_int(&current_has_weight_, 0);
-        lv_subject_set_int(&current_color_, 0x505050);
+        set_current_loaded_defaults();
     }
 
     spdlog::trace("[AMS State] Synced current loaded - slot={}, has_weight={}", slot_index,
@@ -1283,13 +1434,18 @@ void AmsState::update_modal_text_subjects() {
     // Format temperature (e.g., "55°C")
     snprintf(dryer_modal_temp_text_buf_, sizeof(dryer_modal_temp_text_buf_), "%d°C",
              modal_target_temp_c_);
-    lv_subject_copy_string(&dryer_modal_temp_text_, dryer_modal_temp_text_buf_);
+    if (strcmp(lv_subject_get_string(&dryer_modal_temp_text_), dryer_modal_temp_text_buf_) != 0) {
+        lv_subject_copy_string(&dryer_modal_temp_text_, dryer_modal_temp_text_buf_);
+    }
 
     // Format duration using utility (e.g., "4h", "30m", "4h 30m")
     std::string duration = helix::format::duration(modal_duration_min_ * 60);
     snprintf(dryer_modal_duration_text_buf_, sizeof(dryer_modal_duration_text_buf_), "%s",
              duration.c_str());
-    lv_subject_copy_string(&dryer_modal_duration_text_, dryer_modal_duration_text_buf_);
+    if (strcmp(lv_subject_get_string(&dryer_modal_duration_text_),
+              dryer_modal_duration_text_buf_) != 0) {
+        lv_subject_copy_string(&dryer_modal_duration_text_, dryer_modal_duration_text_buf_);
+    }
 }
 
 // ============================================================================
@@ -1546,11 +1702,16 @@ std::optional<SlotInfo> AmsState::get_external_spool_info() const {
 void AmsState::set_external_spool_info(const SlotInfo& info) {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     helix::SettingsManager::instance().set_external_spool_info(info);
-    lv_subject_set_int(&external_spool_color_, static_cast<int>(info.color_rgb));
+    int new_color = static_cast<int>(info.color_rgb);
+    if (lv_subject_get_int(&external_spool_color_) != new_color) {
+        lv_subject_set_int(&external_spool_color_, new_color);
+    }
 }
 
 void AmsState::clear_external_spool_info() {
     std::lock_guard<std::recursive_mutex> lock(mutex_);
     helix::SettingsManager::instance().clear_external_spool_info();
-    lv_subject_set_int(&external_spool_color_, 0);
+    if (lv_subject_get_int(&external_spool_color_) != 0) {
+        lv_subject_set_int(&external_spool_color_, 0);
+    }
 }

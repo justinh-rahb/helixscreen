@@ -371,21 +371,17 @@ void ControlsPanel::setup(lv_obj_t* panel, lv_obj_t* parent_screen) {
 }
 
 void ControlsPanel::on_activate() {
-    // Refresh secondary fans list when panel becomes visible
-    // This handles edge cases where:
-    // 1. Fan discovery completed after initial setup
-    // 2. User switched from one printer connection to another
-    // 3. Observer callback was missed due to timing
-    populate_secondary_fans();
+    // NOTE: populate_secondary_fans() and populate_secondary_temps() are NOT called here.
+    // Both are fully driven by observers (fans_version_observer_ and temp_sensor_count_observer_)
+    // set up in register_observers(). Those observers use observe_int_sync (deferred via
+    // ui_queue_update), but they fire regardless of panel visibility — so any discovery or
+    // reconnection that happened while the panel was inactive has already been processed.
 
-    // Refresh secondary temperature sensors list
-    populate_secondary_temps();
-
-    // Refresh macro buttons in case StandardMacros was initialized after setup()
-    // This ensures button labels reflect auto-detected macros, not just fallbacks
+    // Refresh macro buttons — no observer exists for StandardMacros changes,
+    // so this must run on each activation to pick up auto-detected macros
     refresh_macro_buttons();
 
-    spdlog::trace("[{}] Panel activated, refreshed fans, temps, and macro buttons", get_name());
+    spdlog::trace("[{}] Panel activated, refreshed macro buttons", get_name());
 }
 
 // ============================================================================
