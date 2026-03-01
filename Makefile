@@ -133,8 +133,13 @@ endif
 # Ccache integration - auto-detect and use if available (10x faster rebuilds)
 CCACHE := $(shell command -v ccache 2>/dev/null)
 ifneq ($(CCACHE),)
-    CC := ccache $(CC)
-    CXX := ccache $(CXX)
+    # Avoid double-wrapping when CC/CXX already include ccache (common in CI env).
+    ifneq ($(notdir $(firstword $(CC))),ccache)
+        CC := ccache $(CC)
+    endif
+    ifneq ($(notdir $(firstword $(CXX))),ccache)
+        CXX := ccache $(CXX)
+    endif
 endif
 
 # Dependency generation flags for proper header tracking
