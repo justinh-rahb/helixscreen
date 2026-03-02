@@ -5,14 +5,23 @@
 
 #include "ui_modal.h"
 
-#include "favorite_macro_widget.h"
-
 #include <functional>
 #include <map>
 #include <string>
 #include <vector>
 
 namespace helix {
+
+/// Parsed macro parameter with optional default value
+struct MacroParam {
+    std::string name;          ///< Parameter name (uppercase, e.g., "EXTRUDER_TEMP")
+    std::string default_value; ///< Default value from |default(VALUE), empty if none
+};
+
+/// Parse macro parameters from a Klipper gcode_macro template.
+/// Detects params.NAME, params['NAME'], params["NAME"] references and
+/// extracts |default(VALUE) when present. Deduplicates by name.
+[[nodiscard]] std::vector<MacroParam> parse_macro_params(const std::string& gcode_template);
 
 /// Callback invoked when user confirms macro execution with parameters
 using MacroExecuteCallback = std::function<void(const std::map<std::string, std::string>& params)>;

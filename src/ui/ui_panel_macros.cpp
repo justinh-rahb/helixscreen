@@ -16,6 +16,9 @@
 #include "moonraker_api.h"
 #include "moonraker_client.h"
 #include "printer_state.h"
+#include "lvgl/src/others/translation/lv_translation.h"
+#include "ui_modal.h"
+#include "ui_update_queue.h"
 
 #include <spdlog/spdlog.h>
 
@@ -133,6 +136,7 @@ lv_obj_t* MacrosPanel::create(lv_obj_t* parent) {
 void MacrosPanel::on_activate() {
     // Call base class first
     OverlayBase::on_activate();
+    *alive_ = true;
 
     spdlog::debug("[{}] on_activate()", get_name());
 
@@ -142,6 +146,7 @@ void MacrosPanel::on_activate() {
 
 void MacrosPanel::on_deactivate() {
     spdlog::debug("[{}] on_deactivate()", get_name());
+    *alive_ = false;
 
     // Call base class
     OverlayBase::on_deactivate();
@@ -234,7 +239,7 @@ void MacrosPanel::create_macro_card(const std::string& macro_name) {
         }
     }
 
-    // Store entry info
+    // Store entry info — card pointer used for lookup in click callback
     MacroEntry entry;
     entry.card = card;
     entry.name = macro_name;
@@ -242,11 +247,6 @@ void MacrosPanel::create_macro_card(const std::string& macro_name) {
     entry.is_system = !macro_name.empty() && macro_name[0] == '_';
     entry.is_dangerous = is_dangerous;
     macro_entries_.push_back(entry);
-
-    // Store index to MacroEntry in card's user_data for callback lookup
-    // Using index instead of pointer prevents use-after-free when vector resizes
-    size_t index = macro_entries_.size() - 1;
-    lv_obj_set_user_data(card, reinterpret_cast<void*>(static_cast<intptr_t>(index)));
 
     spdlog::debug("[{}] Created card for macro '{}' (dangerous: {})", get_name(), macro_name,
                   is_dangerous);
@@ -273,18 +273,151 @@ void MacrosPanel::execute_macro(const std::string& macro_name) {
 
     spdlog::info("[{}] Executing macro: {}", get_name(), macro_name);
 
-    // Execute via G-code (macros are just G-code commands)
+    // L072: capture copies only — callbacks fire from WebSocket thread
     api->execute_gcode(
         macro_name,
-        [this, macro_name]() {
-            spdlog::info("[{}] Macro '{}' executed successfully", get_name(), macro_name);
-            // Could show toast notification here
+        [macro_name]() {
+            spdlog::info("[MacrosPanel] Macro '{}' executed successfully", macro_name);
         },
-        [this, macro_name](const MoonrakerError& err) {
-            spdlog::error("[{}] Failed to execute macro '{}': {}", get_name(), macro_name,
+        [macro_name](const MoonrakerError& err) {
+            spdlog::error("[MacrosPanel] Failed to execute macro '{}': {}", macro_name,
                           err.message);
-            std::snprintf(status_buf_, sizeof(status_buf_), "Failed: %s", macro_name.c_str());
-            lv_subject_copy_string(&status_subject_, status_buf_);
+        });
+}
+
+void MacrosPanel::fetch_params_and_execute(const std::string& macro_name) {
+    MoonrakerAPI* api = get_moonraker_api();
+    if (!api) {
+        spdlog::warn("[{}] No MoonrakerAPI available - cannot fetch params", get_name());
+        return;
+    }
+
+    bool dangerous = is_dangerous_macro(macro_name);
+
+    // For dangerous macros, show confirmation before doing anything else
+    if (dangerous) {
+        spdlog::warn("[{}] Dangerous macro requested: {}", get_name(), macro_name);
+
+        // Store pending macro name for the confirmation callback
+        pending_dangerous_macro_ = macro_name;
+
+        std::string msg = macro_name + " may cause unintended changes. Are you sure?";
+        helix::ui::modal_show_confirmation(
+            lv_tr("Run Dangerous Macro?"), msg.c_str(), ModalSeverity::Warning, lv_tr("Run"),
+            [](lv_event_t* e) {
+                LVGL_SAFE_EVENT_CB_BEGIN("[MacrosPanel] dangerous_confirm_cb");
+                auto* self = static_cast<MacrosPanel*>(lv_event_get_user_data(e));
+                std::string macro = self->pending_dangerous_macro_;
+                self->pending_dangerous_macro_.clear();
+                Modal::hide(Modal::get_top());
+                self->fetch_params_and_run(macro);
+                LVGL_SAFE_EVENT_CB_END();
+            },
+            [](lv_event_t* e) {
+                LVGL_SAFE_EVENT_CB_BEGIN("[MacrosPanel] dangerous_cancel_cb");
+                auto* self = static_cast<MacrosPanel*>(lv_event_get_user_data(e));
+                self->pending_dangerous_macro_.clear();
+                Modal::hide(Modal::get_top());
+                spdlog::debug("[MacrosPanel] Dangerous macro cancelled");
+                LVGL_SAFE_EVENT_CB_END();
+            },
+            this);
+        return;
+    }
+
+    fetch_params_and_run(macro_name);
+}
+
+void MacrosPanel::fetch_params_and_run(const std::string& macro_name) {
+    MoonrakerAPI* api = get_moonraker_api();
+    if (!api) {
+        spdlog::warn("[{}] No MoonrakerAPI available - cannot fetch params", get_name());
+        return;
+    }
+
+    // Query macro template to detect parameters
+    std::string object_name = "gcode_macro " + macro_name;
+    nlohmann::json params;
+    params["objects"] = nlohmann::json::object();
+    params["objects"][object_name] = nlohmann::json::array({"gcode"});
+
+    std::weak_ptr<bool> weak_alive = alive_;
+    std::string macro_copy = macro_name;
+
+    api->get_client().send_jsonrpc(
+        "printer.objects.query", params,
+        [this, weak_alive, macro_copy, object_name](nlohmann::json response) {
+            if (weak_alive.expired())
+                return;
+
+            std::string gcode_template;
+            try {
+                if (response.contains("result") && response["result"].contains("status") &&
+                    response["result"]["status"].contains(object_name) &&
+                    response["result"]["status"][object_name].contains("gcode")) {
+                    gcode_template =
+                        response["result"]["status"][object_name]["gcode"].get<std::string>();
+                }
+            } catch (const std::exception& e) {
+                spdlog::warn("[{}] Failed to parse template for {}: {}", get_name(), macro_copy,
+                             e.what());
+            }
+
+            auto parsed = helix::parse_macro_params(gcode_template);
+
+            helix::ui::queue_update(
+                [this, weak_alive, parsed = std::move(parsed), macro_copy]() mutable {
+                    if (weak_alive.expired())
+                        return;
+
+                    if (parsed.empty()) {
+                        execute_macro(macro_copy);
+                    } else {
+                        std::weak_ptr<bool> weak = alive_;
+                        std::string name = macro_copy;
+                        param_modal_.show_for_macro(
+                            lv_screen_active(), macro_copy, parsed,
+                            [this, weak,
+                             name](const std::map<std::string, std::string>& values) {
+                                if (weak.expired())
+                                    return;
+                                execute_with_params(name, values);
+                            });
+                    }
+                });
+        },
+        [macro_copy](const MoonrakerError& err) {
+            spdlog::warn("[MacrosPanel] Failed to query template for {}: {}", macro_copy,
+                         err.message);
+        });
+}
+
+void MacrosPanel::execute_with_params(const std::string& macro_name,
+                                      const std::map<std::string, std::string>& params) {
+    MoonrakerAPI* api = get_moonraker_api();
+    if (!api) {
+        spdlog::warn("[{}] No MoonrakerAPI available - cannot execute macro", get_name());
+        return;
+    }
+
+    // Build gcode command: MACRO_NAME PARAM1=value1 PARAM2=value2
+    std::string gcode = macro_name;
+    for (const auto& [key, value] : params) {
+        gcode += " " + key + "=" + value;
+    }
+
+    spdlog::info("[{}] Executing: {}", get_name(), gcode);
+
+    // L072: capture copies only — callbacks fire from WebSocket thread
+    std::string macro_copy = macro_name;
+    api->execute_gcode(
+        gcode,
+        [macro_copy]() {
+            spdlog::info("[MacrosPanel] Macro '{}' executed successfully", macro_copy);
+        },
+        [macro_copy](const MoonrakerError& err) {
+            spdlog::error("[MacrosPanel] Failed to execute macro '{}': {}", macro_copy,
+                          err.message);
         });
 }
 
@@ -302,30 +435,21 @@ void MacrosPanel::set_show_system_macros(bool show_system) {
 void MacrosPanel::on_macro_card_clicked(lv_event_t* e) {
     LVGL_SAFE_EVENT_CB_BEGIN("[MacrosPanel] on_macro_card_clicked");
 
-    // Get the global instance
     auto& self = get_global_macros_panel();
 
-    lv_obj_t* card = static_cast<lv_obj_t*>(lv_event_get_target(e));
+    // Use current_target (the object the callback is registered on = macro_card root),
+    // NOT target (which could be a child icon/label). L069: never assume user_data
+    // ownership on XML-created objects — lv_button sets its own user_data internally.
+    lv_obj_t* card = static_cast<lv_obj_t*>(lv_event_get_current_target(e));
     if (!card) {
         spdlog::warn("[MacrosPanel] No target in click event");
     } else {
-        // Retrieve index from user_data (stored as intptr_t)
-        auto index = static_cast<size_t>(reinterpret_cast<intptr_t>(lv_obj_get_user_data(card)));
-
-        // Bounds check before accessing vector
-        if (index >= self.macro_entries_.size()) {
-            spdlog::error("[MacrosPanel] Invalid macro entry index: {} (size: {})", index,
-                          self.macro_entries_.size());
-        } else {
-            auto& entry = self.macro_entries_[index];
-
-            // For dangerous macros, could show confirmation dialog
-            // For now, execute directly
-            if (entry.is_dangerous) {
-                spdlog::warn("[MacrosPanel] Executing dangerous macro: {}", entry.name);
-                // TODO: Add confirmation modal for dangerous macros
+        // Find macro entry by matching card pointer
+        for (const auto& entry : self.macro_entries_) {
+            if (entry.card == card) {
+                self.fetch_params_and_execute(entry.name);
+                break;
             }
-            self.execute_macro(entry.name);
         }
     }
 

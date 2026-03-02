@@ -331,6 +331,7 @@ void register_xml_components() {
     register_xml("components/panel_widget_shutdown.xml");
     register_xml("components/panel_widget_job_queue.xml");
     register_xml("components/panel_widget_clog_detection.xml");
+    register_xml("components/panel_widget_print_stats.xml");
     register_xml("components/clog_detection_config_modal.xml");
     register_xml("job_queue_modal.xml");
     register_xml("thermistor_sensor_picker.xml");

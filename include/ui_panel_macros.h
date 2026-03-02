@@ -4,9 +4,11 @@
 #pragma once
 
 #include "lvgl.h"
+#include "macro_param_modal.h"
 #include "overlay_base.h"
 #include "subject_managed_panel.h"
 
+#include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -88,10 +90,31 @@ class MacrosPanel : public OverlayBase {
     void clear_macro_list();
 
     /**
-     * @brief Execute a macro by name
+     * @brief Execute a macro by name (no parameters)
      * @param macro_name The macro to execute (e.g., "CLEAN_NOZZLE")
      */
     void execute_macro(const std::string& macro_name);
+
+    /**
+     * @brief Fetch macro template, parse params, and execute or show param modal.
+     * For dangerous macros, shows confirmation first.
+     * @param macro_name The macro to query and execute
+     */
+    void fetch_params_and_execute(const std::string& macro_name);
+
+    /**
+     * @brief Internal: fetch params and run (after any confirmation).
+     * @param macro_name The macro to query and execute
+     */
+    void fetch_params_and_run(const std::string& macro_name);
+
+    /**
+     * @brief Execute a macro with parameter values
+     * @param macro_name The macro name
+     * @param params Map of parameter name to value
+     */
+    void execute_with_params(const std::string& macro_name,
+                             const std::map<std::string, std::string>& params);
 
     /**
      * @brief Prettify a macro name for display
@@ -128,6 +151,11 @@ class MacrosPanel : public OverlayBase {
     // Data
     std::vector<MacroEntry> macro_entries_; ///< All displayed macro cards
     bool show_system_macros_ = false;       ///< Whether to show _* macros
+
+    // Macro parameter modal and dangerous macro confirmation
+    helix::MacroParamModal param_modal_;
+    std::shared_ptr<bool> alive_ = std::make_shared<bool>(false);
+    std::string pending_dangerous_macro_; ///< Macro awaiting danger confirmation
 
     // Subjects
     SubjectManager subjects_;

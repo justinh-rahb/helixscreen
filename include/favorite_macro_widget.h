@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "macro_param_modal.h"
 #include "ui_observer_guard.h"
 
 #include "panel_widget.h"
@@ -15,17 +16,6 @@
 class MoonrakerAPI;
 
 namespace helix {
-
-/// Parsed macro parameter with optional default value
-struct MacroParam {
-    std::string name;          ///< Parameter name (uppercase, e.g., "EXTRUDER_TEMP")
-    std::string default_value; ///< Default value from |default(VALUE), empty if none
-};
-
-/// Parse macro parameters from a Klipper gcode_macro template.
-/// Detects params.NAME, params['NAME'], params["NAME"] references and
-/// extracts |default(VALUE) when present. Deduplicates by name.
-[[nodiscard]] std::vector<MacroParam> parse_macro_params(const std::string& gcode_template);
 
 /// Home panel widget for one-tap macro execution.
 /// Two instances registered: favorite_macro_1 and favorite_macro_2.
