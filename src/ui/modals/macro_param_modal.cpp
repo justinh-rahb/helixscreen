@@ -136,36 +136,27 @@ void MacroParamModal::populate_param_fields() {
     textareas_.clear();
 
     for (const auto& param : params_) {
-        // Container for label + textarea
-        lv_obj_t* field = lv_obj_create(param_list);
-        lv_obj_set_width(field, LV_PCT(100));
-        lv_obj_set_height(field, LV_SIZE_CONTENT);
-        lv_obj_set_style_pad_all(field, 0, 0);
-        lv_obj_set_style_pad_gap(field, 2, 0);
-        lv_obj_set_flex_flow(field, LV_FLEX_FLOW_COLUMN);
-        lv_obj_remove_flag(field, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_set_style_bg_opa(field, 0, 0);
-        lv_obj_set_style_border_width(field, 0, 0);
-
-        // Label with param name
-        lv_obj_t* label = lv_label_create(field);
         // Prettify: lowercase with first letter capitalized
         std::string display_name = param.name;
         std::transform(display_name.begin(), display_name.end(), display_name.begin(), ::tolower);
         if (!display_name.empty()) {
             display_name[0] = static_cast<char>(::toupper(display_name[0]));
         }
-        lv_label_set_text(label, display_name.c_str());
-        lv_obj_set_style_text_font(label, lv_font_get_default(), 0);
 
-        // Textarea with default value
-        lv_obj_t* textarea = lv_textarea_create(field);
-        lv_obj_set_width(textarea, LV_PCT(100));
-        lv_obj_set_height(textarea, LV_SIZE_CONTENT);
-        lv_textarea_set_one_line(textarea, true);
-        lv_textarea_set_placeholder_text(textarea, param.name.c_str());
+        // Create form_field component (label + themed text_input with keyboard wiring)
+        const char* attrs[] = {"label",       display_name.c_str(),
+                               "placeholder", param.name.c_str(),
+                               nullptr,       nullptr};
+        lv_obj_t* field =
+            static_cast<lv_obj_t*>(lv_xml_create(param_list, "form_field", attrs));
+        if (!field) {
+            spdlog::warn("[MacroParamModal] Failed to create form_field for {}", param.name);
+            continue;
+        }
 
-        if (!param.default_value.empty()) {
+        // Find the text_input inside the form_field to set default value
+        lv_obj_t* textarea = lv_obj_find_by_name(field, "field_input");
+        if (textarea && !param.default_value.empty()) {
             lv_textarea_set_text(textarea, param.default_value.c_str());
         }
 
