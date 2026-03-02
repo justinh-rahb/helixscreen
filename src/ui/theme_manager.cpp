@@ -362,6 +362,9 @@ static void init_extra_styles(const theme_palette_t* palette, int border_radius)
     extra_styles_initialized = true;
 }
 
+// Forward declaration — full definition is below with palette apply functions
+static bool is_inside_dialog(lv_obj_t* obj);
+
 /**
  * @brief HelixScreen theme apply callback - applies styles based on widget type
  *
@@ -398,6 +401,11 @@ static void helix_theme_apply(lv_theme_t* theme, lv_obj_t* obj) {
     if (lv_obj_check_type(obj, &lv_textarea_class)) {
         lv_obj_add_style(obj, tm.get_style(StyleRole::InputBg), LV_PART_MAIN);
         lv_obj_add_style(obj, tm.get_style(StyleRole::Focused), LV_STATE_FOCUSED);
+
+        // Inside dialogs (elevated_bg background), override to overlay_bg for contrast
+        if (is_inside_dialog(obj)) {
+            lv_obj_set_style_bg_color(obj, tm.current_palette().overlay_bg, LV_PART_MAIN);
+        }
     }
 #endif
 
@@ -406,6 +414,11 @@ static void helix_theme_apply(lv_theme_t* theme, lv_obj_t* obj) {
         lv_obj_add_style(obj, tm.get_style(StyleRole::InputBg), LV_PART_MAIN);
         lv_obj_add_style(obj, &dropdown_indicator_style, LV_PART_INDICATOR);
         lv_obj_add_style(obj, tm.get_style(StyleRole::Focused), LV_STATE_FOCUSED);
+
+        // Inside dialogs (elevated_bg background), override to overlay_bg for contrast
+        if (is_inside_dialog(obj)) {
+            lv_obj_set_style_bg_color(obj, tm.current_palette().overlay_bg, LV_PART_MAIN);
+        }
     }
     if (lv_obj_check_type(obj, &lv_dropdownlist_class)) {
         lv_obj_add_style(obj, tm.get_style(StyleRole::InputBg), LV_PART_MAIN);
