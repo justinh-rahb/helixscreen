@@ -5,6 +5,33 @@ All notable changes to HelixScreen will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.95.3] - 2026-03-02
+
+### Added
+- Live webcam panel widget with snapshot polling for camera monitoring
+- Print statistics widget with 4 responsive size modes for the home dashboard
+- Macro parameter dialog — macros with parameters now prompt for values before execution
+- Dangerous macro confirmation — SAVE_CONFIG, FIRMWARE_RESTART, etc. require confirmation
+- Locale-aware date/time formatting with translation support across all languages
+- Clog detection configuration modal for tuning sensitivity and thresholds
+
+### Fixed
+- Macro parameter detection now queries Klipper configfile instead of printer objects, which always returned null
+- LED toggle state now syncs with actual hardware on bind and before toggle
+- Preparing Print overlay no longer gets stuck after print start
+- Clock widget timer restarts correctly after home screen rebuild
+- Filament preset button temperatures now pull from filament database
+- Assert handler re-entrancy and InputShaper threading violations causing crashes
+- Moonraker update detection broken by release name prefix (#270)
+- Wizard kinematics filter now supports Kalico and hybrid variants
+- Input fields inside dialogs now have proper contrasting background color
+- Camera widget initial overlay layout — full-width text and centered spinner
+
+### Changed
+- Text input widgets auto-register with software keyboard — no manual wiring needed
+- Temperature stack padding matches fan stack; enlarged carousel icons
+- Fan arc widget sizing reduced with proper padding in carousel
+
 ## [0.95.2] - 2026-03-01
 
 ### Added
@@ -1410,6 +1437,7 @@ Initial tagged release. Foundation for all subsequent development.
 - Automated GitHub Actions release pipeline
 - One-liner installation script with platform auto-detection
 
+[0.95.3]: https://github.com/prestonbrown/helixscreen/compare/v0.95.2...v0.95.3
 [0.95.2]: https://github.com/prestonbrown/helixscreen/compare/v0.95.1...v0.95.2
 [0.95.1]: https://github.com/prestonbrown/helixscreen/compare/v0.95.0...v0.95.1
 [0.95.0]: https://github.com/prestonbrown/helixscreen/compare/v0.13.13...v0.95.0
